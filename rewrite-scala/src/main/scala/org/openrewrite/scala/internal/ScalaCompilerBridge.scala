@@ -27,7 +27,8 @@ import dotty.tools.dotc.config.ScalaSettings
 
 import scala.collection.mutable.ListBuffer
 import java.io.File
-import java.util.{ArrayList, HashMap, List => JList, Map => JMap}
+import java.nio.file.Paths
+import java.util.{ArrayList, HashMap, LinkedHashSet, List => JList, Map => JMap}
 
 /**
  * Bridge to the Scala 3 (Dotty) compiler for parsing and type-checking Scala source files.
@@ -65,14 +66,9 @@ class ScalaCompilerBridge {
       if (outputDir != null) {
         fresh.setSetting(fresh.settings.outputDir, dotty.tools.io.AbstractFile.getDirectory(outputDir))
       }
-      if (classpath != null && !classpath.isEmpty) {
-        val cp = new StringBuilder()
-        val cpIter = classpath.iterator()
-        while (cpIter.hasNext) {
-          if (cp.nonEmpty) cp.append(File.pathSeparator)
-          cp.append(cpIter.next())
-        }
-        fresh.setSetting(fresh.settings.classpath, cp.toString())
+      val cpString = ScalaCompilerBridge.buildClasspath(classpath)
+      if (cpString.nonEmpty) {
+        fresh.setSetting(fresh.settings.classpath, cpString)
       }
       fresh
     }
@@ -237,6 +233,89 @@ class ScalaCompilerBridge {
     !trimmed.startsWith("//") &&
     !trimmed.startsWith("/*") &&
     trimmed.nonEmpty
+  }
+}
+
+object ScalaCompilerBridge {
+
+  /**
+   * Probe classes covering every jar dotty needs to type-check any Scala source:
+   * scala-library (Scala stdlib), tasty-core (TASTy reader), and scala3-compiler
+   * (dotty itself, needed when parsing code that imports `dotty.tools.*`).
+   *
+   * The bridge code is loaded from these jars, so we can always find them via
+   * `ProtectionDomain.getCodeSource()` regardless of what the caller passes.
+   */
+  private val StdlibProbeClasses: List[Class[?]] = List(
+    classOf[scala.Option[?]],
+    classOf[dotty.tools.tasty.TastyFormat.type],
+    classOf[dotty.tools.dotc.core.Contexts.type]
+  )
+
+  /**
+   * Build the classpath string for dotty. Caller entries come first; stdlib
+   * jars are appended only when the caller's classpath already looks like a
+   * Scala project classpath (i.e. it contains at least one `scala*`, `tasty*`
+   * or `dotty*` artifact) but is missing one of the stdlib jars dotty needs.
+   * Without stdlib on the classpath, dotty's `Definitions` can't resolve
+   * foundational types like `scala.Unit`, leading to `ClassCastException` /
+   * "Bad symbolic reference" failures in the typer. The bridge is loaded from
+   * those same jars so we can always locate them via `ProtectionDomain`.
+   *
+   * Restricting self-heal to Scala-looking classpaths preserves the behaviour
+   * expected by callers (such as `ScalaTemplate`) that intentionally pass a
+   * narrow non-Scala classpath to avoid type resolution.
+   */
+  private[internal] def buildClasspath(classpath: JList[String]): String = {
+    val sb = new StringBuilder()
+    val present = new LinkedHashSet[String]()
+    var hasScalaArtifact = false
+    if (classpath != null) {
+      val it = classpath.iterator()
+      while (it.hasNext) {
+        val e = it.next()
+        if (e != null && !e.isEmpty) {
+          if (sb.nonEmpty) sb.append(File.pathSeparator)
+          sb.append(e)
+          val fn = fileName(e)
+          present.add(fn)
+          if (isScalaArtifact(fn)) hasScalaArtifact = true
+        }
+      }
+    }
+    if (hasScalaArtifact) {
+      for (cls <- StdlibProbeClasses) {
+        locateJar(cls).foreach { jar =>
+          if (!present.contains(fileName(jar))) {
+            if (sb.nonEmpty) sb.append(File.pathSeparator)
+            sb.append(jar)
+            present.add(fileName(jar))
+          }
+        }
+      }
+    }
+    sb.toString()
+  }
+
+  private def isScalaArtifact(fileName: String): Boolean = {
+    val n = fileName.toLowerCase
+    n.startsWith("scala") || n.startsWith("tasty") || n.startsWith("dotty")
+  }
+
+  private def fileName(path: String): String = {
+    val p = Paths.get(path).getFileName
+    if (p == null) path else p.toString
+  }
+
+  private def locateJar(cls: Class[?]): Option[String] = {
+    val pd = cls.getProtectionDomain
+    if (pd == null) return None
+    val cs = pd.getCodeSource
+    if (cs == null) return None
+    val url = cs.getLocation
+    if (url == null) return None
+    try Some(Paths.get(url.toURI).toString)
+    catch { case _: Throwable => None }
   }
 }
 
