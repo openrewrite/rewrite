@@ -1382,8 +1382,8 @@ def _receive_java_type_method(method, q: RpcReceiveQueue):
     )
 
 
-def _receive_java_type_class(cls, q: RpcReceiveQueue):
-    """Codec for receiving JavaType.Class - consumes all class fields."""
+def _receive_java_type_class_fields(cls, q: RpcReceiveQueue, result):
+    """Consume the Class field sequence and populate `result` in place."""
     from rewrite.java.support_types import JavaType as JT
 
     # Receive fields in the same order as JavaTypeSender.visitClass:
@@ -1400,20 +1400,32 @@ def _receive_java_type_class(cls, q: RpcReceiveQueue):
     members = q.receive_list(getattr(cls, '_members', None) if cls else None)
     methods = q.receive_list(getattr(cls, '_methods', None) if cls else None)
 
-    # Create a new Class instance and set attributes
-    class_type = JT.Class()
-    class_type._flags_bit_map = flags
-    class_type._kind = kind
-    class_type._fully_qualified_name = fqn
-    class_type._type_parameters = type_params
-    class_type._supertype = supertype
-    class_type._owning_class = owning_class
-    class_type._annotations = annotations
-    class_type._interfaces = interfaces
-    class_type._members = members
-    class_type._methods = methods
+    result._flags_bit_map = flags
+    result._kind = kind
+    result._fully_qualified_name = fqn
+    result._type_parameters = type_params
+    result._supertype = supertype
+    result._owning_class = owning_class
+    result._annotations = annotations
+    result._interfaces = interfaces
+    result._members = members
+    result._methods = methods
 
-    return class_type
+    return result
+
+
+def _receive_java_type_class(cls, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Class - consumes all class fields."""
+    from rewrite.java.support_types import JavaType as JT
+
+    return _receive_java_type_class_fields(cls, q, JT.Class())
+
+
+def _receive_java_type_shallow_class(cls, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.ShallowClass - same wire shape as Class."""
+    from rewrite.java.support_types import JavaType as JT
+
+    return _receive_java_type_class_fields(cls, q, JT.ShallowClass())
 
 
 def _receive_java_type_parameterized(param, q: RpcReceiveQueue):
@@ -1565,6 +1577,15 @@ def _register_java_type_codecs():
         JT.Class,
         _receive_java_type_class,
         lambda: JT.Class()  # Factory creates empty Class
+    )
+
+    # JavaType.ShallowClass - same wire shape as Class, but preserves the
+    # ShallowClass marker so senders round-trip the correct type name.
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$ShallowClass',
+        JT.ShallowClass,
+        _receive_java_type_shallow_class,
+        lambda: JT.ShallowClass()
     )
 
     # JavaType.Variable - full serialization of variable type info

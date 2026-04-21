@@ -293,6 +293,10 @@ class RpcSendQueue:
             return 'org.openrewrite.java.tree.JavaType$Method'
         if isinstance(obj, JavaType.Parameterized):
             return 'org.openrewrite.java.tree.JavaType$Parameterized'
+        # ShallowClass extends Class, so check it first — otherwise isinstance(obj, Class)
+        # would return the Class type name and strip the ShallowClass marker.
+        if isinstance(obj, JavaType.ShallowClass):
+            return 'org.openrewrite.java.tree.JavaType$ShallowClass'
         if isinstance(obj, JavaType.Class):
             return 'org.openrewrite.java.tree.JavaType$Class'
         if isinstance(obj, JavaType.GenericTypeVariable):
