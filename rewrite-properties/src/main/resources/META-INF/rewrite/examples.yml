@@ -13,26 +13,6 @@
 # limitations under the License.
 ---
 type: specs.openrewrite.org/v1beta/example
-recipeName: org.openrewrite.properties.AddProperty
-examples:
-- description: '`AddPropertyTest#newProperty`'
-  parameters:
-  - management.metrics.enable.process.files
-  - 'true'
-  - 'null'
-  - 'null'
-  - 'null'
-  - 'null'
-  - 'null'
-  sources:
-  - before: |
-      management=true
-    after: |
-      management=true
-      management.metrics.enable.process.files=true
-    language: properties
----
-type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.properties.AddPropertyComment
 examples:
 - description: '`AddPropertyCommentTest#shouldAddCommentToFirstProperty`'
