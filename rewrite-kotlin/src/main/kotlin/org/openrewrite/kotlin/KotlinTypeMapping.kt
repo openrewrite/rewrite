@@ -23,13 +23,11 @@ import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.fir.*
-import org.jetbrains.kotlin.fir.analysis.checkers.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.analysis.checkers.modality
-import org.jetbrains.kotlin.fir.analysis.checkers.toRegularClassSymbol
+import org.jetbrains.kotlin.fir.resolve.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
 import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor
-import org.jetbrains.kotlin.fir.declarations.utils.isLocal
 import org.jetbrains.kotlin.fir.declarations.utils.isStatic
 import org.jetbrains.kotlin.fir.declarations.utils.modality
 import org.jetbrains.kotlin.fir.declarations.utils.visibility
@@ -265,8 +263,8 @@ class KotlinTypeMapping(
         val functions = buildList {
             file.declarations.forEach {
                 when (it) {
-                    is FirSimpleFunction -> add(it)
-                    is FirScript -> it.declarations.filterIsInstance<FirSimpleFunction>().forEach(::add)
+                    is FirNamedFunction -> add(it)
+                    is FirScript -> it.declarations.filterIsInstance<FirNamedFunction>().forEach(::add)
                     else -> {}
                 }
             }
@@ -293,10 +291,10 @@ class KotlinTypeMapping(
                 type.toString()
             }
         }
-        val gtv = GenericTypeVariable(null, name, JavaType.GenericTypeVariable.Variance.INVARIANT, null)
+        val gtv = GenericTypeVariable(null, name, GenericTypeVariable.Variance.INVARIANT, null)
         typeCache.put(signature, gtv)
         if (type is ConeKotlinTypeProjectionIn) {
-            variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
+            variance = GenericTypeVariable.Variance.CONTRAVARIANT
             val bound = type(type.type)
             // Match the Java parser: for `? super Object`, drop the `java.lang.Object`
             // bound so the wildcard surfaces as `Generic{? super }` (bound elided, variance
@@ -307,7 +305,7 @@ class KotlinTypeMapping(
                 bounds.add(bound)
             }
         } else if (type is ConeKotlinTypeProjectionOut) {
-            variance = JavaType.GenericTypeVariable.Variance.COVARIANT
+            variance = GenericTypeVariable.Variance.COVARIANT
             val bound = type(type.type)
             if (bound !is FullyQualified || bound.fullyQualifiedName != "java.lang.Object") {
                 bounds = ArrayList(1)
@@ -329,7 +327,7 @@ class KotlinTypeMapping(
                             if (paramFromJava) {
                                 continue
                             }
-                            mapped = remapKotlinBuiltin(fq!!)
+                            mapped = remapKotlinBuiltin(fq)
                         } else if (fq != null) {
                             mapped = remapKotlinBuiltin(fq)
                         }
@@ -354,15 +352,15 @@ class KotlinTypeMapping(
                 }
                 variance = when {
                     classifierSymbol.variance == Variance.INVARIANT -> {
-                        if (bounds == null) JavaType.GenericTypeVariable.Variance.INVARIANT else JavaType.GenericTypeVariable.Variance.COVARIANT
+                        if (bounds == null) GenericTypeVariable.Variance.INVARIANT else GenericTypeVariable.Variance.COVARIANT
                     }
 
                     classifierSymbol.variance == Variance.IN_VARIANCE && bounds != null -> {
-                        JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
+                        GenericTypeVariable.Variance.CONTRAVARIANT
                     }
 
                     classifierSymbol.variance == Variance.OUT_VARIANCE && bounds != null -> {
-                        JavaType.GenericTypeVariable.Variance.COVARIANT
+                        GenericTypeVariable.Variance.COVARIANT
                     }
 
                     else -> GenericTypeVariable.Variance.INVARIANT
@@ -504,7 +502,7 @@ class KotlinTypeMapping(
                     }
                 } else if (declaration is FirJavaField) {
                     javaFields.add(declaration)
-                } else if (declaration is FirSimpleFunction) {
+                } else if (declaration is FirNamedFunction) {
                     functions.add(declaration as FirFunction)
                 } else if (declaration is FirConstructor) {
                     // Annotation types have no real constructor in bytecode; the Java parser
@@ -984,7 +982,7 @@ class KotlinTypeMapping(
                 ?.entries?.associate { (arg, param) -> param.name.asString() to arg }
 
         val valueParams = (function.toResolvedCallableSymbol()?.fir as FirFunction).valueParameters
-        for ((index, p) in valueParams.withIndex()) {
+        for ((_, p) in valueParams.withIndex()) {
             if (paramTypes == null) {
                 // Ideally, an ArrayList is created with the expected size based on the symbol for the function.
                 paramTypes = ArrayList()
@@ -1085,17 +1083,17 @@ class KotlinTypeMapping(
         return TypeUtils.asFullyQualified(classType(coneType, firFile, signature))
     }
 
-    private fun kotlinPrimitiveFromFqn(fqn: String): JavaType.Primitive? {
+    private fun kotlinPrimitiveFromFqn(fqn: String): Primitive? {
         return when (fqn) {
-            "kotlin.Int" -> JavaType.Primitive.Int
-            "kotlin.Long" -> JavaType.Primitive.Long
-            "kotlin.Short" -> JavaType.Primitive.Short
-            "kotlin.Byte" -> JavaType.Primitive.Byte
-            "kotlin.Float" -> JavaType.Primitive.Float
-            "kotlin.Double" -> JavaType.Primitive.Double
-            "kotlin.Boolean" -> JavaType.Primitive.Boolean
-            "kotlin.Char" -> JavaType.Primitive.Char
-            "kotlin.Unit" -> JavaType.Primitive.Void
+            "kotlin.Int" -> Primitive.Int
+            "kotlin.Long" -> Primitive.Long
+            "kotlin.Short" -> Primitive.Short
+            "kotlin.Byte" -> Primitive.Byte
+            "kotlin.Float" -> Primitive.Float
+            "kotlin.Double" -> Primitive.Double
+            "kotlin.Boolean" -> Primitive.Boolean
+            "kotlin.Char" -> Primitive.Char
+            "kotlin.Unit" -> Primitive.Void
             else -> null
         }
     }
@@ -1180,12 +1178,12 @@ class KotlinTypeMapping(
         val gtv = GenericTypeVariable(
             null,
             type.name.asString(),
-            JavaType.GenericTypeVariable.Variance.INVARIANT,
+            GenericTypeVariable.Variance.INVARIANT,
             null
         )
         typeCache.put(signature, gtv)
         var bounds: MutableList<JavaType>? = null
-        var variance: GenericTypeVariable.Variance = JavaType.GenericTypeVariable.Variance.INVARIANT
+        var variance: GenericTypeVariable.Variance = GenericTypeVariable.Variance.INVARIANT
         // Type parameters declared on Java-origin containers (e.g. java.util.Optional<T>) have
         // their implicit kotlin.Any bound stripped so they match the Java parser's output
         // (Java's unbounded `<T>` has no bound at all). Kotlin source `<T : Any>` has an
@@ -1202,7 +1200,7 @@ class KotlinTypeMapping(
                     if (containerFromJava) {
                         continue
                     }
-                    boundType = remapKotlinBuiltin(fq!!)
+                    boundType = remapKotlinBuiltin(fq)
                 } else if (fq != null) {
                     boundType = remapKotlinBuiltin(fq)
                 }
@@ -1224,9 +1222,9 @@ class KotlinTypeMapping(
             if (bounds.isEmpty()) {
                 bounds = null
             } else if (type.variance == Variance.IN_VARIANCE) {
-                variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
+                variance = GenericTypeVariable.Variance.CONTRAVARIANT
             } else {
-                variance = JavaType.GenericTypeVariable.Variance.COVARIANT
+                variance = GenericTypeVariable.Variance.COVARIANT
             }
         }
         gtv.unsafeSet(gtv.name, variance, bounds)
@@ -1634,7 +1632,7 @@ class KotlinTypeMapping(
         }
         gtv.unsafeSet(
             gtv.name,
-            if (bounds == null) JavaType.GenericTypeVariable.Variance.INVARIANT else JavaType.GenericTypeVariable.Variance.COVARIANT,
+            if (bounds == null) GenericTypeVariable.Variance.INVARIANT else GenericTypeVariable.Variance.COVARIANT,
             bounds
         )
         return gtv

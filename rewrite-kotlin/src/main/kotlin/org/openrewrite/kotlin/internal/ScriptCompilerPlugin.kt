@@ -17,7 +17,6 @@ package org.openrewrite.kotlin.internal
 
 import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.KtSourceFile
-import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.CompilerConfiguration
@@ -56,6 +55,8 @@ class ScriptCompilerPlugin(
     private val defaultImports: List<String>
 ) : CompilerPluginRegistrar() {
 
+    override val pluginId: String = "org.openrewrite.kotlin.ScriptCompilerPlugin"
+
     override val supportsK2: Boolean = true
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
@@ -93,7 +94,7 @@ private class ScriptReceiverExtension(
         // No file-level configuration needed
     }
 
-    override fun FirScriptBuilder.configure(sourceFile: KtSourceFile?, context: Context<PsiElement>) {
+    override fun FirScriptBuilder.configure(sourceFile: KtSourceFile?, context: Context<*>) {
         for (fqn in implicitReceivers) {
             val classId = ClassId.topLevel(FqName(fqn))
             val lookupTag = ConeClassLikeLookupTagImpl(classId)
