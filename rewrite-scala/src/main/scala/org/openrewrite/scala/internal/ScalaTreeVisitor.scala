@@ -1332,7 +1332,11 @@ class ScalaTreeVisitor(
         val dotStart = Math.max(0, qualifierEnd - offsetAdjustment)
         val nameStartAdjusted = Math.max(0, nameStart - offsetAdjustment)
         if (dotStart < nameStartAdjusted && dotStart >= cursor && nameStartAdjusted <= source.length) {
-          val between = source.substring(dotStart, nameStartAdjusted)
+          // If the name is backtick-quoted, the opening backtick sits between the dot and
+          // nameSpan.start (nameSpan does not include the backtick). Strip it so that only
+          // whitespace ends up in dotSpace; the backtick is re-attached in nameStr below.
+          val rawBetween = source.substring(dotStart, nameStartAdjusted)
+          val between = if (rawBetween.endsWith("`")) rawBetween.dropRight(1) else rawBetween
           // Check for type projection (#) or member access (.)
           val hashIndex = between.indexOf('#')
           val dotIndex = between.indexOf('.')
@@ -1352,14 +1356,31 @@ class ScalaTreeVisitor(
       } else {
         Space.EMPTY
       }
-      
-      // Create the name identifier with type from the Select node
+
+      // Create the name identifier with type from the Select node.
+      // sel.name.toString strips backticks for names with special characters (e.g. text/html(UTF-8)),
+      // so we reconstruct the backtick-quoted form when the source has one.
+      // nameSpan covers only the raw name (without backticks); the opening backtick sits at
+      // nameSpan.start-1 and the closing one at nameSpan.end in the source.
+      val nameStr = {
+        val ns = sel.nameSpan
+        if (ns.exists) {
+          val adjStart = Math.max(0, ns.start - offsetAdjustment)
+          val adjEnd = Math.max(0, ns.end - offsetAdjustment)
+          if (adjStart >= 0 && adjEnd <= source.length && adjEnd > adjStart) {
+            if (adjStart > 0 && source.charAt(adjStart - 1) == '`' && adjEnd < source.length && source.charAt(adjEnd) == '`')
+              "`" + source.substring(adjStart, adjEnd) + "`"
+            else
+              source.substring(adjStart, adjEnd)
+          } else sel.name.toString
+        } else sel.name.toString
+      }
       val name = new J.Identifier(
         Tree.randomId(),
         dotSpace,
         Markers.EMPTY,
         Collections.emptyList(),
-        sel.name.toString,
+        nameStr,
         typeOfTree(sel),
         variableTypeOfTree(sel)
       )
