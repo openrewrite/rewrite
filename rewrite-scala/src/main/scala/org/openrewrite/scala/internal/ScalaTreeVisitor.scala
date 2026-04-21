@@ -4297,9 +4297,7 @@ class ScalaTreeVisitor(
           val visitedSpans = new java.util.HashSet[Int]()
           // Sort by source position to preserve source order
           val sortedBody = template.body.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
-          System.err.println(s"[DEBUG-TMPL] template.body has ${sortedBody.length} entries")
           for (stat <- sortedBody) {
-            System.err.println(s"[DEBUG-TMPL] stat class=${stat.getClass.getSimpleName} span=${stat.span} isSynthetic=${stat.span.isSynthetic} text=${stat.toString.take(100)}")
             val isSyntheticStat = stat.span.isSynthetic || {
               def hasTripleQ(t: Trees.Tree[?]): Boolean = t match {
                 case sel: Trees.Select[?] => sel.name.toString == "???" || sel.name.toString == "$qmark$qmark$qmark" || hasTripleQ(sel.qualifier)
