@@ -39,6 +39,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -415,11 +416,14 @@ public class ClasspathScanningLoader implements ResourceLoader {
         if (Files.isDirectory(path)) {
             Path rewriteDir = path.resolve("META-INF/rewrite");
             if (Files.isDirectory(rewriteDir)) {
-                try (DirectoryStream<Path> stream = Files.newDirectoryStream(rewriteDir, "*.{yml,yaml}")) {
-                    for (Path file : stream) {
-                        resources.add(new YamlResource(file.toUri(), () -> Files.newInputStream(file)));
-                    }
-                } catch (IOException ignored) {
+                try (Stream<Path> stream = Files.walk(rewriteDir)) {
+                    stream.filter(Files::isRegularFile)
+                          .filter(p -> {
+                              String name = p.getFileName().toString();
+                              return name.endsWith(".yml") || name.endsWith(".yaml");
+                          })
+                          .forEach(file -> resources.add(new YamlResource(file.toUri(), () -> Files.newInputStream(file))));
+                } catch (IOException | java.io.UncheckedIOException ignored) {
                 }
             }
         } else if (Files.isRegularFile(path)) {
