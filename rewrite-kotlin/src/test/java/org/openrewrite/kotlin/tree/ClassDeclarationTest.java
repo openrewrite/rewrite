@@ -18,13 +18,16 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ALL")
 class ClassDeclarationTest implements RewriteTest {
@@ -744,6 +747,24 @@ class ClassDeclarationTest implements RewriteTest {
             """
               %s
               """.formatted(input)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7442")
+    @Test
+    void classDeclarationWithNullBody() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<ExecutionContext>() {
+              @Override
+              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
+                  return cd.withBody(null);
+              }
+          })),
+          kotlin(
+            "class Foo(val bar: Int)",
+            "class Foo"
           )
         );
     }

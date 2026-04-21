@@ -680,7 +680,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
 
-            if (classDecl.getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
+            if (classDecl.getBody() != null && classDecl.getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
                 for (Statement statement : classDecl.getBody().getStatements()) {
                     if (statement instanceof J.MethodDeclaration &&
                         statement.getMarkers().findFirst(PrimaryConstructor.class).isPresent() &&
