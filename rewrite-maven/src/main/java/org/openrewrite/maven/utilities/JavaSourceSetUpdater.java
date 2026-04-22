@@ -21,17 +21,12 @@ import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.MavenExecutionContextView;
-import org.openrewrite.maven.cache.LocalMavenArtifactCache;
-import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
@@ -50,17 +45,9 @@ public class JavaSourceSetUpdater {
     public JavaSourceSetUpdater(ExecutionContext ctx) {
         MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-        // Use a lenient error handler: download failures are not fatal for JavaSourceSet updates
+        // Download failures are not fatal for JavaSourceSet updates — degrade gracefully
         Consumer<Throwable> onError = t -> {};
-        Path tempDir;
-        try {
-            tempDir = Files.createTempDirectory("rewrite-artifact-cache");
-            tempDir.toFile().deleteOnExit();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-        MavenArtifactCache cache = new LocalMavenArtifactCache(tempDir);
-        this.downloader = new MavenArtifactDownloader(cache, mctx.getSettings(), httpSender, onError);
+        this.downloader = new MavenArtifactDownloader(mctx.getArtifactCache(), mctx.getSettings(), httpSender, onError);
     }
 
     /**
