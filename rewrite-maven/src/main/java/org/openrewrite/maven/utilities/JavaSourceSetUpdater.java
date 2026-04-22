@@ -21,19 +21,15 @@ import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.MavenExecutionContextView;
-import org.openrewrite.maven.cache.LocalMavenArtifactCache;
-import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
@@ -45,22 +41,20 @@ import java.util.function.Consumer;
  * scans it for type names, and updates the JavaSourceSet accordingly.
  */
 public class JavaSourceSetUpdater {
-    private final MavenArtifactDownloader downloader;
+    static final String TYPE_CACHE_KEY = "org.openrewrite.maven.jarTypeCache";
 
+    private final MavenArtifactDownloader downloader;
+    private final Map<String, List<JavaType.FullyQualified>> typeCache;
+
+    @SuppressWarnings("unchecked")
     public JavaSourceSetUpdater(ExecutionContext ctx) {
         MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-        // Use a lenient error handler: download failures are not fatal for JavaSourceSet updates
+        // Download failures are not fatal for JavaSourceSet updates — degrade gracefully
         Consumer<Throwable> onError = t -> {};
-        Path tempDir;
-        try {
-            tempDir = Files.createTempDirectory("rewrite-artifact-cache");
-            tempDir.toFile().deleteOnExit();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-        MavenArtifactCache cache = new LocalMavenArtifactCache(tempDir);
-        this.downloader = new MavenArtifactDownloader(cache, mctx.getSettings(), httpSender, onError);
+        this.downloader = new MavenArtifactDownloader(mctx.getArtifactCache(), mctx.getSettings(), httpSender, onError);
+        this.typeCache = (Map<String, List<JavaType.FullyQualified>>) ctx.getMessages()
+                .computeIfAbsent(TYPE_CACHE_KEY, k -> new ConcurrentHashMap<>());
     }
 
     /**
@@ -119,12 +113,23 @@ public class JavaSourceSetUpdater {
     }
 
     private List<JavaType.FullyQualified> downloadAndScanTypes(ResolvedDependency dep) {
+        String key = gavKey(dep);
+        List<JavaType.FullyQualified> cached = typeCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
         try {
             Path jarPath = downloader.downloadArtifact(dep);
             if (jarPath == null) {
                 return Collections.emptyList();
             }
-            return JavaSourceSet.typesFromPath(jarPath, null);
+            List<JavaType.FullyQualified> types = JavaSourceSet.typesFromPath(jarPath, null);
+            // Only cache positive results: addDependency tries each repository in order until
+            // one succeeds, so caching an empty result would short-circuit later repos.
+            if (!types.isEmpty()) {
+                typeCache.put(key, types);
+            }
+            return types;
         } catch (Exception e) {
             // Graceful degradation: if download fails, return empty list
             return Collections.emptyList();
