@@ -29,6 +29,7 @@ import org.openrewrite.scala.marker.Implicit
 import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedBlock
 import org.openrewrite.scala.marker.OmitBraces
+import org.openrewrite.scala.marker.PackageObject
 import org.openrewrite.scala.marker.SObject
 import org.openrewrite.scala.marker.Semicolon
 import org.openrewrite.scala.marker.TypeProjection
@@ -2808,7 +2809,32 @@ class ScalaTreeVisitor(
     }
     
     // Extract modifiers from text
-    val (modifiers, lastModEnd) = extractModifiersFromText(md.mods, modifierText)
+    val (modifiers, extractedLastModEnd) = extractModifiersFromText(md.mods, modifierText)
+    var lastModEnd = extractedLastModEnd
+
+    // `package object X` — the `package` keyword is not a Scala modifier, but for LST
+    // fidelity we emit it as a leading modifier and attach a PackageObject marker on the
+    // class declaration. Must come before `case` so ordering stays source-faithful.
+    val isPackageObject = md.mods.is(Flags.Package) && modifierText.contains("package")
+    if (isPackageObject) {
+      val packageIndex = findKeyword(modifierText, "package")
+      if (packageIndex >= 0) {
+        val packageSpace = if (packageIndex > lastModEnd) {
+          Space.format(modifierText.substring(lastModEnd, packageIndex))
+        } else {
+          Space.EMPTY
+        }
+        modifiers.add(new J.Modifier(
+          Tree.randomId(),
+          packageSpace,
+          Markers.EMPTY,
+          "package",
+          J.Modifier.Type.LanguageExtension,
+          Collections.emptyList()
+        ))
+        lastModEnd = packageIndex + "package".length
+      }
+    }
 
     // Check for case modifier on object definitions (e.g., `case object Foo`).
     // Skip if this is an enum case — `case` is the keyword, not a modifier.
@@ -3101,11 +3127,16 @@ class ScalaTreeVisitor(
       cursor = Math.max(cursor, md.span.end - offsetAdjustment)
     }
     
-    // Create the class declaration with SObject marker
+    // Create the class declaration with SObject marker (and PackageObject for `package object`)
+    val objectMarkers = if (isPackageObject) {
+      Markers.build(Arrays.asList(SObject.create(), PackageObject(UUID.randomUUID())))
+    } else {
+      Markers.build(Collections.singletonList(SObject.create()))
+    }
     new J.ClassDeclaration(
       Tree.randomId(),
       prefix,
-      Markers.build(Collections.singletonList(SObject.create())),
+      objectMarkers,
       Collections.emptyList(), // annotations
       modifiers,
       kind,
