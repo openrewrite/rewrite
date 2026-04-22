@@ -43,7 +43,7 @@ import java.util.function.Consumer;
 public class JavaSourceSetUpdater {
     static final String TYPE_CACHE_KEY = "org.openrewrite.maven.jarTypeCache";
 
-    private final MavenArtifactDownloader downloader;
+//    private final MavenArtifactDownloader downloader;
     private final Map<String, List<JavaType.FullyQualified>> typeCache;
 
     @SuppressWarnings("unchecked")
@@ -52,7 +52,7 @@ public class JavaSourceSetUpdater {
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
         // Download failures are not fatal for JavaSourceSet updates — degrade gracefully
         Consumer<Throwable> onError = t -> {};
-        this.downloader = new MavenArtifactDownloader(mctx.getArtifactCache(), mctx.getSettings(), httpSender, onError);
+//        this.downloader = new MavenArtifactDownloader(mctx.getArtifactCache(), mctx.getSettings(), httpSender, onError);
         this.typeCache = (Map<String, List<JavaType.FullyQualified>>) ctx.getMessages()
                 .computeIfAbsent(TYPE_CACHE_KEY, k -> new ConcurrentHashMap<>());
     }
