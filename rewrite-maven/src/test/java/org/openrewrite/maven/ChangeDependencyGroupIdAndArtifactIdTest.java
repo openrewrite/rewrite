@@ -22,12 +22,10 @@ import org.openrewrite.Issue;
 import org.openrewrite.Validated;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.*;
@@ -3545,7 +3543,6 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Disabled("JavaSourceSetUpdater JAR download is currently disabled; classpath is no longer mutated mid-run")
     @Test
     void updatesJavaSourceSetMarkerOnJavaFiles() {
         rewriteRun(
@@ -3566,17 +3563,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                 "class A {}",
                 s -> s.afterRecipe(cu -> {
                     JavaSourceSet jss = cu.getMarkers().findFirst(JavaSourceSet.class).orElseThrow();
-                    Map<String, List<JavaType.FullyQualified>> gavToTypes = jss.getGavToTypes();
-                    // Old dependency types should be removed
-                    assertThat(gavToTypes.keySet())
-                      .noneMatch(k -> k.startsWith("javax.activation:javax.activation-api:"));
-                    // New dependency types should be present
-                    assertThat(gavToTypes.keySet())
-                      .anyMatch(k -> k.startsWith("jakarta.activation:jakarta.activation-api:"));
-                    // Classpath should contain types from the new dependency
-                    assertThat(jss.getClasspath())
-                      .extracting(JavaType.FullyQualified::getFullyQualifiedName)
-                      .anyMatch(fqn -> fqn.startsWith("jakarta.activation."));
+                    // Dependency mutation should flip the dirty flag so later recipes
+                    // treat the classpath as stale and fall back to the safe path.
+                    assertThat(jss.isDirty()).isTrue();
                 })
               )
             ),
@@ -3723,7 +3712,6 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Disabled("JavaSourceSetUpdater JAR download is currently disabled; classpath is no longer mutated mid-run")
     @Test
     void composedWithChangePackageUpdatesImports() {
         rewriteRun(
@@ -3763,10 +3751,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   """,
                 s -> s.afterRecipe(cu -> {
                     JavaSourceSet jss = cu.getMarkers().findFirst(JavaSourceSet.class).orElseThrow();
-                    // New dependency types should be present on classpath
-                    assertThat(jss.getClasspath())
-                      .extracting(JavaType.FullyQualified::getFullyQualifiedName)
-                      .anyMatch(fqn -> fqn.startsWith("jakarta.activation."));
+                    // Composed dependency-mutating + package-renaming recipe run:
+                    // the dependency change flips the dirty flag, and ChangePackage still
+                    // rewrites the explicit imports downstream.
+                    assertThat(jss.isDirty()).isTrue();
                 })
               )
             ),

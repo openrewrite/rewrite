@@ -31,6 +31,7 @@ import org.openrewrite.test.SourceSpec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.markSourceSetDirty;
 import static org.openrewrite.java.Assertions.withSourceTypesOnClasspath;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -2594,6 +2595,51 @@ class ChangeTypeTest implements RewriteTest {
             spec -> spec.path("META-INF/services/org.foo.OldInterface")
               .afterRecipe(pt -> assertThat(pt.getSourcePath().toString().replace('\\', '/'))
                 .isEqualTo("META-INF/services/org.bar.NewInterface"))
+          )
+        );
+    }
+
+    @Test
+    void changeTypeAddsExplicitImportWhenSourceSetIsDirty() {
+        // Classpath knows of no other Ambiguous type in b.* or c.*, so ambiguity cannot be proven.
+        // A dirty source set must force the safe path: add an explicit import anyway.
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Ambiguous", "b.Ambiguous", true))
+                  .beforeRecipe(sfs -> {
+                      withSourceTypesOnClasspath().accept(sfs);
+                      markSourceSetDirty().accept(sfs);
+                  }),
+          java(
+            """
+              package a;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              package b;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              import a.Ambiguous;
+              import b.*;
+              import c.*;
+
+              class Test {
+                  Ambiguous a;
+              }
+              """,
+            """
+              import b.Ambiguous;
+              import b.*;
+              import c.*;
+
+              class Test {
+                  Ambiguous a;
+              }
+              """
           )
         );
     }

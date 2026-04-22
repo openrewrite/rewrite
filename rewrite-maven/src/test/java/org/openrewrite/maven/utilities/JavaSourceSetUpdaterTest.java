@@ -17,23 +17,54 @@ package org.openrewrite.maven.utilities;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Tree;
+import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+
+import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaSourceSetUpdaterTest {
 
     @Test
-    void typeCacheIsSharedAcrossUpdaters() {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+    void changeDependencyMarksSourceSetDirty() {
+        JavaSourceSetUpdater updater = new JavaSourceSetUpdater(new InMemoryExecutionContext());
+        JavaSourceSet clean = new JavaSourceSet(Tree.randomId(), "main", Collections.emptyList(), Collections.emptyMap(), false);
 
-        new JavaSourceSetUpdater(ctx);
-        Object firstCache = ctx.getMessage(JavaSourceSetUpdater.TYPE_CACHE_KEY);
+        JavaSourceSet updated = updater.changeDependency(clean, dep("org.slf4j", "slf4j-api", "1.7.36"), dep("org.slf4j", "slf4j-api", "2.0.9"));
 
-        new JavaSourceSetUpdater(ctx);
-        Object secondCache = ctx.getMessage(JavaSourceSetUpdater.TYPE_CACHE_KEY);
+        assertThat(updated.isDirty()).isTrue();
+    }
 
-        // Memoizing typesFromPath only pays off if every updater built from the same
-        // ExecutionContext sees the same map — otherwise each visitor re-scans the JAR.
-        assertThat(firstCache).isNotNull().isSameAs(secondCache);
+    @Test
+    void addDependencyMarksSourceSetDirty() {
+        JavaSourceSetUpdater updater = new JavaSourceSetUpdater(new InMemoryExecutionContext());
+        JavaSourceSet clean = new JavaSourceSet(Tree.randomId(), "main", Collections.emptyList(), Collections.emptyMap(), false);
+
+        JavaSourceSet updated = updater.addDependency(clean, "org.slf4j", "slf4j-api", "2.0.9", Collections.singletonList(MavenRepository.MAVEN_CENTRAL));
+
+        assertThat(updated.isDirty()).isTrue();
+    }
+
+    @Test
+    void alreadyDirtySourceSetIsReturnedUnchanged() {
+        JavaSourceSetUpdater updater = new JavaSourceSetUpdater(new InMemoryExecutionContext());
+        JavaSourceSet dirty = new JavaSourceSet(Tree.randomId(), "main", Collections.emptyList(), Collections.emptyMap(), true);
+
+        JavaSourceSet updated = updater.changeDependency(dirty, dep("g", "a", "1"), dep("g", "a", "2"));
+
+        assertThat(updated).isSameAs(dirty);
+    }
+
+    private static ResolvedDependency dep(String groupId, String artifactId, String version) {
+        return ResolvedDependency.builder()
+                .gav(new ResolvedGroupArtifactVersion(null, groupId, artifactId, version, null))
+                .requested(Dependency.builder().gav(new GroupArtifactVersion(groupId, artifactId, version)).build())
+                .build();
     }
 }

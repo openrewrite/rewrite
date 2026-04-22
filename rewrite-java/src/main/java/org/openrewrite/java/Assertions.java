@@ -267,6 +267,28 @@ public class Assertions {
     }
 
     /**
+     * Mark every Java {@link SourceFile} with a dirty {@link JavaSourceSet} marker, simulating the state
+     * after a dependency-mutating recipe has modified one of the project's dependencies earlier in the recipe run.
+     * If a source file already has a {@link JavaSourceSet} marker, the existing marker's {@code dirty} flag is
+     * toggled on; otherwise a fresh dirty marker (empty classpath) is attached.
+     */
+    public static UncheckedConsumer<List<SourceFile>> markSourceSetDirty() {
+        return sourceFiles -> {
+            for (int i = 0; i < sourceFiles.size(); i++) {
+                SourceFile sf = sourceFiles.get(i);
+                if (!(sf instanceof JavaSourceFile)) {
+                    continue;
+                }
+                Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
+                JavaSourceSet dirty = maybeSourceSet
+                        .map(js -> js.withDirty(true))
+                        .orElseGet(() -> JavaSourceSet.build("main", emptyList()).withDirty(true));
+                sourceFiles.set(i, sf.withMarkers(sf.getMarkers().setByType(dirty)));
+            }
+        };
+    }
+
+    /**
      * Enrich each source file's JavaSourceSet marker with types declared in other source files,
      * so that classpath-based ambiguity detection works in tests where types come from source
      * files rather than JARs.
@@ -294,7 +316,7 @@ public class Assertions {
                     enriched.addAll(sourceTypes);
                     ss = ss.withClasspath(enriched);
                 } else {
-                    ss = new JavaSourceSet(Tree.randomId(), "main", sourceTypes, emptyMap());
+                    ss = new JavaSourceSet(Tree.randomId(), "main", sourceTypes, emptyMap(), false);
                 }
                 sourceFiles.set(i, sf.withMarkers(
                   sf.getMarkers().computeByType(ss, (orig, upd) -> upd)));
@@ -315,6 +337,6 @@ public class Assertions {
 
     private static JavaSourceSet javaSourceSet(String sourceSet) {
         return javaSourceSets.computeIfAbsent(sourceSet, name ->
-                new JavaSourceSet(Tree.randomId(), name, emptyList(), emptyMap()));
+                new JavaSourceSet(Tree.randomId(), name, emptyList(), emptyMap(), false));
     }
 }

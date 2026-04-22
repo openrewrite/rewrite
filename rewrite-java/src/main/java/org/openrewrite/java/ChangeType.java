@@ -638,11 +638,18 @@ public class ChangeType extends Recipe {
             if (!sourceSet.isPresent()) {
                 return sf;
             }
-            boolean ambiguous = false;
-            for (JavaType.FullyQualified fq : sourceSet.get().getClasspath()) {
-                if (fq.getClassName().equals(simpleName) && otherStarPackages.contains(fq.getPackageName())) {
-                    ambiguous = true;
-                    break;
+            boolean ambiguous;
+            if (sourceSet.get().isDirty()) {
+                // An earlier dependency mutation in this run means the classpath cannot be trusted to
+                // prove non-ambiguity; fall back to the safe path and add the explicit import.
+                ambiguous = true;
+            } else {
+                ambiguous = false;
+                for (JavaType.FullyQualified fq : sourceSet.get().getClasspath()) {
+                    if (fq.getClassName().equals(simpleName) && otherStarPackages.contains(fq.getPackageName())) {
+                        ambiguous = true;
+                        break;
+                    }
                 }
             }
 

@@ -377,6 +377,11 @@ public class ChangePackage extends Recipe {
             if (!sourceSet.isPresent()) {
                 return false;
             }
+            if (sourceSet.get().isDirty()) {
+                // An earlier dependency mutation in this run means the classpath cannot be trusted to
+                // prove non-ambiguity; fall back to the safe path and expand the star.
+                return true;
+            }
 
             Set<String> typesInChangedPackage = new HashSet<>();
             Set<String> typesInOtherPackages = new HashSet<>();
