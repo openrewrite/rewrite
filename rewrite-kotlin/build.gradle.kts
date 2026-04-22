@@ -28,6 +28,15 @@ dependencies {
     testImplementation("com.google.testing.compile:compile-testing:0.+")
 }
 
+configurations.matching { it.name == "kotlinBouncyCastleConfiguration" }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.bouncycastle") {
+            useVersion("1.84")
+            because("CVE-2026-3505, CVE-2026-5598, CVE-2026-5588, CVE-2026-0636")
+        }
+    }
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
