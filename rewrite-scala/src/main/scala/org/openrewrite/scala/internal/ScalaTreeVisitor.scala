@@ -5348,7 +5348,22 @@ class ScalaTreeVisitor(
   }
 
   private def visitMethodParameter(vd: Trees.ValDef[?]): J = {
-    val prefix = extractPrefix(vd.span)
+    import dotty.tools.dotc.core.Flags
+    val paramModifiers = new util.ArrayList[J.Modifier]()
+    val prefix: Space = if (vd.mods != null && vd.mods.is(Flags.Implicit)) {
+      val spanStart = Math.max(0, vd.span.start - offsetAdjustment)
+      if (cursor < spanStart && spanStart <= source.length) {
+        val leading = source.substring(cursor, spanStart)
+        val implicitIdx = leading.indexOf("implicit")
+        if (implicitIdx >= 0) {
+          val modPrefix = if (implicitIdx > 0) Space.format(leading.substring(0, implicitIdx)) else Space.EMPTY
+          paramModifiers.add(new J.Modifier(Tree.randomId(), modPrefix, Markers.EMPTY,
+            "implicit", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+          cursor += implicitIdx + "implicit".length
+          Space.EMPTY
+        } else extractPrefix(vd.span)
+      } else extractPrefix(vd.span)
+    } else extractPrefix(vd.span)
     val paramStart = Math.max(0, vd.span.start - offsetAdjustment)
     val paramEnd = Math.max(0, vd.span.end - offsetAdjustment)
     val paramSource = if (paramStart < paramEnd && paramEnd <= source.length) source.substring(paramStart, paramEnd) else ""
@@ -5465,14 +5480,14 @@ class ScalaTreeVisitor(
       prefix,
       Markers.EMPTY,
       paramAnnotations,
-      Collections.emptyList(),
+      paramModifiers,
       typeExpr,
       null,
       Collections.emptyList(),
       Collections.singletonList(JRightPadded.build(variable))
     )
   }
-  
+
   private def visitTryTree(tryTree: Trees.Try[?]): J = {
     visitTryImpl(tryTree)
   }
