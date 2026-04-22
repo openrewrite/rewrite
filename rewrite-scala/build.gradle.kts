@@ -50,6 +50,9 @@ tasks.named<ScalaCompile>("compileScala") {
     javaLauncher.set(javaToolchains.launcherFor {
         languageVersion.set(JavaLanguageVersion.of(17))
     })
+    // Forwarded to javac during Zinc joint compilation so .java files keep
+    // method parameter names in bytecode (MethodParameters attribute).
+    options.compilerArgs.add("-parameters")
 }
 
 // Ensure Java compilation uses output from Scala compilation
