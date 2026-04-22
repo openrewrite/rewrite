@@ -325,6 +325,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 visitSpace(varDecl.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
                 // Print parameter annotations (@unchecked, etc.)
                 visit(varDecl.getLeadingAnnotations(), p);
+                // Print parameter modifiers (e.g., implicit)
+                visit(varDecl.getModifiers(), p);
                 if (!varDecl.getVariables().isEmpty()) {
                     visit(varDecl.getVariables().get(0).getName(), p);
                 }
