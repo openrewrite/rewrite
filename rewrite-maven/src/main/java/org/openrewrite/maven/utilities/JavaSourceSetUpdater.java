@@ -59,81 +59,28 @@ public class JavaSourceSetUpdater {
 
     /**
      * Update a JavaSourceSet to reflect a dependency coordinate change.
-     * Removes types from the old dependency and adds types from the new dependency.
+     * Currently a no-op: JAR downloading is disabled while the classpath-update
+     * approach is being reconsidered.
      */
     public JavaSourceSet changeDependency(JavaSourceSet sourceSet,
                                           ResolvedDependency oldDep,
                                           ResolvedDependency newDep) {
-        String oldGavKey = gavKey(oldDep);
-        String newGavKey = gavKey(newDep);
-        if (!sourceSet.getGavToTypes().containsKey(oldGavKey)) {
-            // Old dependency not tracked. If gavToTypes is non-empty, other dependencies
-            // are being tracked but this one wasn't — nothing to change. If gavToTypes is
-            // empty, we're in initial population mode (first call on this source set).
-            if (!sourceSet.getGavToTypes().isEmpty() || sourceSet.getGavToTypes().containsKey(newGavKey)) {
-                return sourceSet;
-            }
-        }
-        sourceSet = sourceSet.removeTypesForGav(oldGavKey);
-        List<JavaType.FullyQualified> newTypes = downloadAndScanTypes(newDep);
-        if (!newTypes.isEmpty()) {
-            sourceSet = sourceSet.addTypesForGav(newGavKey, newTypes);
-        }
         return sourceSet;
     }
 
     /**
      * Update a JavaSourceSet to reflect a newly added dependency.
-     * Tries each repository in order until the JAR is successfully downloaded.
+     * Currently a no-op: JAR downloading is disabled while the classpath-update
+     * approach is being reconsidered.
      */
     public JavaSourceSet addDependency(JavaSourceSet sourceSet,
                                        String groupId, String artifactId, String version,
                                        List<MavenRepository> repositories) {
-        String key = groupId + ":" + artifactId + ":" + version;
-        if (sourceSet.getGavToTypes().containsKey(key)) {
-            return sourceSet;
-        }
-        ResolvedGroupArtifactVersion gav = new ResolvedGroupArtifactVersion(
-                null, groupId, artifactId, version, null);
-        Dependency requested = Dependency.builder()
-                .gav(new GroupArtifactVersion(groupId, artifactId, version))
-                .build();
-        for (MavenRepository repo : repositories) {
-            ResolvedDependency dep = ResolvedDependency.builder()
-                    .gav(gav)
-                    .repository(repo)
-                    .requested(requested)
-                    .build();
-            List<JavaType.FullyQualified> newTypes = downloadAndScanTypes(dep);
-            if (!newTypes.isEmpty()) {
-                return sourceSet.addTypesForGav(key, newTypes);
-            }
-        }
         return sourceSet;
     }
 
     private List<JavaType.FullyQualified> downloadAndScanTypes(ResolvedDependency dep) {
-        String key = gavKey(dep);
-        List<JavaType.FullyQualified> cached = typeCache.get(key);
-        if (cached != null) {
-            return cached;
-        }
-        try {
-            Path jarPath = downloader.downloadArtifact(dep);
-            if (jarPath == null) {
-                return Collections.emptyList();
-            }
-            List<JavaType.FullyQualified> types = JavaSourceSet.typesFromPath(jarPath, null);
-            // Only cache positive results: addDependency tries each repository in order until
-            // one succeeds, so caching an empty result would short-circuit later repos.
-            if (!types.isEmpty()) {
-                typeCache.put(key, types);
-            }
-            return types;
-        } catch (Exception e) {
-            // Graceful degradation: if download fails, return empty list
-            return Collections.emptyList();
-        }
+        return Collections.emptyList();
     }
 
     private static String gavKey(ResolvedDependency dep) {

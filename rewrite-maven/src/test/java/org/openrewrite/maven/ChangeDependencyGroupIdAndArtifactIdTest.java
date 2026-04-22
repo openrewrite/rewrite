@@ -3545,6 +3545,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Disabled("JavaSourceSetUpdater JAR download is currently disabled; classpath is no longer mutated mid-run")
     @Test
     void updatesJavaSourceSetMarkerOnJavaFiles() {
         rewriteRun(
@@ -3722,6 +3723,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Disabled("JavaSourceSetUpdater JAR download is currently disabled; classpath is no longer mutated mid-run")
     @Test
     void composedWithChangePackageUpdatesImports() {
         rewriteRun(
