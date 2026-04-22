@@ -5836,10 +5836,9 @@ class ScalaTreeVisitor(
       var guard: Expression = null
       var labelAfter = Space.EMPTY
       if (!caseDef.guard.isEmpty && caseDef.guard.span.exists) {
-        val guardSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 100, source.length)) else ""
-        val ifIdx = guardSearch.indexOf("if")
-        if (ifIdx > 0) labelAfter = Space.format(guardSearch.substring(0, ifIdx))
-        if (ifIdx >= 0) cursor = cursor + ifIdx + 2  // past "if"
+        val ifPos = positionOfNext("if")
+        if (ifPos > cursor) labelAfter = Space.format(source.substring(cursor, ifPos))
+        if (ifPos >= 0) cursor = ifPos + 2  // past "if"
         val guardResult = visitTree(caseDef.guard)
         guardResult match {
           case expr: Expression => guard = expr
@@ -6038,11 +6037,42 @@ class ScalaTreeVisitor(
   }
   
   /**
-   * Find the position of the next occurrence of a delimiter.
+   * Find the position of the next occurrence of a delimiter, skipping over line
+   * (`//...`) and block (`/* ... */`) comments. When the delimiter is a word
+   * (starts with a letter/digit/underscore), also enforces whole-word boundaries
+   * so e.g. `"if"` doesn't match inside identifiers like `notify`.
    */
   private def positionOfNext(delimiter: String, startFrom: Int = cursor): Int = {
-    val pos = source.indexOf(delimiter, startFrom)
-    if (pos >= 0) pos else -1
+    val isWord = delimiter.nonEmpty && (Character.isLetterOrDigit(delimiter.charAt(0)) || delimiter.charAt(0) == '_')
+    var inSingleLine = false
+    var inMultiLine = false
+    var i = startFrom
+    while (i <= source.length - delimiter.length) {
+      val c = source.charAt(i)
+      if (inSingleLine) {
+        if (c == '\n') inSingleLine = false
+        i += 1
+      } else if (inMultiLine) {
+        if (c == '*' && i + 1 < source.length && source.charAt(i + 1) == '/') {
+          inMultiLine = false
+          i += 2
+        } else i += 1
+      } else if (c == '/' && i + 1 < source.length && source.charAt(i + 1) == '/') {
+        inSingleLine = true
+        i += 2
+      } else if (c == '/' && i + 1 < source.length && source.charAt(i + 1) == '*') {
+        inMultiLine = true
+        i += 2
+      } else if (source.startsWith(delimiter, i)) {
+        if (!isWord) return i
+        val before = i == 0 || !(Character.isLetterOrDigit(source.charAt(i - 1)) || source.charAt(i - 1) == '_')
+        val afterPos = i + delimiter.length
+        val after = afterPos >= source.length || !(Character.isLetterOrDigit(source.charAt(afterPos)) || source.charAt(afterPos) == '_')
+        if (before && after) return i
+        i += 1
+      } else i += 1
+    }
+    -1
   }
   
   /**
