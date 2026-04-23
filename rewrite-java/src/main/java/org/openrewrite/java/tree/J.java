@@ -6172,7 +6172,6 @@ public interface J extends Tree {
         @Nullable
         @Getter
         @Deprecated
-        @ToBeRemoved(after = "2026-04-01")
         Space varargs;
 
         @Deprecated
