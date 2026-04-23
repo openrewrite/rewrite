@@ -125,6 +125,20 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/7463")
+    @Test
+    void multipleVariableFieldDeclaration() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  final String first, second
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void genericVariableDeclaration() {
         rewriteRun(
