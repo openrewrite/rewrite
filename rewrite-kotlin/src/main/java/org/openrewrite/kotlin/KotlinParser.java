@@ -20,9 +20,7 @@ import kotlin.annotation.AnnotationTarget;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
-import org.jetbrains.kotlin.KtPsiSourceFile;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
-import org.jetbrains.kotlin.KtSourceFile;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
@@ -31,9 +29,6 @@ import org.jetbrains.kotlin.cli.jvm.compiler.CliCompilerUtilsKt;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
 import org.jetbrains.kotlin.cli.jvm.compiler.VfsBasedProjectEnvironment;
-import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFir2IrPipelineArtifact;
-import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFir2IrPipelinePhase;
-import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFrontendPipelineArtifact;
 import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFrontendPipelinePhase;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
@@ -48,21 +43,15 @@ import org.jetbrains.kotlin.com.intellij.psi.SingleRootFileViewProvider;
 import org.jetbrains.kotlin.com.intellij.testFramework.LightVirtualFile;
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar;
 import org.jetbrains.kotlin.config.*;
-import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector;
-import org.jetbrains.kotlin.diagnostics.impl.SimpleDiagnosticsCollector;
 import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.pipeline.AnalyseKt;
-import org.jetbrains.kotlin.fir.pipeline.FirResult;
 import org.jetbrains.kotlin.fir.pipeline.FirUtilsKt;
-import org.jetbrains.kotlin.fir.pipeline.ModuleCompilerAnalyzedOutput;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
-import org.jetbrains.kotlin.ir.declarations.IrFile;
-import org.jetbrains.kotlin.ir.declarations.IrModuleFragment;
 import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.psi.KtFile;
@@ -103,7 +92,6 @@ import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BIND
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.LINK_VIA_SIGNATURES;
 import static org.openrewrite.kotlin.KotlinParser.SourcePathFromSourceTextResolver.determinePath;
 
-@SuppressWarnings("CommentedOutCode")
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class KotlinParser implements Parser {
     public static final String SKIP_SOURCE_SET_TYPE_GENERATION = "org.openrewrite.kotlin.skipSourceSetTypeGeneration";
@@ -133,7 +121,7 @@ public class KotlinParser implements Parser {
         Pattern packagePattern = Pattern.compile("\\bpackage\\s+([`.\\w]+)");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
-        Function<String, String> simpleName = sourceStr -> {
+        Function<String, @Nullable String> simpleName = sourceStr -> {
             Matcher classMatcher = classPattern.matcher(sourceStr);
             return classMatcher.find() ? classMatcher.group(3) : null;
         };
@@ -299,11 +287,15 @@ public class KotlinParser implements Parser {
 
         public Builder(Builder base) {
             super(K.CompilationUnit.class);
-            this.classpath = base.classpath;
             this.artifactNames = base.artifactNames;
+            this.classpath = base.classpath;
+            this.dependsOn = base.dependsOn;
             this.typeCache = base.typeCache;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
+            this.moduleName = base.moduleName;
+            this.languageLevel = base.languageLevel;
+            this.isKotlinScript = base.isKotlinScript;
             this.scriptImplicitReceivers = base.scriptImplicitReceivers;
             this.scriptDefaultImports = base.scriptDefaultImports;
         }
@@ -489,36 +481,10 @@ public class KotlinParser implements Parser {
             kotlinSources.get(i).setFirFile(result.getSecond().get(i));
         }
 
-        // FIR-to-IR conversion
-        try {
-            ModuleCompilerAnalyzedOutput moduleOutput = new ModuleCompilerAnalyzedOutput(
-                    firSession, result.getFirst(), result.getSecond());
-            FirResult firResult = new FirResult(singletonList(moduleOutput));
-
-            List<KtSourceFile> sourceFiles = new ArrayList<>(ktFiles.size());
-            for (KtFile ktFile : ktFiles) {
-                sourceFiles.add(new KtPsiSourceFile(ktFile));
-            }
-
-            JvmFrontendPipelineArtifact frontendArtifact = new JvmFrontendPipelineArtifact(
-                    firResult, compilerConfiguration, projectEnvironment,
-                    new SimpleDiagnosticsCollector(BaseDiagnosticsCollector.RawReporter.Companion.getDO_NOTHING()),
-                    sourceFiles);
-
-            JvmFir2IrPipelineArtifact fir2IrArtifact =
-                    JvmFir2IrPipelinePhase.INSTANCE.executePhase(frontendArtifact);
-
-            IrModuleFragment irModule = fir2IrArtifact.getResult().getIrModuleFragment();
-            Map<String, IrFile> irFilesByName = new HashMap<>();
-            for (IrFile irFile : irModule.getFiles()) {
-                irFilesByName.put(irFile.getFileEntry().getName(), irFile);
-            }
-            for (KotlinSource kotlinSource : kotlinSources) {
-                kotlinSource.setIrFile(irFilesByName.get(kotlinSource.getKtFile().getName()));
-            }
-        } catch (Throwable ignored) {
-            // FIR-to-IR conversion is best-effort; irFile will remain null
-        }
+        // FIR-to-IR conversion is intentionally omitted here. In Kotlin 2.3.0+ the pipeline
+        // clears FIR bodies (via FirDeclarationsContentCleaner) as a memory optimization after
+        // converting to IR, which breaks downstream PSI/FIR association lookups that our parser
+        // relies on. Only disabled test classes currently consume the IR form, so we skip it.
 
         return new CompiledSource(firSession, kotlinSources);
 

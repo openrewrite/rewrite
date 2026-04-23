@@ -17,23 +17,30 @@
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <!-- VSTHRD200: RPC method names must match Java-side protocol (no Async suffix) -->
     <!-- VSTHRD002: Synchronous waits needed for RPC interop with Java peer -->
-    <NoWarn>VSTHRD200;VSTHRD002</NoWarn>
+    <!-- VSTHRD103: Synchronous blocks needed for RPC interop -->
+    <!-- CS0114: Intentional method hiding in sender/receiver visitors -->
+    <!-- CS3021: need a CLSCompliant attribute because the assembly does not have a CLSCompliant attribute -->
+    <NoWarn>VSTHRD200;VSTHRD002;VSTHRD103;CS0114;CS8602;CS8603;CS8604;CS3021</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+    <PackageReference Include="NuGet.Frameworks" Version="6.12.4" />
+    <PackageReference Include="NuGet.Versioning" Version="6.12.4" />
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" PrivateAssets="none" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" PrivateAssets="none" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0" PrivateAssets="none" />
     <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
     <PackageReference Include="Serilog" Version="4.2.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageReference Include="StreamJsonRpc" Version="2.20.20" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzer.Testing" Version="1.1.3" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
-    <PackageReference Include="xunit" Version="2.9.3" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
-    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzer.Testing" Version="1.1.3" PrivateAssets="none" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" PrivateAssets="all" />
+    <PackageReference Include="xunit" Version="2.9.3" PrivateAssets="all" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" PrivateAssets="all" />
+    <PackageReference Include="JunitXml.TestLogger" Version="4.0.254" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

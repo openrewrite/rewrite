@@ -1,0 +1,37 @@
+---
+name: Update EOL Docker images
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: 0 10 * * WED
+
+jobs:
+  update-eol-images:
+    if: github.event_name != 'schedule' || github.repository_owner == 'openrewrite'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Update EOL images
+        run: ./gradlew :rewrite-docker:syncEolImages
+
+      # Commit and push
+      - name: configure-git-user
+        run: |
+          git config user.email "team@moderne.io"
+          git config user.name "team-moderne[bot]"
+      - name: Create timestamp
+        run: echo "NOW=$(date +'%Y-%m-%dT%H%M')" >> $GITHUB_ENV
+      - name: Commit and push
+        run: |
+          git add rewrite-docker/src/main/resources/eol-images.yaml
+          git diff --quiet HEAD || (git commit -m "[Auto] EOL Docker images as of ${{ env.NOW }}" && git push origin main)

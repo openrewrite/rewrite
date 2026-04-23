@@ -1654,6 +1654,47 @@ class AddImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/7178")
+    @Test
+    void addImportWithInflowOrdering() {
+        rewriteRun(
+          importLayout(
+            "java.util.Properties", null,
+            ImportLayoutStyle.builder()
+              .importAllOthersInflow()
+          ),
+          java(
+            """
+              import java.util.List;
+              import java.util.Optional;
+              import static java.util.Optional.ofNullable;
+              import java.util.Scanner;
+
+              public class Test {
+                  List l;
+                  Optional o;
+                  Object n = ofNullable(null);
+                  Scanner s;
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.Optional;
+              import static java.util.Optional.ofNullable;
+              import java.util.Properties;
+              import java.util.Scanner;
+
+              public class Test {
+                  List l;
+                  Optional o;
+                  Object n = ofNullable(null);
+                  Scanner s;
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void codeSanityCheck() {
         rewriteRun(

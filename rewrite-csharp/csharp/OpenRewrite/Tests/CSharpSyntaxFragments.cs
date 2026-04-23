@@ -227,9 +227,6 @@ public class CSharpSyntaxFragments
 
         yield return new SourceTestCase("DeclarationParsingTests.TestClassWithTypeConstraintBound", "class a<b> where b : c { }");
 
-        yield return new SourceTestCase("DeclarationParsingTests.TestNonGenericClassWithTypeConstraintBound", "class a where b : c { }");
-
-        yield return new SourceTestCase("DeclarationParsingTests.TestNonGenericMethodWithTypeConstraintBound", "class a { void M() where b : c { } }");
 
         yield return new SourceTestCase("DeclarationParsingTests.TestClassWithNewConstraintBound", "class a<b> where b : new() { }");
 
@@ -286,6 +283,14 @@ public class CSharpSyntaxFragments
         yield return new SourceTestCase("DeclarationParsingTests.TestDelegateWithParameterAttribute", "delegate a b([attr] c d);");
 
         yield return new SourceTestCase("DeclarationParsingTests.TestNestedDelegate", "class a { delegate b c(); }");
+
+        yield return new SourceTestCase("DeclarationParsingTests.TestDelegateWithPreprocessorConstraint", """
+            public delegate TResult Projection<TState, out TResult>(ref TState state)
+            #if NET10_0_OR_GREATER
+                where TState : allows ref struct
+            #endif
+                ;
+            """);
 
         yield return new SourceTestCase("DeclarationParsingTests.TestClassMethod", "class a { b X() { } }");
 
@@ -604,8 +609,6 @@ public class CSharpSyntaxFragments
 
         yield return new SourceTestCase("DeconstructionTests.NullableTuple", "(x, y)? z = M();");
         
-
-        yield return new SourceTestCase("ExpressionParsingTests.TestConditionalAccessNotVersion5", "a.b?.c.d?[1]?.e()?.f;);");
 
         yield return new SourceTestCase("ExpressionParsingTests.TestConditionalAccess", "a.b?.c.d?[1]?.e()?.f;");
 

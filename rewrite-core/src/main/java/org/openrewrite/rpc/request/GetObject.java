@@ -44,7 +44,13 @@ public class GetObject implements RpcRequest {
 
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<GetObject> {
-        private static final ExecutorService forkJoin = ForkJoinPool.commonPool();
+        // Dedicated pool for tree traversal so GetObject producers can't be starved
+        // by unrelated tasks (e.g. repo-level fork-join work) occupying the commonPool.
+        private static final ExecutorService TREE_TRAVERSAL_POOL = Executors.newCachedThreadPool(r -> {
+            Thread t = new Thread(r, "rpc-get-object-traversal");
+            t.setDaemon(true);
+            return t;
+        });
 
         private final AtomicInteger batchSize;
         private final Map<String, Object> remoteObjects;
@@ -77,7 +83,11 @@ public class GetObject implements RpcRequest {
                 Object before = remoteObjects.get(id);
 
                 RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, request.getSourceFileType(), traceGetObject.get());
-                forkJoin.submit(() -> {
+                TREE_TRAVERSAL_POOL.submit(() -> {
+                    // Snapshot the current ref count so we can roll back on failure.
+                    // Ref IDs are assigned sequentially as localRefs.size() + 1,
+                    // so any ref > savedRefCount was added during this exchange.
+                    int savedRefCount = localRefs.size();
                     try {
                         sendQueue.send(after, before, null);
 
@@ -90,6 +100,13 @@ public class GetObject implements RpcRequest {
                         // forces a full object sync (ADD) instead of a delta (CHANGE)
                         // against the stale, partially-sent baseline.
                         remoteObjects.remove(id);
+
+                        // Roll back localRefs to remove refs assigned during this failed
+                        // exchange. Without this, subsequent exchanges would send pure
+                        // references for objects the remote never received, causing
+                        // "Received a reference to an object that was not previously sent".
+                        localRefs.values().removeIf(ref -> ref > savedRefCount);
+
                         PrintStream logFile = log.get();
                         //noinspection ConstantValue
                         if (logFile != null) {

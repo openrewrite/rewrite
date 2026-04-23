@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 using Microsoft.CodeAnalysis;
+using OpenRewrite.Core;
 using OpenRewrite.CSharp;
+using OpenRewrite.Java;
 
 namespace OpenRewrite.Tests;
 
@@ -211,8 +213,9 @@ public class WorkingSetRoundTripTests
         // Debug: inspect the AST structure
         Console.WriteLine($"\nOuter CU type: {cu.GetType().Name}");
         Console.WriteLine($"Outer CU members: {cu.Members.Count}");
-        foreach (var member in cu.Members)
+        foreach (var memberPadded in cu.Members)
         {
+            var member = memberPadded.Element;
             Console.WriteLine($"  Member type: {member.GetType().Name}");
             if (member is ConditionalDirective cd)
             {
@@ -410,6 +413,57 @@ public class WorkingSetRoundTripTests
         Assert.Equal(source, printed);
     }
 
+    [Fact]
+    public void PrintDoesNotCrashWhenRecipeRemovesNodeWithGhostComments()
+    {
+        // Reproduction of Stack empty crash in VisitConditionalDirective.
+        // When a recipe removes a using whose prefix contains ghost comments (e.g.,
+        // #if A / using X; / #endif — removing 'using X;' loses the #if ghost comment
+        // but the #endif ghost comment survives on the next node), the printer's
+        // internal stack becomes unbalanced.
+        var source =
+            "using System;\r\n" +
+            "\r\n" +
+            "#if XUNIT_NULLABLE\r\n" +
+            "using System.Diagnostics.CodeAnalysis;\r\n" +
+            "#endif\r\n" +
+            "\r\n" +
+            "class C\r\n" +
+            "{\r\n" +
+            "}";
+
+        var parser = new CSharpParser();
+        var cu = parser.Parse(source, "Test.cs");
+
+        // Find the ConditionalDirective
+        var cd = cu.Members[0].Element as ConditionalDirective;
+        Assert.NotNull(cd);
+
+        // Simulate a recipe removing "using System.Diagnostics.CodeAnalysis;" from branch 0.
+        // That using's prefix carries the ghost comment for #if (DIRECTIVE:0).
+        // The #endif ghost comment (DIRECTIVE:1) is on the next node (ClassDeclaration prefix).
+        // This creates an unbalanced stack: Endif without matching If.
+        var branch0 = cd.Branches[0].Element;
+        Assert.Equal(2, branch0.Usings.Count);
+
+        // Keep only the first using (System), drop the conditional one (CodeAnalysis)
+        var modifiedUsings = new List<JRightPadded<Statement>> { branch0.Usings[0] };
+        var modifiedBranch = branch0.WithUsings(modifiedUsings);
+
+        var modifiedBranches = new List<JRightPadded<CompilationUnit>>(cd.Branches);
+        modifiedBranches[0] = cd.Branches[0].WithElement(modifiedBranch);
+        var modifiedCd = cd.WithBranches(modifiedBranches);
+
+        var modifiedCu = cu.WithMembers([
+            new JRightPadded<Statement>(modifiedCd, Space.Empty, Markers.Empty)
+        ]);
+
+        // Before the fix, this would throw: System.InvalidOperationException: Stack empty.
+        var printer = new CSharpPrinter<int>();
+        var exception = Record.Exception(() => printer.Print(modifiedCu));
+        Assert.Null(exception);
+    }
+
     #endregion
 
     #region Helpers
@@ -452,10 +506,11 @@ public class WorkingSetRoundTripTests
 
         foreach (var projPath in projectPaths)
         {
-            List<CompilationUnit> compilationUnits;
+            List<SourceFile> sourceFiles;
             try
             {
-                compilationUnits = parser.ParseProject(solution, projPath, rootDir);
+                sourceFiles = parser.ParseProject(solution, projPath, rootDir,
+                    requirePrintEqualsInput: false);
             }
             catch (Exception ex)
             {
@@ -464,6 +519,15 @@ public class WorkingSetRoundTripTests
                 failures.Add(msg);
                 continue;
             }
+
+            foreach (var pe in sourceFiles.OfType<ParseError>())
+            {
+                var msg = $"Failed to parse {pe.SourcePath}: {pe.Text[..Math.Min(200, pe.Text.Length)]}";
+                Console.WriteLine($"  PARSE ERROR: {msg}");
+                failures.Add(msg);
+            }
+
+            var compilationUnits = sourceFiles.OfType<CompilationUnit>().ToList();
 
             Console.WriteLine($"  Project {Path.GetFileName(projPath)}: {compilationUnits.Count} files");
             totalFiles += compilationUnits.Count;
@@ -594,6 +658,42 @@ public class WorkingSetRoundTripTests
 
     private static string Escape(string s) =>
         s.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
+
+    #endregion
+
+    #region BOM (Byte Order Mark) handling
+
+    [Fact]
+    public void CharsetBomMarked_SetFromParser()
+    {
+        var source = "class C { }\n";
+
+        var parser = new CSharpParser();
+        var cuWithBom = parser.Parse(source, "Test.cs", charsetBomMarked: true);
+        var cuWithoutBom = parser.Parse(source, "Test.cs", charsetBomMarked: false);
+
+        Assert.True(cuWithBom.CharsetBomMarked,
+            "Parser should propagate charsetBomMarked=true to CompilationUnit");
+        Assert.False(cuWithoutBom.CharsetBomMarked,
+            "Parser should propagate charsetBomMarked=false to CompilationUnit");
+
+        // Both should print identically (BOM is not part of the printed source)
+        var printer = new CSharpPrinter<int>();
+        Assert.Equal(source, printer.Print(cuWithBom));
+        Assert.Equal(source, printer.Print(cuWithoutBom));
+    }
+
+    [Fact]
+    public void CharsetBomMarked_PreservedWithPreprocessorDirectives()
+    {
+        var source = "#if DEBUG\nclass C { }\n#else\nclass C { }\n#endif\n";
+
+        var parser = new CSharpParser();
+        var cu = parser.Parse(source, "Test.cs", charsetBomMarked: true);
+
+        Assert.True(cu.CharsetBomMarked,
+            "charsetBomMarked should be preserved through preprocessor directive parsing");
+    }
 
     #endregion
 }

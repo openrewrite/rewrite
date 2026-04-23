@@ -130,8 +130,8 @@ public class KotlinTypeSignatureBuilderTest {
                 .filter(FirRegularClass.class::isInstance)
                 .map(FirRegularClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
-                .filter(FirSimpleFunction.class::isInstance)
-                .map(FirSimpleFunction.class::cast)
+                .filter(FirNamedFunction.class::isInstance)
+                .map(FirNamedFunction.class::cast)
                 .filter(it -> methodName.equals(it.getName().asString()))
                 .findFirst()
                 .orElseThrow()
@@ -155,8 +155,8 @@ public class KotlinTypeSignatureBuilderTest {
                 .filter(FirRegularClass.class::isInstance)
                 .map(FirRegularClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
-                .filter(FirSimpleFunction.class::isInstance)
-                .map(FirSimpleFunction.class::cast)
+                .filter(FirNamedFunction.class::isInstance)
+                .map(FirNamedFunction.class::cast)
                 .filter(it -> methodName.equals(it.getName().asString()))
                 .findFirst()
                 .orElseThrow(), getCompiledSource());
@@ -173,9 +173,9 @@ public class KotlinTypeSignatureBuilderTest {
 
     @Test
     void fileFunction() {
-        FirSimpleFunction function = getCompiledSource().getDeclarations().stream()
-          .filter(it -> it instanceof FirSimpleFunction fsf && "function".equals(fsf.getName().asString()))
-          .map(it -> (FirSimpleFunction) it).findFirst().orElseThrow();
+        FirNamedFunction function = getCompiledSource().getDeclarations().stream()
+          .filter(it -> it instanceof FirNamedFunction fsf && "function".equals(fsf.getName().asString()))
+          .map(it -> (FirNamedFunction) it).findFirst().orElseThrow();
         assertThat(signatureBuilder().methodSignature(function, getCompiledSource()))
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}");
     }

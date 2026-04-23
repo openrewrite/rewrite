@@ -21,4 +21,5 @@ export * from "./parse-project";
 export * from "./prepare-recipe";
 export * from "./print";
 export * from "./visit";
+export * from "./batch-visit";
 export * from "./trace-get-object";

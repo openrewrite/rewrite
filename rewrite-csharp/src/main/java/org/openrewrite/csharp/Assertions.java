@@ -15,19 +15,25 @@
  */
 package org.openrewrite.csharp;
 
+import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
+import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
-import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.function.Consumer;
+
+import static org.openrewrite.test.SourceSpecs.dir;
 
 public class Assertions {
 
     private Assertions() {
     }
+
+    // ---- C# source files ----
 
     public static SourceSpecs csharp(@Nullable String before) {
         return csharp(before, s -> {
@@ -43,6 +49,14 @@ public class Assertions {
         );
         cs.path(System.nanoTime() + ".cs");
         spec.accept(cs);
+        Consumer<Cs.CompilationUnit> userAfterRecipe = cs.getAfterRecipe();
+        cs.afterRecipe(cu -> {
+            try {
+                userAfterRecipe.accept(cu);
+            } finally {
+                CSharpRewriteRpc.shutdownCurrent();
+            }
+        });
         return cs;
     }
 
@@ -62,17 +76,27 @@ public class Assertions {
         cs.path(System.nanoTime() + ".cs");
         cs.after(s -> after);
         spec.accept(cs);
+        Consumer<Cs.CompilationUnit> userAfterRecipe = cs.getAfterRecipe();
+        cs.afterRecipe(cu -> {
+            try {
+                userAfterRecipe.accept(cu);
+            } finally {
+                CSharpRewriteRpc.shutdownCurrent();
+            }
+        });
         return cs;
     }
 
-    public static SourceSpecs csproj(@Nullable String before) {
+    // ---- .csproj files (parsed as XML, MSBuildProject marker attached on C# side) ----
+
+    public static SourceSpecs csproj(@Nullable @Language("xml") String before) {
         return csproj(before, s -> {
         });
     }
 
-    public static SourceSpecs csproj(@Nullable String before, Consumer<SourceSpec<Xml.Document>> spec) {
+    public static SourceSpecs csproj(@Nullable @Language("xml") String before, Consumer<SourceSpec<Xml.Document>> spec) {
         SourceSpec<Xml.Document> xml = new SourceSpec<>(
-                Xml.Document.class, null, XmlParser.builder(), before,
+                Xml.Document.class, null, CsprojParser.builder(), before,
                 SourceSpec.ValidateSource.noop,
                 ctx -> {
                 }
@@ -82,15 +106,15 @@ public class Assertions {
         return xml;
     }
 
-    public static SourceSpecs csproj(@Nullable String before, @Nullable String after) {
+    public static SourceSpecs csproj(@Nullable @Language("xml") String before, @Nullable @Language("xml") String after) {
         return csproj(before, after, s -> {
         });
     }
 
-    public static SourceSpecs csproj(@Nullable String before, @Nullable String after,
+    public static SourceSpecs csproj(@Nullable @Language("xml") String before, @Nullable @Language("xml") String after,
                                      Consumer<SourceSpec<Xml.Document>> spec) {
         SourceSpec<Xml.Document> xml = new SourceSpec<>(
-                Xml.Document.class, null, XmlParser.builder(), before,
+                Xml.Document.class, null, CsprojParser.builder(), before,
                 SourceSpec.ValidateSource.noop,
                 ctx -> {
                 }
@@ -99,5 +123,20 @@ public class Assertions {
         xml.after(s -> after);
         spec.accept(xml);
         return xml;
+    }
+
+    // ---- Project wrapper (analogous to mavenProject) ----
+
+    /**
+     * Wraps child source specs in a project directory, similar to
+     * {@code mavenProject()} in rewrite-java's Assertions.
+     */
+    public static SourceSpecs dotnetProject(String project, SourceSpecs... sources) {
+        return dir(project, spec -> {
+        }, sources);
+    }
+
+    public static SourceSpecs dotnetProject(String project, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sources) {
+        return dir(project, spec, sources);
     }
 }

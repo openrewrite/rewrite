@@ -132,6 +132,17 @@ public class BlockStatementTemplateGenerator {
             @Override
             public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc,
                                                       Integer integer) {
+                if (left != null && blockEnclosingTemplateComment == null) {
+                    for (Comment comment : left.getBefore().getComments()) {
+                        if (comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT)) {
+                            // The __TEMPLATE__ comment is in the JLeftPadded padding (e.g., between '=' and
+                            // the RHS expression in an assignment). Set the enclosing block so the element
+                            // inside this padding will be collected by the visit() method.
+                            blockEnclosingTemplateComment = getCursor().firstEnclosing(J.Block.class);
+                            break;
+                        }
+                    }
+                }
                 left = super.visitLeftPadded(left, loc, integer);
                 if (left != null) {
                     for (Comment comment : left.getBefore().getComments()) {
@@ -300,6 +311,11 @@ public class BlockStatementTemplateGenerator {
                                          .withLeadingAnnotations(emptyList())
                                          .withPrefix(Space.EMPTY)
                                          .printTrimmed(cursor).trim() + '{');
+            } else if (parent instanceof J.SwitchExpression) {
+                // The cases block of a switch expression: emit the label prefix for the case
+                // containing `prior` and print the other cases verbatim so the switch expression
+                // remains a valid expression in its enclosing context.
+                switchExpressionCases(prior, (J.Block) j, before, after, cursor);
             } else {
                 J.Block b = (J.Block) j;
 
@@ -310,8 +326,9 @@ public class BlockStatementTemplateGenerator {
             }
 
             if (prior == insertionPoint && prior instanceof Expression) {
-                // the template represents an expression, so we need to wrap it in a statement
-                after.append(';');
+                // the template represents an expression, so we need to wrap it in a statement.
+                // Use insert(0, ...) so the semicolon comes before any "}\nreturn ...;" from non-void methods.
+                after.insert(0, ';');
             }
             after.append('}');
         } else if (j instanceof J.Annotation) {
@@ -376,7 +393,9 @@ public class BlockStatementTemplateGenerator {
             if (n.getBody() != null && referToSameElement(prior, n.getBody())) {
                 // prior is the body of this anonymous class - already handled by J.Block case
                 // just need to close the anonymous class properly
-                after.append(";");
+                if (!(next(cursor).getValue() instanceof MethodCall)) {
+                    after.append(";");
+                }
             } else if (n.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 StringBuilder beforeSegments = new StringBuilder();
                 StringBuilder afterSegments = new StringBuilder();
@@ -583,10 +602,61 @@ public class BlockStatementTemplateGenerator {
             before.insert(0, ev.getName());
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
+        } else if (j instanceof J.SwitchExpression) {
+            J.SwitchExpression se = (J.SwitchExpression) j;
+            if (referToSameElement(prior, se.getCases())) {
+                // Wrap with `switch (<selector>) {`. The closing `}` is added by the
+                // enclosing `J.Block` handler's unconditional `after.append('}')`.
+                before.insert(0, "switch " + se.getSelector().withPrefix(Space.EMPTY).printTrimmed(cursor).trim() + " {\n");
+            } else if (referToSameElement(prior, se.getSelector())) {
+                before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
+                after.append(";");
+            }
         } else if (j instanceof J.Case) {
             after.append(";");
         }
         contextTemplate(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
+    }
+
+    private void switchExpressionCases(J prior, J.Block casesBlock, StringBuilder before, StringBuilder after, Cursor cursor) {
+        StringBuilder casesBefore = new StringBuilder();
+        StringBuilder casesAfter = new StringBuilder();
+        boolean priorFound = false;
+        for (Statement stmt : casesBlock.getStatements()) {
+            if (referToSameElement(stmt, prior)) {
+                priorFound = true;
+                if (stmt instanceof J.Case) {
+                    casesBefore.append(caseLabelPrefix((J.Case) stmt, cursor));
+                }
+            } else if (priorFound) {
+                casesAfter.append(stmt.printTrimmed(cursor).trim()).append("\n");
+            } else {
+                casesBefore.append(stmt.printTrimmed(cursor).trim()).append("\n");
+            }
+        }
+        before.insert(0, casesBefore);
+        after.append(casesAfter);
+    }
+
+    private String caseLabelPrefix(J.Case c, Cursor cursor) {
+        StringBuilder sb = new StringBuilder();
+        List<J> labels = c.getCaseLabels();
+        J firstLabel = labels.isEmpty() ? null : labels.get(0);
+        boolean isDefault = firstLabel instanceof J.Identifier && "default".equals(((J.Identifier) firstLabel).getSimpleName());
+        if (!isDefault) {
+            sb.append("case ");
+        }
+        for (int i = 0; i < labels.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(labels.get(i).printTrimmed(cursor).trim());
+        }
+        if (c.getGuard() != null) {
+            sb.append(" when ").append(c.getGuard().printTrimmed(cursor).trim());
+        }
+        sb.append(c.getType() == J.Case.Type.Statement ? ": " : " -> ");
+        return sb.toString();
     }
 
     private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock, StringBuilder before, J insertionPoint) {

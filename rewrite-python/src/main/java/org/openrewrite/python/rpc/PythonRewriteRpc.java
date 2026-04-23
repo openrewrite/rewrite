@@ -248,7 +248,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                 final PythonResolutionResult finalMarker = marker;
                 rpcStream = rpcStream.map(sf -> {
                     if (sf instanceof Py.CompilationUnit &&
-                            sf.getSourcePath().getFileName().toString().equals("setup.py")) {
+                            sf.getSourcePath().endsWith("setup.py")) {
                         return sf.withMarkers(sf.getMarkers().addIfAbsent(finalMarker));
                     }
                     return sf;
@@ -273,7 +273,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             return null;
         }
 
-        Path workspace = DependencyWorkspace.getOrCreateSetuptoolsWorkspace(source, projectPath);
+        Path workspace = DependencyWorkspace.getOrCreateSetuptoolsWorkspace(source, projectPath, commandEnv);
         if (workspace == null) {
             return null;
         }
@@ -334,20 +334,19 @@ public class PythonRewriteRpc extends RewriteRpc {
         Path setupCfgPath = projectPath.resolve("setup.cfg");
         if (Files.exists(setupCfgPath)) {
             Parser.Input input = Parser.Input.fromFile(setupCfgPath);
-            return new SetupCfgParser().parseInputs(
+            return new SetupCfgParser(commandEnv).parseInputs(
                     Collections.singletonList(input), effectiveRelativeTo, ctx);
         }
 
-        RequirementsTxtParser reqsParser = new RequirementsTxtParser();
+        RequirementsTxtParser reqsParser = new RequirementsTxtParser(commandEnv);
         try (Stream<Path> entries = Files.list(projectPath)) {
-            Path reqsPath = entries
-                    .filter(p -> reqsParser.accept(p.getFileName()))
-                    .findFirst()
-                    .orElse(null);
-            if (reqsPath != null) {
-                Parser.Input input = Parser.Input.fromFile(reqsPath);
-                return reqsParser.parseInputs(
-                        Collections.singletonList(input), effectiveRelativeTo, ctx);
+            List<Parser.Input> reqInputs = new ArrayList<>();
+            entries.filter(p -> reqsParser.accept(p.getFileName()))
+                    .sorted()
+                    .map(Parser.Input::fromFile)
+                    .forEach(reqInputs::add);
+            if (!reqInputs.isEmpty()) {
+                return reqsParser.parseInputs(reqInputs, effectiveRelativeTo, ctx);
             }
         } catch (IOException e) {
             // Silently skip manifest parsing if we can't list the directory
@@ -366,7 +365,7 @@ public class PythonRewriteRpc extends RewriteRpc {
         private List<RecipeBundleResolver> resolvers = Collections.emptyList();
         private final Map<String, String> environment = new HashMap<>();
         // Default to looking for a venv python, falling back to system python
-        private Path pythonPath = findDefaultPythonPath();
+        private Supplier<@Nullable Path> pythonPathSupplier = Builder::findDefaultPythonPath;
         private @Nullable Path log;
         private @Nullable Path pipPackagesPath;
         private @Nullable Path recipeInstallDir;
@@ -422,7 +421,20 @@ public class PythonRewriteRpc extends RewriteRpc {
          * @return This builder
          */
         public Builder pythonPath(Path pythonPath) {
-            this.pythonPath = pythonPath;
+            return pythonPath(() -> pythonPath);
+        }
+
+        /**
+         * Supplies the path to the Python executable. The supplier is invoked at most
+         * once, when the RPC is first started. Returning {@code null} uses the built-in
+         * default (same as not configuring the path at all). Exceptions thrown by the
+         * supplier propagate out of the RPC-start call.
+         *
+         * @param pythonPathSupplier Supplier for the path to the Python executable
+         * @return This builder
+         */
+        public Builder pythonPath(Supplier<@Nullable Path> pythonPathSupplier) {
+            this.pythonPathSupplier = pythonPathSupplier;
             return this;
         }
 
@@ -527,6 +539,11 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         @Override
         public PythonRewriteRpc get() {
+            Path pythonPath = pythonPathSupplier.get();
+            if (pythonPath == null) {
+                pythonPath = findDefaultPythonPath();
+            }
+
             String version = StringUtils.readFully(
                     PythonRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-python-version.txt")).trim();
             boolean isDevBuild = version.isEmpty() || version.endsWith(".dev0") || "unspecified".equals(version);
@@ -541,7 +558,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                     // Interpreter already has the right version; nothing to do
                 } else if (pipPackagesPath != null) {
                     resolvedPipPackagesPath = pipPackagesPath.resolve(version);
-                    bootstrapOpenrewrite(resolvedPipPackagesPath, version);
+                    bootstrapOpenrewrite(pythonPath, resolvedPipPackagesPath, version);
                 } else if (canImportRewrite(pythonPath)) {
                     // Interpreter has a different version, but no pipPackagesPath to
                     // install the right one — proceed with what's available (e.g., CI
@@ -581,6 +598,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             if (workingDirectory != null) {
                 process.setWorkingDirectory(workingDirectory);
             }
+            process.setStderrRedirect(log);
 
             process.environment().putAll(environment);
 
@@ -707,7 +725,7 @@ public class PythonRewriteRpc extends RewriteRpc {
         /**
          * Installs the pinned openrewrite package into the given pip packages directory.
          */
-        private void bootstrapOpenrewrite(Path pipPackagesPath, String version) {
+        private void bootstrapOpenrewrite(Path pythonPath, Path pipPackagesPath, String version) {
             try {
                 Files.createDirectories(pipPackagesPath);
 
@@ -718,6 +736,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                         "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
                         "openrewrite==" + version
                 );
+                pb.environment().putAll(environment);
                 pb.redirectErrorStream(true);
                 if (log != null) {
                     File logFile = log.toAbsolutePath().normalize().toFile();

@@ -411,6 +411,139 @@ class AutoFormatVisitorTest implements RewriteTest {
         );
     }
 
+    @Test
+    void preserveFourSpaceIndentWhenAddingBraces() {
+        // This test simulates what happens when a recipe (like NeedBraces) adds braces
+        // to a single-line if statement and calls autoFormat.
+        // When no style is attached, it falls back to IntelliJ defaults (4 spaces).
+        K.CompilationUnit cu = KotlinParser.builder().build()
+          .parse("""
+            class MyService {
+                private fun validateInput(value: Int) {
+                    if (value <= 0) throw IllegalArgumentException("error")
+                }
+            }
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get();
+
+        // Simulate what NeedBraces does: wrap the throw statement in a block and autoFormat
+        var result = (K.CompilationUnit) new KotlinIsoVisitor<>() {
+            @Override
+            public J.If visitIf(J.If iff, Object p) {
+                if (!(iff.getThenPart() instanceof J.Block)) {
+                    // Add braces around the then part
+                    J.Block block = new J.Block(
+                        org.openrewrite.Tree.randomId(),
+                        org.openrewrite.java.tree.Space.EMPTY,
+                        org.openrewrite.marker.Markers.EMPTY,
+                        org.openrewrite.java.tree.JRightPadded.build(false),
+                        singletonList(
+                            org.openrewrite.java.tree.JRightPadded.build(iff.getThenPart())
+                        ),
+                        org.openrewrite.java.tree.Space.EMPTY
+                    );
+                    iff = iff.withThenPart(block);
+                    return autoFormat(iff, p);
+                }
+                return iff;
+            }
+        }.visit(cu, new InMemoryExecutionContext());
+
+        String actual = result.printAll();
+
+        // The indentation uses IntelliJ defaults (4 spaces) since no style is attached
+        assertThat(actual).isEqualTo("""
+            class MyService {
+                private fun validateInput(value: Int) {
+                    if (value <= 0) {
+                        throw IllegalArgumentException("error")
+                    }
+                }
+            }
+            """);
+    }
+
+    @Test
+    void attachedStyleUsedForFormatting() {
+        // This test documents the current behavior: when a project-wide style is
+        // attached (e.g., via gradle/maven plugin), that style is used for formatting.
+        // This can result in indentation changes if the file's indentation differs
+        // from the project-wide style.
+        org.openrewrite.kotlin.style.TabsAndIndentsStyle twoSpaceStyle =
+            new org.openrewrite.kotlin.style.TabsAndIndentsStyle(
+                false, // useTabs
+                2,     // tabSize
+                2,     // indentSize
+                4,     // continuationIndent
+                false, // keepIndentsOnEmptyLines
+                new org.openrewrite.kotlin.style.TabsAndIndentsStyle.FunctionDeclarationParameters(true)
+            );
+
+        NamedStyles twoSpaceNamedStyle = new NamedStyles(
+            randomId(),
+            "test",
+            "test",
+            "test",
+            emptySet(),
+            singletonList(twoSpaceStyle)
+        );
+
+        // Parse a file with 4-space indentation but attach 2-space style
+        K.CompilationUnit cu = KotlinParser.builder().build()
+          .parse("""
+            class MyService {
+                private fun validateInput(value: Int) {
+                    if (value <= 0) throw IllegalArgumentException("error")
+                }
+            }
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get();
+
+        // Attach the 2-space style to the source file (simulating what gradle plugin does)
+        cu = cu.withMarkers(cu.getMarkers().add(twoSpaceNamedStyle));
+
+        // Simulate what NeedBraces does: wrap the throw statement in a block and autoFormat
+        var result = (K.CompilationUnit) new KotlinIsoVisitor<>() {
+            @Override
+            public J.If visitIf(J.If iff, Object p) {
+                if (!(iff.getThenPart() instanceof J.Block)) {
+                    // Add braces around the then part
+                    J.Block block = new J.Block(
+                        org.openrewrite.Tree.randomId(),
+                        org.openrewrite.java.tree.Space.EMPTY,
+                        org.openrewrite.marker.Markers.EMPTY,
+                        org.openrewrite.java.tree.JRightPadded.build(false),
+                        singletonList(
+                            org.openrewrite.java.tree.JRightPadded.build(iff.getThenPart())
+                        ),
+                        org.openrewrite.java.tree.Space.EMPTY
+                    );
+                    iff = iff.withThenPart(block);
+                    return autoFormat(iff, p);
+                }
+                return iff;
+            }
+        }.visit(cu, new InMemoryExecutionContext());
+
+        String actual = result.printAll();
+
+        // With 2-space style attached, the if statement and its contents get 2-space indentation.
+        // This creates mixed indentation in the file.
+        assertThat(actual).isEqualTo("""
+            class MyService {
+                private fun validateInput(value: Int) {
+                  if (value <= 0) {
+                    throw IllegalArgumentException("error")
+                  }
+                }
+            }
+            """);
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/370")
     @Test
     void doNotFoldImport() {

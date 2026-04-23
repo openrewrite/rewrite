@@ -841,6 +841,11 @@ public interface JavaType {
             this.values = values;
             return this;
         }
+
+        @Override
+        public String toString() {
+            return new DefaultJavaTypeSignatureBuilder().signature(this);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1296,6 +1301,10 @@ public interface JavaType {
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     class Method implements JavaType {
+        // C#-specific: marks extension methods (bit 20, not used by Java Flag enum)
+        private static final long EXTENSION_METHOD_FLAG = 1L << 20;
+        private static final long VALID_METHOD_FLAGS = Flag.VALID_FLAGS | EXTENSION_METHOD_FLAG;
+
         @With
         @Nullable
         @NonFinal
@@ -1387,7 +1396,7 @@ public interface JavaType {
                       FullyQualified @Nullable [] annotations, @Nullable List<String> defaultValue,
                       String @Nullable [] declaredFormalTypeNames) {
             this.managedReference = managedReference;
-            this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
+            this.flagsBitMap = flagsBitMap & VALID_METHOD_FLAGS;
             this.declaringType = unknownIfNull(declaringType);
             this.name = name;
             this.returnType = unknownIfNull(returnType);
@@ -1634,6 +1643,13 @@ public interface JavaType {
 
         public Method withFlags(Set<Flag> flags) {
             return withFlagsBitMap(Flag.flagsToBitMap(flags));
+        }
+
+        /**
+         * @return {@code true} if this method is a C# extension method.
+         */
+        public boolean isExtensionMethod() {
+            return (flagsBitMap & EXTENSION_METHOD_FLAG) != 0;
         }
 
         @Override

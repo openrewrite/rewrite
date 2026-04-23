@@ -238,6 +238,71 @@ class JavaType(ABC):
                 return t.fully_qualified_name
             return ''
 
+    class Annotation(FullyQualified):
+        _type: JavaType.FullyQualified
+        _values: Optional[List[JavaType.Annotation.ElementValue]]
+
+        @property
+        def type(self) -> JavaType.FullyQualified:
+            return self._type
+
+        @property
+        def values(self) -> List[JavaType.Annotation.ElementValue]:
+            return self._values if self._values is not None else []
+
+        @property
+        def fully_qualified_name(self) -> str:
+            t = getattr(self, '_type', None)
+            if t is not None and hasattr(t, 'fully_qualified_name'):
+                return t.fully_qualified_name
+            return ''
+
+        class ElementValue(ABC):
+            """Base class for annotation element values."""
+
+            @property
+            @abstractmethod
+            def element(self) -> Optional[JavaType]:
+                ...
+
+        @dataclass
+        class SingleElementValue(ElementValue):
+            """A single annotation element value (one constant or one reference)."""
+            _element: Optional[JavaType] = field(default=None)
+            _constant_value: Optional[Any] = field(default=None)
+            _reference_value: Optional[JavaType] = field(default=None)
+
+            @property
+            def element(self) -> Optional[JavaType]:
+                return self._element
+
+            @property
+            def constant_value(self) -> Optional[Any]:
+                return self._constant_value
+
+            @property
+            def reference_value(self) -> Optional[JavaType]:
+                return self._reference_value
+
+        @dataclass
+        class ArrayElementValue(ElementValue):
+            """An array of annotation element values."""
+            _element: Optional[JavaType] = field(default=None)
+            _constant_values: Optional[List[Any]] = field(default=None)
+            _reference_values: Optional[List[JavaType]] = field(default=None)
+
+            @property
+            def element(self) -> Optional[JavaType]:
+                return self._element
+
+            @property
+            def constant_values(self) -> Optional[List[Any]]:
+                return self._constant_values
+
+            @property
+            def reference_values(self) -> Optional[List[JavaType]]:
+                return self._reference_values
+
     @dataclass
     class GenericTypeVariable:
         _name: str = field(default="")

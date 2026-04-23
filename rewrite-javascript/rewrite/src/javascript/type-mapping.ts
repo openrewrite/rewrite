@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import ts from "typescript";
+import * as path from "path";
 import {Type} from "../java";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 
@@ -30,7 +31,8 @@ export class JavaScriptTypeMapping {
 
 
     constructor(
-        private readonly checker: ts.TypeChecker
+        private readonly checker: ts.TypeChecker,
+        private readonly sourceRoot?: string
     ) {
         this.regExpSymbol = checker.resolveName(
             "RegExp",
@@ -69,13 +71,96 @@ export class JavaScriptTypeMapping {
             // Fall through to regular type checking if not a variable
         }
 
+        // TypeNode needs getTypeFromTypeNode (resolves the annotation itself).
+        // Everything else — expressions, declarations, specifiers, bindings, etc. —
+        // uses getTypeAtLocation which works for virtually all node kinds.
         let type: ts.Type | undefined;
-        if (ts.isExpression(node)) {
-            type = this.checker.getTypeAtLocation(node);
-        } else if (ts.isTypeNode(node)) {
+        if (ts.isTypeNode(node)) {
             type = this.checker.getTypeFromTypeNode(node);
+        } else {
+            type = this.checker.getTypeAtLocation(node);
         }
         return type && this.getType(type);
+    }
+
+    /**
+     * Resolve the declared type of a class / interface / enum / class-expression.
+     *
+     * Using {@code getTypeAtLocation} on these declaration nodes is unsafe: TypeScript returns
+     * the type of the declared *value*, not the type itself. For string or numeric enums that
+     * ends up being the union of enum literals, which on the JS side resolves to
+     * {@link Type.Primitive} (e.g. String for string enums). The Java-side RPC receiver then
+     * rejects it with "A class can only be type attributed with a fully qualified type name",
+     * because {@code J.ClassDeclaration.type} must be {@link Type.FullyQualified}.
+     *
+     * Instead, we resolve through the declaration's own symbol. For classes and interfaces we
+     * reuse the full type mapping pipeline (so members, methods, supertypes and type parameters
+     * are populated). For enums — which have no class-shaped representation in TypeScript — and
+     * any residual non-FQ result, we build a minimal class shell whose FQN and {@code classKind}
+     * are derived from the declaration itself.
+     */
+    declarationType(node: ts.ClassDeclaration | ts.ClassExpression | ts.InterfaceDeclaration | ts.EnumDeclaration): Type.FullyQualified | undefined {
+        const symbol = (node as { symbol?: ts.Symbol }).symbol
+            ?? (node.name ? this.checker.getSymbolAtLocation(node.name) : undefined);
+        if (!symbol) {
+            return undefined;
+        }
+
+        // For classes and interfaces `getDeclaredTypeOfSymbol` yields a class-shaped ts.Type whose
+        // symbol we can feed through the normal pipeline. For enums, however, TypeScript returns the
+        // union of enum literals — which on the JS side resolves to `Type.Primitive` (e.g. String for
+        // string enums) and therefore is NOT `FullyQualified`. The Java side then rejects it with
+        // "A class can only be type attributed with a fully qualified type name".
+        //
+        // Since JavaScript/TypeScript has no separate enum runtime representation, we build the
+        // class-shaped type directly from the declaration's own symbol. The `classKind` is derived
+        // from the declaration node kind, not the (lossy) resolved type.
+        let classKind: Type.Class.Kind;
+        if (ts.isEnumDeclaration(node)) {
+            classKind = Type.Class.Kind.Enum;
+        } else if (ts.isInterfaceDeclaration(node)) {
+            classKind = Type.Class.Kind.Interface;
+        } else {
+            classKind = Type.Class.Kind.Class;
+        }
+
+        const fullyQualifiedName = this.getFullyQualifiedNameFromSymbol(symbol);
+        const cacheKey = `decl:${classKind}:${fullyQualifiedName}`;
+        const cached = this.typeCache.get(cacheKey);
+        if (cached && Type.isFullyQualified(cached)) {
+            return cached as Type.FullyQualified;
+        }
+
+        // For classes and interfaces reuse the existing type-based path so that members, methods,
+        // supertypes and type parameters are populated. Enums (and any fallback that produced a
+        // non-FQ result) get a minimal class shell with the correct FQN + kind.
+        if (!ts.isEnumDeclaration(node)) {
+            const declaredType = this.checker.getDeclaredTypeOfSymbol(symbol);
+            if (declaredType) {
+                const mapped = this.getType(declaredType);
+                if (Type.isFullyQualified(mapped)) {
+                    this.typeCache.set(cacheKey, mapped);
+                    return mapped;
+                }
+            }
+        }
+
+        const classType: Type.Class = {
+            kind: Type.Kind.Class,
+            flags: 0,
+            classKind,
+            fullyQualifiedName,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        } as Type.Class;
+        this.typeCache.set(cacheKey, classType);
+        return classType;
     }
 
     private getType(type: ts.Type): Type {
@@ -565,7 +650,7 @@ export class JavaScriptTypeMapping {
      */
     private createMethodType(
         signature: ts.Signature,
-        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.FunctionExpression | ts.CallExpression | ts.NewExpression,
+        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.ConstructorDeclaration | ts.FunctionExpression | ts.CallExpression | ts.NewExpression,
         declaringType: Type.FullyQualified,
         name: string,
         declaredFormalTypeNames: string[] = []
@@ -915,6 +1000,22 @@ export class JavaScriptTypeMapping {
                     declaredFormalTypeNames.push(tp.name.getText());
                 }
             }
+        } else if (ts.isConstructorDeclaration(node)) {
+            // For constructor declarations
+            signature = this.checker.getSignatureFromDeclaration(node);
+            if (!signature) {
+                return undefined;
+            }
+
+            methodName = "<constructor>";
+
+            const parent = node.parent;
+            if (ts.isClassDeclaration(parent) || ts.isClassExpression(parent)) {
+                const parentType = this.checker.getTypeAtLocation(parent);
+                declaringType = this.getType(parentType) as Type.FullyQualified;
+            } else {
+                declaringType = Type.unknownType as Type.FullyQualified;
+            }
         } else if (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node)) {
             // For function declarations/expressions
             signature = this.checker.getSignatureFromDeclaration(node);
@@ -923,7 +1024,24 @@ export class JavaScriptTypeMapping {
             }
 
             methodName = node.name ? node.name.getText() : "<anonymous>";
-            declaringType = Type.unknownType as Type.FullyQualified;
+
+            // Derive declaring type from source file module path (like Go's type_mapper.go).
+            // Use the same relativization as getFullyQualifiedName() so that declarations
+            // and invocations produce matching FQNs.
+            let moduleFqn: string;
+            const fileName = node.getSourceFile().fileName;
+            if (this.sourceRoot && path.isAbsolute(fileName)) {
+                moduleFqn = path.relative(this.sourceRoot, fileName);
+            } else {
+                moduleFqn = fileName;
+            }
+            // Strip file extension to get the module name
+            moduleFqn = moduleFqn.replace(/\.[^/.]+$/, '');
+            declaringType = {
+                kind: Type.Kind.Class,
+                flags: 0,
+                fullyQualifiedName: moduleFqn
+            } as Type.FullyQualified;
 
             // Get type parameters from node
             if (node.typeParameters) {
@@ -952,7 +1070,10 @@ export class JavaScriptTypeMapping {
         if (!symbol) {
             return "unknown";
         }
+        return this.getFullyQualifiedNameFromSymbol(symbol);
+    }
 
+    private getFullyQualifiedNameFromSymbol(symbol: ts.Symbol): string {
         // First, check if this symbol is an import/alias
         // For imported types, we want to use the module specifier instead of the file path
         if (symbol.flags & ts.SymbolFlags.Alias) {
@@ -1031,6 +1152,14 @@ export class JavaScriptTypeMapping {
                 } else {
                     cleanedName = packageName;
                 }
+            }
+        } else if (path.isAbsolute(cleanedName)) {
+            // TypeScript returns absolute file paths as module names for project source files
+            // that are ES modules (have imports/exports). Relativize using sourceRoot.
+            // Example: /var/moderne/.../BookStack/resources/js/foo.MyClass
+            // Should become: resources/js/foo.MyClass
+            if (this.sourceRoot) {
+                cleanedName = path.relative(this.sourceRoot, cleanedName);
             }
         }
 

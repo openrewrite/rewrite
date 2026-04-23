@@ -451,7 +451,15 @@ class PythonTypeMapping:
                 fqn = f"{module_name}.{class_name}"
             else:
                 fqn = class_name
-            class_type = self._create_class_type(fqn)
+
+            # Create a fresh JavaType.Class per type_id rather than deduplicating
+            # by FQN. ty-types can emit multiple classLiterals with the same FQN
+            # (e.g., class Pair(namedtuple('Pair', ...))) and collapsing them
+            # would cause self-referential supertypes.
+            class_type = JavaType.Class()
+            class_type._flags_bit_map = 0
+            class_type._fully_qualified_name = fqn
+            class_type._kind = JavaType.FullyQualified.Kind.Class
 
             # Infer Kind from supertypes before resolving them
             supertypes = descriptor.get('supertypes', [])
@@ -468,12 +476,12 @@ class PythonTypeMapping:
                         break
 
             # Populate supertypes: first → _supertype, rest → _interfaces
-            if supertypes and getattr(class_type, '_supertype', None) is None:
+            if supertypes:
                 super_type = self._resolve_type(supertypes[0])
                 if isinstance(super_type, JavaType.FullyQualified):
                     class_type._supertype = super_type
 
-                if len(supertypes) > 1 and getattr(class_type, '_interfaces', None) is None:
+                if len(supertypes) > 1:
                     interfaces = []
                     for st_id in supertypes[1:]:
                         iface = self._resolve_type(st_id)
@@ -763,14 +771,8 @@ class PythonTypeMapping:
             self, descriptor: Dict[str, Any], name: str
     ) -> JavaType.Method:
         """Build a JavaType.Method from a function descriptor with parameters/returnType."""
-        param_names: List[str] = []
-        param_types: List[JavaType] = []
-        for param in descriptor.get('parameters', []):
-            p_name = param.get('name', '')
-            if p_name in ('self', 'cls'):
-                continue
-            param_names.append(p_name)
-            param_types.append(self._resolve_param_type(param))
+        param_names, param_types = self._process_method_params(
+            descriptor.get('parameters', []))
 
         return_type = None
         ret_id = descriptor.get('returnType')
@@ -781,7 +783,7 @@ class PythonTypeMapping:
 
         return JavaType.Method(
             _flags_bit_map=0,
-            _declaring_type=None,
+            _declaring_type=self._get_declaration_declaring_type(descriptor),
             _name=name,
             _return_type=return_type,
             _parameter_names=param_names if param_names else None,
@@ -865,6 +867,40 @@ class PythonTypeMapping:
                 return result
         return _UNKNOWN
 
+    def _process_method_params(
+            self, params: List[Dict[str, Any]]
+    ) -> Tuple[List[str], List[JavaType]]:
+        """Normalize a ParameterInfo list into (names, types) for JavaType.Method.
+
+        Applies:
+        - Skip `self` / `cls`.
+        - Collapse the synthetic `*args` / `**kwargs` pair emitted for a
+          `ParamSpec` tail (both carry the same ``paramSpecName``) into a
+          single entry whose name is the ParamSpec's name and whose type
+          is `_UNKNOWN`. This avoids exposing `P.args` / `P.kwargs` as two
+          distinct variadic parameters on the produced method.
+        - Treat `concatenatePrefix` params as ordinary positional params.
+        """
+        names: List[str] = []
+        types: List[JavaType] = []
+        last_spec_emitted: Optional[str] = None
+        for p in params:
+            p_name = p.get('name', '')
+            if p_name in ('self', 'cls'):
+                continue
+            spec_name = p.get('paramSpecName')
+            if spec_name is not None:
+                if spec_name == last_spec_emitted:
+                    continue
+                names.append(spec_name)
+                types.append(_UNKNOWN)
+                last_spec_emitted = spec_name
+                continue
+            last_spec_emitted = None
+            names.append(p_name)
+            types.append(self._resolve_param_type(p))
+        return names, types
+
     def _get_method_signature(self, node: ast.Call) -> Tuple[List[str], List[JavaType]]:
         """Get parameter names and types from the method signature.
 
@@ -877,11 +913,7 @@ class PythonTypeMapping:
         if sig:
             params = sig.get('parameters', [])
             if params:
-                names = [p['name'] for p in params
-                         if p['name'] not in ('self', 'cls')]
-                types = [self._resolve_param_type(p) for p in params
-                         if p['name'] not in ('self', 'cls')]
-                return names, types
+                return self._process_method_params(params)
 
         # Try function/method descriptor parameters
         func_type_id = self._lookup_func_type_id(node)
@@ -890,11 +922,7 @@ class PythonTypeMapping:
             if descriptor:
                 params = descriptor.get('parameters', [])
                 if params:
-                    names = [p['name'] for p in params
-                             if p['name'] not in ('self', 'cls')]
-                    types = [self._resolve_param_type(p) for p in params
-                             if p['name'] not in ('self', 'cls')]
-                    return names, types
+                    return self._process_method_params(params)
 
         # Fall back to placeholder names
         return self._generate_placeholder_names(node)
@@ -1197,20 +1225,9 @@ class PythonTypeMapping:
         if return_type_id is not None:
             return_type = self._resolve_type(return_type_id)
 
-        # Resolve parameters (skip self/cls)
-        param_names = []
-        param_types = []
-        for param in descriptor.get('parameters', []):
-            p_name = param.get('name', '')
-            if p_name in ('self', 'cls'):
-                continue
-            param_names.append(p_name)
-            p_type_id = param.get('typeId')
-            if p_type_id is not None:
-                p_type = self._resolve_type(p_type_id)
-                param_types.append(p_type if p_type else _UNKNOWN)
-            else:
-                param_types.append(_UNKNOWN)
+        # Resolve parameters (skip self/cls, collapse ParamSpec *args/**kwargs pairs)
+        param_names, param_types = self._process_method_params(
+            descriptor.get('parameters', []))
 
         type_param_names = self._extract_type_param_names(descriptor)
 
@@ -1266,3 +1283,20 @@ class PythonTypeMapping:
     def module_to_fqn(module_path: str) -> str:
         """Convert a Python module path to a fully qualified name."""
         return module_path
+
+    def _get_declaration_declaring_type(self, descriptor: Dict[str, Any]) -> Optional[JavaType.FullyQualified]:
+        """Get the declaring type for a function declaration.
+
+        Mirrors the invocation-side logic from _get_declaring_type() to ensure
+        declarations and invocations produce matching FQNs.
+        """
+        class_name = descriptor.get('className')
+        if class_name:
+            module_name = descriptor.get('moduleName')
+            if module_name and module_name != 'builtins':
+                return self._create_class_type(f"{module_name}.{class_name}")
+            return self._create_class_type(class_name)
+        module_name = descriptor.get('moduleName')
+        if module_name and module_name != 'builtins':
+            return self._create_class_type(module_name)
+        return None

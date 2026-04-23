@@ -44,7 +44,7 @@ public abstract class Recipe
 
     public virtual List<Recipe> GetRecipeList() => [];
 
-    public virtual JavaVisitor<ExecutionContext> GetVisitor() => new();
+    public virtual ITreeVisitor<ExecutionContext> GetVisitor() => ITreeVisitor<ExecutionContext>.Noop();
 
     public RecipeDescriptor GetDescriptor()
     {
@@ -91,82 +91,64 @@ public abstract class Recipe
         }
         return options;
     }
+}
 
-    public virtual List<Result> Run(List<SourceFile> sources, ExecutionContext ctx)
-    {
-        var visitor = GetVisitor();
-        return EditSources(sources, visitor, ctx);
-    }
+/// <summary>
+/// Marker interface for recipes that delegate entirely to a Java recipe.
+/// When a recipe implements this interface, the Java host loads the recipe
+/// locally instead of wrapping it in an RpcRecipe, eliminating per-file
+/// RPC round trips.
+/// </summary>
+public interface IDelegatesTo
+{
+    /// <summary>
+    /// The fully-qualified Java recipe name, e.g. "org.openrewrite.java.ChangeType".
+    /// </summary>
+    string JavaRecipeName { get; }
 
-    protected static List<Result> EditSources(
-        List<SourceFile> sources,
-        JavaVisitor<ExecutionContext> visitor,
-        ExecutionContext ctx)
-    {
-        var results = new List<Result>();
-        foreach (var source in sources)
-        {
-            var after = visitor.Visit((Tree)source, ctx);
-            if (after == null)
-            {
-                results.Add(new Result(source, null));
-            }
-            else if (after is SourceFile sf && !ReferenceEquals(source, after))
-            {
-                results.Add(new Result(source, sf));
-            }
-        }
+    /// <summary>
+    /// Options to configure the Java recipe, keyed by option name.
+    /// </summary>
+    Dictionary<string, object?> Options { get; }
+}
 
-        return results;
-    }
+/// <summary>
+/// Non-generic interface for scanning recipes, allowing the scheduler to
+/// manage the scan/generate/edit lifecycle without knowing the accumulator type.
+/// </summary>
+public interface IScanningRecipe
+{
+    object InitialValue(ExecutionContext ctx);
+    ITreeVisitor<ExecutionContext> Scanner(object acc);
+    ITreeVisitor<ExecutionContext> Editor(object acc);
+    IEnumerable<SourceFile> Generate(object acc, ExecutionContext ctx);
 }
 
 /// <summary>
 /// A recipe that first scans source files to accumulate data, then transforms them.
 /// </summary>
-/// <typeparam name="T">The type of the accumulator for scanning data.</typeparam>
-public abstract class ScanningRecipe<T> : Recipe
+/// <typeparam name="TAccumulator">The type of the accumulator for scanning data.</typeparam>
+public abstract class ScanningRecipe<TAccumulator> : Recipe, IScanningRecipe
 {
-    public abstract T GetInitialValue(ExecutionContext ctx);
+    public abstract TAccumulator GetInitialValue(ExecutionContext ctx);
 
-    public abstract JavaVisitor<ExecutionContext> GetScanner(T acc);
+    public abstract ITreeVisitor<ExecutionContext> GetScanner(TAccumulator acc);
 
-    public virtual JavaVisitor<ExecutionContext> GetVisitor(T acc) => new();
+    public virtual ITreeVisitor<ExecutionContext> GetVisitor(TAccumulator acc) => ITreeVisitor<ExecutionContext>.Noop();
 
-    public virtual IEnumerable<SourceFile> Generate(T acc, ExecutionContext ctx) => [];
+    public virtual IEnumerable<SourceFile> Generate(TAccumulator acc, ExecutionContext ctx) => [];
 
-    public sealed override JavaVisitor<ExecutionContext> GetVisitor()
+    public sealed override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         throw new InvalidOperationException(
-            "ScanningRecipe.GetVisitor() should not be called directly. Use Run() instead.");
+            "ScanningRecipe.GetVisitor() should not be called directly.");
     }
 
-    public override List<Result> Run(List<SourceFile> sources, ExecutionContext ctx)
-    {
-        var acc = GetInitialValue(ctx);
-
-        // Phase 1: Scan
-        var scanner = GetScanner(acc);
-        foreach (var source in sources)
-        {
-            scanner.Visit((Tree)source, ctx);
-        }
-
-        // Phase 2: Generate
-        var generated = Generate(acc, ctx).ToList();
-
-        // Phase 3: Edit
-        var visitor = GetVisitor(acc);
-        var results = EditSources(sources, visitor, ctx);
-
-        // Add generated files
-        foreach (var gen in generated)
-        {
-            results.Add(new Result(null, gen));
-        }
-
-        return results;
-    }
+    // IScanningRecipe explicit implementation — type-erased bridge for the scheduler
+    object IScanningRecipe.InitialValue(ExecutionContext ctx) => GetInitialValue(ctx)!;
+    ITreeVisitor<ExecutionContext> IScanningRecipe.Scanner(object acc) => GetScanner((TAccumulator)acc);
+    ITreeVisitor<ExecutionContext> IScanningRecipe.Editor(object acc) => GetVisitor((TAccumulator)acc);
+    IEnumerable<SourceFile> IScanningRecipe.Generate(object acc, ExecutionContext ctx) => Generate((TAccumulator)acc, ctx);
 }
 
 /// <summary>

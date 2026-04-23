@@ -22,8 +22,34 @@ namespace OpenRewrite.Core;
 /// </summary>
 /// <typeparam name="T">The type of tree this visitor handles.</typeparam>
 /// <typeparam name="P">A context object passed through every visit method.</typeparam>
-public class TreeVisitor<T, P> where T : class, Tree
+/// <summary>
+/// Non-generic visitor interface so that Recipe.GetVisitor() can return
+/// a visitor without binding to a specific tree type (equivalent to
+/// Java's TreeVisitor&lt;?, P&gt;).
+/// </summary>
+public interface ITreeVisitor<P>
 {
+    Tree? Visit(Tree? tree, P p);
+
+    static ITreeVisitor<P> Noop() => new NoopVisitor<P>();
+}
+
+internal class NoopVisitor<P> : ITreeVisitor<P>
+{
+    public Tree? Visit(Tree? tree, P p) => tree;
+}
+
+public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
+{
+    Tree? ITreeVisitor<P>.Visit(Tree? tree, P p)
+    {
+        // If the tree is a SourceFile that doesn't match this visitor's type parameter T,
+        // pass it through unchanged. Returning null from Visit() for incompatible types
+        // would be interpreted as "delete this file" by the recipe scheduler.
+        if (tree is SourceFile && tree is not T)
+            return tree;
+        return Visit(tree, p);
+    }
     public Cursor Cursor { get; set; } = new();
     private int _visitCount;
     private bool _stopAfterPreVisit;
@@ -104,5 +130,37 @@ public class TreeVisitor<T, P> where T : class, Tree
         _afterVisit.Add(visitor);
     }
 
-    public static TreeVisitor<T, P> Noop() => new();
+    protected IReadOnlyList<TreeVisitor<T, P>> GetAfterVisit() =>
+        _afterVisit ?? (IReadOnlyList<TreeVisitor<T, P>>)[];
+
+    /// <summary>
+    /// Register an after-visitor only if an equal instance is not already registered.
+    /// Requires the visitor to implement proper equality (e.g., <see cref="IEquatable{T}"/>).
+    /// </summary>
+    protected void MaybeDoAfterVisit(TreeVisitor<T, P> visitor)
+    {
+        if (_afterVisit == null || !_afterVisit.Contains(visitor))
+            DoAfterVisit(visitor);
+    }
+
+    public static TreeVisitor<T, P> Noop() => new NoopVisitor();
+
+    private class NoopVisitor : TreeVisitor<T, P>
+    {
+        public override T? Visit(Tree? tree, P p) => tree as T;
+    }
+}
+public static class TreeVisitorExtensions
+{
+    public static ITreeVisitor<T> Combine<T>(this ITreeVisitor<T> first, ITreeVisitor<T> second) where T : class
+    {
+        return new CombinedTreeVisitor<T>(first, second);
+    }
+    public static ITreeVisitor<T> Combine<T>(this IEnumerable<ITreeVisitor<T>> visitors) where T : class => new CombinedTreeVisitor<T>(visitors);
+    public static ITreeVisitor<ExecutionContext> GetVisitor(this Recipe[] recipes) => recipes.Select(x => x.GetVisitor()).Combine();
+
+    private class CombinedTreeVisitor<T>(params IEnumerable<ITreeVisitor<T>> visitors) : ITreeVisitor<T>
+    {
+        public Tree? Visit(Tree? tree, T p) => visitors.Aggregate(tree, (current, visitor) => visitor.Visit(current, p));
+    }
 }

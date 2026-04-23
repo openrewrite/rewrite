@@ -43,7 +43,9 @@ public class ReplaceCharToIntWithCode extends Recipe {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (CHAR_TO_INT_METHOD_MATCHER.matches(method) && method.getSelect() != null) {
-                    return KotlinTemplate.builder("#{any(kotlin.Char)}.code")
+                    // Receiver may be JVM primitive `char` (Kotlin's non-nullable Char
+                    // collapses to a primitive in the type model) or boxed Character.
+                    return KotlinTemplate.builder("#{any()}.code")
                             .build()
                             .apply(getCursor(), method.getCoordinates().replace(), method.getSelect())
                             .withPrefix(method.getPrefix());

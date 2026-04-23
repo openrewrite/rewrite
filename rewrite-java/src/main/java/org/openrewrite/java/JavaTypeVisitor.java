@@ -114,8 +114,55 @@ public class JavaTypeVisitor<P> {
     public JavaType visitAnnotation(JavaType.Annotation annotation, P p) {
         return annotation.unsafeSet(
                 (JavaType.FullyQualified) visit(annotation.getType(), p),
-                arrayOrNullIfEmpty(annotation.getValues(), JavaType.EMPTY_ANNOTATION_VALUE_ARRAY)
+                arrayOrNullIfEmpty(
+                        ListUtils.map(annotation.getValues(), ev -> visitAnnotationElementValue(ev, p)),
+                        JavaType.EMPTY_ANNOTATION_VALUE_ARRAY)
         );
+    }
+
+    /**
+     * Visit the JavaType refs embedded in an annotation element value — the
+     * {@code element} meta-variable and any {@code referenceValue}(s). Constant
+     * values never hold {@link JavaType} instances in practice: Single- and
+     * ArrayElementValue#from route JavaType-valued arguments into the reference
+     * branch, so the constant side is only ever primitives, strings, and enums.
+     * The default implementation returns the same ElementValue when no
+     * referenced JavaType changed identity, matching the semantics of the other
+     * {@code visit*} methods on this visitor.
+     */
+    public JavaType.Annotation.ElementValue visitAnnotationElementValue(JavaType.Annotation.ElementValue ev, P p) {
+        JavaType element = visit(ev.getElement(), p);
+        if (ev instanceof JavaType.Annotation.SingleElementValue) {
+            JavaType.Annotation.SingleElementValue sev = (JavaType.Annotation.SingleElementValue) ev;
+            JavaType referenceValue = sev.getReferenceValue();
+            if (referenceValue != null) {
+                JavaType visited = visit(referenceValue, p);
+                if (visited == referenceValue && element == sev.getElement()) return sev;
+                return new JavaType.Annotation.SingleElementValue(element, null, visited);
+            }
+            if (element == sev.getElement()) return sev;
+            return new JavaType.Annotation.SingleElementValue(element, sev.getConstantValue(), null);
+        }
+        if (ev instanceof JavaType.Annotation.ArrayElementValue) {
+            JavaType.Annotation.ArrayElementValue aev = (JavaType.Annotation.ArrayElementValue) ev;
+            JavaType[] referenceValues = aev.getReferenceValues();
+            if (referenceValues != null) {
+                JavaType[] visited = null;
+                for (int i = 0; i < referenceValues.length; i++) {
+                    JavaType v = visit(referenceValues[i], p);
+                    if (v != referenceValues[i]) {
+                        if (visited == null) visited = referenceValues.clone();
+                        visited[i] = v;
+                    }
+                }
+                if (visited == null && element == aev.getElement()) return aev;
+                return new JavaType.Annotation.ArrayElementValue(element, null,
+                        visited != null ? visited : referenceValues);
+            }
+            if (element == aev.getElement()) return aev;
+            return new JavaType.Annotation.ArrayElementValue(element, aev.getConstantValues(), null);
+        }
+        return ev;
     }
 
     public JavaType visitArray(JavaType.Array array, P p) {

@@ -216,7 +216,7 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         # Update our understanding of what Java has
         remote_objects[obj_id] = obj
         # Also update local_objects for consistency
-        local_objects[str(obj.id)] = obj
+        local_objects[obj_id] = obj
 
     return obj
 
@@ -396,7 +396,7 @@ def handle_parse(params: dict) -> List[str]:
             elif 'path' in input_item:
                 result = parse_python_file(input_item['path'], relative_to, ty_client)
             elif 'text' in input_item or 'source' in input_item:
-                source = input_item.get('text') or input_item.get('source')
+                source = input_item.get('text') if 'text' in input_item else input_item.get('source')
                 path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
                 # For relative paths, write the source under the project root
                 # (tmpdir or relative_to) so ty-types can resolve imports from
@@ -924,6 +924,21 @@ _recipe_phases: Dict[str, str] = {}
 # Data table output directory - if set, data tables will be written to CSV files
 _data_table_output_dir: Optional[str] = None
 
+# Registry mapping fully-qualified visitor names to visitor classes.
+# Used to instantiate visitors by name when dispatched via RPC (e.g., auto-format).
+# Lazily initialized to avoid circular imports.
+_VISITOR_REGISTRY: Optional[Dict[str, type]] = None
+
+
+def _get_visitor_registry() -> Dict[str, type]:
+    global _VISITOR_REGISTRY
+    if _VISITOR_REGISTRY is None:
+        from rewrite.python.format.auto_format import AutoFormatVisitor
+        _VISITOR_REGISTRY = {
+            'org.openrewrite.python.format.AutoFormatVisitor': AutoFormatVisitor,
+        }
+    return _VISITOR_REGISTRY
+
 
 def _install_sub_recipes(recipe, marketplace) -> None:
     """Ensure sub-recipes from recipe_list() are registered in the marketplace."""
@@ -1001,6 +1016,13 @@ def handle_prepare_recipe(params: dict) -> dict:
         'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
     }
 
+    # If the recipe declares delegation to a Java recipe, include it in the response
+    if hasattr(recipe, 'java_recipe_name'):
+        response['delegatesTo'] = {
+            'recipeName': recipe.java_recipe_name,
+            'options': getattr(recipe, 'delegates_to_options', {}),
+        }
+
     logger.debug(f"PrepareRecipe response: {response}")
     return response
 
@@ -1055,6 +1077,7 @@ def handle_visit(params: dict) -> dict:
             ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
 
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
@@ -1066,9 +1089,16 @@ def handle_visit(params: dict) -> dict:
     # Instantiate the visitor
     visitor = _instantiate_visitor(visitor_name, ctx)
 
-    # Apply the visitor
+    # Reconstruct cursor from cursor IDs (if provided).
+    # Cursor IDs are ordered innermost-to-outermost, so we iterate in reverse
+    # to build the cursor chain from root inward (matching JS implementation).
     from rewrite.visitor import Cursor
     cursor = Cursor(None, Cursor.ROOT_VALUE)
+    if cursor_ids:
+        for cursor_id in reversed(cursor_ids):
+            cursor_obj = get_object_from_java(cursor_id, source_file_type)
+            if cursor_obj is not None:
+                cursor = Cursor(cursor, cursor_obj)
 
     before = tree
     after = visitor.visit(tree, ctx, cursor)
@@ -1091,6 +1121,115 @@ def handle_visit(params: dict) -> dict:
 
     logger.debug(f"Visit result: modified={modified}, tree_id={tree_id}, before.id={before.id}, after.id={after.id if after else None}")
     return {'modified': modified}
+
+
+def handle_batch_visit(params: dict) -> dict:
+    """Handle a BatchVisit RPC request.
+
+    Runs multiple visitors in sequence on the same tree, collecting
+    per-visitor metadata (modified, deleted, new search result IDs).
+    """
+    tree_id = params.get('treeId')
+    source_file_type = params.get('sourceFileType')
+    p_id = params.get('p')
+    visitors = params.get('visitors', [])
+
+    if not tree_id:
+        raise ValueError("'treeId' is required")
+
+    logger.debug(f"BatchVisit: treeId={tree_id}, visitors={len(visitors)}")
+
+    # Get or create execution context
+    if p_id and p_id in _execution_contexts:
+        ctx = _execution_contexts[p_id]
+    else:
+        from rewrite import InMemoryExecutionContext
+        ctx = InMemoryExecutionContext()
+        if _data_table_output_dir:
+            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
+            store = CsvDataTableStore(_data_table_output_dir)
+            store.accept_rows(True)
+            ctx.put_message(DATA_TABLE_STORE, store)
+        if p_id:
+            _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
+
+    # Fetch tree once from Java
+    tree = get_object_from_java(tree_id, source_file_type)
+    if tree is None:
+        raise ValueError(f"Tree not found: {tree_id}")
+
+    from rewrite.visitor import Cursor
+    from rewrite.markers import SearchResult
+    cursor = Cursor(None, Cursor.ROOT_VALUE)
+
+    results = []
+    known_ids = _collect_search_result_ids(tree)
+
+    for item in visitors:
+        visitor_name = item.get('visitor', '')
+
+        # Instantiate and run visitor
+        visitor = _instantiate_visitor(visitor_name, ctx)
+        before = tree
+        after = visitor.visit(tree, ctx, cursor)
+
+        modified = after is not before
+        deleted = after is None
+
+        # Diff SearchResult IDs against the running set
+        if deleted:
+            search_result_ids = []
+        else:
+            after_ids = _collect_search_result_ids(after)
+            search_result_ids = list(after_ids - known_ids)
+            known_ids.update(search_result_ids)
+
+        results.append({
+            'modified': modified,
+            'deleted': deleted,
+            'hasNewMessages': False,
+            'searchResultIds': search_result_ids,
+        })
+
+        if deleted:
+            if tree_id in local_objects:
+                del local_objects[tree_id]
+            break
+
+        if modified:
+            tree = after
+
+    # Store final tree in localObjects for subsequent GetObject
+    if tree is not None:
+        local_objects[str(tree.id)] = tree
+        if str(tree.id) != tree_id:
+            local_objects[tree_id] = tree
+
+    return {'results': results}
+
+
+def _collect_search_result_ids(tree) -> set:
+    """Collect all SearchResult marker UUIDs from a tree."""
+    from rewrite.markers import SearchResult
+    ids = set()
+    if tree is None:
+        return ids
+
+    def _walk(node):
+        if hasattr(node, 'markers') and node.markers is not None:
+            for m in node.markers.markers:
+                if isinstance(m, SearchResult):
+                    ids.add(str(m.id))
+
+    # Use the visitor framework to walk all nodes
+    from rewrite.visitor import TreeVisitor
+    class _Collector(TreeVisitor):
+        def pre_visit(self, tree, p):
+            _walk(tree)
+            return tree
+    _Collector().visit(tree, None)
+    return ids
 
 
 def _instantiate_visitor(visitor_name: str, ctx):
@@ -1147,7 +1286,11 @@ def _instantiate_visitor(visitor_name: str, ctx):
         return recipe.scanner(acc)
 
     else:
-        raise ValueError(f"Unknown visitor name format: {visitor_name}")
+        # Look up visitor by fully-qualified name from registry
+        visitor_cls = _get_visitor_registry().get(visitor_name)
+        if visitor_cls is None:
+            raise ValueError(f"Unknown visitor name format: {visitor_name}")
+        return visitor_cls()
 
 
 def handle_generate(params: dict) -> dict:
@@ -1191,6 +1334,7 @@ def handle_generate(params: dict) -> dict:
             ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
 
     # Only scanning recipes can generate files
     from rewrite.recipe import ScanningRecipe
@@ -1231,6 +1375,7 @@ def handle_request(method: str, params: dict) -> Any:
         'GetMarketplace': handle_get_marketplace,
         'PrepareRecipe': handle_prepare_recipe,
         'Visit': handle_visit,
+        'BatchVisit': handle_batch_visit,
         'Generate': handle_generate,
     }
 

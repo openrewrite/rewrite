@@ -26,6 +26,7 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.style.Autodetect;
@@ -434,6 +435,83 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void parseProjectWithVariousYamlStructures(@TempDir Path projectDir) throws IOException {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+
+        // Simple nested mappings
+        Files.writeString(projectDir.resolve("simple.yml"), """
+          top:
+            middle:
+              bottom: value
+          """);
+
+        // Anchors and aliases
+        Files.writeString(projectDir.resolve("anchors.yml"), """
+          defaults: &defaults
+            adapter: postgres
+            host: localhost
+          development:
+            database: dev_db
+            <<: *defaults
+          """);
+
+        // Sequences with nested mappings
+        Files.writeString(projectDir.resolve("sequences.yml"), """
+          items:
+            - name: first
+              value: 1
+            - name: second
+              value: 2
+          """);
+
+        // Multi-document
+        Files.writeString(projectDir.resolve("multi.yml"), """
+          ---
+          doc1: value1
+          ---
+          doc2: value2
+          """);
+
+        // Flow sequences and flow mappings
+        Files.writeString(projectDir.resolve("flow.yml"), """
+          flow_seq: [a, b, c]
+          flow_map: {key1: val1, key2: val2}
+          nested_flow: {outer: {inner: deep}}
+          """);
+
+        // Deeply nested (3+ levels)
+        Files.writeString(projectDir.resolve("deep.yml"), """
+          level1:
+            level2:
+              level3:
+                level4: deep_value
+              sibling3: sibling_value
+            sibling2: value
+          """);
+
+        List<SourceFile> sourceFiles = client()
+          .parseProject(projectDir, new InMemoryExecutionContext())
+          .toList();
+
+        List<SourceFile> yamlFiles = sourceFiles.stream()
+          .filter(sf -> sf.getSourcePath().toString().endsWith(".yml"))
+          .toList();
+
+        assertThat(yamlFiles).hasSize(6);
+        for (SourceFile yamlFile : yamlFiles) {
+            assertThat(yamlFile)
+              .as("File %s should parse as YAML, not ParseError", yamlFile.getSourcePath())
+              .isInstanceOf(Yaml.Documents.class)
+              .isNotInstanceOf(ParseError.class);
+            assertThat(client().print(yamlFile))
+              .as("File %s should print non-empty", yamlFile.getSourcePath())
+              .isNotEmpty();
+        }
+    }
+
+    @Test
     void parseProjectWithYamlContainingNestedFlowMappings(@TempDir Path projectDir) throws IOException {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}
@@ -459,6 +537,36 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
         SourceFile yamlFile = sourceFiles.stream()
           .filter(sf -> sf.getSourcePath().toString().endsWith("ci.yml"))
+          .findFirst().orElseThrow();
+
+        assertThat(yamlFile).isInstanceOf(Yaml.Documents.class);
+        assertThat(yamlFile).isNotInstanceOf(ParseError.class);
+        assertThat(client().print(yamlFile)).isNotEmpty();
+    }
+
+    @Test
+    void parseProjectWithYamlFlowCollectionKeys(@TempDir Path projectDir) throws IOException {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+
+        // Flow mapping used as a mapping key (valid YAML, no ? needed)
+        // The yaml npm CST parser produces a flow-collection token as the key,
+        // which the TS parser converts to Yaml.Mapping - but MappingEntry.key
+        // expects YamlKey (Scalar | Alias). This causes ClassCastException
+        // when sent via RPC to Java.
+        Files.writeString(projectDir.resolve("complex-keys.yml"), """
+          {a: 1}: value1
+          {b: 2, c: 3}: value2
+          simple: normal_value
+          """);
+
+        List<SourceFile> sourceFiles = client()
+          .parseProject(projectDir, new InMemoryExecutionContext())
+          .toList();
+
+        SourceFile yamlFile = sourceFiles.stream()
+          .filter(sf -> sf.getSourcePath().toString().endsWith("complex-keys.yml"))
           .findFirst().orElseThrow();
 
         assertThat(yamlFile).isInstanceOf(Yaml.Documents.class);
@@ -512,8 +620,39 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
+    /**
+     * Regression test for <a href="https://github.com/moderneinc/customer-requests/issues/2234">#2234</a>:
+     * a string enum declaration would send a {@link JavaType.Primitive} (resolved from the union of
+     * enum literals) for {@code J.ClassDeclaration.type}, which the Java-side RPC receiver rejects
+     * with "A class can only be type attributed with a fully qualified type name".
+     */
+    @Test
+    void parseStringEnumDeclaration() {
+        rewriteRun(
+          typescript(
+            """
+              export enum ContentType {
+                APPLICATION_JSON = 'application/json',
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaScriptIsoVisitor<Integer>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+                    assertThat(classDecl.getType())
+                      .as("enum declaration must have a FullyQualified type")
+                      .isInstanceOf(JavaType.Class.class);
+                    JavaType.Class type = (JavaType.Class) classDecl.getType();
+                    assertThat(type.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Enum);
+                    assertThat(type.getFullyQualifiedName()).contains("ContentType");
+                    return classDecl;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
     private void installRecipes() {
-        File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
+        var exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
         assertThat(exampleRecipes).exists();
         assertThat(client().installRecipes(exampleRecipes).getRecipesInstalled()).isGreaterThan(0);
     }

@@ -96,7 +96,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             }
 
             is FirErrorNamedReference -> {
-                return type.name.asString()
+                type.name.asString()
             }
 
             is FirFile -> {
@@ -244,7 +244,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 if (type.typeArguments.isNotEmpty()) {
                     throw UnsupportedOperationException("Unsupported ConeCapturedType with type arguments: ${type.javaClass.name}")
                 }
-                return "Generic{?}"
+                "Generic{?}"
             }
 
             is ConeIntersectionType -> {
@@ -415,7 +415,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 ?.entries?.associate { (arg, param) -> param.name.asString() to arg }
 
         val valueParams = (function.toResolvedCallableSymbol()?.fir as FirFunction).valueParameters
-        for ((index, p) in valueParams.withIndex()) {
+        for ((_, p) in valueParams.withIndex()) {
             val sig = signature(p.returnTypeRef, function)
             if (sig.startsWith("Generic{")) {
                 val arg = paramToArg?.get(p.name.asString())
@@ -481,16 +481,16 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 when (type.variance) {
                     Variance.INVARIANT -> signature(type.typeRef)
                     Variance.IN_VARIANCE -> {
-                        return "Generic{? super " + signature(type.typeRef)
+                        "Generic{? super " + signature(type.typeRef)
                     }
 
                     Variance.OUT_VARIANCE -> {
-                        return "Generic{? extends " + signature(type.typeRef)
+                        "Generic{? extends " + signature(type.typeRef)
                     }
                 }
             }
             is FirStarProjection -> {
-                return "Generic{?}"
+                "Generic{?}"
             }
 
             else -> throw UnsupportedOperationException("Unsupported FirTypeProjection: ${type.javaClass.name}")
@@ -506,8 +506,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 convertClassIdToFqn(property.dispatchReceiverType!!.toRegularClassSymbol(firSession)!!.classId)
             }
 
-            property.symbol.callableId.classId != null -> {
-                var oSig = convertClassIdToFqn(property.symbol.callableId.classId)
+            property.symbol.callableId?.classId != null -> {
+                var oSig = convertClassIdToFqn(property.symbol.callableId?.classId)
                 if (oSig.contains("<")) {
                     oSig = oSig.substring(0, oSig.indexOf('<'))
                 }
@@ -530,10 +530,19 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         return when (type) {
             is JavaArrayType -> javaArraySignature(type)
             is JavaPrimitiveType -> javaPrimitiveSignature(type)
-            // The classifier is evaluated separately, because the BinaryJavaClass may have type parameters.
-            is JavaClassifierType -> if (type.typeArguments.isNotEmpty()) javaParameterizedSignature(type) else signature(
-                type.classifier
-            )
+            // A raw JavaClassifierType (one without explicit type arguments) refers
+            // to the classifier as a raw type. Use the classifier's non-parameterized
+            // FQN so this is a distinct cache key from the BinaryJavaClass's own raw
+            // Parameterized form (which uses the `Foo<Generic{T}>` signature). Without
+            // this, a raw reference to a generic class collides on the type cache with
+            // the class's raw Parameterized and surfaces as Parameterized — which
+            // diverges from the Java parser's handling of raw references.
+            is JavaClassifierType -> if (type.typeArguments.isNotEmpty()) {
+                javaParameterizedSignature(type)
+            } else when (val classifier = type.classifier) {
+                is JavaClass -> javaClassSignature(classifier)
+                else -> signature(classifier)
+            }
 
             is BinaryJavaAnnotation -> signature(type.classId.toSymbol(firSession)?.fir)
             is BinaryJavaClass -> if (type.typeParameters.isNotEmpty()) javaParameterizedSignature(type) else javaClassSignature(
@@ -552,6 +561,14 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     }
 
     private fun javaClassSignature(type: BinaryJavaClass): String {
+        // Walk outerClass to produce the JVM-style `Outer$Inner` FQN. Without this,
+        // nested `BinaryJavaClass` entries would surface as `Outer.Inner` — not
+        // matching the `$`-separated form the Java parser (and `toJvmFqn`) uses,
+        // which blocks cross-parser cache coherence for nested classes.
+        val outer = type.outerClass
+        if (outer != null) {
+            return $$"$${javaClassSignature(outer)}$$${type.name.asString()}"
+        }
         return type.fqName.asString()
     }
 
@@ -560,7 +577,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             return "{undefined}"
         }
         return when {
-            type.outerClass != null -> "${javaClassSignature(type.outerClass!!)}${'$'}${type.name}"
+            type.outerClass != null -> $$"$${javaClassSignature(type.outerClass!!)}$$${type.name}"
             else -> type.fqName!!.asString()
         }
     }
@@ -589,7 +606,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     }
 
     private fun javaParameterizedSignature(type: BinaryJavaClass): String {
-        val sig = StringBuilder(type.fqName.asString())
+        val sig = StringBuilder(javaClassSignature(type))
         val joiner = StringJoiner(", ", "<", ">")
         for (tp in type.typeParameters) {
             joiner.add(signature(tp, type))
@@ -598,7 +615,16 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     }
 
     private fun javaParameterizedSignature(type: JavaClassifierType): String {
-        val sig = StringBuilder(type.classifierQualifiedName)
+        // Use the classifier's own FQN rendering (which produces `$`-separated form
+        // for nested classes via `javaClassSignature(JavaClass)`) so instantiated
+        // signatures stay consistent with the BinaryJavaClass's raw Parameterized
+        // signature. Falling back to `classifierQualifiedName` yields dotted form,
+        // which would produce `Outer.Inner<T>` instead of `Outer$Inner<T>` and
+        // diverge from the JVM-style FQN used elsewhere.
+        val sig = StringBuilder(when (val classifier = type.classifier) {
+            is JavaClass -> javaClassSignature(classifier)
+            else -> type.classifierQualifiedName
+        })
         val joiner = StringJoiner(", ", "<", ">")
         for (tp in type.typeArguments) {
             joiner.add(signature(tp, type))
@@ -607,16 +633,21 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     }
 
     private fun javaPrimitiveSignature(type: JavaPrimitiveType): String {
+        // Use the primitive keyword (e.g. "int", "boolean") rather than the boxed FQN —
+        // the type cache is keyed by signature, and JavaType.Primitive.Int.className is
+        // "java.lang.Integer", which collides with the java.lang.Integer class entry
+        // (written by javaClassType) and causes the cache to hand back the boxed Class
+        // when asked for the primitive.
         return when (type.type) {
-            PrimitiveType.BOOLEAN -> JavaType.Primitive.Boolean.className
-            PrimitiveType.BYTE -> JavaType.Primitive.Byte.className
-            PrimitiveType.CHAR -> JavaType.Primitive.Char.className
-            PrimitiveType.DOUBLE -> JavaType.Primitive.Double.className
-            PrimitiveType.FLOAT -> JavaType.Primitive.Float.className
-            PrimitiveType.INT -> JavaType.Primitive.Int.className
-            PrimitiveType.LONG -> JavaType.Primitive.Long.className
-            PrimitiveType.SHORT -> JavaType.Primitive.Short.className
-            null -> JavaType.Primitive.Void.className
+            PrimitiveType.BOOLEAN -> JavaType.Primitive.Boolean.keyword
+            PrimitiveType.BYTE -> JavaType.Primitive.Byte.keyword
+            PrimitiveType.CHAR -> JavaType.Primitive.Char.keyword
+            PrimitiveType.DOUBLE -> JavaType.Primitive.Double.keyword
+            PrimitiveType.FLOAT -> JavaType.Primitive.Float.keyword
+            PrimitiveType.INT -> JavaType.Primitive.Int.keyword
+            PrimitiveType.LONG -> JavaType.Primitive.Long.keyword
+            PrimitiveType.SHORT -> JavaType.Primitive.Short.keyword
+            null -> JavaType.Primitive.Void.keyword
         }
     }
 

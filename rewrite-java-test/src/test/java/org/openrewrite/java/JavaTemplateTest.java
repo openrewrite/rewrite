@@ -110,9 +110,7 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
-                    return JavaTemplate.builder("#{any()}")
-                      .build()
-                      .apply(getCursor(), parens.getCoordinates().replace(), parens.getTree());
+                    return JavaTemplate.apply("#{any()}", getCursor(), parens.getCoordinates().replace(), parens.getTree());
                 }
             }))
             .cycles(1)
@@ -138,9 +136,7 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                    return JavaTemplate.builder("#{any(int)} * 3")
-                      .build()
-                      .apply(getCursor(), binary.getCoordinates().replace(), binary);
+                    return JavaTemplate.apply("#{any(int)} * 3", getCursor(), binary.getCoordinates().replace(), binary);
                 }
             }))
             .cycles(1)
@@ -209,9 +205,7 @@ class JavaTemplateTest implements RewriteTest {
                       return multiVariable;
                   }
                   J.VariableDeclarations.NamedVariable var0 = multiVariable.getVariables().getFirst();
-                  return JavaTemplate.builder("var #{} = #{any()};")
-                    .build()
-                    .apply(getCursor(), multiVariable.getCoordinates().replace(), var0.getSimpleName(), var0.getInitializer());
+                  return JavaTemplate.apply("var #{} = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), var0.getSimpleName(), var0.getInitializer());
               }
           })),
           java(
@@ -399,18 +393,11 @@ class JavaTemplateTest implements RewriteTest {
                   if (classDecl.getBody().getStatements().size() > 1) {
                       return classDecl;
                   }
-                  return JavaTemplate.builder("""
+                  return JavaTemplate.apply("""
                       void m2() {
                       	  #{any()}
                       }
-                      """
-                    )
-                    .build()
-                    .apply(
-                      getCursor(),
-                      classDecl.getBody().getStatements().getFirst().getCoordinates().after(),
-                      ((J.MethodDeclaration) classDecl.getBody().getStatements().getFirst()).getBody().getStatements().getFirst()
-                    );
+                      """, getCursor(), classDecl.getBody().getStatements().getFirst().getCoordinates().after(), ((J.MethodDeclaration) classDecl.getBody().getStatements().getFirst()).getBody().getStatements().getFirst());
               }
           })),
           java(
@@ -595,9 +582,7 @@ class JavaTemplateTest implements RewriteTest {
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
                   if (binary.getLeft() instanceof J.MethodInvocation) {
                       var mi = (J.MethodInvocation) binary.getLeft();
-                      return JavaTemplate.builder("!#{any(java.util.List)}.isEmpty()")
-                        .build()
-                        .apply(getCursor(), mi.getCoordinates().replace(), mi.getSelect());
+                      return JavaTemplate.apply("!#{any(java.util.List)}.isEmpty()", getCursor(), mi.getCoordinates().replace(), mi.getSelect());
                   } else if (binary.getLeft() instanceof J.Unary) {
                       return binary.getLeft();
                   }
@@ -678,12 +663,7 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitUnary(J.Unary unary, ExecutionContext ctx) {
-                  return JavaTemplate.builder("#{any()}++")
-                    .build().apply(
-                      getCursor(),
-                      unary.getCoordinates().replace(),
-                      unary.getExpression()
-                    );
+                  return JavaTemplate.apply("#{any()}++", getCursor(), unary.getCoordinates().replace(), unary.getExpression());
               }
           }).withMaxCycles(1)),
           java(
@@ -1017,9 +997,7 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return JavaTemplate.builder("\"ab\"")
-                    .build()
-                    .apply(getCursor(), binary.getCoordinates().replace());
+                  return JavaTemplate.apply("\"ab\"", getCursor(), binary.getCoordinates().replace());
               }
           })),
           java(
@@ -1354,9 +1332,7 @@ class JavaTemplateTest implements RewriteTest {
                 @Override
                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     if (new MethodMatcher("batch.StepBuilder create()").matches(method)) {
-                        return JavaTemplate.builder("new StepBuilder()")
-                          .build()
-                          .apply(getCursor(), method.getCoordinates().replace());
+                        return JavaTemplate.apply("new StepBuilder()", getCursor(), method.getCoordinates().replace());
                     }
                     return super.visitMethodInvocation(method, ctx);
                 }
@@ -1406,9 +1382,7 @@ class JavaTemplateTest implements RewriteTest {
                   J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
                   if (new MethodMatcher("Foo bar(..)").matches(mi) &&
                     mi.getArguments().getFirst() instanceof J.Binary) {
-                      return JavaTemplate.builder("\"Hello, {}\", \"World!\"")
-                        .build()
-                        .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments());
+                      return JavaTemplate.apply("\"Hello, {}\", \"World!\"", new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments());
                   }
                   return mi;
               }
@@ -1518,6 +1492,165 @@ class JavaTemplateTest implements RewriteTest {
 
                   abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
                   abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7443")
+    @Test
+    void replaceExpressionInSwitchExpressionRuleArm() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final MethodMatcher emptyListMatcher = new MethodMatcher("java.util.Collections emptyList()");
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (emptyListMatcher.matches(m)) {
+                      return JavaTemplate.builder("List.of()")
+                        .contextSensitive()
+                        .imports("java.util.List")
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().replace());
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0 -> Collections.emptyList();
+                          default -> null;
+                      };
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0 -> List.of();
+                          default -> null;
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7443")
+    @Test
+    void replaceExpressionInSwitchExpressionColonArm() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final MethodMatcher emptyListMatcher = new MethodMatcher("java.util.Collections emptyList()");
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (emptyListMatcher.matches(m)) {
+                      return JavaTemplate.builder("List.of()")
+                        .contextSensitive()
+                        .imports("java.util.List")
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().replace());
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0: yield Collections.emptyList();
+                          default: yield null;
+                      };
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0: yield List.of();
+                          default: yield null;
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7443")
+    @Test
+    void replaceExpressionInSwitchExpressionPreservesUnrelatedArms() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final MethodMatcher emptyListMatcher = new MethodMatcher("java.util.Collections emptyList()");
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (emptyListMatcher.matches(m)) {
+                      return JavaTemplate.builder("List.of()")
+                        .contextSensitive()
+                        .imports("java.util.List")
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().replace());
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              import java.util.Arrays;
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0 -> Arrays.asList("a");
+                          case 1 -> Collections.emptyList();
+                          case 2 -> Arrays.asList("b");
+                          default -> null;
+                      };
+                  }
+              }
+              """,
+            """
+              import java.util.Arrays;
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0 -> Arrays.asList("a");
+                          case 1 -> List.of();
+                          case 2 -> Arrays.asList("b");
+                          default -> null;
+                      };
+                  }
               }
               """
           )

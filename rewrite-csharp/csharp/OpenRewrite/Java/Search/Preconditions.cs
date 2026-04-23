@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.CSharp.Rpc;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -20,55 +21,50 @@ using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 namespace OpenRewrite.Java.Search;
 
 /// <summary>
-/// Convenience functions for common precondition visitors.
-/// When connected to Java via RPC, delegates to Java's implementations.
-/// Otherwise falls back to local implementations.
+/// Search-based precondition visitors that delegate to Java's implementations via RPC.
+/// Requires an active RPC connection to a Java process.
 /// </summary>
 public static class Preconditions
 {
     /// <summary>
-    /// Creates a UsesType precondition. If connected to Java via RPC, delegates to
-    /// Java's org.openrewrite.java.search.HasType. Otherwise falls back to local implementation.
+    /// Creates a UsesType precondition that delegates to Java's
+    /// org.openrewrite.java.search.HasType via RPC.
     /// </summary>
-    public static JavaVisitor<ExecutionContext> UsesType(string fullyQualifiedTypeName)
+    /// <exception cref="InvalidOperationException">Thrown when no RPC connection is available.</exception>
+    public static ITreeVisitor<ExecutionContext> UsesType(string fullyQualifiedTypeName)
     {
-        var rpc = RewriteRpcServer.Current;
-        if (rpc != null)
-        {
-            var response = rpc.PrepareRecipeOnRemote(
-                "org.openrewrite.java.search.HasType",
-                new Dictionary<string, object?>
-                {
-                    ["fullyQualifiedType"] = fullyQualifiedTypeName,
-                    ["checkAssignability"] = false
-                }
-            );
-            return new RpcVisitor(rpc, response.EditVisitor);
-        }
+        var rpc = RewriteRpcServer.Current
+                  ?? throw new InvalidOperationException("UsesType requires an RPC connection to Java");
 
-        return new LocalUsesType<ExecutionContext>(fullyQualifiedTypeName);
+        var response = rpc.PrepareRecipeOnRemote(
+            "org.openrewrite.java.search.HasType",
+            new Dictionary<string, object?>
+            {
+                ["fullyQualifiedTypeName"] = fullyQualifiedTypeName,
+                ["checkAssignability"] = false
+            }
+        );
+        return new RpcVisitor(rpc, response.EditVisitor);
     }
 
     /// <summary>
-    /// Creates a UsesMethod precondition. If connected to Java via RPC, delegates to
-    /// Java's org.openrewrite.java.search.HasMethod.
+    /// Creates a UsesMethod precondition that delegates to Java's
+    /// org.openrewrite.java.search.HasMethod via RPC.
     /// </summary>
-    public static JavaVisitor<ExecutionContext> UsesMethod(string methodPattern)
+    /// <exception cref="InvalidOperationException">Thrown when no RPC connection is available.</exception>
+    public static ITreeVisitor<ExecutionContext> UsesMethod(string methodPattern)
     {
-        var rpc = RewriteRpcServer.Current;
-        if (rpc != null)
-        {
-            var response = rpc.PrepareRecipeOnRemote(
-                "org.openrewrite.java.search.HasMethod",
-                new Dictionary<string, object?>
-                {
-                    ["methodPattern"] = methodPattern,
-                    ["matchOverrides"] = false
-                }
-            );
-            return new RpcVisitor(rpc, response.EditVisitor);
-        }
+        var rpc = RewriteRpcServer.Current
+                  ?? throw new InvalidOperationException("UsesMethod requires an RPC connection to Java");
 
-        throw new InvalidOperationException("UsesMethod requires an RPC connection to Java");
+        var response = rpc.PrepareRecipeOnRemote(
+            "org.openrewrite.java.search.HasMethod",
+            new Dictionary<string, object?>
+            {
+                ["methodPattern"] = methodPattern,
+                ["matchOverrides"] = false
+            }
+        );
+        return new RpcVisitor(rpc, response.EditVisitor);
     }
 }

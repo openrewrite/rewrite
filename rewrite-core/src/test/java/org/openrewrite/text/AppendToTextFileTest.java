@@ -317,6 +317,59 @@ class AppendToTextFileTest implements RewriteTest {
     }
 
     @Nested
+    class Glob {
+
+        @Test
+        void globMatchesMultipleFiles() {
+            rewriteRun(
+              spec -> spec.recipe(new AppendToTextFile("**/*.txt", "content", null, true, AppendToTextFile.Strategy.Continue)),
+              text(
+                "existing1",
+                """
+                  existing1
+                  content
+                  """,
+                spec -> spec.path("a/file1.txt").noTrim()
+              ),
+              text(
+                "existing2",
+                """
+                  existing2
+                  content
+                  """,
+                spec -> spec.path("b/file2.txt").noTrim()
+              )
+            );
+        }
+
+        @Test
+        void globDoesNotCreateNewFile() {
+            rewriteRun(
+              spec -> spec.recipe(new AppendToTextFile("**/*.txt", "content", "preamble", true, AppendToTextFile.Strategy.Leave))
+            );
+        }
+
+        @Test
+        void globSkipsNonMatchingFiles() {
+            rewriteRun(
+              spec -> spec.recipe(new AppendToTextFile("**/*.txt", "content", null, true, AppendToTextFile.Strategy.Continue)),
+              text(
+                "keep me",
+                spec -> spec.path("a/file.md")
+              ),
+              text(
+                "existing",
+                """
+                  existing
+                  content
+                  """,
+                spec -> spec.path("a/file.txt").noTrim()
+              )
+            );
+        }
+    }
+
+    @Nested
     class Merge {
         /**
          * Demonstrates the @{code Merge} strategy with smart line-based deduplication.

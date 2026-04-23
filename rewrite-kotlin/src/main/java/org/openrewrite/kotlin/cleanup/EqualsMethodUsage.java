@@ -27,6 +27,7 @@ import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.IsNullSafe;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.kotlin.tree.KotlinTypeUtils;
 
 import java.time.Duration;
 import java.util.Set;
@@ -92,7 +93,7 @@ public class EqualsMethodUsage extends Recipe {
                 if ("equals".equals(method.getSimpleName()) &&
                     method.getMethodType() != null &&
                     method.getArguments().size() == 1 &&
-                    TypeUtils.isOfClassType(method.getMethodType().getReturnType(), "kotlin.Boolean") &&
+                    KotlinTypeUtils.isOfClassType(method.getMethodType().getReturnType(), "kotlin.Boolean") &&
                     method.getSelect() != null &&
                     !method.getMarkers().findFirst(IsNullSafe.class).isPresent()
                 ) {

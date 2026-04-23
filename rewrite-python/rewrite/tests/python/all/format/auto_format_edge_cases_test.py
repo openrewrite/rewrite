@@ -374,3 +374,21 @@ def test_type_alias():
         spec=RecipeSpec()
         .with_recipe(AutoFormat())
     )
+
+
+def test_import_with_alias_normalizes_spacing():
+    rewrite_run(
+        # language=python
+        python(
+            """\
+            from typing import Tuple  as  T
+            import os as  operating_system
+            """,
+            """\
+            from typing import Tuple as T
+            import os as operating_system
+            """,
+        ),
+        spec=RecipeSpec()
+        .with_recipe(AutoFormat())
+    )

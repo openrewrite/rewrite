@@ -23,6 +23,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Path;
@@ -31,6 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.properties.Assertions.properties;
 
 class ChangeDependencyTest implements RewriteTest {
@@ -1071,15 +1074,121 @@ class ChangeDependencyTest implements RewriteTest {
 
     @Test
     void isAcceptable() {
-        ChangeDependency recipe = new ChangeDependency(
+        var recipe = new ChangeDependency(
                 "org.old", "artifact", "org.new", "artifact", null, null, null
         );
         @SuppressWarnings("unchecked")
-        TreeVisitor<?, ExecutionContext> visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
+        var visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
 
         SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file")
                 .findFirst().orElseThrow()
                 .withSourcePath(Path.of("not-a-gradle-file.txt"));
         assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
+    }
+
+    @Test
+    void isNotAcceptableForPlainTextWithGradleProjectMarker() {
+        var recipe = new ChangeDependency(
+                "org.old", "artifact", "org.new", "artifact", null, null, null
+        );
+        @SuppressWarnings("unchecked")
+        var visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
+
+        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file")
+                .findFirst().orElseThrow()
+                .withSourcePath(Path.of("build.gradle"))
+                .withMarkers(new org.openrewrite.marker.Markers(org.openrewrite.Tree.randomId(),
+                        java.util.Collections.singletonList(GradleProject.builder()
+                                .group("com.example")
+                                .name("test")
+                                .version("1.0")
+                                .path(":")
+                                .build())));
+        assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
+    }
+
+    @Test
+    void doesNotChangeGroupIdWhenNewCoordinatesDontResolve() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("org.hibernate", "hibernate-*", "org.hibernate.orm", null, "6.0.x", null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def hibernateVersion = '5.6.15.Final'
+              dependencies {
+                  implementation "org.hibernate:hibernate-core:${hibernateVersion}"
+                  implementation "org.hibernate:hibernate-validator:${hibernateVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def hibernateVersion = '5.6.15.Final'
+              dependencies {
+                  implementation "org.hibernate.orm:hibernate-core:6.0.2.Final"
+                  implementation "org.hibernate:hibernate-validator:${hibernateVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeDependencyWhenJavaSourcesPresent() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          mavenProject("sample",
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "commons-lang:commons-lang:2.6"
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "org.apache.commons:commons-lang3:3.11"
+                }
+                """
+            ),
+            java(
+              """
+                class A {
+                    String foo(String s) {
+                        return s;
+                    }
+                }
+                """
+            )
+          )
+        );
     }
 }

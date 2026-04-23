@@ -15,18 +15,30 @@
  */
 package org.openrewrite.gradle;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenExecutionContextView;
+import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.cache.MavenPomCache;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainTextParser;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -100,6 +112,137 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       assertThat(dep.getVersion()).isEqualTo("30.1.1-jre");
                   });
             })
+          )
+        );
+    }
+
+    @Test
+    void doesNotResolveTransitiveDependencies() {
+        MavenPomCache delegate = new InMemoryMavenPomCache();
+        MavenPomCache failOnFailureAccess = new MavenPomCache() {
+            private void assertNotFailureAccess(String groupId, String artifactId) {
+                if ("com.google.guava".equals(groupId) && "failureaccess".equals(artifactId)) {
+                    throw new AssertionError("UpgradeDependencyVersion should not resolve the transitive dependency " +
+                            "com.google.guava:failureaccess");
+                }
+            }
+
+            @Override
+            public @Nullable ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
+                assertNotFailureAccess(dependency.getGroupId(), dependency.getArtifactId());
+                return delegate.getResolvedDependencyPom(dependency);
+            }
+
+            @Override
+            public void putResolvedDependencyPom(ResolvedGroupArtifactVersion dependency, ResolvedPom resolved) {
+                assertNotFailureAccess(dependency.getGroupId(), dependency.getArtifactId());
+                delegate.putResolvedDependencyPom(dependency, resolved);
+            }
+
+            @Override
+            public @Nullable Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+                assertNotFailureAccess(gav.getGroupId(), gav.getArtifactId());
+                return delegate.getMavenMetadata(repo, gav);
+            }
+
+            @Override
+            public void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata) {
+                assertNotFailureAccess(gav.getGroupId(), gav.getArtifactId());
+                delegate.putMavenMetadata(repo, gav, metadata);
+            }
+
+            @Override
+            public @Nullable Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException {
+                assertNotFailureAccess(gav.getGroupId(), gav.getArtifactId());
+                return delegate.getPom(gav);
+            }
+
+            @Override
+            public void putPom(ResolvedGroupArtifactVersion gav, @Nullable Pom pom) {
+                assertNotFailureAccess(gav.getGroupId(), gav.getArtifactId());
+                delegate.putPom(gav, pom);
+            }
+
+            @Override
+            public @Nullable Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
+                return delegate.getNormalizedRepository(repository);
+            }
+
+            @Override
+            public void putNormalizedRepository(MavenRepository repository, MavenRepository normalized) {
+                delegate.putNormalizedRepository(repository, normalized);
+            }
+        };
+        rewriteRun(
+          spec -> spec.recipeExecutionContext(
+            MavenExecutionContextView.view(new InMemoryExecutionContext()).setPomCache(failOnFailureAccess)),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                compileOnly 'com.google.guava:guava:29.0-jre'
+                runtimeOnly ('com.google.guava:guava:29.0-jre')
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                compileOnly 'com.google.guava:guava:30.1.1-jre'
+                runtimeOnly ('com.google.guava:guava:30.1.1-jre')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependencyInsightFindsUpdatedTransitiveAfterUpgrade() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre"),
+            new org.openrewrite.gradle.search.DependencyInsight("org.checkerframework", "checker-qual", null, null)
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation 'com.google.guava:guava:29.0-jre'
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                /*~~(org.checkerframework:checker-qual:3.8.0)~~>*/implementation 'com.google.guava:guava:30.1.1-jre'
+              }
+              """
           )
         );
     }
@@ -422,6 +565,125 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
               dependencies {
                   implementation("com.google.guava", "guava", "30.1.1-jre")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiComponentVariableReferenceNotation() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "29.0-jre"
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "30.1.1-jre"
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiComponentVariableReferenceWithExtraProperties() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "29.0-jre"
+              extra["guavaVersion"] = guavaVersion
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "30.1.1-jre"
+              extra["guavaVersion"] = guavaVersion
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiComponentVariableReferenceSharedAcrossMultipleDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("io.awspring.cloud", "*", "3.4.2", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val awsVersion = "3.3.1"
+
+              dependencies {
+                  implementation("io.awspring.cloud", "spring-cloud-aws-starter", awsVersion)
+                  implementation("io.awspring.cloud", "spring-cloud-aws-starter-sqs", awsVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val awsVersion = "3.4.2"
+
+              dependencies {
+                  implementation("io.awspring.cloud", "spring-cloud-aws-starter", awsVersion)
+                  implementation("io.awspring.cloud", "spring-cloud-aws-starter-sqs", awsVersion)
               }
               """
           )
@@ -1535,7 +1797,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void isAcceptable() {
         // Mimic org.openrewrite.java.dependencies.UpgradeTransitiveDependencyVersion#getVisitor
-        UpgradeDependencyVersion guava = new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre");
+        var guava = new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre");
         TreeVisitor<?, ExecutionContext> visitor = guava.getVisitor();
 
         SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file").findFirst().orElseThrow().withSourcePath(Path.of("not-a-gradle-file.txt"));
@@ -2272,6 +2534,33 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   dependencies {
                       classpath "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeExtPropertyVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0-jre", null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  guavaVersion = "30.1.1-jre"
+              }
+
+              dependencies {
+                  implementation "com.google.guava:guava:${guavaVersion}"
               }
               """
           )

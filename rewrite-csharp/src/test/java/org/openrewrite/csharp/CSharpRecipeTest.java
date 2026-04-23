@@ -15,12 +15,14 @@
  */
 package org.openrewrite.csharp;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.java.*;
 import org.openrewrite.java.search.FindMethods;
@@ -28,8 +30,6 @@ import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -53,16 +53,16 @@ class CSharpRecipeTest implements RewriteTest {
     static void setUpFactory() {
         Path basePath = Paths.get(System.getProperty("user.dir"));
         Path[] searchPaths = {
-                basePath.resolve("csharp"),
-                basePath.resolve("rewrite-csharp/csharp"),
+          basePath.resolve("csharp"),
+          basePath.resolve("rewrite-csharp/csharp"),
         };
         for (Path searchPath : searchPaths) {
             Path csproj = searchPath.resolve("OpenRewrite.Tool/OpenRewrite.Tool.csproj");
             if (csproj.toFile().exists()) {
                 CSharpRewriteRpc.setFactory(
-                        CSharpRewriteRpc.builder()
-                                .csharpServerEntry(csproj.toAbsolutePath().normalize())
-                                .log(Paths.get("/tmp/csharp-rpc.log"))
+                  CSharpRewriteRpc.builder()
+                    .csharpServerEntry(csproj.toAbsolutePath().normalize())
+                    .log(Paths.get("/tmp/csharp-rpc.log"))
                 );
                 return;
             }
@@ -72,6 +72,11 @@ class CSharpRecipeTest implements RewriteTest {
 
     @AfterEach
     void tearDown() {
+        CSharpRewriteRpc.resetCurrent();
+    }
+
+    @AfterAll
+    static void shutDown() {
         CSharpRewriteRpc.shutdownCurrent();
     }
 
@@ -81,14 +86,17 @@ class CSharpRecipeTest implements RewriteTest {
         CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
 
         List<SourceFile> sourceFiles = parseSolutionWithRefs(rpc, source, "Test.cs",
-                "Newtonsoft.Json", "13.0.1");
+          "Newtonsoft.Json", "13.0.1");
 
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile sf = sourceFiles.getFirst();
+        List<SourceFile> csFiles = sourceFiles.stream()
+          .filter(sf -> sf instanceof Cs.CompilationUnit)
+          .toList();
+        assertThat(csFiles).hasSize(1);
+        SourceFile sf = csFiles.getFirst();
         assertThat(sf).isInstanceOf(Cs.CompilationUnit.class);
 
         // Find the method invocation
-        Cs.CompilationUnit cu = (Cs.CompilationUnit) sf;
+        var cu = (Cs.CompilationUnit) sf;
         J.MethodInvocation invocation = findFirstMethodInvocation(cu);
         assertThat(invocation).as("Should find SerializeObject invocation").isNotNull();
         assertThat(invocation.getSimpleName()).isEqualTo("SerializeObject");
@@ -99,26 +107,26 @@ class CSharpRecipeTest implements RewriteTest {
         assertThat(methodType.getName()).isEqualTo("SerializeObject");
         assertThat(methodType.getDeclaringType()).isNotNull();
         assertThat(methodType.getDeclaringType().getFullyQualifiedName())
-                .isEqualTo("Newtonsoft.Json.JsonConvert");
+          .isEqualTo("Newtonsoft.Json.JsonConvert");
     }
 
     private static List<SourceFile> parseSolutionWithRefs(CSharpRewriteRpc rpc, String source,
-                                                             String fileName, String packageName,
-                                                             String packageVersion) throws IOException {
+                                                          String fileName, String packageName,
+                                                          String packageVersion) throws IOException {
         Path tempDir = Files.createTempDirectory("csharp-recipe-test-");
         Path csFile = tempDir.resolve(fileName);
         try (OutputStream os = Files.newOutputStream(csFile)) {
             os.write(source.getBytes(StandardCharsets.UTF_8));
         }
         String csprojContent =
-                "<Project Sdk=\"Microsoft.NET.Sdk\">\n" +
-                "  <PropertyGroup>\n" +
-                "    <TargetFramework>net10.0</TargetFramework>\n" +
-                "  </PropertyGroup>\n" +
-                "  <ItemGroup>\n" +
-                "    <PackageReference Include=\"" + packageName + "\" Version=\"" + packageVersion + "\" />\n" +
-                "  </ItemGroup>\n" +
-                "</Project>\n";
+          "<Project Sdk=\"Microsoft.NET.Sdk\">\n" +
+          "  <PropertyGroup>\n" +
+          "    <TargetFramework>net10.0</TargetFramework>\n" +
+          "  </PropertyGroup>\n" +
+          "  <ItemGroup>\n" +
+          "    <PackageReference Include=\"" + packageName + "\" Version=\"" + packageVersion + "\" />\n" +
+          "  </ItemGroup>\n" +
+          "</Project>\n";
         Path csproj = tempDir.resolve("Test.csproj");
         try (OutputStream os = Files.newOutputStream(csproj)) {
             os.write(csprojContent.getBytes(StandardCharsets.UTF_8));
@@ -133,32 +141,42 @@ class CSharpRecipeTest implements RewriteTest {
         if (tree instanceof Cs.CompilationUnit cu) {
             for (Statement member : cu.getMembers()) {
                 J.MethodInvocation result = findFirstMethodInvocation(member);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
-        if (tree instanceof Cs.BlockScopeNamespaceDeclaration ns) {
+        if (tree instanceof Cs.NamespaceDeclaration ns) {
             for (var member : ns.getMembers()) {
                 J.MethodInvocation result = findFirstMethodInvocation(member);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof J.ClassDeclaration cd) {
             for (Statement stmt : cd.getBody().getStatements()) {
                 J.MethodInvocation result = findFirstMethodInvocation(stmt);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof J.MethodDeclaration md && md.getBody() != null) {
             for (Statement stmt : md.getBody().getStatements()) {
                 J.MethodInvocation result = findFirstMethodInvocation(stmt);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof J.VariableDeclarations vd) {
             for (var v : vd.getVariables()) {
                 if (v.getInitializer() != null) {
                     J.MethodInvocation result = findFirstMethodInvocation(v.getInitializer());
-                    if (result != null) return result;
+                    if (result != null) {
+                        return result;
+                    }
                 }
             }
         }
@@ -171,14 +189,17 @@ class CSharpRecipeTest implements RewriteTest {
         CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
 
         List<SourceFile> sourceFiles = parseSolutionWithRefs(rpc, source, "Test.cs",
-                "Newtonsoft.Json", "13.0.1");
+          "Newtonsoft.Json", "13.0.1");
 
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile sf = sourceFiles.getFirst();
+        List<SourceFile> csFiles = sourceFiles.stream()
+          .filter(f -> f instanceof Cs.CompilationUnit)
+          .toList();
+        assertThat(csFiles).hasSize(1);
+        SourceFile sf = csFiles.getFirst();
 
         // Apply ChangeMethodName recipe directly via visitor
         var recipe = new ChangeMethodName(
-                "Newtonsoft.Json.JsonConvert SerializeObject(..)", "ToJson", null, null);
+          "Newtonsoft.Json.JsonConvert SerializeObject(..)", "ToJson", null, null);
         var visitor = recipe.getVisitor();
         var modified = (SourceFile) visitor.visit(sf, new InMemoryExecutionContext());
         assertThat(modified).as("Recipe visitor should produce a modified tree").isNotSameAs(sf);
@@ -191,298 +212,299 @@ class CSharpRecipeTest implements RewriteTest {
     @Test
     void changeMethodName() {
         rewriteRun(
-                spec -> spec
-                        .recipe(new ChangeMethodName(
-                                "Newtonsoft.Json.JsonConvert SerializeObject(..)", "ToJson", null, null))
-                        .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
-                        .typeValidationOptions(TypeValidation.builder()
-                                .allowNonWhitespaceInWhitespace(true)
-                                .build()),
-                csproj(
-                        """
-                        <Project Sdk="Microsoft.NET.Sdk">
-                          <PropertyGroup>
-                            <TargetFramework>net9.0</TargetFramework>
-                          </PropertyGroup>
-                          <ItemGroup>
-                            <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-                          </ItemGroup>
-                        </Project>
-                        """
-                ),
-                csharp(
-                        """
-                        using Newtonsoft.Json;
-                        class Foo {
-                            void Test() {
-                                var json = JsonConvert.SerializeObject("test");
-                            }
-                        }
-                        """,
-                        """
-                        using Newtonsoft.Json;
-                        class Foo {
-                            void Test() {
-                                var json = JsonConvert.ToJson("test");
-                            }
-                        }
-                        """
-                )
+          spec -> spec
+            .recipe(new ChangeMethodName(
+              "Newtonsoft.Json.JsonConvert SerializeObject(..)", "ToJson", null, null))
+            .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
+            .typeValidationOptions(TypeValidation.builder()
+              .allowNonWhitespaceInWhitespace(true)
+              .build()),
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net9.0</TargetFramework>
+                </PropertyGroup>
+                <ItemGroup>
+                  <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+                </ItemGroup>
+              </Project>
+              """
+          ),
+          csharp(
+            """
+              using Newtonsoft.Json;
+              class Foo {
+                  void Test() {
+                      var json = JsonConvert.SerializeObject("test");
+                  }
+              }
+              """,
+            """
+              using Newtonsoft.Json;
+              class Foo {
+                  void Test() {
+                      var json = JsonConvert.ToJson("test");
+                  }
+              }
+              """
+          )
         );
     }
 
     @Test
     void findMethods() {
         rewriteRun(
-                spec -> spec
-                        .recipe(new FindMethods("Newtonsoft.Json.JsonConvert SerializeObject(..)", null))
-                        .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
-                        .typeValidationOptions(TypeValidation.builder()
-                                .allowNonWhitespaceInWhitespace(true)
-                                .build()),
-                csproj(
-                        """
-                        <Project Sdk="Microsoft.NET.Sdk">
-                          <PropertyGroup>
-                            <TargetFramework>net9.0</TargetFramework>
-                          </PropertyGroup>
-                          <ItemGroup>
-                            <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-                          </ItemGroup>
-                        </Project>
-                        """
-                ),
-                csharp(
-                        """
-                        using Newtonsoft.Json;
-                        class Foo {
-                            void Test() {
-                                var json = JsonConvert.SerializeObject("test");
-                            }
-                        }
-                        """,
-                        """
-                        using Newtonsoft.Json;
-                        class Foo {
-                            void Test() {
-                                var json = /*~~>*/JsonConvert.SerializeObject("test");
-                            }
-                        }
-                        """
-                )
+          spec -> spec
+            .recipe(new FindMethods("Newtonsoft.Json.JsonConvert SerializeObject(..)", null))
+            .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
+            .typeValidationOptions(TypeValidation.builder()
+              .allowNonWhitespaceInWhitespace(true)
+              .build()),
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net9.0</TargetFramework>
+                </PropertyGroup>
+                <ItemGroup>
+                  <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+                </ItemGroup>
+              </Project>
+              """
+          ),
+          csharp(
+            """
+              using Newtonsoft.Json;
+              class Foo {
+                  void Test() {
+                      var json = JsonConvert.SerializeObject("test");
+                  }
+              }
+              """,
+            """
+              using Newtonsoft.Json;
+              class Foo {
+                  void Test() {
+                      var json = /*~~>*/JsonConvert.SerializeObject("test");
+                  }
+              }
+              """
+          )
         );
     }
 
     @Test
     void findTypes() {
         rewriteRun(
-                spec -> spec
-                        .recipe(new FindTypes("Newtonsoft.Json.JsonConvert", null))
-                        .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
-                        .typeValidationOptions(TypeValidation.builder()
-                                .allowNonWhitespaceInWhitespace(true)
-                                .build()),
-                csproj(
-                        """
-                        <Project Sdk="Microsoft.NET.Sdk">
-                          <PropertyGroup>
-                            <TargetFramework>net9.0</TargetFramework>
-                          </PropertyGroup>
-                          <ItemGroup>
-                            <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-                          </ItemGroup>
-                        </Project>
-                        """
-                ),
-                csharp(
-                        """
-                        using Newtonsoft.Json;
-                        class Foo {
-                            void Test() {
-                                var json = JsonConvert.SerializeObject("test");
-                            }
-                        }
-                        """,
-                        """
-                        using Newtonsoft.Json;
-                        class Foo {
-                            void Test() {
-                                var json = /*~~>*/JsonConvert.SerializeObject("test");
-                            }
-                        }
-                        """
-                )
+          spec -> spec
+            .recipe(new FindTypes("Newtonsoft.Json.JsonConvert", null))
+            .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
+            .typeValidationOptions(TypeValidation.builder()
+              .allowNonWhitespaceInWhitespace(true)
+              .build()),
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net9.0</TargetFramework>
+                </PropertyGroup>
+                <ItemGroup>
+                  <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+                </ItemGroup>
+              </Project>
+              """
+          ),
+          csharp(
+            """
+              using Newtonsoft.Json;
+              class Foo {
+                  void Test() {
+                      var json = JsonConvert.SerializeObject("test");
+                  }
+              }
+              """,
+            """
+              using Newtonsoft.Json;
+              class Foo {
+                  void Test() {
+                      var json = /*~~>*/JsonConvert.SerializeObject("test");
+                  }
+              }
+              """
+          )
         );
     }
 
     @Test
     void deleteMethodArgument() {
         rewriteRun(
-                spec -> spec
-                        .recipe(new DeleteMethodArgument("Newtonsoft.Json.JsonConvert SerializeObject(..)", 1))
-                        .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
-                        .typeValidationOptions(TypeValidation.builder()
-                                .allowNonWhitespaceInWhitespace(true)
-                                .build()),
-                csproj(
-                        """
-                        <Project Sdk="Microsoft.NET.Sdk">
-                          <PropertyGroup>
-                            <TargetFramework>net9.0</TargetFramework>
-                          </PropertyGroup>
-                          <ItemGroup>
-                            <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-                          </ItemGroup>
-                        </Project>
-                        """
-                ),
-                csharp(
-                        """
-                        using Newtonsoft.Json;
-                        class Foo {
-                            void Test() {
-                                var json = JsonConvert.SerializeObject("test", Formatting.Indented);
-                            }
-                        }
-                        """,
-                        """
-                        using Newtonsoft.Json;
-                        class Foo {
-                            void Test() {
-                                var json = JsonConvert.SerializeObject("test");
-                            }
-                        }
-                        """
-                )
+          spec -> spec
+            .recipe(new DeleteMethodArgument("Newtonsoft.Json.JsonConvert SerializeObject(..)", 1))
+            .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
+            .typeValidationOptions(TypeValidation.builder()
+              .allowNonWhitespaceInWhitespace(true)
+              .build()),
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net9.0</TargetFramework>
+                </PropertyGroup>
+                <ItemGroup>
+                  <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+                </ItemGroup>
+              </Project>
+              """
+          ),
+          csharp(
+            """
+              using Newtonsoft.Json;
+              class Foo {
+                  void Test() {
+                      var json = JsonConvert.SerializeObject("test", Formatting.Indented);
+                  }
+              }
+              """,
+            """
+              using Newtonsoft.Json;
+              class Foo {
+                  void Test() {
+                      var json = JsonConvert.SerializeObject("test");
+                  }
+              }
+              """
+          )
         );
     }
 
     @Test
     void reorderMethodArguments() {
         rewriteRun(
-                spec -> spec
-                        .recipe(new ReorderMethodArguments(
-                                "Newtonsoft.Json.JsonConvert SerializeObject(..)",
-                                new String[]{"formatting", "value"},
-                                null,
-                                null, null))
-                        .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
-                        .typeValidationOptions(TypeValidation.builder()
-                                .allowNonWhitespaceInWhitespace(true)
-                                .build()),
-                csproj(
-                        """
-                        <Project Sdk="Microsoft.NET.Sdk">
-                          <PropertyGroup>
-                            <TargetFramework>net9.0</TargetFramework>
-                          </PropertyGroup>
-                          <ItemGroup>
-                            <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-                          </ItemGroup>
-                        </Project>
-                        """
-                ),
-                csharp(
-                        """
-                        using Newtonsoft.Json;
-                        class Foo {
-                            void Test() {
-                                var json = JsonConvert.SerializeObject("test", Formatting.Indented);
-                            }
-                        }
-                        """,
-                        """
-                        using Newtonsoft.Json;
-                        class Foo {
-                            void Test() {
-                                var json = JsonConvert.SerializeObject(Formatting.Indented, "test");
-                            }
-                        }
-                        """
-                )
+          spec -> spec
+            .recipe(new ReorderMethodArguments(
+              "Newtonsoft.Json.JsonConvert SerializeObject(..)",
+              new String[]{"formatting", "value"},
+              null,
+              null, null))
+            .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
+            .typeValidationOptions(TypeValidation.builder()
+              .allowNonWhitespaceInWhitespace(true)
+              .build()),
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net9.0</TargetFramework>
+                </PropertyGroup>
+                <ItemGroup>
+                  <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+                </ItemGroup>
+              </Project>
+              """
+          ),
+          csharp(
+            """
+              using Newtonsoft.Json;
+              class Foo {
+                  void Test() {
+                      var json = JsonConvert.SerializeObject("test", Formatting.Indented);
+                  }
+              }
+              """,
+            """
+              using Newtonsoft.Json;
+              class Foo {
+                  void Test() {
+                      var json = JsonConvert.SerializeObject(Formatting.Indented, "test");
+                  }
+              }
+              """
+          )
         );
     }
 
     @Test
     void changeType() {
         rewriteRun(
-                spec -> spec
-                        .recipe(new ChangeType(
-                                "Newtonsoft.Json.JsonSerializer",
-                                "Newtonsoft.Json.JsonWriter", null))
-                        .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
-                        .typeValidationOptions(TypeValidation.builder()
-                                .allowNonWhitespaceInWhitespace(true)
-                                .build()),
-                csproj(
-                        """
-                        <Project Sdk="Microsoft.NET.Sdk">
-                          <PropertyGroup>
-                            <TargetFramework>net9.0</TargetFramework>
-                          </PropertyGroup>
-                          <ItemGroup>
-                            <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-                          </ItemGroup>
-                        </Project>
-                        """
-                ),
-                csharp(
-                        """
-                        using Newtonsoft.Json;
-                        class Foo {
-                            void Test(JsonSerializer s) {
-                            }
-                        }
-                        """,
-                        """
-                        using Newtonsoft.Json;
-                        class Foo {
-                            void Test(JsonWriter s) {
-                            }
-                        }
-                        """
-                )
+          spec -> spec
+            .recipe(new ChangeType(
+              "Newtonsoft.Json.JsonSerializer",
+              "Newtonsoft.Json.JsonWriter", null))
+            .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
+            .typeValidationOptions(TypeValidation.builder()
+              .allowNonWhitespaceInWhitespace(true)
+              .build()),
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net9.0</TargetFramework>
+                </PropertyGroup>
+                <ItemGroup>
+                  <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+                </ItemGroup>
+              </Project>
+              """
+          ),
+          csharp(
+            """
+              using Newtonsoft.Json;
+              class Foo {
+                  void Test(JsonSerializer s) {
+                  }
+              }
+              """,
+            """
+              using Newtonsoft.Json;
+              class Foo {
+                  void Test(JsonWriter s) {
+                  }
+              }
+              """
+          )
         );
     }
 
     @Test
     void changePackage() {
         rewriteRun(
-                spec -> spec
-                        .recipe(new ChangePackage(
-                                "Newtonsoft.Json", "MyJson", true))
-                        .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
-                        .typeValidationOptions(TypeValidation.builder()
-                                .allowNonWhitespaceInWhitespace(true)
-                                .build()),
-                csproj(
-                        """
-                        <Project Sdk="Microsoft.NET.Sdk">
-                          <PropertyGroup>
-                            <TargetFramework>net9.0</TargetFramework>
-                          </PropertyGroup>
-                          <ItemGroup>
-                            <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-                          </ItemGroup>
-                        </Project>
-                        """
-                ),
-                csharp(
-                        """
-                        class Foo {
-                            void Test() {
-                                var json = Newtonsoft.Json.JsonConvert.SerializeObject("test");
-                            }
-                        }
-                        """,
-                        """
-                        class Foo {
-                            void Test() {
-                                var json = MyJson.JsonConvert.SerializeObject("test");
-                            }
-                        }
-                        """
-                )
+          spec -> spec
+            .recipe(new ChangePackage(
+              "Newtonsoft.Json", "MyJson", true))
+            .parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.1"))
+            .typeValidationOptions(TypeValidation.builder()
+              .allowNonWhitespaceInWhitespace(true)
+              .build()),
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net9.0</TargetFramework>
+                </PropertyGroup>
+                <ItemGroup>
+                  <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+                </ItemGroup>
+              </Project>
+              """
+          ),
+          csharp(
+            """
+              class Foo {
+                  void Test() {
+                      var json = Newtonsoft.Json.JsonConvert.SerializeObject("test");
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  void Test() {
+                      var json = MyJson.JsonConvert.SerializeObject("test");
+                  }
+              }
+              """
+          )
         );
     }
+
 }

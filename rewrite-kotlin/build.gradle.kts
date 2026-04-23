@@ -5,7 +5,7 @@ plugins {
     kotlin("jvm") version "2.2.21"
 }
 
-val kotlinVersion = "2.2.0"
+val kotlinVersion = "2.3.20"
 
 dependencies {
     compileOnly(project(":rewrite-core"))
@@ -14,6 +14,7 @@ dependencies {
     implementation(project(":rewrite-java"))
 
     implementation(kotlin("compiler-embeddable", kotlinVersion))
+    implementation(kotlin("reflect", kotlinVersion))
     implementation(kotlin("stdlib", kotlinVersion))
 
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
@@ -25,6 +26,15 @@ dependencies {
     testImplementation("com.github.ajalt.clikt:clikt:3.5.0")
     testImplementation("com.squareup:javapoet:1.13.0")
     testImplementation("com.google.testing.compile:compile-testing:0.+")
+}
+
+configurations.matching { it.name == "kotlinBouncyCastleConfiguration" }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.bouncycastle") {
+            useVersion("1.84")
+            because("CVE-2026-3505, CVE-2026-5598, CVE-2026-5588, CVE-2026-0636")
+        }
+    }
 }
 
 java {

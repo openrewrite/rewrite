@@ -25,13 +25,13 @@ dependencies {
     implementation("org.apache.commons:commons-text:latest.release")
 
     implementation("io.micrometer:micrometer-core:1.9.+")
-    implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
 
     implementation("io.moderne:jsonrpc:latest.integration")
     implementation("org.objenesis:objenesis:latest.release")
 
     testImplementation("org.assertj:assertj-core:latest.release")
+    testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testImplementation(project(":rewrite-test"))
 }
 

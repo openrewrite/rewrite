@@ -292,6 +292,24 @@ examples:
     language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.ChangeTaskToTasksRegister
+examples:
+- description: '`ChangeTaskToTasksRegisterTest#groovyTaskWithClosure`'
+  sources:
+  - before: |
+      task taskName(type: Copy) {
+          from 'src/main/resources'
+          into 'build/generated-resources'
+      }
+    after: |
+      tasks.register("taskName", Copy) {
+          from 'src/main/resources'
+          into 'build/generated-resources'
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.DependencyConstraintToRule
 examples:
 - description: '`DependencyConstraintToRuleTest#newResolutionStrategyBlock`'
@@ -519,6 +537,40 @@ examples:
     language: toml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.MigrateToGradle9
+examples:
+- description: '`MigrateToGradle9Test#multipleSubRecipesApplyTogether`'
+  sources:
+  - before: |
+      plugins {
+          id 'java'
+          id 'jacoco'
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          implementation group: 'com.google.guava', name: 'guava', version: '31.1-jre'
+      }
+    after: |
+      plugins {
+          id 'java'
+          id 'jacoco'
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          implementation "com.google.guava:guava:31.1-jre"
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.RemoveDependency
 examples:
 - description: '`RemoveDependencyTest#removeGradleDependencyUsingStringNotation`'
@@ -702,6 +754,61 @@ examples:
     language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.SortDependencies
+examples:
+- description: '`SortDependenciesTest#sortsByConfigurationThenGroupThenArtifact`'
+  sources:
+  - before: |
+      plugins {
+          id 'java-library'
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          testImplementation "org.junit.jupiter:junit-jupiter-api:5.9.1"
+          implementation "org.springframework:spring-web:5.3.23"
+          api "com.google.guava:guava:31.1-jre"
+          implementation "com.fasterxml.jackson.core:jackson-databind:2.13.4"
+      }
+    after: |
+      plugins {
+          id 'java-library'
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          api "com.google.guava:guava:31.1-jre"
+          implementation "com.fasterxml.jackson.core:jackson-databind:2.13.4"
+          implementation "org.springframework:spring-web:5.3.23"
+          testImplementation "org.junit.jupiter:junit-jupiter-api:5.9.1"
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.SyncGradleExtPropertiesWithBom
+examples:
+- description: '`SyncGradleExtPropertiesWithBomTest#updatesExtSubscriptPropertyWhenBomVersionIsHigher`'
+  parameters:
+  - org.springframework.boot
+  - spring-boot-dependencies
+  - 3.4.0
+  - 'false'
+  sources:
+  - before: |
+      ext['jackson-bom.version'] = '2.14.0'
+    after: |
+      ext['jackson-bom.version'] = '2.18.1'
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.UpdateGradleWrapper
 examples:
 - description: Update existing Gradle wrapper
@@ -868,6 +975,28 @@ examples:
           }
 
           implementation 'org.openrewrite:rewrite-java:7.0.0'
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.UsePropertyAssignmentSyntax
+examples:
+- description: '`UsePropertyAssignmentSyntaxTest#spaceSyntaxConvertedToAssignment`'
+  parameters:
+  - description
+  sources:
+  - before: |
+      tasks.register('runLogic', JavaExec) {
+          description 'My precious logic'
+          classpath sourceSets.main.runtimeClasspath
+          mainClass = 'my.org.logic.Logic'
+      }
+    after: |
+      tasks.register('runLogic', JavaExec) {
+          description = 'My precious logic'
+          classpath sourceSets.main.runtimeClasspath
+          mainClass = 'my.org.logic.Logic'
       }
     path: build.gradle
     language: groovy

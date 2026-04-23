@@ -15,6 +15,7 @@
  */
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
+using OpenRewrite.CSharp;
 using Space = OpenRewrite.Core.Space;
 
 namespace OpenRewrite.Java.Rpc;
@@ -65,6 +66,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             ForLoop fl => VisitForLoop(fl, q),
             ForEachLoop.Control fec => VisitForEachControl(fec, q),
             ForEachLoop fel => VisitForEachLoop(fel, q),
+            Try.Resource tryResource => VisitTryResource(tryResource, q),
             Try.Catch tryCatch => VisitCatch(tryCatch, q),
             Try tr => VisitTry(tr, q),
             Throw thr => VisitThrow(thr, q),
@@ -85,6 +87,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             ControlParentheses<Expression> cp => VisitControlParentheses(cp, q),
             ControlParentheses<TypeTree> cptt => VisitControlParentheses(cptt, q),
             ControlParentheses<VariableDeclarations> cpvd => VisitControlParentheses(cpvd, q),
+            ControlParentheses<J> cpj => VisitControlParenthesesUntyped(cpj, q),
             ExpressionStatement es => VisitExpressionStatement(es, q),
             VariableDeclarations vd => VisitVariableDeclarations(vd, q),
             NamedVariable nv => VisitVariable(nv, q),
@@ -259,7 +262,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var implements_ = q.Receive(classDecl.Implements, c => VisitContainer(c, q));
         var permits = q.Receive(classDecl.Permits, c => VisitContainer(c, q));
         var body = q.Receive((J)classDecl.Body, el => (J)VisitNonNull(el, q));
-        return classDecl.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLeadingAnnotations(leadingAnnotations!).WithModifiers(modifiers!).WithClassKind((ClassDeclaration.Kind)kind!).WithName((Identifier)name!).WithTypeParameters(typeParameters).WithPrimaryConstructor(primaryConstructor).WithExtends(extends_).WithImplements(implements_).WithPermits(permits).WithBody((Block)body!);
+        var type = q.Receive(classDecl.Type, t => (JavaType.FullyQualified?)VisitType(t, q));
+        return classDecl.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLeadingAnnotations(leadingAnnotations!).WithModifiers(modifiers!).WithClassKind((ClassDeclaration.Kind)kind!).WithName((Identifier)name!).WithTypeParameters(typeParameters).WithPrimaryConstructor(primaryConstructor).WithExtends(extends_).WithImplements(implements_).WithPermits(permits).WithBody((Block)body!).WithType(type);
     }
 
     private J VisitClassDeclarationKind(ClassDeclaration.Kind kind, RpcReceiveQueue q)
@@ -314,8 +318,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         var annotations = q.ReceiveList(enumValue.Annotations, a => (Annotation)VisitNonNull(a, q));
         var name = q.Receive((J)enumValue.Name, el => (J)VisitNonNull(el, q));
-        var initializer = q.Receive(enumValue.Initializer, lp => VisitLeftPadded(lp, q));
-        return enumValue.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithAnnotations(annotations!).WithName((Identifier)name!).WithInitializer(initializer);
+        var initializer = q.Receive((J?)enumValue.Initializer, el => (J)VisitNonNull(el, q));
+        return enumValue.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithAnnotations(annotations!).WithName((Identifier)name!).WithInitializer((NewClass?)initializer);
     }
 
     public override J VisitEnumValueSet(EnumValueSet enumValueSet, RpcReceiveQueue q)
@@ -384,13 +388,11 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public override J VisitIdentifier(Identifier identifier, RpcReceiveQueue q)
     {
-        // C# model does not have Annotations on Identifier; consume and discard
-        q.ReceiveList<Annotation>([], el => (Annotation)VisitNonNull(el, q));
+        var annotations = q.ReceiveList(identifier.Annotations, el => (Annotation)VisitNonNull(el, q));
         var simpleName = q.Receive(identifier.SimpleName);
         var type = q.Receive(identifier.Type, t => VisitType(t, q)!);
-        // C# model does not have FieldType; consume and discard
-        q.Receive<object?>(null);
-        return identifier.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithSimpleName(simpleName!).WithType(type);
+        var fieldType = q.Receive(identifier.FieldType, t => VisitType(t, q)!);
+        return identifier.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithAnnotations(annotations!).WithSimpleName(simpleName!).WithType(type).WithFieldType(fieldType);
     }
 
     public override J VisitIf(If iff, RpcReceiveQueue q)
@@ -440,15 +442,14 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var tpReceived = q.Receive(tpBefore, tp => (TypeParameters)VisitNonNull(tp, q));
         var typeParameters = tpReceived?.ToContainer();
         var returnTypeExpression = q.Receive((J?)method.ReturnTypeExpression, el => (J)VisitNonNull(el!, q));
-        // C# model does not have name annotations; consume and discard
-        q.ReceiveList<Annotation>([], el => (Annotation)VisitNonNull(el, q));
-        var name = q.Receive((J)method.Name, el => (J)VisitNonNull(el, q));
+        var nameAnnotations = q.ReceiveList(method.Name?.Annotations ?? [], el => (Annotation)VisitNonNull(el, q));
+        var name = q.Receive((J?)method.Name ?? new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "", null, null), el => (J)VisitNonNull(el, q));
         var parameters = q.Receive(method.Parameters, c => VisitContainer(c, q));
         var throws_ = q.Receive(method.Throws, c => VisitContainer(c, q));
         var body = q.Receive((J?)method.Body, el => (J)VisitNonNull(el!, q));
         var defaultValue = q.Receive(method.DefaultValue, lp => VisitLeftPadded(lp, q));
         var methodType = q.Receive(method.MethodType, t => (JavaType.Method)VisitType(t, q)!);
-        return method.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLeadingAnnotations(leadingAnnotations!).WithModifiers(modifiers!).WithTypeParameters(typeParameters).WithReturnTypeExpression((TypeTree?)returnTypeExpression).WithName((Identifier)name!).WithParameters(parameters!).WithThrows(throws_).WithBody((Block?)body).WithDefaultValue(defaultValue).WithMethodType(methodType);
+        return method.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLeadingAnnotations(leadingAnnotations!).WithModifiers(modifiers!).WithTypeParameters(typeParameters).WithReturnTypeExpression((TypeTree?)returnTypeExpression).WithName(((Identifier)name!).WithAnnotations(nameAnnotations!)).WithParameters(parameters!).WithThrows(throws_).WithBody((Block?)body).WithDefaultValue(defaultValue).WithMethodType(methodType);
     }
 
     public override J VisitMethodInvocation(MethodInvocation methodInvocation, RpcReceiveQueue q)
@@ -502,17 +503,14 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var arguments = q.Receive(newClass.Arguments, c => VisitContainer(c, q));
         var body = q.Receive((J?)newClass.Body, el => (J)VisitNonNull(el!, q));
         var constructorType = q.Receive(newClass.ConstructorType, t => (JavaType.Method)VisitType(t, q)!);
-        return newClass.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithEnclosing(enclosing).WithNew(@new!).WithClazz((TypeTree?)clazz).WithArguments(arguments!).WithBody((Block?)body).WithConstructorType(constructorType);
+        return newClass.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithEnclosing(enclosing).WithNew(@new!).WithClazz(clazz).WithArguments(arguments!).WithBody((Block?)body).WithConstructorType(constructorType);
     }
 
     public override J VisitPackage(Package pkg, RpcReceiveQueue q)
     {
-        var expression = q.Receive(pkg.Expression?.Element as J, el => (J)VisitNonNull(el, q));
+        var expression = q.Receive((J)pkg.Expression, el => (J)VisitNonNull(el, q));
         var annotations = q.ReceiveList(pkg.Annotations, a => (Annotation)VisitNonNull(a, q));
-        var expr = pkg.Expression != null
-            ? pkg.Expression.WithElement((Expression)expression!)
-            : JRightPadded<Expression>.Build((Expression)expression!);
-        return pkg.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithExpression(expr).WithAnnotations(annotations!);
+        return pkg.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithExpression((Expression)expression!).WithAnnotations(annotations!);
     }
 
     public J VisitParentheses<T>(Parentheses<T> parentheses, RpcReceiveQueue q) where T : J
@@ -528,10 +526,17 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         return new Parentheses<Expression>(_pvId, _pvPrefix, _pvMarkers, rp);
     }
 
+    private J VisitControlParenthesesUntyped(ControlParentheses<J> shell, RpcReceiveQueue q)
+    {
+        var tree = q.Receive(shell.Tree, rp => VisitRightPadded(rp, q));
+        var rp = new JRightPadded<Expression>((Expression)tree!.Element, tree.After, tree.Markers);
+        return new ControlParentheses<Expression>(_pvId, _pvPrefix, _pvMarkers, rp);
+    }
+
     public override J VisitPrimitive(Primitive primitive, RpcReceiveQueue q)
     {
         var type = q.Receive(
-            primitive.Kind != 0 ? (JavaType?)new JavaType.Primitive(primitive.Kind) : null,
+            primitive.Kind != 0 ? (JavaType?)JavaType.Primitive.Of(primitive.Kind) : null,
             t => VisitType(t, q)!);
         var kind = type is JavaType.Primitive p ? p.Kind : primitive.Kind;
         return primitive.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithKind(kind);
@@ -589,6 +594,13 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         return tryStmt.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithResources(resources).WithBody((Block)body!).WithCatches(catches!).WithFinally(@finally);
     }
 
+    public virtual J VisitTryResource(Try.Resource tryResource, RpcReceiveQueue q)
+    {
+        var variableDeclarations = q.Receive((J)tryResource.VariableDeclarations, el => (J)VisitNonNull(el, q));
+        var terminatedWithSemicolon = q.Receive(tryResource.TerminatedWithSemicolon);
+        return tryResource.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithVariableDeclarations((J)variableDeclarations!).WithTerminatedWithSemicolon(terminatedWithSemicolon);
+    }
+
     public override J VisitTypeCast(TypeCast typeCast, RpcReceiveQueue q)
     {
         var clazz = q.Receive(typeCast.Clazz, el => (ControlParentheses<TypeTree>)VisitNonNull(el, q));
@@ -632,7 +644,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public override J VisitVariableDeclarations(VariableDeclarations variableDeclarations, RpcReceiveQueue q)
     {
-        var leadingAnnotations = q.ReceiveList(variableDeclarations.LeadingAnnotations, m => (Modifier)VisitNonNull(m, q));
+        var leadingAnnotations = q.ReceiveList(variableDeclarations.LeadingAnnotations, a => (Annotation)VisitNonNull(a, q));
         var modifiers = q.ReceiveList(variableDeclarations.Modifiers, m => (Modifier)VisitNonNull(m, q));
         var typeExpression = q.Receive((J?)variableDeclarations.TypeExpression, el => (J)VisitNonNull(el!, q));
         var varargs = q.Receive(variableDeclarations.Varargs, space => VisitSpace(space, q));
@@ -697,16 +709,16 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         var comments = q.ReceiveList(space.Comments, c =>
         {
-            if (c is TextComment tc)
+            var multiline = q.Receive(c.Multiline);
+            var text = q.Receive(c.Text);
+            var suffix = q.Receive(c.Suffix);
+            // C# Comment doesn't have Markers; consume and discard
+            q.Receive<Markers>(Markers.Empty);
+            if (c is XmlDocComment)
             {
-                var multiline = q.Receive(tc.Multiline);
-                var text = q.Receive(tc.Text);
-                var suffix = q.Receive(tc.Suffix);
-                // C# Comment doesn't have Markers; consume and discard
-                q.Receive<Markers>(Markers.Empty);
-                return new TextComment(text!, suffix!, multiline);
+                return new XmlDocComment(text!, suffix!, multiline);
             }
-            throw new ArgumentException($"Unexpected comment type {c.GetType().Name}");
+            return new TextComment(text!, suffix!, multiline);
         });
         var whitespace = q.Receive(space.Whitespace);
         return space.WithComments(comments!).WithWhitespace(whitespace!);
@@ -721,6 +733,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             case JavaType.Annotation annotation:
                 annotation.AnnotationType = (JavaType.FullyQualified?)q.Receive(
                     (JavaType?)annotation.AnnotationType, t => VisitType(t, q)!);
+                annotation.Values = q.ReceiveList(annotation.Values,
+                    v => ReceiveAnnotationElementValue(v, q));
                 break;
 
             case JavaType.MultiCatch multiCatch:
@@ -775,7 +789,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
             case JavaType.Primitive prim:
                 var keyword = q.Receive(GetPrimitiveKeyword(prim.Kind));
-                javaType = new JavaType.Primitive(KeywordToPrimitiveKind(keyword!));
+                javaType = JavaType.Primitive.Of(KeywordToPrimitiveKind(keyword!));
                 break;
 
             case JavaType.Method method:
@@ -808,6 +822,28 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         }
 
         return javaType;
+    }
+
+    private JavaType.Annotation.ElementValue ReceiveAnnotationElementValue(
+        JavaType.Annotation.ElementValue v, RpcReceiveQueue q)
+    {
+        var element = q.Receive(v.Element, t => VisitType(t, q)!);
+        switch (v)
+        {
+            case JavaType.Annotation.ArrayElementValue array:
+            {
+                var constantValues = q.ReceiveList(array.ConstantValues, x => x);
+                var refValues = q.ReceiveList(array.ReferenceValues, t => VisitType(t, q)!);
+                return new JavaType.Annotation.ArrayElementValue(element, constantValues, refValues);
+            }
+            default:
+            {
+                var single = v as JavaType.Annotation.SingleElementValue;
+                var constantValue = q.Receive(single?.ConstantValue);
+                var refValue = q.Receive(single?.ReferenceValue, t => VisitType(t, q)!);
+                return new JavaType.Annotation.SingleElementValue(element, constantValue, refValue);
+            }
+        }
     }
 
     // Utility methods

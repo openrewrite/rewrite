@@ -16,11 +16,14 @@
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Format;
+using OpenRewrite.CSharp.Template;
 using OpenRewrite.Java;
+using OpenRewrite.Test;
+using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Tests.Format;
 
-public class AutoFormatTests
+public class AutoFormatTests : RewriteTest
 {
     private readonly CSharpParser _parser = new();
     private readonly CSharpPrinter<int> _printer = new();
@@ -54,7 +57,9 @@ public class AutoFormatTests
 
             namespace Test
             {
-                class Foo { }
+                class Foo
+                {
+                }
             }
             """;
 
@@ -162,61 +167,52 @@ public class AutoFormatTests
     }
 
     [Fact]
-    public void FormatStyleDetectsSpaces()
-    {
-        const string source = """
-            class Foo
-            {
-                void Bar()
-                {
-                    int x = 1;
-                }
-            }
-            """;
-
-        var style = FormatStyle.DetectStyle(source);
-        Assert.False(style.UseTabs);
-        Assert.Equal(4, style.IndentationSize);
-    }
-
-    [Fact]
-    public void FormatStyleDetectsTabs()
-    {
-        var source = "class Foo\n{\n\tvoid Bar()\n\t{\n\t\tint x = 1;\n\t}\n}\n";
-        var style = FormatStyle.DetectStyle(source);
-        Assert.True(style.UseTabs);
-    }
-
-    [Fact]
-    public void FormatStyleDetectsTwoSpaceIndent()
-    {
-        const string source = """
-            class Foo
-            {
-              void Bar()
-              {
-                int x = 1;
-              }
-            }
-            """;
-
-        var style = FormatStyle.DetectStyle(source);
-        Assert.False(style.UseTabs);
-        Assert.Equal(2, style.IndentationSize);
-    }
-
-    [Fact]
-    public void RoslynFormatterNormalizesWhitespace()
+    public void RoslynFormatterExpandsSingleLineBlocks()
     {
         const string before = "class Foo{void Bar(){int x=1;}}";
-        var style = new FormatStyle(false, 4, "\n");
-        var formatted = RoslynFormatter.FormatWithRoslyn(before, style);
+        var formatted = RoslynFormatter.FormatWithRoslyn(before, CSharpFormatStyle.Default);
 
-        // Roslyn normalizes spacing (adds spaces around braces) but doesn't add line breaks
+        // With WrappingPreserveSingleLine=false, Roslyn expands single-line blocks
         Assert.Contains("class Foo", formatted);
         Assert.NotEqual(before, formatted);
     }
 
+    [Fact]
+    public void RoslynFormatterRespectsKnrBraceStyle()
+    {
+        const string source = "class Foo\n{\n    void Bar()\n    {\n    }\n}\n";
+
+        // Default (Allman) keeps braces on new lines
+        var allman = RoslynFormatter.FormatWithRoslyn(source, CSharpFormatStyle.Default);
+        Assert.Contains("class Foo\n{", allman);
+        Assert.Contains("void Bar()\n    {", allman);
+
+        // K&R style: braces on same line as declaration
+        var knrStyle = new CSharpFormatStyle(Guid.NewGuid(),
+            newLinesForBracesInTypes: false,
+            newLinesForBracesInMethods: false,
+            newLinesForBracesInControlBlocks: false);
+
+        var knr = RoslynFormatter.FormatWithRoslyn(source, knrStyle);
+        Assert.Contains("class Foo {", knr);
+        Assert.Contains("void Bar() {", knr);
+    }
+
+    [Fact]
+    public void RoslynFormatterRespectsSpaceAfterCast()
+    {
+        const string source = "class C { void M() { var x = (int)y; } }";
+
+        // Default: no space after cast
+        var noSpace = RoslynFormatter.FormatWithRoslyn(source, CSharpFormatStyle.Default);
+        Assert.Contains("(int)y", noSpace);
+
+        // With SpaceAfterCast=true
+        var withSpaceStyle = new CSharpFormatStyle(Guid.NewGuid(), spaceAfterCast: true);
+
+        var withSpace = RoslynFormatter.FormatWithRoslyn(source, withSpaceStyle);
+        Assert.Contains("(int) y", withSpace);
+    }
     [Fact]
     public void IntegrationAutoFormatVisitorOnIllFormattedSource()
     {
@@ -339,8 +335,10 @@ public class AutoFormatTests
         Assert.Contains("\n    public string Name", formatted);
         Assert.Contains("\n    public int Age", formatted);
 
-        // Spaces around braces in auto-properties
-        Assert.Contains("{ get; set; }", formatted);
+        // Auto-property accessors are expanded to multi-line by whole-CU formatting
+        // (WrappingPreserveSingleLine=false causes Roslyn to expand single-line blocks)
+        Assert.Contains("get;", formatted);
+        Assert.Contains("set;", formatted);
 
         // Expression-bodied member spacing
         Assert.Contains("FullName =>", formatted);
@@ -360,7 +358,7 @@ public class AutoFormatTests
         var cu = _parser.Parse(source);
 
         // Get the class declaration from the CU to use as the subtree target
-        var classDecl = cu.Members[0] as ClassDeclaration;
+        var classDecl = cu.Members[0].Element as ClassDeclaration;
         Assert.NotNull(classDecl);
 
         // Build a cursor chain: root → CU → classDecl
@@ -369,7 +367,7 @@ public class AutoFormatTests
         var classCursor = new Cursor(cuCursor, classDecl);
 
         // AutoFormat the class declaration subtree
-        var formatted = classDecl.AutoFormat(classCursor);
+        var formatted = new AutoFormatVisitor<int>().Format(classDecl, classCursor);
 
         // The result should be a ClassDeclaration, not a CompilationUnit
         Assert.IsType<ClassDeclaration>(formatted);
@@ -381,6 +379,306 @@ public class AutoFormatTests
         // Should have formatted whitespace applied
         var printed = _printer.Print(formatted);
         Assert.Contains("x = 1 + 2", printed);
+    }
+
+    [Fact]
+    public void FormatSubtreeDirectCall()
+    {
+        const string source =
+            "class Foo\n" +
+            "{\n" +
+            "    void Bar()\n" +
+            "    {\n" +
+            "        int x=1+2;\n" +
+            "    }\n" +
+            "}\n";
+
+        var cu = _parser.Parse(source);
+
+        // Find the method body block
+        var classDecl = cu.Members[0].Element as ClassDeclaration;
+        var method = classDecl!.Body.Statements[0].Element as MethodDeclaration;
+        var body = method!.Body!;
+
+        // Structurally modify the body: strip its prefix to create a new object with the same ID
+        var modifiedBody = body.WithPrefix(Space.Empty);
+
+        // FormatSubtree should splice modifiedBody into the CU, format, and extract it
+        var formatted = RoslynFormatter.FormatSubtree(cu, body.Id, modifiedBody, stopAfter: null);
+
+        var printed = _printer.Print(formatted);
+        Assert.Contains("x = 1 + 2", printed);
+    }
+
+    [Fact]
+    public void SubtreeAutoFormatWorksAfterStructuralChange()
+    {
+        // Source has a for loop with no braces
+        const string source =
+            "class Foo\n" +
+            "{\n" +
+            "    void Bar()\n" +
+            "    {\n" +
+            "        for (int i = 0; i < 10; i++)\n" +
+            "            DoWork();\n" +
+            "    }\n" +
+            "    void DoWork() { }\n" +
+            "}\n";
+
+        var cu = _parser.Parse(source);
+
+        // Find the for loop
+        ForLoop? forLoop = null;
+        new ForLoopFinder(f => forLoop = f).Visit(cu, 0);
+        Assert.NotNull(forLoop);
+
+        // Structurally modify: wrap body in a Block with empty spaces
+        var stmt = forLoop.Body.Element;
+        var stmtPadded = new JRightPadded<Statement>(stmt, Space.Empty, Markers.Empty);
+        var block = new Block(
+            Guid.NewGuid(),
+            Space.Empty,
+            Markers.Empty,
+            new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+            new List<JRightPadded<Statement>> { stmtPadded },
+            Space.Empty
+        );
+        var modifiedForLoop = forLoop.WithBody(forLoop.Body.WithElement(block));
+
+        // Build cursor: root → CU → forLoop (points to OLD forLoop in old CU)
+        var rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
+        var cuCursor = new Cursor(rootCursor, cu);
+        var forCursor = new Cursor(cuCursor, forLoop);
+
+        // AutoFormat the modified subtree
+        var formatted = new AutoFormatVisitor<int>().Format(modifiedForLoop, forCursor);
+
+        // The result should have properly indented braces
+        var printed = _printer.Print(formatted);
+        Assert.Contains("{\n", printed);
+        Assert.Contains("DoWork();", printed);
+        // The block should NOT be left with empty spaces (unformatted)
+        Assert.DoesNotContain("{DoWork", printed);
+    }
+
+    [Fact]
+    public void AutoFormatFromVisitorWithExplicitCursor()
+    {
+        // Verify AutoFormat works when called from inside a visitor using the
+        // extension method with the visitor's cursor, matching JS/Python pattern
+        const string source =
+            "class Foo\n" +
+            "{\n" +
+            "    void Bar()\n" +
+            "    {\n" +
+            "        for (int i = 0; i < 10; i++)\n" +
+            "            DoWork();\n" +
+            "    }\n" +
+            "    void DoWork() { }\n" +
+            "}\n";
+
+        var cu = _parser.Parse(source);
+
+        // Run a visitor that wraps the for-loop body in a block and auto-formats
+        var visitor = new WrapForBodyInBlock();
+        var result = visitor.Visit(cu, 0)!;
+
+        var printed = _printer.Print(result);
+        // The block should be properly formatted, not left with empty spaces
+        Assert.Contains("{\n", printed);
+        Assert.DoesNotContain("{DoWork", printed);
+    }
+
+    /// <summary>
+    /// Visitor that wraps a for-loop's body in a Block and calls AutoFormat
+    /// using the extension method with an explicit cursor — the same pattern
+    /// used in JS and Python.
+    /// </summary>
+    private class WrapForBodyInBlock : CSharpVisitor<int>
+    {
+        public override J VisitForLoop(ForLoop forLoop, int p)
+        {
+            var fl = (ForLoop)base.VisitForLoop(forLoop, p);
+
+            // Only wrap if body is not already a block
+            if (fl.Body.Element is Block)
+                return fl;
+
+            var stmt = fl.Body.Element;
+            var stmtPadded = new JRightPadded<Statement>(stmt, Space.Empty, Markers.Empty);
+            var block = new Block(
+                Guid.NewGuid(),
+                Space.Empty,
+                Markers.Empty,
+                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+                new List<JRightPadded<Statement>> { stmtPadded },
+                Space.Empty
+            );
+            var modified = fl.WithBody(fl.Body.WithElement(block));
+
+            return AutoFormat(modified, p, Cursor.ParentTree);
+        }
+    }
+
+    [Fact]
+    public void FormatSubtreeFallsBackWhenSpliceFails()
+    {
+        const string source =
+            "class Foo\n" +
+            "{\n" +
+            "    void Bar()\n" +
+            "    {\n" +
+            "        int x = 1;\n" +
+            "    }\n" +
+            "}\n";
+
+        var cu = _parser.Parse(source);
+
+        // Create a simple block with a brand-new ID that doesn't exist in the CU
+        var block = new Block(
+            Guid.NewGuid(),
+            Space.Empty,
+            Markers.Empty,
+            new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+            new List<JRightPadded<Statement>>(),
+            Space.Empty
+        );
+
+        // FormatSubtree with a nonexistent nodeToReplaceId — splice will fail
+        var result = RoslynFormatter.FormatSubtree(cu, Guid.NewGuid(), block, stopAfter: null);
+
+        // Should not throw — should return the replacement unchanged
+        Assert.NotNull(result);
+        Assert.Equal(block.Id, result.Id);
+    }
+
+    [Fact]
+    public void FormatSubtreeDoesNotCorruptUnrelatedWhitespace()
+    {
+        // Reproducer for autoformat corrupting whitespace in base type lists
+        // and async modifiers when a method body subtree is formatted.
+        const string source =
+            "using System;\n" +
+            "using System.Threading.Tasks;\n" +
+            "\n" +
+            "public class TestObj : IComparable<TestObj?>, IEquatable<TestObj?>\n" +
+            "{\n" +
+            "    public int CompareTo(TestObj? other) => 0;\n" +
+            "    public bool Equals(TestObj? other) => false;\n" +
+            "\n" +
+            "    public async Task<int> RunAsync()\n" +
+            "    {\n" +
+            "        return await Task.FromResult(0);\n" +
+            "    }\n" +
+            "}\n";
+
+        var cu = _parser.Parse(source);
+        var originalPrinted = _printer.Print(cu);
+        Assert.Equal(source, originalPrinted);
+
+        // Find the first method body (simulating a localized change via FormatSubtree)
+        var classDecl = cu.Members[0].Element as ClassDeclaration;
+        Assert.NotNull(classDecl);
+        var method = classDecl.Body.Statements[0].Element as MethodDeclaration;
+        Assert.NotNull(method);
+        var body = method.Body!;
+
+        // 1. Test FormatSubtree path (used by template application):
+        //    Splice the unmodified body back and format — should be a no-op
+        var subtreeResult = RoslynFormatter.FormatSubtree(cu, body.Id, body, stopAfter: null);
+        Assert.Equal(body.Id, subtreeResult.Id);
+
+        // 2. Test Format path with a target subtree
+        var formattedCu = RoslynFormatter.Format(cu, targetSubtree: method, stopAfter: null);
+        var result = _printer.Print(formattedCu);
+
+        // Since the body is unmodified, the output should be character-identical to input
+        Assert.Equal(source, result);
+    }
+
+    /// <summary>
+    /// Simulates what the MakeFieldReadOnly recipe does: adds a readonly modifier
+    /// to a field and calls MaybeAutoFormat. Verifies the output has proper spacing
+    /// between the modifier and the type name.
+    /// </summary>
+    [Fact]
+    public void AutoFormatAfterAddingReadonlyModifierToGenericField()
+    {
+        const string source = """
+            class Foo
+            {
+                List<int> _elements = new List<int>();
+            }
+            """;
+
+        var cu = _parser.Parse(source);
+
+        var visitor = new AddReadonlyModifierVisitor();
+        visitor.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        var result = visitor.Visit(cu, 0)!;
+
+        var printed = _printer.Print(result);
+
+        // The readonly keyword must be separated from the type name
+        Assert.DoesNotContain("readonlyList", printed);
+        Assert.Contains("readonly List<int>", printed);
+    }
+
+    [Fact]
+    public void AutoFormatAfterAddingReadonlyModifierToSimpleField()
+    {
+        const string source = """
+            class Foo
+            {
+                int _x;
+            }
+            """;
+
+        var cu = _parser.Parse(source);
+
+        var visitor = new AddReadonlyModifierVisitor();
+        visitor.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        var result = visitor.Visit(cu, 0)!;
+
+        var printed = _printer.Print(result);
+
+        Assert.DoesNotContain("readonlyint", printed);
+        Assert.Contains("readonly int", printed);
+    }
+
+    /// <summary>
+    /// Visitor that adds a readonly modifier to fields and calls AutoFormat,
+    /// simulating MakeFieldReadOnly recipe behavior.
+    /// </summary>
+    private class AddReadonlyModifierVisitor : CSharpVisitor<int>
+    {
+        public override J VisitVariableDeclarations(VariableDeclarations varDecl, int p)
+        {
+            var v = (VariableDeclarations)base.VisitVariableDeclarations(varDecl, p);
+
+            if (Cursor.FirstEnclosing<ClassDeclaration>() == null)
+                return v;
+
+            if (v.Modifiers.Any(m => m.Type == Modifier.ModifierType.Readonly))
+                return v;
+
+            var newModifiers = new List<Modifier>(v.Modifiers);
+            newModifiers.Add(new Modifier(
+                Guid.NewGuid(), Space.SingleSpace, Markers.Empty,
+                Modifier.ModifierType.Readonly, new List<Annotation>()));
+            var after = v.WithModifiers(newModifiers);
+
+            return MaybeAutoFormat(v, after, p, Cursor);
+        }
+    }
+
+    private class ForLoopFinder(Action<ForLoop> onFound) : CSharpVisitor<int>
+    {
+        public override J VisitForLoop(ForLoop forLoop, int p)
+        {
+            onFound(forLoop);
+            return forLoop;
+        }
     }
 
     [Fact]
@@ -419,4 +717,452 @@ public class AutoFormatTests
         // Proper indentation of bodies
         Assert.Contains("\n            Console.WriteLine(", formatted);
     }
+
+    /// <summary>
+    /// Verifies that WhitespaceReconciler throws with property paths when
+    /// a recipe produces a tree that doesn't match what the parser produces.
+    /// </summary>
+    [Fact]
+    public void ReconcilerMismatchReportsPropertyPath()
+    {
+        var ex = Assert.Throws<WhitespaceReconciler.WhitespaceReconcileMismatchException>(() =>
+        {
+            RewriteRun(
+                spec => spec.SetRecipe(new MismatchingTypeRecipe()),
+                CSharp(
+                    "class Foo\n{\n}\n",
+                    "class Foo\n{\n    string x;\n}\n"
+                )
+            );
+        });
+
+        Assert.Contains("Identifier", ex.Message);
+        Assert.Contains("Primitive", ex.Message);
+        Assert.Contains("TypeExpression", ex.Message);
+    }
+
+    /// <summary>
+    /// Reproduces the AvoidNestingTernary pattern: manually constructed if/else chain with
+    /// Space.Empty, conditions extracted from the original ternary, MaybeAutoFormat at Block level.
+    /// Surrounding formatting quirks must be preserved — only the spliced subtree is reformatted.
+    /// </summary>
+    [Fact]
+    public void AutoFormatManualIfElseWithMaybeAutoFormatAtBlockLevel()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new ManualIfElseAtBlockLevelRecipe()),
+            CSharp(
+                // Formatting quirks outside the target method must survive
+                """
+                class Test
+                {
+                    public  string Name { get;set; }
+                    string M(int x)
+                    {
+                        return x > 0 ? "positive" : x < 0 ? "negative" : "zero";
+                    }
+
+                    public   int Age {get; set; }
+                }
+                """,
+                """
+                class Test
+                {
+                    public  string Name { get;set; }
+                    string M(int x)
+                    {
+                        if (x > 0)
+                        {
+                            return "positive";
+                        }
+                        else if (x < 0)
+                        {
+                            return "negative";
+                        }
+                        else
+                        {
+                            return "zero";
+                        }
+                    }
+
+                    public   int Age {get; set; }
+                }
+                """
+            )
+        );
+    }
+
+    /// <summary>
+    /// Multi-statement template: string declaration + compressed if/else + return.
+    /// The template returns a SyntheticBlock that gets flattened into the parent block.
+    /// Each spliced statement should be individually formatted.
+    /// </summary>
+    [Fact]
+    public void AutoFormatSplicedMultiStatementTemplate()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new ReplaceWithMultiStatementTemplateRecipe()),
+            CSharp(
+                """
+                class Test
+                {
+                    string M(int x)
+                    {
+                        return x > 0 ? "positive" : x < 0 ? "negative" : "zero";
+                    }
+                }
+                """,
+                """
+                class Test
+                {
+                    string M(int x)
+                    {
+                        string s;
+                        if (x > 0)
+                        {
+                            s = "positive";
+                        }
+                        else if (x < 0)
+                        {
+                            s = "negative";
+                        }
+                        else
+                        {
+                            s = "zero";
+                        }
+                        return s;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    /// <summary>
+    /// Workaround test for https://github.com/dotnet/roslyn/issues/82974:
+    /// AutoFormat must expand empty constructor bodies with initializers to Allman style.
+    /// </summary>
+    [Fact]
+    public void AutoFormatEmptyConstructorBodyWithInitializer()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new AutoFormatRecipe()),
+            CSharp(
+                "class Foo : Exception\n{\npublic Foo() : base(){}\npublic Foo(string m) : base(m){}\n}\n",
+                "class Foo : Exception\n{\n    public Foo() : base()\n    {\n    }\n    public Foo(string m) : base(m)\n    {\n    }\n}\n"
+            )
+        );
+    }
+
+    /// <summary>
+    /// Trace the FormatSpans pipeline to verify the WhitespaceReconciler
+    /// correctly applies Roslyn's formatting to synthesized nodes.
+    /// </summary>
+    [Fact]
+    public void FormatSpansReconcilerAppliesFormattingToSynthesizedNodes()
+    {
+        var input = "class Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n}\n";
+        var cu = _parser.Parse(input, "source.cs");
+
+        // Add a synthesized constructor with Space.Empty everywhere
+        var classDecl = cu.Members[0].Element as ClassDeclaration;
+        Assert.NotNull(classDecl);
+
+        var body = new Block(
+            Guid.NewGuid(), Space.Empty, Markers.Empty,
+            new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+            [], Space.Empty);
+        // Use Space.Empty for prefix too — the recipe might not provide newlines
+        var method = new MethodDeclaration(
+            Guid.NewGuid(), Space.Empty, Markers.Empty, [],
+            [new Modifier(Guid.NewGuid(), Space.Empty, Markers.Empty, Modifier.ModifierType.Public, [])],
+            null, null,
+            new Identifier(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, [], "Foo", null, null),
+            new JContainer<Statement>(Space.Empty, [], Markers.Empty),
+            null, body,
+            new JLeftPadded<Expression>(Space.SingleSpace,
+                new MethodInvocation(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, null,
+                    new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "base", null, null),
+                    null, new JContainer<Expression>(Space.Empty, [], Markers.Empty), null)),
+            null);
+
+        var newStatements = new List<JRightPadded<Statement>>(classDecl.Body!.Statements)
+        {
+            new(method, Space.Empty, Markers.Empty)
+        };
+        var modifiedClassDecl = classDecl.WithBody(classDecl.Body.WithStatements(newStatements));
+        cu = cu.WithMembers([new JRightPadded<Statement>(modifiedClassDecl, cu.Members[0].After, cu.Members[0].Markers)]);
+
+        // Call FormatSpans directly (same as DeferredFormatVisitor does)
+        var nodeIds = new HashSet<Guid> { modifiedClassDecl.Id };
+        var preservedPrefixes = new Dictionary<Guid, Space> { { modifiedClassDecl.Id, modifiedClassDecl.Prefix } };
+        var result = RoslynFormatter.FormatSpans(cu, nodeIds, preservedPrefixes);
+
+        var printed = _printer.Print(result);
+
+        // The existing constructor should be preserved as-is
+        Assert.Contains("public Foo(string m) : base(m) { }", printed);
+
+        // The synthesized constructor should have proper indentation (at minimum)
+        Assert.DoesNotContain("base(){}", printed);
+        // Roslyn should have indented the constructor
+        Assert.Contains("    public Foo() : base()", printed);
+    }
+
+    /// <summary>
+    /// End-to-end test: recipe adds a constructor via MaybeAutoFormat at class level.
+    /// This is the exact pattern from the bug report.
+    /// </summary>
+    [Fact]
+    public void MaybeAutoFormatAtClassLevelWithSynthesizedConstructor()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new AddConstructorWithMaybeAutoFormatRecipe()),
+            CSharp(
+                "class Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n}\n",
+                "class Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n\n    public Foo() : base()\n    {\n    }\n}\n"
+            )
+        );
+    }
+
 }
+
+/// <summary>
+/// Recipe that adds a constructor with Space.Empty on synthesized nodes and
+/// calls MaybeAutoFormat at ClassDeclaration level — the exact pattern from the bug report.
+/// </summary>
+file class AddConstructorWithMaybeAutoFormatRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Add constructor with MaybeAutoFormat";
+    public override string Description => "Test recipe.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitClassDeclaration(ClassDeclaration classDecl, ExecutionContext ctx)
+        {
+            var before = classDecl;
+            classDecl = (ClassDeclaration)base.VisitClassDeclaration(classDecl, ctx);
+            if (classDecl.Body == null) return classDecl;
+
+            // Check if parameterless constructor already exists
+            foreach (var stmt in classDecl.Body.Statements)
+                if (stmt.Element is MethodDeclaration md && md.Parameters.Elements.Count == 0 &&
+                    md.Name.SimpleName == classDecl.Name.SimpleName)
+                    return classDecl;
+
+            var className = classDecl.Name.SimpleName;
+
+            var body = new Block(
+                Guid.NewGuid(), Space.Empty, Markers.Empty,
+                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+                [], Space.Empty);
+
+            var method = new MethodDeclaration(
+                Guid.NewGuid(), Space.Format("\n\n"), Markers.Empty, [],
+                [new Modifier(Guid.NewGuid(), Space.Empty, Markers.Empty, Modifier.ModifierType.Public, [])],
+                null, null,
+                new Identifier(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, [], className, null, null),
+                new JContainer<Statement>(Space.Empty, [], Markers.Empty),
+                null, body,
+                new JLeftPadded<Expression>(Space.SingleSpace,
+                    new MethodInvocation(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, null,
+                        new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "base", null, null),
+                        null, new JContainer<Expression>(Space.Empty, [], Markers.Empty), null)),
+                null);
+
+            var newStatements = new List<JRightPadded<Statement>>(classDecl.Body.Statements)
+            {
+                new(method, Space.Empty, Markers.Empty)
+            };
+            classDecl = classDecl.WithBody(classDecl.Body.WithStatements(newStatements));
+            return MaybeAutoFormat(before, classDecl, ctx, Cursor);
+        }
+    }
+}
+
+/// <summary>
+/// Recipe that auto-formats the entire compilation unit.
+/// </summary>
+file class AutoFormatRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Auto-format";
+    public override string Description => "Formats the entire source file.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new AutoFormatVisitor<ExecutionContext>();
+}
+
+/// <summary>
+/// Recipe that replaces a return statement with a multi-statement template:
+/// string s; if/else chain; return s; — using deferred formatting (AutoFormat at statement level).
+/// The template produces a SyntheticBlock that gets flattened.
+/// </summary>
+file class ReplaceWithMultiStatementTemplateRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Replace with multi-statement template";
+    public override string Description => "Test recipe.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitReturn(Return ret, ExecutionContext ctx)
+        {
+            ret = (Return)base.VisitReturn(ret, ctx);
+            if (ret.Expression is not Ternary)
+                return ret;
+
+            // Multi-statement compressed template — produces a SyntheticBlock
+            var tmpl = CSharpTemplate.Statement(
+                "string s;if(x>0){s=\"positive\";}else if(x<0){s=\"negative\";}else{s=\"zero\";}return s;");
+            return AutoFormat((J)tmpl.Apply(Cursor)!, ctx, Cursor);
+        }
+    }
+}
+
+/// <summary>
+/// Recipe that manually constructs an if/else chain with Space.Empty (like AvoidNestingTernary),
+/// extracting conditions and values from the original ternary, and calls MaybeAutoFormat at Block level.
+/// </summary>
+file class ManualIfElseAtBlockLevelRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Manual if/else at block level";
+    public override string Description => "Test recipe.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitBlock(Block block, ExecutionContext ctx)
+        {
+            var before = block;
+            block = (Block)base.VisitBlock(block, ctx);
+
+            bool changed = false;
+            var newStmts = new List<JRightPadded<Statement>>();
+
+            foreach (var padded in block.Statements)
+            {
+                if (padded.Element is Return ret && ret.Expression is Ternary ternary &&
+                    ternary.FalsePart.Element is Ternary)
+                {
+                    // Flatten the ternary chain (like AvoidNestingTernary does)
+                    var branches = new List<(Expression condition, Expression value)>();
+                    Expression elseValue;
+                    FlattenTernary(ternary, branches, out elseValue);
+
+                    var ifStmt = BuildIfElseReturn(branches, elseValue, ret.Prefix);
+                    newStmts.Add(new JRightPadded<Statement>(ifStmt, Space.Empty, Markers.Empty));
+                    changed = true;
+                }
+                else
+                {
+                    newStmts.Add(padded);
+                }
+            }
+
+            return changed
+                ? MaybeAutoFormat(before, block.WithStatements(newStmts), ctx, Cursor)
+                : block;
+        }
+
+        private static void FlattenTernary(Ternary ternary,
+            List<(Expression condition, Expression value)> branches, out Expression elseValue)
+        {
+            branches.Add((ternary.Condition, ternary.TruePart.Element));
+            if (ternary.FalsePart.Element is Ternary nested)
+                FlattenTernary(nested, branches, out elseValue);
+            else
+                elseValue = ternary.FalsePart.Element;
+        }
+
+        private static If BuildIfElseReturn(
+            List<(Expression condition, Expression value)> branches,
+            Expression elseValue, Space declPrefix)
+        {
+            var elseBlock = MakeReturnBlock(elseValue);
+            If.Else? currentElse = new(Guid.NewGuid(), Space.Empty, Markers.Empty,
+                new JRightPadded<Statement>(elseBlock, Space.Empty, Markers.Empty));
+
+            for (int i = branches.Count - 1; i >= 1; i--)
+            {
+                var (cond, val) = branches[i];
+                var block = MakeReturnBlock(val);
+                var elseIfStmt = new If(Guid.NewGuid(), Space.SingleSpace, Markers.Empty,
+                    MakeCondition(cond),
+                    new JRightPadded<Statement>(block, Space.Empty, Markers.Empty),
+                    currentElse);
+                currentElse = new If.Else(Guid.NewGuid(), Space.Empty, Markers.Empty,
+                    new JRightPadded<Statement>(elseIfStmt, Space.Empty, Markers.Empty));
+            }
+
+            var (firstCond, firstVal) = branches[0];
+            var firstBlock = MakeReturnBlock(firstVal);
+            return new If(Guid.NewGuid(), declPrefix, Markers.Empty,
+                MakeCondition(firstCond),
+                new JRightPadded<Statement>(firstBlock, Space.Empty, Markers.Empty),
+                currentElse);
+        }
+
+        private static ControlParentheses<Expression> MakeCondition(Expression condition)
+        {
+            return new ControlParentheses<Expression>(
+                Guid.NewGuid(), Space.SingleSpace, Markers.Empty,
+                new JRightPadded<Expression>(
+                    J.SetPrefix(condition, Space.Empty),
+                    Space.Empty, Markers.Empty));
+        }
+
+        private static Block MakeReturnBlock(Expression value)
+        {
+            var ret = new Return(Guid.NewGuid(), Space.Empty, Markers.Empty,
+                J.SetPrefix(value, Space.SingleSpace));
+            return new Block(Guid.NewGuid(), Space.Empty, Markers.Empty,
+                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+                [new JRightPadded<Statement>(ret, Space.Empty, Markers.Empty)],
+                Space.Empty);
+        }
+    }
+}
+
+/// <summary>
+/// Recipe that intentionally creates a type mismatch: uses Identifier("string")
+/// instead of Primitive(String). Used to test mismatch reporting.
+/// </summary>
+file class MismatchingTypeRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Mismatching type recipe";
+    public override string Description => "Test recipe.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitClassDeclaration(ClassDeclaration classDecl, ExecutionContext ctx)
+        {
+            var before = classDecl;
+            classDecl = (ClassDeclaration)base.VisitClassDeclaration(classDecl, ctx);
+            if (classDecl.Body == null || classDecl.Body.Statements.Count > 0) return classDecl;
+
+            // Deliberately use Identifier("string") — the parser produces Primitive(String)
+            var typeExpr = new Identifier(
+                Guid.NewGuid(), Space.Empty, Markers.Empty, [], "string", null, null);
+            var variable = new NamedVariable(
+                Guid.NewGuid(), Space.SingleSpace, Markers.Empty,
+                new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "x", null, null),
+                [], null, null);
+            var field = new VariableDeclarations(
+                Guid.NewGuid(), Space.Empty, Markers.Empty, [], [], typeExpr, null, [],
+                [new JRightPadded<NamedVariable>(variable, Space.Empty, Markers.Empty)]);
+
+            var newStatements = new List<JRightPadded<Statement>>(classDecl.Body.Statements)
+            {
+                new(field, Space.Empty, Markers.Empty)
+            };
+            classDecl = classDecl.WithBody(classDecl.Body.WithStatements(newStatements));
+            return MaybeAutoFormat(before, classDecl, ctx, Cursor);
+        }
+    }
+}
+

@@ -24,10 +24,60 @@ namespace OpenRewrite.CSharp.Template;
 public sealed class MatchResult
 {
     private readonly Dictionary<string, object> _captures;
+    private readonly IReadOnlyDictionary<string, NullSafe>? _nullSafeCaptures;
 
-    internal MatchResult(Dictionary<string, object> captures)
+    internal MatchResult(Dictionary<string, object> captures,
+        IReadOnlyDictionary<string, NullSafe>? nullSafeCaptures = null)
     {
         _captures = captures;
+        _nullSafeCaptures = nullSafeCaptures;
+    }
+
+    /// <summary>
+    /// Create a <see cref="MatchResult"/> from manually-assembled capture values.
+    /// This allows recipe authors to use <see cref="CSharpTemplate.Apply"/> with
+    /// substitution values that come from imperative extraction rather than
+    /// <see cref="CSharpPattern.Match"/>.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var values = MatchResult.Of(("reason", skipLiteral));
+    /// var result = template.Apply(cursor, values: values);
+    /// </code>
+    /// </example>
+    public static MatchResult Of(params (string name, J value)[] captures)
+    {
+        var dict = new Dictionary<string, object>(captures.Length);
+        foreach (var (name, value) in captures)
+        {
+            dict[name] = value;
+        }
+        return new MatchResult(dict);
+    }
+
+    /// <summary>
+    /// Create a <see cref="MatchResult"/> from <see cref="ICapture"/> keys.
+    /// This allows using unnamed captures (with auto-generated names) as keys,
+    /// avoiding the need to manually synchronize string names between template
+    /// creation and value binding.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var left = Capture.Expression();
+    /// var right = Capture.Expression();
+    /// var template = CSharpTemplate.Expression($"{left} &amp;&amp; {right}");
+    /// var values = MatchResult.Of((left, outerCond), (right, innerCond));
+    /// var result = template.Apply(cursor, values: values);
+    /// </code>
+    /// </example>
+    public static MatchResult Of(params (ICapture capture, J value)[] captures)
+    {
+        var dict = new Dictionary<string, object>(captures.Length);
+        foreach (var (capture, value) in captures)
+        {
+            dict[capture.Name] = value;
+        }
+        return new MatchResult(dict);
     }
 
     /// <summary>
@@ -40,6 +90,13 @@ public sealed class MatchResult
     /// Get a captured value by its <see cref="Capture{T}"/> object.
     /// </summary>
     public T? Get<T>(Capture<T> capture) where T : class, J
+        => Get<T>(capture.Name);
+
+    /// <summary>
+    /// Get a captured value by its <see cref="ICapture"/> object.
+    /// Useful when the capture's type parameter doesn't match the desired return type.
+    /// </summary>
+    public T? Get<T>(ICapture capture) where T : class, J
         => Get<T>(capture.Name);
 
     /// <summary>
@@ -61,6 +118,18 @@ public sealed class MatchResult
     /// Check if a capture with the given name was bound.
     /// </summary>
     public bool Has(string name) => _captures.ContainsKey(name);
+
+    /// <summary>
+    /// Check if a capture was bound.
+    /// </summary>
+    public bool Has(ICapture capture) => _captures.ContainsKey(capture.Name);
+
+    /// <summary>
+    /// Get the NullSafe marker associated with a capture, if any.
+    /// Present when the capture was the Select of a null-conditional MI/FA in the matched tree.
+    /// </summary>
+    internal NullSafe? GetNullSafe(string name) =>
+        _nullSafeCaptures != null && _nullSafeCaptures.TryGetValue(name, out var ns) ? ns : null;
 
     internal Dictionary<string, object> AsDict() => _captures;
 }

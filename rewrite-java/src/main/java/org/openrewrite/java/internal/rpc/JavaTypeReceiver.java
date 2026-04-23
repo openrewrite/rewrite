@@ -19,9 +19,11 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.openrewrite.internal.ListUtils.arrayOrNullIfEmpty;
+import static org.openrewrite.java.tree.JavaType.EMPTY_ANNOTATION_VALUE_ARRAY;
 import static org.openrewrite.java.tree.JavaType.EMPTY_FULLY_QUALIFIED_ARRAY;
 import static org.openrewrite.java.tree.JavaType.EMPTY_JAVA_TYPE_ARRAY;
 
@@ -31,30 +33,29 @@ public class JavaTypeReceiver extends JavaTypeVisitor<RpcReceiveQueue> {
     @Override
     public JavaType visitAnnotation(JavaType.Annotation annotation, RpcReceiveQueue q) {
         JavaType.FullyQualified type = q.receive(annotation.getType(), v -> (JavaType.FullyQualified) visit(v, q));
-        return annotation.unsafeSet(
-                type,
-                null
-//                    arrayOrNullIfEmpty(q.receiveList(annotation.getValues(), v -> {
-//                        if (v instanceof JavaType.Annotation.SingleElementValue) {
-//                            JavaType.Annotation.SingleElementValue sev = (JavaType.Annotation.SingleElementValue) v;
-//                            JavaType element = q.receive(sev.getElement(), null);
-//                            Object constantValue = q.receive(sev.getConstantValue(), null);
-//                            JavaType referenceValue = q.receive(sev.getReferenceValue(), null);
-//                            return new JavaType.Annotation.SingleElementValue(element, constantValue, referenceValue);
-//                        } else if (v instanceof JavaType.Annotation.ArrayElementValue) {
-//                            JavaType.Annotation.ArrayElementValue aev = (JavaType.Annotation.ArrayElementValue) v;
-//                            JavaType element = q.receive(aev.getElement(), null);
-//                            List<Object> constantValues = q.receiveList(aev.getConstantValues() == null ? null : Arrays.asList(aev.getConstantValues()), null);
-//                            List<JavaType> referenceValues = q.receiveList(aev.getReferenceValues() == null ? null : Arrays.asList(aev.getReferenceValues()), null);
-//                            return new JavaType.Annotation.ArrayElementValue(
-//                                    element,
-//                                    constantValues == null ? null : constantValues.toArray(),
-//                                    referenceValues == null ? null : referenceValues.toArray(EMPTY_JAVA_TYPE_ARRAY)
-//                            );
-//                        }
-//                        return v;
-//                    }), EMPTY_ANNOTATION_VALUE_ARRAY)
-        );
+        List<JavaType.Annotation.ElementValue> values = q.receiveList(annotation.getValues(), v -> {
+            JavaType element = q.receive(v.getElement(), t -> visit(t, q));
+            if (v instanceof JavaType.Annotation.ArrayElementValue) {
+                JavaType.Annotation.ArrayElementValue aev = (JavaType.Annotation.ArrayElementValue) v;
+                List<Object> constantValues = q.receiveList(
+                        aev.getConstantValues() == null ? null : Arrays.asList(aev.getConstantValues()),
+                        null);
+                List<JavaType> referenceValues = q.receiveList(
+                        aev.getReferenceValues() == null ? null : Arrays.asList(aev.getReferenceValues()),
+                        t -> visit(t, q));
+                return new JavaType.Annotation.ArrayElementValue(
+                        element,
+                        constantValues == null ? null : constantValues.toArray(),
+                        referenceValues == null ? null : referenceValues.toArray(EMPTY_JAVA_TYPE_ARRAY));
+            }
+            JavaType.Annotation.SingleElementValue sev = (JavaType.Annotation.SingleElementValue) v;
+            // constantValue arrives as whatever the JSON-RPC layer deserialized — typically Integer for
+            // any non-fractional JSON number, Double for fractional, String for text, Boolean for bools.
+            Object constantValue = q.receive(sev.getConstantValue());
+            JavaType referenceValue = q.receive(sev.getReferenceValue(), t -> visit(t, q));
+            return new JavaType.Annotation.SingleElementValue(element, constantValue, referenceValue);
+        });
+        return annotation.unsafeSet(type, arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY));
     }
 
     @Override

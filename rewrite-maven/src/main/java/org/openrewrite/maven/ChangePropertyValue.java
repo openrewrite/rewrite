@@ -90,7 +90,7 @@ public class ChangePropertyValue extends Recipe {
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isPropertyTag() && propertyName.equals(tag.getName()) &&
+                if ((isPropertyTag() || isProfilePropertyTag()) && propertyName.equals(tag.getName()) &&
                     !newValue.equals(tag.getValue().orElse(null))) {
                     doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
                     maybeUpdateModel();

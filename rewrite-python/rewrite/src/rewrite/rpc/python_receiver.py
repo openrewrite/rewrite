@@ -81,27 +81,12 @@ class PythonRpcReceiver:
         if tree is None:
             return None
 
-        # First handle common J fields via pre_visit
-        # Java's preVisit always sends id, prefix, markers for all J elements.
-        # ExpressionStatement and StatementExpression delegate prefix/markers to their child,
-        # but we still need to receive them to stay in sync with the queue.
+        # First handle common J fields via pre_visit.
+        # ExpressionStatement and StatementExpression delegate prefix/markers to their
+        # wrapped child: the sender skips them here and sends them via the child's preVisit.
         if isinstance(tree, J):
-            if isinstance(tree, ExpressionStatement):
-                # Java sends id, prefix, markers even though prefix/markers delegate to expression
-                # We must receive them to stay in sync, but only use the id
-                # Note: tree.prefix/markers would fail on fresh instances since _expression is None,
-                # so we pass None as the before value - the RPC data contains the actual values anyway.
+            if isinstance(tree, (ExpressionStatement, StatementExpression)):
                 new_id = q.receive(tree.id)
-                q.receive(None)    # Receive but discard prefix - delegated to expression
-                q.receive(None)    # Receive but discard markers - delegated to expression
-                tree = tree.replace(id=new_id) if new_id is not tree.id else tree
-            elif isinstance(tree, StatementExpression):
-                # Java sends id, prefix, markers even though prefix/markers delegate to statement
-                # We must receive them to stay in sync, but only use the id
-                # Note: tree.prefix/markers would fail on fresh instances since _statement is None
-                new_id = q.receive(tree.id)
-                q.receive(None)    # Receive but discard prefix - delegated to statement
-                q.receive(None)    # Receive but discard markers - delegated to statement
                 tree = tree.replace(id=new_id) if new_id is not tree.id else tree
             else:
                 tree = self._pre_visit(tree, q)
@@ -727,10 +712,11 @@ class PythonRpcReceiver:
             lambda c: self._receive_container(c, q) if c else None
         )
         body = q.receive(class_decl.body)
+        type_ = q.receive(class_decl.type)
         return replace_if_changed(class_decl, leading_annotations=leading_annotations, modifiers=modifiers,
                                   kind=kind, name=name, type_parameters=type_parameters,
                                   primary_constructor=primary_constructor, extends=extends, implements=implements,
-                                  permits=permits, body=body)
+                                  permits=permits, body=body, type=type_)
 
     def _visit_j_class_declaration_kind(self, kind, q: RpcReceiveQueue):
         from rewrite.java.tree import ClassDeclaration
@@ -1396,8 +1382,8 @@ def _receive_java_type_method(method, q: RpcReceiveQueue):
     )
 
 
-def _receive_java_type_class(cls, q: RpcReceiveQueue):
-    """Codec for receiving JavaType.Class - consumes all class fields."""
+def _receive_java_type_class_fields(cls, q: RpcReceiveQueue, result):
+    """Consume the Class field sequence and populate `result` in place."""
     from rewrite.java.support_types import JavaType as JT
 
     # Receive fields in the same order as JavaTypeSender.visitClass:
@@ -1414,20 +1400,32 @@ def _receive_java_type_class(cls, q: RpcReceiveQueue):
     members = q.receive_list(getattr(cls, '_members', None) if cls else None)
     methods = q.receive_list(getattr(cls, '_methods', None) if cls else None)
 
-    # Create a new Class instance and set attributes
-    class_type = JT.Class()
-    class_type._flags_bit_map = flags
-    class_type._kind = kind
-    class_type._fully_qualified_name = fqn
-    class_type._type_parameters = type_params
-    class_type._supertype = supertype
-    class_type._owning_class = owning_class
-    class_type._annotations = annotations
-    class_type._interfaces = interfaces
-    class_type._members = members
-    class_type._methods = methods
+    result._flags_bit_map = flags
+    result._kind = kind
+    result._fully_qualified_name = fqn
+    result._type_parameters = type_params
+    result._supertype = supertype
+    result._owning_class = owning_class
+    result._annotations = annotations
+    result._interfaces = interfaces
+    result._members = members
+    result._methods = methods
 
-    return class_type
+    return result
+
+
+def _receive_java_type_class(cls, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Class - consumes all class fields."""
+    from rewrite.java.support_types import JavaType as JT
+
+    return _receive_java_type_class_fields(cls, q, JT.Class())
+
+
+def _receive_java_type_shallow_class(cls, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.ShallowClass - same wire shape as Class."""
+    from rewrite.java.support_types import JavaType as JT
+
+    return _receive_java_type_class_fields(cls, q, JT.ShallowClass())
 
 
 def _receive_java_type_parameterized(param, q: RpcReceiveQueue):
@@ -1441,6 +1439,47 @@ def _receive_java_type_parameterized(param, q: RpcReceiveQueue):
     p._type = type_  # ty: ignore[invalid-assignment]  # RPC deserialization
     p._type_parameters = type_params
     return p
+
+
+def _receive_java_type_annotation(annotation, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Annotation - consumes type and values."""
+    from rewrite.java.support_types import JavaType as JT
+
+    type_ = q.receive(getattr(annotation, '_type', None))
+    before_values = getattr(annotation, '_values', None)
+    values = q.receive_list(before_values, lambda v: _receive_annotation_element_value(v, q))
+
+    a = JT.Annotation()
+    a._type = type_  # ty: ignore[invalid-assignment]  # RPC deserialization
+    a._values = values
+    return a
+
+
+def _receive_annotation_element_value(v, q: RpcReceiveQueue):
+    """Receive a JavaType.Annotation.ElementValue (Single or Array variant).
+
+    Mirrors the Java JavaTypeReceiver visitor lambda inside visitAnnotation.
+    Constant values arrive as whatever the JSON-RPC layer deserialized.
+    """
+    from rewrite.java.support_types import JavaType as JT
+
+    element = q.receive(getattr(v, '_element', None))
+    if isinstance(v, JT.Annotation.ArrayElementValue):
+        constant_values = q.receive_list(getattr(v, '_constant_values', None), None)
+        ref_values = q.receive_list(getattr(v, '_reference_values', None) or [])
+        return JT.Annotation.ArrayElementValue(
+            _element=element,
+            _constant_values=constant_values,
+            _reference_values=ref_values,
+        )
+    sev = v if isinstance(v, JT.Annotation.SingleElementValue) else None
+    constant_value = q.receive(getattr(sev, '_constant_value', None) if sev is not None else None)
+    ref_value = q.receive(getattr(sev, '_reference_value', None) if sev is not None else None)
+    return JT.Annotation.SingleElementValue(
+        _element=element,
+        _constant_value=constant_value,
+        _reference_value=ref_value,
+    )
 
 
 def _receive_java_type_array(array, q: RpcReceiveQueue):
@@ -1540,6 +1579,15 @@ def _register_java_type_codecs():
         lambda: JT.Class()  # Factory creates empty Class
     )
 
+    # JavaType.ShallowClass - same wire shape as Class, but preserves the
+    # ShallowClass marker so senders round-trip the correct type name.
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$ShallowClass',
+        JT.ShallowClass,
+        _receive_java_type_shallow_class,
+        lambda: JT.ShallowClass()
+    )
+
     # JavaType.Variable - full serialization of variable type info
     register_codec_with_both_names(
         'org.openrewrite.java.tree.JavaType$Variable',
@@ -1554,6 +1602,30 @@ def _register_java_type_codecs():
         JT.Parameterized,
         _receive_java_type_parameterized,
         lambda: JT.Parameterized()  # Factory creates empty Parameterized
+    )
+
+    # JavaType.Annotation - type and values
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Annotation',
+        JT.Annotation,
+        _receive_java_type_annotation,
+        lambda: JT.Annotation()  # Factory creates empty Annotation
+    )
+
+    # JavaType.Annotation.SingleElementValue - element + constantValue + referenceValue
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Annotation$SingleElementValue',
+        JT.Annotation.SingleElementValue,
+        _receive_annotation_element_value,
+        lambda: JT.Annotation.SingleElementValue(),
+    )
+
+    # JavaType.Annotation.ArrayElementValue - element + constantValues + referenceValues
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Annotation$ArrayElementValue',
+        JT.Annotation.ArrayElementValue,
+        _receive_annotation_element_value,
+        lambda: JT.Annotation.ArrayElementValue(),
     )
 
     # JavaType.Array - element type and annotations

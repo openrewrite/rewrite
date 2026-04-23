@@ -22,14 +22,18 @@ import org.openrewrite.*;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.python.marker.PythonResolutionResult;
-import org.openrewrite.toml.TomlIsoVisitor;
+import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
-import org.openrewrite.toml.tree.TomlType;
 
-import java.util.*;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * Upgrade the version constraint for a dependency in {@code [project].dependencies} in pyproject.toml.
+ * Upgrade the version constraint for a dependency. Supports {@code pyproject.toml}
+ * (with scope and group targeting), {@code requirements.txt}, and {@code Pipfile}.
  * When uv is available, the uv.lock file is regenerated to reflect the change.
  */
 @EqualsAndHashCode(callSuper = false)
@@ -47,9 +51,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     String newVersion;
 
     @Option(displayName = "Scope",
-            description = "The dependency scope to update in. Defaults to `project.dependencies`.",
-            valid = {"project.dependencies", "project.optional-dependencies", "dependency-groups",
-                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies"},
+            description = "The dependency scope to update in. All scopes are searched by default.",
             example = "project.dependencies",
             required = false)
     @Nullable
@@ -83,12 +85,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Override
     public String getDescription() {
-        return "Upgrade the version constraint for a dependency in `[project].dependencies` in `pyproject.toml`. " +
+        return "Upgrade the version constraint for a dependency. Supports `pyproject.toml` " +
+                "(with scope/group targeting), `requirements.txt`, and `Pipfile`. " +
                 "When `uv` is available, the `uv.lock` file is regenerated.";
     }
 
     static class Accumulator {
-        final Set<String> projectsToUpdate = new HashSet<>();
+        final Set<Path> projectsToUpdate = new HashSet<>();
     }
 
     @Override
@@ -98,155 +101,74 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
-        return new TomlIsoVisitor<ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
             @Override
-            public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-                String sourcePath = document.getSourcePath().toString();
-
-                if (sourcePath.endsWith("uv.lock")) {
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sourceFile = (SourceFile) tree;
+                if (tree instanceof Toml.Document && sourceFile.getSourcePath().endsWith("uv.lock")) {
                     PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
-                            PyProjectHelper.correspondingPyprojectPath(sourcePath),
-                            document.printAll());
-                    return document;
+                            PyProjectHelper.correspondingPyprojectPath(sourceFile.getSourcePath()),
+                            ((Toml.Document) tree).printAll());
+                    return tree;
                 }
-
-                if (!sourcePath.endsWith("pyproject.toml")) {
-                    return document;
+                PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
+                if (trait == null) {
+                    return tree;
                 }
-                Optional<PythonResolutionResult> resolution = document.getMarkers()
-                        .findFirst(PythonResolutionResult.class);
-                if (!resolution.isPresent()) {
-                    return document;
-                }
-
-                PythonResolutionResult marker = resolution.get();
-
-                // Check if the dependency exists in the target scope and has a different version
                 PythonResolutionResult.Dependency dep = PyProjectHelper.findDependencyInScope(
-                        marker, packageName, scope, groupName);
-                if (dep == null) {
-                    return document;
+                        trait.getMarker(), packageName, scope, groupName);
+                if (dep != null && !PyProjectHelper.normalizeVersionConstraint(newVersion).equals(dep.getVersionConstraint())) {
+                    acc.projectsToUpdate.add(sourceFile.getSourcePath());
                 }
-
-                // Skip if the version constraint already matches
-                if (PyProjectHelper.normalizeVersionConstraint(newVersion).equals(dep.getVersionConstraint())) {
-                    return document;
-                }
-
-                acc.projectsToUpdate.add(sourcePath);
-                return document;
+                return tree;
             }
         };
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        return new TomlIsoVisitor<ExecutionContext>() {
-            @Override
-            public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-                String sourcePath = document.getSourcePath().toString();
+        if (acc.projectsToUpdate.isEmpty()) {
+            return TreeVisitor.noop();
+        }
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
 
-                if (sourcePath.endsWith("pyproject.toml") && acc.projectsToUpdate.contains(sourcePath)) {
-                    return changeVersionInPyproject(document, ctx, acc);
+            @Override
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sourceFile = (SourceFile) tree;
+                Path sourcePath = sourceFile.getSourcePath();
+
+                if (acc.projectsToUpdate.contains(sourcePath)) {
+                    PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
+                    if (trait != null) {
+                        Map<String, String> upgrades = Collections.singletonMap(
+                                PythonResolutionResult.normalizeName(packageName), newVersion);
+                        PythonDependencyFile updated = trait.withUpgradedVersions(upgrades, scope, groupName);
+                        if (updated.getTree() != tree) {
+                            return updated.afterModification(ctx);
+                        }
+                    }
                 }
 
-                if (sourcePath.endsWith("uv.lock")) {
-                    Toml.Document updatedLock = PyProjectHelper.maybeUpdateUvLock(document, ctx);
+                if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
+                    Toml.Document updatedLock = PyProjectHelper.maybeUpdateUvLock((Toml.Document) tree, ctx);
                     if (updatedLock != null) {
                         return updatedLock;
                     }
                 }
 
-                return document;
+                return tree;
             }
         };
     }
-
-    private Toml.Document changeVersionInPyproject(Toml.Document document, ExecutionContext ctx, Accumulator acc) {
-        String normalizedName = PythonResolutionResult.normalizeName(packageName);
-
-        Toml.Document updated = (Toml.Document) new TomlIsoVisitor<ExecutionContext>() {
-            @Override
-            public Toml.Literal visitLiteral(Toml.Literal literal, ExecutionContext ctx) {
-                Toml.Literal l = super.visitLiteral(literal, ctx);
-                if (l.getType() != TomlType.Primitive.String) {
-                    return l;
-                }
-
-                Object val = l.getValue();
-                if (!(val instanceof String)) {
-                    return l;
-                }
-
-                // Check if we're inside the target dependency array
-                if (!isInsideTargetDependencies()) {
-                    return l;
-                }
-
-                // Check if this literal matches the package we're looking for
-                String spec = (String) val;
-                String depName = PyProjectHelper.extractPackageName(spec);
-                if (depName == null || !PythonResolutionResult.normalizeName(depName).equals(normalizedName)) {
-                    return l;
-                }
-
-                // Build new PEP 508 string preserving extras and markers
-                String newSpec = buildNewSpec(spec, depName);
-                return l.withSource("\"" + newSpec + "\"").withValue(newSpec);
-            }
-
-            private boolean isInsideTargetDependencies() {
-                // Walk up the cursor to find the enclosing array, then check scope
-                Cursor c = getCursor();
-                while (c != null) {
-                    if (c.getValue() instanceof Toml.Array) {
-                        return PyProjectHelper.isInsideDependencyArray(c, scope, groupName);
-                    }
-                    c = c.getParent();
-                }
-                return false;
-            }
-
-            private String buildNewSpec(String oldSpec, String depName) {
-                // Parse extras and markers from old spec
-                String extras = extractExtras(oldSpec);
-                String marker = extractMarker(oldSpec);
-
-                StringBuilder sb = new StringBuilder(depName);
-                if (extras != null) {
-                    sb.append('[').append(extras).append(']');
-                }
-                sb.append(PyProjectHelper.normalizeVersionConstraint(newVersion));
-                if (marker != null) {
-                    sb.append("; ").append(marker);
-                }
-                return sb.toString();
-            }
-        }.visitNonNull(document, ctx);
-
-        if (updated != document) {
-            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, ctx);
-        }
-
-        return updated;
-    }
-
-    static @Nullable String extractExtras(String pep508Spec) {
-        int start = pep508Spec.indexOf('[');
-        int end = pep508Spec.indexOf(']');
-        if (start >= 0 && end > start) {
-            return pep508Spec.substring(start + 1, end);
-        }
-        return null;
-    }
-
-    static @Nullable String extractMarker(String pep508Spec) {
-        int idx = pep508Spec.indexOf(';');
-        if (idx >= 0) {
-            String marker = pep508Spec.substring(idx + 1).trim();
-            return marker.isEmpty() ? null : marker;
-        }
-        return null;
-    }
-
 }
