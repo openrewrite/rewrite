@@ -1544,6 +1544,89 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Test
+    void preCodeBlockWithNewlineAfterOpeningTag() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * <p>Example:
+               *
+               * <pre><code>
+               *   class Outer {
+               *     static class Inner {
+               *     }
+               *   }
+               * </code></pre>
+               */
+              public @interface Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preCodeBlockTwoInstances() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * <pre><code>
+               *   first block
+               * </code></pre>
+               *
+               * <pre><code>
+               *   second block
+               * </code></pre>
+               */
+              public @interface Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preCodeBlockWithInlineLiteralTag() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * Defines a Hilt component.
+               *
+               * <p>Example defining a root component, {@code ParentComponent}:
+               *
+               * <pre><code>
+               *   {@literal @}ParentScoped
+               *   {@literal @}DefineComponent
+               *   interface ParentComponent {}
+               * </code></pre>
+               */
+              public @interface Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preCodeBlockSameLineAsText() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * Some text <pre><code>
+               *   content
+               * </code></pre>
+               */
+              public @interface Test {
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1409")
     @Test
     void trailingWhitespaceWithWhitespaceOnEmptyLine() {
