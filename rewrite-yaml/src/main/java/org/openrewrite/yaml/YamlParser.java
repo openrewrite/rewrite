@@ -345,9 +345,14 @@ public class YamlParser implements org.openrewrite.Parser {
                                 scalarValue = scalarValue.replace(entry.getKey(), entry.getValue());
                             }
                         }
-                        // Then check for variable UUIDs (these are exact matches)
-                        if (variableByUuid.containsKey(scalarValue)) {
-                            scalarValue = variableByUuid.get(scalarValue);
+                        // Then restore any variable/asterisk placeholder UUIDs. The UUID may be
+                        // the entire scalar value (e.g. `key: @var@`) or embedded within a longer
+                        // scalar (e.g. markdown bold text inside a block scalar that happened to
+                        // match the asterisk placeholder regex).
+                        for (Map.Entry<String, String> entry : variableByUuid.entrySet()) {
+                            if (scalarValue.contains(entry.getKey())) {
+                                scalarValue = scalarValue.replace(entry.getKey(), entry.getValue());
+                            }
                         }
 
                         Yaml.Scalar.Style style;
