@@ -586,28 +586,18 @@ public class GroovyParserVisitor {
         private void visitVariableField(FieldNode field) {
             RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field, this);
 
-            // A multi-variable declaration (e.g., `final String a, b`) produces a separate FieldNode for each variable.
-            // For continuation fields, the modifiers and type keyword exist only before the first variable,
-            // so just consume the comma and emit an empty type expression; the MultiVariable marker lets the printer render the comma.
-            int saveCursor = cursor;
-            Space beforeComma = whitespace();
-            MultiVariable multiVariable = null;
-            List<J.Annotation> annotations;
-            List<J.Modifier> modifiers;
+            // Groovy emits a separate FieldNode per variable in a multi-variable declaration (e.g. `final String a, b`);
+            // continuation fields have no modifiers or type keyword in the source, so skip past just the comma.
+            Optional<MultiVariable> multiVariable = maybeMultiVariable();
+            List<J.Annotation> annotations = multiVariable.isPresent() ? emptyList() : visitAndGetAnnotations(field, this);
+            List<J.Modifier> modifiers = multiVariable.isPresent() ? emptyList() : getModifiers();
             TypeTree typeExpr;
-            if (cursor < source.length() && source.charAt(cursor) == ',') {
-                skip(",");
-                multiVariable = new MultiVariable(randomId(), beforeComma);
-                annotations = emptyList();
-                modifiers = emptyList();
-                typeExpr = field.isDynamicTyped() ? null :
-                        new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "",
-                                typeMapping.type(field.getOriginType()), null);
+            if (field.isDynamicTyped()) {
+                typeExpr = null;
+            } else if (multiVariable.isPresent()) {
+                typeExpr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", typeMapping.type(field.getOriginType()), null);
             } else {
-                cursor = saveCursor;
-                annotations = visitAndGetAnnotations(field, this);
-                modifiers = getModifiers();
-                typeExpr = field.isDynamicTyped() ? null : visitTypeTree(field.getOriginType());
+                typeExpr = visitTypeTree(field.getOriginType());
             }
 
             J.Identifier name = new J.Identifier(randomId(), sourceBefore(field.getName()), Markers.EMPTY,
@@ -629,11 +619,10 @@ public class GroovyParserVisitor {
                 namedVariable = namedVariable.getPadding().withInitializer(padLeft(beforeAssign, initializer));
             }
 
-            Markers markers = multiVariable == null ? Markers.EMPTY : Markers.build(singleton(multiVariable));
             J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
                     randomId(),
                     EMPTY,
-                    markers,
+                    multiVariable.<Markers>map(mv -> Markers.build(singleton(mv))).orElse(Markers.EMPTY),
                     annotations,
                     modifiers,
                     typeExpr,
@@ -1846,17 +1835,6 @@ public class GroovyParserVisitor {
             queue.add(variableDeclarations);
         }
 
-        private Optional<MultiVariable> maybeMultiVariable() {
-            int saveCursor = cursor;
-            Space commaPrefix = whitespace();
-            if (source.startsWith(",", cursor)) {
-                skip(",");
-                return Optional.of(new MultiVariable(randomId(), commaPrefix));
-            }
-            cursor = saveCursor;
-            return Optional.empty();
-        }
-
         @Override
         public void visitEmptyExpression(EmptyExpression expression) {
             queue.add(new J.Empty(randomId(), EMPTY, Markers.EMPTY));
@@ -3035,6 +3013,17 @@ public class GroovyParserVisitor {
      * Get all characters of the source file between the cursor and the given delimiter.
      * The cursor will be moved past the delimiter.
      */
+    private Optional<MultiVariable> maybeMultiVariable() {
+        int saveCursor = cursor;
+        Space commaPrefix = whitespace();
+        if (source.startsWith(",", cursor)) {
+            skip(",");
+            return Optional.of(new MultiVariable(randomId(), commaPrefix));
+        }
+        cursor = saveCursor;
+        return Optional.empty();
+    }
+
     private Space sourceBefore(String untilDelim) {
         int delimIndex = positionOfNext(untilDelim);
         if (delimIndex < 0) {

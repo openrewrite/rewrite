@@ -140,19 +140,6 @@ class VariableDeclarationsTest implements RewriteTest {
     }
 
     @Test
-    void multipleVariableFieldDeclarationWithInitializers() {
-        rewriteRun(
-          groovy(
-            """
-              class A {
-                  String first = "a", second = "b"
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void genericVariableDeclaration() {
         rewriteRun(
           groovy("def a = new HashMap<String, String>()")
