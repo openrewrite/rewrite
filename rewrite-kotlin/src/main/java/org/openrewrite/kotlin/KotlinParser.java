@@ -179,7 +179,13 @@ public class KotlinParser implements Parser {
             compilerCus = parse(acceptedInputs, disposable, pctx);
         } catch (Throwable t) {
             disposable.dispose();
-            return acceptedInputs.stream().map(input -> ParseError.build(this, input, relativeTo, ctx, t));
+            // Exclude dependsOn stub inputs from error reporting; they are parser-internal
+            // scaffolding (e.g., synthetic `package org.gradle.api` stubs used by GradleParser)
+            // and their synthetic paths (like `org/gradle/api/<nanotime>.kt`) must not leak
+            // into downstream manifests/LST outputs as ParseError source files.
+            return acceptedInputs.stream()
+                    .filter(input -> !dependsOnPaths.contains(input.getRelativePath(relativeTo)))
+                    .map(input -> ParseError.build(this, input, relativeTo, ctx, t));
         }
 
         FirSession firSession = compilerCus.getFirSession();

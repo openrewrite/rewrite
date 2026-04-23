@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -273,6 +274,69 @@ class GradleParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    /**
+     * Regression test for the bug where the Kotlin DSL parser's internal depends-on stub
+     * inputs (synthetic `package org.gradle.api` stubs) leaked into downstream manifest/LST
+     * outputs as ParseError source files when the Kotlin compiler threw an exception
+     * parsing a build.gradle.kts whose plugin imports could not be resolved. The leaked
+     * path pattern is `org/gradle/api/<nanotime>.kt`, which never exists on disk — hashing
+     * fails in later stages. See KotlinParser#parseInputs error-path dependsOn filter.
+     */
+    @Test
+    void kotlinDslDependsOnStubsDoNotLeakOnParseFailure() {
+        // Regression test: when the Kotlin DSL parser fails (e.g., because of unresolvable
+        // plugin imports), its internal `dependsOn` stub inputs — whose synthetic paths
+        // look like `org/gradle/api/<nanotime>.kt` — must not leak into the output stream
+        // as ParseError source files. See org/openrewrite/kotlin/KotlinParser#parseInputs
+        // error-path filter.
+        //
+        // Uses the exact kotlin-script shape that broke `mod build openrewrite/rewrite` when
+        // parsing rewrite-javascript/build.gradle.kts: imports that cannot be resolved from
+        // the default buildscript classpath (node-gradle plugin, develocity agent, license
+        // plugin) plus reified-generic `extensions.configure<NodeExtension>` calls.
+        var gradleParser = GradleParser.builder().build();
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(
+          List.of(Parser.Input.fromString(Paths.get("build.gradle.kts"), """
+            @file:Suppress("UnstableApiUsage")
+
+            import com.github.gradle.node.NodeExtension
+            import com.github.gradle.node.npm.task.NpmTask
+            import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
+            import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
+            import nl.javadude.gradle.plugins.license.LicenseExtension
+
+            plugins {
+                id("com.github.node-gradle.node") version "latest.release"
+            }
+
+            extensions.configure<NodeExtension> {
+                workDir.set(projectDir.resolve("rewrite"))
+            }
+
+            val npmBuild = tasks.register<NpmTask>("npmBuild") {
+                args = listOf("run", "build")
+            }
+
+            ImportJUnitXmlReports.register(tasks, npmBuild, JUnitXmlDialect.GENERIC)
+
+            extensions.configure<LicenseExtension> {
+                header = file("header.txt")
+            }
+            """)),
+          null,
+          new InMemoryExecutionContext()
+        );
+        List<SourceFile> results = sourceFileStream.toList();
+        for (SourceFile sf : results) {
+            String path = sf.getSourcePath().toString().replace('\\', '/');
+            assertThat(path)
+                .as("dependsOn stub path leaked into output: %s (sourceFileType=%s)",
+                    path, sf.getClass().getSimpleName())
+                .doesNotStartWith("org/gradle/api/")
+                .doesNotStartWith("org/gradle/api/initialization/");
+        }
     }
 
     @Test
