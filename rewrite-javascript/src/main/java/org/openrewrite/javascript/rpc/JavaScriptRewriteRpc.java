@@ -252,7 +252,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private List<RecipeBundleResolver> resolvers = Collections.emptyList();
         private final Map<String, String> environment = new HashMap<>();
-        private Path npxPath = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");
+        private static final Path DEFAULT_NPX_PATH = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");
+        private Supplier<@Nullable Path> npxPathSupplier = () -> DEFAULT_NPX_PATH;
         private @Nullable Path log;
         private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;
@@ -289,7 +290,20 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             if (Files.notExists(npxPath) || Files.isDirectory(npxPath)) {
                 throw new IllegalArgumentException("Invalid npx executable " + npxPath.toAbsolutePath().normalize());
             }
-            this.npxPath = npxPath;
+            return npxPath(() -> npxPath);
+        }
+
+        /**
+         * Supplies the path to the `npx` executable. The supplier is invoked at most
+         * once, when the RPC is first started. Returning {@code null} uses the built-in
+         * default (same as not configuring the path at all). Exceptions thrown by the
+         * supplier propagate out of the RPC-start call.
+         *
+         * @param npxPathSupplier Supplier for the path to the `npx` executable
+         * @return This builder
+         */
+        public Builder npxPath(Supplier<@Nullable Path> npxPathSupplier) {
+            this.npxPathSupplier = npxPathSupplier;
             return this;
         }
 
@@ -365,6 +379,11 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         @Override
         public JavaScriptRewriteRpc get() {
+            Path npxPath = npxPathSupplier.get();
+            if (npxPath == null) {
+                npxPath = DEFAULT_NPX_PATH;
+            }
+
             DynamicDispatchRpcCodec.requireCodecFor(Json.Document.class.getName());
 
             Stream<@Nullable String> cmd;
