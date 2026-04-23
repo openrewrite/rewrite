@@ -21,6 +21,7 @@ import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 
 import java.net.URI;
 import java.time.Duration;
@@ -503,15 +504,85 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
     @Override
     public final List<Recipe> getRecipeList() {
+        List<Recipe> filtered = deduplicateSingletonsRecursively(recipeList, new HashSet<>());
+
         if (preconditions.isEmpty()) {
-            return recipeList;
+            return filtered;
         }
 
         PreconditionBellwether bellwether = new PreconditionBellwether(this);
-        List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
+        List<Recipe> recipeListWithBellwether = new ArrayList<>(filtered.size() + 1);
         recipeListWithBellwether.add(bellwether);
-        recipeListWithBellwether.addAll(decorateWithPreconditionBellwether(bellwether, recipeList));
+        recipeListWithBellwether.addAll(decorateWithPreconditionBellwether(bellwether, filtered));
         return recipeListWithBellwether;
+    }
+
+    /**
+     * Walk {@code recipes} and every {@link DeclarativeRecipe} reachable through it, dropping
+     * later occurrences of any DeclarativeRecipe (by name) whose preconditions include
+     * {@link Singleton}. The {@code seen} set is threaded through the entire traversal so a
+     * Singleton-gated recipe that appears under one branch is also filtered from sibling or
+     * nested branches. The {@code Singleton} precondition would make the later occurrences
+     * no-op at runtime; removing them from the list avoids scheduling them at all.
+     */
+    private static List<Recipe> deduplicateSingletonsRecursively(List<Recipe> recipes, Set<String> seen) {
+        return ListUtils.map(recipes, recipe -> {
+            if (recipe instanceof DeclarativeRecipe) {
+                DeclarativeRecipe dr = (DeclarativeRecipe) recipe;
+                if (hasSingletonPrecondition(dr) && !seen.add(dr.getName())) {
+                    //noinspection DataFlowIssue
+                    return null;
+                }
+                return dr.withDeduplicatedChildren(seen);
+            }
+            return recipe;
+        });
+    }
+
+    /**
+     * Return a view of this recipe whose {@code recipeList} has been recursively filtered to
+     * remove Singleton-gated duplicates using the shared {@code seen} set. If nothing changes
+     * the original instance is returned; otherwise a copy is produced so the original tree is
+     * left untouched.
+     */
+    DeclarativeRecipe withDeduplicatedChildren(Set<String> seen) {
+        List<Recipe> deduplicated = deduplicateSingletonsRecursively(recipeList, seen);
+        if (deduplicated == recipeList) {
+            return this;
+        }
+        return copyWithRecipeList(this, deduplicated);
+    }
+
+    /**
+     * Factory used by {@link #withDeduplicatedChildren(Set)} to produce an otherwise identical
+     * recipe whose {@code recipeList} has been filtered. Shares immutable (or effectively
+     * immutable) state — {@code preconditions}, {@code validation}, {@code initValidation} —
+     * with {@code source} and leaves {@code uninitializedRecipes} empty so {@link #validate()}
+     * doesn't reject the filtered list as "uninitialized". The new instance's
+     * {@link ScanningRecipe} field initializer gives it a fresh {@code recipeAccMessage}.
+     * <p>
+     * Implemented as a static factory rather than an additional constructor so that Jackson
+     * can still unambiguously pick the Lombok-generated required-args constructor during
+     * recipe deserialization.
+     */
+    private static DeclarativeRecipe copyWithRecipeList(DeclarativeRecipe source, List<Recipe> recipeList) {
+        DeclarativeRecipe copy = new DeclarativeRecipe(source.name, source.displayName,
+                source.description, source.tags, source.estimatedEffortPerOccurrence,
+                source.source, source.causesAnotherCycle, source.maintainers);
+        copy.recipeList = recipeList;
+        copy.preconditions = source.preconditions;
+        copy.validation = source.validation;
+        copy.initValidation = source.initValidation;
+        return copy;
+    }
+
+    private static boolean hasSingletonPrecondition(DeclarativeRecipe recipe) {
+        for (Recipe precondition : recipe.getPreconditions()) {
+            if (precondition instanceof Singleton) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
