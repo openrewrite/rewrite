@@ -150,5 +150,4 @@ class ConstructorTest implements RewriteTest {
           )
         );
     }
-
 }
