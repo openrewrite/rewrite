@@ -588,7 +588,7 @@ public class GroovyParserVisitor {
 
             // Groovy emits a separate FieldNode per variable in a multi-variable declaration (e.g. `final String a, b`);
             // continuation fields have no modifiers or type keyword in the source, so skip past just the comma.
-            Optional<MultiVariable> multiVariable = maybeMultiVariable();
+            Optional<MultiVariable> multiVariable = visitor.maybeMultiVariable();
             List<J.Annotation> annotations = multiVariable.isPresent() ? emptyList() : visitAndGetAnnotations(field, this);
             List<J.Modifier> modifiers = multiVariable.isPresent() ? emptyList() : getModifiers();
             TypeTree typeExpr;
@@ -1835,6 +1835,17 @@ public class GroovyParserVisitor {
             queue.add(variableDeclarations);
         }
 
+        private Optional<MultiVariable> maybeMultiVariable() {
+            int saveCursor = cursor;
+            Space commaPrefix = whitespace();
+            if (source.startsWith(",", cursor)) {
+                skip(",");
+                return Optional.of(new MultiVariable(randomId(), commaPrefix));
+            }
+            cursor = saveCursor;
+            return Optional.empty();
+        }
+
         @Override
         public void visitEmptyExpression(EmptyExpression expression) {
             queue.add(new J.Empty(randomId(), EMPTY, Markers.EMPTY));
@@ -3013,17 +3024,6 @@ public class GroovyParserVisitor {
      * Get all characters of the source file between the cursor and the given delimiter.
      * The cursor will be moved past the delimiter.
      */
-    private Optional<MultiVariable> maybeMultiVariable() {
-        int saveCursor = cursor;
-        Space commaPrefix = whitespace();
-        if (source.startsWith(",", cursor)) {
-            skip(",");
-            return Optional.of(new MultiVariable(randomId(), commaPrefix));
-        }
-        cursor = saveCursor;
-        return Optional.empty();
-    }
-
     private Space sourceBefore(String untilDelim) {
         int delimIndex = positionOfNext(untilDelim);
         if (delimIndex < 0) {
