@@ -1482,8 +1482,10 @@ public class GroovyParserVisitor {
         @Override
         public void visitCastExpression(CastExpression cast) {
             queue.add(insideParentheses(cast, prefix -> {
-                // Might be looking at a Java-style cast "(type)object" or a groovy-style cast "object as type"
-                if (source.charAt(cursor) == '(') {
+                // Java-style cast "(type)object" vs groovy-style cast "object as type".
+                // Can't detect by looking at cursor character because the expression
+                // itself may start with '(' (e.g. "(foo as Bar).name as Set").
+                if (!cast.isCoerce()) {
                     skip("(");
                     return new J.TypeCast(randomId(), prefix, Markers.EMPTY,
                             new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
