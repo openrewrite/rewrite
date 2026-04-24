@@ -696,7 +696,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             preconditionDescriptors.add(childRecipe.getDescriptor());
         }
         List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
-        for (Recipe childRecipe : recipeList) {
+        for (Recipe childRecipe : deduplicateSingletonsRecursively(recipeList, new HashSet<>())) {
             recipeDescriptors.add(childRecipe.getDescriptor());
         }
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription() != null ? getDescription() : "",
