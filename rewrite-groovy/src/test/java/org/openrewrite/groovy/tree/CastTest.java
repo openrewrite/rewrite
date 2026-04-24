@@ -123,4 +123,15 @@ class CastTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void asStyleCastOfParenthesizedCast() {
+        rewriteRun(
+          groovy(
+            """
+              def x = (foo as Bar).name as Set
+              """
+          )
+        );
+    }
 }
