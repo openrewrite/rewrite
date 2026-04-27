@@ -272,7 +272,7 @@ public class RewriteRpcServer
             // so we parse XML directly and create the marker from project.assets.json.
             try
             {
-                var content = File.ReadAllText(project.FilePath!);
+                var content = ReadFilePreservingBom(project.FilePath!);
                 var relativePath = Path.GetRelativePath(rootDir, project.FilePath!);
                 var xmlParser = new OpenRewrite.Xml.XmlParser();
                 var csprojDoc = xmlParser.Parse(content, relativePath);
@@ -299,6 +299,21 @@ public class RewriteRpcServer
 
         Log.Debug("RPC ParseSolution: completed, {ItemCount} source files", response.Items.Count);
         return response;
+    }
+
+    /// <summary>
+    /// Reads a text file while preserving a leading UTF-8 BOM as a `\uFEFF` character in
+    /// the returned string. File.ReadAllText silently strips BOMs, which defeats the
+    /// XmlParser's BOM detection and causes csproj files to round-trip without their BOM.
+    /// </summary>
+    private static string ReadFilePreservingBom(string filePath)
+    {
+        var bytes = File.ReadAllBytes(filePath);
+        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+        {
+            return "\uFEFF" + System.Text.Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
+        }
+        return System.Text.Encoding.UTF8.GetString(bytes);
     }
 
     /// <summary>
