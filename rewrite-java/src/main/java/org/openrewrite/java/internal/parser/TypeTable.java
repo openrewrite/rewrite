@@ -437,15 +437,13 @@ public class TypeTable implements JavaParserClasspathLoader {
 
             if (classDef.getInnerClasses() != null) {
                 for (String entry : classDef.getInnerClasses()) {
-                    // Format: name,outerName,innerName,access (outerName/innerName empty means null)
-                    String[] parts = entry.split(",", 4);
-                    if (parts.length == 4) {
+                    InnerClassRef ref = InnerClassRef.parse(entry);
+                    if (ref != null) {
                         classVisitor.visitInnerClass(
-                                parts[0],
-                                parts[1].isEmpty() ? null : parts[1],
-                                parts[2].isEmpty() ? null : parts[2],
-                                Integer.parseInt(parts[3])
-                        );
+                                ref.getName(),
+                                ref.getOuterName(),
+                                ref.getInnerName(),
+                                ref.getAccess());
                     }
                 }
             } else {
@@ -974,10 +972,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                     public void visitInnerClass(String name, @Nullable String outerName, @Nullable String innerName, int access) {
                         if (classDefinition != null) {
                             classDefinition.innerClasses.add(
-                                    name + "," +
-                                            (outerName == null ? "" : outerName) + "," +
-                                            (innerName == null ? "" : innerName) + "," +
-                                            access);
+                                    new InnerClassRef(name, outerName, innerName, access).toString());
                         }
                     }
 
@@ -1369,6 +1364,34 @@ public class TypeTable implements JavaParserClasspathLoader {
                             PipeDelimitedJoiner.joinWithPipes(typeAnnotations))
                     .constantValue(constantValue == null ? "" : constantValue)
                     .build();
+        }
+    }
+
+    @Value
+    static class InnerClassRef {
+        String name;
+        @Nullable String outerName;
+        @Nullable String innerName;
+        int access;
+
+        @Override
+        public String toString() {
+            return name + "," +
+                    (outerName == null ? "" : outerName) + "," +
+                    (innerName == null ? "" : innerName) + "," +
+                    access;
+        }
+
+        static @Nullable InnerClassRef parse(String entry) {
+            String[] parts = entry.split(",", 4);
+            if (parts.length != 4) {
+                return null;
+            }
+            return new InnerClassRef(
+                    parts[0],
+                    parts[1].isEmpty() ? null : parts[1],
+                    parts[2].isEmpty() ? null : parts[2],
+                    Integer.parseInt(parts[3]));
         }
     }
 
