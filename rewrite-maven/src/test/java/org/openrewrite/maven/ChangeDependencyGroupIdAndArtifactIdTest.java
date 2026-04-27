@@ -3814,7 +3814,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "junit",
             "org.junit.jupiter",
             "junit-jupiter",
-            "5.x",
+            "5.14.3",
             null,
             false,
             false
