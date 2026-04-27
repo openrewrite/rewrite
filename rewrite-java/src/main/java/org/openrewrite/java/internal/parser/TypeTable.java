@@ -272,8 +272,8 @@ public class TypeTable implements JavaParserClasspathLoader {
             try (BufferedReader in = new BufferedReader(new InputStreamReader(is))) {
                 AtomicReference<@Nullable GroupArtifactVersion> lastGav = new AtomicReference<>();
                 in.lines().skip(1).forEach(line -> {
-                    String[] fields = line.split("\t", -1);
-                    GroupArtifactVersion rowGav = new GroupArtifactVersion(fields[0], fields[1], fields[2]);
+                    TsvRow row = TsvRow.parse(line);
+                    GroupArtifactVersion rowGav = new GroupArtifactVersion(row.getGroupId(), row.getArtifactId(), row.getVersion());
 
                     if (!Objects.equals(rowGav, lastGav.get())) {
                         if (matchedGav.get() != null) {
@@ -284,7 +284,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                         nestedTypesByOwner.clear();
                         resourcesByPath.clear();
 
-                        String artifactVersion = fields[1] + "-" + fields[2];
+                        String artifactVersion = row.getArtifactId() + "-" + row.getVersion();
 
                         // Check if this artifact matches our predicate
                         if (options.getArtifactMatcher().test(artifactVersion)) {
@@ -294,47 +294,33 @@ public class TypeTable implements JavaParserClasspathLoader {
                     lastGav.set(rowGav);
 
                     if (matchedGav.get() != null) {
-                        int classAccess = Integer.parseInt(fields[3]);
-                        if (classAccess == -2) {
-                            // Resource row — see Writer.Jar.writeResource
-                            String resourcePath = fields[4];
-                            String base64 = fields.length > 17 ? fields[17] : "";
-                            resourcesByPath.put(resourcePath, Base64.getDecoder().decode(base64));
-                            return;
-                        }
-                        String className = fields[4];
-                        ClassDefinition classDefinition = classesByName.computeIfAbsent(className, name ->
-                                new ClassDefinition(
-                                        classAccess,
-                                        name,
-                                        fields[5].isEmpty() ? null : fields[5],
-                                        fields[6].isEmpty() ? null : fields[6],
-                                        fields[7].isEmpty() ? null : fields[7].split("\\|"),
-                                        fields.length > 14 && !fields[14].isEmpty() ? fields[14] : null,  // elementAnnotations - raw string (may have | delimiters)
-                                        fields.length > 17 && !fields[17].isEmpty() ? fields[17] : null,  // constantValue moved to column 17
-                                        fields.length > 18 && !fields[18].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[18], '|') : null
+                        switch (row.kind()) {
+                            case RESOURCE: {
+                                resourcesByPath.put(row.getClassName(),
+                                        Base64.getDecoder().decode(row.getConstantValue()));
+                                return;
+                            }
+                            case CLASS: {
+                                getOrCreateClassDefinition(row, classesByName, nestedTypesByOwner);
+                                break;
+                            }
+                            case MEMBER: {
+                                ClassDefinition classDefinition = getOrCreateClassDefinition(row, classesByName, nestedTypesByOwner);
+                                classDefinition.addMember(new Member(
+                                        classDefinition,
+                                        row.getMemberAccess(),
+                                        row.getMemberName(),
+                                        row.getDescriptor(),
+                                        row.getSignature().isEmpty() ? null : row.getSignature(),
+                                        row.getParameterNames().isEmpty() ? null : row.getParameterNames().split("\\|"),
+                                        row.getExceptions().isEmpty() ? null : row.getExceptions().split("\\|"),
+                                        row.getElementAnnotations().isEmpty() ? null : row.getElementAnnotations(),
+                                        row.getParameterAnnotations().isEmpty() ? null : row.getParameterAnnotations(),
+                                        row.getTypeAnnotations().isEmpty() ? null : TsvEscapeUtils.splitAnnotationList(row.getTypeAnnotations(), '|'),
+                                        row.getConstantValue().isEmpty() ? null : row.getConstantValue()
                                 ));
-                        int lastIndexOf$ = className.lastIndexOf('$');
-                        if (lastIndexOf$ != -1) {
-                            String ownerName = className.substring(0, lastIndexOf$);
-                            nestedTypesByOwner.computeIfAbsent(ownerName, k -> new ArrayList<>(4))
-                                    .add(classDefinition);
-                        }
-                        int memberAccess = Integer.parseInt(fields[8]);
-                        if (memberAccess != -1) {
-                            classDefinition.addMember(new Member(
-                                    classDefinition,
-                                    memberAccess,
-                                    fields[9],
-                                    fields[10],
-                                    fields[11].isEmpty() ? null : fields[11],
-                                    fields[12].isEmpty() ? null : fields[12].split("\\|"),
-                                    fields[13].isEmpty() ? null : fields[13].split("\\|"),
-                                    fields.length > 14 && !fields[14].isEmpty() ? fields[14] : null,  // elementAnnotations - raw string
-                                    fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null,
-                                    fields.length > 16 && !fields[16].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[16], '|') : null,  // typeAnnotations - keep `|` delimiter between different type contexts
-                                    fields.length > 17 && !fields[17].isEmpty() ? fields[17] : null
-                            ));
+                                break;
+                            }
                         }
                     }
                 });
@@ -344,6 +330,30 @@ public class TypeTable implements JavaParserClasspathLoader {
             if (matchedGav.get() != null) {
                 processor.accept(matchedGav.get(), classesByName, nestedTypesByOwner, resourcesByPath);
             }
+        }
+
+        private static ClassDefinition getOrCreateClassDefinition(TsvRow row,
+                                                                  Map<String, ClassDefinition> classesByName,
+                                                                  Map<String, List<ClassDefinition>> nestedTypesByOwner) {
+            String className = row.getClassName();
+            ClassDefinition classDefinition = classesByName.computeIfAbsent(className, name ->
+                    new ClassDefinition(
+                            row.getClassAccess(),
+                            name,
+                            row.getClassSignature().isEmpty() ? null : row.getClassSignature(),
+                            row.getClassSuperclassName() == null || row.getClassSuperclassName().isEmpty() ? null : row.getClassSuperclassName(),
+                            row.getClassSuperinterfaceSignatures().isEmpty() ? null : row.getClassSuperinterfaceSignatures().split("\\|"),
+                            row.getElementAnnotations().isEmpty() ? null : row.getElementAnnotations(),
+                            row.getConstantValue().isEmpty() ? null : row.getConstantValue(),
+                            row.getInnerClasses().isEmpty() ? null : TsvEscapeUtils.splitAnnotationList(row.getInnerClasses(), '|')
+                    ));
+            int lastIndexOf$ = className.lastIndexOf('$');
+            if (lastIndexOf$ != -1) {
+                String ownerName = className.substring(0, lastIndexOf$);
+                nestedTypesByOwner.computeIfAbsent(ownerName, k -> new ArrayList<>(4))
+                        .add(classDefinition);
+            }
+            return classDefinition;
         }
 
         @FunctionalInterface
@@ -686,7 +696,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         public Writer(OutputStream out) throws IOException {
             this.deflater = new GZIPOutputStream(out);
             this.out = new PrintStream(deflater);
-            this.out.println("groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\telementAnnotations\tparameterAnnotations\ttypeAnnotations\tconstantValue\tinnerClasses");
+            this.out.println(TsvRow.HEADER);
         }
 
         public Jar jar(String groupId, String artifactId, String version) {
@@ -742,17 +752,9 @@ public class TypeTable implements JavaParserClasspathLoader {
              * functions in a package).
              */
             public void writeResource(String resourcePath, byte[] content) {
-                // Resource row: classAccess sentinel -2, className holds the path, content is
-                // base64-encoded in the constantValue column. All other columns are empty.
-                out.printf(
-                        "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
-                        groupId, artifactId, version,
-                        -2, resourcePath,
-                        "", "", "",
-                        -1, "", "", "", "", "",
-                        "", "", "",
-                        Base64.getEncoder().encodeToString(content),
-                        "");
+                out.println(TsvRow.resourceRow(groupId, artifactId, version,
+                        resourcePath, Base64.getEncoder().encodeToString(content))
+                        .build());
             }
 
             /**
@@ -1012,19 +1014,12 @@ public class TypeTable implements JavaParserClasspathLoader {
 
             public void writeClass() {
                 if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & classAccess) == 0) {
-                    out.printf(
-                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
+                    out.println(TsvRow.classRow(
                             jar.groupId, jar.artifactId, jar.version,
                             classAccess, className,
-                            classSignature == null ? "" : classSignature,
-                            classSuperclassName,
-                            classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
-                            -1, "", "", "", "", "",
-                            classAnnotations.isEmpty() ? "" : String.join("", classAnnotations),
-                            "", // Empty parameter annotations for class row
-                            classTypeAnnotations.isEmpty() ? "" : PipeDelimitedJoiner.joinWithPipes(classTypeAnnotations),
-                            "", // Empty constant value for class row
-                            innerClasses.isEmpty() ? "" : PipeDelimitedJoiner.joinWithPipes(innerClasses));
+                            classSignature, classSuperclassName, classSuperinterfaceSignatures,
+                            classAnnotations, classTypeAnnotations, innerClasses)
+                            .build());
 
                     for (Writer.Member member : members) {
                         member.writeMember(jar, this);
@@ -1062,23 +1057,18 @@ public class TypeTable implements JavaParserClasspathLoader {
 
             private void writeMember(Jar jar, ClassDefinition classDefinition) {
                 if ((Opcodes.ACC_PRIVATE & access) == 0) {
-                    out.printf(
-                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
+                    out.println(TsvRow.memberRow(
                             jar.groupId, jar.artifactId, jar.version,
                             classDefinition.classAccess, classDefinition.className,
-                            classDefinition.classSignature == null ? "" : classDefinition.classSignature,
+                            classDefinition.classSignature,
                             classDefinition.classSuperclassName,
-                            classDefinition.classSuperinterfaceSignatures == null ? "" : String.join("|", classDefinition.classSuperinterfaceSignatures),
-                            access, name, descriptor,
-                            signature == null ? "" : signature,
-                            parameterNames.isEmpty() ? "" : String.join("|", parameterNames),
-                            exceptions == null ? "" : String.join("|", exceptions),
-                            elementAnnotations.isEmpty() ? "" : String.join("", elementAnnotations),
+                            classDefinition.classSuperinterfaceSignatures,
+                            access, name, descriptor, signature,
+                            parameterNames, exceptions,
+                            elementAnnotations,
                             serializeParameterAnnotations(parameterAnnotations, descriptor),
-                            typeAnnotations.isEmpty() ? "" : PipeDelimitedJoiner.joinWithPipes(typeAnnotations),
-                            constantValue == null ? "" : constantValue,
-                            "" // innerClasses column is written on class row only
-                    );
+                            typeAnnotations, constantValue)
+                            .build());
                 }
             }
         }
@@ -1202,6 +1192,184 @@ public class TypeTable implements JavaParserClasspathLoader {
             }
         }
         return result.toString();
+    }
+
+    /**
+     * One row of the TSV type table. Owns the column order and the encoding of each
+     * row variety in one place — see {@link Kind}. Used by both reader and writer
+     * so the layout (and the legacy-tolerance for older TSVs missing trailing columns)
+     * is defined exactly once.
+     */
+    @Value
+    @Builder
+    static class TsvRow {
+
+        /**
+         * Discriminates the three row varieties. Real ASM access flags are {@code >= 0},
+         * so negative ints in an access column are reserved as sentinels.
+         */
+        @RequiredArgsConstructor
+        enum Kind {
+            /** {@code -1} in the {@code memberAccess} column → row carries class-level data only. */
+            CLASS(-1),
+            /** No sentinel; both access columns hold real ASM access flags. */
+            MEMBER(0),
+            /** {@code -2} in the {@code classAccess} column → row is a non-class resource. */
+            RESOURCE(-2);
+
+            @Getter
+            private final int sentinel;
+        }
+
+        static final String HEADER = String.join("\t",
+                "groupId", "artifactId", "version",
+                "classAccess", "className", "classSignature",
+                "classSuperclassSignature", "classSuperinterfaceSignatures",
+                "access", "name", "descriptor", "signature",
+                "parameterNames", "exceptions",
+                "elementAnnotations", "parameterAnnotations", "typeAnnotations",
+                "constantValue", "innerClasses");
+
+        String groupId;
+        String artifactId;
+        String version;
+
+        @Builder.Default int classAccess = Kind.CLASS.getSentinel();
+        @Builder.Default String className = "";
+        @Builder.Default String classSignature = "";
+        // Nullable so RESOURCE rows can default to "" while CLASS/MEMBER rows can carry
+        // null through and serialize as the literal "null" — matching the prior printf
+        // behavior on the rare case (e.g. java.lang.Object) where the JVM superName is null.
+        @Nullable
+        @Builder.Default
+        String classSuperclassName = "";
+        @Builder.Default String classSuperinterfaceSignatures = "";
+
+        @Builder.Default int memberAccess = Kind.CLASS.getSentinel();
+        @Builder.Default String memberName = "";
+        @Builder.Default String descriptor = "";
+        @Builder.Default String signature = "";
+        @Builder.Default String parameterNames = "";
+        @Builder.Default String exceptions = "";
+
+        @Builder.Default String elementAnnotations = "";
+        @Builder.Default String parameterAnnotations = "";
+        @Builder.Default String typeAnnotations = "";
+        @Builder.Default String constantValue = "";
+        @Builder.Default String innerClasses = "";
+
+        Kind kind() {
+            if (classAccess == Kind.RESOURCE.getSentinel()) {
+                return Kind.RESOURCE;
+            }
+            if (memberAccess == Kind.CLASS.getSentinel()) {
+                return Kind.CLASS;
+            }
+            return Kind.MEMBER;
+        }
+
+        static TsvRow parse(String line) {
+            String[] f = line.split("\t", -1);
+            TsvRowBuilder b = TsvRow.builder()
+                    .groupId(f[0]).artifactId(f[1]).version(f[2])
+                    .classAccess(Integer.parseInt(f[3])).className(f[4])
+                    .classSignature(f[5]).classSuperclassName(f[6])
+                    .classSuperinterfaceSignatures(f[7])
+                    .memberAccess(Integer.parseInt(f[8]))
+                    .memberName(f[9]).descriptor(f[10]).signature(f[11])
+                    .parameterNames(f[12]).exceptions(f[13]);
+            // Tolerate older TSVs missing trailing columns
+            if (f.length > 14) {
+                b.elementAnnotations(f[14]);
+            }
+            if (f.length > 15) {
+                b.parameterAnnotations(f[15]);
+            }
+            if (f.length > 16) {
+                b.typeAnnotations(f[16]);
+            }
+            if (f.length > 17) {
+                b.constantValue(f[17]);
+            }
+            if (f.length > 18) {
+                b.innerClasses(f[18]);
+            }
+            return b.build();
+        }
+
+        @Override
+        public String toString() {
+            return String.join("\t",
+                    groupId, artifactId, version,
+                    Integer.toString(classAccess), className, classSignature,
+                    classSuperclassName, classSuperinterfaceSignatures,
+                    Integer.toString(memberAccess), memberName, descriptor, signature,
+                    parameterNames, exceptions,
+                    elementAnnotations, parameterAnnotations, typeAnnotations,
+                    constantValue, innerClasses);
+        }
+
+        static TsvRowBuilder resourceRow(String groupId, String artifactId, String version,
+                                         String path, String base64) {
+            return TsvRow.builder()
+                    .groupId(groupId).artifactId(artifactId).version(version)
+                    .classAccess(Kind.RESOURCE.getSentinel())
+                    .className(path)
+                    .constantValue(base64);
+        }
+
+        static TsvRowBuilder classRow(String groupId, String artifactId, String version,
+                                      int classAccess, String className,
+                                      @Nullable String classSignature,
+                                      @Nullable String classSuperclassName,
+                                      String @Nullable [] classSuperinterfaceSignatures,
+                                      List<String> classAnnotations,
+                                      List<String> classTypeAnnotations,
+                                      List<String> innerClasses) {
+            return TsvRow.builder()
+                    .groupId(groupId).artifactId(artifactId).version(version)
+                    .classAccess(classAccess).className(className)
+                    .classSignature(classSignature == null ? "" : classSignature)
+                    .classSuperclassName(classSuperclassName)
+                    .classSuperinterfaceSignatures(classSuperinterfaceSignatures == null ? "" :
+                            String.join("|", classSuperinterfaceSignatures))
+                    .elementAnnotations(classAnnotations.isEmpty() ? "" : String.join("", classAnnotations))
+                    .typeAnnotations(classTypeAnnotations.isEmpty() ? "" :
+                            PipeDelimitedJoiner.joinWithPipes(classTypeAnnotations))
+                    .innerClasses(innerClasses.isEmpty() ? "" :
+                            PipeDelimitedJoiner.joinWithPipes(innerClasses));
+        }
+
+        static TsvRowBuilder memberRow(String groupId, String artifactId, String version,
+                                       int classAccess, String className,
+                                       @Nullable String classSignature,
+                                       @Nullable String classSuperclassName,
+                                       String @Nullable [] classSuperinterfaceSignatures,
+                                       int memberAccess, String memberName, String descriptor,
+                                       @Nullable String signature,
+                                       List<String> parameterNames,
+                                       String @Nullable [] exceptions,
+                                       List<String> elementAnnotations,
+                                       String parameterAnnotations,
+                                       List<String> typeAnnotations,
+                                       @Nullable String constantValue) {
+            return TsvRow.builder()
+                    .groupId(groupId).artifactId(artifactId).version(version)
+                    .classAccess(classAccess).className(className)
+                    .classSignature(classSignature == null ? "" : classSignature)
+                    .classSuperclassName(classSuperclassName)
+                    .classSuperinterfaceSignatures(classSuperinterfaceSignatures == null ? "" :
+                            String.join("|", classSuperinterfaceSignatures))
+                    .memberAccess(memberAccess).memberName(memberName).descriptor(descriptor)
+                    .signature(signature == null ? "" : signature)
+                    .parameterNames(parameterNames.isEmpty() ? "" : String.join("|", parameterNames))
+                    .exceptions(exceptions == null ? "" : String.join("|", exceptions))
+                    .elementAnnotations(elementAnnotations.isEmpty() ? "" : String.join("", elementAnnotations))
+                    .parameterAnnotations(parameterAnnotations)
+                    .typeAnnotations(typeAnnotations.isEmpty() ? "" :
+                            PipeDelimitedJoiner.joinWithPipes(typeAnnotations))
+                    .constantValue(constantValue == null ? "" : constantValue);
+        }
     }
 
     private static class PipeDelimitedJoiner {
