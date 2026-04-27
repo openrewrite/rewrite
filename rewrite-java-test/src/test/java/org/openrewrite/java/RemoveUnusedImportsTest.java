@@ -115,6 +115,21 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doNotRemoveLombokVal() {
+        rewriteRun(
+          java(
+            """
+              import lombok.val;
+
+              public class Foo {
+                  val myField = 10.0;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1798")
     @Test
     void doNotRemoveInnerClassInSamePackage() {
