@@ -34,6 +34,7 @@ import * as fsp from "fs/promises";
 import * as path from "path";
 import * as os from "os";
 import {spawnSync} from "child_process";
+import {isDeepStrictEqual} from "util";
 import * as YAML from "yaml";
 
 /**
@@ -571,6 +572,16 @@ export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo
         existingMarker.packageManager,
         existingMarker.npmrcConfigs
     );
+
+    // If the new marker is structurally identical to the existing one (ignoring the
+    // auto-generated id), return doc unchanged to avoid minting a fresh AST identity
+    // for a no-op marker update. This prevents the empty-diff guard from firing on
+    // recipes that don't modify package.json (e.g. lock-file-only fix strategies).
+    const {id: _existingId, ...existingRest} = existingMarker;
+    const {id: _newId, ...newRest} = newMarker;
+    if (isDeepStrictEqual(existingRest, newRest)) {
+        return doc;
+    }
 
     // Replace the marker in the document
     return {
