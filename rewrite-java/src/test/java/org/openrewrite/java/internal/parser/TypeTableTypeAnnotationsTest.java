@@ -108,30 +108,20 @@ class TypeTableTypeAnnotationsTest {
 
         String tsvContent = processJarThroughTypeTable(jarFile);
 
-        // Parse TSV to check parameter annotations column (column 16)
-        String[] lines = tsvContent.split("\n");
-
-        // Find method rows
-        for (String line : lines) {
-            if (line.contains("\tsingleParam\t")) {
-                String[] cols = line.split("\t", -1);
-                assertThat(cols.length).isGreaterThanOrEqualTo(18);
-                assertThat(cols[15]).as("parameterAnnotations column for singleParam")
-                  .isEqualTo("@Ltest/annotations/NotNull;");
-            }
-
-            if (line.contains("\tmultipleParams\t")) {
-                String[] cols = line.split("\t", -1);
-                assertThat(cols.length).isGreaterThanOrEqualTo(18);
-                assertThat(cols[15]).as("parameterAnnotations column for multipleParams")
-                  .isEqualTo("@Ltest/annotations/NotNull;|@Ltest/annotations/NotNull;@Ltest/annotations/Valid;");
-            }
-
-            if (line.contains("\tmixedParams\t")) {
-                String[] cols = line.split("\t", -1);
-                assertThat(cols.length).isGreaterThanOrEqualTo(18);
-                assertThat(cols[15]).as("parameterAnnotations column for mixedParams")
-                  .isEqualTo("|@Ltest/annotations/Valid;");
+        for (TypeTable.TsvRow row : parseRows(tsvContent)) {
+            switch (row.getMemberName()) {
+                case "singleParam":
+                    assertThat(row.getParameterAnnotations()).as("parameterAnnotations column for singleParam")
+                      .isEqualTo("@Ltest/annotations/NotNull;");
+                    break;
+                case "multipleParams":
+                    assertThat(row.getParameterAnnotations()).as("parameterAnnotations column for multipleParams")
+                      .isEqualTo("@Ltest/annotations/NotNull;|@Ltest/annotations/NotNull;@Ltest/annotations/Valid;");
+                    break;
+                case "mixedParams":
+                    assertThat(row.getParameterAnnotations()).as("parameterAnnotations column for mixedParams")
+                      .isEqualTo("|@Ltest/annotations/Valid;");
+                    break;
             }
         }
     }
@@ -196,46 +186,34 @@ class TypeTableTypeAnnotationsTest {
 
         String tsvContent = processJarThroughTypeTable(jarFile);
 
-        // Parse TSV to check type annotations column (column 17)
-        String[] lines = tsvContent.split("\n");
-
-        for (String line : lines) {
-            String[] cols = line.split("\t", -1);
-
-            if (line.contains("\tfield\t") && line.contains("Ljava/lang/String;")) {
-                assertThat(cols.length).isGreaterThanOrEqualTo(18);
-                assertThat(cols[16]).as("typeAnnotations for field")
-                  .contains("13000000::@Ltest/annotations/Nullable;");
-            }
-
-            if (line.contains("\tarrayField\t")) {
-                assertThat(cols.length).isGreaterThanOrEqualTo(18);
-                assertThat(cols[16]).as("typeAnnotations for arrayField")
-                  .contains("13000000::@Ltest/annotations/NonNull;");
-            }
-
-            if (line.contains("\tgetField\t")) {
-                assertThat(cols.length).isGreaterThanOrEqualTo(18);
-                assertThat(cols[16]).as("typeAnnotations for getField")
-                  .contains("14000000::@Ltest/annotations/Nullable;");
-            }
-
-            if (line.contains("\tsetField\t")) {
-                assertThat(cols.length).isGreaterThanOrEqualTo(18);
-                assertThat(cols[16]).as("typeAnnotations for setField")
-                  .contains("16000000::@Ltest/annotations/NonNull;");
-            }
-
-            if (line.contains("\tprocessList\t")) {
-                assertThat(cols.length).isGreaterThanOrEqualTo(18);
-                assertThat(cols[16]).as("typeAnnotations for processList")
-                  .contains("16000000:0;:@Ltest/annotations/Nullable;");
-            }
-
-            if (line.contains("\tprocessWildcard\t")) {
-                assertThat(cols.length).isGreaterThanOrEqualTo(18);
-                assertThat(cols[16]).as("typeAnnotations for processWildcard")
-                  .contains("16000000:0;*:@Ltest/annotations/NonNull;");
+        for (TypeTable.TsvRow row : parseRows(tsvContent)) {
+            switch (row.getMemberName()) {
+                case "field":
+                    if (row.getDescriptor().contains("Ljava/lang/String;")) {
+                        assertThat(row.getTypeAnnotations()).as("typeAnnotations for field")
+                          .contains("13000000::@Ltest/annotations/Nullable;");
+                    }
+                    break;
+                case "arrayField":
+                    assertThat(row.getTypeAnnotations()).as("typeAnnotations for arrayField")
+                      .contains("13000000::@Ltest/annotations/NonNull;");
+                    break;
+                case "getField":
+                    assertThat(row.getTypeAnnotations()).as("typeAnnotations for getField")
+                      .contains("14000000::@Ltest/annotations/Nullable;");
+                    break;
+                case "setField":
+                    assertThat(row.getTypeAnnotations()).as("typeAnnotations for setField")
+                      .contains("16000000::@Ltest/annotations/NonNull;");
+                    break;
+                case "processList":
+                    assertThat(row.getTypeAnnotations()).as("typeAnnotations for processList")
+                      .contains("16000000:0;:@Ltest/annotations/Nullable;");
+                    break;
+                case "processWildcard":
+                    assertThat(row.getTypeAnnotations()).as("typeAnnotations for processWildcard")
+                      .contains("16000000:0;*:@Ltest/annotations/NonNull;");
+                    break;
             }
         }
     }
@@ -340,61 +318,44 @@ class TypeTableTypeAnnotationsTest {
         Path jarFile = compileAndPackage(sources, "test.TestClass");
         String tsvContent = processJarThroughTypeTable(jarFile);
 
-        // Parse the TSV content to verify it's valid
-        String[] lines = tsvContent.split("\n");
-        for (String line : lines) {
-            String[] cols = line.split("\t", -1);
-
-            if (line.contains("\tquotes\t")) {
-                // Check that the escaped quotes are properly handled
-                assertThat(cols[15]).as("parameterAnnotations for quotes method")
-                  .contains("@Ltest/Message;")
-                  .contains("value=s\"He said \\\"Hello\\\"\"");
-            }
-
-            if (line.contains("\tcommas\t")) {
-                // Check that commas in values don't break the format
-                // Note: pipes are escaped in TSV format since they're used as delimiters  
-                assertThat(cols[15]).as("parameterAnnotations for commas method")
-                  .contains("@Ltest/Message;")
-                  .contains("value=s\"a,b,c\"")
-                  .contains("tags=[s\"tag1,tag2\",s\"tag3\\|tag4\"]");
-            }
-
-            if (line.contains("\tpipes\t")) {
-                // Check that pipes in values are escaped (pipes are TSV delimiters)
-                assertThat(cols[15]).as("parameterAnnotations for pipes method")
-                  .contains("value=s\"value\\|with\\|pipes\"");
-                // Also verify that the pipe delimiter between parameters is handled correctly
-                // if there were multiple parameters with annotations
-            }
-
-            if (line.contains("\twhitespace\t")) {
-                // Check that newlines and tabs are escaped
-                assertThat(cols[15]).as("parameterAnnotations for whitespace method")
-                  .contains("value=s\"line1\\nline2\\ttab\"");
-            }
-
-            if (line.contains("\tbackslashes\t")) {
-                // Check that backslashes are properly escaped
-                assertThat(cols[15]).as("parameterAnnotations for backslashes method")
-                  .contains("value=s\"C:\\\\Users\\\\file.txt\"");
-            }
-
-            if (line.contains("\tgetDate\t")) {
-                // Check type annotation with regex pattern (pipes and backslashes are escaped in TSV)
-                assertThat(cols[16]).as("typeAnnotations for getDate method")
-                  .contains("14000000::@Ltest/Format;")
-                  .contains("pattern=s\"\\\\d{2,4}-\\\\d{2}-\\\\d{2}\\|\\\\d{4}/\\\\d{2}/\\\\d{2}\"");
-            }
-
-            if (line.contains("\tcomplex\t")) {
-                // Check multiple annotations with complex values
-                // @Message is a parameter annotation, @Format is a type annotation
-                assertThat(cols[15]).as("parameterAnnotations for complex method")
-                  .contains("@Ltest/Message;");
-                assertThat(cols[16]).as("typeAnnotations for complex method")
-                  .contains("16000000::@Ltest/Format;");
+        for (TypeTable.TsvRow row : parseRows(tsvContent)) {
+            switch (row.getMemberName()) {
+                case "quotes":
+                    assertThat(row.getParameterAnnotations()).as("parameterAnnotations for quotes method")
+                      .contains("@Ltest/Message;")
+                      .contains("value=s\"He said \\\"Hello\\\"\"");
+                    break;
+                case "commas":
+                    // Note: pipes are escaped in TSV format since they're used as delimiters
+                    assertThat(row.getParameterAnnotations()).as("parameterAnnotations for commas method")
+                      .contains("@Ltest/Message;")
+                      .contains("value=s\"a,b,c\"")
+                      .contains("tags=[s\"tag1,tag2\",s\"tag3\\|tag4\"]");
+                    break;
+                case "pipes":
+                    assertThat(row.getParameterAnnotations()).as("parameterAnnotations for pipes method")
+                      .contains("value=s\"value\\|with\\|pipes\"");
+                    break;
+                case "whitespace":
+                    assertThat(row.getParameterAnnotations()).as("parameterAnnotations for whitespace method")
+                      .contains("value=s\"line1\\nline2\\ttab\"");
+                    break;
+                case "backslashes":
+                    assertThat(row.getParameterAnnotations()).as("parameterAnnotations for backslashes method")
+                      .contains("value=s\"C:\\\\Users\\\\file.txt\"");
+                    break;
+                case "getDate":
+                    assertThat(row.getTypeAnnotations()).as("typeAnnotations for getDate method")
+                      .contains("14000000::@Ltest/Format;")
+                      .contains("pattern=s\"\\\\d{2,4}-\\\\d{2}-\\\\d{2}\\|\\\\d{4}/\\\\d{2}/\\\\d{2}\"");
+                    break;
+                case "complex":
+                    // @Message is a parameter annotation, @Format is a type annotation
+                    assertThat(row.getParameterAnnotations()).as("parameterAnnotations for complex method")
+                      .contains("@Ltest/Message;");
+                    assertThat(row.getTypeAnnotations()).as("typeAnnotations for complex method")
+                      .contains("16000000::@Ltest/Format;");
+                    break;
             }
         }
     }
@@ -434,20 +395,14 @@ class TypeTableTypeAnnotationsTest {
         Path jarFile = compileAndPackage(sources, "test.TestClass");
         String tsvContent = processJarThroughTypeTable(jarFile);
 
-        // Find the validate method row
-        for (String line : tsvContent.split("\n")) {
-            if (line.contains("\tvalidate\t")) {
-                String[] cols = line.split("\t", -1);
-                String paramAnnotations = cols[15];
-
-                // Verify the parameter annotations are properly formatted
+        for (TypeTable.TsvRow row : parseRows(tsvContent)) {
+            if ("validate".equals(row.getMemberName())) {
                 // The pipe delimiter between parameters should work correctly
                 // even though the annotation values contain escaped pipes
-                assertThat(paramAnnotations).as("parameterAnnotations for validate method")
+                assertThat(row.getParameterAnnotations()).as("parameterAnnotations for validate method")
                   .contains("@Ltest/Pattern;(value=s\"\\\\d+\\|\\\\w+\")")
                   .contains("@Ltest/Description;(text=s\"Options: A\\|B\\|C\")")
                   .contains("@Ltest/Pattern;(value=s\"[a-z]+\\|[A-Z]+\")@Ltest/Description;(text=s\"Letters\\|Digits\")");
-
                 break;
             }
         }
@@ -485,20 +440,34 @@ class TypeTableTypeAnnotationsTest {
         Path jarFile = compileAndPackage(sources, "test.TestClass");
         String tsvContent = processJarThroughTypeTable(jarFile);
 
-        // Find the process method row
-        for (String line : tsvContent.split("\n")) {
-            if (line.contains("\tprocess\t")) {
-                String[] cols = line.split("\t", -1);
-                assertThat(cols[14]).as("elementAnnotations")
+        for (TypeTable.TsvRow row : parseRows(tsvContent)) {
+            if ("process".equals(row.getMemberName())) {
+                assertThat(row.getElementAnnotations()).as("elementAnnotations")
                   .contains("@Ltest/MethodAnnotation;");
-                assertThat(cols[15]).as("parameterAnnotations")
+                assertThat(row.getParameterAnnotations()).as("parameterAnnotations")
                   .contains("@Ltest/ParamAnnotation;");
-                assertThat(cols[16]).as("typeAnnotations")
+                assertThat(row.getTypeAnnotations()).as("typeAnnotations")
                   .contains("14000000::@Ltest/TypeAnnotation;")
                   .contains("16000000::@Ltest/TypeAnnotation;");
                 break;
             }
         }
+    }
+
+    /**
+     * Parse all data rows from gzipped-then-decoded TSV content, skipping the header
+     * and any blank lines. Yields named-field access via {@link TypeTable.TsvRow} so
+     * tests don't have to encode column indices.
+     */
+    private List<TypeTable.TsvRow> parseRows(String tsvContent) {
+        String[] lines = tsvContent.split("\n");
+        List<TypeTable.TsvRow> rows = new java.util.ArrayList<>(lines.length);
+        for (int i = 1; i < lines.length; i++) {
+            String line = lines[i];
+            if (line.isEmpty()) continue;
+            rows.add(TypeTable.TsvRow.parse(line));
+        }
+        return rows;
     }
 
     /**
