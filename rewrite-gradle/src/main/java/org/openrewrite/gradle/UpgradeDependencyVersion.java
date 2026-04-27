@@ -187,20 +187,21 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-                // Track variable usages for ALL dependencies (matched and unmatched). When a
-                // shared version variable also backs dependencies the upgrade does not target,
-                // the variable cannot be updated safely without corrupting those neighbours.
+                // Resolve the multi-dependency once and apply the recipe's matcher inline. The
+                // unfiltered pass also records variable usages for unmatched neighbours so a
+                // shared variable backing dependencies the upgrade does not target is detected
+                // before we corrupt those neighbours.
                 GradleMultiDependency.matcher()
                         .get(getCursor())
-                        .ifPresent(multiDependency ->
-                                multiDependency.forEach(this::trackVariableUsage));
-
-                // Check for any dependency (single or varargs with literal strings)
-                GradleMultiDependency.matcher()
-                        .matcher(new DependencyMatcher(groupId, artifactId, getVersionComparator()))
-                        .get(getCursor())
-                        .ifPresent(multiDependency ->
-                                multiDependency.forEach(dep -> scanDependency(dep, ctx)));
+                        .ifPresent(multiDependency -> {
+                            DependencyMatcher matcher = new DependencyMatcher(groupId, artifactId, getVersionComparator());
+                            multiDependency.forEach(dep -> {
+                                trackVariableUsage(dep);
+                                if (matcher.matches(dep.getGroupId(), dep.getArtifactId())) {
+                                    scanDependency(dep, ctx);
+                                }
+                            });
+                        });
 
                 new SpringDependencyManagementPluginEntry.Matcher()
                         .groupId(groupId)
@@ -221,15 +222,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return;
                 }
                 GroupArtifact ga = new GroupArtifact(depGroupId, depArtifactId);
+                Set<String> configs = acc.variableNames
+                        .computeIfAbsent(versionVariableName, k -> new HashMap<>())
+                        .computeIfAbsent(ga, k -> new HashSet<>());
                 String configName = gradleDependency.getConfigurationName();
-                acc.variableNames
-                        .computeIfAbsent(versionVariableName, k -> new HashMap<>())
-                        .computeIfAbsent(ga, k -> new HashSet<>())
-                        .add(configName == null ? "" : configName);
-                acc.versionPropNameToGA
-                        .computeIfAbsent(versionVariableName, k -> new HashMap<>())
-                        .computeIfAbsent(ga, k -> new HashSet<>())
-                        .add(configName == null ? "" : configName);
+                if (configName != null) {
+                    configs.add(configName);
+                }
             }
 
             private void scanSpringDependencyManagementEntry(SpringDependencyManagementPluginEntry entry, ExecutionContext ctx) {
@@ -272,7 +271,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
              * Scans a single dependency and records its information for later processing.
              */
             private void scanDependency(GradleDependency gradleDependency, ExecutionContext ctx) {
-                gatherVariables(gradleDependency);
                 String groupId = gradleDependency.getGroupId();
                 String artifactId = gradleDependency.getArtifactId();
 
@@ -317,25 +315,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         new DependencyMatcher(groupId, artifactId, null).matches(declaredGroupId, declaredArtifactId);
             }
 
-            /**
-             * Gathers version variable names for dependencies
-             */
-            private void gatherVariables(GradleDependency gradleDependency) {
-                String versionVariableName = gradleDependency.getVersionVariable();
-                if (versionVariableName == null) {
-                    return;
-                }
-
-                String groupId = gradleDependency.getGroupId();
-                String artifactId = gradleDependency.getArtifactId();
-
-                if (shouldResolveVersion(groupId, artifactId)) {
-                    J.MethodInvocation method = gradleDependency.getTree();
-                    acc.variableNames.computeIfAbsent(versionVariableName, it -> new HashMap<>())
-                            .computeIfAbsent(new GroupArtifact(groupId, artifactId), it -> new HashSet<>())
-                            .add(method.getSimpleName());
-                }
-            }
         };
     }
 
@@ -534,10 +513,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 // Not cached: happens for GAs the matcher targets but which were not encountered
                 // in a regular dependencies {} block (only via a shared variable). Resolve now.
                 Set<String> configs = entry.getValue();
-                String configName = configs == null ? null : configs.stream()
-                        .filter(c -> !c.isEmpty())
-                        .findFirst()
-                        .orElse(null);
+                String configName = configs == null ? null : configs.stream().findFirst().orElse(null);
                 if (selector == null) {
                     selector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
                 }
