@@ -694,7 +694,17 @@ class XmlParserTest implements RewriteTest {
       "Packages.config",
       "nuget.config",
       "NuGet.config",
-      "NuGet.Config"
+      "NuGet.Config",
+      "Directory.Build.targets",
+      "Some.TARGETS",
+      "MySolution.slnx",
+      "rules.ruleset",
+      "Project.DotSettings",
+      "App.config",
+      "app.config",
+      "Web.config",
+      "Web.Debug.config",
+      "App.Release.config"
     })
     void acceptWithValidPaths(String path) {
         assertThat(new XmlParser().accept(Path.of(path))).isTrue();
@@ -706,7 +716,10 @@ class XmlParserTest implements RewriteTest {
       ".xml",
       "foo.xml.",
       "file.cpp",
-      "/foo/bar/baz.xml.txt"
+      "/foo/bar/baz.xml.txt",
+      "log4net.config",
+      "appsettings.config",
+      "webhook.config"
     })
     void acceptWithInvalidPaths(String path) {
         assertThat(new XmlParser().accept(Path.of(path))).isFalse();
