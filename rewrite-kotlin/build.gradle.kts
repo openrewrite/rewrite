@@ -5,6 +5,9 @@ plugins {
     kotlin("jvm") version "2.2.21"
 }
 
+// When bumping this version, also update the kotlin-bom platform version
+// in rewrite-gradle/build.gradle.kts and rewrite-maven/build.gradle.kts so
+// the kotlin-stdlib alignment stays in lockstep across modules.
 val kotlinVersion = "2.3.20"
 
 dependencies {
@@ -12,6 +15,10 @@ dependencies {
     compileOnly(project(":rewrite-test"))
 
     implementation(project(":rewrite-java"))
+
+    // Align kotlin-stdlib-jdk7/-jdk8/-common with kotlin-stdlib (clikt 3.5.0
+    // would otherwise drag the jdk7/jdk8/common artifacts back to 1.6.20).
+    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:$kotlinVersion"))
 
     implementation(kotlin("compiler-embeddable", kotlinVersion))
     implementation(kotlin("reflect", kotlinVersion))
