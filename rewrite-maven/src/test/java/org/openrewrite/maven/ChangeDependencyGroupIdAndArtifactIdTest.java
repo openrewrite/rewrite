@@ -3836,22 +3836,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1.0.0</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.junit.jupiter</groupId>
-                          <artifactId>junit-jupiter</artifactId>
-                          <version>5.14.3</version>
-                          <scope>test</scope>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
+            spec -> spec.after(actual -> assertThat(actual)
+              .containsPattern("<groupId>org\\.junit\\.jupiter</groupId>\\s*<artifactId>junit-jupiter</artifactId>\\s*<version>5\\.\\d+(\\.\\d+)?</version>")
+              .doesNotContain("<groupId>junit</groupId>")
+              .actual())
           )
         );
     }

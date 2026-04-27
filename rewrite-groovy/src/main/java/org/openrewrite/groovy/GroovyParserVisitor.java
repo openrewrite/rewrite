@@ -586,9 +586,19 @@ public class GroovyParserVisitor {
         private void visitVariableField(FieldNode field) {
             RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field, this);
 
-            List<J.Annotation> annotations = visitAndGetAnnotations(field, this);
-            List<J.Modifier> modifiers = getModifiers();
-            TypeTree typeExpr = field.isDynamicTyped() ? null : visitTypeTree(field.getOriginType());
+            // Groovy emits a separate FieldNode per variable in a multi-variable declaration (e.g. `final String a, b`);
+            // continuation fields have no modifiers or type keyword in the source, so skip past just the comma.
+            Optional<MultiVariable> multiVariable = visitor.maybeMultiVariable();
+            List<J.Annotation> annotations = multiVariable.isPresent() ? emptyList() : visitAndGetAnnotations(field, this);
+            List<J.Modifier> modifiers = multiVariable.isPresent() ? emptyList() : getModifiers();
+            TypeTree typeExpr;
+            if (field.isDynamicTyped()) {
+                typeExpr = null;
+            } else if (multiVariable.isPresent()) {
+                typeExpr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", typeMapping.type(field.getOriginType()), null);
+            } else {
+                typeExpr = visitTypeTree(field.getOriginType());
+            }
 
             J.Identifier name = new J.Identifier(randomId(), sourceBefore(field.getName()), Markers.EMPTY,
                     emptyList(), field.getName(), typeMapping.type(field.getOriginType()), typeMapping.variableType(field));
@@ -612,7 +622,7 @@ public class GroovyParserVisitor {
             J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
                     randomId(),
                     EMPTY,
-                    Markers.EMPTY,
+                    multiVariable.<Markers>map(mv -> Markers.build(singleton(mv))).orElse(Markers.EMPTY),
                     annotations,
                     modifiers,
                     typeExpr,
@@ -1472,8 +1482,10 @@ public class GroovyParserVisitor {
         @Override
         public void visitCastExpression(CastExpression cast) {
             queue.add(insideParentheses(cast, prefix -> {
-                // Might be looking at a Java-style cast "(type)object" or a groovy-style cast "object as type"
-                if (source.charAt(cursor) == '(') {
+                // Java-style cast "(type)object" vs groovy-style cast "object as type".
+                // Can't detect by looking at cursor character because the expression
+                // itself may start with '(' (e.g. "(foo as Bar).name as Set").
+                if (!cast.isCoerce()) {
                     skip("(");
                     return new J.TypeCast(randomId(), prefix, Markers.EMPTY,
                             new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,

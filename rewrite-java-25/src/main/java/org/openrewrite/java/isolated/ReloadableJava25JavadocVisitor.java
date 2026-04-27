@@ -1055,6 +1055,19 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < node.length(); i++) {
             char c = node.charAt(i);
+            // Java 25's AST may strip leading line breaks from text nodes (e.g. after `<pre><code>`).
+            // If source has a newline here that's missing from the node, emit a LineBreak first.
+            while (c != '\n' && cursor < source.length() && source.charAt(cursor) == '\n') {
+                if (text.length() > 0) {
+                    texts.add(new Javadoc.Text(randomId(), Markers.EMPTY, text.toString()));
+                    text = new StringBuilder();
+                }
+                cursor++;
+                Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor);
+                if (lineBreak != null) {
+                    texts.add(lineBreak);
+                }
+            }
             if (c == '\n') {
                 if (text.length() > 0) {
                     texts.add(new Javadoc.Text(randomId(), Markers.EMPTY, text.toString()));
