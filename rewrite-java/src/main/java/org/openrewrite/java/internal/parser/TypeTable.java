@@ -753,8 +753,7 @@ public class TypeTable implements JavaParserClasspathLoader {
              */
             public void writeResource(String resourcePath, byte[] content) {
                 out.println(TsvRow.resourceRow(groupId, artifactId, version,
-                        resourcePath, Base64.getEncoder().encodeToString(content))
-                        .build());
+                        resourcePath, Base64.getEncoder().encodeToString(content)));
             }
 
             /**
@@ -1018,8 +1017,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             jar.groupId, jar.artifactId, jar.version,
                             classAccess, className,
                             classSignature, classSuperclassName, classSuperinterfaceSignatures,
-                            classAnnotations, classTypeAnnotations, innerClasses)
-                            .build());
+                            classAnnotations, classTypeAnnotations, innerClasses));
 
                     for (Writer.Member member : members) {
                         member.writeMember(jar, this);
@@ -1067,8 +1065,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             parameterNames, exceptions,
                             elementAnnotations,
                             serializeParameterAnnotations(parameterAnnotations, descriptor),
-                            typeAnnotations, constantValue)
-                            .build());
+                            typeAnnotations, constantValue));
                 }
             }
         }
@@ -1309,23 +1306,24 @@ public class TypeTable implements JavaParserClasspathLoader {
                     constantValue, innerClasses);
         }
 
-        static TsvRowBuilder resourceRow(String groupId, String artifactId, String version,
-                                         String path, String base64) {
+        static TsvRow resourceRow(String groupId, String artifactId, String version,
+                                  String path, String base64) {
             return TsvRow.builder()
                     .groupId(groupId).artifactId(artifactId).version(version)
                     .classAccess(Kind.RESOURCE.getSentinel())
                     .className(path)
-                    .constantValue(base64);
+                    .constantValue(base64)
+                    .build();
         }
 
-        static TsvRowBuilder classRow(String groupId, String artifactId, String version,
-                                      int classAccess, String className,
-                                      @Nullable String classSignature,
-                                      @Nullable String classSuperclassName,
-                                      String @Nullable [] classSuperinterfaceSignatures,
-                                      List<String> classAnnotations,
-                                      List<String> classTypeAnnotations,
-                                      List<String> innerClasses) {
+        static TsvRow classRow(String groupId, String artifactId, String version,
+                               int classAccess, String className,
+                               @Nullable String classSignature,
+                               @Nullable String classSuperclassName,
+                               String @Nullable [] classSuperinterfaceSignatures,
+                               List<String> classAnnotations,
+                               List<String> classTypeAnnotations,
+                               List<String> innerClasses) {
             return TsvRow.builder()
                     .groupId(groupId).artifactId(artifactId).version(version)
                     .classAccess(classAccess).className(className)
@@ -1337,22 +1335,23 @@ public class TypeTable implements JavaParserClasspathLoader {
                     .typeAnnotations(classTypeAnnotations.isEmpty() ? "" :
                             PipeDelimitedJoiner.joinWithPipes(classTypeAnnotations))
                     .innerClasses(innerClasses.isEmpty() ? "" :
-                            PipeDelimitedJoiner.joinWithPipes(innerClasses));
+                            PipeDelimitedJoiner.joinWithPipes(innerClasses))
+                    .build();
         }
 
-        static TsvRowBuilder memberRow(String groupId, String artifactId, String version,
-                                       int classAccess, String className,
-                                       @Nullable String classSignature,
-                                       @Nullable String classSuperclassName,
-                                       String @Nullable [] classSuperinterfaceSignatures,
-                                       int memberAccess, String memberName, String descriptor,
-                                       @Nullable String signature,
-                                       List<String> parameterNames,
-                                       String @Nullable [] exceptions,
-                                       List<String> elementAnnotations,
-                                       String parameterAnnotations,
-                                       List<String> typeAnnotations,
-                                       @Nullable String constantValue) {
+        static TsvRow memberRow(String groupId, String artifactId, String version,
+                                int classAccess, String className,
+                                @Nullable String classSignature,
+                                @Nullable String classSuperclassName,
+                                String @Nullable [] classSuperinterfaceSignatures,
+                                int memberAccess, String memberName, String descriptor,
+                                @Nullable String signature,
+                                List<String> parameterNames,
+                                String @Nullable [] exceptions,
+                                List<String> elementAnnotations,
+                                String parameterAnnotations,
+                                List<String> typeAnnotations,
+                                @Nullable String constantValue) {
             return TsvRow.builder()
                     .groupId(groupId).artifactId(artifactId).version(version)
                     .classAccess(classAccess).className(className)
@@ -1368,7 +1367,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                     .parameterAnnotations(parameterAnnotations)
                     .typeAnnotations(typeAnnotations.isEmpty() ? "" :
                             PipeDelimitedJoiner.joinWithPipes(typeAnnotations))
-                    .constantValue(constantValue == null ? "" : constantValue);
+                    .constantValue(constantValue == null ? "" : constantValue)
+                    .build();
         }
     }
 
