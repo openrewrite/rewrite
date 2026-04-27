@@ -120,7 +120,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
     public override J VisitCompilationUnit(CompilationUnit compilationUnit, PrintOutputCapture<P> p)
     {
-        if (compilationUnit.CharsetBomMarked) p.Append('\uFEFF');
         BeforeSyntax(compilationUnit, p);
 
         foreach (var externAlias in compilationUnit.Externs)
