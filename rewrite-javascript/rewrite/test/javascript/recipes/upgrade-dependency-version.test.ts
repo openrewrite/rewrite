@@ -24,6 +24,7 @@ import {
 import {Json} from "../../../src/json";
 import {RecipeSpec} from "../../../src/test";
 import {withDir} from "tmp-promise";
+import {findMarker, MarkersKind} from "../../../src";
 import * as fs from "fs";
 import * as path from "path";
 import * as semver from "semver";
@@ -294,7 +295,7 @@ describe("UpgradeDependencyVersion", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("throws when install fails for non-existent version", async () => {
+    test("adds warning marker when install fails for non-existent version", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new UpgradeDependencyVersion({
             packageName: "uuid",
@@ -302,25 +303,34 @@ describe("UpgradeDependencyVersion", () => {
         });
 
         await withDir(async (repo) => {
-            await expect(spec.rewriteRun(
+            await spec.rewriteRun(
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    packageJson(`
-                        {
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "dependencies": {
-                                "uuid": "^9.0.0"
+                    {
+                        ...packageJson(`
+                            {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                    "uuid": "^9.0.0"
+                                }
                             }
+                        `, (actual: string) => {
+                            expect(actual).toContain('/*~~(Failed to upgrade uuid to ^999.0.0');
+                            return actual;
+                        }), afterRecipe: async (doc: Json.Document) => {
+                            const warnMarker = findMarker(doc, MarkersKind.MarkupWarn);
+                            expect(warnMarker).toBeDefined();
+                            expect((warnMarker as any).message).toContain("Failed to upgrade uuid to ^999.0.0");
                         }
-                    `)
+                    }
                 )
-            )).rejects.toThrow("Failed to upgrade uuid to ^999.0.0");
+            );
         }, {unsafeCleanup: true});
     });
 
-    test("throws when install fails due to engine version mismatch", async () => {
+    test("adds warning marker when install fails due to engine version mismatch", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new UpgradeDependencyVersion({
             packageName: "uuid",
@@ -332,24 +342,33 @@ describe("UpgradeDependencyVersion", () => {
             fs.writeFileSync(path.join(repo.path, '.npmrc'), 'engine-strict=true');
 
             // when / then
-            await expect(spec.rewriteRun(
+            await spec.rewriteRun(
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    packageJson(`
-                        {
-                            "name": "test-project",
-                            "version": "1.0.0",
-                            "engines": {
-                                "node": "504.436"
-                            },
-                            "dependencies": {
-                                "uuid": "^9.0.0"
+                    {
+                        ...packageJson(`
+                            {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "engines": {
+                                    "node": "504.436"
+                                },
+                                "dependencies": {
+                                    "uuid": "^9.0.0"
+                                }
                             }
+                        `, (actual: string) => {
+                            expect(actual).toContain('/*~~(Failed to upgrade uuid to ^10.0.0');
+                            return actual;
+                        }), afterRecipe: async (doc: Json.Document) => {
+                            const warnMarker = findMarker(doc, MarkersKind.MarkupWarn);
+                            expect(warnMarker).toBeDefined();
+                            expect((warnMarker as any).message).toContain("Failed to upgrade uuid to ^10.0.0");
                         }
-                    `)
+                    }
                 )
-            )).rejects.toThrow(/^Error: Failed to upgrade uuid to \^10\.0\.0:/);
+            );
         }, {unsafeCleanup: true});
     });
 
