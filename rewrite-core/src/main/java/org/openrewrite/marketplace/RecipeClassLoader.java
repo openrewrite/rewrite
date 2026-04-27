@@ -16,8 +16,12 @@
 package org.openrewrite.marketplace;
 
 import org.jspecify.annotations.Nullable;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.Opcodes;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -103,6 +107,14 @@ public class RecipeClassLoader extends URLClassLoader {
                 return foundClass;
             }
 
+            foundClass = loadNestMember(name);
+            if (foundClass != null) {
+                if (resolve) {
+                    resolveClass(foundClass);
+                }
+                return foundClass;
+            }
+
             // Determine delegation strategy
             try {
                 if (shouldDelegateToParent(name)) {
@@ -128,6 +140,56 @@ public class RecipeClassLoader extends URLClassLoader {
                 resolveClass(foundClass);
             }
             return foundClass;
+        }
+    }
+
+    /**
+     * Anchors nestmates to the defining loader of their NestHost. The JVM uses the NestHost
+     * attribute to gate private member access between siblings; if members of the same nest
+     * end up on different defining loaders, access checks fail at runtime with
+     * {@link IllegalAccessError}. Routing every member through the host's loader keeps the
+     * nest intact regardless of how delegation rules are configured.
+     *
+     * @return the resolved class when {@code name} declares a NestHost, or {@code null} when
+     *         the class has no NestHost attribute (or is its own host) and normal delegation
+     *         should apply.
+     */
+    private @Nullable Class<?> loadNestMember(String name) throws ClassNotFoundException {
+        String nestHostInternal = peekNestHost(name);
+        if (nestHostInternal == null || nestHostInternal.equals(name.replace('.', '/'))) {
+            return null;
+        }
+        Class<?> hostClass = loadClass(nestHostInternal.replace('/', '.'));
+        ClassLoader hostLoader = hostClass.getClassLoader();
+        if (hostLoader == this) {
+            // Host is defined here: load the member here too. No parent fallback —
+            // surfacing ClassNotFoundException is preferable to silently splitting the nest.
+            return findClass(name);
+        }
+        if (hostLoader != null) {
+            return hostLoader.loadClass(name);
+        }
+        return Class.forName(name, false, null);
+    }
+
+    private @Nullable String peekNestHost(String name) {
+        // getResource already checks this loader's URLs first and falls through to the parent,
+        // so we can detect nest membership even for members the child doesn't ship.
+        URL url = getResource(name.replace('.', '/') + ".class");
+        if (url == null) {
+            return null;
+        }
+        try (InputStream in = url.openStream()) {
+            String[] holder = new String[1];
+            new ClassReader(in).accept(new ClassVisitor(Opcodes.ASM9) {
+                @Override
+                public void visitNestHost(String nestHost) {
+                    holder[0] = nestHost;
+                }
+            }, ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
+            return holder[0];
+        } catch (IOException e) {
+            return null;
         }
     }
 
