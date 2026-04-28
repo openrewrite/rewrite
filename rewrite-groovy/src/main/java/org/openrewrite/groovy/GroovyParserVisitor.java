@@ -186,6 +186,10 @@ public class GroovyParserVisitor {
         for (ClassNode aClass : ast.getClasses()) {
             // skip over the synthetic script class
             if (!aClass.getName().equals(ast.getMainClassName()) || !aClass.getName().endsWith("doesntmatter")) {
+                // skip over synthetic helper classes Groovy generates for traits (e.g. Foo$Trait$Helper, Foo$Trait$FieldHelper)
+                if (aClass.getName().contains("$Trait$")) {
+                    continue;
+                }
                 sortedByPosition.put(pos(aClass), aClass);
             }
         }
@@ -255,9 +259,14 @@ public class GroovyParserVisitor {
 
             Space kindPrefix = whitespace();
             J.ClassDeclaration.Kind.Type kindType;
+            Markers kindMarkers = Markers.EMPTY;
             if (sourceStartsWith("class")) {
                 kindType = J.ClassDeclaration.Kind.Type.Class;
                 skip("class");
+            } else if (sourceStartsWith("trait")) {
+                kindType = J.ClassDeclaration.Kind.Type.Interface;
+                kindMarkers = kindMarkers.addIfAbsent(new Trait(randomId()));
+                skip("trait");
             } else if (clazz.isAnnotationDefinition()) {
                 kindType = J.ClassDeclaration.Kind.Type.Annotation;
                 skip("@interface");
@@ -273,7 +282,7 @@ public class GroovyParserVisitor {
             } else {
                 throw new IllegalStateException("Unexpected class type: " + name());
             }
-            J.ClassDeclaration.Kind kind = new J.ClassDeclaration.Kind(randomId(), kindPrefix, Markers.EMPTY, emptyList(), kindType);
+            J.ClassDeclaration.Kind kind = new J.ClassDeclaration.Kind(randomId(), kindPrefix, kindMarkers, emptyList(), kindType);
             J.Identifier name = new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), name(), typeMapping.type(clazz), null);
             JContainer<J.TypeParameter> typeParameterContainer = null;
             if (clazz.isUsingGenerics() && clazz.getGenericsTypes() != null) {
@@ -440,7 +449,7 @@ public class GroovyParserVisitor {
             Iterator<InnerClassNode> innerClassIterator = clazz.getInnerClasses();
             while (innerClassIterator.hasNext()) {
                 InnerClassNode icn = innerClassIterator.next();
-                if (icn.isSynthetic() || fieldInitializers.contains(icn)) {
+                if (icn.isSynthetic() || fieldInitializers.contains(icn) || icn.getName().contains("$Trait$")) {
                     continue;
                 }
                 sortedByPosition.put(pos(icn), icn);

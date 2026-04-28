@@ -528,4 +528,30 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trait() {
+        rewriteRun(
+          groovy(
+            """
+              trait Foo {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void traitExtendsTrait() {
+        rewriteRun(
+          groovy(
+            """
+              trait A {
+              }
+              trait B extends A {
+              }
+              """
+          )
+        );
+    }
 }
