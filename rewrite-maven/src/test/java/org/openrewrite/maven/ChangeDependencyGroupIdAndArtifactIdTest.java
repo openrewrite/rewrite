@@ -32,6 +32,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.maven.Assertions.withLocalRepository;
 
 class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @DocumentExample
@@ -1113,6 +1114,90 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2127")
+    @Test
+    void doesNotPinVersionWhenOldDepManagedOnlyByRemoteAncestor() {
+        // The project has no local <dependencyManagement> and the old
+        // dependency's version is declared only by a remote ancestor parent
+        // (a published "wrapper" parent). Renaming must not pin an explicit
+        // version on the new artifact — the user manages versions via parent
+        // inheritance, and pinning would defeat that workflow.
+        withLocalRepository(
+          //language=xml
+          """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example.test</groupId>
+                <artifactId>custom-parent</artifactId>
+                <version>1.0.0</version>
+                <packaging>pom</packaging>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """,
+          () -> rewriteRun(
+            spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+              "javax.activation",
+              "javax.activation-api",
+              "jakarta.activation",
+              "jakarta.activation-api",
+              "1.2.2",
+              null
+            )),
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.example.test</groupId>
+                        <artifactId>custom-parent</artifactId>
+                        <version>1.0.0</version>
+                        <relativePath/>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>app</artifactId>
+                    <version>1.0.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.example.test</groupId>
+                        <artifactId>custom-parent</artifactId>
+                        <version>1.0.0</version>
+                        <relativePath/>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>app</artifactId>
+                    <version>1.0.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
           )
         );
     }

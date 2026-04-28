@@ -407,6 +407,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             @Nullable
             private Collection<String> availableVersions;
             private boolean isNewDependencyPresent;
+            private boolean hasLocalDependencyManagement;
             private Set<String> safeVersionPlaceholdersToChange = new HashSet<>();
             private final boolean configuredToOverrideManagedVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
             private final boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency;  // True by default
@@ -414,6 +415,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 isNewDependencyPresent = checkIfNewDependencyPresent(newGroupId, newArtifactId, newVersion);
+                hasLocalDependencyManagement = hasLocalDependencyManagement(getResolutionResult());
                 safeVersionPlaceholdersToChange = getSafeVersionPlaceholdersToChange(oldGroupId, oldArtifactId, ctx);
                 if (configuredToChangeManagedDependency) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
@@ -520,6 +522,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                             boolean versionTagPresent = versionTag.isPresent();
                             // dependencyManagement does not apply to plugin dependencies or annotation processor paths
                             boolean oldDependencyDefinedManaged = isOldDependencyTag && canAffectManagedDependency(getResolutionResult(), scope, oldGroupId, oldArtifactId);
+                            // Old dependency may be managed only by a remote ancestor parent (e.g. a custom wrapper around spring-boot-starter-parent),
+                            // with no local dependencyManagement in this project. In that case the user relies on parent-managed versions and we
+                            // must not pin an explicit version on the renamed dependency — let the (eventual) parent upgrade flow the new managed version through.
+                            boolean oldDependencyManagedOnlyByRemoteParent = isOldDependencyTag &&
+                                    !hasLocalDependencyManagement &&
+                                    isDependencyManaged(scope, oldGroupId, oldArtifactId);
                             boolean newDependencyManaged = isOldDependencyTag && isDependencyManaged(scope, groupId, artifactId);
                             if (versionTagPresent) {
                                 // If the previous dependency had a version but the new artifact is managed, removed the version tag.
@@ -533,7 +541,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                                         t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
                                     }
                                 }
-                            } else if (configuredToOverrideManagedVersion || (!newDependencyManaged && !(oldDependencyDefinedManaged && configuredToChangeManagedDependency))) {
+                            } else if (configuredToOverrideManagedVersion || (!newDependencyManaged && !oldDependencyManagedOnlyByRemoteParent && !(oldDependencyDefinedManaged && configuredToChangeManagedDependency))) {
                                 // If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
                                 Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
                                 //noinspection ConstantConditions
@@ -582,6 +590,17 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
                         return scope.isInClasspathOf(managedDependency.getScope());
                     }
+                }
+                return false;
+            }
+
+            private boolean hasLocalDependencyManagement(MavenResolutionResult result) {
+                List<ManagedDependency> managedDependencies = result.getPom().getRequested().getDependencyManagement();
+                if (managedDependencies != null && !managedDependencies.isEmpty()) {
+                    return true;
+                }
+                if (result.parentPomIsProjectPom() && result.getParent() != null) {
+                    return hasLocalDependencyManagement(result.getParent());
                 }
                 return false;
             }
