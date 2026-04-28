@@ -568,18 +568,17 @@ class KotlinTypeMappingTest {
                   """,
                 spec -> spec.afterRecipe(cu -> {
                     var matcher = new MethodMatcher("com.fasterxml.jackson.core.JsonGenerationException <constructor>(String, Throwable, com.fasterxml.jackson.core.JsonGenerator)");
-                    var found = new AtomicBoolean(false);
-                    new KotlinIsoVisitor<AtomicBoolean>() {
+                    AtomicBoolean found = new KotlinIsoVisitor<AtomicBoolean>() {
                         @Override
-                        public J.NewClass visitNewClass(J.NewClass newClass, AtomicBoolean atomicBoolean) {
+                        public J.NewClass visitNewClass(J.NewClass newClass, AtomicBoolean found) {
                             var paramTypes = newClass.getConstructorType().getParameterTypes();
                             assertThat(paramTypes.get(0).toString()).isEqualTo("java.lang.String");
                             assertThat(paramTypes.get(1).toString()).isEqualTo("java.lang.Throwable");
                             assertThat(matcher.matches(newClass)).isTrue();
-                            atomicBoolean.set(true);
-                            return super.visitNewClass(newClass, atomicBoolean);
+                            found.set(true);
+                            return super.visitNewClass(newClass, found);
                         }
-                    }.visit(cu, found);
+                    }.reduce(cu, new AtomicBoolean());
                     assertThat(found.get()).isTrue();
                 })
               )
