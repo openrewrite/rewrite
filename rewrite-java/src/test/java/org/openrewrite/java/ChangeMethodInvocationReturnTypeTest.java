@@ -121,4 +121,133 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void replaceVariableAssignmentWithGenericReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.Set<java.lang.String>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.List;
+                  public class Bar {
+                      public static List<String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.List;
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+
+              import java.util.Set;
+
+              class Foo {
+                  void foo() {
+                      Set<String> one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceVariableAssignmentWithNestedGenericReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.Map<java.lang.String, java.util.List<java.lang.Integer>>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.List;
+                  public class Bar {
+                      public static List<String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.List;
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+              import java.util.List;
+              import java.util.Map;
+
+              class Foo {
+                  void foo() {
+                      Map<String, List<Integer>> one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceParameterizedReturnTypeWithRaw() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.lang.Object"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.List;
+                  public class Bar {
+                      public static List<String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.List;
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+              class Foo {
+                  void foo() {
+                      Object one = Bar.bar();
+                  }
+              }
+              """
+          )
+        );
+    }
 }
