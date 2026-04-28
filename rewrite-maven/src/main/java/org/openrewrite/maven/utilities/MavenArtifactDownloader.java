@@ -109,20 +109,21 @@ public class MavenArtifactDownloader {
             } else if ("file".equals(URI.create(uri).getScheme())) {
                 bodyStream = Files.newInputStream(Paths.get(URI.create(uri)));
             } else {
-                HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
                 try {
+                    // Try anonymously first, mirroring Apache Maven's DeferredCredentialsProvider behavior
                     byte[] responseBytes = null;
                     int responseCode;
-                    try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
+                    try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(httpSender.get(uri).build()));
                          InputStream body = response.getBody()) {
                         responseCode = response.getCode();
                         if (response.isSuccessful() && body != null) {
                             responseBytes = readAllBytes(body);
                         }
                     }
-                    // Fall back to anonymous if authenticated request fails with a 4xx client error
-                    if (responseBytes == null && hasCredentials(dependency.getRepository()) && responseCode >= 400 && responseCode < 500) {
-                        try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(httpSender.get(uri).build()));
+                    // Retry with credentials if the anonymous request failed with a 4xx and we have credentials
+                    if (responseBytes == null && responseCode >= 400 && responseCode < 500 && hasCredentials(dependency.getRepository())) {
+                        HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
+                        try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
                              InputStream body = response.getBody()) {
                             responseCode = response.getCode();
                             if (response.isSuccessful() && body != null) {

@@ -133,8 +133,8 @@ class MavenArtifactDownloaderTest {
     }
 
     @Test
-    void fallsBackToAnonymousWhenServerReturns401(@TempDir Path tempDir) throws Exception {
-        byte[] jarBytes = {0x50, 0x4B, 0x03, 0x04};
+    void publicArtifactsResolveAnonymouslyEvenWhenCredentialsAreInvalid(@TempDir Path tempDir) throws Exception {
+        byte[] jarBytes = {0x50, 0x4B, 0x03, 0x04}; // minimal ZIP magic bytes
 
         try (MockWebServer mockRepo = new MockWebServer()) {
             mockRepo.setDispatcher(new Dispatcher() {
@@ -183,22 +183,21 @@ class MavenArtifactDownloaderTest {
 
             assertThat(artifact).isNotNull();
             assertThat(error.get()).isNull();
-            assertThat(mockRepo.getRequestCount()).isEqualTo(2);
-            assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNotNull();
+            assertThat(mockRepo.getRequestCount()).isEqualTo(1);
             assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNull();
         }
     }
 
     @Test
-    void fallsBackToAnonymousWhenCredentialsRejected(@TempDir Path tempDir) throws Exception {
-        byte[] jarBytes = {0x50, 0x4B, 0x03, 0x04}; // minimal ZIP magic bytes
+    void retriesWithCredentialsWhenAnonymousReturns401(@TempDir Path tempDir) throws Exception {
+        byte[] jarBytes = {0x50, 0x4B, 0x03, 0x04};
 
         try (MockWebServer mockRepo = new MockWebServer()) {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
-                    if (request.getHeader("Authorization") != null) {
-                        return new MockResponse().setResponseCode(403); // Throw if used; it should not be called at all
+                    if (request.getHeader("Authorization") == null) {
+                        return new MockResponse().setResponseCode(401);
                     }
                     return new MockResponse().setResponseCode(200)
                       .setBody(new okio.Buffer().write(jarBytes));
@@ -215,8 +214,8 @@ class MavenArtifactDownloaderTest {
                     <servers>
                         <server>
                             <id>mock-repo</id>
-                            <username>${placeholder}</username>
-                            <password>${placeholder}</password>
+                            <username>good-user</username>
+                            <password>good-password</password>
                         </server>
                     </servers>
                 </settings>
@@ -240,7 +239,9 @@ class MavenArtifactDownloaderTest {
 
             assertThat(artifact).isNotNull();
             assertThat(error.get()).isNull();
-            assertThat(mockRepo.getRequestCount()).isEqualTo(1);
+            assertThat(mockRepo.getRequestCount()).isEqualTo(2);
+            assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNull();
+            assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNotNull();
         }
     }
 }
