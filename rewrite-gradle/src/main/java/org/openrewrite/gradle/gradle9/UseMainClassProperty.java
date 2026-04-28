@@ -58,25 +58,25 @@ public class UseMainClassProperty extends Recipe {
 
             @Override
             public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
-                if (getCursor().getNearestMessage(IN_JAVA_EXEC) != null) {
-                    if (assignment.getVariable() instanceof J.Identifier) {
-                        J.Identifier id = (J.Identifier) assignment.getVariable();
-                        if ("main".equals(id.getSimpleName())) {
-                            return assignment.withVariable(id.withSimpleName("mainClass"));
-                        }
-                    } else if (assignment.getVariable() instanceof J.FieldAccess) {
-                        J.FieldAccess fieldAccess = (J.FieldAccess) assignment.getVariable();
-                        if ("main".equals(fieldAccess.getSimpleName())) {
-                            return assignment.withVariable(
-                                    fieldAccess.withName(fieldAccess.getName().withSimpleName("mainClass"))
-                            );
-                        }
+                Expression variable = assignment.getVariable();
+                if (variable instanceof J.Identifier) {
+                    J.Identifier id = (J.Identifier) variable;
+                    if ("main".equals(id.getSimpleName()) && getCursor().getNearestMessage(IN_JAVA_EXEC) != null) {
+                        return assignment.withVariable(id.withSimpleName("mainClass"));
+                    }
+                } else if (variable instanceof J.FieldAccess) {
+                    J.FieldAccess fieldAccess = (J.FieldAccess) variable;
+                    if ("main".equals(fieldAccess.getSimpleName()) && getCursor().getNearestMessage(IN_JAVA_EXEC) != null) {
+                        return assignment.withVariable(
+                                fieldAccess.withName(fieldAccess.getName().withSimpleName("mainClass"))
+                        );
                     }
                 }
                 return assignment;
             }
 
             private boolean hasJavaExecType(J.MethodInvocation method) {
+                // Groovy DSL: task foo(type: JavaExec) { ... }
                 for (Expression arg : method.getArguments()) {
                     if (arg instanceof G.MapEntry) {
                         G.MapEntry entry = (G.MapEntry) arg;
@@ -87,22 +87,23 @@ public class UseMainClassProperty extends Recipe {
                         return true;
                     }
                 }
+                // Kotlin DSL: tasks.register<JavaExec>("foo") { ... }
+                if (method.getTypeParameters() != null) {
+                    for (Expression typeParameter : method.getTypeParameters()) {
+                        if (isJavaExecValue(typeParameter)) {
+                            return true;
+                        }
+                    }
+                }
                 return false;
             }
 
             private boolean isTypeKey(Expression key) {
-                if (key instanceof G.Literal) {
-                    Object value = ((G.Literal) key).getValue();
-                    return "type".equals(value);
-                }
-                return false;
+                return key instanceof G.Literal && "type".equals(((G.Literal) key).getValue());
             }
 
             private boolean isJavaExecValue(Expression value) {
-                if (value instanceof J.Identifier) {
-                    return "JavaExec".equals(((J.Identifier) value).getSimpleName());
-                }
-                return false;
+                return value instanceof J.Identifier && "JavaExec".equals(((J.Identifier) value).getSimpleName());
             }
         });
     }

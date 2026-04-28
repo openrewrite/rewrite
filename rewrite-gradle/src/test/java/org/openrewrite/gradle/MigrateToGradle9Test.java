@@ -83,6 +83,32 @@ class MigrateToGradle9Test implements RewriteTest {
         );
     }
 
+    @Test
+    void useMainClassPropertyInKotlinDsl() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java`
+              }
+
+              tasks.register<JavaExec>("doSomething") {
+                  main = "com.example.AppMain"
+              }
+              """,
+            """
+              plugins {
+                  `java`
+              }
+
+              tasks.register<JavaExec>("doSomething") {
+                  mainClass = "com.example.AppMain"
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class NoChange {
         @Test
