@@ -773,11 +773,19 @@ public class GroovyParserVisitor {
             J.Block body = null;
             if (method.getCode() != null) {
                 if (isConstructorOfInnerNonStaticClass) {
+                    // Groovy injects a synthetic super() call at index 0 (when the user didn't write one)
+                    // and a synthetic `this.this$0 = $p$` BlockStatement at index 1. Keep an explicit
+                    // user-written super() call (line number > 0) and skip both synthetic statements.
+                    List<org.codehaus.groovy.ast.stmt.Statement> all = ((BlockStatement) method.getCode()).getStatements();
+                    List<org.codehaus.groovy.ast.stmt.Statement> visible = new ArrayList<>(all.size());
+                    if (!all.isEmpty() && all.get(0).getLineNumber() > 0) {
+                        visible.add(all.get(0));
+                    }
+                    if (all.size() > 2) {
+                        visible.addAll(all.subList(2, all.size()));
+                    }
                     body = bodyVisitor.doVisit(
-                            new BlockStatement(
-                                    ((BlockStatement) method.getCode()).getStatements().subList(2, ((BlockStatement) method.getCode()).getStatements().size()),
-                                    ((BlockStatement) method.getCode()).getVariableScope()
-                            )
+                            new BlockStatement(visible, ((BlockStatement) method.getCode()).getVariableScope())
                     );
                 } else if (isConstructorOfEnum && ((BlockStatement) method.getCode()).getStatements().size() > 1) {
                     org.codehaus.groovy.ast.stmt.Statement node = ((BlockStatement) method.getCode()).getStatements().get(1);
