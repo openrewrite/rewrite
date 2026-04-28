@@ -797,6 +797,17 @@ public class GroovyParserVisitor {
                 } else {
                     if (annotations.stream().anyMatch(a -> TypeUtils.isOfClassType(a.getAnnotationType().getType(), "groovy.transform.Synchronized"))) {
                         body = bodyVisitor.doVisit(((SynchronizedStatement) method.getCode()).getCode());
+                    } else if (annotations.stream().anyMatch(a -> TypeUtils.isOfClassType(a.getAnnotationType().getType(), "groovy.test.NotYetImplemented") ||
+                            TypeUtils.isOfClassType(a.getAnnotationType().getType(), "groovy.transform.NotYetImplemented"))) {
+                        // The @NotYetImplemented AST transformation wraps the original method body in a TryCatchStatement
+                        // followed by a ThrowStatement; unwrap it so source positions align with the original body
+                        org.codehaus.groovy.ast.stmt.Statement code = method.getCode();
+                        if (code instanceof BlockStatement && !((BlockStatement) code).getStatements().isEmpty() &&
+                                ((BlockStatement) code).getStatements().get(0) instanceof TryCatchStatement) {
+                            body = bodyVisitor.doVisit(((TryCatchStatement) ((BlockStatement) code).getStatements().get(0)).getTryStatement());
+                        } else {
+                            body = bodyVisitor.doVisit(method.getCode());
+                        }
                     } else {
                         body = bodyVisitor.doVisit(method.getCode());
                     }
