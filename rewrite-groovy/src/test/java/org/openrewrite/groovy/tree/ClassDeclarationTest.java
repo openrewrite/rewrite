@@ -554,4 +554,54 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void traitWithMethod() {
+        rewriteRun(
+          groovy(
+            """
+              trait Greeter {
+                  String greet() {
+                      "hello"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void traitWithMethodTakingParameter() {
+        rewriteRun(
+          groovy(
+            """
+              trait Greeter {
+                  String greet(String name) {
+                      "hello $name"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void traitWithMultipleMethods() {
+        rewriteRun(
+          groovy(
+            """
+              trait Greeter {
+                  String greet() {
+                      "hello"
+                  }
+
+                  String shout(String msg) {
+                      msg.toUpperCase()
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }
