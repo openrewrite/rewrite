@@ -1168,7 +1168,16 @@ public class GroovyParserVisitor {
                             emptyList(),
                             name,
                             typeMapping.type(type), null);
-                    queue.add(new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(generics), typeMapping.type(type)));
+                    J.ParameterizedType parameterizedType = new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(generics), typeMapping.type(type));
+                    if (sourceStartsWith(".class")) {
+                        Space beforeDot = sourceBefore(".");
+                        Space classPrefix = whitespace();
+                        skip("class");
+                        J.Identifier classIdent = new J.Identifier(randomId(), classPrefix, Markers.EMPTY, emptyList(), "class", null, null);
+                        queue.add(new J.FieldAccess(randomId(), EMPTY, Markers.EMPTY, parameterizedType, padLeft(beforeDot, classIdent), typeMapping.type(type)));
+                        return;
+                    }
+                    queue.add(parameterizedType);
                     return;
                 }
             }
