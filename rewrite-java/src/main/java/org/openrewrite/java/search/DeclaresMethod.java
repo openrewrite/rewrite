@@ -21,7 +21,6 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
 
 public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
@@ -47,12 +46,14 @@ public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
     public J visit(@Nullable Tree tree, P p) {
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
-            for (JavaType.Method method : cu.getTypesInUse().getDeclaredMethods()) {
-                if (methodMatcher.matches(method)) {
-                    return SearchResult.found(cu);
-                }
+            // Per-file matcher cache on TypesInUse: equivalent matchers from different recipe
+            // instances share results, so a composite that preconditions many recipes on the
+            // same DeclaresMethod pattern only iterates getDeclaredMethods() once per file.
+            if (cu.getTypesInUse().declaresMethod(methodMatcher)) {
+                return SearchResult.found(cu);
             }
         }
+        //noinspection DataFlowIssue
         return (J) tree;
     }
 }

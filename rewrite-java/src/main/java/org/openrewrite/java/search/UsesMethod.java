@@ -25,7 +25,6 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 
@@ -61,14 +60,12 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J preVisit(@NonNull J tree, P p) {
+    public J preVisit(J tree, P p) {
         stopAfterPreVisit();
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
-            for (JavaType.Method type : cu.getTypesInUse().getUsedMethods()) {
-                if (methodMatcher.matches(type)) {
-                    return found(cu);
-                }
+            if (cu.getTypesInUse().hasMethod(methodMatcher)) {
+                return found(cu);
             }
         }
         return tree;

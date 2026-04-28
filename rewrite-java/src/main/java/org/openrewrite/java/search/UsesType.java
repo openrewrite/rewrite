@@ -23,10 +23,8 @@ import org.openrewrite.SourceFileWithReferences;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.TypeNameMatcher;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
 
@@ -90,41 +88,28 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
     public @Nullable Tree visit(@Nullable Tree tree, P p) {
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-            JavaSourceFile c = cu;
+            boolean implicit = Boolean.TRUE.equals(includeImplicit);
 
-            for (JavaType type : c.getTypesInUse().getTypesInUse()) {
-                JavaType checkType = type instanceof JavaType.Primitive ? type : TypeUtils.asFullyQualified(type);
-                if ((c = maybeMark(c, checkType)) != cu) {
-                    return c;
-                }
+            // Exact FQN: O(1) closure lookup on TypesInUse.
+            if (fullyQualifiedType != null) {
+                return cu.getTypesInUse().hasType(fullyQualifiedType, implicit) ? SearchResult.found(cu) : cu;
             }
 
-            for (J.Import anImport : c.getImports()) {
-                if (anImport.isStatic()) {
-                    if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType()))) != cu) {
-                        return c;
-                    }
-                } else if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getType()))) != cu) {
-                    return c;
-                }
+            // Package-shaped wildcards (com.foo.* / com.foo..*): O(prefix-depth) trie lookup.
+            if (typePattern instanceof PackagePattern) {
+                return cu.getTypesInUse().hasTypeInPackage(((PackagePattern) typePattern).getName(), implicit)
+                        ? SearchResult.found(cu) : cu;
             }
-
-            if (Boolean.TRUE.equals(includeImplicit)) {
-                for (JavaType.Method method : c.getTypesInUse().getUsedMethods()) {
-                    if ((c = maybeMark(c, method.getDeclaringType())) != cu) {
-                        return c;
-                    }
-                    if ((c = maybeMark(c, method.getReturnType())) != cu) {
-                        return c;
-                    }
-
-                    for (JavaType parameterType : method.getParameterTypes()) {
-                        if ((c = maybeMark(c, parameterType)) != cu) {
-                            return c;
-                        }
-                    }
-                }
+            if (typePattern instanceof PackagePrefixPattern) {
+                return cu.getTypesInUse().hasTypeInPackageOrSubpackage(((PackagePrefixPattern) typePattern).getPrefix(), implicit)
+                        ? SearchResult.found(cu) : cu;
             }
+            // GenericPattern (regex-like): one trie walk, memoized per (matcher, implicit).
+            if (typePattern instanceof GenericPattern) {
+                return cu.getTypesInUse().hasTypeMatching(((GenericPattern) typePattern).getMatcher(), implicit)
+                        ? SearchResult.found(cu) : cu;
+            }
+            return cu;
         } else if (tree instanceof SourceFileWithReferences) {
             SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
             SourceFileWithReferences.References references = sourceFile.getReferences();
@@ -133,19 +118,6 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
             }
         }
         return tree;
-    }
-
-    private JavaSourceFile maybeMark(JavaSourceFile c, @Nullable JavaType type) {
-        if (type == null) {
-            return c;
-        }
-
-        if (typePattern != null && TypeUtils.isAssignableTo(typePattern, type) ||
-            fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
-            return SearchResult.found(c);
-        }
-
-        return c;
     }
 
     @Value
