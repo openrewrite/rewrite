@@ -33,17 +33,11 @@ public class UseMainClassProperty extends Recipe {
 
     private static final String IN_JAVA_EXEC = "IN_JAVA_EXEC";
 
-    @Override
-    public String getDisplayName() {
-        return "Use `mainClass` instead of `main` for `JavaExec` tasks";
-    }
+    String displayName = "Use `mainClass` instead of `main` for `JavaExec` tasks";
 
-    @Override
-    public String getDescription() {
-        return "The `main` property on `JavaExec` tasks was deprecated in Gradle 7.1 and removed in Gradle 9.0. " +
-                "Use the `mainClass` property instead. " +
-                "See the [Gradle upgrade guide](https://docs.gradle.org/9.0.0/userguide/upgrading_major_version_9.html) for more information.";
-    }
+    String description = "The `main` property on `JavaExec` tasks was deprecated in Gradle 7.1 and removed in Gradle 9.0. " +
+            "Use the `mainClass` property instead. " +
+            "See the [Gradle upgrade guide](https://docs.gradle.org/9.0.0/userguide/upgrading_major_version_9.html) for more information.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
