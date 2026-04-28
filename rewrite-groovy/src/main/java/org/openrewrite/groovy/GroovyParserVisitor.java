@@ -2134,6 +2134,24 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMethodCallExpression(MethodCallExpression call) {
+            // Groovy parses control-flow constructs inside a GString interpolation
+            // (e.g. ${if (cond) { a } else { b }}) as a synthetic implicit call() on
+            // a ClosureExpression that wraps the statement. The "call" method name
+            // does not appear in the source, so unwrap and visit the inner statement.
+            if (call.isImplicitThis() &&
+                    call.getObjectExpression() instanceof ClosureExpression &&
+                    "call".equals(call.getMethodAsString()) &&
+                    call.getArguments() instanceof ArgumentListExpression &&
+                    ((ArgumentListExpression) call.getArguments()).getExpressions().isEmpty()) {
+                ClosureExpression closure = (ClosureExpression) call.getObjectExpression();
+                if (closure.getCode() instanceof BlockStatement) {
+                    BlockStatement body = (BlockStatement) closure.getCode();
+                    if (body.getStatements().size() == 1 && body.getStatements().get(0) instanceof IfStatement) {
+                        body.getStatements().get(0).visit(this);
+                        return;
+                    }
+                }
+            }
             queue.add(insideParentheses(call, fmt -> {
                 ImplicitDot implicitDot = null;
                 JRightPadded<Expression> select = null;
