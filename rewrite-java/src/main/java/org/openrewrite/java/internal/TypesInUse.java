@@ -69,18 +69,6 @@ public class TypesInUse {
     private volatile FqnTrie trie;
 
     /**
-     * Per-{@link MethodMatcher} memo for {@link #hasMethod}. Lazily allocated on first use, keyed
-     * by {@code matchOverrides ⊕ matcher.toString()} so equivalent matchers from different
-     * recipe instances share cache entries.
-     */
-    @Nullable
-    private volatile Map<String, Boolean> usedMethodCache;
-
-    /** Same shape as {@link #usedMethodCache} but over {@link #declaredMethods}. */
-    @Nullable
-    private volatile Map<String, Boolean> declaredMethodCache;
-
-    /**
      * Per-{@link TypeNameMatcher} memo for {@link #hasTypeMatching}. Lazily allocated; keyed by
      * the matcher's pattern combined with the {@code includeImplicit} dimension.
      */
@@ -152,35 +140,15 @@ public class TypesInUse {
     }
 
     /**
-     * Whether this compilation unit invokes any method matching {@code matcher}. The first call
-     * iterates {@link #usedMethods}; subsequent calls with an equivalent matcher (same pattern,
-     * same {@code matchOverrides}) hit the cache regardless of which recipe instance asks.
+     * Whether this compilation unit invokes any method matching {@code matcher}. Iterates
+     * {@link #usedMethods}, which {@link FindTypesInUse} populates once when this {@code TypesInUse}
+     * is first built. There is no per-matcher memoization: in practice equivalent matchers are
+     * rarely re-queried for the same file, so the cache overhead would not pay back. The shared
+     * work that does matter — building the {@code usedMethods} set itself — is already amortized
+     * across all matcher queries on this file.
      */
-    public boolean hasMethod(MethodMatcher matcher) {
-        Map<String, Boolean> cache = usedMethodCache;
-        if (cache == null) {
-            cache = new ConcurrentHashMap<>();
-            usedMethodCache = cache;
-        }
-        return cache.computeIfAbsent(keyOf(matcher), k -> computeHasMatch(usedMethods, matcher));
-    }
-
-    /**
-     * Whether this compilation unit declares any method matching {@code matcher}. The first call
-     * iterates {@link #declaredMethods}; subsequent calls with an equivalent matcher hit the
-     * cache regardless of which recipe instance asks.
-     */
-    public boolean declaresMethod(MethodMatcher matcher) {
-        Map<String, Boolean> cache = declaredMethodCache;
-        if (cache == null) {
-            cache = new ConcurrentHashMap<>();
-            declaredMethodCache = cache;
-        }
-        return cache.computeIfAbsent(keyOf(matcher), k -> computeHasMatch(declaredMethods, matcher));
-    }
-
-    private static boolean computeHasMatch(Set<JavaType.Method> methods, MethodMatcher matcher) {
-        for (JavaType.Method m : methods) {
+    public boolean hasMethodUse(MethodMatcher matcher) {
+        for (JavaType.Method m : usedMethods) {
             if (matcher.matches(m)) {
                 return true;
             }
@@ -189,12 +157,16 @@ public class TypesInUse {
     }
 
     /**
-     * Cache key combining the matcher's parsed-pattern string form with its {@code matchOverrides}
-     * dimension. The leading {@code +}/{@code -} disambiguates the override flag without a
-     * separator that could collide with characters {@link MethodMatcher#toString()} produces.
+     * Whether this compilation unit declares any method matching {@code matcher}. Iterates
+     * {@link #declaredMethods}; same rationale as {@link #hasMethodUse} for not memoizing per matcher.
      */
-    private static String keyOf(MethodMatcher matcher) {
-        return (matcher.isMatchOverrides() ? "+" : "-") + matcher;
+    public boolean declaresMethod(MethodMatcher matcher) {
+        for (JavaType.Method m : declaredMethods) {
+            if (matcher.matches(m)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private FqnTrie getOrBuildTrie() {
@@ -450,7 +422,7 @@ public class TypesInUse {
         }
 
         /**
-         * Trie node with parallel arrays for children instead of a {@link HashMap}, so
+         * Trie node with parallel arrays for children instead of a {@link java.util.HashMap}, so
          * {@link #findChild} can locate a child via {@link String#regionMatches} without
          * allocating a substring of the query string. Average branching for FQN tries is small
          * (typically 1–10), so the linear scan is faster than a hashed lookup once you account

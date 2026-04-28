@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
 import lombok.With;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -64,7 +63,7 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
         stopAfterPreVisit();
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
-            if (cu.getTypesInUse().hasMethod(methodMatcher)) {
+            if (cu.getTypesInUse().hasMethodUse(methodMatcher)) {
                 return found(cu);
             }
         }
