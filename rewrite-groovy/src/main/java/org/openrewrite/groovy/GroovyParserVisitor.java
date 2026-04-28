@@ -2098,7 +2098,9 @@ public class GroovyParserVisitor {
             Expression key;
             int saveCursor = cursor;
             Space beforeOpenParen = whitespace();
-            if (cursor < source.length() && source.charAt(cursor) == '(') {
+            Integer keyParenLevel = getInsideParenthesesLevel(expression.getKeyExpression());
+            if ((keyParenLevel == null || keyParenLevel == 0) &&
+                    cursor < source.length() && source.charAt(cursor) == '(') {
                 skip("(");
                 Expression inner = doVisit(expression.getKeyExpression());
                 key = new J.Parentheses<>(randomId(), beforeOpenParen, Markers.EMPTY,
