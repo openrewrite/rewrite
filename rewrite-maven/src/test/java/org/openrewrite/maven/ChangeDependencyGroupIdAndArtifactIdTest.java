@@ -1118,7 +1118,6 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/moderneinc/customer-requests/issues/2127")
     @Test
     void doesNotPinVersionWhenOldDepManagedOnlyByRemoteAncestor() {
         // The project has no local <dependencyManagement> and the old
