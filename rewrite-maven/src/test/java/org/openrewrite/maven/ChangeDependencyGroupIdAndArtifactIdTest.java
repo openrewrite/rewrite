@@ -3846,7 +3846,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                       <dependency>
                           <groupId>org.junit.jupiter</groupId>
                           <artifactId>junit-jupiter</artifactId>
-                          <version>5.14.3</version>
+                          <version>5.14.4</version>
                           <scope>test</scope>
                       </dependency>
                   </dependencies>
