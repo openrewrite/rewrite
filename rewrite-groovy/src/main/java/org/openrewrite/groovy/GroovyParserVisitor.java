@@ -92,6 +92,11 @@ public class GroovyParserVisitor {
 
     private int cursor = 0;
 
+    /** Maps a trait class name to its synthetic Groovy-generated {@code $Trait$Helper} class. */
+    private final Map<String, ClassNode> traitHelpers = new HashMap<>();
+    /** Maps a trait class name to its synthetic Groovy-generated {@code $Trait$FieldHelper} class. */
+    private final Map<String, ClassNode> traitFieldHelpers = new HashMap<>();
+
     private static final Pattern MULTILINE_COMMENT_REGEX = Pattern.compile("(?s)/\\*.*?\\*/");
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
 
@@ -186,6 +191,19 @@ public class GroovyParserVisitor {
         for (ClassNode aClass : ast.getClasses()) {
             // skip over the synthetic script class
             if (!aClass.getName().equals(ast.getMainClassName()) || !aClass.getName().endsWith("doesntmatter")) {
+                // synthetic helper classes Groovy generates for traits hold the bodies of trait methods/fields;
+                // record them by their owning trait so we can merge bodies back when visiting the trait
+                String name = aClass.getName();
+                int helperIdx = name.indexOf("$Trait$Helper");
+                if (helperIdx > 0) {
+                    traitHelpers.put(name.substring(0, helperIdx), aClass);
+                    continue;
+                }
+                int fieldHelperIdx = name.indexOf("$Trait$FieldHelper");
+                if (fieldHelperIdx > 0) {
+                    traitFieldHelpers.put(name.substring(0, fieldHelperIdx), aClass);
+                    continue;
+                }
                 sortedByPosition.put(pos(aClass), aClass);
             }
         }
@@ -255,9 +273,14 @@ public class GroovyParserVisitor {
 
             Space kindPrefix = whitespace();
             J.ClassDeclaration.Kind.Type kindType;
+            Markers kindMarkers = Markers.EMPTY;
             if (sourceStartsWith("class")) {
                 kindType = J.ClassDeclaration.Kind.Type.Class;
                 skip("class");
+            } else if (sourceStartsWith("trait")) {
+                kindType = J.ClassDeclaration.Kind.Type.Interface;
+                kindMarkers = kindMarkers.addIfAbsent(new Trait(randomId()));
+                skip("trait");
             } else if (clazz.isAnnotationDefinition()) {
                 kindType = J.ClassDeclaration.Kind.Type.Annotation;
                 skip("@interface");
@@ -273,7 +296,7 @@ public class GroovyParserVisitor {
             } else {
                 throw new IllegalStateException("Unexpected class type: " + name());
             }
-            J.ClassDeclaration.Kind kind = new J.ClassDeclaration.Kind(randomId(), kindPrefix, Markers.EMPTY, emptyList(), kindType);
+            J.ClassDeclaration.Kind kind = new J.ClassDeclaration.Kind(randomId(), kindPrefix, kindMarkers, emptyList(), kindType);
             J.Identifier name = new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), name(), typeMapping.type(clazz), null);
             JContainer<J.TypeParameter> typeParameterContainer = null;
             if (clazz.isUsingGenerics() && clazz.getGenericsTypes() != null) {
@@ -366,9 +389,28 @@ public class GroovyParserVisitor {
                     TypeUtils.asFullyQualified(typeMapping.type(clazz))));
         }
 
+        /**
+         * Find the helper method on a trait's {@code $Trait$Helper} class that corresponds to {@code traitMethod}.
+         * The helper version has the trait instance prepended as a synthetic {@code $self} parameter.
+         */
+        private @Nullable MethodNode findTraitHelperMethod(ClassNode helper, MethodNode traitMethod) {
+            for (MethodNode candidate : helper.getMethods(traitMethod.getName())) {
+                Parameter[] params = candidate.getParameters();
+                if (params.length == traitMethod.getParameters().length + 1 &&
+                        ("$self".equals(params[0].getName()) || "$static$self".equals(params[0].getName()))) {
+                    return candidate;
+                }
+            }
+            return null;
+        }
+
         J.Block visitClassBlock(ClassNode clazz) {
             NavigableMap<LineColumn, ASTNode> sortedByPosition = new TreeMap<>();
             List<FieldNode> enumConstants = new ArrayList<>();
+            // Groovy's trait AST transformation strips method bodies from the trait and moves them to a synthetic
+            // $Trait$Helper class, leaving the trait class with only abstract method signatures. Substitute each
+            // trait method with its helper counterpart so we can recover the original body when visiting it.
+            ClassNode helperForTrait = traitHelpers.get(clazz.getName());
             for (MethodNode method : clazz.getMethods()) {
                 // Most synthetic methods do not appear in source code and should be skipped entirely.
                 if (method.isSynthetic()) {
@@ -378,8 +420,15 @@ public class GroovyParserVisitor {
                         org.codehaus.groovy.ast.stmt.Statement statement = ((BlockStatement) method.getCode()).getStatements().get(0);
                         sortedByPosition.put(pos(statement), statement);
                     }
-                } else if (method.getAnnotations(new ClassNode(Generated.class)).isEmpty()) {
-                    sortedByPosition.put(pos(method), method);
+                } else if (method.getAnnotations(new ClassNode(Generated.class)).isEmpty() && appearsInSource(method)) {
+                    MethodNode toAdd = method;
+                    if (helperForTrait != null) {
+                        MethodNode helperMethod = findTraitHelperMethod(helperForTrait, method);
+                        if (helperMethod != null) {
+                            toAdd = helperMethod;
+                        }
+                    }
+                    sortedByPosition.put(pos(toAdd), toAdd);
                 }
             }
             for (org.codehaus.groovy.ast.stmt.Statement objectInitializer : clazz.getObjectInitializerStatements()) {
@@ -440,7 +489,7 @@ public class GroovyParserVisitor {
             Iterator<InnerClassNode> innerClassIterator = clazz.getInnerClasses();
             while (innerClassIterator.hasNext()) {
                 InnerClassNode icn = innerClassIterator.next();
-                if (icn.isSynthetic() || fieldInitializers.contains(icn)) {
+                if (icn.isSynthetic() || fieldInitializers.contains(icn) || icn.getName().contains("$Trait$")) {
                     continue;
                 }
                 sortedByPosition.put(pos(icn), icn);
@@ -713,7 +762,13 @@ public class GroovyParserVisitor {
             Space beforeParen = sourceBefore("(");
             List<JRightPadded<Statement>> params = new ArrayList<>(method.getParameters().length);
             Parameter[] unparsedParams = method.getParameters();
-            int skipParams = isConstructorOfEnum ? 2 : isConstructorOfInnerNonStaticClass ? 1 : 0;
+            // For trait methods (which are stored on the synthetic $Trait$Helper class), skip the
+            // synthetic first parameter ($self / $static$self) the trait transformation prepends.
+            boolean isTraitHelperMethod = method.getDeclaringClass() != null &&
+                    method.getDeclaringClass().getName().contains("$Trait$Helper") &&
+                    unparsedParams.length > 0 &&
+                    ("$self".equals(unparsedParams[0].getName()) || "$static$self".equals(unparsedParams[0].getName()));
+            int skipParams = isConstructorOfEnum ? 2 : isConstructorOfInnerNonStaticClass ? 1 : isTraitHelperMethod ? 1 : 0;
             for (int i = skipParams; i < unparsedParams.length; i++) {
                 Parameter param = unparsedParams[i];
 
