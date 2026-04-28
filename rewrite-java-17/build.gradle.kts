@@ -7,7 +7,15 @@ plugins {
 
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
+    isCanBeConsumed = false
+    isCanBeResolved = true
 }
+
+val javaTckClasses = javaTck.incoming.artifactView {
+    attributes {
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))
+    }
+}.files
 
 dependencies {
     api(project(":rewrite-core"))
@@ -75,7 +83,7 @@ testing {
                 all {
                     testTask.configure {
                         useJUnitPlatform()
-                        testClassesDirs += files(javaTck.files.map { zipTree(it) })
+                        testClassesDirs += javaTckClasses
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)
                     }

@@ -15,20 +15,18 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.ObjectMappers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 import org.openrewrite.table.StylesInUse;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.introspector.BeanAccess;
-import org.yaml.snakeyaml.introspector.Property;
-import org.yaml.snakeyaml.nodes.MappingNode;
-import org.yaml.snakeyaml.nodes.Tag;
-import org.yaml.snakeyaml.representer.Representer;
 
 import java.util.*;
 
@@ -79,22 +77,15 @@ public class FindStyles extends Recipe {
     }
 
     private static final Yaml SNAKE_YAML;
+    private static final ObjectMapper MAPPER = ObjectMappers.propertyBasedMapper(FindStyles.class.getClassLoader());
+    private static final TypeReference<Map<String, Object>> STYLE_MAP = new TypeReference<Map<String, Object>>() {};
 
     static {
         DumperOptions options = new DumperOptions();
         options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
         options.setIndent(2);
         options.setPrettyFlow(true);
-        // Suppress class tags (e.g. !!com.example.SomeStyle) so beans dump as plain maps
-        Representer representer = new Representer(options) {
-            @Override
-            protected MappingNode representJavaBean(Set<Property> properties, Object javaBean) {
-                addClassTag(javaBean.getClass(), Tag.MAP);
-                return super.representJavaBean(properties, javaBean);
-            }
-        };
-        SNAKE_YAML = new Yaml(representer, options);
-        SNAKE_YAML.setBeanAccess(BeanAccess.FIELD);
+        SNAKE_YAML = new Yaml(options);
     }
 
     private static String stylesToYaml(List<NamedStyles> namedStylesList) {
@@ -115,7 +106,9 @@ public class FindStyles extends Recipe {
             List<Map<String, Object>> styleConfigs = new ArrayList<>();
             for (Style style : styles) {
                 Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put(style.getClass().getName(), style);
+                // Round-trip through Jackson so any custom @JsonSerialize on the Style
+                // (e.g. ImportLayoutStyle.Serializer) is honored before SnakeYAML sees it.
+                entry.put(style.getClass().getName(), MAPPER.convertValue(style, STYLE_MAP));
                 styleConfigs.add(entry);
             }
             doc.put("styleConfigs", styleConfigs);

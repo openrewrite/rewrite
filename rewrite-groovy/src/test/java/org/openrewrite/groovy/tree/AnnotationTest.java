@@ -276,17 +276,35 @@ class AnnotationTest implements RewriteTest {
           groovy(
             """
             package org.dummy
-            
+
             import groovy.transform.Synchronized
-            
+
             class Foo {
-            
+
                 @Synchronized
                 void bar() {
                     println('Hello World')
                 }
             }
             """
+          )
+        );
+    }
+
+    @Test
+    void immutableAndToString() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Immutable
+              import groovy.transform.ToString
+
+              @Immutable @ToString
+              class A {
+                  void foo() {
+                  }
+              }
+              """
           )
         );
     }

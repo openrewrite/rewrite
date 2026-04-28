@@ -112,6 +112,18 @@ class VariableDeclarationsTest implements RewriteTest {
     }
 
     @Test
+    void diamondOperatorOnUnresolvedImportedType() {
+        rewriteRun(
+          groovy(
+            """
+              import a.b.Foo
+              def x = new Foo<>()
+              """
+          )
+        );
+    }
+
+    @Test
     void singleTypeMultipleVariableDeclaration() {
         rewriteRun(
           groovy("def a = 1, b = 1")
