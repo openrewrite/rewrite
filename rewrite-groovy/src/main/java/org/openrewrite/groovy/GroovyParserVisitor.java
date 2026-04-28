@@ -1960,6 +1960,7 @@ public class GroovyParserVisitor {
                 sortedByPosition.put(pos(e), e);
             }
             List<org.codehaus.groovy.ast.expr.Expression> rawExprs = new ArrayList<>(sortedByPosition.values());
+            boolean hasInterpolation = !gstring.getValues().isEmpty();
             List<J> strings = new ArrayList<>(rawExprs.size());
             for (int i = 0; i < rawExprs.size(); i++) {
                 org.codehaus.groovy.ast.expr.Expression e = rawExprs.get(i);
@@ -1977,15 +1978,9 @@ public class GroovyParserVisitor {
                     }
                 } else if (e instanceof ConstantExpression) {
                     // Get the string literal from the source, so escaping of newlines and the like works out of the box
-                    String value = sourceSubstring(cursor, delimiter.close);
-                    // There could be a closer GString before the end of the closing delimiter, so shorten the string if needs be
-                    int indexNextSign = source.indexOf("$", cursor);
-                    while (isEscaped(indexNextSign, delimiter)) {
-                        indexNextSign = source.indexOf("$", indexNextSign + 1);
-                    }
-                    if (indexNextSign != -1 && indexNextSign < (cursor + value.length())) {
-                        value = source.substring(cursor, indexNextSign);
-                    }
+                    String value = hasInterpolation ?
+                            readConstantSegmentBeforeNextInterpolation(delimiter) :
+                            sourceSubstring(cursor, delimiter.close);
                     strings.add(new J.Literal(randomId(), EMPTY, Markers.EMPTY, value, value, null, JavaType.Primitive.String));
                     skip(value);
                 } else {
@@ -3132,6 +3127,38 @@ public class GroovyParserVisitor {
             );
         }
         return source.substring(beginIndex, endIndex);
+    }
+
+    /**
+     * Reads a constant (literal) segment of a GString, starting at the current {@code cursor} and
+     * ending just before either the next interpolation sign ({@code $}) or the closing delimiter.
+     * Unlike {@link #sourceSubstring(int, String)} this does not scan the entire remaining source
+     * for the closing delimiter, which is unreliable for multi-line strings that may contain
+     * embedded quote sequences.
+     */
+    private String readConstantSegmentBeforeNextInterpolation(Delimiter delimiter) {
+        int indexNextSign = source.indexOf("$", cursor);
+        while (indexNextSign != -1 && isEscaped(indexNextSign, delimiter)) {
+            indexNextSign = source.indexOf("$", indexNextSign + 1);
+        }
+        int indexCloseDelim = source.indexOf(delimiter.close, cursor);
+        while (indexCloseDelim != -1 && isEscaped(indexCloseDelim)) {
+            indexCloseDelim = source.indexOf(delimiter.close, indexCloseDelim + 1);
+        }
+        int endIndex;
+        if (indexNextSign == -1) {
+            endIndex = indexCloseDelim;
+        } else if (indexCloseDelim == -1) {
+            endIndex = indexNextSign;
+        } else {
+            endIndex = Math.min(indexNextSign, indexCloseDelim);
+        }
+        if (endIndex < 0) {
+            throw new IllegalArgumentException(
+                "Couldn't find end of GString constant segment starting at cursor: " + cursor
+            );
+        }
+        return source.substring(cursor, endIndex);
     }
 
     private @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
