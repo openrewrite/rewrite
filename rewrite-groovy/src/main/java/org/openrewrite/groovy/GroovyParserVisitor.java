@@ -2774,7 +2774,9 @@ public class GroovyParserVisitor {
         Space prefix = sourceBefore("@");
         NameTree annotationType = visitTypeTree(annotation.getClassNode());
         JContainer<Expression> arguments = null;
-        if (!annotation.getMembers().isEmpty()) {
+        // AST transforms like @Immutable can attach synthetic members to other annotations
+        // (e.g. @ToString) that don't appear in source — only parse arguments if "(" is actually next.
+        if (!annotation.getMembers().isEmpty() && sourceStartsWith("(")) {
             arguments = JContainer.build(
                     sourceBefore("("),
                     annotation.getMembers().entrySet().stream()
