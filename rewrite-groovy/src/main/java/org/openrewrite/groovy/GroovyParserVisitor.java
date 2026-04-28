@@ -3002,17 +3002,21 @@ public class GroovyParserVisitor {
 
     private TypeTree mapDimensions(TypeTree baseType, ClassNode classNode) {
         if (classNode.isArray()) {
+            int saveCursor = cursor;
             Space prefix = whitespace();
-            JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
-            return new J.ArrayType(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    mapDimensions(baseType, classNode.getComponentType()),
-                    null,
-                    dimension,
-                    typeMapping.type(classNode)
-            );
+            if (cursor < source.length() && source.charAt(cursor) == '[') {
+                JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+                return new J.ArrayType(
+                        randomId(),
+                        prefix,
+                        Markers.EMPTY,
+                        mapDimensions(baseType, classNode.getComponentType()),
+                        null,
+                        dimension,
+                        typeMapping.type(classNode)
+                );
+            }
+            cursor = saveCursor;
         }
         return baseType;
     }
