@@ -789,6 +789,17 @@ public class GroovyParserVisitor {
                 } else {
                     if (annotations.stream().anyMatch(a -> TypeUtils.isOfClassType(a.getAnnotationType().getType(), "groovy.transform.Synchronized"))) {
                         body = bodyVisitor.doVisit(((SynchronizedStatement) method.getCode()).getCode());
+                    } else if (annotations.stream().anyMatch(a -> TypeUtils.isOfClassType(a.getAnnotationType().getType(), "groovy.test.NotYetImplemented") ||
+                            TypeUtils.isOfClassType(a.getAnnotationType().getType(), "groovy.transform.NotYetImplemented"))) {
+                        // The @NotYetImplemented AST transformation wraps the original method body in a TryCatchStatement
+                        // followed by a ThrowStatement; unwrap it so source positions align with the original body
+                        org.codehaus.groovy.ast.stmt.Statement code = method.getCode();
+                        if (code instanceof BlockStatement && !((BlockStatement) code).getStatements().isEmpty() &&
+                                ((BlockStatement) code).getStatements().get(0) instanceof TryCatchStatement) {
+                            body = bodyVisitor.doVisit(((TryCatchStatement) ((BlockStatement) code).getStatements().get(0)).getTryStatement());
+                        } else {
+                            body = bodyVisitor.doVisit(method.getCode());
+                        }
                     } else {
                         body = bodyVisitor.doVisit(method.getCode());
                     }
@@ -829,7 +840,13 @@ public class GroovyParserVisitor {
 
         private <T> T doVisit(ASTNode node) {
             nodeCursor = new Cursor(nodeCursor, node);
-            node.visit(this);
+            if (node instanceof AnnotationConstantExpression) {
+                // AnnotationConstantExpression.visit() walks the inner annotation's members itself,
+                // which would re-visit them at the wrong cursor position. Dispatch directly instead.
+                queue.add(visitAnnotation((AnnotationNode) ((AnnotationConstantExpression) node).getValue(), classVisitor));
+            } else {
+                node.visit(this);
+            }
             nodeCursor = nodeCursor.getParentOrThrow();
             return pollQueue();
         }
@@ -1662,7 +1679,7 @@ public class GroovyParserVisitor {
                     }
                     for (; i < source.length(); i++) {
                         char c = source.charAt(i);
-                        if (!(isJavaIdentifierPart(c) || (c == '.' && source.length() > (i + 1) && isJavaIdentifierPart(source.charAt(i + 1))))) {
+                        if (!(isJavaIdentifierPart(c) || (c == '.' && source.length() > (i + 1) && Character.isDigit(source.charAt(i + 1))))) {
                             break;
                         }
                     }
@@ -2787,7 +2804,9 @@ public class GroovyParserVisitor {
         Space prefix = sourceBefore("@");
         NameTree annotationType = visitTypeTree(annotation.getClassNode());
         JContainer<Expression> arguments = null;
-        if (!annotation.getMembers().isEmpty()) {
+        // AST transforms like @Immutable can attach synthetic members to other annotations
+        // (e.g. @ToString) that don't appear in source — only parse arguments if "(" is actually next.
+        if (!annotation.getMembers().isEmpty() && sourceStartsWith("(")) {
             arguments = JContainer.build(
                     sourceBefore("("),
                     annotation.getMembers().entrySet().stream()

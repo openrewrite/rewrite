@@ -68,6 +68,13 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void closureArgumentOnNumericLiteralReceiver() {
+        rewriteRun(
+          groovy("50.times { 1 }")
+        );
+    }
+
+    @Test
     void noParentheses() {
         rewriteRun(
           groovy(
