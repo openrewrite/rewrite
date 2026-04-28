@@ -276,6 +276,16 @@ public class TypesInUse {
      * so {@code com.foo..*} queries don't get false positives from canonical alias paths.
      */
     private static final class FqnTrie {
+        // Bit flags packed into a single byte on each Node, replacing six boolean fields.
+        // Java 25's compact object headers (-XX:+UseCompactObjectHeaders) shrinks Node from 32 B
+        // to 24 B with this packing — material savings on tries with thousands of nodes.
+        private static final byte LEAF_EXPLICIT = 1;
+        private static final byte LEAF_IMPLICIT = 1 << 1;
+        private static final byte ALIAS_EXPLICIT = 1 << 2;
+        private static final byte ALIAS_IMPLICIT = 1 << 3;
+        private static final byte DESCENDANT_EXPLICIT = 1 << 4;
+        private static final byte DESCENDANT_IMPLICIT = 1 << 5;
+
         private final Node root = new Node();
 
         /**
@@ -296,32 +306,33 @@ public class TypesInUse {
             Node n = root;
             int start = 0;
             int len = path.length();
-            for (int i = 0; i <= len; i++) {
-                if (i == len || path.charAt(i) == '.') {
-                    // Descendant rollup propagates only for raw-leaf insertions; alias paths do
-                    // not contribute to "this package has any class beneath it" queries.
-                    if (!alias) {
-                        if (explicit) {
-                            n.descendantExplicit = true;
-                        } else {
-                            n.descendantImplicit = true;
-                        }
-                    }
-                    n = n.findOrAddChild(path, start, i);
-                    start = i + 1;
+            // Use String.indexOf('.', start) so the JVM can apply its SIMD-friendly intrinsic
+            // for char scans rather than a manual charAt loop.
+            while (true) {
+                int dot = start < len ? path.indexOf('.', start) : -1;
+                int end = dot < 0 ? len : dot;
+                // Descendant rollup propagates only for raw-leaf insertions; alias paths do
+                // not contribute to "this package has any class beneath it" queries.
+                if (!alias) {
+                    n.flags |= explicit ? DESCENDANT_EXPLICIT : DESCENDANT_IMPLICIT;
                 }
+                n = n.findOrAddChild(path, start, end);
+                if (dot < 0) {
+                    break;
+                }
+                start = end + 1;
             }
             if (alias) {
                 if (explicit) {
-                    n.aliasExplicit = true;
-                } else if (!n.aliasExplicit) {
-                    n.aliasImplicit = true;
+                    n.flags |= ALIAS_EXPLICIT;
+                } else if ((n.flags & ALIAS_EXPLICIT) == 0) {
+                    n.flags |= ALIAS_IMPLICIT;
                 }
             } else {
                 if (explicit) {
-                    n.leafExplicit = true;
-                } else if (!n.leafExplicit) {
-                    n.leafImplicit = true;
+                    n.flags |= LEAF_EXPLICIT;
+                } else if ((n.flags & LEAF_EXPLICIT) == 0) {
+                    n.flags |= LEAF_IMPLICIT;
                 }
             }
         }
@@ -332,10 +343,10 @@ public class TypesInUse {
             if (n == null) {
                 return false;
             }
-            if (n.leafExplicit || n.aliasExplicit) {
+            if ((n.flags & (LEAF_EXPLICIT | ALIAS_EXPLICIT)) != 0) {
                 return true;
             }
-            return includeImplicit && (n.leafImplicit || n.aliasImplicit);
+            return includeImplicit && (n.flags & (LEAF_IMPLICIT | ALIAS_IMPLICIT)) != 0;
         }
 
         /** {@code com.foo.*}: any FQN whose package is exactly {@code pkg}. */
@@ -344,11 +355,11 @@ public class TypesInUse {
             if (n == null) {
                 return false;
             }
+            byte mask = includeImplicit ? (byte) (LEAF_EXPLICIT | LEAF_IMPLICIT) : LEAF_EXPLICIT;
             for (int i = 0; i < n.childCount; i++) {
-                Node child = n.childNodes[i];
                 // Deliberately ignore alias bits: a canonicalized inner-class path like
                 // [com, foo, Outer, Inner] must not let `com.foo.Outer.*` match.
-                if (child.leafExplicit || (includeImplicit && child.leafImplicit)) {
+                if ((n.childNodes[i].flags & mask) != 0) {
                     return true;
                 }
             }
@@ -361,9 +372,10 @@ public class TypesInUse {
             if (n == null) {
                 return false;
             }
-            // Deliberately exclude n.leaf*/n.alias* — `pkg..*` matches strict subpackages of pkg,
+            // Deliberately exclude leaf/alias bits — `pkg..*` matches strict subpackages of pkg,
             // not pkg itself. Descendant flags only track raw-leaf insertions.
-            return n.descendantExplicit || (includeImplicit && n.descendantImplicit);
+            byte mask = includeImplicit ? (byte) (DESCENDANT_EXPLICIT | DESCENDANT_IMPLICIT) : DESCENDANT_EXPLICIT;
+            return (n.flags & mask) != 0;
         }
 
         /**
@@ -377,7 +389,8 @@ public class TypesInUse {
         }
 
         private static boolean anyLeafFqn(Node node, StringBuilder fqn, TypeNameMatcher matcher, boolean includeImplicit) {
-            if ((node.leafExplicit || (includeImplicit && node.leafImplicit)) && matcher.matches(fqn.toString())) {
+            byte mask = includeImplicit ? (byte) (LEAF_EXPLICIT | LEAF_IMPLICIT) : LEAF_EXPLICIT;
+            if ((node.flags & mask) != 0 && matcher.matches(fqn.toString())) {
                 return true;
             }
             for (int i = 0; i < node.childCount; i++) {
@@ -401,14 +414,15 @@ public class TypesInUse {
             Node n = root;
             int start = 0;
             int len = pkg.length();
-            for (int i = 0; i <= len; i++) {
-                if (i == len || pkg.charAt(i) == '.') {
-                    n = n.findChild(pkg, start, i);
-                    if (n == null) {
-                        return null;
-                    }
-                    start = i + 1;
+            // SIMD-friendly intrinsic over manual charAt scan.
+            while (start < len) {
+                int dot = pkg.indexOf('.', start);
+                int end = dot < 0 ? len : dot;
+                n = n.findChild(pkg, start, end);
+                if (n == null) {
+                    return null;
                 }
+                start = end + 1;
             }
             return n;
         }
@@ -428,12 +442,8 @@ public class TypesInUse {
             Node[] childNodes = EMPTY_NODES;
             int childCount;
 
-            boolean leafExplicit;
-            boolean leafImplicit;
-            boolean aliasExplicit;
-            boolean aliasImplicit;
-            boolean descendantExplicit;
-            boolean descendantImplicit;
+            // Six packed bits, see the LEAF_*/ALIAS_*/DESCENDANT_* constants on FqnTrie.
+            byte flags;
 
             /** Locate a child by the segment {@code path[start, end)}; allocation-free. */
             @Nullable Node findChild(String path, int start, int end) {
