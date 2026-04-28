@@ -34,6 +34,17 @@ class FieldAccessTest implements RewriteTest {
     }
 
     @Test
+    void starAccessInsideParenthesesFollowedByMethodCall() {
+        rewriteRun(
+          groovy(
+            """
+              def updates = (push*.remoteUpdates).flatten()
+              """
+          )
+        );
+    }
+
+    @Test
     void fieldAccess() {
         rewriteRun(
           groovy(

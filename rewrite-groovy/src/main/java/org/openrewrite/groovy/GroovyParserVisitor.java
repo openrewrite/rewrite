@@ -3289,6 +3289,12 @@ public class GroovyParserVisitor {
                 // Only for groovy 3+, because lower versions do always return `-1` for objectExpression.lineNumber / objectExpression.columnNumber
                 MethodCallExpression expr = (MethodCallExpression) node;
                 return determineParenthesisLevel(expr, expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
+            } else if (node instanceof PropertyExpression && source.charAt(indexOfNextNonWhitespace(cursor, source)) == '(') {
+                // Groovy doesn't set _INSIDE_PARENTHESES_LEVEL on parenthesized PropertyExpressions like `(a.b)` but does
+                // extend the column range to cover the wrapping parens. Only apply when the cursor is positioned at `(` to
+                // avoid double-counting in cases where a caller already consumed the wrapping parens (e.g. map entry keys).
+                PropertyExpression expr = (PropertyExpression) node;
+                return determineParenthesisLevel(expr, expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
             }
         }
 
