@@ -68,4 +68,19 @@ class MapEntryTest implements RewriteTest {
           groovy("def a = someMap /*[*/ [ /*'*/ 'someKey' /*]*/ ]")
         );
     }
+
+    @Test
+    void parenthesizedKeyInMethodArgument() {
+        rewriteRun(
+          groovy(
+            """
+              class Defaults {
+                  static final String KEY = "k"
+              }
+              def writeProperties(Map m) {}
+              writeProperties((Defaults.KEY): "value")
+              """
+          )
+        );
+    }
 }
