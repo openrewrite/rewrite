@@ -94,6 +94,21 @@ testing {
     }
 }
 
+// Keep the Test tasks' @Classpath fingerprint stable across CI runs. In this module the
+// only consumers of runtimeClasspath are :test and :compatibilityTest (compileJava uses
+// compileClasspath / ABI-only normalization and is unaffected). The convention plugin's
+// info-broker writes build-varying entries (Build-Date, Change, Build-Number, ...) into
+// MANIFEST.MF and META-INF/<project>.properties of every consumed JAR; none of META-INF
+// is a real input for the TCK's parser tests, so drop the whole directory from the
+// fingerprint and let the build cache hit when only those metadata bytes have changed.
+normalization {
+    runtimeClasspath {
+        metaInf {
+            ignoreCompletely()
+        }
+    }
+}
+
 tasks.named("check") {
     dependsOn(testing.suites.named("compatibilityTest"))
 }
