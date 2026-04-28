@@ -2011,8 +2011,21 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMapEntryExpression(MapEntryExpression expression) {
-            G.MapEntry mapEntry = new G.MapEntry(randomId(), whitespace(), Markers.EMPTY,
-                    JRightPadded.build((Expression) doVisit(expression.getKeyExpression())).withAfter(sourceBefore(":")),
+            Space prefix = whitespace();
+            Expression key;
+            int saveCursor = cursor;
+            Space beforeOpenParen = whitespace();
+            if (cursor < source.length() && source.charAt(cursor) == '(') {
+                skip("(");
+                Expression inner = doVisit(expression.getKeyExpression());
+                key = new J.Parentheses<>(randomId(), beforeOpenParen, Markers.EMPTY,
+                        JRightPadded.build((J) inner).withAfter(sourceBefore(")")));
+            } else {
+                cursor = saveCursor;
+                key = doVisit(expression.getKeyExpression());
+            }
+            G.MapEntry mapEntry = new G.MapEntry(randomId(), prefix, Markers.EMPTY,
+                    JRightPadded.build(key).withAfter(sourceBefore(":")),
                     doVisit(expression.getValueExpression()),
                     null
             );
