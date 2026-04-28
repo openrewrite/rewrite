@@ -160,6 +160,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 if (usesType == null) {
                     usesType = new UsesType<>(onlyIfUsing, true);
                 }
+
                 return usesType.isAcceptable(sourceFile, ctx) && usesType.visit(sourceFile, ctx) != sourceFile;
             }
 
@@ -176,16 +177,25 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         sourceFile == hasTestSourceSet.visit(sourceFile, ctx)) {
                     return tree;
                 }
-                sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
-                    boolean uses = usesType(sourceFile, ctx);
-                    acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || uses);
+                JavaProject javaProject = sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null);
+                if (javaProject == null) {
+                    return tree;
+                }
+                JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
+                String configForThisFile = javaSourceSet == null ? null :
+                        "main".equals(javaSourceSet.getName()) ? "implementation" : javaSourceSet.getName() + "Implementation";
+                // Skip the expensive UsesType visit if a previous file in this project's source set already
+                // contributed the same configuration; subsequent files cannot change the answer.
+                Set<String> knownConfigurations = acc.configurationsByProject.get(javaProject);
+                if (configForThisFile != null && knownConfigurations != null && knownConfigurations.contains(configForThisFile)) {
+                    return tree;
+                }
+                boolean uses = usesType(sourceFile, ctx);
+                acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || uses);
 
-                    if (uses) {
-                        Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
-                        sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
-                                configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
-                    }
-                });
+                if (uses && configForThisFile != null) {
+                    acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>()).add(configForThisFile);
+                }
                 return tree;
             }
         };
