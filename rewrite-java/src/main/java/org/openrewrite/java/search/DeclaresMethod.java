@@ -19,11 +19,30 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
 
 public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
+
+    /**
+     * Whether {@link TypesInUse} on the runtime classpath exposes
+     * {@link TypesInUse#declaresMethod}. Probed once at class load so an older parent-loaded
+     * {@code rewrite-java} doesn't trigger {@link NoSuchMethodError}.
+     */
+    private static final boolean TYPES_IN_USE_HAS_DECLARES_METHOD = probeTypesInUseHasDeclaresMethod();
+
+    private static boolean probeTypesInUseHasDeclaresMethod() {
+        try {
+            TypesInUse.class.getMethod("declaresMethod", MethodMatcher.class);
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
+    }
+
     private final MethodMatcher methodMatcher;
 
     public DeclaresMethod(String methodPattern) {
@@ -46,14 +65,22 @@ public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
     public J visit(@Nullable Tree tree, P p) {
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
-            // Per-file matcher cache on TypesInUse: equivalent matchers from different recipe
-            // instances share results, so a composite that preconditions many recipes on the
-            // same DeclaresMethod pattern only iterates getDeclaredMethods() once per file.
-            if (cu.getTypesInUse().declaresMethod(methodMatcher)) {
+            if (TYPES_IN_USE_HAS_DECLARES_METHOD
+                    ? cu.getTypesInUse().declaresMethod(methodMatcher)
+                    : legacyDeclaresMethod(cu)) {
                 return SearchResult.found(cu);
             }
         }
         //noinspection DataFlowIssue
         return (J) tree;
+    }
+
+    private boolean legacyDeclaresMethod(JavaSourceFile cu) {
+        for (JavaType.Method method : cu.getTypesInUse().getDeclaredMethods()) {
+            if (methodMatcher.matches(method)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

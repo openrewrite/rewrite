@@ -22,8 +22,10 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 
@@ -32,6 +34,24 @@ import java.util.UUID;
 import static org.openrewrite.Tree.randomId;
 
 public class UsesMethod<P> extends JavaIsoVisitor<P> {
+
+    /**
+     * Whether {@link TypesInUse} on the runtime classpath exposes {@link TypesInUse#hasMethodUse}.
+     * Recipes can be deployed against an older parent-loaded {@code rewrite-java} that lacks the
+     * method; probing once at class load lets us fall back to direct iteration without
+     * {@link NoSuchMethodError}.
+     */
+    private static final boolean TYPES_IN_USE_HAS_METHOD_USE = probeTypesInUseHasMethodUse();
+
+    private static boolean probeTypesInUseHasMethodUse() {
+        try {
+            TypesInUse.class.getMethod("hasMethodUse", MethodMatcher.class);
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
+    }
+
     private final String methodPattern;
 
     @Getter
@@ -63,11 +83,22 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
         stopAfterPreVisit();
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
-            if (cu.getTypesInUse().hasMethodUse(methodMatcher)) {
+            if (TYPES_IN_USE_HAS_METHOD_USE
+                    ? cu.getTypesInUse().hasMethodUse(methodMatcher)
+                    : legacyHasMethodUse(cu)) {
                 return found(cu);
             }
         }
         return tree;
+    }
+
+    private boolean legacyHasMethodUse(JavaSourceFile cu) {
+        for (JavaType.Method type : cu.getTypesInUse().getUsedMethods()) {
+            if (methodMatcher.matches(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private <J2 extends J> J2 found(J2 j) {
