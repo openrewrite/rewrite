@@ -140,12 +140,7 @@ public class TypesInUse {
     }
 
     /**
-     * Whether this compilation unit invokes any method matching {@code matcher}. Iterates
-     * {@link #usedMethods}, which {@link FindTypesInUse} populates once when this {@code TypesInUse}
-     * is first built. There is no per-matcher memoization: in practice equivalent matchers are
-     * rarely re-queried for the same file, so the cache overhead would not pay back. The shared
-     * work that does matter — building the {@code usedMethods} set itself — is already amortized
-     * across all matcher queries on this file.
+     * Whether this compilation unit invokes any method matching {@code matcher}.
      */
     public boolean hasMethodUse(MethodMatcher matcher) {
         for (JavaType.Method m : usedMethods) {
@@ -156,10 +151,7 @@ public class TypesInUse {
         return false;
     }
 
-    /**
-     * Whether this compilation unit declares any method matching {@code matcher}. Iterates
-     * {@link #declaredMethods}; same rationale as {@link #hasMethodUse} for not memoizing per matcher.
-     */
+    /** Whether this compilation unit declares any method matching {@code matcher}. */
     public boolean declaresMethod(MethodMatcher matcher) {
         for (JavaType.Method m : declaredMethods) {
             if (matcher.matches(m)) {
