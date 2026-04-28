@@ -1099,9 +1099,12 @@ public class GroovyParserVisitor {
                 }
             }
             if (sourceStartsWith(".class")) {
-                String classSuffix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source)) + ".class";
-                name += classSuffix;
-                skip(classSuffix);
+                int afterClass = indexOfNextNonWhitespace(cursor, source) + ".class".length();
+                if (afterClass >= source.length() || !Character.isJavaIdentifierPart(source.charAt(afterClass))) {
+                    String classSuffix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source)) + ".class";
+                    name += classSuffix;
+                    skip(classSuffix);
+                }
             }
             queue.add(TypeTree.build(name)
                     .withType(typeMapping.type(type))
