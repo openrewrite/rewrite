@@ -83,4 +83,21 @@ class JavaSourceSetTest {
     void tolerateWeirdClassNames(){
         assertThat(JavaSourceSet.isDeclarable("fj.data.$")).isFalse();
     }
+
+    @Test
+    void parserBuiltSourceSetIsNotDirty() {
+        JavaSourceSet jss = JavaSourceSet.build("main", emptyList());
+        assertThat(jss.isDirty()).isFalse();
+    }
+
+    @Test
+    void withDirtyTogglesFlagWithoutOtherChanges() {
+        JavaSourceSet clean = JavaSourceSet.build("main", emptyList());
+        JavaSourceSet dirty = clean.withDirty(true);
+
+        assertThat(dirty.isDirty()).isTrue();
+        assertThat(dirty.getClasspath()).isEqualTo(clean.getClasspath());
+        assertThat(dirty.getGavToTypes()).isEqualTo(clean.getGavToTypes());
+        assertThat(dirty.getId()).isEqualTo(clean.getId());
+    }
 }

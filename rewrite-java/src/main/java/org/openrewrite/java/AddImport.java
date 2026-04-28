@@ -175,11 +175,11 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, ((SourceFile) cu)))
                     .orElse(IntelliJ.importLayout());
 
-            List<JavaType.FullyQualified> classpath = cu.getMarkers().findFirst(JavaSourceSet.class)
-                    .map(JavaSourceSet::getClasspath)
-                    .orElse(emptyList());
+            Optional<JavaSourceSet> maybeSourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
+            List<JavaType.FullyQualified> classpath = maybeSourceSet.map(JavaSourceSet::getClasspath).orElse(emptyList());
+            boolean classpathDirty = maybeSourceSet.map(JavaSourceSet::isDirty).orElse(false);
 
-            List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath);
+            List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath, classpathDirty);
 
             if (member != null && typeReference.isPresent()) {
                 cu = (JavaSourceFile) new ShortenFullyQualifiedMemberReferences(typeReference.get()).visit(cu, p);

@@ -95,12 +95,14 @@ public class OrderImports extends Recipe {
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                 Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
                 List<JavaType.FullyQualified> classpath = emptyList();
+                boolean classpathDirty = false;
                 if (sourceSet.isPresent()) {
                     classpath = sourceSet.get().getClasspath();
+                    classpathDirty = sourceSet.get().isDirty();
                 }
 
                 ImportLayoutStyle importLayoutStyle = importLayoutStyle(cu, namedStyles);
-                List<JRightPadded<J.Import>> orderedImports = importLayoutStyle.orderImports(cu.getPadding().getImports(), classpath);
+                List<JRightPadded<J.Import>> orderedImports = importLayoutStyle.orderImports(cu.getPadding().getImports(), classpath, classpathDirty);
 
                 boolean changed = false;
                 if (orderedImports.size() != cu.getImports().size()) {

@@ -59,6 +59,16 @@ public class JavaSourceSet implements SourceSet {
     Map<String, List<JavaType.FullyQualified>> gavToTypes;
 
     /**
+     * When {@code true}, the {@link #classpath} and {@link #gavToTypes} are known to be stale with respect to
+     * dependency mutations performed earlier in this recipe run. Recipes making ambiguity-sensitive decisions
+     * from the classpath (e.g. whether to expand a star import or fold a group of imports into a star) must
+     * treat a dirty source set as "ambiguity possible" and take the safe path: expand stars, never fold.
+     * <p>
+     * Cleared only by re-parsing — sticky within a recipe run. Parser-built markers are never dirty.
+     */
+    boolean dirty;
+
+    /**
      * Add types for the given GAV key to this source set's classpath and gavToTypes mapping.
      *
      * @param gavKey a "group:artifact:version" string
@@ -237,7 +247,7 @@ public class JavaSourceSet implements SourceSet {
 
         // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
         typeNames.add("java.lang.Object");
-        return new JavaSourceSet(randomId(), sourceSetName, typesFrom(typeNames), emptyMap());
+        return new JavaSourceSet(randomId(), sourceSetName, typesFrom(typeNames), emptyMap(), false);
     }
 
 
@@ -351,7 +361,7 @@ public class JavaSourceSet implements SourceSet {
                 gavToTypes.put(gav, typesFromPath);
             }
         }
-        return new JavaSourceSet(randomId(), sourceSetName, types, gavToTypes);
+        return new JavaSourceSet(randomId(), sourceSetName, types, gavToTypes, false);
     }
 
     /**
