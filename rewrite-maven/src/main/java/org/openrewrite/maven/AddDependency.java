@@ -180,10 +180,19 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     if ("test".equals(scope) && onlyIfUsing != null && sourceFile == hasTestSourceSet.visit(sourceFile, ctx)) {
                         return sourceFile;
                     }
+                    JavaProject javaProject = sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null);
+                    String knownScope = javaProject == null ? null : acc.scopeByProject.get(javaProject);
+                    // "compile" is the broadest scope; no further file in this project can change the answer
+                    if ("compile".equals(knownScope)) {
+                        return sourceFile;
+                    }
+                    JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
+                    // If we already know "test" scope and this file is also in a test source set, no further info
+                    if ("test".equals(knownScope) && javaSourceSet != null && "test".equals(javaSourceSet.getName())) {
+                        return sourceFile;
+                    }
                     if (onlyIfUsing == null || sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx)) {
                         acc.usingType = true;
-                        JavaProject javaProject = sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null);
-                        JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
                         if (javaProject != null && javaSourceSet != null) {
                             acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
                                     scope /* a `compile` scope dependency will also be available in test source set */ :
