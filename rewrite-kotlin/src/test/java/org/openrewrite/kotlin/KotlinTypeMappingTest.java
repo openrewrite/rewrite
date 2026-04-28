@@ -535,7 +535,7 @@ class KotlinTypeMappingTest {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
                                 if ("println".equals(method.getSimpleName())) {
-                                    assertThat(method.getMethodType().toString()).isEqualTo("kotlin.io.ConsoleKt{name=println,return=void,parameters=[java.lang.Object]}");
+                                    assertThat(method.getMethodType().toString()).isEqualTo("kotlin.io.ConsoleKt{name=println,return=void,parameters=[kotlin.Any]}");
                                     found.set(true);
                                 }
                                 return super.visitMethodInvocation(method, atomicBoolean);
@@ -549,19 +549,25 @@ class KotlinTypeMappingTest {
 
         @Issue("https://github.com/openrewrite/rewrite/issues/7427")
         @Test
-        void constructorParameterTypesRemapKotlinBuiltins() {
-            // A Kotlin constructor taking `String` / `Throwable` must surface parameter types
-            // as the Java-parser's `java.lang.String` / `java.lang.Throwable`, not the Kotlin
-            // builtins, so `MethodMatcher` patterns written against the Java FQN match.
+        void constructorParameterTypesRemapKotlinBuiltinsForJavaOrigin() {
+            // A Kotlin call into a Java-origin constructor taking `String` / `Throwable`
+            // must surface parameter types as the JVM `java.lang.String` /
+            // `java.lang.Throwable`, not the Kotlin builtins, so `MethodMatcher` patterns
+            // written against the Java FQN match. Jackson's JsonGenerationException is the
+            // motivating case from #7427. Kotlin-declared signatures are intentionally
+            // left as-is — see #7428 review discussion.
             rewriteRun(
               kotlin(
                 """
-                  fun example(cause: Throwable): IllegalArgumentException {
-                      return IllegalArgumentException("message", cause)
+                  import com.fasterxml.jackson.core.JsonGenerationException
+                  import com.fasterxml.jackson.core.JsonGenerator
+
+                  fun example(gen: JsonGenerator, cause: Throwable) {
+                      throw JsonGenerationException("message", cause, gen)
                   }
                   """,
                 spec -> spec.afterRecipe(cu -> {
-                    var matcher = new MethodMatcher("java.lang.IllegalArgumentException <constructor>(String, Throwable)");
+                    var matcher = new MethodMatcher("com.fasterxml.jackson.core.JsonGenerationException <constructor>(String, Throwable, com.fasterxml.jackson.core.JsonGenerator)");
                     var found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<AtomicBoolean>() {
                         @Override
@@ -691,13 +697,13 @@ class KotlinTypeMappingTest {
 
         @CsvSource(value = {
           // Method type on overload with no named arguments.
-          "foo(\"\", 1, true)~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[java.lang.String,int,boolean]}",
+          "foo(\"\", 1, true)~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[kotlin.String,int,boolean]}",
           // Method type on overload with named arguments.
           "foo(b = 1)~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[int,boolean]}",
           // Method type when named arguments are declared out of order.
-          "foo(trailingLambda = {}, noDefault = true, c = true, b = 1)~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[java.lang.String,int,boolean,boolean,kotlin.Function0<void>]}",
+          "foo(trailingLambda = {}, noDefault = true, c = true, b = 1)~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[kotlin.String,int,boolean,boolean,kotlin.Function0<void>]}",
           // Method type with trailing lambda
-          "foo(b = 1, noDefault = true) {}~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[java.lang.String,int,boolean,boolean,kotlin.Function0<void>]}"
+          "foo(b = 1, noDefault = true) {}~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[kotlin.String,int,boolean,boolean,kotlin.Function0<void>]}"
         }, delimiter = '~')
         @ParameterizedTest
         void methodInvocationWithDefaults(String invocation, String methodType) {

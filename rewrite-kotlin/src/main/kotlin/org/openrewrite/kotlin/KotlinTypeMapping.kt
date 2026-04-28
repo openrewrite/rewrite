@@ -35,6 +35,7 @@ import org.jetbrains.kotlin.fir.declarations.utils.modality
 import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.impl.FirResolvedArgumentList
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaClass
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaField
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
@@ -704,7 +705,15 @@ class KotlinTypeMapping(
             parentType = parentType.type
         }
         val resolvedDeclaringType = TypeUtils.asFullyQualified(parentType)
-        var returnType = remapKotlinBuiltin(type(function.returnTypeRef))
+        // Only remap kotlin.* builtins to JVM FQNs for methods declared on Java-origin
+        // classes (third-party Java libraries loaded as FirJavaClass). The Kotlin compiler's
+        // FIR renders a Java method's `String` parameter as `kotlin.String` even though the
+        // bytecode signature is `java.lang.String`; remapping puts the parser's output back
+        // in line with the JVM signature so MethodMatcher patterns written against Java
+        // FQNs match. Kotlin-declared methods are left alone — `kotlin.Any` there is the
+        // author's intent, and Kotlin-aware matching belongs in KotlinTypeUtils.
+        val javaOrigin = parent is FirJavaClass
+        var returnType = if (javaOrigin) remapKotlinBuiltin(type(function.returnTypeRef)) else type(function.returnTypeRef)
         // Java parser uses the raw Class for a constructor's returnType, not the
         // class's parameterized form. Kotlin's FIR renders a constructor's
         // `returnTypeRef` as the class instantiated with its own type parameters
@@ -721,13 +730,14 @@ class KotlinTypeMapping(
             else -> null
         }
         if (function.receiverParameter != null) {
-            parameterTypes!!.add(remapKotlinBuiltin(type(function.receiverParameter!!.typeRef))!!)
+            val rt = type(function.receiverParameter!!.typeRef)
+            parameterTypes!!.add(if (javaOrigin) remapKotlinBuiltin(rt)!! else rt)
         }
         if (function.valueParameters.isNotEmpty()) {
             for (p in function.valueParameters) {
-                val t = remapKotlinBuiltin(type(p.returnTypeRef, function))
+                val t = type(p.returnTypeRef, function)
                 if (t != null) {
-                    parameterTypes!!.add(t)
+                    parameterTypes!!.add(if (javaOrigin) remapKotlinBuiltin(t)!! else t)
                 }
             }
         }
@@ -973,10 +983,20 @@ class KotlinTypeMapping(
         if (declaringType == null) {
             declaringType = TypeUtils.asFullyQualified(type(firFile))
         }
-        val returnType = remapKotlinBuiltin(type(function.resolvedType))
+        // See methodDeclarationType: only remap for Java-origin methods so Kotlin-declared
+        // signatures (e.g. `kotlin.io.ConsoleKt.println(kotlin.Any)`) are preserved.
+        // The discriminator is the containing class FIR — Java-origin classes (third-party
+        // Java libraries on the classpath) are loaded as FirJavaClass even when the
+        // synthesized member FIR is FirConstructorImpl with an Enhancement origin. JDK
+        // classes are special-cased by Kotlin's classfile loader and aren't FirJavaClass —
+        // recipes targeting JDK signatures need a Kotlin-aware matcher instead.
+        val javaOrigin = (sym as? FirCallableSymbol<*>)
+            ?.containingClassLookupTag()?.toRegularClassSymbol(firSession)?.fir is FirJavaClass
+        val returnType = if (javaOrigin) remapKotlinBuiltin(type(function.resolvedType)) else type(function.resolvedType)
 
         if (function.toResolvedCallableSymbol()?.receiverParameterSymbol != null) {
-            paramTypes!!.add(remapKotlinBuiltin(type(function.toResolvedCallableSymbol()?.receiverParameterSymbol!!.fir.typeRef))!!)
+            val rt = type(function.toResolvedCallableSymbol()?.receiverParameterSymbol!!.fir.typeRef)
+            paramTypes!!.add(if (javaOrigin) remapKotlinBuiltin(rt)!! else rt)
         }
         // Build a mapping from parameter name to its corresponding argument expression
         val paramToArg: Map<String, FirExpression>? =
@@ -993,12 +1013,13 @@ class KotlinTypeMapping(
             if (t is GenericTypeVariable) {
                 val arg = paramToArg?.get(p.name.asString())
                 if (arg != null) {
-                    paramTypes.add(remapKotlinBuiltin(type(arg.resolvedType, function))!!)
+                    val argType = type(arg.resolvedType, function)!!
+                    paramTypes.add(if (javaOrigin) remapKotlinBuiltin(argType)!! else argType)
                 } else {
                     paramTypes.add(t)
                 }
             } else {
-                paramTypes.add(remapKotlinBuiltin(t)!!)
+                paramTypes.add(if (javaOrigin) remapKotlinBuiltin(t)!! else t)
             }
         }
         method.unsafeSet(
@@ -1291,7 +1312,13 @@ class KotlinTypeMapping(
             declaringType = declaringType.type
         }
 
-        val typeRef = remapKotlinBuiltin(type(variable.returnTypeRef))
+        // See methodDeclarationType: only remap for Java-origin variables (e.g. fields read
+        // from a Java class file) so Kotlin properties keep their author-intended types.
+        val typeRef = if (variable is FirJavaField) {
+            remapKotlinBuiltin(type(variable.returnTypeRef))
+        } else {
+            type(variable.returnTypeRef)
+        }
         vt.unsafeSet(declaringType!!, typeRef, annotations)
         return vt
     }
