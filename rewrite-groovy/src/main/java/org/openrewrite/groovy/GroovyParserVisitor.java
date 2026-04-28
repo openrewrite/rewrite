@@ -2168,6 +2168,7 @@ public class GroovyParserVisitor {
                         source.charAt(cursor) == '(' && (cursor + methodName.length() > source.length() ||
                         !methodName.equals(source.substring(cursor, cursor + methodName.length())))
                 );
+                Space spaceBeforeArgs = null;
                 if (implicitCall) {
                     // This is an implicit call() method - create identifier but it doesn't get printed
                     name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), "", null, null);
@@ -2177,6 +2178,10 @@ public class GroovyParserVisitor {
                         name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), methodName, null, null);
                     } else if (select != null && select.getElement() instanceof J.Identifier) {
                         name = (J.Identifier) select.getElement();
+                        // Closure-style command expression like `x foo(c)` parses as `x.call(foo(c))`.
+                        // The whitespace captured as select's right-padding is the space between
+                        // the closure name and its argument list, which has no parens.
+                        spaceBeforeArgs = select.getAfter();
                         select = null;
                     } else {
                         throw new IllegalArgumentException("Unable to parse method call");
@@ -2221,6 +2226,9 @@ public class GroovyParserVisitor {
                     markers = handlesCaseWhereEmptyParensAheadOfClosure(args, markers);
                 }
                 JContainer<Expression> args = doVisit(call.getArguments());
+                if (spaceBeforeArgs != null && !spaceBeforeArgs.getWhitespace().isEmpty()) {
+                    args = args.withBefore(spaceBeforeArgs);
+                }
 
                 MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
                 JavaType.Method methodType = null;

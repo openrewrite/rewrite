@@ -771,4 +771,16 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commandExpressionWithParenthesizedArgument() {
+        rewriteRun(
+          groovy(
+            """
+              def x
+              x foo(c)
+              """
+          )
+        );
+    }
 }
