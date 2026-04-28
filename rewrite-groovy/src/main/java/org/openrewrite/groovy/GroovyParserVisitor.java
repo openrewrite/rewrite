@@ -829,7 +829,13 @@ public class GroovyParserVisitor {
 
         private <T> T doVisit(ASTNode node) {
             nodeCursor = new Cursor(nodeCursor, node);
-            node.visit(this);
+            if (node instanceof AnnotationConstantExpression) {
+                // AnnotationConstantExpression.visit() walks the inner annotation's members itself,
+                // which would re-visit them at the wrong cursor position. Dispatch directly instead.
+                queue.add(visitAnnotation((AnnotationNode) ((AnnotationConstantExpression) node).getValue(), classVisitor));
+            } else {
+                node.visit(this);
+            }
             nodeCursor = nodeCursor.getParentOrThrow();
             return pollQueue();
         }
