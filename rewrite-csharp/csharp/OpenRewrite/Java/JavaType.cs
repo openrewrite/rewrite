@@ -328,6 +328,7 @@ public abstract class JavaType
         public JavaType? Owner { get; set; }
         public JavaType? Type { get; set; }
         public IList<FullyQualified>? Annotations { get; set; }
+        public object? ConstantValue { get; set; }
 
         public Variable() { }
 

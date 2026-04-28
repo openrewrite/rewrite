@@ -1050,11 +1050,13 @@ class PythonRpcReceiver:
                                lambda t: self._receive_type(t, q))
             annotations = q.receive_list(getattr(java_type, '_annotations', None) or [],
                                           lambda t: self._receive_type(t, q))
+            constant_value = q.receive(getattr(java_type, '_constant_value', None))
             var = JT.Variable()
             var._name = name  # ty: ignore[invalid-assignment]  # RPC deserialization
             var._owner = owner
             var._type = type_
             var._annotations = annotations
+            var._constant_value = constant_value
             return var
 
         elif isinstance(java_type, JT.GenericTypeVariable):

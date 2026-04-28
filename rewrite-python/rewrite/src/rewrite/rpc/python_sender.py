@@ -901,11 +901,12 @@ class PythonRpcSender:
             q.get_and_send_list_as_ref(java_type, lambda x: x._annotations or [], self._type_signature, lambda t: self._visit_type(t, q))
 
         elif isinstance(java_type, JT.Variable):
-            # Variable: name, owner, type, annotations (no flags over RPC)
+            # Variable: name, owner, type, annotations, constantValue (no flags over RPC)
             q.get_and_send(java_type, lambda x: x._name)
             q.get_and_send_as_ref(java_type, lambda x: x._owner, lambda t: self._visit_type(t, q))
             q.get_and_send_as_ref(java_type, lambda x: x._type, lambda t: self._visit_type(t, q))
             q.get_and_send_list_as_ref(java_type, lambda x: x._annotations or [], self._type_signature, lambda t: self._visit_type(t, q))
+            q.get_and_send(java_type, lambda x: x._constant_value)
 
         elif isinstance(java_type, JT.GenericTypeVariable):
             # GenericTypeVariable: name, variance, bounds

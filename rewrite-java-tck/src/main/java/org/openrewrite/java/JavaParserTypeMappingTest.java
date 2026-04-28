@@ -397,4 +397,75 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
           )
         );
     }
+
+    @Test
+    void constantValueFromClasspath() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int x = Integer.MAX_VALUE;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaVisitor<>() {
+                @Override
+                public J visitIdentifier(J.Identifier ident, Object o) {
+                    if ("MAX_VALUE".equals(ident.getSimpleName())) {
+                        assertThat(ident.getFieldType()).isNotNull();
+                        assertThat(ident.getFieldType().getConstantValue()).isEqualTo(Integer.MAX_VALUE);
+                    }
+                    return ident;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void constantValueOnStaticFinalFields() {
+        rewriteRun(
+          java(
+            """
+              class Constants {
+                  static final int INT_CONST = 42;
+                  static final long LONG_CONST = 100L;
+                  static final String STRING_CONST = "hello";
+                  static final boolean BOOL_CONST = true;
+                  static final double DOUBLE_CONST = 3.14;
+                  static final Object NOT_CONST = new Object();
+                  int instanceField = 1;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                JavaType.Class type = (JavaType.Class) cu.getClasses().get(0).getType();
+                assertThat(type).isNotNull();
+                for (JavaType.Variable member : type.getMembers()) {
+                    switch (member.getName()) {
+                        case "INT_CONST":
+                            assertThat(member.getConstantValue()).isEqualTo(42);
+                            break;
+                        case "LONG_CONST":
+                            assertThat(member.getConstantValue()).isEqualTo(100L);
+                            break;
+                        case "STRING_CONST":
+                            assertThat(member.getConstantValue()).isEqualTo("hello");
+                            break;
+                        case "BOOL_CONST":
+                            assertThat(member.getConstantValue()).isEqualTo(true);
+                            break;
+                        case "DOUBLE_CONST":
+                            assertThat(member.getConstantValue()).isEqualTo(3.14);
+                            break;
+                        case "NOT_CONST":
+                            assertThat(member.getConstantValue()).isNull();
+                            break;
+                        case "instanceField":
+                            assertThat(member.getConstantValue()).isNull();
+                            break;
+                    }
+                }
+            })
+          )
+        );
+    }
 }

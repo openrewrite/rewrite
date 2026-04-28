@@ -417,7 +417,8 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
                 null,
                 symbol.flags_field,
                 symbol.name.toString(),
-                null, null, null);
+                null, null, null,
+                ((Symbol.VarSymbol) symbol).getConstValue());
 
         typeCache.put(signature, variable);
 
@@ -436,7 +437,8 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
             assert resolvedOwner != null;
         }
 
-        return variable.unsafeSet(resolvedOwner, type(symbol.type), listAnnotations(symbol));
+        variable.unsafeSet(resolvedOwner, type(symbol.type), listAnnotations(symbol));
+        return variable;
     }
 
     /**

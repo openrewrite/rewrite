@@ -111,6 +111,7 @@ export namespace Type {
         owner?: Type;
         type: Type;
         annotations: Type.Annotation[];
+        constantValue?: string | number | boolean;
 
         toJSON?(): string;
     }

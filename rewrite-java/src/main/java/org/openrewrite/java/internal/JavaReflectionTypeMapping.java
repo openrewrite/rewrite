@@ -279,11 +279,28 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             return existing;
         }
 
+        Object constantValue = null;
+        if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) &&
+                java.lang.reflect.Modifier.isFinal(field.getModifiers())) {
+            try {
+                Object val = field.get(null);
+                if (val instanceof String || val instanceof Boolean ||
+                        val instanceof Character || val instanceof Byte ||
+                        val instanceof Short || val instanceof Integer ||
+                        val instanceof Long || val instanceof Float ||
+                        val instanceof Double) {
+                    constantValue = val;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
         JavaType.Variable mappedVariable = new JavaType.Variable(
                 null,
                 field.getModifiers(),
                 field.getName(),
-                null, null, null
+                null, null, null,
+                constantValue
         );
         typeCache.put(signature, mappedVariable);
 

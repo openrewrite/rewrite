@@ -424,6 +424,7 @@ class JavaType(ABC):
         _owner: Optional[JavaType] = field(default=None)
         _type: Optional[JavaType] = field(default=None)
         _annotations: Optional[List[JavaType.FullyQualified]] = field(default=None)
+        _constant_value: Optional[object] = field(default=None)
 
         @property
         def flags_bit_map(self) -> int:
@@ -444,6 +445,10 @@ class JavaType(ABC):
         @property
         def annotations(self) -> Optional[List[JavaType.FullyQualified]]:
             return self._annotations
+
+        @property
+        def constant_value(self) -> Optional[object]:
+            return self._constant_value
 
     @dataclass
     class Array:

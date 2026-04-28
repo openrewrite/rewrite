@@ -132,6 +132,7 @@ public class JavaTypeSender extends JavaTypeVisitor<RpcSendQueue> {
         q.getAndSend(variable, v -> asRef(v.getOwner()), t -> visit(Reference.<JavaType>getValueNonNull(t), q));
         q.getAndSend(variable, v -> asRef(v.getType()), t -> visit(Reference.<JavaType>getValueNonNull(t), q));
         q.getAndSendListAsRef(variable, JavaType.Variable::getAnnotations, sig::signature, t -> visit(t, q));
+        q.getAndSend(variable, JavaType.Variable::getConstantValue);
         return variable;
     }
 }
