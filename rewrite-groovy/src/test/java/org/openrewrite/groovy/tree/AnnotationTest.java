@@ -308,4 +308,22 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void notYetImplementedAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.test.NotYetImplemented
+
+              class Foo {
+                  @NotYetImplemented
+                  void m() {
+                      println("hello")
+                  }
+              }
+              """
+          )
+        );
+    }
 }
