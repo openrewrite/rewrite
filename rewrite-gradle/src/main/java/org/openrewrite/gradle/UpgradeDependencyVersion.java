@@ -33,13 +33,10 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.marker.JavaProject;
-import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
-import org.openrewrite.maven.utilities.JavaSourceSetUpdater;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -134,8 +131,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         Map<GroupArtifact, @Nullable Object> gaToNewVersion = new HashMap<>();
 
         Map<String, Map<GroupArtifact, Set<String>>> configurationPerGAPerModule = new HashMap<>();
-
-        Map<JavaProject, Set<ResolvedDependency>> modulesWithDependency = new HashMap<>();
     }
 
     @Override
@@ -161,24 +156,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
-                    // Record modules with matching resolved dependencies for JavaSourceSet updates
-                    if (gradleProject != null) {
-                        Optional<JavaProject> maybeJp = tree.getMarkers().findFirst(JavaProject.class);
-                        if (maybeJp.isPresent() && !acc.modulesWithDependency.containsKey(maybeJp.get())) {
-                            DependencyMatcher depMatcher = new DependencyMatcher(groupId, artifactId, null);
-                            Set<ResolvedDependency> matched = new HashSet<>();
-                            for (GradleDependencyConfiguration config : gradleProject.getConfigurations()) {
-                                for (ResolvedDependency resolved : config.getDirectResolvedShallow()) {
-                                    if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
-                                        matched.add(resolved);
-                                    }
-                                }
-                            }
-                            if (!matched.isEmpty()) {
-                                acc.modulesWithDependency.put(maybeJp.get(), matched);
-                            }
-                        }
-                    }
                 }
                 return super.visit(tree, ctx);
             }
@@ -311,21 +288,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
-        boolean hasModulesWithDep = !acc.modulesWithDependency.isEmpty();
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
-            @Nullable
-            private JavaSourceSetUpdater jssUpdater;
-            private final Map<String, JavaSourceSet> updatedSourceSets = new HashMap<>();
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
-                if (updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx)) {
-                    return true;
-                }
-                return hasModulesWithDep && sf instanceof JavaSourceFile
-                        && !(sf instanceof G.CompilationUnit) && !(sf instanceof K.CompilationUnit);
+                return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx);
             }
 
             @Override
@@ -334,11 +303,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 Tree t = tree;
                 if (t instanceof SourceFile) {
                     SourceFile sf = (SourceFile) t;
-                    // Handle regular Java source files for JavaSourceSet updates
-                    if (hasModulesWithDep && sf instanceof JavaSourceFile
-                            && !(sf instanceof G.CompilationUnit) && !(sf instanceof K.CompilationUnit)) {
-                        return updateJavaSourceSet(sf, ctx);
-                    }
                     if (updateProperties.isAcceptable(sf, ctx)) {
                         t = updateProperties.visitNonNull(t, ctx);
                     } else if (updateGradle.isAcceptable(sf, ctx)) {
@@ -395,41 +359,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return t;
             }
 
-            private SourceFile updateJavaSourceSet(SourceFile sf, ExecutionContext ctx) {
-                Optional<JavaProject> maybeJp = sf.getMarkers().findFirst(JavaProject.class);
-                if (!maybeJp.isPresent()) {
-                    return sf;
-                }
-                Set<ResolvedDependency> oldDeps = acc.modulesWithDependency.get(maybeJp.get());
-                if (oldDeps == null || oldDeps.isEmpty()) {
-                    return sf;
-                }
-                return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet -> {
-                    if (sourceSet.getGavToTypes().isEmpty()) {
-                        return sourceSet;
-                    }
-                    if (jssUpdater == null) {
-                        jssUpdater = new JavaSourceSetUpdater(ctx);
-                    }
-                    JavaSourceSet result = sourceSet;
-                    for (ResolvedDependency oldDep : oldDeps) {
-                        GroupArtifact ga = new GroupArtifact(oldDep.getGroupId(), oldDep.getArtifactId());
-                        Object newVersionObj = acc.gaToNewVersion.get(ga);
-                        if (!(newVersionObj instanceof String)) {
-                            continue;
-                        }
-                        String resolvedNewVersion = (String) newVersionObj;
-                        ResolvedGroupArtifactVersion newGav = new ResolvedGroupArtifactVersion(
-                                oldDep.getGav().getRepository(),
-                                oldDep.getGroupId(), oldDep.getArtifactId(), resolvedNewVersion, null);
-                        ResolvedDependency newDep = oldDep
-                                .withGav(newGav)
-                                .withRepository(MavenRepository.MAVEN_CENTRAL);
-                        result = jssUpdater.changeDependency(result, oldDep, newDep);
-                    }
-                    return result;
-                });
-            }
         };
     }
 

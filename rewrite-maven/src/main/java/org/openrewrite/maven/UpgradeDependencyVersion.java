@@ -19,14 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.java.marker.JavaProject;
-import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
-import org.openrewrite.maven.utilities.JavaSourceSetUpdater;
 import org.openrewrite.maven.utilities.RetainVersions;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
@@ -139,28 +135,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 ResolvedPom pom = getResolutionResult().getPom();
                 accumulator.projectArtifacts.add(new GroupArtifact(pom.getGroupId(), pom.getArtifactId()));
-
-                // Record modules that have the matching dependency for JavaSourceSet updates
-                Optional<JavaProject> maybeJp = document.getMarkers().findFirst(JavaProject.class);
-                if (maybeJp.isPresent() && !accumulator.modulesWithDependency.containsKey(maybeJp.get())) {
-                    for (ResolvedDependency dep : getResolutionResult().findDependencies(groupId, artifactId, null)) {
-                        if (dep.getRepository() != null) {
-                            accumulator.modulesWithDependency.put(maybeJp.get(), dep);
-                            accumulator.moduleRepositories.put(maybeJp.get(), pom.getRepositories());
-                            try {
-                                String newerVersion = MavenDependency.findNewerVersion(dep.getGroupId(), dep.getArtifactId(), dep.getVersion(), getResolutionResult(), metadataFailures,
-                                        versionComparator, ctx);
-                                if (newerVersion != null) {
-                                    accumulator.resolvedNewVersions.put(maybeJp.get(), newerVersion);
-                                }
-                            } catch (MavenDownloadingException e) {
-                                // Version resolution failed; don't record new version
-                            }
-                            break;
-                        }
-                    }
-                }
-
                 return super.visitDocument(document, ctx);
             }
 
@@ -609,87 +583,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
         };
 
-        if (accumulator.modulesWithDependency.isEmpty()) {
-            return mavenVisitor;
-        }
-
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Nullable
-            private JavaSourceSetUpdater updater;
-            private final Map<String, JavaSourceSet> updatedSourceSets = new HashMap<>();
-
-            @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return mavenVisitor.isAcceptable(sourceFile, ctx) || sourceFile instanceof JavaSourceFile;
-            }
-
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (!(tree instanceof SourceFile)) {
-                    return tree;
-                }
-                SourceFile sf = (SourceFile) tree;
-                if (mavenVisitor.isAcceptable(sf, ctx)) {
-                    return mavenVisitor.visit(tree, ctx);
-                }
-                if (sf instanceof JavaSourceFile) {
-                    return updateJavaSourceSet(sf, ctx);
-                }
-                return tree;
-            }
-
-            private SourceFile updateJavaSourceSet(SourceFile sf, ExecutionContext ctx) {
-                Optional<JavaProject> maybeJp = sf.getMarkers().findFirst(JavaProject.class);
-                if (!maybeJp.isPresent()) {
-                    return sf;
-                }
-                ResolvedDependency oldDep = accumulator.modulesWithDependency.get(maybeJp.get());
-                if (oldDep == null) {
-                    return sf;
-                }
-                String newVersion = accumulator.resolvedNewVersions.get(maybeJp.get());
-                if (newVersion == null) {
-                    return sf;
-                }
-                return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet -> {
-                    if (sourceSet.getGavToTypes().isEmpty()) {
-                        return sourceSet;
-                    }
-                    if (updater == null) {
-                        updater = new JavaSourceSetUpdater(ctx);
-                    }
-                    ResolvedGroupArtifactVersion newGav = new ResolvedGroupArtifactVersion(
-                            oldDep.getGav().getRepository(),
-                            oldDep.getGroupId(), oldDep.getArtifactId(), newVersion, null);
-                    ResolvedDependency newDep = oldDep
-                            .withGav(newGav)
-                            .withRepository(findRemoteRepository(maybeJp.get()));
-                    return updater.changeDependency(sourceSet, oldDep, newDep);
-                });
-            }
-
-            private MavenRepository findRemoteRepository(JavaProject jp) {
-                List<MavenRepository> repos = accumulator.moduleRepositories.get(jp);
-                if (repos != null) {
-                    for (MavenRepository repo : repos) {
-                        String uri = repo.getUri();
-                        if (uri != null && (uri.startsWith("http://") || uri.startsWith("https://"))) {
-                            return repo;
-                        }
-                    }
-                }
-                return MavenRepository.MAVEN_CENTRAL;
-            }
-        };
+        return mavenVisitor;
     }
 
     @Value
     public static class Accumulator {
         Set<GroupArtifact> projectArtifacts = new HashSet<>();
         Set<PomProperty> pomProperties = new HashSet<>();
-        Map<JavaProject, ResolvedDependency> modulesWithDependency = new HashMap<>();
-        Map<JavaProject, String> resolvedNewVersions = new HashMap<>();
-        Map<JavaProject, List<MavenRepository>> moduleRepositories = new HashMap<>();
     }
 
     @Value
