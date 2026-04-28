@@ -83,4 +83,71 @@ class MapEntryTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void parenthesizedKeyInMapLiteral() {
+        rewriteRun(
+          groovy(
+            """
+              def first(String key) {
+                  def m = [(key): "v"]
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedKeyInMapLiteralMultipleEntries() {
+        rewriteRun(
+          groovy(
+            """
+              def m(String k1, String k2) {
+                  return [(k1): "v1", (k2): "v2"]
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedKeyExpressionInMapLiteral() {
+        rewriteRun(
+          groovy(
+            """
+              class Defaults {
+                  static final String KEY = "k"
+              }
+              def m = [(Defaults.KEY): "v"]
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedKeyInMapLiteralAsArgument() {
+        rewriteRun(
+          groovy(
+            """
+              def writeProperties(Map m) {}
+              def call(String key) {
+                  writeProperties([(key): "v"])
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedKeyInNestedMapLiteral() {
+        rewriteRun(
+          groovy(
+            """
+              def first(String key) {
+                  def m = [outer: [(key): "v"]]
+              }
+              """
+          )
+        );
+    }
 }
