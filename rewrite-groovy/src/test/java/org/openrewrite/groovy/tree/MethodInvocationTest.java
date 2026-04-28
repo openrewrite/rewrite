@@ -760,4 +760,15 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void methodNameStartingWithClassKeyword() {
+        rewriteRun(
+          groovy(
+            """
+              Object.className("foo")
+              """
+          )
+        );
+    }
 }
