@@ -133,7 +133,9 @@ public class GroovyParser implements Parser {
                                 StaticTypeCheckingVisitor staticTypeCheckingVisitor = new StaticTypeCheckingVisitor(unit, aClass);
                                 staticTypeCheckingVisitor.setCompilationUnit(compUnit);
                                 staticTypeCheckingVisitor.visitClass(aClass);
-                            } catch (NoClassDefFoundError ignored) {
+                            } catch (NoClassDefFoundError | NullPointerException ignored) {
+                                // Static type checking is best-effort; skip enrichment when Groovy fails internally
+                                // (e.g., NPE in inferDiamondType when diamond is used with an unresolved imported class).
                             }
                         }
 
