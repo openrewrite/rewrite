@@ -1821,7 +1821,21 @@ public class GroovyParserVisitor {
             queue.add(insideParentheses(expression, fmt -> {
                 skip("!");
                 JLeftPadded<J.Unary.Type> op = padLeft(EMPTY, J.Unary.Type.Not);
-                Expression expr = doVisit(expression.getExpression());
+                // Groovy 3+ does not set _INSIDE_PARENTHESES_LEVEL on PropertyExpression / MethodCallExpression,
+                // so when `!` directly wraps such an expression in parentheses, detect the parentheses from the source.
+                org.codehaus.groovy.ast.expr.Expression operand = expression.getExpression();
+                int savedCursor = cursor;
+                Space beforeParen = whitespace();
+                Expression expr;
+                if (cursor < source.length() && source.charAt(cursor) == '(' && getInsideParenthesesLevel(operand) == null) {
+                    skip("(");
+                    Expression inner = doVisit(operand);
+                    expr = new J.Parentheses<>(randomId(), beforeParen, Markers.EMPTY,
+                            JRightPadded.build((J) inner).withAfter(sourceBefore(")")));
+                } else {
+                    cursor = savedCursor;
+                    expr = doVisit(operand);
+                }
                 return new J.Unary(randomId(), fmt, Markers.EMPTY, op, expr, typeMapping.type(expression.getType()));
             }));
         }
