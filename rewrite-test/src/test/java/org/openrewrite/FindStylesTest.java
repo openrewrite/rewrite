@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
+import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 import org.openrewrite.test.RecipeSpec;
@@ -156,6 +157,57 @@ class FindStylesTest implements RewriteTest {
         // Should NOT have multiple YAML documents (no second "---")
         String yamlContent = content.substring(content.indexOf("---"));
         assertThat(yamlContent.indexOf("---", 3)).isEqualTo(-1);
+    }
+
+    @Test
+    void importLayoutStyleSerializesBlocksAsStrings() {
+        ImportLayoutStyle importLayoutStyle = ImportLayoutStyle.builder()
+                .classCountToUseStarImport(9999)
+                .nameCountToUseStarImport(9999)
+                .importPackage("java.*")
+                .blankLine()
+                .importAllOthers()
+                .blankLine()
+                .importStaticAllOthers()
+                .packageToFold("java.util.*")
+                .build();
+
+        NamedStyles namedStyles = new NamedStyles(
+            Tree.randomId(),
+            "org.openrewrite.test.ImportStyles",
+            "Import Styles",
+            "Import layout styles for unit testing",
+            emptySet(),
+            singletonList(importLayoutStyle)
+        );
+
+        PlainText plainText = PlainTextParser.builder().build()
+            .parse("hello world!")
+            .map(PlainText.class::cast)
+            .findFirst()
+            .orElseThrow()
+            .withSourcePath(Paths.get("hello.txt"));
+        plainText = plainText.withMarkers(plainText.getMarkers().add(namedStyles));
+
+        FindStyles recipe = new FindStyles();
+        ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+        RecipeRun run = recipe.run(new InMemoryLargeSourceSet(List.of(plainText)), ctx);
+
+        assertThat(run.getChangeset().getAllResults()).hasSize(1);
+        String content = run.getChangeset().getAllResults().get(0).getAfter().printAll();
+
+        assertThat(content).contains("org.openrewrite.java.style.ImportLayoutStyle:");
+        assertThat(content).contains("classCountToUseStarImport: 9999");
+        assertThat(content).contains("nameCountToUseStarImport: 9999");
+        // The Block instances must round-trip through ImportLayoutStyle.Serializer
+        // and appear as readable strings, not be silently dropped to an empty list.
+        assertThat(content).contains("import java.*");
+        assertThat(content).contains("<blank line>");
+        assertThat(content).contains("import all other imports");
+        assertThat(content).contains("import static all other imports");
+        assertThat(content).contains("import java.util.*");
+        assertThat(content).doesNotContain("layout: []");
+        assertThat(content).doesNotContain("packagesToFold: []");
     }
 
     /**
