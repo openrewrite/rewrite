@@ -489,7 +489,7 @@ public class GroovyParserVisitor {
             Iterator<InnerClassNode> innerClassIterator = clazz.getInnerClasses();
             while (innerClassIterator.hasNext()) {
                 InnerClassNode icn = innerClassIterator.next();
-                if (icn.isSynthetic() || fieldInitializers.contains(icn) || icn.getName().contains("$Trait$")) {
+                if (icn.isSynthetic() || fieldInitializers.contains(icn) || icn.getName().contains("$Trait$") || !appearsInSource(icn)) {
                     continue;
                 }
                 sortedByPosition.put(pos(icn), icn);
