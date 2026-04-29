@@ -19,14 +19,17 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.trait.PythonDependencyFile;
+import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Add a dependency to a Python project. Supports {@code pyproject.toml}
@@ -94,7 +97,21 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     }
 
     static class Accumulator {
-        final Set<Path> projectsToUpdate = new HashSet<>();
+        final Map<Path, ProjectState> projects = new HashMap<>();
+        final Map<Path, Path> lockToDeps = new HashMap<>();
+    }
+
+    static class ProjectState {
+        final Path depsFilePath;
+        @Nullable Path lockFilePath;
+        @Nullable String capturedLockContent;
+        boolean depsFileMatches;
+        @Nullable String regeneratedLockContent;
+        @Nullable String regenerationError;
+
+        ProjectState(Path depsFilePath) {
+            this.depsFilePath = depsFilePath;
+        }
     }
 
     @Override
@@ -114,21 +131,48 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                if (PyProjectHelper.captureExistingLockContent(sourceFile, tree, ctx)) {
+                Path sourcePath = sourceFile.getSourcePath();
+
+                if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
+                    Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
+                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                    ps.lockFilePath = sourcePath;
+                    ps.capturedLockContent = ((Toml.Document) tree).printAll();
+                    acc.lockToDeps.put(sourcePath, depsPath);
                     return tree;
                 }
+                if (tree instanceof Json.Document && sourcePath.endsWith("Pipfile.lock")) {
+                    Path depsPath = PyProjectHelper.correspondingPipfilePath(sourcePath);
+                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                    ps.lockFilePath = sourcePath;
+                    ps.capturedLockContent = ((Json.Document) tree).printAll();
+                    acc.lockToDeps.put(sourcePath, depsPath);
+                    return tree;
+                }
+
                 PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
-                if (trait != null && PyProjectHelper.findDependencyInScope(trait.getMarker(), packageName, scope, groupName) == null) {
-                    acc.projectsToUpdate.add(sourceFile.getSourcePath());
+                if (trait != null) {
+                    ProjectState ps = acc.projects.computeIfAbsent(sourcePath, ProjectState::new);
+                    ps.depsFileMatches = matchesAddDependency(trait);
                 }
                 return tree;
             }
         };
     }
 
+    private boolean matchesAddDependency(PythonDependencyFile trait) {
+        return PyProjectHelper.findDependencyInScope(
+                trait.getMarker(), packageName, scope, groupName) == null;
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
+        return Collections.emptyList();
+    }
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        if (acc.projectsToUpdate.isEmpty()) {
+        if (acc.projects.isEmpty()) {
             return TreeVisitor.noop();
         }
         return new TreeVisitor<Tree, ExecutionContext>() {
@@ -143,23 +187,49 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 SourceFile sourceFile = (SourceFile) tree;
                 Path sourcePath = sourceFile.getSourcePath();
 
-                if (acc.projectsToUpdate.contains(sourcePath)) {
+                ProjectState ps = acc.projects.get(sourcePath);
+                if (ps != null && ps.depsFileMatches) {
                     PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                     if (trait != null) {
                         String ver = version != null ? version : "";
                         Map<String, String> additions = Collections.singletonMap(packageName, ver);
                         PythonDependencyFile updated = trait.withAddedDependencies(additions, scope, groupName);
                         if (updated.getTree() != tree) {
-                            return updated.afterModification(ctx);
+                            SourceFile modified = PyProjectHelper.refreshMarker((SourceFile) updated.getTree());
+                            if (ps.capturedLockContent != null) {
+                                PyProjectHelper.RegenerationResult r =
+                                        PyProjectHelper.regenerateLockContent(modified, ps.capturedLockContent);
+                                if (r != null) {
+                                    if (r.isSuccess()) {
+                                        ps.regeneratedLockContent = r.getLockContent();
+                                    } else {
+                                        ps.regenerationError = r.getErrorMessage();
+                                    }
+                                }
+                            }
+                            if (ps.regenerationError != null) {
+                                modified = Markup.warn(modified, new RuntimeException(
+                                        "lock regeneration failed: " + ps.regenerationError));
+                            }
+                            return modified;
                         }
                     }
                 }
 
-                Tree updatedLock = PyProjectHelper.maybeReplayLockContent(tree, ctx);
-                if (updatedLock != null) {
-                    return updatedLock;
+                Path depsPath = acc.lockToDeps.get(sourcePath);
+                if (depsPath != null) {
+                    ProjectState lockPs = acc.projects.get(depsPath);
+                    if (lockPs != null && lockPs.regeneratedLockContent != null) {
+                        if (tree instanceof Toml.Document) {
+                            return PyProjectHelper.reparseToml(
+                                    (Toml.Document) tree, lockPs.regeneratedLockContent);
+                        }
+                        if (tree instanceof Json.Document) {
+                            return PyProjectHelper.reparseJson(
+                                    (Json.Document) tree, lockPs.regeneratedLockContent);
+                        }
+                    }
                 }
-
                 return tree;
             }
         };

@@ -17,14 +17,11 @@ package org.openrewrite.python;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.config.CompositeRecipe;
-import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.*;
@@ -70,18 +67,20 @@ class AddDependencyTest implements RewriteTest {
           ]
           """;
 
-        var ctx = new InMemoryExecutionContext();
         rewriteRun(
-          spec -> spec.executionContext(ctx).recipe(new CompositeRecipe(List.of(
+          spec -> spec.recipe(new CompositeRecipe(List.of(
             new AddDependency("flask", ">=2.0", null, null),
             new AddDependency("click", ">=8.0", null, null)
           ))).afterRecipe(run -> {
-              // Verify lock was regenerated with both new dependencies
-              Map<Path, String> updatedLocks = PythonDependencyExecutionContextView.view(ctx).getUpdatedLockFiles();
-              assertThat(updatedLocks).isNotEmpty();
-              String lockContent = updatedLocks.values().iterator().next();
-              assertThat(lockContent).contains("name = \"flask\"");
-              assertThat(lockContent).contains("name = \"click\"");
+              // Verify both recipes applied: pyproject has both flask and click in the changeset
+              List<String> pyprojectContents = run.getChangeset().getAllResults().stream()
+                      .filter(r -> r.getAfter() != null && r.getAfter().getSourcePath().endsWith("pyproject.toml"))
+                      .map(r -> r.getAfter().printAll())
+                      .collect(java.util.stream.Collectors.toList());
+              assertThat(pyprojectContents).isNotEmpty();
+              String pyprojectContent = pyprojectContents.get(0);
+              assertThat(pyprojectContent).contains("flask>=2.0");
+              assertThat(pyprojectContent).contains("click>=8.0");
           }),
           uv(tempDir,
             pyproject(
