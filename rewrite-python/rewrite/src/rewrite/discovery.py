@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import inspect
 from importlib.metadata import entry_points
-from typing import List, Tuple, Type
+from typing import Dict, List, Optional, Set, Tuple, Type
 
 from rewrite.category import CategoryDescriptor
 from rewrite.decorators import get_recipe_category
@@ -26,7 +26,10 @@ from rewrite.marketplace import RecipeMarketplace
 from rewrite.recipe import Recipe
 
 
-def discover_recipes() -> RecipeMarketplace:
+def discover_recipes(
+    marketplace: Optional[RecipeMarketplace] = None,
+    attribution: Optional[Dict[str, Set[str]]] = None,
+) -> RecipeMarketplace:
     """
     Discover all recipes from installed packages via entry points.
 
@@ -34,8 +37,19 @@ def discover_recipes() -> RecipeMarketplace:
     [project.entry-points."openrewrite.recipes"] and calls their
     activate function to install recipes into the marketplace.
 
+    Args:
+        marketplace: Optional existing marketplace to install into; a new one
+            is created when None.
+        attribution: Optional ``{distribution_name: set_of_recipe_names}`` map
+            populated as a side effect. Each entry point's contribution is
+            recorded under its distribution's normalized name so callers can
+            later answer "which recipes came from package X?" without
+            re-walking entry_points. Names not present after activation
+            (e.g., recipes deduplicated by an earlier entry point) are
+            still attributed because deduplication doesn't remove them.
+
     Returns:
-        A RecipeMarketplace containing all discovered recipes.
+        The marketplace containing all discovered recipes.
 
     Example pyproject.toml entry point:
         [project.entry-points."openrewrite.recipes"]
@@ -45,7 +59,8 @@ def discover_recipes() -> RecipeMarketplace:
         def activate(marketplace: RecipeMarketplace) -> None:
             marketplace.install(MyRecipe, [Python, Cleanup])
     """
-    marketplace = RecipeMarketplace()
+    if marketplace is None:
+        marketplace = RecipeMarketplace()
 
     # Python 3.10+ uses select parameter via SelectableGroups
     eps = entry_points(group="openrewrite.recipes")
@@ -54,12 +69,35 @@ def discover_recipes() -> RecipeMarketplace:
         try:
             module = ep.load()
             if hasattr(module, "activate") and callable(module.activate):
-                module.activate(marketplace)
+                if attribution is None:
+                    module.activate(marketplace)
+                else:
+                    dist_name = ep.dist.name if ep.dist is not None else None
+                    before = _recipe_name_set(marketplace)
+                    module.activate(marketplace)
+                    if dist_name:
+                        added = _recipe_name_set(marketplace) - before
+                        if added:
+                            attribution.setdefault(_normalize_package_name(dist_name), set()).update(added)
         except Exception:
             # Log or handle the error - for now, skip failed activations
             pass
 
     return marketplace
+
+
+def _recipe_name_set(marketplace: RecipeMarketplace) -> Set[str]:
+    """Snapshot the set of recipe names currently in the marketplace."""
+    return {r.name for r in marketplace.all_recipes()}
+
+
+def _normalize_package_name(name: str) -> str:
+    """Normalize a python distribution name for attribution lookup.
+
+    PyPI/pip treats hyphens, underscores, and case as equivalent when
+    resolving distribution identity.
+    """
+    return name.replace("-", "_").replace(".", "_").lower()
 
 
 def discover_decorated_recipes_in_module(
