@@ -1,2 +1,1 @@
-ecosystem,packageName,name,displayName,description,recipeCount,category1,category2
-maven,org.openrewrite:rewrite-csharp,org.openrewrite.csharp.sln.RemoveNjsprojFromSolution,Remove projects from solution by extension,"Removes Project entries with a matching file extension (e.g., `.njsproj`) from Visual Studio Solution (.sln/.slnx) files, plus associated ProjectConfigurationPlatforms and NestedProjects entries. Default extension is `.njsproj` (Node.js Tools projects, which `dotnet build` cannot process).",1,Sln,Csharp
+ecosystem,packageName,name,displayName,description,recipeCount,category1,options
