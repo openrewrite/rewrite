@@ -1,0 +1,1373 @@
+# Python Dependency Recipe Accumulator Rework Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Move per-project dependency-file and lock-file state from `ExecutionContext` into the recipes' `Accumulator`, and run the package-manager regeneration (`uv lock` / `pipenv lock`) inside `ScanningRecipe.generate()` so that the visitor phase becomes a pure lookup that is independent of file visit order.
+
+**Architecture:** Each of the 5 dependency recipes (`AddDependency`, `RemoveDependency`, `ChangeDependency`, `UpgradeDependencyVersion`, `UpgradeTransitiveDependencyVersion`) gets a per-project `ProjectState` value object on its `Accumulator`. Scanner captures the deps-file `SourceFile` and the sibling lock-file content. `generate()` applies the recipe-specific trait edit to each captured deps-file, runs the matching package manager, and stores the modified deps-file plus the regenerated lock content back on the `ProjectState`. The visitor emits cached results: deps-file path → modified `SourceFile`; lock-file path → reparsed lock document. Failure during regeneration is captured as a per-project error string and rendered via `Markup.warn` on the deps-file at visit time.
+
+**Tech Stack:** Java 17+, OpenRewrite (`rewrite-core`, `rewrite-python`, `rewrite-toml`, `rewrite-json`), JUnit 5, Lombok, JSpecify nullability annotations.
+
+---
+
+## Background: Current State and Why It Is Broken
+
+All 5 recipes today share the same shape:
+- `Accumulator { Set<Path> projectsToUpdate }` — only the deps-file paths to edit.
+- Cross-recipe state on `ExecutionContext` via `PythonDependencyExecutionContextView`: two `Map<Path, String>` (`existingLockContents` keyed by deps-file path, `updatedLockFiles` keyed by deps-file path).
+- Scanner calls `PyProjectHelper.captureExistingLockContent(sourceFile, tree, ctx)` to stash on-disk lock content. If a deps-file matches, scanner adds its source path to `acc.projectsToUpdate`.
+- Visitor: when visiting a deps-file in `projectsToUpdate`, calls `trait.with…(…).afterModification(ctx)`, where `afterModification` runs the package manager and refreshes the marker. When visiting a lock-file, calls `PyProjectHelper.maybeReplayLockContent(tree, ctx)` which reparses the lock document from `updatedLockFiles`.
+
+Problems:
+1. **Per-project state lives on `ExecutionContext`** (a flat global bag). Wrong scope for per-project data.
+2. **Trait owns lock regeneration**, which forced `PipfileFile.afterModification` to take a `Function<Toml.Document, PythonResolutionResult> markerFactory` parameter to dodge a coupling cycle with `PipfileParser`.
+3. **Visit-order dependence.** `PyProjectHelper.maybeReplayLockContent` only finds something if the deps-file was visited *before* the lock-file in the same pass. Path-sort order is not guaranteed (e.g. `package-lock.json` < `package.json` ASCII-wise; the JS analogue has the same hazard and copes by relying on multi-cycle execution).
+4. **Recipe visitors do slow process invocations** (`uv lock` ~120s timeout, `pipenv lock` ~300s timeout) inline. No batching, no clear single-shot semantics.
+
+## Design
+
+### `ProjectState` (one per deps-file)
+
+```java
+static class ProjectState {
+    final Path depsFilePath;
+    @Nullable Path lockFilePath;
+    @Nullable SourceFile depsFile;
+    @Nullable String capturedLockContent;
+    boolean depsFileMatches;
+    @Nullable SourceFile modifiedDepsFile;
+    @Nullable String regeneratedLockContent;
+    @Nullable String regenerationError;
+
+    ProjectState(Path depsFilePath) {
+        this.depsFilePath = depsFilePath;
+    }
+}
+```
+
+### `Accumulator` shape (same shape in every recipe)
+
+```java
+static class Accumulator {
+    final Map<Path, ProjectState> projects = new HashMap<>();
+    final Map<Path, Path> lockToDeps = new HashMap<>();
+}
+```
+
+### Phase responsibilities
+
+- **`getScanner(Accumulator)`**: For each `SourceFile`, dispatch on filename.
+  - If lock-file (`uv.lock` → `Toml.Document`; `Pipfile.lock` → `Json.Document`): compute the corresponding deps-file path via `PyProjectHelper.correspondingPyprojectPath` / `correspondingPipfilePath`, write `lockFilePath` and `capturedLockContent` into the matching `ProjectState`, and add an entry to `lockToDeps`.
+  - Otherwise, attempt to match a deps-file via `PythonDependencyFile.Matcher`. If matched: create or update `ProjectState` for its source path, write `depsFile`, run the recipe-specific match predicate to set `depsFileMatches`.
+- **`generate(Accumulator, ExecutionContext)`**: Iterate over `projects.values()`. For each `ProjectState` with `depsFileMatches == true && depsFile != null`, apply the recipe-specific trait edit to produce the modified deps-file, then call `PyProjectHelper.regenerateLockContent(modifiedDepsFile, capturedLockContent)`. Store `modifiedDepsFile`, `regeneratedLockContent` (or `regenerationError`) on the state. Return `Collections.emptyList()` — no new SourceFiles are generated; we are only mutating the accumulator.
+- **`getVisitor(Accumulator)`**: Pure lookup with no side effects.
+  - For deps-file paths in `projects`: emit `modifiedDepsFile` if present (with `Markup.warn` applied if `regenerationError` is non-null), else the original tree.
+  - For lock-file paths in `lockToDeps`: look up the corresponding `ProjectState`. If `regeneratedLockContent != null`, reparse via `PyProjectHelper.reparseToml` / `reparseJson` and emit the new document. Else emit unchanged.
+
+### Cross-recipe carryover
+
+Within a composite recipe, OpenRewrite passes the LST stream from one recipe to the next. Recipe B's scan therefore sees recipe A's emitted modified deps-file and its emitted regenerated lock-file as the on-stream state. No global maps needed — the carry-over is implicit in the LST stream.
+
+### What disappears
+
+- `PythonDependencyExecutionContextView` (deleted).
+- `PyProjectHelper.captureExistingLockContent`, `maybeReplayLockContent`, `maybeUpdateUvLock`, `maybeUpdatePipfileLock`, `regenerateLockAndRefreshMarker`, `regeneratePipfileLockAndRefreshMarker` (deleted).
+- `PythonDependencyFile.afterModification` (default method removed from the interface; overrides removed from `PyProjectFile` and `PipfileFile`).
+
+### What is added
+
+- `PyProjectHelper.regenerateLockContent(SourceFile depsFile, @Nullable String capturedLockContent)` — reads `PythonResolutionResult.PackageManager` from the marker and dispatches to `LockFileRegeneration.UV` or `LockFileRegeneration.PIPENV`. Returns `RegenerationResult` carrying either lock content or an error message.
+
+## File Structure
+
+| File | Action |
+|---|---|
+| `rewrite-python/src/main/java/org/openrewrite/python/internal/PyProjectHelper.java` | Modify: remove 6 methods, add 1 method + nested type |
+| `rewrite-python/src/main/java/org/openrewrite/python/internal/PythonDependencyExecutionContextView.java` | Delete |
+| `rewrite-python/src/main/java/org/openrewrite/python/trait/PythonDependencyFile.java` | Modify: remove default `afterModification` |
+| `rewrite-python/src/main/java/org/openrewrite/python/trait/PyProjectFile.java` | Modify: remove `afterModification` override |
+| `rewrite-python/src/main/java/org/openrewrite/python/trait/PipfileFile.java` | Modify: remove `afterModification` override and `PipfileParser` import |
+| `rewrite-python/src/main/java/org/openrewrite/python/AddDependency.java` | Modify: new Accumulator/scan/generate/visit |
+| `rewrite-python/src/main/java/org/openrewrite/python/RemoveDependency.java` | Modify: same |
+| `rewrite-python/src/main/java/org/openrewrite/python/ChangeDependency.java` | Modify: same |
+| `rewrite-python/src/main/java/org/openrewrite/python/UpgradeDependencyVersion.java` | Modify: same |
+| `rewrite-python/src/main/java/org/openrewrite/python/UpgradeTransitiveDependencyVersion.java` | Modify: same |
+
+Tests covering recipe behavior already exist and constitute the regression suite:
+- `rewrite-python/src/test/java/org/openrewrite/python/AddDependencyTest.java`
+- `rewrite-python/src/test/java/org/openrewrite/python/RemoveDependencyTest.java`
+- `rewrite-python/src/test/java/org/openrewrite/python/ChangeDependencyTest.java`
+- `rewrite-python/src/test/java/org/openrewrite/python/UpgradeDependencyVersionTest.java`
+- `rewrite-python/src/test/java/org/openrewrite/python/UpgradeTransitiveDependencyVersionTest.java`
+- `rewrite-python/src/test/java/org/openrewrite/python/trait/PipfileFileTest.java`
+- `rewrite-python/src/test/java/org/openrewrite/python/PipfileParserTest.java`
+- `rewrite-python/src/test/java/org/openrewrite/python/PyProjectTomlParserTest.java`
+
+After each recipe refactor task, the matching `*Test.java` must pass with no edits.
+
+---
+
+## Tasks
+
+### Task 1: Add PackageManager-aware regeneration dispatch helper
+
+**Files:**
+- Modify: `rewrite-python/src/main/java/org/openrewrite/python/internal/PyProjectHelper.java`
+
+- [ ] **Step 1.1: Add the `regenerateLockContent` method and `RegenerationResult` nested type to `PyProjectHelper`**
+
+Insert this block into `PyProjectHelper` (location: just above `regenerateLockAndRefreshMarker`, which will be deleted in Task 8):
+
+```java
+/**
+ * Regenerate the lock file for a dependencies-file source by dispatching to the
+ * package manager indicated by its {@link PythonResolutionResult} marker.
+ * Returns a {@link RegenerationResult} carrying the regenerated lock content
+ * on success, or an error message on failure. Returns {@code null} when the
+ * source has no marker, no resolvable package manager, or no recognised
+ * regeneration adapter.
+ */
+public static @Nullable RegenerationResult regenerateLockContent(
+        SourceFile depsFile, @Nullable String capturedLockContent) {
+    PythonResolutionResult marker = depsFile.getMarkers()
+            .findFirst(PythonResolutionResult.class).orElse(null);
+    if (marker == null) {
+        return null;
+    }
+    LockFileRegeneration regen;
+    switch (marker.getPackageManager()) {
+        case Uv:
+            regen = LockFileRegeneration.UV;
+            break;
+        case Pipenv:
+            regen = LockFileRegeneration.PIPENV;
+            break;
+        default:
+            return null;
+    }
+    LockFileRegeneration.Result result = regen.regenerate(
+            depsFile.printAll(), capturedLockContent);
+    return result.isSuccess()
+            ? RegenerationResult.success(result.getLockFileContent())
+            : RegenerationResult.failure(result.getErrorMessage());
+}
+
+@lombok.Value
+public static class RegenerationResult {
+    boolean success;
+    @Nullable String lockContent;
+    @Nullable String errorMessage;
+
+    public static RegenerationResult success(String lockContent) {
+        return new RegenerationResult(true, lockContent, null);
+    }
+
+    public static RegenerationResult failure(String errorMessage) {
+        return new RegenerationResult(false, null, errorMessage);
+    }
+}
+```
+
+- [ ] **Step 1.2: Compile to confirm the new method is well-formed**
+
+Run:
+```
+gw :rewrite-python:compileJava -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+```
+Expected: BUILD SUCCESSFUL.
+
+- [ ] **Step 1.3: Commit**
+
+```
+git add rewrite-python/src/main/java/org/openrewrite/python/internal/PyProjectHelper.java
+git commit -m "Add PyProjectHelper.regenerateLockContent dispatcher"
+```
+
+---
+
+### Reference: shared scanner / visitor / generate templates used by Tasks 2–6
+
+Each recipe rewrite uses the same `Accumulator`, `ProjectState`, scanner, and visitor structure. The differences across recipes are: (a) the recipe-specific match predicate run from the scanner, and (b) the trait method called from `generate()`. The reference blocks are inlined in each task below so each task is self-contained.
+
+---
+
+### Task 2: Refactor `AddDependency` to the new Accumulator + generate() pattern
+
+This task establishes the canonical shape that Tasks 3–6 will copy.
+
+**Files:**
+- Modify: `rewrite-python/src/main/java/org/openrewrite/python/AddDependency.java`
+
+- [ ] **Step 2.1: Add imports**
+
+At the top of `AddDependency.java`, ensure these imports are present (add any missing ones):
+
+```java
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import org.openrewrite.Cursor;
+import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.toml.tree.Toml;
+```
+
+- [ ] **Step 2.2: Replace the `Accumulator` declaration (current lines 96–98)**
+
+Replace the existing 3-line `Accumulator` class with:
+
+```java
+static class Accumulator {
+    final Map<Path, ProjectState> projects = new HashMap<>();
+    final Map<Path, Path> lockToDeps = new HashMap<>();
+}
+
+static class ProjectState {
+    final Path depsFilePath;
+    @Nullable Path lockFilePath;
+    @Nullable SourceFile depsFile;
+    @Nullable String capturedLockContent;
+    boolean depsFileMatches;
+    @Nullable SourceFile modifiedDepsFile;
+    @Nullable String regeneratedLockContent;
+    @Nullable String regenerationError;
+
+    ProjectState(Path depsFilePath) {
+        this.depsFilePath = depsFilePath;
+    }
+}
+```
+
+- [ ] **Step 2.3: Replace `getScanner` with the deps/lock-aware scanner**
+
+Replace the entire `getScanner(Accumulator acc)` method with:
+
+```java
+@Override
+public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+    return new TreeVisitor<Tree, ExecutionContext>() {
+        final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
+        @Override
+        public Tree preVisit(Tree tree, ExecutionContext ctx) {
+            stopAfterPreVisit();
+            if (!(tree instanceof SourceFile)) {
+                return tree;
+            }
+            SourceFile sourceFile = (SourceFile) tree;
+            Path sourcePath = sourceFile.getSourcePath();
+
+            if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
+                Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
+                ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                ps.lockFilePath = sourcePath;
+                ps.capturedLockContent = ((Toml.Document) tree).printAll();
+                acc.lockToDeps.put(sourcePath, depsPath);
+                return tree;
+            }
+            if (tree instanceof Json.Document && sourcePath.endsWith("Pipfile.lock")) {
+                Path depsPath = PyProjectHelper.correspondingPipfilePath(sourcePath);
+                ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                ps.lockFilePath = sourcePath;
+                ps.capturedLockContent = ((Json.Document) tree).printAll();
+                acc.lockToDeps.put(sourcePath, depsPath);
+                return tree;
+            }
+
+            PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
+            if (trait != null) {
+                ProjectState ps = acc.projects.computeIfAbsent(sourcePath, ProjectState::new);
+                ps.depsFile = sourceFile;
+                ps.depsFileMatches = matchesAddDependency(trait);
+            }
+            return tree;
+        }
+    };
+}
+
+private boolean matchesAddDependency(PythonDependencyFile trait) {
+    return PyProjectHelper.findDependencyInScope(
+            trait.getMarker(), packageName, scope, groupName) == null;
+}
+```
+
+- [ ] **Step 2.4: Add the `generate` override**
+
+Add this override below `getScanner`:
+
+```java
+@Override
+public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
+    PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+    String ver = version != null ? version : "";
+    Map<String, String> additions = Collections.singletonMap(packageName, ver);
+
+    for (ProjectState ps : acc.projects.values()) {
+        if (!ps.depsFileMatches || ps.depsFile == null) {
+            continue;
+        }
+        PythonDependencyFile trait = matcher.test(new Cursor(null, ps.depsFile));
+        if (trait == null) {
+            continue;
+        }
+        PythonDependencyFile updated = trait.withAddedDependencies(additions, scope, groupName);
+        if (updated.getTree() == ps.depsFile) {
+            continue;
+        }
+        ps.modifiedDepsFile = (SourceFile) updated.getTree();
+
+        if (ps.capturedLockContent != null) {
+            PyProjectHelper.RegenerationResult r =
+                    PyProjectHelper.regenerateLockContent(ps.modifiedDepsFile, ps.capturedLockContent);
+            if (r != null) {
+                if (r.isSuccess()) {
+                    ps.regeneratedLockContent = r.getLockContent();
+                } else {
+                    ps.regenerationError = r.getErrorMessage();
+                }
+            }
+        }
+    }
+    return Collections.emptyList();
+}
+```
+
+- [ ] **Step 2.5: Replace `getVisitor` with the pure-lookup visitor**
+
+Replace the entire `getVisitor(Accumulator acc)` method with:
+
+```java
+@Override
+public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+    if (acc.projects.isEmpty()) {
+        return TreeVisitor.noop();
+    }
+    return new TreeVisitor<Tree, ExecutionContext>() {
+        @Override
+        public Tree preVisit(Tree tree, ExecutionContext ctx) {
+            stopAfterPreVisit();
+            if (!(tree instanceof SourceFile)) {
+                return tree;
+            }
+            SourceFile sourceFile = (SourceFile) tree;
+            Path sourcePath = sourceFile.getSourcePath();
+
+            ProjectState ps = acc.projects.get(sourcePath);
+            if (ps != null && ps.modifiedDepsFile != null) {
+                SourceFile out = ps.modifiedDepsFile;
+                if (ps.regenerationError != null) {
+                    out = Markup.warn(out, new RuntimeException(
+                            "lock regeneration failed: " + ps.regenerationError));
+                }
+                return out;
+            }
+
+            Path depsPath = acc.lockToDeps.get(sourcePath);
+            if (depsPath != null) {
+                ProjectState lockPs = acc.projects.get(depsPath);
+                if (lockPs != null && lockPs.regeneratedLockContent != null) {
+                    if (tree instanceof Toml.Document) {
+                        return PyProjectHelper.reparseToml(
+                                (Toml.Document) tree, lockPs.regeneratedLockContent);
+                    }
+                    if (tree instanceof Json.Document) {
+                        return PyProjectHelper.reparseJson(
+                                (Json.Document) tree, lockPs.regeneratedLockContent);
+                    }
+                }
+            }
+            return tree;
+        }
+    };
+}
+```
+
+- [ ] **Step 2.6: Compile**
+
+Run:
+```
+gw :rewrite-python:compileJava -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+```
+Expected: BUILD SUCCESSFUL. The codebase will not yet compile if `afterModification` is referenced from `PyProjectFile`/`PipfileFile` for the other 4 recipes — leave those untouched until Tasks 3–6 are done.
+
+- [ ] **Step 2.7: Run `AddDependencyTest`**
+
+Run:
+```
+gw :rewrite-python:test --tests "org.openrewrite.python.AddDependencyTest" -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+```
+Expected: all tests pass.
+
+- [ ] **Step 2.8: Commit**
+
+```
+git add rewrite-python/src/main/java/org/openrewrite/python/AddDependency.java
+git commit -m "AddDependency: move per-project state to Accumulator and run regen in generate()"
+```
+
+---
+
+### Task 3: Apply the same pattern to `RemoveDependency`
+
+**Files:**
+- Modify: `rewrite-python/src/main/java/org/openrewrite/python/RemoveDependency.java`
+
+- [ ] **Step 3.1: Add imports**
+
+Ensure these imports are present in `RemoveDependency.java`:
+
+```java
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import org.openrewrite.Cursor;
+import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.toml.tree.Toml;
+```
+
+- [ ] **Step 3.2: Replace `Accumulator` and add `ProjectState`**
+
+Replace the existing `Accumulator` class (~3 lines) with:
+
+```java
+static class Accumulator {
+    final Map<Path, ProjectState> projects = new HashMap<>();
+    final Map<Path, Path> lockToDeps = new HashMap<>();
+}
+
+static class ProjectState {
+    final Path depsFilePath;
+    @Nullable Path lockFilePath;
+    @Nullable SourceFile depsFile;
+    @Nullable String capturedLockContent;
+    boolean depsFileMatches;
+    @Nullable SourceFile modifiedDepsFile;
+    @Nullable String regeneratedLockContent;
+    @Nullable String regenerationError;
+
+    ProjectState(Path depsFilePath) {
+        this.depsFilePath = depsFilePath;
+    }
+}
+```
+
+- [ ] **Step 3.3: Replace `getScanner`**
+
+Replace the entire `getScanner(Accumulator acc)` method with:
+
+```java
+@Override
+public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+    return new TreeVisitor<Tree, ExecutionContext>() {
+        final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
+        @Override
+        public Tree preVisit(Tree tree, ExecutionContext ctx) {
+            stopAfterPreVisit();
+            if (!(tree instanceof SourceFile)) {
+                return tree;
+            }
+            SourceFile sourceFile = (SourceFile) tree;
+            Path sourcePath = sourceFile.getSourcePath();
+
+            if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
+                Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
+                ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                ps.lockFilePath = sourcePath;
+                ps.capturedLockContent = ((Toml.Document) tree).printAll();
+                acc.lockToDeps.put(sourcePath, depsPath);
+                return tree;
+            }
+            if (tree instanceof Json.Document && sourcePath.endsWith("Pipfile.lock")) {
+                Path depsPath = PyProjectHelper.correspondingPipfilePath(sourcePath);
+                ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                ps.lockFilePath = sourcePath;
+                ps.capturedLockContent = ((Json.Document) tree).printAll();
+                acc.lockToDeps.put(sourcePath, depsPath);
+                return tree;
+            }
+
+            PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
+            if (trait != null) {
+                ProjectState ps = acc.projects.computeIfAbsent(sourcePath, ProjectState::new);
+                ps.depsFile = sourceFile;
+                ps.depsFileMatches = matchesRemoveDependency(trait);
+            }
+            return tree;
+        }
+    };
+}
+
+private boolean matchesRemoveDependency(PythonDependencyFile trait) {
+    return PyProjectHelper.findDependencyInScope(
+            trait.getMarker(), packageName, scope, groupName) != null;
+}
+```
+
+- [ ] **Step 3.4: Add the `generate` override**
+
+```java
+@Override
+public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
+    PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+    Set<String> removals = Collections.singleton(packageName);
+
+    for (ProjectState ps : acc.projects.values()) {
+        if (!ps.depsFileMatches || ps.depsFile == null) {
+            continue;
+        }
+        PythonDependencyFile trait = matcher.test(new Cursor(null, ps.depsFile));
+        if (trait == null) {
+            continue;
+        }
+        PythonDependencyFile updated = trait.withRemovedDependencies(removals, scope, groupName);
+        if (updated.getTree() == ps.depsFile) {
+            continue;
+        }
+        ps.modifiedDepsFile = (SourceFile) updated.getTree();
+
+        if (ps.capturedLockContent != null) {
+            PyProjectHelper.RegenerationResult r =
+                    PyProjectHelper.regenerateLockContent(ps.modifiedDepsFile, ps.capturedLockContent);
+            if (r != null) {
+                if (r.isSuccess()) {
+                    ps.regeneratedLockContent = r.getLockContent();
+                } else {
+                    ps.regenerationError = r.getErrorMessage();
+                }
+            }
+        }
+    }
+    return Collections.emptyList();
+}
+```
+
+- [ ] **Step 3.5: Replace `getVisitor`**
+
+```java
+@Override
+public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+    if (acc.projects.isEmpty()) {
+        return TreeVisitor.noop();
+    }
+    return new TreeVisitor<Tree, ExecutionContext>() {
+        @Override
+        public Tree preVisit(Tree tree, ExecutionContext ctx) {
+            stopAfterPreVisit();
+            if (!(tree instanceof SourceFile)) {
+                return tree;
+            }
+            SourceFile sourceFile = (SourceFile) tree;
+            Path sourcePath = sourceFile.getSourcePath();
+
+            ProjectState ps = acc.projects.get(sourcePath);
+            if (ps != null && ps.modifiedDepsFile != null) {
+                SourceFile out = ps.modifiedDepsFile;
+                if (ps.regenerationError != null) {
+                    out = Markup.warn(out, new RuntimeException(
+                            "lock regeneration failed: " + ps.regenerationError));
+                }
+                return out;
+            }
+
+            Path depsPath = acc.lockToDeps.get(sourcePath);
+            if (depsPath != null) {
+                ProjectState lockPs = acc.projects.get(depsPath);
+                if (lockPs != null && lockPs.regeneratedLockContent != null) {
+                    if (tree instanceof Toml.Document) {
+                        return PyProjectHelper.reparseToml(
+                                (Toml.Document) tree, lockPs.regeneratedLockContent);
+                    }
+                    if (tree instanceof Json.Document) {
+                        return PyProjectHelper.reparseJson(
+                                (Json.Document) tree, lockPs.regeneratedLockContent);
+                    }
+                }
+            }
+            return tree;
+        }
+    };
+}
+```
+
+- [ ] **Step 3.6: Compile, run `RemoveDependencyTest`, commit**
+
+```
+gw :rewrite-python:compileJava -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+gw :rewrite-python:test --tests "org.openrewrite.python.RemoveDependencyTest" -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+git add rewrite-python/src/main/java/org/openrewrite/python/RemoveDependency.java
+git commit -m "RemoveDependency: move per-project state to Accumulator and run regen in generate()"
+```
+
+---
+
+### Task 4: Apply the same pattern to `ChangeDependency`
+
+**Files:**
+- Modify: `rewrite-python/src/main/java/org/openrewrite/python/ChangeDependency.java`
+
+- [ ] **Step 4.1: Add imports**
+
+```java
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import org.openrewrite.Cursor;
+import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.toml.tree.Toml;
+```
+
+- [ ] **Step 4.2: Replace `Accumulator` and add `ProjectState`**
+
+```java
+static class Accumulator {
+    final Map<Path, ProjectState> projects = new HashMap<>();
+    final Map<Path, Path> lockToDeps = new HashMap<>();
+}
+
+static class ProjectState {
+    final Path depsFilePath;
+    @Nullable Path lockFilePath;
+    @Nullable SourceFile depsFile;
+    @Nullable String capturedLockContent;
+    boolean depsFileMatches;
+    @Nullable SourceFile modifiedDepsFile;
+    @Nullable String regeneratedLockContent;
+    @Nullable String regenerationError;
+
+    ProjectState(Path depsFilePath) {
+        this.depsFilePath = depsFilePath;
+    }
+}
+```
+
+- [ ] **Step 4.3: Replace `getScanner`**
+
+```java
+@Override
+public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+    return new TreeVisitor<Tree, ExecutionContext>() {
+        final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
+        @Override
+        public Tree preVisit(Tree tree, ExecutionContext ctx) {
+            stopAfterPreVisit();
+            if (!(tree instanceof SourceFile)) {
+                return tree;
+            }
+            SourceFile sourceFile = (SourceFile) tree;
+            Path sourcePath = sourceFile.getSourcePath();
+
+            if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
+                Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
+                ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                ps.lockFilePath = sourcePath;
+                ps.capturedLockContent = ((Toml.Document) tree).printAll();
+                acc.lockToDeps.put(sourcePath, depsPath);
+                return tree;
+            }
+            if (tree instanceof Json.Document && sourcePath.endsWith("Pipfile.lock")) {
+                Path depsPath = PyProjectHelper.correspondingPipfilePath(sourcePath);
+                ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                ps.lockFilePath = sourcePath;
+                ps.capturedLockContent = ((Json.Document) tree).printAll();
+                acc.lockToDeps.put(sourcePath, depsPath);
+                return tree;
+            }
+
+            PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
+            if (trait != null) {
+                ProjectState ps = acc.projects.computeIfAbsent(sourcePath, ProjectState::new);
+                ps.depsFile = sourceFile;
+                ps.depsFileMatches = matchesChangeDependency(trait);
+            }
+            return tree;
+        }
+    };
+}
+
+private boolean matchesChangeDependency(PythonDependencyFile trait) {
+    return PyProjectHelper.findDependencyInScope(
+            trait.getMarker(), oldPackageName, scope, groupName) != null;
+}
+```
+
+- [ ] **Step 4.4: Add the `generate` override**
+
+```java
+@Override
+public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
+    PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
+    for (ProjectState ps : acc.projects.values()) {
+        if (!ps.depsFileMatches || ps.depsFile == null) {
+            continue;
+        }
+        PythonDependencyFile trait = matcher.test(new Cursor(null, ps.depsFile));
+        if (trait == null) {
+            continue;
+        }
+        PythonDependencyFile updated = trait.withChangedDependency(
+                oldPackageName, newPackageName, newVersion, scope, groupName);
+        if (updated.getTree() == ps.depsFile) {
+            continue;
+        }
+        ps.modifiedDepsFile = (SourceFile) updated.getTree();
+
+        if (ps.capturedLockContent != null) {
+            PyProjectHelper.RegenerationResult r =
+                    PyProjectHelper.regenerateLockContent(ps.modifiedDepsFile, ps.capturedLockContent);
+            if (r != null) {
+                if (r.isSuccess()) {
+                    ps.regeneratedLockContent = r.getLockContent();
+                } else {
+                    ps.regenerationError = r.getErrorMessage();
+                }
+            }
+        }
+    }
+    return Collections.emptyList();
+}
+```
+
+- [ ] **Step 4.5: Replace `getVisitor`**
+
+```java
+@Override
+public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+    if (acc.projects.isEmpty()) {
+        return TreeVisitor.noop();
+    }
+    return new TreeVisitor<Tree, ExecutionContext>() {
+        @Override
+        public Tree preVisit(Tree tree, ExecutionContext ctx) {
+            stopAfterPreVisit();
+            if (!(tree instanceof SourceFile)) {
+                return tree;
+            }
+            SourceFile sourceFile = (SourceFile) tree;
+            Path sourcePath = sourceFile.getSourcePath();
+
+            ProjectState ps = acc.projects.get(sourcePath);
+            if (ps != null && ps.modifiedDepsFile != null) {
+                SourceFile out = ps.modifiedDepsFile;
+                if (ps.regenerationError != null) {
+                    out = Markup.warn(out, new RuntimeException(
+                            "lock regeneration failed: " + ps.regenerationError));
+                }
+                return out;
+            }
+
+            Path depsPath = acc.lockToDeps.get(sourcePath);
+            if (depsPath != null) {
+                ProjectState lockPs = acc.projects.get(depsPath);
+                if (lockPs != null && lockPs.regeneratedLockContent != null) {
+                    if (tree instanceof Toml.Document) {
+                        return PyProjectHelper.reparseToml(
+                                (Toml.Document) tree, lockPs.regeneratedLockContent);
+                    }
+                    if (tree instanceof Json.Document) {
+                        return PyProjectHelper.reparseJson(
+                                (Json.Document) tree, lockPs.regeneratedLockContent);
+                    }
+                }
+            }
+            return tree;
+        }
+    };
+}
+```
+
+- [ ] **Step 4.6: Compile, run `ChangeDependencyTest`, commit**
+
+```
+gw :rewrite-python:compileJava -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+gw :rewrite-python:test --tests "org.openrewrite.python.ChangeDependencyTest" -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+git add rewrite-python/src/main/java/org/openrewrite/python/ChangeDependency.java
+git commit -m "ChangeDependency: move per-project state to Accumulator and run regen in generate()"
+```
+
+---
+
+### Task 5: Apply the same pattern to `UpgradeDependencyVersion`
+
+**Files:**
+- Modify: `rewrite-python/src/main/java/org/openrewrite/python/UpgradeDependencyVersion.java`
+
+- [ ] **Step 5.1: Add imports**
+
+```java
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import org.openrewrite.Cursor;
+import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.toml.tree.Toml;
+```
+
+- [ ] **Step 5.2: Replace `Accumulator` and add `ProjectState`**
+
+```java
+static class Accumulator {
+    final Map<Path, ProjectState> projects = new HashMap<>();
+    final Map<Path, Path> lockToDeps = new HashMap<>();
+}
+
+static class ProjectState {
+    final Path depsFilePath;
+    @Nullable Path lockFilePath;
+    @Nullable SourceFile depsFile;
+    @Nullable String capturedLockContent;
+    boolean depsFileMatches;
+    @Nullable SourceFile modifiedDepsFile;
+    @Nullable String regeneratedLockContent;
+    @Nullable String regenerationError;
+
+    ProjectState(Path depsFilePath) {
+        this.depsFilePath = depsFilePath;
+    }
+}
+```
+
+- [ ] **Step 5.3: Replace `getScanner`**
+
+The match predicate preserves the existing behavior at lines 117–125 of the original file: a project matches when the named dependency exists in the scope **and** its current version differs from the requested new version.
+
+```java
+@Override
+public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+    return new TreeVisitor<Tree, ExecutionContext>() {
+        final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
+        @Override
+        public Tree preVisit(Tree tree, ExecutionContext ctx) {
+            stopAfterPreVisit();
+            if (!(tree instanceof SourceFile)) {
+                return tree;
+            }
+            SourceFile sourceFile = (SourceFile) tree;
+            Path sourcePath = sourceFile.getSourcePath();
+
+            if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
+                Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
+                ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                ps.lockFilePath = sourcePath;
+                ps.capturedLockContent = ((Toml.Document) tree).printAll();
+                acc.lockToDeps.put(sourcePath, depsPath);
+                return tree;
+            }
+            if (tree instanceof Json.Document && sourcePath.endsWith("Pipfile.lock")) {
+                Path depsPath = PyProjectHelper.correspondingPipfilePath(sourcePath);
+                ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                ps.lockFilePath = sourcePath;
+                ps.capturedLockContent = ((Json.Document) tree).printAll();
+                acc.lockToDeps.put(sourcePath, depsPath);
+                return tree;
+            }
+
+            PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
+            if (trait != null) {
+                ProjectState ps = acc.projects.computeIfAbsent(sourcePath, ProjectState::new);
+                ps.depsFile = sourceFile;
+                ps.depsFileMatches = matchesUpgrade(trait);
+            }
+            return tree;
+        }
+    };
+}
+
+private boolean matchesUpgrade(PythonDependencyFile trait) {
+    PythonResolutionResult.Dependency dep = PyProjectHelper.findDependencyInScope(
+            trait.getMarker(), packageName, scope, groupName);
+    return dep != null && !PyProjectHelper.normalizeVersionConstraint(newVersion)
+            .equals(dep.getVersionConstraint());
+}
+```
+
+- [ ] **Step 5.4: Add the `generate` override**
+
+```java
+@Override
+public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
+    PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+    Map<String, String> upgrades = Collections.singletonMap(packageName, newVersion);
+
+    for (ProjectState ps : acc.projects.values()) {
+        if (!ps.depsFileMatches || ps.depsFile == null) {
+            continue;
+        }
+        PythonDependencyFile trait = matcher.test(new Cursor(null, ps.depsFile));
+        if (trait == null) {
+            continue;
+        }
+        PythonDependencyFile updated = trait.withUpgradedVersions(upgrades, scope, groupName);
+        if (updated.getTree() == ps.depsFile) {
+            continue;
+        }
+        ps.modifiedDepsFile = (SourceFile) updated.getTree();
+
+        if (ps.capturedLockContent != null) {
+            PyProjectHelper.RegenerationResult r =
+                    PyProjectHelper.regenerateLockContent(ps.modifiedDepsFile, ps.capturedLockContent);
+            if (r != null) {
+                if (r.isSuccess()) {
+                    ps.regeneratedLockContent = r.getLockContent();
+                } else {
+                    ps.regenerationError = r.getErrorMessage();
+                }
+            }
+        }
+    }
+    return Collections.emptyList();
+}
+```
+
+- [ ] **Step 5.5: Replace `getVisitor`**
+
+```java
+@Override
+public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+    if (acc.projects.isEmpty()) {
+        return TreeVisitor.noop();
+    }
+    return new TreeVisitor<Tree, ExecutionContext>() {
+        @Override
+        public Tree preVisit(Tree tree, ExecutionContext ctx) {
+            stopAfterPreVisit();
+            if (!(tree instanceof SourceFile)) {
+                return tree;
+            }
+            SourceFile sourceFile = (SourceFile) tree;
+            Path sourcePath = sourceFile.getSourcePath();
+
+            ProjectState ps = acc.projects.get(sourcePath);
+            if (ps != null && ps.modifiedDepsFile != null) {
+                SourceFile out = ps.modifiedDepsFile;
+                if (ps.regenerationError != null) {
+                    out = Markup.warn(out, new RuntimeException(
+                            "lock regeneration failed: " + ps.regenerationError));
+                }
+                return out;
+            }
+
+            Path depsPath = acc.lockToDeps.get(sourcePath);
+            if (depsPath != null) {
+                ProjectState lockPs = acc.projects.get(depsPath);
+                if (lockPs != null && lockPs.regeneratedLockContent != null) {
+                    if (tree instanceof Toml.Document) {
+                        return PyProjectHelper.reparseToml(
+                                (Toml.Document) tree, lockPs.regeneratedLockContent);
+                    }
+                    if (tree instanceof Json.Document) {
+                        return PyProjectHelper.reparseJson(
+                                (Json.Document) tree, lockPs.regeneratedLockContent);
+                    }
+                }
+            }
+            return tree;
+        }
+    };
+}
+```
+
+- [ ] **Step 5.6: Compile, run `UpgradeDependencyVersionTest`, commit**
+
+```
+gw :rewrite-python:compileJava -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+gw :rewrite-python:test --tests "org.openrewrite.python.UpgradeDependencyVersionTest" -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+git add rewrite-python/src/main/java/org/openrewrite/python/UpgradeDependencyVersion.java
+git commit -m "UpgradeDependencyVersion: move per-project state to Accumulator and run regen in generate()"
+```
+
+---
+
+### Task 6: Apply the same pattern to `UpgradeTransitiveDependencyVersion`
+
+**Files:**
+- Modify: `rewrite-python/src/main/java/org/openrewrite/python/UpgradeTransitiveDependencyVersion.java`
+
+- [ ] **Step 6.1: Add imports**
+
+```java
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import org.openrewrite.Cursor;
+import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.toml.tree.Toml;
+```
+
+- [ ] **Step 6.2: Replace `Accumulator` and add `ProjectState`**
+
+```java
+static class Accumulator {
+    final Map<Path, ProjectState> projects = new HashMap<>();
+    final Map<Path, Path> lockToDeps = new HashMap<>();
+}
+
+static class ProjectState {
+    final Path depsFilePath;
+    @Nullable Path lockFilePath;
+    @Nullable SourceFile depsFile;
+    @Nullable String capturedLockContent;
+    boolean depsFileMatches;
+    @Nullable SourceFile modifiedDepsFile;
+    @Nullable String regeneratedLockContent;
+    @Nullable String regenerationError;
+
+    ProjectState(Path depsFilePath) {
+        this.depsFilePath = depsFilePath;
+    }
+}
+```
+
+- [ ] **Step 6.3: Replace `getScanner`**
+
+```java
+@Override
+public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+    return new TreeVisitor<Tree, ExecutionContext>() {
+        final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
+        @Override
+        public Tree preVisit(Tree tree, ExecutionContext ctx) {
+            stopAfterPreVisit();
+            if (!(tree instanceof SourceFile)) {
+                return tree;
+            }
+            SourceFile sourceFile = (SourceFile) tree;
+            Path sourcePath = sourceFile.getSourcePath();
+
+            if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
+                Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
+                ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                ps.lockFilePath = sourcePath;
+                ps.capturedLockContent = ((Toml.Document) tree).printAll();
+                acc.lockToDeps.put(sourcePath, depsPath);
+                return tree;
+            }
+            if (tree instanceof Json.Document && sourcePath.endsWith("Pipfile.lock")) {
+                Path depsPath = PyProjectHelper.correspondingPipfilePath(sourcePath);
+                ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                ps.lockFilePath = sourcePath;
+                ps.capturedLockContent = ((Json.Document) tree).printAll();
+                acc.lockToDeps.put(sourcePath, depsPath);
+                return tree;
+            }
+
+            PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
+            if (trait != null) {
+                ProjectState ps = acc.projects.computeIfAbsent(sourcePath, ProjectState::new);
+                ps.depsFile = sourceFile;
+                ps.depsFileMatches = matchesTransitive(trait);
+            }
+            return tree;
+        }
+    };
+}
+
+private boolean matchesTransitive(PythonDependencyFile trait) {
+    PythonResolutionResult marker = trait.getMarker();
+    if (marker.findDependency(packageName) != null) {
+        return false;
+    }
+    if (marker.getPackageManager() == PythonResolutionResult.PackageManager.Uv &&
+            marker.getResolvedDependency(packageName) == null) {
+        return false;
+    }
+    return true;
+}
+```
+
+- [ ] **Step 6.4: Add the `generate` override**
+
+```java
+@Override
+public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
+    PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+    String normalizedName = PythonResolutionResult.normalizeName(packageName);
+    Map<String, String> pins = Collections.singletonMap(normalizedName, version);
+
+    for (ProjectState ps : acc.projects.values()) {
+        if (!ps.depsFileMatches || ps.depsFile == null) {
+            continue;
+        }
+        PythonDependencyFile trait = matcher.test(new Cursor(null, ps.depsFile));
+        if (trait == null) {
+            continue;
+        }
+        PythonDependencyFile updated = trait.withPinnedTransitiveDependencies(pins, null, null);
+        if (updated.getTree() == ps.depsFile) {
+            continue;
+        }
+        ps.modifiedDepsFile = (SourceFile) updated.getTree();
+
+        if (ps.capturedLockContent != null) {
+            PyProjectHelper.RegenerationResult r =
+                    PyProjectHelper.regenerateLockContent(ps.modifiedDepsFile, ps.capturedLockContent);
+            if (r != null) {
+                if (r.isSuccess()) {
+                    ps.regeneratedLockContent = r.getLockContent();
+                } else {
+                    ps.regenerationError = r.getErrorMessage();
+                }
+            }
+        }
+    }
+    return Collections.emptyList();
+}
+```
+
+- [ ] **Step 6.5: Replace `getVisitor`**
+
+```java
+@Override
+public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+    if (acc.projects.isEmpty()) {
+        return TreeVisitor.noop();
+    }
+    return new TreeVisitor<Tree, ExecutionContext>() {
+        @Override
+        public Tree preVisit(Tree tree, ExecutionContext ctx) {
+            stopAfterPreVisit();
+            if (!(tree instanceof SourceFile)) {
+                return tree;
+            }
+            SourceFile sourceFile = (SourceFile) tree;
+            Path sourcePath = sourceFile.getSourcePath();
+
+            ProjectState ps = acc.projects.get(sourcePath);
+            if (ps != null && ps.modifiedDepsFile != null) {
+                SourceFile out = ps.modifiedDepsFile;
+                if (ps.regenerationError != null) {
+                    out = Markup.warn(out, new RuntimeException(
+                            "lock regeneration failed: " + ps.regenerationError));
+                }
+                return out;
+            }
+
+            Path depsPath = acc.lockToDeps.get(sourcePath);
+            if (depsPath != null) {
+                ProjectState lockPs = acc.projects.get(depsPath);
+                if (lockPs != null && lockPs.regeneratedLockContent != null) {
+                    if (tree instanceof Toml.Document) {
+                        return PyProjectHelper.reparseToml(
+                                (Toml.Document) tree, lockPs.regeneratedLockContent);
+                    }
+                    if (tree instanceof Json.Document) {
+                        return PyProjectHelper.reparseJson(
+                                (Json.Document) tree, lockPs.regeneratedLockContent);
+                    }
+                }
+            }
+            return tree;
+        }
+    };
+}
+```
+
+- [ ] **Step 6.6: Compile, run `UpgradeTransitiveDependencyVersionTest`, commit**
+
+```
+gw :rewrite-python:compileJava -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+gw :rewrite-python:test --tests "org.openrewrite.python.UpgradeTransitiveDependencyVersionTest" -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+git add rewrite-python/src/main/java/org/openrewrite/python/UpgradeTransitiveDependencyVersion.java
+git commit -m "UpgradeTransitiveDependencyVersion: move per-project state to Accumulator and run regen in generate()"
+```
+
+---
+
+### Task 7: Remove `afterModification` from the trait API and overrides
+
+**Files:**
+- Modify: `rewrite-python/src/main/java/org/openrewrite/python/trait/PythonDependencyFile.java`
+- Modify: `rewrite-python/src/main/java/org/openrewrite/python/trait/PyProjectFile.java`
+- Modify: `rewrite-python/src/main/java/org/openrewrite/python/trait/PipfileFile.java`
+
+After Tasks 2–6, no recipe calls `afterModification(ctx)` anymore. The trait method becomes dead code.
+
+- [ ] **Step 7.1: Remove the default `afterModification` method from the trait interface**
+
+In `PythonDependencyFile.java`, delete this entire default method (currently around lines 93–103):
+
+```java
+/**
+ * Post-process the modified source file, e.g. regenerate lock files.
+ * Called by recipes after a trait method modifies the tree.
+ * The default implementation returns the tree unchanged.
+ *
+ * @param ctx the execution context
+ * @return the post-processed source file
+ */
+default SourceFile afterModification(ExecutionContext ctx) {
+    return getTree();
+}
+```
+
+Drop the unused `import org.openrewrite.ExecutionContext;` if it is no longer referenced.
+
+- [ ] **Step 7.2: Remove the `afterModification` override from `PyProjectFile`**
+
+In `PyProjectFile.java`, delete this override (currently around lines 417–420):
+
+```java
+@Override
+public SourceFile afterModification(ExecutionContext ctx) {
+    return PyProjectHelper.regenerateLockAndRefreshMarker((Toml.Document) getTree(), ctx);
+}
+```
+
+Drop unused imports (`ExecutionContext`) if no longer referenced.
+
+- [ ] **Step 7.3: Remove the `afterModification` override from `PipfileFile`**
+
+In `PipfileFile.java`, delete this override (currently around lines 165–169):
+
+```java
+@Override
+public SourceFile afterModification(ExecutionContext ctx) {
+    return PyProjectHelper.regeneratePipfileLockAndRefreshMarker(
+            (Toml.Document) getTree(), ctx, PipfileParser::createMarker);
+}
+```
+
+Drop the no-longer-needed imports: `ExecutionContext`, `PipfileParser`.
+
+- [ ] **Step 7.4: Compile**
+
+```
+gw :rewrite-python:compileJava -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+```
+Expected: BUILD SUCCESSFUL.
+
+- [ ] **Step 7.5: Commit**
+
+```
+git add rewrite-python/src/main/java/org/openrewrite/python/trait/PythonDependencyFile.java \
+        rewrite-python/src/main/java/org/openrewrite/python/trait/PyProjectFile.java \
+        rewrite-python/src/main/java/org/openrewrite/python/trait/PipfileFile.java
+git commit -m "Trait: drop afterModification — recipes now own lock regeneration"
+```
+
+---
+
+### Task 8: Delete dead helpers and the ExecutionContext view
+
+**Files:**
+- Modify: `rewrite-python/src/main/java/org/openrewrite/python/internal/PyProjectHelper.java`
+- Delete: `rewrite-python/src/main/java/org/openrewrite/python/internal/PythonDependencyExecutionContextView.java`
+
+- [ ] **Step 8.1: Remove the deprecated helpers from `PyProjectHelper`**
+
+Delete these methods entirely (with their javadoc):
+- `captureExistingLockContent` (currently around lines 101–116)
+- `maybeReplayLockContent` (currently around lines 123–137)
+- `maybeUpdateUvLock` (currently around lines 147–162)
+- `maybeUpdatePipfileLock` (currently around lines 168–182)
+- `regenerateLockAndRefreshMarker` (currently around lines 232–274)
+- `regeneratePipfileLockAndRefreshMarker` (currently around lines 284–324)
+
+Keep: `correspondingPyprojectPath`, `correspondingPipfilePath`, `reparseJson`, `reparseToml`, `regenerateLockContent` (added in Task 1), `RegenerationResult` (added in Task 1), and all the dependency-array predicates and lookup helpers.
+
+Drop the now-unused imports: at minimum `org.openrewrite.marker.Markup`, `org.openrewrite.ExecutionContext`, and `java.util.function.Function`. Keep `java.util.Map` if still referenced.
+
+- [ ] **Step 8.2: Delete `PythonDependencyExecutionContextView.java`**
+
+```
+git rm rewrite-python/src/main/java/org/openrewrite/python/internal/PythonDependencyExecutionContextView.java
+```
+
+- [ ] **Step 8.3: Compile**
+
+```
+gw :rewrite-python:compileJava -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+```
+Expected: BUILD SUCCESSFUL with no references to the deleted symbols.
+
+- [ ] **Step 8.4: Commit**
+
+```
+git add rewrite-python/src/main/java/org/openrewrite/python/internal/PyProjectHelper.java
+git commit -m "Drop PythonDependencyExecutionContextView and unused PyProjectHelper helpers"
+```
+
+---
+
+### Task 9: Run the full Python test suite for the recipe surface
+
+**Files:** none (verification only).
+
+- [ ] **Step 9.1: Run all five recipe test classes plus trait/parser tests**
+
+```
+gw :rewrite-python:test \
+    --tests "org.openrewrite.python.AddDependencyTest" \
+    --tests "org.openrewrite.python.RemoveDependencyTest" \
+    --tests "org.openrewrite.python.ChangeDependencyTest" \
+    --tests "org.openrewrite.python.UpgradeDependencyVersionTest" \
+    --tests "org.openrewrite.python.UpgradeTransitiveDependencyVersionTest" \
+    --tests "org.openrewrite.python.trait.PipfileFileTest" \
+    --tests "org.openrewrite.python.PipfileParserTest" \
+    --tests "org.openrewrite.python.PyProjectTomlParserTest" \
+    -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+```
+Expected: all pass. If any fail, fix the recipe in question and amend the failing test scenario to that recipe's commit before continuing — do **not** create a separate fix commit on top of an unrelated recipe.
+
+- [ ] **Step 9.2: (Optional) full module test pass**
+
+```
+gw :rewrite-python:test -x pythonInstall -x pythonUpgradePip -x pythonSetupVenv
+```
+Expected: green.
+
+- [ ] **Step 9.3: Push the branch**
+
+```
+git push origin pipenv-lockfiles
+```
+
+---
+
+## Out of Scope for This Plan
+
+These items from the original handoff are **not** addressed here:
+- **Real-repo testing via `/create-organization`** — separate, downstream of this rework.
+- **CLI / DevCenter project-type detection for standalone `Pipfile`** — lives in another repo.
+- **Marker refresh from regenerated lock content** — current code passes `null` for lock content to `PythonDependencyParser.createMarker(doc, null)`; the rework preserves that behavior. A follow-up could add a `createMarker(doc, lockContent)` overload to both `PythonDependencyParser` and `PipfileParser`, then call it from `generate()` after regeneration succeeds.
+
+---
+
+## Self-Review
+
+**Spec coverage**
+
+| Handoff requirement | Plan task |
+|---|---|
+| Accumulator holds per-project deps + lock | Tasks 2–6 (`ProjectState`) |
+| Capture both files during scanner phase | Tasks 2–6 (scanner branches) |
+| Regenerate lock during between-scan-and-visit phase from updated deps + captured lock seed | Tasks 2–6 (`generate()`) |
+| Emit regenerated lock file in place of old | Tasks 2–6 (visitor lock branch) |
+| Refresh marker on deps file from new lock contents | Preserved via existing `createMarker(updated, null)` path inside the trait `with…` methods; deeper marker-from-lock-content refresh is called out in "Out of Scope" |
+| Drop `captureExistingLockContent` / `maybeReplayLockContent` | Task 8 |
+| Drop `PythonDependencyExecutionContextView` indirection | Task 8 |
+| Drop trait `afterModification` (with `markerFactory` parameter) | Task 7 |
+
+**Type/name consistency**
+
+- `ProjectState` field names (`depsFilePath`, `lockFilePath`, `depsFile`, `capturedLockContent`, `depsFileMatches`, `modifiedDepsFile`, `regeneratedLockContent`, `regenerationError`) used identically in scanner, generate, and visitor across Tasks 2–6.
+- `RegenerationResult` defined in Task 1 (`isSuccess`, `getLockContent`, `getErrorMessage`); consumed in Tasks 2–6 with consistent property names.
+- `PyProjectHelper.correspondingPyprojectPath` / `correspondingPipfilePath` already exist in the current file; no rename.
+
+**Placeholder scan**
+
+Searched the plan for "TBD", "implement later", "similar to", "fill in", "etc.", "as appropriate". None remain. Tasks 3–6 inline the full scanner / `generate()` / visitor blocks rather than referring back to Task 2; the only differences across recipes (the match predicate and the trait method called) are inlined verbatim in each task.
