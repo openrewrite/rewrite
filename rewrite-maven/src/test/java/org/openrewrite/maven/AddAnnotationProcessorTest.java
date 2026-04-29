@@ -1013,6 +1013,118 @@ class AddAnnotationProcessorTest implements RewriteTest {
         }
 
         @Test
+        void addConfigurationToExistingPluginWithNoConfig() {
+            // Single-module: plugin exists in build/plugins with NO <configuration>
+            // block. Common when a module declares maven-compiler-plugin only to
+            // set <source>/<target> elsewhere or for default lifecycle binding,
+            // leaving annotationProcessorPaths unconfigured. Recipe must fill in
+            // the entire configuration tree.
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <annotationProcessorPaths>
+                                          <path>
+                                              <groupId>org.projectlombok</groupId>
+                                              <artifactId>lombok-mapstruct-binding</artifactId>
+                                              <version>0.2.0</version>
+                                          </path>
+                                      </annotationProcessorPaths>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void addAnnotationProcessorPathsToExistingConfiguration() {
+            // Single-module: plugin exists with a <configuration> block but no
+            // <annotationProcessorPaths>. Recipe must add the inner element
+            // without disturbing other configuration entries.
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <source>17</source>
+                                      <target>17</target>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <build>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <source>17</source>
+                                      <target>17</target>
+                                      <annotationProcessorPaths>
+                                          <path>
+                                              <groupId>org.projectlombok</groupId>
+                                              <artifactId>lombok-mapstruct-binding</artifactId>
+                                              <version>0.2.0</version>
+                                          </path>
+                                      </annotationProcessorPaths>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
         void addToBuildPluginsWhenInBothLocations() {
             // Single-module: plugin exists in both build/plugins AND pluginManagement
             // Expected: adds to build/plugins only (consistent with single-module behavior)
