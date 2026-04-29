@@ -2743,7 +2743,7 @@ public class GroovyParserVisitor {
                     emptyList(),
                     typeName,
                     type, null);
-            if (expression.getOriginType().getGenericsTypes() != null) {
+            if (expression.getOriginType().getGenericsTypes() != null && !expression.getOriginType().isGenericsPlaceHolder() && sourceStartsWith("<")) {
                 return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(
                         staticType((org.codehaus.groovy.ast.expr.Expression) expression).getGenericsTypes()), type);
             }
