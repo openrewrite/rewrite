@@ -127,6 +127,7 @@ testing {
             dependencies {
                 implementation(project())
                 implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-test"))
                 implementation("org.assertj:assertj-core:latest.release")
                 implementation("org.junit.platform:junit-platform-suite-api")
