@@ -211,7 +211,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         beforeSyntax(range, GSpace.Location.RANGE_PREFIX, p);
         visit(range.getFrom(), p);
         visitSpace(range.getPadding().getInclusive().getBefore(), GSpace.Location.RANGE_INCLUSION, p);
-        p.append(range.getInclusive() ? ".." : "..>");
+        p.append(range.getInclusive() ? ".." : "..<");
         visit(range.getTo(), p);
         afterSyntax(range, p);
         return range;

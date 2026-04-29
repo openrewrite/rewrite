@@ -2427,7 +2427,7 @@ public class GroovyParserVisitor {
         public void visitRangeExpression(RangeExpression range) {
             queue.add(insideParentheses(range, fmt -> new G.Range(randomId(), fmt, Markers.EMPTY,
                     doVisit(range.getFrom()),
-                    JLeftPadded.build(range.isInclusive()).withBefore(sourceBefore(range.isInclusive() ? ".." : "..>")),
+                    JLeftPadded.build(range.isInclusive()).withBefore(sourceBefore(range.isInclusive() ? ".." : "..<")),
                     doVisit(range.getTo()))));
         }
 
