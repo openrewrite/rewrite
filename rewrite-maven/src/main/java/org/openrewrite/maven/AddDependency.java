@@ -20,17 +20,17 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.marker.Markup;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.HasSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.*;
-import org.openrewrite.maven.utilities.JavaSourceSetUpdater;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
-import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -161,11 +161,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         boolean usingType;
         Map<JavaProject, String> scopeByProject = new HashMap<>();
         Set<ResolvedGroupArtifactVersion> pomsDefinedInCurrentRepository = new HashSet<>();
-        @Nullable
-        String resolvedVersion;
-        List<MavenRepository> repositories = new ArrayList<>();
-        @Nullable
-        Exception versionResolutionFailure;
     }
 
     @Override
@@ -185,10 +180,19 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     if ("test".equals(scope) && onlyIfUsing != null && sourceFile == hasTestSourceSet.visit(sourceFile, ctx)) {
                         return sourceFile;
                     }
+                    JavaProject javaProject = sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null);
+                    String knownScope = javaProject == null ? null : acc.scopeByProject.get(javaProject);
+                    // "compile" is the broadest scope; no further file in this project can change the answer
+                    if ("compile".equals(knownScope)) {
+                        return sourceFile;
+                    }
+                    JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
+                    // If we already know "test" scope and this file is also in a test source set, no further info
+                    if ("test".equals(knownScope) && javaSourceSet != null && "test".equals(javaSourceSet.getName())) {
+                        return sourceFile;
+                    }
                     if (onlyIfUsing == null || sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx)) {
                         acc.usingType = true;
-                        JavaProject javaProject = sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null);
-                        JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
                         if (javaProject != null && javaSourceSet != null) {
                             acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
                                     scope /* a `compile` scope dependency will also be available in test source set */ :
@@ -203,27 +207,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         return sourceFile;
                     }
                     acc.pomsDefinedInCurrentRepository.add(mrr.getPom().getGav());
-                    // Resolve the version once for JavaSourceSet updates
-                    if (acc.resolvedVersion == null && version != null) {
-                        try {
-                            List<MavenRepository> repos = mrr.getPom().getRepositories();
-                            VersionComparator vc = requireNonNull(Semver.validate(version, versionPattern).getValue());
-                            MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
-                            org.openrewrite.maven.internal.MavenPomDownloader downloader = new org.openrewrite.maven.internal.MavenPomDownloader(
-                                    Collections.emptyMap(), ctx, mctx.getSettings(), null);
-                            MavenMetadata metadata = downloader.downloadMetadata(
-                                    new GroupArtifact(groupId, artifactId), null, repos);
-                            acc.resolvedVersion = metadata.getVersioning().getVersions().stream()
-                                    .filter(v -> vc.isValid(null, v))
-                                    .max((v1, v2) -> vc.compare(null, v1, v2))
-                                    .orElse(null);
-                            if (acc.resolvedVersion != null) {
-                                acc.repositories = repos;
-                            }
-                        } catch (Exception e) {
-                            acc.versionResolutionFailure = e;
-                        }
-                    }
                 }
                 return sourceFile;
             }
@@ -232,7 +215,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
-        TreeVisitor<?, ExecutionContext> mavenVisitor = Preconditions.check(onlyIfUsing == null || acc.usingType && !acc.scopeByProject.isEmpty(), new MavenVisitor<ExecutionContext>() {
+        return Preconditions.check(onlyIfUsing == null || acc.usingType && !acc.scopeByProject.isEmpty(), new MavenVisitor<ExecutionContext>() {
             @Nullable
             final Pattern familyPatternCompiled = familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"));
 
@@ -245,8 +228,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 if (onlyIfUsing != null && maybeScope == null && !acc.scopeByProject.isEmpty()) {
                     return maven;
                 }
-
-                VersionComparator vc = requireNonNull(Semver.validate(version, versionPattern).getValue());
 
                 // If the dependency is already in compile scope it will be available everywhere, no need to continue
                 Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
@@ -281,13 +262,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return maven;
                 }
 
-                Xml result = new AddDependencyVisitor(
+                return new AddDependencyVisitor(
                         groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
                         type, classifier, optional, familyPatternCompiled, metadataFailures).visitNonNull(document, ctx);
-                if (result != document && acc.versionResolutionFailure != null) {
-                    result = Markup.warn(result, acc.versionResolutionFailure);
-                }
-                return result;
             }
 
             private boolean isSubprojectOfParentInRepository(Scanned acc) {
@@ -313,52 +290,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             }
 
         });
-
-        if (acc.scopeByProject.isEmpty() || acc.resolvedVersion == null) {
-            return mavenVisitor;
-        }
-
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Nullable
-            private JavaSourceSetUpdater updater;
-            private final Map<String, JavaSourceSet> updatedSourceSets = new HashMap<>();
-
-            @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return mavenVisitor.isAcceptable(sourceFile, ctx) || sourceFile instanceof JavaSourceFile;
-            }
-
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (!(tree instanceof SourceFile)) {
-                    return tree;
-                }
-                SourceFile sf = (SourceFile) tree;
-                if (sf instanceof Xml.Document) {
-                    return mavenVisitor.visit(tree, ctx);
-                }
-                if (sf instanceof JavaSourceFile) {
-                    return updateJavaSourceSet(sf, ctx);
-                }
-                return tree;
-            }
-
-            private SourceFile updateJavaSourceSet(SourceFile sf, ExecutionContext ctx) {
-                Optional<JavaProject> maybeJp = sf.getMarkers().findFirst(JavaProject.class);
-                if (!maybeJp.isPresent() || !acc.scopeByProject.containsKey(maybeJp.get())) {
-                    return sf;
-                }
-                return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet -> {
-                    if (sourceSet.getGavToTypes().isEmpty()) {
-                        return sourceSet;
-                    }
-                    if (updater == null) {
-                        updater = new JavaSourceSetUpdater(ctx);
-                    }
-                    return updater.addDependency(sourceSet, groupId, artifactId, acc.resolvedVersion, acc.repositories);
-                });
-            }
-        };
     }
 
     private boolean hasAcceptableTransitivity(ResolvedDependency d, Scanned acc) {

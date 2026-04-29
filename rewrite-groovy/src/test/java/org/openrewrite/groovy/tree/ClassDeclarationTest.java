@@ -260,6 +260,24 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void innerClassWithBuilderAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.builder.Builder
+
+              class Outer {
+                  @Builder
+                  class Inner {
+                      String controller
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4705")
     @Test
     void constructorWithDef() {
@@ -528,4 +546,80 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trait() {
+        rewriteRun(
+          groovy(
+            """
+              trait Foo {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void traitExtendsTrait() {
+        rewriteRun(
+          groovy(
+            """
+              trait A {
+              }
+              trait B extends A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void traitWithMethod() {
+        rewriteRun(
+          groovy(
+            """
+              trait Greeter {
+                  String greet() {
+                      "hello"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void traitWithMethodTakingParameter() {
+        rewriteRun(
+          groovy(
+            """
+              trait Greeter {
+                  String greet(String name) {
+                      "hello $name"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void traitWithMultipleMethods() {
+        rewriteRun(
+          groovy(
+            """
+              trait Greeter {
+                  String greet() {
+                      "hello"
+                  }
+
+                  String shout(String msg) {
+                      msg.toUpperCase()
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }

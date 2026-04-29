@@ -34,8 +34,6 @@ class MavenExecutionContextViewTest {
         MavenArtifactCache first = ctx.getArtifactCache();
         MavenArtifactCache second = ctx.getArtifactCache();
 
-        // Memoization is the whole point — without it, every visitor that constructs a
-        // JavaSourceSetUpdater gets a fresh cache and re-downloads JARs it's already fetched.
         assertThat(first).isSameAs(second);
     }
 
@@ -56,9 +54,6 @@ class MavenExecutionContextViewTest {
         MavenArtifactCache fromFirstView = MavenExecutionContextView.view(delegate).getArtifactCache();
         MavenArtifactCache fromSecondView = MavenExecutionContextView.view(delegate).getArtifactCache();
 
-        // Each JavaSourceSetUpdater wraps the ctx in a fresh MavenExecutionContextView; the
-        // underlying cache must survive that because the message lives on the delegate's
-        // message map, not the view.
         assertThat(fromFirstView).isSameAs(fromSecondView);
     }
 }

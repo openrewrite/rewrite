@@ -96,4 +96,15 @@ class ClassExpressionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void parameterizedClassLiteral() {
+        rewriteRun(
+          groovy(
+            """
+              def x = ArrayList<String>.class
+              """
+          )
+        );
+    }
 }

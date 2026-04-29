@@ -150,4 +150,21 @@ class ConstructorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void innerClassConstructorWithOnlySuperCall() {
+        rewriteRun(
+          groovy(
+            """
+              class Outer {
+                  class Inner extends Base {
+                      Inner(int x, int y) {
+                          super(x, y)
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }

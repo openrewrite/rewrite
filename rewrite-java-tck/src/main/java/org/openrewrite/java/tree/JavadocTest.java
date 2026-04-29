@@ -2214,6 +2214,23 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multilineHtmlCommentInBlockTag() {
+        rewriteRun(
+          java(
+            """
+              /**
+              * @version 0.1
+              *    <!-- xml comment nested
+              *       * [someAuthor] fixed something
+              *    -->
+              **/
+              class Test {}
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5443")
     @Test
     void parsingIncorrectJavadocValueReference() {

@@ -27,6 +27,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.DependencyNotation;
@@ -78,7 +79,6 @@ public class SortDependencies extends Recipe {
                     return m;
                 }
 
-                // Separate dependency statements from non-dependency statements (comments are whitespace in Gradle AST)
                 List<Statement> sorted = new ArrayList<>(statements);
                 sorted.sort(dependencyComparator);
 
@@ -95,9 +95,20 @@ public class SortDependencies extends Recipe {
                     return m;
                 }
 
-                // Preserve original whitespace prefixes
-                for (int i = 0; i < sorted.size(); i++) {
-                    sorted.set(i, sorted.get(i).withPrefix(statements.get(i).getPrefix()));
+                // Keep each statement's prefix with the statement itself so that any preceding comments
+                // (which the parser stores on the next statement's prefix) move along with the dependency.
+                // Swap only the leading whitespace of the new first statement with the original first
+                // statement's leading whitespace, to keep the block opening formatting consistent.
+                Space originalFirstPrefix = statements.get(0).getPrefix();
+                Space newFirstPrefix = sorted.get(0).getPrefix();
+                sorted.set(0, sorted.get(0).withPrefix(newFirstPrefix.withWhitespace(originalFirstPrefix.getWhitespace())));
+                // Apply the displaced leading whitespace to whichever sorted statement now follows the
+                // original first statement, to preserve the block-internal blank-line layout.
+                int originalFirstIndex = sorted.indexOf(statements.get(0));
+                if (originalFirstIndex > 0) {
+                    Space displacedPrefix = sorted.get(originalFirstIndex).getPrefix();
+                    sorted.set(originalFirstIndex, sorted.get(originalFirstIndex)
+                      .withPrefix(displacedPrefix.withWhitespace(newFirstPrefix.getWhitespace())));
                 }
 
                 body = body.withStatements(sorted);

@@ -7,7 +7,15 @@ plugins {
 
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
+    isCanBeConsumed = false
+    isCanBeResolved = true
 }
+
+val javaTckClasses = javaTck.incoming.artifactView {
+    attributes {
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))
+    }
+}.files
 
 dependencies {
     api(project(":rewrite-core"))
@@ -79,12 +87,27 @@ testing {
                 all {
                     testTask.configure {
                         useJUnitPlatform()
-                        testClassesDirs += files(javaTck.files.map { zipTree(it) })
+                        testClassesDirs += javaTckClasses
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)
                     }
                 }
             }
+        }
+    }
+}
+
+// Keep the Test tasks' @Classpath fingerprint stable across CI runs. In this module the
+// only consumers of runtimeClasspath are :test and :compatibilityTest (compileJava uses
+// compileClasspath / ABI-only normalization and is unaffected). The convention plugin's
+// info-broker writes build-varying entries (Build-Date, Change, Build-Number, ...) into
+// MANIFEST.MF and META-INF/<project>.properties of every consumed JAR; none of META-INF
+// is a real input for the TCK's parser tests, so drop the whole directory from the
+// fingerprint and let the build cache hit when only those metadata bytes have changed.
+normalization {
+    runtimeClasspath {
+        metaInf {
+            ignoreCompletely()
         }
     }
 }

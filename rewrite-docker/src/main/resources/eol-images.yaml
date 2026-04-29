@@ -47,112 +47,112 @@
 - imageName: ubuntu
   tagPatterns: ["12.04", "12.04.*"]
   eolDate: "2017-04-28"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: [trusty, "trusty-*", "14.04", "14.04.*"]
   eolDate: "2019-04-02"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: ["14.10", "14.10.*"]
   eolDate: "2015-07-23"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: ["15.04", "15.04.*"]
   eolDate: "2016-02-04"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: ["15.10", "15.10.*"]
   eolDate: "2016-07-28"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: [xenial, "xenial-*", "16.04", "16.04.*"]
   eolDate: "2021-04-02"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: ["16.10", "16.10.*"]
   eolDate: "2017-07-20"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: ["17.04", "17.04.*"]
   eolDate: "2018-01-13"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: ["17.10", "17.10.*"]
   eolDate: "2018-07-19"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: [bionic, "bionic-*", "18.04", "18.04.*"]
   eolDate: "2023-05-31"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: ["18.10", "18.10.*"]
   eolDate: "2019-07-18"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: ["19.04", "19.04.*"]
   eolDate: "2020-01-23"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: ["19.10", "19.10.*"]
   eolDate: "2020-07-06"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: [focal, "focal-*", "20.04", "20.04.*"]
   eolDate: "2025-05-31"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: [groovy, "groovy-*", "20.10", "20.10.*"]
   eolDate: "2021-07-22"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: [hirsute, "hirsute-*", "21.04", "21.04.*"]
   eolDate: "2022-01-20"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: [impish, "impish-*", "21.10", "21.10.*"]
   eolDate: "2022-07-14"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: [kinetic, "kinetic-*", "22.10", "22.10.*"]
   eolDate: "2023-07-20"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: [lunar, "lunar-*", "23.04", "23.04.*"]
   eolDate: "2024-01-20"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: [mantic, "mantic-*", "23.10", "23.10.*"]
   eolDate: "2024-07-12"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: [oracular, "oracular-*", "24.10", "24.10.*"]
   eolDate: "2025-07-10"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: ubuntu
   tagPatterns: [plucky, "plucky-*", "25.04", "25.04.*"]
   eolDate: "2026-01-17"
-  suggestedReplacement: noble (24.04)
+  suggestedReplacement: plucky (26.04)
 
 - imageName: alpine
   tagPatterns: ["2.6", "2.6.*", "2.6-*"]
