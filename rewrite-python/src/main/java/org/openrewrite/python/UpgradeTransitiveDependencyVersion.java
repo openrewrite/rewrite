@@ -20,10 +20,8 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.python.internal.PyProjectHelper;
-import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.trait.PythonDependencyFile;
-import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
 import java.util.Collections;
@@ -36,8 +34,9 @@ import java.util.Set;
  * and package manager. For {@code pyproject.toml}: uv uses
  * {@code [tool.uv].constraint-dependencies}, PDM uses {@code [tool.pdm.overrides]},
  * and other managers add a direct dependency. For {@code requirements.txt} and
- * {@code Pipfile}: appends the dependency. When uv is available, the uv.lock file
- * is regenerated.
+ * {@code Pipfile}: appends the dependency. When the matching package manager
+ * (uv or pipenv) is available on {@code PATH}, the corresponding lock file
+ * (uv.lock or Pipfile.lock) is regenerated.
  */
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -92,10 +91,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                if (tree instanceof Toml.Document && sourceFile.getSourcePath().endsWith("uv.lock")) {
-                    PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
-                            PyProjectHelper.correspondingPyprojectPath(sourceFile.getSourcePath()),
-                            ((Toml.Document) tree).printAll());
+                if (PyProjectHelper.captureExistingLockContent(sourceFile, tree, ctx)) {
                     return tree;
                 }
                 PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
@@ -150,11 +146,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     }
                 }
 
-                if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
-                    Toml.Document updatedLock = PyProjectHelper.maybeUpdateUvLock((Toml.Document) tree, ctx);
-                    if (updatedLock != null) {
-                        return updatedLock;
-                    }
+                Tree updatedLock = PyProjectHelper.maybeReplayLockContent(tree, ctx);
+                if (updatedLock != null) {
+                    return updatedLock;
                 }
 
                 return tree;

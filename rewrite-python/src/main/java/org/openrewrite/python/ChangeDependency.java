@@ -20,9 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.python.internal.PyProjectHelper;
-import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.python.trait.PythonDependencyFile;
-import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
 import java.util.HashSet;
@@ -31,7 +29,8 @@ import java.util.Set;
 /**
  * Change a dependency to a different package. Supports {@code pyproject.toml},
  * {@code requirements.txt}, and {@code Pipfile}. Searches all dependency scopes.
- * When uv is available, the uv.lock file is regenerated to reflect the change.
+ * When the matching package manager is available on {@code PATH}, the lock file
+ * (uv.lock for pyproject, Pipfile.lock for Pipfile) is regenerated to reflect the change.
  */
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -68,7 +67,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     public String getDescription() {
         return "Change a dependency to a different package. Supports `pyproject.toml`, " +
                 "`requirements.txt`, and `Pipfile`. Searches all dependency scopes. " +
-                "When `uv` is available, the `uv.lock` file is regenerated.";
+                "When the matching package manager (`uv` or `pipenv`) is available, " +
+                "the corresponding lock file (`uv.lock` or `Pipfile.lock`) is regenerated.";
     }
 
     static class Accumulator {
@@ -92,10 +92,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                if (tree instanceof Toml.Document && sourceFile.getSourcePath().endsWith("uv.lock")) {
-                    PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
-                            PyProjectHelper.correspondingPyprojectPath(sourceFile.getSourcePath()),
-                            ((Toml.Document) tree).printAll());
+                if (PyProjectHelper.captureExistingLockContent(sourceFile, tree, ctx)) {
                     return tree;
                 }
                 PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
@@ -134,11 +131,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     }
                 }
 
-                if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
-                    Toml.Document updatedLock = PyProjectHelper.maybeUpdateUvLock((Toml.Document) tree, ctx);
-                    if (updatedLock != null) {
-                        return updatedLock;
-                    }
+                Tree updatedLock = PyProjectHelper.maybeReplayLockContent(tree, ctx);
+                if (updatedLock != null) {
+                    return updatedLock;
                 }
 
                 return tree;

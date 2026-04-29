@@ -9,9 +9,11 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.python.PipfileParser;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.toml.TomlIsoVisitor;
@@ -158,6 +160,12 @@ public class PipfileFile implements PythonDependencyFile {
     public PipfileFile withPinnedTransitiveDependencies(Map<String, String> pins, @Nullable String scope, @Nullable String groupName) {
         // Pipfile has no constraint mechanism — add to target scope or default to [packages]
         return withAddedDependencies(pins, scope != null ? scope : "packages", null);
+    }
+
+    @Override
+    public SourceFile afterModification(ExecutionContext ctx) {
+        return PyProjectHelper.regeneratePipfileLockAndRefreshMarker(
+                (Toml.Document) getTree(), ctx, PipfileParser::createMarker);
     }
 
     @Override

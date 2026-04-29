@@ -21,7 +21,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.internal.PythonDependencyParser;
 import org.openrewrite.python.internal.UvLockParser;
-import org.openrewrite.python.internal.UvLockRegeneration;
+import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
@@ -93,7 +93,7 @@ public class PyProjectTomlParser implements Parser {
         }
 
         // Fall back to running uv lock
-        UvLockRegeneration.Result result = UvLockRegeneration.regenerate(doc.printAll());
+        LockFileRegeneration.Result result = LockFileRegeneration.UV.regenerate(doc.printAll());
         if (!result.isSuccess() || result.getLockFileContent() == null) {
             return marker;
         }

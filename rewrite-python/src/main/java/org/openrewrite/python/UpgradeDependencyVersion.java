@@ -20,10 +20,8 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.python.internal.PyProjectHelper;
-import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.trait.PythonDependencyFile;
-import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
 import java.util.Collections;
@@ -34,7 +32,8 @@ import java.util.Set;
 /**
  * Upgrade the version constraint for a dependency. Supports {@code pyproject.toml}
  * (with scope and group targeting), {@code requirements.txt}, and {@code Pipfile}.
- * When uv is available, the uv.lock file is regenerated to reflect the change.
+ * When the matching package manager is available on {@code PATH}, the lock file
+ * (uv.lock for pyproject, Pipfile.lock for Pipfile) is regenerated to reflect the change.
  */
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -87,7 +86,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     public String getDescription() {
         return "Upgrade the version constraint for a dependency. Supports `pyproject.toml` " +
                 "(with scope/group targeting), `requirements.txt`, and `Pipfile`. " +
-                "When `uv` is available, the `uv.lock` file is regenerated.";
+                "When the matching package manager (`uv` or `pipenv`) is available, " +
+                "the corresponding lock file (`uv.lock` or `Pipfile.lock`) is regenerated.";
     }
 
     static class Accumulator {
@@ -111,10 +111,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                if (tree instanceof Toml.Document && sourceFile.getSourcePath().endsWith("uv.lock")) {
-                    PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
-                            PyProjectHelper.correspondingPyprojectPath(sourceFile.getSourcePath()),
-                            ((Toml.Document) tree).printAll());
+                if (PyProjectHelper.captureExistingLockContent(sourceFile, tree, ctx)) {
                     return tree;
                 }
                 PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
@@ -160,11 +157,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     }
                 }
 
-                if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
-                    Toml.Document updatedLock = PyProjectHelper.maybeUpdateUvLock((Toml.Document) tree, ctx);
-                    if (updatedLock != null) {
-                        return updatedLock;
-                    }
+                Tree updatedLock = PyProjectHelper.maybeReplayLockContent(tree, ctx);
+                if (updatedLock != null) {
+                    return updatedLock;
                 }
 
                 return tree;

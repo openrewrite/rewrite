@@ -9,15 +9,18 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.internal.LockFileRegeneration;
+import org.openrewrite.python.internal.PipfileLockParser;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
+import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.openrewrite.Tree.randomId;
@@ -41,11 +44,70 @@ public class PipfileParser implements Parser {
             if (marker == null) {
                 return sf;
             }
+            marker = resolveFromLockFile(marker, doc, relativeTo);
             return doc.withMarkers(doc.getMarkers().addIfAbsent(marker));
         });
     }
 
-    static @Nullable PythonResolutionResult createMarker(Toml.Document doc) {
+    private static PythonResolutionResult resolveFromLockFile(PythonResolutionResult marker,
+                                                              Toml.Document doc,
+                                                              @Nullable Path relativeTo) {
+        Path sourcePath = doc.getSourcePath();
+        Path pipfileDir = relativeTo != null
+                ? relativeTo.resolve(sourcePath).getParent()
+                : sourcePath.getParent();
+
+        if (pipfileDir == null) {
+            return marker;
+        }
+
+        List<ResolvedDependency> resolvedDeps = PipfileLockParser.findAndParse(pipfileDir, relativeTo);
+        if (!resolvedDeps.isEmpty()) {
+            return applyResolution(marker, resolvedDeps);
+        }
+
+        // No Pipfile.lock found — try regenerating it from the Pipfile contents.
+        LockFileRegeneration.Result result = LockFileRegeneration.PIPENV.regenerate(doc.printAll());
+        if (!result.isSuccess() || result.getLockFileContent() == null) {
+            return marker;
+        }
+
+        resolvedDeps = PipfileLockParser.parse(result.getLockFileContent());
+        if (resolvedDeps.isEmpty()) {
+            return marker;
+        }
+        return applyResolution(marker, resolvedDeps);
+    }
+
+    private static PythonResolutionResult applyResolution(PythonResolutionResult marker,
+                                                          List<ResolvedDependency> resolvedDeps) {
+        marker = marker.withResolvedDependencies(resolvedDeps);
+        marker = marker.withDependencies(linkResolved(marker.getDependencies(), resolvedDeps));
+        marker = marker.withOptionalDependencies(linkResolvedMap(marker.getOptionalDependencies(), resolvedDeps));
+        return marker;
+    }
+
+    private static Map<String, List<Dependency>> linkResolvedMap(Map<String, List<Dependency>> depMap,
+                                                                 List<ResolvedDependency> resolved) {
+        Map<String, List<Dependency>> result = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Dependency>> entry : depMap.entrySet()) {
+            result.put(entry.getKey(), linkResolved(entry.getValue(), resolved));
+        }
+        return result;
+    }
+
+    private static List<Dependency> linkResolved(List<Dependency> deps, List<ResolvedDependency> resolved) {
+        return deps.stream().map(dep -> {
+            String normalizedName = PythonResolutionResult.normalizeName(dep.getName());
+            ResolvedDependency found = resolved.stream()
+                    .filter(r -> PythonResolutionResult.normalizeName(r.getName()).equals(normalizedName))
+                    .findFirst()
+                    .orElse(null);
+            return found != null ? dep.withResolved(found) : dep;
+        }).collect(Collectors.toList());
+    }
+
+    public static @Nullable PythonResolutionResult createMarker(Toml.Document doc) {
         Map<String, Toml.Table> tables = indexTables(doc);
 
         Toml.Table packagesTable = tables.get("packages");

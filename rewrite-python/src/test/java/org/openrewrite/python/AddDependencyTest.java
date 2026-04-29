@@ -309,8 +309,8 @@ class AddDependencyTest implements RewriteTest {
                   "flask>=2.0",
               ]
               """;
-        org.openrewrite.python.internal.UvLockRegeneration.Result result =
-                org.openrewrite.python.internal.UvLockRegeneration.regenerate(pyprojectWithFlask);
+        org.openrewrite.python.internal.LockFileRegeneration.Result result =
+                org.openrewrite.python.internal.LockFileRegeneration.UV.regenerate(pyprojectWithFlask);
         assertThat(result.isSuccess()).as("uv lock should succeed: " + result.getErrorMessage()).isTrue();
         assertThat(result.getLockFileContent()).contains("name = \"flask\"");
     }

@@ -17,7 +17,7 @@ package org.openrewrite.python;
 
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.python.internal.UvExecutor;
+import org.openrewrite.python.internal.PackageManagerExecutor;
 
 import java.io.File;
 import java.io.IOException;
@@ -181,7 +181,7 @@ public class DependencyWorkspace {
     static @Nullable Path getOrCreateRequirementsWorkspace(String requirementsContent,
                                                             @Nullable Path originalFilePath,
                                                             Map<String, String> environment) {
-        String uvPath = UvExecutor.findUvExecutable();
+        String uvPath = PackageManagerExecutor.UV.find();
         if (uvPath == null) {
             return null;
         }
@@ -226,7 +226,7 @@ public class DependencyWorkspace {
                 runCommandWithPath(tempDir, uvPath, environment, "pip", "install", "-r", reqFile.toString());
 
                 // Capture freeze output BEFORE installing ty
-                UvExecutor.RunResult freezeResult = UvExecutor.run(tempDir, uvPath, environment, "pip", "freeze");
+                PackageManagerExecutor.RunResult freezeResult = PackageManagerExecutor.UV.run(tempDir, uvPath, environment, "pip", "freeze");
                 if (freezeResult.isSuccess()) {
                     Files.write(
                             tempDir.resolve("freeze.txt"),
@@ -292,7 +292,7 @@ public class DependencyWorkspace {
     public static @Nullable Path getOrCreateSetuptoolsWorkspace(String manifestContent,
                                                                 @Nullable Path projectDir,
                                                                 Map<String, String> environment) {
-        String uvPath = UvExecutor.findUvExecutable();
+        String uvPath = PackageManagerExecutor.UV.find();
         if (uvPath == null) {
             return null;
         }
@@ -334,7 +334,7 @@ public class DependencyWorkspace {
                 runCommandWithPath(tempDir, uvPath, environment, "pip", "install", projectDir.toString());
 
                 // Capture freeze output BEFORE installing ty
-                UvExecutor.RunResult freezeResult = UvExecutor.run(tempDir, uvPath, environment, "pip", "freeze");
+                PackageManagerExecutor.RunResult freezeResult = PackageManagerExecutor.UV.run(tempDir, uvPath, environment, "pip", "freeze");
                 if (freezeResult.isSuccess()) {
                     Files.write(
                             tempDir.resolve("freeze.txt"),
@@ -389,14 +389,14 @@ public class DependencyWorkspace {
     }
 
     private static void runCommandWithPath(Path dir, String uvPath, Map<String, String> environment, String... args) throws IOException, InterruptedException {
-        UvExecutor.RunResult result = UvExecutor.run(dir, uvPath, environment, args);
+        PackageManagerExecutor.RunResult result = PackageManagerExecutor.UV.run(dir, uvPath, environment, args);
         if (!result.isSuccess()) {
             throw new RuntimeException("uv " + String.join(" ", args) + " failed with exit code: " + result.getExitCode());
         }
     }
 
     private static void runCommand(Path dir, Map<String, String> environment, String... command) throws IOException, InterruptedException {
-        String uvPath = UvExecutor.findUvExecutable();
+        String uvPath = PackageManagerExecutor.UV.find();
         if (uvPath == null) {
             throw new RuntimeException("uv is not installed. Install it with: pip install uv");
         }
@@ -405,7 +405,7 @@ public class DependencyWorkspace {
         String[] args = new String[command.length - 1];
         System.arraycopy(command, 1, args, 0, args.length);
 
-        UvExecutor.RunResult result = UvExecutor.run(dir, uvPath, environment, args);
+        PackageManagerExecutor.RunResult result = PackageManagerExecutor.UV.run(dir, uvPath, environment, args);
         if (!result.isSuccess()) {
             throw new RuntimeException(String.join(" ", command) + " failed with exit code: " + result.getExitCode());
         }

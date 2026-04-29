@@ -18,6 +18,8 @@ package org.openrewrite.python.internal;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.json.JsonParser;
+import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
@@ -29,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Shared utilities for Python dependency recipes operating on pyproject.toml files.
@@ -82,6 +85,58 @@ public class PyProjectHelper {
     }
 
     /**
+     * Derive the Pipfile path that corresponds to a Pipfile.lock path.
+     */
+    public static Path correspondingPipfilePath(Path pipfileLockPath) {
+        return pipfileLockPath.resolveSibling("Pipfile");
+    }
+
+    /**
+     * If {@code tree} is a Python lock file (uv.lock or Pipfile.lock), capture
+     * its current content into the shared {@link PythonDependencyExecutionContextView}
+     * so downstream recipes can seed regeneration from it.
+     *
+     * @return {@code true} when the tree was recognized as a lock file
+     */
+    public static boolean captureExistingLockContent(SourceFile sourceFile, Tree tree, ExecutionContext ctx) {
+        Path sourcePath = sourceFile.getSourcePath();
+        if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
+            PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
+                    correspondingPyprojectPath(sourcePath),
+                    ((Toml.Document) tree).printAll());
+            return true;
+        }
+        if (tree instanceof Json.Document && sourcePath.endsWith("Pipfile.lock")) {
+            PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
+                    correspondingPipfilePath(sourcePath),
+                    ((Json.Document) tree).printAll());
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * If a previous visitor regenerated lock content for this file, replay it here.
+     * Returns the updated tree, or {@code null} if the tree is not a lock file or
+     * there is no pending update.
+     */
+    public static @Nullable Tree maybeReplayLockContent(Tree tree, ExecutionContext ctx) {
+        if (tree instanceof Toml.Document) {
+            Toml.Document doc = (Toml.Document) tree;
+            if (doc.getSourcePath().endsWith("uv.lock")) {
+                return maybeUpdateUvLock(doc, ctx);
+            }
+        }
+        if (tree instanceof Json.Document) {
+            Json.Document doc = (Json.Document) tree;
+            if (doc.getSourcePath().endsWith("Pipfile.lock")) {
+                return maybeUpdatePipfileLock(doc, ctx);
+            }
+        }
+        return null;
+    }
+
+    /**
      * If there is regenerated uv.lock content for this document, reparse the document
      * from that content. Returns {@code null} when no update is needed (either no
      * regenerated content exists, or the current document already matches).
@@ -104,6 +159,44 @@ public class PyProjectHelper {
         // Normalize stored content to printer output for round-trip stability
         view.getUpdatedLockFiles().put(pyprojectPath, reparsedContent);
         return reparsed;
+    }
+
+    /**
+     * If there is regenerated Pipfile.lock content for this document, reparse the
+     * document from that content. Returns {@code null} when no update is needed.
+     */
+    public static Json.@Nullable Document maybeUpdatePipfileLock(Json.Document document, ExecutionContext ctx) {
+        PythonDependencyExecutionContextView view = PythonDependencyExecutionContextView.view(ctx);
+        Path pipfilePath = correspondingPipfilePath(document.getSourcePath());
+        String newContent = view.getUpdatedLockFiles().get(pipfilePath);
+        if (newContent == null) {
+            return null;
+        }
+        Json.Document reparsed = reparseJson(document, newContent);
+        String reparsedContent = reparsed.printAll();
+        if (reparsedContent.equals(document.printAll())) {
+            return null;
+        }
+        view.getUpdatedLockFiles().put(pipfilePath, reparsedContent);
+        return reparsed;
+    }
+
+    /**
+     * Reparse a JSON document from new content while preserving the original document's
+     * identity (id) and markers.
+     */
+    public static Json.Document reparseJson(Json.Document original, String newContent) {
+        JsonParser parser = new JsonParser();
+        Parser.Input input = Parser.Input.fromString(original.getSourcePath(), newContent);
+        List<SourceFile> parsed = new ArrayList<>();
+        parser.parseInputs(Collections.singletonList(input), null,
+                new InMemoryExecutionContext(Throwable::printStackTrace)).forEach(parsed::add);
+        if (!parsed.isEmpty() && parsed.get(0) instanceof Json.Document) {
+            Json.Document newDoc = (Json.Document) parsed.get(0);
+            return newDoc.withId(original.getId())
+                    .withMarkers(original.getMarkers());
+        }
+        return original;
     }
 
     /**
@@ -160,7 +253,7 @@ public class PyProjectHelper {
             String seedLock = updatedLockFiles.getOrDefault(sourcePath,
                     existingLockContents.get(sourcePath));
 
-            UvLockRegeneration.Result lockResult = UvLockRegeneration.regenerate(pyprojectContent, seedLock);
+            LockFileRegeneration.Result lockResult = LockFileRegeneration.UV.regenerate(pyprojectContent, seedLock);
             if (lockResult.isSuccess()) {
                 updatedLockFiles.put(sourcePath, lockResult.getLockFileContent());
                 existingLockContents.put(sourcePath, lockResult.getLockFileContent());
@@ -172,6 +265,56 @@ public class PyProjectHelper {
 
         if (marker != null) {
             PythonResolutionResult newMarker = PythonDependencyParser.createMarker(updated, null);
+            if (newMarker != null) {
+                updated = updated.withMarkers(updated.getMarkers().setByType(newMarker.withId(marker.getId())));
+            }
+        }
+
+        return updated;
+    }
+
+    /**
+     * After modifying a Pipfile document, regenerate the Pipfile.lock file and
+     * refresh the {@link PythonResolutionResult} marker. Returns the updated document.
+     * <p>
+     * The {@code markerFactory} callback rebuilds the marker from the updated
+     * Pipfile contents — passed in to avoid coupling this internal class to the
+     * public {@code PipfileParser}.
+     */
+    public static Toml.Document regeneratePipfileLockAndRefreshMarker(
+            Toml.Document updated,
+            ExecutionContext ctx,
+            Function<Toml.Document, PythonResolutionResult> markerFactory) {
+        PythonDependencyExecutionContextView view = PythonDependencyExecutionContextView.view(ctx);
+        Map<Path, String> updatedLockFiles = view.getUpdatedLockFiles();
+        Map<Path, String> existingLockContents = view.getExistingLockContents();
+
+        PythonResolutionResult marker = updated.getMarkers()
+                .findFirst(PythonResolutionResult.class).orElse(null);
+
+        Path sourcePath = updated.getSourcePath();
+
+        boolean lockKnown = existingLockContents.containsKey(sourcePath) ||
+                updatedLockFiles.containsKey(sourcePath) ||
+                (marker != null && !marker.getResolvedDependencies().isEmpty());
+
+        if (marker != null && lockKnown) {
+            String pipfileContent = updated.printAll();
+            String seedLock = updatedLockFiles.getOrDefault(sourcePath,
+                    existingLockContents.get(sourcePath));
+
+            LockFileRegeneration.Result lockResult = LockFileRegeneration.PIPENV.regenerate(pipfileContent, seedLock);
+            if (lockResult.isSuccess()) {
+                updatedLockFiles.put(sourcePath, lockResult.getLockFileContent());
+                existingLockContents.put(sourcePath, lockResult.getLockFileContent());
+            } else {
+                updated = Markup.warn(updated, new RuntimeException(
+                        "pipenv lock regeneration failed: " + lockResult.getErrorMessage()));
+            }
+        }
+
+        if (marker != null) {
+            PythonResolutionResult newMarker = markerFactory.apply(updated);
             if (newMarker != null) {
                 updated = updated.withMarkers(updated.getMarkers().setByType(newMarker.withId(marker.getId())));
             }
