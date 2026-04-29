@@ -36,6 +36,8 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import org.openrewrite.Parser;
+import org.openrewrite.json.JsonParser;
+import org.openrewrite.python.PipfileParser;
 import org.openrewrite.python.PyProjectTomlParser;
 import org.openrewrite.toml.TomlParser;
 
@@ -312,7 +314,7 @@ public class PythonRewriteRpc extends RewriteRpc {
     private Stream<SourceFile> parseManifest(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {
         Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
 
-        // Priority: pyproject.toml > setup.cfg > requirements.txt
+        // Priority: pyproject.toml > Pipfile > setup.cfg > requirements.txt
         // Note: setup.py is NOT handled here — it's already in the RPC stream as Py.CompilationUnit
 
         Path pyprojectPath = projectPath.resolve("pyproject.toml");
@@ -327,6 +329,22 @@ public class PythonRewriteRpc extends RewriteRpc {
                 Stream<SourceFile> uvLockStream = new TomlParser().parseInputs(
                         Collections.singletonList(uvLockInput), effectiveRelativeTo, ctx);
                 result = Stream.concat(result, uvLockStream);
+            }
+            return result;
+        }
+
+        Path pipfilePath = projectPath.resolve("Pipfile");
+        if (Files.exists(pipfilePath)) {
+            Parser.Input pipfileInput = Parser.Input.fromFile(pipfilePath);
+            Stream<SourceFile> result = new PipfileParser().parseInputs(
+                    Collections.singletonList(pipfileInput), effectiveRelativeTo, ctx);
+
+            Path pipfileLockPath = projectPath.resolve("Pipfile.lock");
+            if (Files.exists(pipfileLockPath)) {
+                Parser.Input pipfileLockInput = Parser.Input.fromFile(pipfileLockPath);
+                Stream<SourceFile> pipfileLockStream = new JsonParser().parseInputs(
+                        Collections.singletonList(pipfileLockInput), effectiveRelativeTo, ctx);
+                result = Stream.concat(result, pipfileLockStream);
             }
             return result;
         }
