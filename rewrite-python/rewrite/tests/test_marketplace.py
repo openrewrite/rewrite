@@ -248,19 +248,19 @@ class TestPerPackageAttribution:
 
     def setup_method(self):
         import rewrite.rpc.server as server
+        from rewrite.discovery import RecipeAttribution
 
         # Reset module state so tests don't bleed into each other.
         self._saved_marketplace = server._marketplace
-        self._saved_package_recipes = dict(server._package_recipes)
+        self._saved_attribution = server._attribution
         server._marketplace = RecipeMarketplace()
-        server._package_recipes.clear()
+        server._attribution = RecipeAttribution()
 
     def teardown_method(self):
         import rewrite.rpc.server as server
 
         server._marketplace = self._saved_marketplace
-        server._package_recipes.clear()
-        server._package_recipes.update(self._saved_package_recipes)
+        server._attribution = self._saved_attribution
 
     def test_install_response_returns_only_packages_own_recipes(self, monkeypatch):
         """Installing pkg-a then pkg-b: each response carries only its own recipe."""

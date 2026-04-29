@@ -36,6 +36,8 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable, Set
 from uuid import uuid4
 
+from rewrite.discovery import RecipeAttribution
+
 # Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
 # overflow the default recursion limit (1000) during RPC serialization.
 sys.setrecursionlimit(sys.getrecursionlimit() * 2)
@@ -584,18 +586,17 @@ def handle_reset(params: dict) -> bool:
 # Global marketplace instance (lazily initialized)
 _marketplace = None
 
-# Per-package recipe attribution: normalized distribution name -> set of recipe names
-# that were activated by that distribution's entry points (or by an explicit
-# InstallRecipes call for that package). Used by handle_install_recipes to
-# scope its response to the requested package and by handle_get_marketplace
-# to filter the singleton marketplace down to a single package.
-_package_recipes: Dict[str, Set[str]] = {}
+# Tracks which distribution's entry point activated which recipes. Used by
+# handle_install_recipes to scope its response to the requested distribution
+# and by handle_get_marketplace to filter the singleton marketplace down to
+# a single package.
+_attribution = RecipeAttribution()
 
 
 def _get_marketplace():
     """Get or create the global marketplace instance.
 
-    Discovery populates ``_package_recipes`` so each recipe is attributed to the
+    Discovery populates ``_attribution`` so each recipe is attributed to the
     distribution whose entry point activated it. Without that attribution, a
     later GetMarketplace or InstallRecipes for package X would incorrectly
     return every recipe in the singleton, including the built-in
@@ -604,7 +605,7 @@ def _get_marketplace():
     """
     global _marketplace
     if _marketplace is None:
-        from rewrite.discovery import discover_recipes, _normalize_package_name, _recipe_name_set
+        from rewrite.discovery import discover_recipes, _recipe_name_set
         from rewrite.marketplace import RecipeMarketplace
         from rewrite import activate
 
@@ -612,7 +613,7 @@ def _get_marketplace():
 
         # Discover from installed packages, tracking which distribution
         # contributed each recipe.
-        discover_recipes(marketplace=_marketplace, attribution=_package_recipes)
+        discover_recipes(marketplace=_marketplace, attribution=_attribution)
 
         # Also activate local recipes (in case the openrewrite distribution
         # isn't pip-installed, e.g., when running from source). When it is
@@ -621,9 +622,7 @@ def _get_marketplace():
         # they're returned by GetMarketplace/InstallRecipes for that package.
         before = _recipe_name_set(_marketplace)
         activate(_marketplace)
-        added = _recipe_name_set(_marketplace) - before
-        if added:
-            _package_recipes.setdefault(_normalize_package_name("openrewrite"), set()).update(added)
+        _attribution.record("openrewrite", _recipe_name_set(_marketplace) - before)
 
     return _marketplace
 
@@ -650,7 +649,7 @@ def handle_install_recipes(params: dict) -> dict:
     """
     import importlib
     import importlib.util
-    from rewrite.discovery import _normalize_package_name, _recipe_name_set
+    from rewrite.discovery import _recipe_name_set
 
     marketplace = _get_marketplace()
 
@@ -669,11 +668,7 @@ def handle_install_recipes(params: dict) -> dict:
         if package_name:
             before = _recipe_name_set(marketplace)
             _import_and_activate_package(package_name, marketplace, local_path)
-            added = _recipe_name_set(marketplace) - before
-            if added:
-                _package_recipes.setdefault(
-                    _normalize_package_name(package_name), set()
-                ).update(added)
+            _attribution.record(package_name, _recipe_name_set(marketplace) - before)
 
     elif isinstance(recipes, dict):
         # Package spec with name and optional version - package should already be installed
@@ -694,21 +689,19 @@ def handle_install_recipes(params: dict) -> dict:
 
         before = _recipe_name_set(marketplace)
         _import_and_activate_package(package_name, marketplace)
-        added = _recipe_name_set(marketplace) - before
-        if added:
-            _package_recipes.setdefault(
-                _normalize_package_name(package_name), set()
-            ).update(added)
+        _attribution.record(package_name, _recipe_name_set(marketplace) - before)
     else:
         raise ValueError(f"Invalid recipes parameter: {recipes}")
 
     package_rows: List[dict] = []
     if package_name:
-        # Use an empty set rather than None when the package activated nothing,
-        # so the filter scopes the result to "this package's recipes" (zero of
-        # them) instead of falling back to "no filter" and returning everything.
-        attributed = _package_recipes.get(_normalize_package_name(package_name), set())
-        package_rows = _collect_marketplace_rows(marketplace, recipe_filter=attributed)
+        # recipes_for returns an empty set (not None) when the package activated
+        # nothing, so the filter scopes the result to "this package's recipes"
+        # (zero of them) instead of falling back to "no filter" and returning
+        # everything.
+        package_rows = _collect_marketplace_rows(
+            marketplace, recipe_filter=_attribution.recipes_for(package_name)
+        )
 
     logger.info(
         f"InstallRecipes: returning {len(package_rows)} recipes for {package_name}"
@@ -883,22 +876,20 @@ def handle_get_marketplace(params: dict) -> List[dict]:
 
     Args:
         params: Optional dict with a 'packageName' key. When supplied, the
-            response is filtered to recipes attributed to that distribution
-            (via _package_recipes), so callers requesting a specific bundle
-            don't get every recipe in the singleton marketplace.
+            response is filtered to recipes attributed to that distribution,
+            so callers requesting a specific bundle don't get every recipe
+            in the singleton marketplace.
 
     Returns:
         List of dicts with 'descriptor' and 'categoryPaths' for each recipe.
     """
-    from rewrite.discovery import _normalize_package_name
-
     marketplace = _get_marketplace()
 
     recipe_filter: Optional[Set[str]] = None
     if isinstance(params, dict):
         package_name = params.get('packageName')
         if isinstance(package_name, str) and package_name:
-            recipe_filter = _package_recipes.get(_normalize_package_name(package_name), set())
+            recipe_filter = _attribution.recipes_for(package_name)
 
     rows = _collect_marketplace_rows(marketplace, recipe_filter=recipe_filter)
     logger.info(f"GetMarketplace: returning {len(rows)} recipes")
