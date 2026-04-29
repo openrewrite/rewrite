@@ -240,8 +240,8 @@ class TestPerPackageAttribution:
 
     Before the fix, a singleton marketplace was shared across all installs and
     GetMarketplace returned everything in it. Installing a non-recipe package
-    (e.g., a visualization-only pip package) would still report the eight
-    built-in ``org.openrewrite.python.*`` recipes as belonging to that package.
+    (e.g., a visualization-only pip package) would still report every built-in
+    ``org.openrewrite.python.*`` recipe as belonging to that package.
     These tests pin the per-distribution scoping so each package's install
     response carries only the recipes its own entry points activated.
     """
@@ -289,7 +289,7 @@ class TestPerPackageAttribution:
 
         Reproduces the moderne-visualizations-misc case: pkg-a contributed
         recipes earlier; pkg-b is a no-op (no openrewrite.recipes entry point).
-        Installing pkg-b must NOT inherit pkg-a's eight recipes.
+        Installing pkg-b must NOT inherit pkg-a's recipes.
         """
         import rewrite.rpc.server as server
 

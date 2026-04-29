@@ -598,9 +598,9 @@ def _get_marketplace():
     Discovery populates ``_package_recipes`` so each recipe is attributed to the
     distribution whose entry point activated it. Without that attribution, a
     later GetMarketplace or InstallRecipes for package X would incorrectly
-    return every recipe in the singleton (e.g., the eight built-in
+    return every recipe in the singleton, including the built-in
     ``org.openrewrite.python.*`` recipes activated by the ``openrewrite``
-    distribution itself).
+    distribution itself.
     """
     global _marketplace
     if _marketplace is None:
