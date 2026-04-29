@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.python.PipfileParser;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.toml.TomlParser;
@@ -215,6 +216,90 @@ public class PyProjectHelper {
                     .withMarkers(original.getMarkers());
         }
         return original;
+    }
+
+    /**
+     * Re-derive the {@link PythonResolutionResult} marker on a modified dependency
+     * source file by re-parsing its current document content. This is needed after
+     * structural edits (adding/removing/changing dependencies) so that the marker's
+     * declared-dependency list reflects the new content; otherwise idempotency
+     * checks in subsequent recipe cycles see stale data and re-apply the edit.
+     * Returns the source file unchanged if no marker is present or the file shape
+     * is not recognised.
+     */
+    public static SourceFile refreshMarker(SourceFile depsFile) {
+        PythonResolutionResult existing = depsFile.getMarkers()
+                .findFirst(PythonResolutionResult.class).orElse(null);
+        if (existing == null) {
+            return depsFile;
+        }
+        if (depsFile instanceof Toml.Document) {
+            Toml.Document doc = (Toml.Document) depsFile;
+            Path sourcePath = doc.getSourcePath();
+            if (sourcePath.endsWith("pyproject.toml")) {
+                PythonResolutionResult newMarker = PythonDependencyParser.createMarker(doc, null);
+                if (newMarker != null) {
+                    return doc.withMarkers(doc.getMarkers().setByType(newMarker.withId(existing.getId())));
+                }
+            } else if (sourcePath.endsWith("Pipfile")) {
+                PythonResolutionResult newMarker = PipfileParser.createMarker(doc);
+                if (newMarker != null) {
+                    return doc.withMarkers(doc.getMarkers().setByType(newMarker.withId(existing.getId())));
+                }
+            }
+        }
+        return depsFile;
+    }
+
+    /**
+     * Regenerate the lock file for a dependencies-file source by dispatching to the
+     * package manager indicated by its {@link PythonResolutionResult} marker.
+     * Returns a {@link RegenerationResult} carrying the regenerated lock content
+     * on success, or an error message on failure. Returns {@code null} when the
+     * source has no marker, no resolvable package manager, or no recognised
+     * regeneration adapter.
+     */
+    public static @Nullable RegenerationResult regenerateLockContent(
+            SourceFile depsFile, @Nullable String capturedLockContent) {
+        PythonResolutionResult marker = depsFile.getMarkers()
+                .findFirst(PythonResolutionResult.class).orElse(null);
+        if (marker == null) {
+            return null;
+        }
+        if (marker.getPackageManager() == null) {
+            return null;
+        }
+        LockFileRegeneration regen;
+        switch (marker.getPackageManager()) {
+            case Uv:
+                regen = LockFileRegeneration.UV;
+                break;
+            case Pipenv:
+                regen = LockFileRegeneration.PIPENV;
+                break;
+            default:
+                return null;
+        }
+        LockFileRegeneration.Result result = regen.regenerate(
+                depsFile.printAll(), capturedLockContent);
+        return result.isSuccess()
+                ? RegenerationResult.success(result.getLockFileContent())
+                : RegenerationResult.failure(result.getErrorMessage());
+    }
+
+    @lombok.Value
+    public static class RegenerationResult {
+        boolean success;
+        @Nullable String lockContent;
+        @Nullable String errorMessage;
+
+        public static RegenerationResult success(String lockContent) {
+            return new RegenerationResult(true, lockContent, null);
+        }
+
+        public static RegenerationResult failure(String errorMessage) {
+            return new RegenerationResult(false, null, errorMessage);
+        }
     }
 
     /**
