@@ -2515,8 +2515,8 @@ class AddAnnotationProcessorTest implements RewriteTest {
               mavenProject("service-module",
                 pomXml(
                   // Service module: declares the corporate parent by GAV (no relativePath
-                  // — externally resolved), has Lombok at provided scope, and declares
-                  // maven-compiler-plugin without annotationProcessorPaths.
+                  // — externally resolved), has Lombok at provided scope, no <build>
+                  // declared (relies on Maven default lifecycle / inherited plugin config).
                   """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
@@ -2541,14 +2541,6 @@ class AddAnnotationProcessorTest implements RewriteTest {
                                 <scope>provided</scope>
                             </dependency>
                         </dependencies>
-                        <build>
-                            <plugins>
-                                <plugin>
-                                    <groupId>org.apache.maven.plugins</groupId>
-                                    <artifactId>maven-compiler-plugin</artifactId>
-                                </plugin>
-                            </plugins>
-                        </build>
                     </project>
                     """,
                   // Expected: the orphan child gets the annotation processor in its own

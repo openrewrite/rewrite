@@ -33,8 +33,13 @@ import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -78,47 +83,75 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
             "Updates the annotation processor version if a newer version is specified.";
 
     /**
-     * Accumulator to track which POMs need modifications and how.
+     * Accumulator populated during the scan phase and resolved into final
+     * parent/orphan path sets via {@link #resolve()} before the visitor runs.
      */
     public static class Scanned {
-        /**
-         * Source paths of POMs that are referenced as parents by at least one child within the reactor.
-         * These should get pluginManagement updates.
-         */
-        Set<Path> parentPomPaths = new HashSet<>();
-
-        /**
-         * Source paths of POMs that have no parent within the reactor.
-         * After scanning, aggregator-only POMs will be filtered out.
-         */
-        Set<Path> candidateOrphanPaths = new HashSet<>();
-
-        /**
-         * Source paths of POMs that have a &lt;modules&gt; section (aggregators).
-         * Used to identify aggregator-only POMs that should not be modified.
-         */
         Set<Path> aggregatorPaths = new HashSet<>();
+        Map<Path, Set<Path>> aggregatorSubmodulePaths = new HashMap<>();
 
         /**
-         * Paths of POMs where the annotation processor is already present in the effective POM
-         * (via a parent POM outside the reactor), but not in the POM's own XML.
-         * These POMs should be skipped to avoid redundant configuration.
+         * Child-to-parent links recorded whenever
+         * {@code MavenResolutionResult.parentPomIsProjectPom()} is true. The
+         * check is GAV-based, so the link is upheld in {@link #resolve()} only
+         * when the child is reachable via some aggregator's &lt;modules&gt;
+         * chain; otherwise the child is treated as an orphan instead.
          */
+        Map<Path, Path> tentativeChildToParent = new HashMap<>();
+
+        Set<Path> noReactorParentPaths = new HashSet<>();
+        Set<Path> packagingPomPaths = new HashSet<>();
         Set<Path> alreadyConfiguredInEffectivePomPaths = new HashSet<>();
 
-        /**
-         * Get the actual orphan paths (candidates minus aggregator-only POMs).
-         * A true orphan has no parent in reactor and is not an aggregator-only POM.
-         */
-        Set<Path> getOrphanPomPaths() {
-            Set<Path> result = new HashSet<>(candidateOrphanPaths);
-            // Remove aggregator-only POMs (aggregators that are not also parents)
-            for (Path aggregatorPath : aggregatorPaths) {
-                if (!parentPomPaths.contains(aggregatorPath)) {
-                    result.remove(aggregatorPath);
+        Set<Path> parentPomPaths = new HashSet<>();
+        Set<Path> orphanPomPaths = new HashSet<>();
+
+        void resolve() {
+            Set<Path> reactorLinked = computeReactorLinkedPaths();
+            Set<Path> orphans = new HashSet<>(noReactorParentPaths);
+
+            for (Map.Entry<Path, Path> e : tentativeChildToParent.entrySet()) {
+                Path child = e.getKey();
+                Path parent = e.getValue();
+                if (reactorLinked.contains(child)) {
+                    parentPomPaths.add(parent);
+                } else {
+                    orphans.add(child);
                 }
             }
-            return result;
+
+            // Aggregator-only POMs are not modified.
+            for (Path aggregator : aggregatorPaths) {
+                if (!parentPomPaths.contains(aggregator)) {
+                    orphans.remove(aggregator);
+                }
+            }
+
+            // Dangling pom-packaging POMs (not claimed as parents, not aggregators)
+            // have nothing to compile; leave them alone.
+            for (Path packagingPom : packagingPomPaths) {
+                if (!parentPomPaths.contains(packagingPom) && !aggregatorPaths.contains(packagingPom)) {
+                    orphans.remove(packagingPom);
+                }
+            }
+
+            orphanPomPaths.addAll(orphans);
+        }
+
+        private Set<Path> computeReactorLinkedPaths() {
+            Set<Path> reachable = new HashSet<>();
+            Deque<Path> queue = new ArrayDeque<>(aggregatorPaths);
+            while (!queue.isEmpty()) {
+                Path p = queue.poll();
+                if (!reachable.add(p)) {
+                    continue;
+                }
+                Set<Path> subs = aggregatorSubmodulePaths.get(p);
+                if (subs != null) {
+                    queue.addAll(subs);
+                }
+            }
+            return reachable;
         }
     }
 
@@ -148,28 +181,54 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                     acc.alreadyConfiguredInEffectivePomPaths.add(sourcePath);
                 }
 
-                if (mrr.parentPomIsProjectPom()) {
-                    // This module has a parent within the reactor
-                    // Mark the parent for pluginManagement update
-                    MavenResolutionResult parent = mrr.getParent();
-                    if (parent != null) {
-                        Path parentPath = parent.getPom().getRequested().getSourcePath();
+                if (sourcePath != null) {
+                    if (mrr.parentPomIsProjectPom()) {
+                        // Parent's GAV matches a project pom, but this is a tentative
+                        // signal only — verified at resolution time by checking that
+                        // the child is reactor-linked via an aggregator's <modules>
+                        // chain. Two POMs co-ingested in the LST without a real
+                        // aggregator linking them must not be treated as a reactor.
+                        MavenResolutionResult parent = mrr.getParent();
+                        Path parentPath = parent == null ? null :
+                                parent.getPom().getRequested().getSourcePath();
                         if (parentPath != null) {
-                            acc.parentPomPaths.add(parentPath);
+                            acc.tentativeChildToParent.put(sourcePath, parentPath);
+                        } else {
+                            acc.noReactorParentPaths.add(sourcePath);
                         }
+                    } else {
+                        // No project-pom parent — true single-module root or
+                        // standalone pom-packaging shell.
+                        acc.noReactorParentPaths.add(sourcePath);
                     }
-                } else {
-                    // This module has no parent within the reactor
-                    // Mark as candidate orphan (will be filtered later if it's aggregator-only)
-                    if (sourcePath != null) {
-                        acc.candidateOrphanPaths.add(sourcePath);
+
+                    if ("pom".equals(resolvedPom.getPackaging())) {
+                        acc.packagingPomPaths.add(sourcePath);
                     }
                 }
 
-                // Track aggregator POMs (those with <modules> section)
-                List<String> subprojects = mrr.getPom().getSubprojects();
-                if (sourcePath != null && subprojects != null && !subprojects.isEmpty()) {
+                // Treat this POM as a reactor aggregator only when its raw XML
+                // declared <modules>/<subprojects>. We read that off the
+                // requested (unresolved) Pom — `mrr.getModules()` is unsuitable
+                // because it lists POMs that declare *this* one as their
+                // <parent> (which can happen without any <modules>
+                // declaration on this side).
+                List<String> requestedSubs = mrr.getPom().getRequested().getSubprojects();
+                if (sourcePath != null && requestedSubs != null && !requestedSubs.isEmpty()) {
                     acc.aggregatorPaths.add(sourcePath);
+                    // Resolve each <module> string relative to the aggregator's
+                    // directory. baseDir is null when the aggregator is at the
+                    // root (e.g. "pom.xml"); fall back to the empty path so
+                    // root-level reactors still reach their children.
+                    Path baseDir = sourcePath.getParent();
+                    Set<Path> resolvedSubmodules = new HashSet<>();
+                    for (String sub : requestedSubs) {
+                        Path resolved = baseDir == null ?
+                                Paths.get(sub, "pom.xml").normalize() :
+                                baseDir.resolve(sub).resolve("pom.xml").normalize();
+                        resolvedSubmodules.add(resolved);
+                    }
+                    acc.aggregatorSubmodulePaths.put(sourcePath, resolvedSubmodules);
                 }
 
                 return document;
@@ -179,6 +238,7 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
+        acc.resolve();
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -197,21 +257,23 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                 }
 
                 boolean isParent = acc.parentPomPaths.contains(sourcePath);
-                // Skip POMs that are neither parents nor orphans (children with parents in reactor)
-                if (!isParent && !acc.getOrphanPomPaths().contains(sourcePath)) {
+                if (!isParent && !acc.orphanPomPaths.contains(sourcePath)) {
                     return tree;
                 }
-
-                // Skip POMs where the annotation processor is already configured via a parent POM
-                // outside the reactor (present in effective POM but not in own XML)
                 if (acc.alreadyConfiguredInEffectivePomPaths.contains(sourcePath)) {
                     return tree;
                 }
 
-                // First, ensure the plugin exists - use the source path as file pattern
+                // GAV-coincident orphan: AddPluginVisitor.isAcceptable would
+                // otherwise short-circuit via its parentPomIsProjectPom()
+                // check and refuse to add the plugin. Targeting the visitor
+                // at this exact source path bypasses that guard.
+                boolean isGavCoincidentOrphan = !isParent && mrr.parentPomIsProjectPom();
+                String pluginFilePattern = isGavCoincidentOrphan ? sourcePath.toString() : null;
                 tree = new AddPluginVisitor(isParent,
                         MAVEN_COMPILER_PLUGIN_GROUP_ID, MAVEN_COMPILER_PLUGIN_ARTIFACT_ID, null,
-                        "<configuration><annotationProcessorPaths/></configuration>", null, null, null
+                        "<configuration><annotationProcessorPaths/></configuration>", null, null,
+                        pluginFilePattern
                 ).visit(tree, ctx);
 
                 // Then, configure the annotation processor path
