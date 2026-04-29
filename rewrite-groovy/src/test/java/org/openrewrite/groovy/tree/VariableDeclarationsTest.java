@@ -233,4 +233,35 @@ class VariableDeclarationsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void typeParameterAsLocalVariableType() {
+        rewriteRun(
+          groovy(
+            """
+              class TaskRunner<E> {
+                  void run() {
+                      E task = null
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeParameterAsLocalVariableTypeFromMethodCall() {
+        rewriteRun(
+          groovy(
+            """
+              class TaskRunner<E> {
+                  java.util.concurrent.BlockingQueue<E> queue
+                  void run() {
+                      E task = queue.take()
+                  }
+              }
+              """
+          )
+        );
+    }
 }
