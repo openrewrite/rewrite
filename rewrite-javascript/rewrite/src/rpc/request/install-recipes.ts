@@ -197,7 +197,15 @@ function preloadCoreModules(logger?: rpc.Logger) {
  */
 function setupSharedDependencies(targetModulePath: string, logger?: rpc.Logger) {
     const sharedDeps = ['@openrewrite/rewrite', 'vscode-jsonrpc', 'mutative'];
-    const targetDir = path.dirname(targetModulePath);
+    // For local-path installs, targetModulePath is the package dir itself.
+    let targetDir: string;
+    try {
+        targetDir = fs.statSync(targetModulePath).isDirectory()
+            ? targetModulePath
+            : path.dirname(targetModulePath);
+    } catch {
+        targetDir = path.dirname(targetModulePath);
+    }
 
     sharedDeps.forEach(depName => {
         try {
