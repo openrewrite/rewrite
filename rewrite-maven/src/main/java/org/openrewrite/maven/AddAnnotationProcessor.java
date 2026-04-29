@@ -285,6 +285,14 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                             MavenResolutionResult currentMrr = getResolutionResult();
                             AtomicReference<TreeVisitor<?, ExecutionContext>> maybePropertyUpdate = new AtomicReference<>();
 
+                            // Ensure <configuration><annotationProcessorPaths/></configuration>
+                            // exists on the plugin so the path-adding visitor below has
+                            // something to attach to. AddPluginVisitor only seeds this
+                            // template when it adds a *new* plugin; when the plugin is
+                            // pre-declared (e.g. just to set <source>/<target>), the
+                            // structure must be filled in here.
+                            Xml.Tag pluginTree = ensureAnnotationProcessorPathsTag(plugin.getTree());
+
                             Xml.Tag modifiedPlugin = new XmlIsoVisitor<ExecutionContext>() {
                                 @Override
                                 public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -345,7 +353,7 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                                                     groupId, artifactId, version);
                                     return tg.withContent(ListUtils.concat(tg.getChildren(), Xml.Tag.build(pathXml)));
                                 }
-                            }.visitTag(plugin.getTree(), ctx);
+                            }.visitTag(pluginTree, ctx);
 
                             if (maybePropertyUpdate.get() != null) {
                                 doAfterVisit(maybePropertyUpdate.get());
@@ -362,6 +370,27 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                 }.visit(tree, ctx);
             }
         };
+    }
+
+    /**
+     * If the matched maven-compiler-plugin lacks {@code <configuration>} or its
+     * {@code <configuration>} lacks {@code <annotationProcessorPaths>}, add the
+     * missing structure so the path-adding visitor has somewhere to attach.
+     * No-op when the structure is already present.
+     */
+    private static Xml.Tag ensureAnnotationProcessorPathsTag(Xml.Tag plugin) {
+        Xml.Tag config = plugin.getChild("configuration").orElse(null);
+        if (config == null) {
+            Xml.Tag newConfig = Xml.Tag.build("<configuration>\n<annotationProcessorPaths/>\n</configuration>");
+            return plugin.withContent(ListUtils.concat(plugin.getChildren(), newConfig));
+        }
+        if (config.getChild("annotationProcessorPaths").isPresent()) {
+            return plugin;
+        }
+        Xml.Tag updatedConfig = config.withContent(
+                ListUtils.concat(config.getChildren(), Xml.Tag.build("<annotationProcessorPaths/>")));
+        return plugin.withContent(ListUtils.map(plugin.getChildren(),
+                child -> child == config ? updatedConfig : child));
     }
 
     /**
