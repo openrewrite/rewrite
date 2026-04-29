@@ -102,16 +102,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     }
 
     static class ProjectState {
-        final Path depsFilePath;
         @Nullable Path lockFilePath;
         @Nullable String capturedLockContent;
         boolean depsFileMatches;
         @Nullable String regeneratedLockContent;
         @Nullable String regenerationError;
-
-        ProjectState(Path depsFilePath) {
-            this.depsFilePath = depsFilePath;
-        }
     }
 
     @Override
@@ -135,7 +130,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
 
                 if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
                     Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
-                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, k -> new ProjectState());
                     ps.lockFilePath = sourcePath;
                     ps.capturedLockContent = ((Toml.Document) tree).printAll();
                     acc.lockToDeps.put(sourcePath, depsPath);
@@ -143,7 +138,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 }
                 if (tree instanceof Json.Document && sourcePath.endsWith("Pipfile.lock")) {
                     Path depsPath = PyProjectHelper.correspondingPipfilePath(sourcePath);
-                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, ProjectState::new);
+                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, k -> new ProjectState());
                     ps.lockFilePath = sourcePath;
                     ps.capturedLockContent = ((Json.Document) tree).printAll();
                     acc.lockToDeps.put(sourcePath, depsPath);
@@ -152,7 +147,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
 
                 PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                 if (trait != null) {
-                    ProjectState ps = acc.projects.computeIfAbsent(sourcePath, ProjectState::new);
+                    ProjectState ps = acc.projects.computeIfAbsent(sourcePath, k -> new ProjectState());
                     ps.depsFileMatches = matchesAddDependency(trait);
                 }
                 return tree;
@@ -172,7 +167,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        if (acc.projects.isEmpty()) {
+        if (acc.projects.values().stream().noneMatch(ps -> ps.depsFileMatches)) {
             return TreeVisitor.noop();
         }
         return new TreeVisitor<Tree, ExecutionContext>() {
