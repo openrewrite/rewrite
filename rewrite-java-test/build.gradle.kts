@@ -14,6 +14,8 @@ dependencies {
     implementation(project(":rewrite-java"))
     implementation(project(":rewrite-test"))
 
+    testImplementation(project(":rewrite-groovy"))
+    testImplementation(project(":rewrite-kotlin"))
     testImplementation("io.github.classgraph:classgraph:latest.release")
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
     testRuntimeOnly(project(":rewrite-java-21"))
