@@ -17,9 +17,8 @@
 from __future__ import annotations
 
 import inspect
-from dataclasses import dataclass, field
 from importlib.metadata import entry_points
-from typing import Dict, List, Optional, Set, Tuple, Type
+from typing import Dict, List, NewType, Optional, Set, Tuple, Type
 
 from rewrite.category import CategoryDescriptor
 from rewrite.decorators import get_recipe_category
@@ -27,7 +26,19 @@ from rewrite.marketplace import RecipeMarketplace
 from rewrite.recipe import Recipe
 
 
-@dataclass
+# A recipe's fully qualified name (e.g., ``org.openrewrite.python.RemovePass``).
+# NewType is a static-only distinction — at runtime these are plain ``str`` —
+# but it lets type checkers refuse a bare string where a recipe-name set is
+# expected, which catches the kind of "did I just lookup the wrong key" bug
+# that motivated this module's per-distribution attribution in the first place.
+RecipeName = NewType("RecipeName", str)
+
+# A python distribution name in its PEP 503 normalized form (hyphens,
+# underscores, dots all folded to ``_`` and lowercased). Used as the
+# attribution map key. Construct only via :func:`_normalize_package_name`.
+NormalizedDistName = NewType("NormalizedDistName", str)
+
+
 class RecipeAttribution:
     """Tracks which distribution's entry point activated which recipes.
 
@@ -38,9 +49,10 @@ class RecipeAttribution:
     can use any common spelling.
     """
 
-    _by_package: Dict[str, Set[str]] = field(default_factory=dict)
+    def __init__(self) -> None:
+        self._by_package: Dict[NormalizedDistName, Set[RecipeName]] = {}
 
-    def record(self, distribution_name: str, recipe_names: Set[str]) -> None:
+    def record(self, distribution_name: str, recipe_names: Set[RecipeName]) -> None:
         """Attribute ``recipe_names`` to ``distribution_name``.
 
         No-op when ``recipe_names`` is empty; multiple calls for the same
@@ -51,15 +63,12 @@ class RecipeAttribution:
         key = _normalize_package_name(distribution_name)
         self._by_package.setdefault(key, set()).update(recipe_names)
 
-    def recipes_for(self, distribution_name: str) -> Set[str]:
+    def recipes_for(self, distribution_name: str) -> Set[RecipeName]:
         """Return the (possibly empty) set of recipe names attributed to a
         distribution. The returned set is a snapshot — mutating it does not
         change the attribution.
         """
         return set(self._by_package.get(_normalize_package_name(distribution_name), ()))
-
-    def clear(self) -> None:
-        self._by_package.clear()
 
 
 def discover_recipes(
@@ -108,10 +117,10 @@ def discover_recipes(
                 module.activate(marketplace)
                 continue
             dist_name = ep.dist.name if ep.dist is not None else None
-            before = _recipe_name_set(marketplace)
+            before = recipe_name_set(marketplace)
             module.activate(marketplace)
             if dist_name:
-                attribution.record(dist_name, _recipe_name_set(marketplace) - before)
+                attribution.record(dist_name, recipe_name_set(marketplace) - before)
         except Exception:
             # Log or handle the error - for now, skip failed activations
             pass
@@ -119,18 +128,18 @@ def discover_recipes(
     return marketplace
 
 
-def _recipe_name_set(marketplace: RecipeMarketplace) -> Set[str]:
+def recipe_name_set(marketplace: RecipeMarketplace) -> Set[RecipeName]:
     """Snapshot the set of recipe names currently in the marketplace."""
-    return {r.name for r in marketplace.all_recipes()}
+    return {RecipeName(r.name) for r in marketplace.all_recipes()}
 
 
-def _normalize_package_name(name: str) -> str:
+def _normalize_package_name(name: str) -> NormalizedDistName:
     """Normalize a python distribution name for attribution lookup.
 
     PyPI/pip treats hyphens, underscores, and case as equivalent when
     resolving distribution identity.
     """
-    return name.replace("-", "_").replace(".", "_").lower()
+    return NormalizedDistName(name.replace("-", "_").replace(".", "_").lower())
 
 
 def discover_decorated_recipes_in_module(

@@ -9,7 +9,13 @@ except ImportError:
 
 from .category import CategoryDescriptor, LOWEST_PRECEDENCE, DEFAULT_PRECEDENCE, HIGHEST_PRECEDENCE
 from .decorators import categorize, get_recipe_category
-from .discovery import discover_recipes, discover_decorated_recipes_in_module, RecipeAttribution
+from .discovery import (
+    discover_recipes,
+    discover_decorated_recipes_in_module,
+    RecipeAttribution,
+    RecipeName,
+    NormalizedDistName,
+)
 from .execution import ExecutionContext, DelegatingExecutionContext, InMemoryExecutionContext, \
     RecipeRunException, LargeSourceSet, InMemoryLargeSourceSet, Result
 from .marketplace import RecipeMarketplace, Python
@@ -69,6 +75,8 @@ __all__ = [
     'discover_recipes',
     'discover_decorated_recipes_in_module',
     'RecipeAttribution',
+    'RecipeName',
+    'NormalizedDistName',
     'activate',
 
     # Markers
