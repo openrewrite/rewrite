@@ -1196,16 +1196,18 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitAssertStatement(AssertStatement statement) {
-            Space prefix = whitespace();
-            skip("assert");
-            Expression condition = doVisit(statement.getBooleanExpression());
-            JLeftPadded<Expression> message = null;
-            if (!(statement.getMessageExpression() instanceof ConstantExpression) || !((ConstantExpression) statement.getMessageExpression()).isNullExpression()) {
-                Space messagePrefix = whitespace();
-                skip(":");
-                message = padLeft(messagePrefix, doVisit(statement.getMessageExpression()));
-            }
-            queue.add(new J.Assert(randomId(), prefix, Markers.EMPTY, condition, message));
+            queue.add(labeled(statement, () -> {
+                Space prefix = whitespace();
+                skip("assert");
+                Expression condition = doVisit(statement.getBooleanExpression());
+                JLeftPadded<Expression> message = null;
+                if (!(statement.getMessageExpression() instanceof ConstantExpression) || !((ConstantExpression) statement.getMessageExpression()).isNullExpression()) {
+                    Space messagePrefix = whitespace();
+                    skip(":");
+                    message = padLeft(messagePrefix, doVisit(statement.getMessageExpression()));
+                }
+                return new J.Assert(randomId(), prefix, Markers.EMPTY, condition, message);
+            }));
         }
 
         @Override
