@@ -27,6 +27,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.RandomizeIdVisitor;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
@@ -43,6 +44,17 @@ public class JavaTemplateParser {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("#{", "}", null);
 
     private static final String TEMPLATE_CACHE_MESSAGE_KEY = "__org.openrewrite.java.internal.template.JavaTemplateParser.cache__";
+
+    /**
+     * Key for a {@link JavaTypeFactory.Provider} on a cursor (looked up via
+     * {@link Cursor#getNearestMessage}). When present, template parsers install
+     * the provider on the internal {@link JavaParser.Builder}, which invokes it
+     * with the parser's resolved classpath at build time — enabling partition-
+     * backed type resolution (proxies match those on the surrounding AST) and
+     * reuse of types resolved during the main parse. Per-file cursors may
+     * override the root default to provide per-classpath factories.
+     */
+    public static final String TYPE_FACTORY_PROVIDER_KEY = "org.openrewrite.java.typeFactoryProvider";
 
     private static final String PACKAGE_STUB = "package #{}; class $Template {}";
     private static final String PARAMETER_STUB = "abstract class $Template { abstract void $template(#{}); }";
@@ -90,7 +102,7 @@ public class JavaTemplateParser {
         @Language("java") String stub = addImports(substitute(PARAMETER_STUB, template));
         onBeforeParseTemplate.accept(stub);
         return cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(stub);
+            JavaSourceFile cu = compileTemplate(cursor, stub);
             J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
             return m.getParameters();
         });
@@ -101,7 +113,7 @@ public class JavaTemplateParser {
         onBeforeParseTemplate.accept(stub);
 
         return (J.Lambda.Parameters) cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(stub);
+            JavaSourceFile cu = compileTemplate(cursor, stub);
             J.Block b = (J.Block) cu.getClasses().get(0).getBody().getStatements().get(0);
             J.VariableDeclarations v = (J.VariableDeclarations) b.getStatements().get(0);
             J.Lambda l = (J.Lambda) v.getVariables().get(0).getInitializer();
@@ -115,7 +127,7 @@ public class JavaTemplateParser {
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
-                    JavaSourceFile cu = compileTemplate(stub);
+                    JavaSourceFile cu = compileTemplate(cursor, stub);
                     return statementTemplateGenerator.listTemplatedTrees(cu, Expression.class);
                 });
         if (result.isEmpty()) {
@@ -131,7 +143,7 @@ public class JavaTemplateParser {
         onBeforeParseTemplate.accept(stub);
 
         return (TypeTree) cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(stub);
+            JavaSourceFile cu = compileTemplate(cursor, stub);
             TypeTree anExtends = cu.getClasses().get(0).getExtends();
             assert anExtends != null;
             return singletonList(anExtends);
@@ -142,7 +154,7 @@ public class JavaTemplateParser {
         @Language("java") String stub = addImports(substitute(IMPLEMENTS_STUB, template));
         onBeforeParseTemplate.accept(stub);
         return cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(stub);
+            JavaSourceFile cu = compileTemplate(cursor, stub);
             List<TypeTree> anImplements = cu.getClasses().get(0).getImplements();
             assert anImplements != null;
             return anImplements;
@@ -153,7 +165,7 @@ public class JavaTemplateParser {
         @Language("java") String stub = addImports(substitute(THROWS_STUB, template));
         onBeforeParseTemplate.accept(stub);
         return cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(stub);
+            JavaSourceFile cu = compileTemplate(cursor, stub);
             J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
             List<NameTree> aThrows = m.getThrows();
             assert aThrows != null;
@@ -165,7 +177,7 @@ public class JavaTemplateParser {
         @Language("java") String stub = addImports(substitute(TYPE_PARAMS_STUB, template));
         onBeforeParseTemplate.accept(stub);
         return cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(stub);
+            JavaSourceFile cu = compileTemplate(cursor, stub);
             List<J.TypeParameter> tps = cu.getClasses().get(0).getTypeParameters();
             assert tps != null;
             return tps;
@@ -182,7 +194,7 @@ public class JavaTemplateParser {
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, mode),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
-                    JavaSourceFile cu = compileTemplate(stub);
+                    JavaSourceFile cu = compileTemplate(cursor, stub);
                     return statementTemplateGenerator.listTemplatedTrees(cu, expected);
                 });
     }
@@ -200,7 +212,7 @@ public class JavaTemplateParser {
         //       a safe, reusable key, we can consider using the cache for block statements.
         @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT);
         onBeforeParseTemplate.accept(stub);
-        JavaSourceFile cu = compileTemplate(stub);
+        JavaSourceFile cu = compileTemplate(cursor, stub);
         return (J.MethodInvocation) statementTemplateGenerator
                 .listTemplatedTrees(cu, Statement.class).get(0);
     }
@@ -214,7 +226,7 @@ public class JavaTemplateParser {
         //       a safe, reusable key, we can consider using the cache for block statements.
         @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT);
         onBeforeParseTemplate.accept(stub);
-        JavaSourceFile cu = compileTemplate(stub);
+        JavaSourceFile cu = compileTemplate(cursor, stub);
         return (J.MethodInvocation) statementTemplateGenerator
                 .listTemplatedTrees(cu, Statement.class).get(0);
     }
@@ -237,7 +249,7 @@ public class JavaTemplateParser {
         return cache(cursor, cacheKey, () -> {
             @Language("java") String stub = annotationTemplateGenerator.template(cursor, template);
             onBeforeParseTemplate.accept(stub);
-            JavaSourceFile cu = compileTemplate(stub);
+            JavaSourceFile cu = compileTemplate(cursor, stub);
             return annotationTemplateGenerator.listAnnotations(cu);
         });
     }
@@ -247,7 +259,7 @@ public class JavaTemplateParser {
         onBeforeParseTemplate.accept(stub);
 
         return (Expression) cache(cursor, stub, () -> {
-            JavaSourceFile cu = compileTemplate(stub);
+            JavaSourceFile cu = compileTemplate(cursor, stub);
             @SuppressWarnings("ConstantConditions") Expression expression = cu.getPackageDeclaration()
                     .getExpression();
             return singletonList(expression);
@@ -272,10 +284,14 @@ public class JavaTemplateParser {
         return stub;
     }
 
-    private JavaSourceFile compileTemplate(@Language("java") String stub) {
+    private JavaSourceFile compileTemplate(Cursor cursor, @Language("java") String stub) {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
+        JavaTypeFactory.Provider typeFactoryProvider = cursor.getNearestMessage(TYPE_FACTORY_PROVIDER_KEY);
+        if (parser instanceof JavaParser.Builder && typeFactoryProvider != null) {
+            ((JavaParser.Builder<?, ?>) parser).typeFactoryProvider(typeFactoryProvider);
+        }
         Parser jp = parser.build();
         return getJavaSourceFile(stub, jp, ctx)
                 // In some specific and rare cases, the parser fails to parse what is a valid program. This has been

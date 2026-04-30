@@ -28,6 +28,7 @@ import java.io.*;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,6 +37,7 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -97,7 +99,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     public static final String DEFAULT_RESOURCE_PATH = "META-INF/rewrite/classpath.tsv.gz";
 
-    private static final Map<GroupArtifactVersion, CompletableFuture<Path>> classesDirByArtifact = new ConcurrentHashMap<>();
+    private static final Map<GroupArtifactVersion, CompletableFuture<Path>> jarByArtifact = new ConcurrentHashMap<>();
 
     public static @Nullable TypeTable fromClasspath(ExecutionContext ctx, Collection<String> artifactNames) {
         try {
@@ -161,7 +163,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         Collection<String> notWritten = new ArrayList<>(artifactNames);
         for (String artifactName : artifactNames) {
             Pattern artifactPattern = Pattern.compile(artifactName + ".*");
-            for (GroupArtifactVersion groupArtifactVersion : classesDirByArtifact.keySet()) {
+            for (GroupArtifactVersion groupArtifactVersion : jarByArtifact.keySet()) {
                 if (artifactPattern
                         .matcher(groupArtifactVersion.getArtifactId() + "-" + groupArtifactVersion.getVersion())
                         .matches()) {
@@ -173,7 +175,11 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     /**
-     * Reads a type table from the classpath, and writes classes directories to disk for matching artifact names.
+     * Reads a type table from the classpath, and writes per-artifact JARs to disk for matching artifact names.
+     * <p>
+     * JARs are preferred over classes-directories on the parser classpath because javac uses an in-memory
+     * archive index ({@code ArchiveContainer}) for jars, whereas a classes-directory triggers an
+     * {@code openat} per {@code list()} call from {@code DirectoryContainer} during template parsing.
      */
     @RequiredArgsConstructor
     public static class Reader {
@@ -226,7 +232,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         private final ExecutionContext ctx;
 
         public void read(InputStream is, Options options) throws IOException {
-            parseTsvAndProcess(is, options, this::writeClassesDir);
+            parseTsvAndProcess(is, options, this::writeJar);
         }
 
         /**
@@ -368,49 +374,59 @@ public class TypeTable implements JavaParserClasspathLoader {
             void accept(String resourcePath, byte[] content);
         }
 
-        private void writeClassesDir(@Nullable GroupArtifactVersion gav, Map<String, ClassDefinition> classes,
-                                     Map<String, List<ClassDefinition>> nestedTypesByOwner,
-                                     Map<String, byte[]> resources) {
+        private void writeJar(@Nullable GroupArtifactVersion gav, Map<String, ClassDefinition> classes,
+                              Map<String, List<ClassDefinition>> nestedTypesByOwner,
+                              Map<String, byte[]> resources) {
             if (gav == null) {
                 return;
             }
 
             CompletableFuture<@Nullable Path> future = new CompletableFuture<>();
-            if (classesDirByArtifact.putIfAbsent(gav, future) != null) {
+            if (jarByArtifact.putIfAbsent(gav, future) != null) {
                 // is already being written (by concurrent thread)
                 return;
             }
 
-            Path classesDir = getClassesDir(ctx, gav);
+            Path jarPath = getJarPath(ctx, gav);
             try {
-                classes.values().forEach(classDef -> {
-                    Path classFile = classesDir.resolve(classDef.getName() + ".class");
-                    if (!classFile.getParent().toFile().mkdirs() && !Files.exists(classFile.getParent())) {
-                        throw new UncheckedIOException(new IOException("Failed to create directory " + classesDir.getParent()));
-                    }
+                // Sorting class and resource names produces deterministic jar layout — useful
+                // for cache stability across runs.
+                List<String> classNames = new ArrayList<>(classes.keySet());
+                sort(classNames);
+                List<String> resourcePaths = new ArrayList<>(resources.keySet());
+                sort(resourcePaths);
 
-                    ClassWriter cw = new ClassWriter(COMPUTE_MAXS);
-                    ClassVisitor classWriter = ctx.getMessage(VERIFY_CLASS_WRITING, false) ?
-                            new CheckClassAdapter(cw) : cw;
-
-                    processClass(classDef, nestedTypesByOwner.getOrDefault(classDef.getName(), emptyList()), classWriter);
-
-                    try {
-                        Files.write(classFile, cw.toByteArray());
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
+                Path tmpJar = Files.createTempFile(jarPath.getParent(),
+                        jarPath.getFileName().toString() + ".", ".tmp");
+                try (JarOutputStream jos = new JarOutputStream(
+                        new BufferedOutputStream(Files.newOutputStream(tmpJar)))) {
+                    for (String name : classNames) {
+                        ClassDefinition classDef = classes.get(name);
+                        ClassWriter cw = new ClassWriter(COMPUTE_MAXS);
+                        ClassVisitor classWriter = ctx.getMessage(VERIFY_CLASS_WRITING, false) ?
+                                new CheckClassAdapter(cw) : cw;
+                        processClass(classDef,
+                                nestedTypesByOwner.getOrDefault(name, emptyList()), classWriter);
+                        JarEntry entry = new JarEntry(name + ".class");
+                        // Fixed entry timestamp keeps the jar bit-stable across rebuilds.
+                        entry.setTime(0L);
+                        jos.putNextEntry(entry);
+                        jos.write(cw.toByteArray());
+                        jos.closeEntry();
                     }
-                });
-                resources.forEach((resourcePath, content) -> {
-                    Path target = classesDir.resolve(resourcePath);
-                    try {
-                        Files.createDirectories(target.getParent());
-                        Files.write(target, content);
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
+                    for (String resourcePath : resourcePaths) {
+                        JarEntry entry = new JarEntry(resourcePath);
+                        entry.setTime(0L);
+                        jos.putNextEntry(entry);
+                        jos.write(resources.get(resourcePath));
+                        jos.closeEntry();
                     }
-                });
-                future.complete(classesDir);
+                }
+                // Atomic publish: callers blocked on `future` see either the prior jar
+                // (if any) or the fully-written one — never a half-written file.
+                Files.move(tmpJar, jarPath,
+                        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                future.complete(jarPath);
             } catch (Exception e) {
                 future.completeExceptionally(e);
             }
@@ -636,24 +652,24 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
 
-    private static Path getClassesDir(ExecutionContext ctx, GroupArtifactVersion gav) {
+    private static Path getJarPath(ExecutionContext ctx, GroupArtifactVersion gav) {
         Path jarsFolder = JavaParserExecutionContextView.view(ctx)
                 .getParserClasspathDownloadTarget().toPath().resolve(".tt");
         if (!jarsFolder.toFile().mkdirs() && !Files.exists(jarsFolder)) {
             throw new UncheckedIOException(new IOException("Failed to create directory " + jarsFolder));
         }
 
-        Path classesDir = jarsFolder;
+        Path artifactDir = jarsFolder;
         for (String g : gav.getGroupId().split("\\.")) {
-            classesDir = classesDir.resolve(g);
+            artifactDir = artifactDir.resolve(g);
         }
-        classesDir = classesDir.resolve(gav.getArtifactId()).resolve(gav.getVersion());
+        artifactDir = artifactDir.resolve(gav.getArtifactId()).resolve(gav.getVersion());
 
-        if (!classesDir.toFile().mkdirs() && !Files.exists(classesDir)) {
-            throw new UncheckedIOException(new IOException("Failed to create directory " + classesDir));
+        if (!artifactDir.toFile().mkdirs() && !Files.exists(artifactDir)) {
+            throw new UncheckedIOException(new IOException("Failed to create directory " + artifactDir));
         }
 
-        return classesDir;
+        return artifactDir.resolve(gav.getArtifactId() + "-" + gav.getVersion() + ".jar");
     }
 
     public static Writer newWriter(OutputStream out) {
@@ -666,12 +682,12 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     @Override
     public @Nullable Path load(String artifactName) {
-        for (Map.Entry<GroupArtifactVersion, CompletableFuture<Path>> gavAndClassesDir : classesDirByArtifact.entrySet()) {
-            GroupArtifactVersion gav = gavAndClassesDir.getKey();
+        for (Map.Entry<GroupArtifactVersion, CompletableFuture<Path>> gavAndJar : jarByArtifact.entrySet()) {
+            GroupArtifactVersion gav = gavAndJar.getKey();
             if (Pattern.compile(artifactName + ".*")
                     .matcher(gav.getArtifactId() + "-" + gav.getVersion())
                     .matches()) {
-                return gavAndClassesDir.getValue().join();
+                return gavAndJar.getValue().join();
             }
         }
         return null;
@@ -679,8 +695,8 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     @Override
     public Collection<String> availableArtifacts() {
-        List<String> available = new ArrayList<>(classesDirByArtifact.size());
-        for (GroupArtifactVersion gav : classesDirByArtifact.keySet()) {
+        List<String> available = new ArrayList<>(jarByArtifact.size());
+        for (GroupArtifactVersion gav : jarByArtifact.keySet()) {
             available.add(gav.getArtifactId() + "-" + gav.getVersion());
         }
         sort(available);
@@ -688,13 +704,25 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     public static class Writer implements AutoCloseable {
-        private final PrintStream out;
-        private final GZIPOutputStream deflater;
+        private final @Nullable PrintStream out;
+        private final @Nullable GZIPOutputStream deflater;
+        private final @Nullable TypeTableSink sink;
 
         public Writer(OutputStream out) throws IOException {
             this.deflater = new GZIPOutputStream(out);
             this.out = new PrintStream(deflater);
             this.out.println(TsvRow.HEADER);
+            this.sink = null;
+        }
+
+        /**
+         * Create a writer that sends type metadata to a custom sink
+         * instead of writing TSV.
+         */
+        public Writer(TypeTableSink sink) {
+            this.out = null;
+            this.deflater = null;
+            this.sink = sink;
         }
 
         public Jar jar(String groupId, String artifactId, String version) {
@@ -703,8 +731,12 @@ public class TypeTable implements JavaParserClasspathLoader {
 
         @Override
         public void close() throws IOException {
-            deflater.flush();
-            out.close();
+            if (deflater != null) {
+                deflater.flush();
+            }
+            if (out != null) {
+                out.close();
+            }
         }
 
         @Value
@@ -750,8 +782,11 @@ public class TypeTable implements JavaParserClasspathLoader {
              * functions in a package).
              */
             public void writeResource(String resourcePath, byte[] content) {
-                out.println(TsvRow.resourceRow(groupId, artifactId, version,
-                        resourcePath, Base64.getEncoder().encodeToString(content)));
+                // No sink equivalent yet; resources are TSV-only.
+                if (out != null) {
+                    out.println(TsvRow.resourceRow(groupId, artifactId, version,
+                            resourcePath, Base64.getEncoder().encodeToString(content)));
+                }
             }
 
             /**
@@ -788,6 +823,9 @@ public class TypeTable implements JavaParserClasspathLoader {
                     @Override
                     public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
                         if (classDefinition != null) {
+                            if (sink != null) {
+                                return AnnotationCollectorHelper.createStructuredCollector(descriptor, classDefinition.structuredClassAnnotations);
+                            }
                             return AnnotationCollectorHelper.createCollector(descriptor, requireNonNull(classDefinition).classAnnotations);
                         }
                         return null;
@@ -827,6 +865,9 @@ public class TypeTable implements JavaParserClasspathLoader {
                             return new FieldVisitor(Opcodes.ASM9) {
                                 @Override
                                 public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                                    if (sink != null) {
+                                        return AnnotationCollectorHelper.createStructuredCollector(descriptor, member.structuredAnnotations);
+                                    }
                                     return AnnotationCollectorHelper.createCollector(descriptor, member.elementAnnotations);
                                 }
 
@@ -860,10 +901,13 @@ public class TypeTable implements JavaParserClasspathLoader {
                     @Override
                     public @Nullable MethodVisitor visitMethod(int access, @Nullable String name, String descriptor,
                                                                @Nullable String signature, String @Nullable [] exceptions) {
-                        // Repeating check from `writeMethod()` for performance reasons.
-                        // Synthetic methods are kept: Kotlin extension functions, $default overloads,
-                        // and Java bridge methods are all synthetic but part of the user-visible API.
-                        if (classDefinition != null && (Opcodes.ACC_PRIVATE & access) == 0 &&
+                        // For TSV: exclude only private; synthetic methods (Kotlin extension
+                        // functions, $default overloads, Java bridge methods) are part of the
+                        // user-visible API. For sink: exclude synthetic + bridge (match compiler).
+                        int excludeFlags = sink != null
+                                ? (Opcodes.ACC_SYNTHETIC | Opcodes.ACC_BRIDGE)
+                                : Opcodes.ACC_PRIVATE;
+                        if (classDefinition != null && (excludeFlags & access) == 0 &&
                                 name != null && !"<clinit>".equals(name)) {
                             Writer.Member member = new Writer.Member(access, name, descriptor, signature, exceptions, null);
                             return new MethodVisitor(Opcodes.ASM9) {
@@ -876,6 +920,9 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                                 @Override
                                 public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                                    if (sink != null) {
+                                        return AnnotationCollectorHelper.createStructuredCollector(descriptor, member.structuredAnnotations);
+                                    }
                                     return AnnotationCollectorHelper.createCollector(descriptor, member.elementAnnotations);
                                 }
 
@@ -1002,20 +1049,34 @@ public class TypeTable implements JavaParserClasspathLoader {
             String @Nullable [] classSuperinterfaceSignatures;
 
             List<String> classAnnotations = new ArrayList<>(4);
+            List<AnnotationDeserializer.AnnotationInfo> structuredClassAnnotations = new ArrayList<>(4);
             List<String> classTypeAnnotations = new ArrayList<>(4);
             List<String> innerClasses = new ArrayList<>(4);
             List<Writer.Member> members = new ArrayList<>();
 
             public void writeClass() {
-                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & classAccess) == 0) {
-                    out.println(TsvRow.classRow(
-                            jar.groupId, jar.artifactId, jar.version,
-                            classAccess, className,
-                            classSignature, classSuperclassName, classSuperinterfaceSignatures,
-                            classAnnotations, classTypeAnnotations, innerClasses));
+                // Sink gets all classes except synthetic; TSV excludes private too.
+                int excludeFlags = sink != null ? Opcodes.ACC_SYNTHETIC : (Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC);
+                if ((excludeFlags & classAccess) == 0) {
+                    if (sink != null) {
+                        sink.visitClass(jar.groupId, jar.artifactId, jar.version,
+                                classAccess, className, classSignature,
+                                classSuperclassName, classSuperinterfaceSignatures,
+                                structuredClassAnnotations);
+                        for (Writer.Member member : members) {
+                            member.writeMemberToSink(sink);
+                        }
+                        sink.visitEndClass();
+                    } else {
+                        out.println(TsvRow.classRow(
+                                jar.groupId, jar.artifactId, jar.version,
+                                classAccess, className,
+                                classSignature, classSuperclassName, classSuperinterfaceSignatures,
+                                classAnnotations, classTypeAnnotations, innerClasses));
 
-                    for (Writer.Member member : members) {
-                        member.writeMember(jar, this);
+                        for (Writer.Member member : members) {
+                            member.writeMember(jar, this);
+                        }
                     }
                 }
             }
@@ -1041,12 +1102,27 @@ public class TypeTable implements JavaParserClasspathLoader {
             String @Nullable [] exceptions;
             List<String> parameterNames = new ArrayList<>(4);
             List<String> elementAnnotations = new ArrayList<>(4);
+            List<AnnotationDeserializer.AnnotationInfo> structuredAnnotations = new ArrayList<>(4);
             List<String> parameterAnnotations = new ArrayList<>(4);
             List<String> typeAnnotations = new ArrayList<>(4);
 
             @Nullable
             @NonFinal
             String constantValue;
+
+            private void writeMemberToSink(TypeTableSink sink) {
+                // Sink gets all members except synthetic (match compiler behavior)
+                if ((Opcodes.ACC_SYNTHETIC & access) == 0) {
+                    if (descriptor.startsWith("(")) {
+                        sink.visitMethod(access, name, descriptor, signature,
+                                parameterNames, exceptions,
+                                structuredAnnotations, constantValue);
+                    } else {
+                        sink.visitField(access, name, descriptor, signature,
+                                structuredAnnotations, constantValue);
+                    }
+                }
+            }
 
             private void writeMember(Jar jar, ClassDefinition classDefinition) {
                 if ((Opcodes.ACC_PRIVATE & access) == 0) {

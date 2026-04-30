@@ -676,7 +676,7 @@ public class MethodMatcher {
 
         @Override
         public boolean matches(String name) {
-            return "<constructor>".equals(name);
+            return "<constructor>".equals(name) || "<init>".equals(name);
         }
 
         @Override

@@ -30,7 +30,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
@@ -60,6 +62,7 @@ public class GroovyParser implements Parser {
 
     private final boolean logCompilationWarningsAndErrors;
     private final JavaTypeCache typeCache;
+    private final JavaTypeFactory typeFactory;
     private final List<Consumer<CompilerConfiguration>> compilerCustomizers;
 
     @Override
@@ -146,6 +149,7 @@ public class GroovyParser implements Parser {
                                 compiled.getInput().getFileAttributes(),
                                 compiled.getInput().getSource(ctx),
                                 typeCache,
+                                typeFactory,
                                 ctx
                         );
                         G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
@@ -210,6 +214,12 @@ public class GroovyParser implements Parser {
         protected Collection<String> artifactNames = emptyList();
 
         private JavaTypeCache typeCache = new JavaTypeCache();
+
+        @Nullable
+        private JavaTypeFactory typeFactory;
+
+        private JavaTypeFactory.@Nullable Provider typeFactoryProvider;
+
         private boolean logCompilationWarningsAndErrors = false;
         private final List<NamedStyles> styles = new ArrayList<>();
         private final List<Consumer<CompilerConfiguration>> compilerCustomizers = new ArrayList<>();
@@ -223,6 +233,8 @@ public class GroovyParser implements Parser {
             this.classpath = base.classpath;
             this.artifactNames = base.artifactNames;
             this.typeCache = base.typeCache;
+            this.typeFactory = base.typeFactory;
+            this.typeFactoryProvider = base.typeFactoryProvider;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
             this.compilerCustomizers.addAll(base.compilerCustomizers);
@@ -264,9 +276,27 @@ public class GroovyParser implements Parser {
             return this;
         }
 
+        /**
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} or
+         * {@link #typeFactoryProvider} instead. The cache becomes an implementation
+         * detail of the default {@link DefaultJavaTypeFactory}.
+         */
+        @Deprecated
         @SuppressWarnings("unused")
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;
+            return this;
+        }
+
+        @SuppressWarnings("unused")
+        public Builder typeFactory(JavaTypeFactory typeFactory) {
+            this.typeFactory = typeFactory;
+            return this;
+        }
+
+        @SuppressWarnings("unused")
+        public Builder typeFactoryProvider(JavaTypeFactory.Provider provider) {
+            this.typeFactoryProvider = provider;
             return this;
         }
 
@@ -299,7 +329,15 @@ public class GroovyParser implements Parser {
 
         @Override
         public GroovyParser build() {
-            return new GroovyParser(resolvedClasspath(), logCompilationWarningsAndErrors, typeCache, compilerCustomizers);
+            Collection<Path> cp = resolvedClasspath();
+            JavaTypeFactory factory = typeFactory;
+            if (factory == null && typeFactoryProvider != null) {
+                factory = typeFactoryProvider.create(cp == null ? new ArrayList<>() : new ArrayList<>(cp), null);
+            }
+            if (factory == null) {
+                factory = new DefaultJavaTypeFactory(typeCache);
+            }
+            return new GroovyParser(cp, logCompilationWarningsAndErrors, typeCache, factory, compilerCustomizers);
         }
 
         @Override

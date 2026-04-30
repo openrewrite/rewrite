@@ -42,6 +42,7 @@ import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIrTypeMapping;
@@ -65,7 +66,7 @@ public class PsiTreePrinter {
 
     private static final String CONTINUE_PREFIX = "----";
     private static final String UNVISITED_PREFIX = "#";
-    private static final KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new JavaTypeCache());
+    private static final KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new DefaultJavaTypeFactory(new JavaTypeCache()));
 
     // Set to true to print types and verify, otherwise just verify the parse to print idempotent.
     private final static boolean printTypes = true;

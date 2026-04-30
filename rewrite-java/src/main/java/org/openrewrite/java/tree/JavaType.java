@@ -1468,14 +1468,16 @@ public interface JavaType {
         }
 
         public boolean isConstructor() {
-            return "<constructor>".equals(name);
+            return "<constructor>".equals(name) || "<init>".equals(name);
         }
 
         public @Nullable String getConstructorName() {
             if (!isConstructor()) {
                 return null;
             }
-            String className = ((JavaType.Class) getReturnType()).getClassName();
+            // Use declaring type — the return type may be the declaring class (compiler convention)
+            // or void (bytecode convention for <init>)
+            String className = declaringType.getClassName();
             int beginIndex = className.lastIndexOf(".");
             return beginIndex == -1 ? className : className.substring(beginIndex + 1);
         }
