@@ -101,6 +101,12 @@ public class PyProjectHelper {
      *
      * @return {@code true} when the tree was recognized as a lock file
      */
+    /**
+     * @deprecated Tied to the old {@link PythonDependencyExecutionContextView}-based design;
+     * to be deleted in Task 8 of the Accumulator rework. New recipes should mirror
+     * {@code AddDependency} and capture lock content directly into their {@code Accumulator}.
+     */
+    @Deprecated
     public static boolean captureExistingLockContent(SourceFile sourceFile, Tree tree, ExecutionContext ctx) {
         Path sourcePath = sourceFile.getSourcePath();
         if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
@@ -123,6 +129,11 @@ public class PyProjectHelper {
      * Returns the updated tree, or {@code null} if the tree is not a lock file or
      * there is no pending update.
      */
+    /**
+     * @deprecated See {@link #captureExistingLockContent}. Use the visitor lock-branch
+     * pattern in {@code AddDependency} instead.
+     */
+    @Deprecated
     public static @Nullable Tree maybeReplayLockContent(Tree tree, ExecutionContext ctx) {
         if (tree instanceof Toml.Document) {
             Toml.Document doc = (Toml.Document) tree;
@@ -147,6 +158,8 @@ public class PyProjectHelper {
      * After reparsing, the stored content is normalized to the printer output so that
      * subsequent recipe cycles see identical content and do not trigger spurious changes.
      */
+    /** @deprecated See {@link #captureExistingLockContent}. */
+    @Deprecated
     public static Toml.@Nullable Document maybeUpdateUvLock(Toml.Document document, ExecutionContext ctx) {
         PythonDependencyExecutionContextView view = PythonDependencyExecutionContextView.view(ctx);
         Path pyprojectPath = correspondingPyprojectPath(document.getSourcePath());
@@ -168,6 +181,8 @@ public class PyProjectHelper {
      * If there is regenerated Pipfile.lock content for this document, reparse the
      * document from that content. Returns {@code null} when no update is needed.
      */
+    /** @deprecated See {@link #captureExistingLockContent}. */
+    @Deprecated
     public static Json.@Nullable Document maybeUpdatePipfileLock(Json.Document document, ExecutionContext ctx) {
         PythonDependencyExecutionContextView view = PythonDependencyExecutionContextView.view(ctx);
         Path pipfilePath = correspondingPipfilePath(document.getSourcePath());
@@ -308,38 +323,27 @@ public class PyProjectHelper {
             return EditAndRegenerateResult.unchanged();
         }
         SourceFile modified = refreshMarker((SourceFile) updated.getTree());
-        String regen = null;
-        String error = null;
-        if (capturedLockContent != null) {
-            LockFileRegeneration.Result r = regenerateLockContent(modified, capturedLockContent);
-            if (r != null) {
-                if (r.isSuccess()) {
-                    regen = r.getLockFileContent();
-                } else {
-                    error = r.getErrorMessage();
-                }
-            }
-        }
-        return EditAndRegenerateResult.changed(modified, regen, error);
+        LockFileRegeneration.Result regen = capturedLockContent == null ? null
+                : regenerateLockContent(modified, capturedLockContent);
+        return EditAndRegenerateResult.changed(modified, regen);
     }
 
     @lombok.Value
     public static class EditAndRegenerateResult {
         @Nullable SourceFile modifiedDepsFile;
-        @Nullable String regeneratedLockContent;
-        @Nullable String regenerationError;
+        LockFileRegeneration.@Nullable Result regenResult;
 
         public boolean isChanged() {
             return modifiedDepsFile != null;
         }
 
         public static EditAndRegenerateResult unchanged() {
-            return new EditAndRegenerateResult(null, null, null);
+            return new EditAndRegenerateResult(null, null);
         }
 
         public static EditAndRegenerateResult changed(
-                SourceFile modified, @Nullable String regen, @Nullable String error) {
-            return new EditAndRegenerateResult(modified, regen, error);
+                SourceFile modified, LockFileRegeneration.@Nullable Result regen) {
+            return new EditAndRegenerateResult(modified, regen);
         }
     }
 
@@ -375,6 +379,8 @@ public class PyProjectHelper {
      * @param ctx     the execution context holding shared lock file state
      * @return the document with refreshed marker (and possibly a warning markup)
      */
+    /** @deprecated See {@link #captureExistingLockContent}. Use {@link #editAndRegenerate} from the Accumulator pattern. */
+    @Deprecated
     public static Toml.Document regenerateLockAndRefreshMarker(
             Toml.Document updated,
             ExecutionContext ctx) {
@@ -427,6 +433,8 @@ public class PyProjectHelper {
      * Pipfile contents — passed in to avoid coupling this internal class to the
      * public {@code PipfileParser}.
      */
+    /** @deprecated See {@link #regenerateLockAndRefreshMarker}. */
+    @Deprecated
     public static Toml.Document regeneratePipfileLockAndRefreshMarker(
             Toml.Document updated,
             ExecutionContext ctx,

@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
@@ -106,8 +107,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
         @Nullable String capturedLockContent;
         boolean depsFileMatches;
         @Nullable SourceFile modifiedDepsFile;
-        @Nullable String regeneratedLockContent;
-        @Nullable String regenerationError;
+        LockFileRegeneration.@Nullable Result regenResult;
     }
 
     @Override
@@ -181,13 +181,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 if (ps != null && ps.depsFileMatches) {
                     PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                     if (trait != null) {
-                        ensureComputed(ps, trait, ctx);
+                        ensureComputed(ps, trait);
                     }
                     if (ps.modifiedDepsFile != null) {
                         SourceFile out = ps.modifiedDepsFile;
-                        if (ps.regenerationError != null) {
+                        if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             out = Markup.warn(out, new RuntimeException(
-                                    "lock regeneration failed: " + ps.regenerationError));
+                                    "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
                         PyProjectHelper.putLiveDepsTree(ctx, sourcePath, out);
                         return out;
@@ -211,28 +211,27 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                         Cursor synth = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), depsTree);
                         PythonDependencyFile trait = matcher.get(synth).orElse(null);
                         if (trait != null) {
-                            ensureComputed(lockPs, trait, ctx);
+                            ensureComputed(lockPs, trait);
                             if (lockPs.modifiedDepsFile != null) {
                                 PyProjectHelper.putLiveDepsTree(ctx, depsPath, lockPs.modifiedDepsFile);
                             }
                         }
                     }
                 }
-                if (lockPs.regeneratedLockContent != null) {
+                if (lockPs.regenResult != null && lockPs.regenResult.isSuccess()) {
+                    String lockContent = lockPs.regenResult.getLockFileContent();
                     if (tree instanceof Toml.Document) {
-                        return PyProjectHelper.reparseToml(
-                                (Toml.Document) tree, lockPs.regeneratedLockContent);
+                        return PyProjectHelper.reparseToml((Toml.Document) tree, lockContent);
                     }
                     if (tree instanceof Json.Document) {
-                        return PyProjectHelper.reparseJson(
-                                (Json.Document) tree, lockPs.regeneratedLockContent);
+                        return PyProjectHelper.reparseJson((Json.Document) tree, lockContent);
                     }
                 }
                 return tree;
             }
 
-            private void ensureComputed(ProjectState ps, PythonDependencyFile trait, ExecutionContext ctx) {
-                if (ps.modifiedDepsFile != null || ps.regenerationError != null) {
+            private void ensureComputed(ProjectState ps, PythonDependencyFile trait) {
+                if (ps.modifiedDepsFile != null) {
                     return;
                 }
                 String ver = version != null ? version : "";
@@ -243,8 +242,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                         PyProjectHelper.editAndRegenerate(trait, editFn, ps.capturedLockContent);
                 if (r.isChanged()) {
                     ps.modifiedDepsFile = r.getModifiedDepsFile();
-                    ps.regeneratedLockContent = r.getRegeneratedLockContent();
-                    ps.regenerationError = r.getRegenerationError();
+                    ps.regenResult = r.getRegenResult();
                 }
             }
         };
