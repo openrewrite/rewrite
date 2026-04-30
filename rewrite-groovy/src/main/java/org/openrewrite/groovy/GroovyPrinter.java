@@ -306,7 +306,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             visit(classDecl.getName(), p);
             visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
             visitLeftPadded("extends", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, p);
-            visitContainer("extends", classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", null, p);
+            JContainer<TypeTree> impls = classDecl.getPadding().getImplements();
+            String implsKeyword = impls != null && impls.getMarkers().findFirst(TraitImplementsKeyword.class).isPresent() ? "implements" : "extends";
+            visitContainer(implsKeyword, impls, JContainer.Location.IMPLEMENTS, ",", null, p);
             visit(classDecl.getBody(), p);
             afterSyntax(classDecl, p);
             return classDecl;

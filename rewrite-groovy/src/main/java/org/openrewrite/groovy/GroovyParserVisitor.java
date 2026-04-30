@@ -339,12 +339,25 @@ public class GroovyParserVisitor {
             }
 
             JContainer<TypeTree> implementings = null;
+            Markers implementingsMarkers = Markers.EMPTY;
             if (clazz.getInterfaces().length > 0) {
                 Space implPrefix;
-                if (kindType == J.ClassDeclaration.Kind.Type.Interface || kindType == J.ClassDeclaration.Kind.Type.Annotation) {
+                boolean isTrait = kindMarkers.findFirst(Trait.class).isPresent();
+                // Traits can have either "extends" (extending another trait) or "implements" (implementing a regular interface)
+                boolean traitImplements = false;
+                if (isTrait) {
+                    int saveCursor = cursor;
+                    whitespace();
+                    traitImplements = source.startsWith("implements", cursor);
+                    cursor = saveCursor;
+                    implPrefix = traitImplements ? sourceBefore("implements") : sourceBefore("extends");
+                } else if (kindType == J.ClassDeclaration.Kind.Type.Interface || kindType == J.ClassDeclaration.Kind.Type.Annotation) {
                     implPrefix = sourceBefore("extends");
                 } else {
                     implPrefix = sourceBefore("implements");
+                }
+                if (traitImplements) {
+                    implementingsMarkers = implementingsMarkers.addIfAbsent(new TraitImplementsKeyword(randomId()));
                 }
                 List<JRightPadded<TypeTree>> implTypes = new ArrayList<>(clazz.getInterfaces().length);
                 ClassNode[] interfaces = clazz.getInterfaces();
@@ -359,7 +372,7 @@ public class GroovyParserVisitor {
                 }
                 // Can be empty for an annotation @interface which only implements Annotation
                 if (!implTypes.isEmpty()) {
-                    implementings = JContainer.build(implPrefix, implTypes, Markers.EMPTY);
+                    implementings = JContainer.build(implPrefix, implTypes, implementingsMarkers);
                 }
             }
 
@@ -404,6 +417,217 @@ public class GroovyParserVisitor {
             return null;
         }
 
+        /**
+         * Recover trait field declarations whose source positions were lost by Groovy's trait AST transformation.
+         * The transformation strips fields from the trait class and exposes them only as abstract accessors on a
+         * {@code $Trait$FieldHelper} interface. Walk the helper for accessor methods to learn each field's name,
+         * type, and modifiers, scan the trait body source for the matching declaration, then synthesize a
+         * {@link FieldNode} with valid source positions and add it to {@code sortedByPosition} so the existing
+         * field-printing path picks it up.
+         */
+        private void recoverTraitFields(ClassNode clazz, ClassNode fieldHelper, NavigableMap<LineColumn, ASTNode> sortedByPosition, int blockBodyStart) {
+            String traitName = clazz.getNameWithoutPackage();
+            String accessorPrefix = traitName + "__";
+            // fieldName -> getter (carries return type + modifiers)
+            Map<String, MethodNode> getters = new LinkedHashMap<>();
+            for (MethodNode m : fieldHelper.getMethods()) {
+                String name = m.getName();
+                if (name.startsWith(accessorPrefix) && name.endsWith("$get")) {
+                    getters.put(name.substring(accessorPrefix.length(), name.length() - 4), m);
+                }
+            }
+            // Backing fields on the helper carry the original type and initial expression even when their own
+            // positions are -1. Static-only fields don't get $get/$set accessors, so the backing fields are also
+            // the only place to discover their names.
+            Map<String, FieldNode> backingFields = new LinkedHashMap<>();
+            for (FieldNode bf : fieldHelper.getFields()) {
+                int idx = bf.getName().indexOf(accessorPrefix);
+                if (idx >= 0) {
+                    String fieldName = bf.getName().substring(idx + accessorPrefix.length());
+                    FieldNode existing = backingFields.get(fieldName);
+                    if (existing == null || (existing.getInitialExpression() == null && bf.getInitialExpression() != null)) {
+                        backingFields.put(fieldName, bf);
+                    }
+                }
+            }
+            // Trait field initializers are stored on the trait helper as setter calls inside $init$ / $static$init$:
+            //     ((TraitName$Trait$FieldHelper) $self).TraitName__field$set((castedType) <init expr>)
+            // Walk those bodies to recover the original initial expression for each field.
+            Map<String, org.codehaus.groovy.ast.expr.Expression> initialExpressions = new HashMap<>();
+            ClassNode traitHelperClass = traitHelpers.get(clazz.getName());
+            if (traitHelperClass != null) {
+                for (MethodNode m : traitHelperClass.getMethods()) {
+                    if (("$init$".equals(m.getName()) || "$static$init$".equals(m.getName())) && m.getCode() instanceof BlockStatement) {
+                        for (org.codehaus.groovy.ast.stmt.Statement s : ((BlockStatement) m.getCode()).getStatements()) {
+                            if (!(s instanceof org.codehaus.groovy.ast.stmt.ExpressionStatement)) {
+                                continue;
+                            }
+                            org.codehaus.groovy.ast.expr.Expression e = ((org.codehaus.groovy.ast.stmt.ExpressionStatement) s).getExpression();
+                            if (!(e instanceof MethodCallExpression)) {
+                                continue;
+                            }
+                            MethodCallExpression mce = (MethodCallExpression) e;
+                            String methodName = mce.getMethodAsString();
+                            if (methodName == null || !(mce.getArguments() instanceof org.codehaus.groovy.ast.expr.TupleExpression)) {
+                                continue;
+                            }
+                            List<org.codehaus.groovy.ast.expr.Expression> args = ((org.codehaus.groovy.ast.expr.TupleExpression) mce.getArguments()).getExpressions();
+                            String fieldName = null;
+                            org.codehaus.groovy.ast.expr.Expression initArg = null;
+                            if (methodName.startsWith(accessorPrefix) && methodName.endsWith("$set") && !args.isEmpty()) {
+                                // Direct setter call: ((FieldHelper) $self).TraitName__field$set(<initExpr>)
+                                fieldName = methodName.substring(accessorPrefix.length(), methodName.length() - 4);
+                                initArg = args.get(0);
+                            } else if ("invokeStaticMethod".equals(methodName) && args.size() >= 3 &&
+                                    args.get(1) instanceof ConstantExpression &&
+                                    ((ConstantExpression) args.get(1)).getValue() instanceof String) {
+                                // Reflective static setter: InvokerHelper.invokeStaticMethod($static$self, "TraitName__field$set", <initExpr>)
+                                String setterName = (String) ((ConstantExpression) args.get(1)).getValue();
+                                if (setterName.startsWith(accessorPrefix) && setterName.endsWith("$set")) {
+                                    fieldName = setterName.substring(accessorPrefix.length(), setterName.length() - 4);
+                                    initArg = args.get(2);
+                                }
+                            }
+                            if (fieldName != null && initArg != null) {
+                                if (initArg instanceof CastExpression) {
+                                    initArg = ((CastExpression) initArg).getExpression();
+                                }
+                                initialExpressions.put(fieldName, initArg);
+                            }
+                        }
+                    }
+                }
+            }
+            Set<String> fieldNames = new LinkedHashSet<>(getters.keySet());
+            fieldNames.addAll(backingFields.keySet());
+            if (fieldNames.isEmpty()) {
+                return;
+            }
+            Map<String, Integer> declarationStarts = scanTraitBodyForFieldDeclarations(blockBodyStart, fieldNames);
+            for (Map.Entry<String, Integer> e : declarationStarts.entrySet()) {
+                String fieldName = e.getKey();
+                int declStart = e.getValue();
+                MethodNode getter = getters.get(fieldName);
+                FieldNode backing = backingFields.get(fieldName);
+                int modifiers;
+                ClassNode fieldType;
+                if (getter != null) {
+                    modifiers = getter.getModifiers() & ~java.lang.reflect.Modifier.ABSTRACT;
+                    fieldType = getter.getReturnType();
+                } else {
+                    // Static-only fields lack accessors; reconstruct modifiers from the backing field.
+                    modifiers = backing.getModifiers() & ~java.lang.reflect.Modifier.PRIVATE & ~java.lang.reflect.Modifier.FINAL;
+                    fieldType = backing.getOriginType();
+                }
+                org.codehaus.groovy.ast.expr.Expression initExpr = initialExpressions.get(fieldName);
+                if (initExpr == null && backing != null) {
+                    initExpr = backing.getInitialExpression();
+                }
+                FieldNode synth = new FieldNode(
+                        fieldName,
+                        modifiers,
+                        fieldType,
+                        clazz,
+                        initExpr
+                );
+                int line = lineOf(declStart);
+                int column = declStart - sourceLineNumberOffsets[line - 1] + 1;
+                synth.setLineNumber(line);
+                synth.setColumnNumber(column);
+                synth.setLastLineNumber(line);
+                synth.setLastColumnNumber(column + fieldName.length());
+                sortedByPosition.put(pos(synth), synth);
+            }
+        }
+
+        /**
+         * Scan from {@code start} (just past the trait body's opening {@code {}) to the matching {@code }},
+         * skipping nested braces, strings, comments, and regex/slashy literals. Return the start position of
+         * each top-level declaration whose name appears in {@code fieldNames}.
+         */
+        private Map<String, Integer> scanTraitBodyForFieldDeclarations(int start, Set<String> fieldNames) {
+            Map<String, Integer> result = new LinkedHashMap<>();
+            int len = source.length();
+            int depth = 1;
+            // Tracks where the next top-level statement *could* start (after a separator, just past whitespace).
+            int statementStart = start;
+            int i = start;
+            while (i < len && depth > 0) {
+                char c = source.charAt(i);
+                if (depth == 1) {
+                    Delimiter d = getDelimiter(null, i);
+                    if (d != null && d != CLOSURE && d != ARRAY) {
+                        // Skip past string/comment/regex
+                        i += d.open.length();
+                        while (i < len && !source.startsWith(d.close, i)) {
+                            i++;
+                        }
+                        i += d.close.length();
+                        continue;
+                    }
+                }
+                if (c == '{') {
+                    depth++;
+                    i++;
+                    continue;
+                }
+                if (c == '}') {
+                    depth--;
+                    i++;
+                    if (depth == 1) {
+                        statementStart = i;
+                    }
+                    continue;
+                }
+                if (depth > 1) {
+                    i++;
+                    continue;
+                }
+                if (c == ';' || c == '\n') {
+                    i++;
+                    statementStart = i;
+                    continue;
+                }
+                if (Character.isJavaIdentifierStart(c)) {
+                    int idStart = i;
+                    while (i < len && Character.isJavaIdentifierPart(source.charAt(i))) {
+                        i++;
+                    }
+                    String id = source.substring(idStart, i);
+                    if (fieldNames.contains(id) && !result.containsKey(id)) {
+                        // Verify this looks like a declaration: after the identifier, the next non-whitespace
+                        // is one of `=`, `;`, `\n`, `}` (i.e., ends a simple declaration), not `(` (method),
+                        // `.` (chained access), or operators that would indicate a reference.
+                        int j = i;
+                        while (j < len && (source.charAt(j) == ' ' || source.charAt(j) == '\t')) {
+                            j++;
+                        }
+                        if (j < len) {
+                            char next = source.charAt(j);
+                            if (next == '=' || next == '\n' || next == ';' || next == '}' || next == '\r') {
+                                // Find first non-whitespace from statementStart - that's the declaration start
+                                int declStart = statementStart;
+                                while (declStart < idStart && Character.isWhitespace(source.charAt(declStart))) {
+                                    declStart++;
+                                }
+                                if (declStart <= idStart) {
+                                    result.put(id, declStart);
+                                }
+                            }
+                        }
+                    }
+                    continue;
+                }
+                i++;
+            }
+            return result;
+        }
+
+        private int lineOf(int position) {
+            int line = Arrays.binarySearch(sourceLineNumberOffsets, position);
+            return line >= 0 ? line + 1 : -line - 1;
+        }
+
         J.Block visitClassBlock(ClassNode clazz) {
             NavigableMap<LineColumn, ASTNode> sortedByPosition = new TreeMap<>();
             List<FieldNode> enumConstants = new ArrayList<>();
@@ -429,6 +653,20 @@ public class GroovyParserVisitor {
                         }
                     }
                     sortedByPosition.put(pos(toAdd), toAdd);
+                }
+            }
+            // For traits, the AST transformation may move static methods entirely to the $Trait$Helper class,
+            // leaving the trait class with no source-positioned counterpart. Pick those up from the helper.
+            if (helperForTrait != null) {
+                for (MethodNode helperMethod : helperForTrait.getMethods()) {
+                    if (helperMethod.isSynthetic() || !appearsInSource(helperMethod)) {
+                        continue;
+                    }
+                    Parameter[] params = helperMethod.getParameters();
+                    if (params.length == 0 || !"$static$self".equals(params[0].getName())) {
+                        continue;
+                    }
+                    sortedByPosition.put(pos(helperMethod), helperMethod);
                 }
             }
             for (org.codehaus.groovy.ast.stmt.Statement objectInitializer : clazz.getObjectInitializerStatements()) {
@@ -496,6 +734,14 @@ public class GroovyParserVisitor {
             }
 
             Space blockPrefix = sourceBefore("{");
+
+            // The trait AST transformation strips fields entirely from the trait class and synthesizes them on the
+            // $Trait$FieldHelper interface with no source positions. Recover them by reading source between the
+            // trait's `{` and matching `}` for declarations matching the field names exposed by the helper getters.
+            ClassNode fieldHelperForTrait = traitFieldHelpers.get(clazz.getName());
+            if (fieldHelperForTrait != null) {
+                recoverTraitFields(clazz, fieldHelperForTrait, sortedByPosition, cursor);
+            }
 
             List<JRightPadded<Statement>> statements = new ArrayList<>();
             if (!enumConstants.isEmpty()) {
@@ -2179,10 +2425,31 @@ public class GroovyParserVisitor {
                     }
                 }
             }
+            // Trait field reads inside method bodies are rewritten by the trait transform into synthetic accessor
+            // calls like `$self.TraitName__field$get()`. Only the field name appears in source, so emit the bare
+            // identifier here rather than walking the synthetic call.
+            String callMethodName = call.getMethodAsString();
+            if (callMethodName != null && callMethodName.endsWith("$get") &&
+                    call.getObjectExpression().getLineNumber() < 0) {
+                int sep = callMethodName.indexOf("__");
+                if (sep > 0) {
+                    String fieldName = callMethodName.substring(sep + 2, callMethodName.length() - 4);
+                    Space prefix = whitespace();
+                    if (source.startsWith(fieldName, cursor)) {
+                        skip(fieldName);
+                        queue.add(new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), fieldName, typeMapping.type(staticType(call)), null));
+                        return;
+                    }
+                }
+            }
             queue.add(insideParentheses(call, fmt -> {
                 ImplicitDot implicitDot = null;
                 JRightPadded<Expression> select = null;
-                if (!call.isImplicitThis()) {
+                // The trait AST transformation rewrites implicit-this calls inside trait method bodies to use a
+                // synthetic $self variable expression with no source position; treat that as implicit-this so we
+                // don't print "$self" where the user wrote nothing.
+                boolean syntheticSelf = !call.isImplicitThis() && call.getObjectExpression().getLineNumber() < 0;
+                if (!call.isImplicitThis() && !syntheticSelf) {
                     Expression selectExpr = doVisit(call.getObjectExpression());
                     int saveCursor = cursor;
                     Space afterSelect = whitespace();
@@ -2408,6 +2675,20 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitPropertyExpression(PropertyExpression prop) {
+            // The trait AST transformation rewrites field accesses inside trait method bodies to use a synthetic
+            // $self variable expression with no source position; collapse such property accesses to the property
+            // name only since "$self." does not appear in source.
+            if (prop.getObjectExpression().getLineNumber() < 0 && prop.getProperty() instanceof ConstantExpression) {
+                ConstantExpression nameExpr = (ConstantExpression) prop.getProperty();
+                Object value = nameExpr.getValue();
+                if (value instanceof String) {
+                    Space namePrefix = whitespace();
+                    String simpleName = (String) value;
+                    skip(simpleName);
+                    queue.add(new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), simpleName, typeMapping.type(staticType(prop)), null));
+                    return;
+                }
+            }
             queue.add(insideParentheses(prop, fmt -> {
                 Expression target = doVisit(prop.getObjectExpression());
                 Space beforeDot = prop.isSpreadSafe() ? sourceBefore("*.") : sourceBefore(prop.isSafe() ? "?." : ".");
@@ -3341,6 +3622,12 @@ public class GroovyParserVisitor {
             if (node instanceof MethodCallExpression) {
                 // Only for groovy 3+, because lower versions do always return `-1` for objectExpression.lineNumber / objectExpression.columnNumber
                 MethodCallExpression expr = (MethodCallExpression) node;
+                // The trait AST transformation rewrites implicit-this calls inside trait method bodies to use a synthetic
+                // $self variable expression that has no source position; without a valid object position there's nothing
+                // to scan, so skip the parenthesis-level computation.
+                if (expr.getObjectExpression().getLineNumber() < 0) {
+                    return null;
+                }
                 return determineParenthesisLevel(expr, expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
             } else if (node instanceof PropertyExpression && source.charAt(indexOfNextNonWhitespace(cursor, source)) == '(') {
                 // Groovy doesn't set _INSIDE_PARENTHESES_LEVEL on parenthesized PropertyExpressions like `(a.b)` but does
