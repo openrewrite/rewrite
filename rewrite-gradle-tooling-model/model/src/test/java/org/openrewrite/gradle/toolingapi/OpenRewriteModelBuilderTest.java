@@ -22,17 +22,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OpenRewriteModelBuilderTest {
 
     @Test
-    void java8FallsBackToBaselineDistribution() {
-        assertThat(OpenRewriteModelBuilder.defaultGradleVersion(8)).isEqualTo("8.12");
+    void java8UsesGradle814() {
+        assertThat(OpenRewriteModelBuilder.defaultGradleVersion(8)).isEqualTo("8.14.3");
     }
 
     @Test
-    void java23StaysOnBaselineDistribution() {
-        assertThat(OpenRewriteModelBuilder.defaultGradleVersion(23)).isEqualTo("8.12");
-    }
-
-    @Test
-    void java24RequiresGradle814() {
+    void java24UsesGradle814() {
         assertThat(OpenRewriteModelBuilder.defaultGradleVersion(24)).isEqualTo("8.14.3");
     }
 

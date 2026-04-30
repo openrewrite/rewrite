@@ -145,10 +145,7 @@ public class OpenRewriteModelBuilder {
         if (javaFeatureVersion >= 25) {
             return "9.1.0";
         }
-        if (javaFeatureVersion >= 24) {
-            return "8.14.3";
-        }
-        return "8.12";
+        return "8.14.3";
     }
 
     private static int javaSpecificationVersion() {
