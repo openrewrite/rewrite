@@ -31,6 +31,7 @@ import org.openrewrite.toml.tree.Toml;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -279,7 +280,7 @@ public class PyProjectHelper {
      * to apply their edit on top of prior recipes' modifications.
      */
     public static void putLiveDepsTree(ExecutionContext ctx, Path depsPath, SourceFile depsTree) {
-        Map<Path, SourceFile> map = ctx.computeMessageIfAbsent(LIVE_DEPS_TREES, k -> new java.util.HashMap<>());
+        Map<Path, SourceFile> map = ctx.computeMessageIfAbsent(LIVE_DEPS_TREES, k -> new HashMap<>());
         map.put(depsPath, depsTree);
     }
 
@@ -300,7 +301,7 @@ public class PyProjectHelper {
      */
     public static EditAndRegenerateResult editAndRegenerate(
             PythonDependencyFile trait,
-            java.util.function.Function<PythonDependencyFile, PythonDependencyFile> editFn,
+            Function<PythonDependencyFile, PythonDependencyFile> editFn,
             @Nullable String capturedLockContent) {
         PythonDependencyFile updated = editFn.apply(trait);
         if (updated.getTree() == trait.getTree()) {
@@ -310,10 +311,10 @@ public class PyProjectHelper {
         String regen = null;
         String error = null;
         if (capturedLockContent != null) {
-            RegenerationResult r = regenerateLockContent(modified, capturedLockContent);
+            LockFileRegeneration.Result r = regenerateLockContent(modified, capturedLockContent);
             if (r != null) {
                 if (r.isSuccess()) {
-                    regen = r.getLockContent();
+                    regen = r.getLockFileContent();
                 } else {
                     error = r.getErrorMessage();
                 }
@@ -345,52 +346,21 @@ public class PyProjectHelper {
     /**
      * Regenerate the lock file for a dependencies-file source by dispatching to the
      * package manager indicated by its {@link PythonResolutionResult} marker.
-     * Returns a {@link RegenerationResult} carrying the regenerated lock content
-     * on success, or an error message on failure. Returns {@code null} when the
-     * source has no marker, no resolvable package manager, or no recognised
-     * regeneration adapter.
+     * Returns {@code null} when the source has no marker, no package manager, or
+     * no regeneration adapter for that package manager.
      */
-    public static @Nullable RegenerationResult regenerateLockContent(
+    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
             SourceFile depsFile, @Nullable String capturedLockContent) {
         PythonResolutionResult marker = depsFile.getMarkers()
                 .findFirst(PythonResolutionResult.class).orElse(null);
         if (marker == null) {
             return null;
         }
-        if (marker.getPackageManager() == null) {
+        LockFileRegeneration regen = LockFileRegeneration.forPackageManager(marker.getPackageManager());
+        if (regen == null) {
             return null;
         }
-        LockFileRegeneration regen;
-        switch (marker.getPackageManager()) {
-            case Uv:
-                regen = LockFileRegeneration.UV;
-                break;
-            case Pipenv:
-                regen = LockFileRegeneration.PIPENV;
-                break;
-            default:
-                return null;
-        }
-        LockFileRegeneration.Result result = regen.regenerate(
-                depsFile.printAll(), capturedLockContent);
-        return result.isSuccess()
-                ? RegenerationResult.success(result.getLockFileContent())
-                : RegenerationResult.failure(result.getErrorMessage());
-    }
-
-    @lombok.Value
-    public static class RegenerationResult {
-        boolean success;
-        @Nullable String lockContent;
-        @Nullable String errorMessage;
-
-        public static RegenerationResult success(String lockContent) {
-            return new RegenerationResult(true, lockContent, null);
-        }
-
-        public static RegenerationResult failure(String errorMessage) {
-            return new RegenerationResult(false, null, errorMessage);
-        }
+        return regen.regenerate(depsFile.printAll(), capturedLockContent);
     }
 
     /**

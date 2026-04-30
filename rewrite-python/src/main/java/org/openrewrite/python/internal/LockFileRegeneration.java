@@ -17,6 +17,7 @@ package org.openrewrite.python.internal;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +41,20 @@ public final class LockFileRegeneration {
 
     public static final LockFileRegeneration PIPENV = new LockFileRegeneration(
             PackageManagerExecutor.PIPENV, "Pipfile", "Pipfile.lock");
+
+    public static @Nullable LockFileRegeneration forPackageManager(@Nullable PackageManager pm) {
+        if (pm == null) {
+            return null;
+        }
+        switch (pm) {
+            case Uv:
+                return UV;
+            case Pipenv:
+                return PIPENV;
+            default:
+                return null;
+        }
+    }
 
     @Value
     public static class Result {
