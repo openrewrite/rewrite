@@ -19,8 +19,10 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.maven.table.DependenciesDeclared;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
@@ -370,6 +372,84 @@ class FindDependencyTest implements RewriteTest {
               }
               dependencies {
                   api "org.openrewrite:rewrite-core:8.28.0-jre"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void emitsDataTableRow() {
+        rewriteRun(
+          spec -> spec.recipe(new FindDependency("org.openrewrite", "rewrite-core", "api", null, null))
+            .dataTable(DependenciesDeclared.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                DependenciesDeclared.Row row = rows.get(0);
+                assertThat(row.getGroupId()).isEqualTo("org.openrewrite");
+                assertThat(row.getArtifactId()).isEqualTo("rewrite-core");
+                assertThat(row.getScope()).isEqualTo("api");
+                assertThat(row.getDatedSnapshotVersion()).isNull();
+            }),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  api "org.openrewrite:rewrite-core:latest.release"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  /*~~>*/api "org.openrewrite:rewrite-core:latest.release"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void emitsDataTableRowKotlinDsl() {
+        rewriteRun(spec -> spec
+            .beforeRecipe(withToolingApi())
+            .recipe(new FindDependency("org.openrewrite", "rewrite-core", "api", null, null))
+            .dataTable(DependenciesDeclared.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                assertThat(rows.get(0).getArtifactId()).isEqualTo("rewrite-core");
+                assertThat(rows.get(0).getScope()).isEqualTo("api");
+            }),
+          buildGradleKts(
+            //language=gradle
+            """
+              plugins {
+                  `java-library`
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  api("org.openrewrite:rewrite-core:latest.release")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  /*~~>*/api("org.openrewrite:rewrite-core:latest.release")
               }
               """
           )
