@@ -78,7 +78,7 @@ dependencies {
 
     testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
     testRuntimeOnly("com.google.guava:guava:latest.release")
-    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly(project(":rewrite-java-25"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
