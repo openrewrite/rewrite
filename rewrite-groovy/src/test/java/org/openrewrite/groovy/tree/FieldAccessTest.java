@@ -72,4 +72,17 @@ class FieldAccessTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dynamicPropertyNameWithGString() {
+        rewriteRun(
+          groovy(
+            """
+              def f(node, key) {
+                  node."@$key"
+              }
+              """
+          )
+        );
+    }
 }
