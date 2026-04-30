@@ -2110,34 +2110,10 @@ public class GroovyParserVisitor {
                 VariableExpression firstVar = (VariableExpression) tupleExpressions.get(0);
                 TypeTree typeExpr = visitVariableExpressionType(firstVar);
 
-                Space beforeOpenParen = sourceBefore("(");
-
-                List<JRightPadded<J.VariableDeclarations>> tupleVars = new ArrayList<>(tupleExpressions.size());
-                for (int i = 0; i < tupleExpressions.size(); i++) {
-                    VariableExpression varExpr = (VariableExpression) tupleExpressions.get(i);
-                    TypeTree innerType = visitVariableExpressionType(varExpr);
-                    J.Identifier name = doVisit(varExpr);
-                    J.VariableDeclarations.NamedVariable nv = new J.VariableDeclarations.NamedVariable(
-                            randomId(),
-                            name.getPrefix(),
-                            Markers.EMPTY,
-                            name.withPrefix(EMPTY),
-                            emptyList(),
-                            null,
-                            typeMapping.variableType(name.getSimpleName(), innerType.getType()));
-                    J.VariableDeclarations innerDecl = new J.VariableDeclarations(
-                            randomId(), EMPTY, Markers.EMPTY,
-                            emptyList(), emptyList(),
-                            innerType, null,
-                            singletonList(JRightPadded.build(nv)));
-                    Space after = i < tupleExpressions.size() - 1 ? sourceBefore(",") : sourceBefore(")");
-                    tupleVars.add(JRightPadded.<J.VariableDeclarations>build(innerDecl).withAfter(after));
-                }
-
-                G.TupleExpression tupleDeclarator = new G.TupleExpression(
-                        randomId(), EMPTY, Markers.EMPTY,
-                        JContainer.build(beforeOpenParen, tupleVars, Markers.EMPTY),
-                        null);
+                List<VariableExpression> tupleVarExprs = tupleExpressions.stream()
+                        .map(e -> (VariableExpression) e)
+                        .collect(toList());
+                G.TupleExpression tupleDeclarator = parseTupleExpression(tupleVarExprs);
 
                 J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
                         randomId(), EMPTY, Markers.EMPTY,
@@ -2799,11 +2775,28 @@ public class GroovyParserVisitor {
             queue.add(new J.Throw(randomId(), fmt, Markers.EMPTY, doVisit(statement.getExpression())));
         }
 
-        // the current understanding is that TupleExpression only exist as method invocation arguments.
-        // this is the reason behind the simplifying assumption that there is one expression, and it is
-        // a NamedArgumentListExpression.
         @Override
         public void visitTupleExpression(TupleExpression tuple) {
+            List<org.codehaus.groovy.ast.expr.Expression> expressions = tuple.getExpressions();
+
+            // A TupleExpression whose visible elements are all VariableExpression is the LHS of a
+            // destructuring assignment without `def`: (a, b) = expr.
+            // (Synthetic elements like the implicit outer-`this` are VariableExpression too but
+            // don't appear in source and must not influence this check.)
+            List<org.codehaus.groovy.ast.expr.Expression> visibleExpressions = expressions.stream()
+                    .filter(GroovyParserVisitor.this::appearsInSource)
+                    .collect(toList());
+            boolean isDestructuringLhs = !visibleExpressions.isEmpty() &&
+                    visibleExpressions.stream().allMatch(e -> e instanceof VariableExpression);
+            if (isDestructuringLhs) {
+                List<VariableExpression> varExprs = visibleExpressions.stream()
+                        .map(e -> (VariableExpression) e)
+                        .collect(toList());
+                queue.add(parseTupleExpression(varExprs));
+                return;
+            }
+
+            // TupleExpression as method invocation arguments: each element is a NamedArgumentListExpression
             int saveCursor = cursor;
             Space beforeOpenParen = whitespace();
 
@@ -2816,8 +2809,8 @@ public class GroovyParserVisitor {
                 cursor = saveCursor;
             }
 
-            List<JRightPadded<Expression>> args = new ArrayList<>(tuple.getExpressions().size());
-            for (org.codehaus.groovy.ast.expr.Expression expression : tuple.getExpressions()) {
+            List<JRightPadded<Expression>> args = new ArrayList<>(expressions.size());
+            for (org.codehaus.groovy.ast.expr.Expression expression : expressions) {
                 // Skip synthetic args (e.g. the implicit outer-`this` Groovy adds when
                 // constructing a non-static inner class from within the enclosing class)
                 if (!appearsInSource(expression)) {
@@ -2859,6 +2852,27 @@ public class GroovyParserVisitor {
             }
 
             queue.add(JContainer.build(beforeOpenParen, args, Markers.EMPTY));
+        }
+
+        private G.TupleExpression parseTupleExpression(List<VariableExpression> varExprs) {
+            Space beforeOpenParen = sourceBefore("(");
+            List<JRightPadded<J.VariableDeclarations>> tupleVars = new ArrayList<>(varExprs.size());
+            for (int i = 0; i < varExprs.size(); i++) {
+                VariableExpression varExpr = varExprs.get(i);
+                TypeTree innerType = visitVariableExpressionType(varExpr);
+                J.Identifier name = doVisit(varExpr);
+                J.VariableDeclarations.NamedVariable nv = new J.VariableDeclarations.NamedVariable(
+                        randomId(), name.getPrefix(), Markers.EMPTY,
+                        name.withPrefix(EMPTY), emptyList(), null,
+                        typeMapping.variableType(name.getSimpleName(), innerType.getType()));
+                J.VariableDeclarations innerDecl = new J.VariableDeclarations(
+                        randomId(), EMPTY, Markers.EMPTY, emptyList(), emptyList(),
+                        innerType, null, singletonList(JRightPadded.build(nv)));
+                Space after = i < varExprs.size() - 1 ? sourceBefore(",") : sourceBefore(")");
+                tupleVars.add(JRightPadded.<J.VariableDeclarations>build(innerDecl).withAfter(after));
+            }
+            return new G.TupleExpression(randomId(), EMPTY, Markers.EMPTY,
+                    JContainer.build(beforeOpenParen, tupleVars, Markers.EMPTY), null);
         }
 
         @Override
