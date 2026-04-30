@@ -24,6 +24,7 @@ import org.openrewrite.marker.Markup;
 import org.openrewrite.python.PipfileParser;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
+import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
@@ -249,6 +250,96 @@ public class PyProjectHelper {
             }
         }
         return depsFile;
+    }
+
+    /**
+     * ExecutionContext key for the {@code Map<Path, SourceFile>} that holds the
+     * latest chain-modified deps tree for each project path. Recipes write to this
+     * after applying their edit so that subsequent recipes (or the same recipe's
+     * lock-file visit when lock is visited before deps) can read the up-to-date
+     * deps tree.
+     */
+    private static final String LIVE_DEPS_TREES = "org.openrewrite.python.liveDepsTrees";
+
+    /**
+     * Read the latest known chain-modified deps tree for a given path from the
+     * shared {@link ExecutionContext} side channel, or {@code null} if no recipe
+     * has written one yet.
+     */
+    @SuppressWarnings("unchecked")
+    public static @Nullable SourceFile getLiveDepsTree(ExecutionContext ctx, Path depsPath) {
+        Map<Path, SourceFile> map = (Map<Path, SourceFile>) ctx.getMessage(LIVE_DEPS_TREES);
+        return map == null ? null : map.get(depsPath);
+    }
+
+    /**
+     * Publish the current chain-modified deps tree for a given path to the shared
+     * {@link ExecutionContext} side channel. Subsequent recipes — and lock-file
+     * visits within the same recipe pass that arrive after this one — read this
+     * to apply their edit on top of prior recipes' modifications.
+     */
+    public static void putLiveDepsTree(ExecutionContext ctx, Path depsPath, SourceFile depsTree) {
+        Map<Path, SourceFile> map = ctx.computeMessageIfAbsent(LIVE_DEPS_TREES, k -> new java.util.HashMap<>());
+        map.put(depsPath, depsTree);
+    }
+
+    /**
+     * Apply a recipe-specific trait edit to a deps tree, refresh its marker, and
+     * regenerate the lock file. Used both by deps-file visits (which obtain the
+     * trait from the framework's live cursor) and by lock-file lazy-compute visits
+     * (which obtain the trait via a synthetic cursor over a tree pulled from the
+     * accumulator or the {@link #getLiveDepsTree(ExecutionContext, Path) ctx side
+     * channel}).
+     *
+     * @param trait               the trait wrapping the deps tree to edit
+     * @param editFn              applies the recipe-specific edit (e.g.
+     *                            {@code t -> t.withAddedDependencies(...)})
+     * @param capturedLockContent the lock content captured during scanning, or
+     *                            {@code null} when no lock file was seen
+     * @return a result describing what changed
+     */
+    public static EditAndRegenerateResult editAndRegenerate(
+            PythonDependencyFile trait,
+            java.util.function.Function<PythonDependencyFile, PythonDependencyFile> editFn,
+            @Nullable String capturedLockContent) {
+        PythonDependencyFile updated = editFn.apply(trait);
+        if (updated.getTree() == trait.getTree()) {
+            return EditAndRegenerateResult.unchanged();
+        }
+        SourceFile modified = refreshMarker((SourceFile) updated.getTree());
+        String regen = null;
+        String error = null;
+        if (capturedLockContent != null) {
+            RegenerationResult r = regenerateLockContent(modified, capturedLockContent);
+            if (r != null) {
+                if (r.isSuccess()) {
+                    regen = r.getLockContent();
+                } else {
+                    error = r.getErrorMessage();
+                }
+            }
+        }
+        return EditAndRegenerateResult.changed(modified, regen, error);
+    }
+
+    @lombok.Value
+    public static class EditAndRegenerateResult {
+        @Nullable SourceFile modifiedDepsFile;
+        @Nullable String regeneratedLockContent;
+        @Nullable String regenerationError;
+
+        public boolean isChanged() {
+            return modifiedDepsFile != null;
+        }
+
+        public static EditAndRegenerateResult unchanged() {
+            return new EditAndRegenerateResult(null, null, null);
+        }
+
+        public static EditAndRegenerateResult changed(
+                SourceFile modified, @Nullable String regen, @Nullable String error) {
+            return new EditAndRegenerateResult(modified, regen, error);
+        }
     }
 
     /**

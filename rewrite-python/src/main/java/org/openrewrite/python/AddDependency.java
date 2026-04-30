@@ -30,6 +30,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Add a dependency to a Python project. Supports {@code pyproject.toml}
@@ -103,8 +104,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
 
     static class ProjectState {
         @Nullable Path lockFilePath;
+        @Nullable SourceFile capturedDepsFile;
         @Nullable String capturedLockContent;
         boolean depsFileMatches;
+        @Nullable SourceFile modifiedDepsFile;
         @Nullable String regeneratedLockContent;
         @Nullable String regenerationError;
     }
@@ -148,6 +151,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                 if (trait != null) {
                     ProjectState ps = acc.projects.computeIfAbsent(sourcePath, k -> new ProjectState());
+                    ps.capturedDepsFile = sourceFile;
                     ps.depsFileMatches = matchesAddDependency(trait);
                 }
                 return tree;
@@ -182,38 +186,46 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 SourceFile sourceFile = (SourceFile) tree;
                 Path sourcePath = sourceFile.getSourcePath();
 
+                // Deps-file branch: live src reflects any prior recipe's edits.
                 ProjectState ps = acc.projects.get(sourcePath);
                 if (ps != null && ps.depsFileMatches) {
                     PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                     if (trait != null) {
-                        String ver = version != null ? version : "";
-                        Map<String, String> additions = Collections.singletonMap(packageName, ver);
-                        PythonDependencyFile updated = trait.withAddedDependencies(additions, scope, groupName);
-                        if (updated.getTree() != tree) {
-                            SourceFile modified = PyProjectHelper.refreshMarker((SourceFile) updated.getTree());
-                            if (ps.capturedLockContent != null) {
-                                PyProjectHelper.RegenerationResult r =
-                                        PyProjectHelper.regenerateLockContent(modified, ps.capturedLockContent);
-                                if (r != null) {
-                                    if (r.isSuccess()) {
-                                        ps.regeneratedLockContent = r.getLockContent();
-                                    } else {
-                                        ps.regenerationError = r.getErrorMessage();
-                                    }
-                                }
-                            }
-                            if (ps.regenerationError != null) {
-                                modified = Markup.warn(modified, new RuntimeException(
-                                        "lock regeneration failed: " + ps.regenerationError));
-                            }
-                            return modified;
+                        ensureComputed(ps, trait, ctx);
+                    }
+                    if (ps.modifiedDepsFile != null) {
+                        SourceFile out = ps.modifiedDepsFile;
+                        if (ps.regenerationError != null) {
+                            out = Markup.warn(out, new RuntimeException(
+                                    "lock regeneration failed: " + ps.regenerationError));
                         }
+                        PyProjectHelper.putLiveDepsTree(ctx, sourcePath, out);
+                        return out;
                     }
                 }
 
+                // Lock-file branch: lazily compute on first visit if not yet done,
+                // using the live deps tree from the ctx side channel (which holds
+                // any prior recipe's edits) or the scanner-captured fallback.
                 Path depsPath = acc.lockToDeps.get(sourcePath);
                 if (depsPath != null) {
                     ProjectState lockPs = acc.projects.get(depsPath);
+                    if (lockPs != null && lockPs.depsFileMatches && lockPs.modifiedDepsFile == null) {
+                        SourceFile depsTree = PyProjectHelper.getLiveDepsTree(ctx, depsPath);
+                        if (depsTree == null) {
+                            depsTree = lockPs.capturedDepsFile;
+                        }
+                        if (depsTree != null) {
+                            Cursor synth = new Cursor(getCursor().getRoot(), depsTree);
+                            PythonDependencyFile trait = new PythonDependencyFile.Matcher().get(synth).orElse(null);
+                            if (trait != null) {
+                                ensureComputed(lockPs, trait, ctx);
+                                if (lockPs.modifiedDepsFile != null) {
+                                    PyProjectHelper.putLiveDepsTree(ctx, depsPath, lockPs.modifiedDepsFile);
+                                }
+                            }
+                        }
+                    }
                     if (lockPs != null && lockPs.regeneratedLockContent != null) {
                         if (tree instanceof Toml.Document) {
                             return PyProjectHelper.reparseToml(
@@ -226,6 +238,23 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                     }
                 }
                 return tree;
+            }
+
+            private void ensureComputed(ProjectState ps, PythonDependencyFile trait, ExecutionContext ctx) {
+                if (ps.modifiedDepsFile != null || ps.regenerationError != null) {
+                    return;
+                }
+                String ver = version != null ? version : "";
+                Map<String, String> additions = Collections.singletonMap(packageName, ver);
+                Function<PythonDependencyFile, PythonDependencyFile> editFn =
+                        t -> t.withAddedDependencies(additions, scope, groupName);
+                PyProjectHelper.EditAndRegenerateResult r =
+                        PyProjectHelper.editAndRegenerate(trait, editFn, ps.capturedLockContent);
+                if (r.isChanged()) {
+                    ps.modifiedDepsFile = r.getModifiedDepsFile();
+                    ps.regeneratedLockContent = r.getRegeneratedLockContent();
+                    ps.regenerationError = r.getRegenerationError();
+                }
             }
         };
     }
