@@ -62,7 +62,7 @@ dependencies {
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
     testRuntimeOnly("org.apache.groovy:groovy-all:4.+")
-    testRuntimeOnly(project(":rewrite-java-25"))
+    testRuntimeOnly(project(":rewrite-java-21"))
 }
 
 tasks.named("check") {

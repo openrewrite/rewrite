@@ -22,7 +22,7 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
-    testRuntimeOnly(project(":rewrite-java-25"))
+    testRuntimeOnly(project(":rewrite-java-21"))
 }
 
 tasks.withType<Javadoc>().configureEach {
@@ -59,7 +59,7 @@ testing {
 
             dependencies {
                 implementation(project())
-                implementation(project(":rewrite-java-25"))
+                implementation(project(":rewrite-java-21"))
                 implementation(project(":rewrite-test"))
                 implementation("org.assertj:assertj-core:latest.release")
             }
