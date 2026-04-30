@@ -20,6 +20,7 @@ import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
+import org.openrewrite.java.internal.JavaSourceSetCompat;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
@@ -218,10 +219,9 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         // Check the JavaSourceSet classpath
         Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
         if (sourceSet.isPresent()) {
-            for (JavaType.FullyQualified fq : sourceSet.get().getClasspath()) {
-                if (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fqn)) {
-                    return fq;
-                }
+            Optional<JavaType.FullyQualified> hit = JavaSourceSetCompat.findClasspathType(sourceSet.get(), fqn);
+            if (hit.isPresent()) {
+                return hit.get();
             }
         }
 

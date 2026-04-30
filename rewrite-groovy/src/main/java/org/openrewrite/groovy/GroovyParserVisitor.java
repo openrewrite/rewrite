@@ -42,6 +42,7 @@ import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Semicolon;
@@ -117,6 +118,11 @@ public class GroovyParserVisitor {
 
     @SuppressWarnings("unused")
     public GroovyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, ExecutionContext ctx) {
+        this(sourcePath, fileAttributes, source, typeCache, null, ctx);
+    }
+
+    @SuppressWarnings("unused")
+    public GroovyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, @Nullable JavaTypeFactory typeFactory, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
         this.fileAttributes = fileAttributes;
         this.source = source.readFully();
@@ -129,7 +135,8 @@ public class GroovyParserVisitor {
         }).toArray();
         this.charset = source.getCharset();
         this.charsetBomMarked = source.isCharsetBomMarked();
-        this.typeMapping = new GroovyTypeMapping(typeCache);
+        JavaTypeFactory factory = typeFactory != null ? typeFactory : new org.openrewrite.java.internal.DefaultJavaTypeFactory(typeCache);
+        this.typeMapping = new GroovyTypeMapping(factory);
     }
 
     private static int groovyMajorVersion() {
