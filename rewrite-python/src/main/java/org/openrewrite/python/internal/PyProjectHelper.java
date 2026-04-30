@@ -163,6 +163,43 @@ public class PyProjectHelper {
     }
 
     /**
+     * Overlay resolved-dependency information from regenerated lock content onto
+     * the source file's existing {@link PythonResolutionResult} marker. Dispatches
+     * on the marker's package manager (uv → {@link UvLockParser}; pipenv →
+     * {@link PipfileLockParser}). Returns the source file unchanged if there is no
+     * marker, no recognised package manager, or the lock content has no resolved
+     * dependencies.
+     */
+    public static SourceFile applyResolvedDependencies(SourceFile depsFile, String regeneratedLockContent) {
+        PythonResolutionResult existing = depsFile.getMarkers()
+                .findFirst(PythonResolutionResult.class).orElse(null);
+        if (existing == null || existing.getPackageManager() == null) {
+            return depsFile;
+        }
+        List<PythonResolutionResult.ResolvedDependency> resolved;
+        PythonResolutionResult overlaid;
+        switch (existing.getPackageManager()) {
+            case Uv:
+                resolved = UvLockParser.parse(regeneratedLockContent);
+                if (resolved.isEmpty()) {
+                    return depsFile;
+                }
+                overlaid = PythonResolutionLinker.applyPyproject(existing, resolved);
+                break;
+            case Pipenv:
+                resolved = PipfileLockParser.parse(regeneratedLockContent);
+                if (resolved.isEmpty()) {
+                    return depsFile;
+                }
+                overlaid = PythonResolutionLinker.applyPipfile(existing, resolved);
+                break;
+            default:
+                return depsFile;
+        }
+        return depsFile.withMarkers(depsFile.getMarkers().setByType(overlaid.withId(existing.getId())));
+    }
+
+    /**
      * ExecutionContext key for the {@code Map<Path, SourceFile>} that holds the
      * latest chain-modified deps tree for each project path. Recipes write to this
      * after applying their edit so that subsequent recipes (or the same recipe's
@@ -219,6 +256,9 @@ public class PyProjectHelper {
         SourceFile modified = refreshMarker((SourceFile) updated.getTree());
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
                 : regenerateLockContent(modified, capturedLockContent);
+        if (regen != null && regen.isSuccess() && regen.getLockFileContent() != null) {
+            modified = applyResolvedDependencies(modified, regen.getLockFileContent());
+        }
         return EditAndRegenerateResult.changed(modified, regen);
     }
 

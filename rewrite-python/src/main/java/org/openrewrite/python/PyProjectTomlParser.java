@@ -19,21 +19,18 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.python.internal.PythonDependencyParser;
-import org.openrewrite.python.internal.UvLockParser;
 import org.openrewrite.python.internal.LockFileRegeneration;
+import org.openrewrite.python.internal.PythonDependencyParser;
+import org.openrewrite.python.internal.PythonResolutionLinker;
+import org.openrewrite.python.internal.UvLockParser;
 import org.openrewrite.python.marker.PythonResolutionResult;
-import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -80,7 +77,7 @@ public class PyProjectTomlParser implements Parser {
 
         List<ResolvedDependency> resolvedDeps = UvLockParser.findAndParse(pyprojectDir, relativeTo);
         if (!resolvedDeps.isEmpty()) {
-            return applyResolution(marker, resolvedDeps);
+            return PythonResolutionLinker.applyPyproject(marker, resolvedDeps);
         }
 
         // No uv.lock found — check if another package manager owns this project
@@ -103,43 +100,7 @@ public class PyProjectTomlParser implements Parser {
             return marker;
         }
 
-        return applyResolution(marker, resolvedDeps);
-    }
-
-    private PythonResolutionResult applyResolution(PythonResolutionResult marker,
-                                                    List<ResolvedDependency> resolvedDeps) {
-        marker = marker.withResolvedDependencies(resolvedDeps);
-        marker = marker.withPackageManager(PackageManager.Uv);
-
-        // Link declared dependencies to their resolved versions
-        marker = marker.withDependencies(linkResolved(marker.getDependencies(), resolvedDeps));
-        marker = marker.withBuildRequires(linkResolved(marker.getBuildRequires(), resolvedDeps));
-        marker = marker.withOptionalDependencies(linkResolvedMap(marker.getOptionalDependencies(), resolvedDeps));
-        marker = marker.withDependencyGroups(linkResolvedMap(marker.getDependencyGroups(), resolvedDeps));
-        marker = marker.withConstraintDependencies(linkResolved(marker.getConstraintDependencies(), resolvedDeps));
-        marker = marker.withOverrideDependencies(linkResolved(marker.getOverrideDependencies(), resolvedDeps));
-
-        return marker;
-    }
-
-    private Map<String, List<Dependency>> linkResolvedMap(Map<String, List<Dependency>> depMap,
-                                                            List<ResolvedDependency> resolved) {
-        Map<String, List<Dependency>> result = new LinkedHashMap<>();
-        for (Map.Entry<String, List<Dependency>> entry : depMap.entrySet()) {
-            result.put(entry.getKey(), linkResolved(entry.getValue(), resolved));
-        }
-        return result;
-    }
-
-    private List<Dependency> linkResolved(List<Dependency> deps, List<ResolvedDependency> resolved) {
-        return deps.stream().map(dep -> {
-            String normalizedName = PythonResolutionResult.normalizeName(dep.getName());
-            ResolvedDependency found = resolved.stream()
-                    .filter(r -> PythonResolutionResult.normalizeName(r.getName()).equals(normalizedName))
-                    .findFirst()
-                    .orElse(null);
-            return found != null ? dep.withResolved(found) : dep;
-        }).collect(Collectors.toList());
+        return PythonResolutionLinker.applyPyproject(marker, resolvedDeps);
     }
 
     @Override

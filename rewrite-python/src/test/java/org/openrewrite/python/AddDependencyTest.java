@@ -18,6 +18,7 @@ package org.openrewrite.python;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
@@ -293,6 +294,48 @@ class AddDependencyTest implements RewriteTest {
                   "pytest>=7.0",
               ]
               """
+          )
+        );
+    }
+
+    @Test
+    void markerResolvedDependenciesUpdatedAfterEdit(@TempDir Path tempDir) {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null)),
+          uv(tempDir,
+            pyproject(
+              """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = [
+                    "requests>=2.28.0",
+                ]
+                """,
+              """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = [
+                    "requests>=2.28.0",
+                    "flask>=2.0",
+                ]
+                """,
+              s -> s.afterRecipe(doc -> {
+                  PythonResolutionResult marker = doc.getMarkers()
+                          .findFirst(PythonResolutionResult.class).orElseThrow();
+                  assertThat(marker.getResolvedDependencies())
+                          .extracting(d -> PythonResolutionResult.normalizeName(d.getName()))
+                          .as("regenerated uv.lock should contain flask among resolved dependencies")
+                          .contains("flask");
+                  assertThat(marker.getDependencies())
+                          .filteredOn(d -> "flask".equals(PythonResolutionResult.normalizeName(d.getName())))
+                          .singleElement()
+                          .satisfies(d -> assertThat(d.getResolved())
+                                  .as("declared `flask` dep should be linked to its resolved entry")
+                                  .isNotNull());
+              })
+            )
           )
         );
     }
