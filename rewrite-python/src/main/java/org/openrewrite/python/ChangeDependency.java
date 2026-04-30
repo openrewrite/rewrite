@@ -73,7 +73,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         return "Change a dependency to a different package. Supports `pyproject.toml`, " +
                 "`requirements.txt`, and `Pipfile`. Searches all dependency scopes. " +
                 "When the matching package manager (`uv` or `pipenv`) is available, " +
-                "the corresponding lock file (`uv.lock` or `Pipfile.lock`) is regenerated.";
+                "the corresponding lock file (`uv.lock` or `Pipfile.lock`) is regenerated. " +
+                "Not safe to use as a precondition: invokes the package manager and " +
+                "publishes per-project state shared with other dependency recipes.";
     }
 
     static class Accumulator {

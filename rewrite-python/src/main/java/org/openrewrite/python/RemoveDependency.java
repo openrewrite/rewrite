@@ -86,7 +86,9 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
         return "Remove a dependency from a Python project. Supports `pyproject.toml` " +
                 "(with scope/group targeting), `requirements.txt`, and `Pipfile`. " +
                 "When the matching package manager (`uv` or `pipenv`) is available, " +
-                "the corresponding lock file (`uv.lock` or `Pipfile.lock`) is regenerated.";
+                "the corresponding lock file (`uv.lock` or `Pipfile.lock`) is regenerated. " +
+                "Not safe to use as a precondition: invokes the package manager and " +
+                "publishes per-project state shared with other dependency recipes.";
     }
 
     static class Accumulator {

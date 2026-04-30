@@ -91,7 +91,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return "Upgrade the version constraint for a dependency. Supports `pyproject.toml` " +
                 "(with scope/group targeting), `requirements.txt`, and `Pipfile`. " +
                 "When the matching package manager (`uv` or `pipenv`) is available, " +
-                "the corresponding lock file (`uv.lock` or `Pipfile.lock`) is regenerated.";
+                "the corresponding lock file (`uv.lock` or `Pipfile.lock`) is regenerated. " +
+                "Not safe to use as a precondition: invokes the package manager and " +
+                "publishes per-project state shared with other dependency recipes.";
     }
 
     static class Accumulator {
