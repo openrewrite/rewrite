@@ -1454,12 +1454,18 @@ public class GroovyParserVisitor {
                 skip("assert");
                 Expression condition = doVisit(statement.getBooleanExpression());
                 JLeftPadded<Expression> message = null;
+                Markers markers = Markers.EMPTY;
                 if (!(statement.getMessageExpression() instanceof ConstantExpression) || !((ConstantExpression) statement.getMessageExpression()).isNullExpression()) {
                     Space messagePrefix = whitespace();
-                    skip(":");
+                    if (cursor < source.length() && source.charAt(cursor) == ',') {
+                        skip(",");
+                        markers = markers.addIfAbsent(new AssertMessageComma(randomId()));
+                    } else {
+                        skip(":");
+                    }
                     message = padLeft(messagePrefix, doVisit(statement.getMessageExpression()));
                 }
-                return new J.Assert(randomId(), prefix, Markers.EMPTY, condition, message);
+                return new J.Assert(randomId(), prefix, markers, condition, message);
             }));
         }
 

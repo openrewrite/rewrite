@@ -315,6 +315,19 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitAssert(J.Assert assert_, PrintOutputCapture<P> p) {
+            if (!assert_.getMarkers().findFirst(AssertMessageComma.class).isPresent()) {
+                return super.visitAssert(assert_, p);
+            }
+            beforeSyntax(assert_, Space.Location.ASSERT_PREFIX, p);
+            p.append("assert");
+            visit(assert_.getCondition(), p);
+            visitLeftPadded(",", assert_.getDetail(), JLeftPadded.Location.ASSERT_DETAIL, p);
+            afterSyntax(assert_, p);
+            return assert_;
+        }
+
+        @Override
         public J visitTypeCast(J.TypeCast t, PrintOutputCapture<P> p) {
             if (!t.getMarkers().findFirst(AsStyleTypeCast.class).isPresent()) {
                 return super.visitTypeCast(t, p);
