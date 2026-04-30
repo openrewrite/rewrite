@@ -19,13 +19,19 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.trait.PythonDependencyFile;
+import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
 import java.util.Collections;
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Remove a dependency from a Python project. Supports {@code pyproject.toml}
@@ -84,7 +90,16 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     }
 
     static class Accumulator {
-        final Set<Path> projectsToUpdate = new HashSet<>();
+        final Map<Path, ProjectState> projects = new HashMap<>();
+        final Map<Path, Path> lockToDeps = new HashMap<>();
+    }
+
+    static class ProjectState {
+        @Nullable SourceFile capturedDepsFile;
+        @Nullable String capturedLockContent;
+        boolean depsFileMatches;
+        @Nullable SourceFile modifiedDepsFile;
+        LockFileRegeneration.@Nullable Result regenResult;
     }
 
     @Override
@@ -98,34 +113,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
             final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
 
             @Override
-            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
-                stopAfterPreVisit();
-                if (!(tree instanceof SourceFile)) {
-                    return tree;
-                }
-                SourceFile sourceFile = (SourceFile) tree;
-                if (PyProjectHelper.captureExistingLockContent(sourceFile, tree, ctx)) {
-                    return tree;
-                }
-                PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
-                if (trait != null && PyProjectHelper.findDependencyInScope(trait.getMarker(), packageName, scope, groupName) != null) {
-                    acc.projectsToUpdate.add(sourceFile.getSourcePath());
-                }
-                return tree;
-            }
-        };
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        if (acc.projectsToUpdate.isEmpty()) {
-            return TreeVisitor.noop();
-        }
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
-
-            @Override
-            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+            public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
                 if (!(tree instanceof SourceFile)) {
                     return tree;
@@ -133,23 +121,120 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 SourceFile sourceFile = (SourceFile) tree;
                 Path sourcePath = sourceFile.getSourcePath();
 
-                if (acc.projectsToUpdate.contains(sourcePath)) {
+                if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
+                    Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
+                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, k -> new ProjectState());
+                    ps.capturedLockContent = ((Toml.Document) tree).printAll();
+                    acc.lockToDeps.put(sourcePath, depsPath);
+                    return tree;
+                }
+                if (tree instanceof Json.Document && sourcePath.endsWith("Pipfile.lock")) {
+                    Path depsPath = PyProjectHelper.correspondingPipfilePath(sourcePath);
+                    ProjectState ps = acc.projects.computeIfAbsent(depsPath, k -> new ProjectState());
+                    ps.capturedLockContent = ((Json.Document) tree).printAll();
+                    acc.lockToDeps.put(sourcePath, depsPath);
+                    return tree;
+                }
+
+                PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
+                if (trait != null) {
+                    ProjectState ps = acc.projects.computeIfAbsent(sourcePath, k -> new ProjectState());
+                    ps.capturedDepsFile = sourceFile;
+                    ps.depsFileMatches = matchesRemoveDependency(trait);
+                }
+                return tree;
+            }
+        };
+    }
+
+    private boolean matchesRemoveDependency(PythonDependencyFile trait) {
+        return PyProjectHelper.findDependencyInScope(
+                trait.getMarker(), packageName, scope, groupName) != null;
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+        if (acc.projects.values().stream().noneMatch(ps -> ps.depsFileMatches)) {
+            return TreeVisitor.noop();
+        }
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
+            @Override
+            public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sourceFile = (SourceFile) tree;
+                Path sourcePath = sourceFile.getSourcePath();
+
+                ProjectState ps = acc.projects.get(sourcePath);
+                if (ps != null && ps.depsFileMatches) {
                     PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                     if (trait != null) {
-                        PythonDependencyFile updated = trait.withRemovedDependencies(
-                                Collections.singleton(packageName), scope, groupName);
-                        if (updated.getTree() != tree) {
-                            return updated.afterModification(ctx);
+                        ensureComputed(ps, trait);
+                    }
+                    if (ps.modifiedDepsFile != null) {
+                        SourceFile out = ps.modifiedDepsFile;
+                        if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
+                            out = Markup.warn(out, new RuntimeException(
+                                    "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
                         }
+                        PyProjectHelper.putLiveDepsTree(ctx, sourcePath, out);
+                        return out;
                     }
                 }
 
-                Tree updatedLock = PyProjectHelper.maybeReplayLockContent(tree, ctx);
-                if (updatedLock != null) {
-                    return updatedLock;
+                Path depsPath = acc.lockToDeps.get(sourcePath);
+                if (depsPath == null) {
+                    return tree;
                 }
-
+                ProjectState lockPs = acc.projects.get(depsPath);
+                if (lockPs == null) {
+                    return tree;
+                }
+                if (lockPs.depsFileMatches && lockPs.modifiedDepsFile == null) {
+                    SourceFile depsTree = PyProjectHelper.getLiveDepsTree(ctx, depsPath);
+                    if (depsTree == null) {
+                        depsTree = lockPs.capturedDepsFile;
+                    }
+                    if (depsTree != null) {
+                        Cursor synth = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), depsTree);
+                        PythonDependencyFile trait = matcher.get(synth).orElse(null);
+                        if (trait != null) {
+                            ensureComputed(lockPs, trait);
+                            if (lockPs.modifiedDepsFile != null) {
+                                PyProjectHelper.putLiveDepsTree(ctx, depsPath, lockPs.modifiedDepsFile);
+                            }
+                        }
+                    }
+                }
+                if (lockPs.regenResult != null && lockPs.regenResult.isSuccess()) {
+                    String lockContent = lockPs.regenResult.getLockFileContent();
+                    if (tree instanceof Toml.Document) {
+                        return PyProjectHelper.reparseToml((Toml.Document) tree, lockContent);
+                    }
+                    if (tree instanceof Json.Document) {
+                        return PyProjectHelper.reparseJson((Json.Document) tree, lockContent);
+                    }
+                }
                 return tree;
+            }
+
+            private void ensureComputed(ProjectState ps, PythonDependencyFile trait) {
+                if (ps.modifiedDepsFile != null) {
+                    return;
+                }
+                Set<String> removals = Collections.singleton(packageName);
+                Function<PythonDependencyFile, PythonDependencyFile> editFn =
+                        t -> t.withRemovedDependencies(removals, scope, groupName);
+                PyProjectHelper.EditAndRegenerateResult r =
+                        PyProjectHelper.editAndRegenerate(trait, editFn, ps.capturedLockContent);
+                if (r.isChanged()) {
+                    ps.modifiedDepsFile = r.getModifiedDepsFile();
+                    ps.regenResult = r.getRegenResult();
+                }
             }
         };
     }
