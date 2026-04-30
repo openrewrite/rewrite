@@ -472,22 +472,21 @@ Mirror `AddDependency.java` exactly; only the recipe option fields, the match pr
 
 - [ ] **Step 4.1: Imports.** Same as AddDependency.
 
-- [ ] **Step 4.2: Recipe option fields.** Keep ChangeDependency's existing `oldPackageName`, `newPackageName`, `newVersion`, `scope`, and `groupName`.
+- [ ] **Step 4.2: Recipe option fields.** Keep ChangeDependency's existing `oldPackageName`, `newPackageName`, `newVersion`. ChangeDependency does **not** have `scope` / `groupName` — it operates across all scopes. Drop the now-unused `HashSet` / `Set` imports.
 
-- [ ] **Step 4.3: Match predicate.**
+- [ ] **Step 4.3: Match predicate.** ChangeDependency searches all scopes via `findDependencyInAnyScope`:
 
 ```java
 private boolean matchesChangeDependency(PythonDependencyFile trait) {
-    return PyProjectHelper.findDependencyInScope(
-            trait.getMarker(), oldPackageName, scope, groupName) != null;
+    return trait.getMarker().findDependencyInAnyScope(oldPackageName) != null;
 }
 ```
 
-- [ ] **Step 4.4: Edit function inside `ensureComputed`.**
+- [ ] **Step 4.4: Edit function inside `ensureComputed`.** Pass `null, null` for scope/groupName to preserve the existing all-scopes behavior:
 
 ```java
 Function<PythonDependencyFile, PythonDependencyFile> editFn =
-        t -> t.withChangedDependency(oldPackageName, newPackageName, newVersion, scope, groupName);
+        t -> t.withChangedDependency(oldPackageName, newPackageName, newVersion, null, null);
 ```
 
 - [ ] **Step 4.5: Compile, test, commit.**
