@@ -2388,11 +2388,14 @@ public class GroovyParserVisitor {
             queue.add(insideParentheses(attr, fmt -> {
                 Expression target = doVisit(attr.getObjectExpression());
                 Space beforeDot = attr.isSafe() ? sourceBefore("?.") : sourceBefore(attr.isSpreadSafe() ? "*." : ".");
+                int saveCursor = cursor;
                 J name = doVisit(attr.getProperty());
                 if (name instanceof J.Literal) {
                     String nameStr = ((J.Literal) name).getValueSource();
                     assert nameStr != null;
                     name = new J.Identifier(randomId(), name.getPrefix(), Markers.EMPTY, emptyList(), nameStr, null, null);
+                } else if (name instanceof G.GString) {
+                    name = gStringAsIdentifier((G.GString) name, saveCursor);
                 }
                 if (attr.isSpreadSafe()) {
                     name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
@@ -2409,10 +2412,13 @@ public class GroovyParserVisitor {
             queue.add(insideParentheses(prop, fmt -> {
                 Expression target = doVisit(prop.getObjectExpression());
                 Space beforeDot = prop.isSpreadSafe() ? sourceBefore("*.") : sourceBefore(prop.isSafe() ? "?." : ".");
+                int saveCursor = cursor;
                 J name = doVisit(prop.getProperty());
                 if (name instanceof J.Literal) {
                     J.Literal nameLiteral = ((J.Literal) name);
                     name = new J.Identifier(randomId(), name.getPrefix(), Markers.EMPTY, emptyList(), nameLiteral.getValueSource(), nameLiteral.getType(), null);
+                } else if (name instanceof G.GString) {
+                    name = gStringAsIdentifier((G.GString) name, saveCursor);
                 }
                 if (prop.isSpreadSafe()) {
                     name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
@@ -2421,6 +2427,12 @@ public class GroovyParserVisitor {
                 }
                 return new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name), null);
             }));
+        }
+
+        private J.Identifier gStringAsIdentifier(G.GString gString, int saveCursor) {
+            int gStringStart = indexOfNextNonWhitespace(saveCursor, source);
+            String text = source.substring(gStringStart, cursor);
+            return new J.Identifier(randomId(), gString.getPrefix(), Markers.EMPTY, emptyList(), text, gString.getType(), null);
         }
 
         @Override
