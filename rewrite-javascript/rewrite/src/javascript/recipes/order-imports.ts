@@ -20,7 +20,6 @@ import {ExecutionContext} from "../../execution";
 import {JavaScriptVisitor, JS} from "../index";
 import {J} from "../../java";
 import {create as produce, Draft} from "mutative";
-import {SpacesStyle, styleFromSourceFile, StyleKind} from "../style";
 
 /**
  * Import type categories for sorting order:
@@ -57,12 +56,8 @@ export class OrderImports extends Recipe {
                 const originalImportPosition = Object.fromEntries(imports.map((item, i) => [item.element.id, i]));
                 const restStatements = cu.statements.slice(importCount);
 
-                // Get style for consistent brace spacing
-                const spacesStyle = styleFromSourceFile(StyleKind.SpacesStyle, cu) as SpacesStyle | undefined;
-                const useBraceSpaces = spacesStyle?.within.es6ImportExportBraces ?? false;
-
                 // Sort named specifiers within each import
-                const sortedSpecifiers = this.sortNamedSpecifiersWithinImports(imports, useBraceSpaces);
+                const sortedSpecifiers = this.sortNamedSpecifiersWithinImports(imports);
 
                 // Sort imports by category and module path
                 sortedSpecifiers.sort((aPadded, bPadded) => {
@@ -159,7 +154,7 @@ export class OrderImports extends Recipe {
             /**
              * Sort named specifiers within each import statement alphabetically.
              */
-            private sortNamedSpecifiersWithinImports(imports: J.RightPadded<JS.Import>[], useBraceSpaces: boolean): J.RightPadded<JS.Import>[] {
+            private sortNamedSpecifiersWithinImports(imports: J.RightPadded<JS.Import>[]): J.RightPadded<JS.Import>[] {
                 const ret = [];
                 for (const importPadded of imports) {
                     const import_ = importPadded.element;
@@ -171,6 +166,13 @@ export class OrderImports extends Recipe {
                             if (elements.length <= 1) {
                                 return; // Nothing to sort
                             }
+
+                            // Detect brace spacing from the current import before sorting
+                            const firstEl = elements[0];
+                            const lastEl = elements[elements.length - 1];
+                            const hasBraceSpaces = (firstEl.element.prefix?.whitespace?.includes(' ') ?? false) ||
+                                (lastEl.after?.whitespace?.includes(' ') ?? false);
+                            const braceSpace = hasBraceSpaces ? " " : "";
 
                             // Handle trailing comma
                             const trailingComma = elements.length > 0 &&
@@ -187,18 +189,17 @@ export class OrderImports extends Recipe {
                                 return nameA.localeCompare(nameB);
                             });
 
-                            // Normalize spacing based on es6ImportExportBraces style
-                            const braceSpace = useBraceSpaces ? " " : "";
+                            // Normalize all spacing after sorting
                             for (let i = 0; i < elements.length; i++) {
                                 if (i === 0) {
-                                    // First element: space after opening brace based on style
                                     elements[i].element.prefix = {kind: J.Kind.Space, whitespace: braceSpace, comments: []};
                                 } else {
-                                    // Other elements: space after comma
                                     elements[i].element.prefix = {kind: J.Kind.Space, whitespace: ' ', comments: []};
                                 }
+                                if (i < elements.length - 1) {
+                                    elements[i].after = {kind: J.Kind.Space, whitespace: '', comments: []};
+                                }
                             }
-                            // Last element: space before closing brace based on style
                             elements[elements.length - 1].after = {kind: J.Kind.Space, whitespace: braceSpace, comments: []};
 
                             // Restore trailing comma to last element
