@@ -841,6 +841,11 @@ public interface JavaType {
             this.values = values;
             return this;
         }
+
+        @Override
+        public String toString() {
+            return new DefaultJavaTypeSignatureBuilder().signature(this);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

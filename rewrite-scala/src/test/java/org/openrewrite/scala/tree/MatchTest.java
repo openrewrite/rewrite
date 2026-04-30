@@ -213,4 +213,21 @@ class MatchTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void matchWithLineCommentContainingIfBeforeGuard() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def handle(x: Any): String = x match {
+                case s: String // if something
+                    if s.nonEmpty => s
+                case _ => "empty"
+              }
+            }
+            """
+          )
+        );
+    }
 }

@@ -33,8 +33,10 @@ import traceback
 import threading
 
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Callable
+from typing import Dict, Any, Optional, List, Callable, Set
 from uuid import uuid4
+
+from rewrite.discovery import RecipeAttribution, RecipeName
 
 # Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
 # overflow the default recursion limit (1000) during RPC serialization.
@@ -584,21 +586,43 @@ def handle_reset(params: dict) -> bool:
 # Global marketplace instance (lazily initialized)
 _marketplace = None
 
+# Tracks which distribution's entry point activated which recipes. Used by
+# handle_install_recipes to scope its response to the requested distribution
+# and by handle_get_marketplace to filter the singleton marketplace down to
+# a single package.
+_attribution = RecipeAttribution()
+
 
 def _get_marketplace():
-    """Get or create the global marketplace instance."""
+    """Get or create the global marketplace instance.
+
+    Discovery populates ``_attribution`` so each recipe is attributed to the
+    distribution whose entry point activated it. Without that attribution, a
+    later GetMarketplace or InstallRecipes for package X would incorrectly
+    return every recipe in the singleton, including the built-in
+    ``org.openrewrite.python.*`` recipes activated by the ``openrewrite``
+    distribution itself.
+    """
     global _marketplace
     if _marketplace is None:
-        from rewrite.discovery import discover_recipes
+        from rewrite.discovery import discover_recipes, recipe_name_set
         from rewrite.marketplace import RecipeMarketplace
         from rewrite import activate
 
-        # First try to discover from installed packages
-        _marketplace = discover_recipes()
+        _marketplace = RecipeMarketplace()
 
-        # Also activate local recipes (in case package isn't installed)
-        # This ensures recipes work during development
+        # Discover from installed packages, tracking which distribution
+        # contributed each recipe.
+        discover_recipes(marketplace=_marketplace, attribution=_attribution)
+
+        # Also activate local recipes (in case the openrewrite distribution
+        # isn't pip-installed, e.g., when running from source). When it is
+        # installed, discovery already covered these and install() will dedupe
+        # by name; attribute the source-mode additions to "openrewrite" so
+        # they're returned by GetMarketplace/InstallRecipes for that package.
+        before = recipe_name_set(_marketplace)
         activate(_marketplace)
+        _attribution.record("openrewrite", recipe_name_set(_marketplace) - before)
 
     return _marketplace
 
@@ -616,16 +640,24 @@ def handle_install_recipes(params: dict) -> dict:
             - 'recipes': {'packageName': str, 'version': str|None} - A package spec
 
     Returns:
-        Dict with 'recipesInstalled' count and 'version' (if resolved)
+        Dict with:
+            - 'recipesInstalled': count of recipes added to the marketplace by
+              this call (zero on idempotent reinstalls).
+            - 'version': resolved version (if known).
+            - 'recipes': cumulative list of {descriptor, categoryPaths} rows
+              for recipes attributed to this distribution. Stable across
+              reinstalls; this is what the caller binds to its bundle.
     """
     import importlib
     import importlib.util
+    from rewrite.discovery import recipe_name_set
 
     marketplace = _get_marketplace()
-    before_count = len(list(marketplace.all_recipes()))
 
     recipes = params.get('recipes')
     installed_version = None
+    package_name: Optional[str] = None
+    recipes_added = 0
 
     if isinstance(recipes, str):
         # Local file path - package should already be installed by caller
@@ -636,7 +668,11 @@ def handle_install_recipes(params: dict) -> dict:
         # For local paths, we look for the package name from setup.py/pyproject.toml
         package_name = _find_package_name(local_path)
         if package_name:
+            before = recipe_name_set(marketplace)
             _import_and_activate_package(package_name, marketplace, local_path)
+            added = recipe_name_set(marketplace) - before
+            _attribution.record(package_name, added)
+            recipes_added = len(added)
 
     elif isinstance(recipes, dict):
         # Package spec with name and optional version - package should already be installed
@@ -655,17 +691,31 @@ def handle_install_recipes(params: dict) -> dict:
         except Exception:
             pass
 
+        before = recipe_name_set(marketplace)
         _import_and_activate_package(package_name, marketplace)
+        added = recipe_name_set(marketplace) - before
+        _attribution.record(package_name, added)
+        recipes_added = len(added)
     else:
         raise ValueError(f"Invalid recipes parameter: {recipes}")
 
-    after_count = len(list(marketplace.all_recipes()))
-    recipes_installed = after_count - before_count
+    package_rows: List[dict] = []
+    if package_name:
+        # recipes_for returns an empty set (not None) when the package activated
+        # nothing, so the filter scopes the result to "this package's recipes"
+        # (zero of them) instead of falling back to "no filter" and returning
+        # everything.
+        package_rows = _collect_marketplace_rows(
+            marketplace, recipe_filter=_attribution.recipes_for(package_name)
+        )
 
-    logger.info(f"InstallRecipes: installed {recipes_installed} recipes")
+    logger.info(
+        f"InstallRecipes: {recipes_added} new, {len(package_rows)} cumulative for {package_name}"
+    )
     return {
-        'recipesInstalled': recipes_installed,
-        'version': installed_version
+        'recipesInstalled': recipes_added,
+        'version': installed_version,
+        'recipes': package_rows,
     }
 
 
@@ -828,22 +878,48 @@ def _import_and_activate_package(package_name: str, marketplace, local_path: Opt
 def handle_get_marketplace(params: dict) -> List[dict]:
     """Handle a GetMarketplace RPC request.
 
-    Returns all recipes organized by category in a format compatible with Java.
+    Returns recipes organized by category in a format compatible with Java.
+
+    Args:
+        params: Optional dict with a 'packageName' key. When supplied, the
+            response is filtered to recipes attributed to that distribution,
+            so callers requesting a specific bundle don't get every recipe
+            in the singleton marketplace.
 
     Returns:
         List of dicts with 'descriptor' and 'categoryPaths' for each recipe.
     """
-    from dataclasses import asdict
-
     marketplace = _get_marketplace()
+
+    recipe_filter: Optional[Set[RecipeName]] = None
+    if isinstance(params, dict):
+        package_name = params.get('packageName')
+        if isinstance(package_name, str) and package_name:
+            recipe_filter = _attribution.recipes_for(package_name)
+
+    rows = _collect_marketplace_rows(marketplace, recipe_filter=recipe_filter)
+    logger.info(f"GetMarketplace: returning {len(rows)} recipes")
+    return rows
+
+
+def _collect_marketplace_rows(
+    marketplace,
+    recipe_filter: Optional[Set[RecipeName]] = None,
+) -> List[dict]:
+    """Walk the marketplace and return recipe rows in GetMarketplaceResponse shape.
+
+    A recipe that appears in multiple categories produces one row whose
+    ``categoryPaths`` lists each path. When ``recipe_filter`` is provided,
+    recipes whose name isn't in the set are skipped.
+    """
     rows: List[dict] = []
 
-    def collect_recipes(category, category_path: List[dict]):
-        """Recursively collect recipes from a category and its subcategories."""
+    def collect(category, category_path: List[dict]) -> None:
         current_path = [*category_path, _category_descriptor_to_dict(category.descriptor)]
 
-        for recipe_name, (recipe_desc, _recipe_class) in category.recipes.items():
-            # Check if we already have this recipe (it can appear in multiple categories)
+        for _recipe_name, (recipe_desc, _recipe_class) in category.recipes.items():
+            if recipe_filter is not None and recipe_desc.name not in recipe_filter:
+                continue
             existing = next((r for r in rows if r['descriptor']['name'] == recipe_desc.name), None)
             if existing:
                 existing['categoryPaths'].append(current_path)
@@ -854,13 +930,11 @@ def handle_get_marketplace(params: dict) -> List[dict]:
                 })
 
         for subcategory in category.categories:
-            collect_recipes(subcategory, current_path)
+            collect(subcategory, current_path)
 
-    # Start from the root's children (skip the root itself)
     for category in marketplace.categories():
-        collect_recipes(category, [])
+        collect(category, [])
 
-    logger.info(f"GetMarketplace: returning {len(rows)} recipes")
     return rows
 
 

@@ -846,4 +846,41 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void UpgradeFloatingWildcardVersion()
+    {
+        // Source csproj uses NuGet's floating "8.0.*" syntax. The recipe should
+        // still upgrade it to the exact target version.
+        RewriteRun(
+            spec => spec.SetRecipe(new UpgradeNuGetPackageVersion
+            {
+                PackageName = "Newtonsoft.Json",
+                NewVersion = "14.0.1"
+            }),
+            CsProj(
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="Newtonsoft.Json" Version="8.0.*" />
+                  </ItemGroup>
+                </Project>
+                """,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <PackageReference Include="Newtonsoft.Json" Version="14.0.1" />
+                  </ItemGroup>
+                </Project>
+                """
+            )
+        );
+    }
+
 }

@@ -29,6 +29,7 @@ import org.openrewrite.scala.marker.Implicit
 import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedBlock
 import org.openrewrite.scala.marker.OmitBraces
+import org.openrewrite.scala.marker.PackageObject
 import org.openrewrite.scala.marker.SObject
 import org.openrewrite.scala.marker.Semicolon
 import org.openrewrite.scala.marker.TypeProjection
@@ -1332,7 +1333,11 @@ class ScalaTreeVisitor(
         val dotStart = Math.max(0, qualifierEnd - offsetAdjustment)
         val nameStartAdjusted = Math.max(0, nameStart - offsetAdjustment)
         if (dotStart < nameStartAdjusted && dotStart >= cursor && nameStartAdjusted <= source.length) {
-          val between = source.substring(dotStart, nameStartAdjusted)
+          // If the name is backtick-quoted, the opening backtick sits between the dot and
+          // nameSpan.start (nameSpan does not include the backtick). Strip it so that only
+          // whitespace ends up in dotSpace; the backtick is re-attached in nameStr below.
+          val rawBetween = source.substring(dotStart, nameStartAdjusted)
+          val between = if (rawBetween.endsWith("`")) rawBetween.dropRight(1) else rawBetween
           // Check for type projection (#) or member access (.)
           val hashIndex = between.indexOf('#')
           val dotIndex = between.indexOf('.')
@@ -1352,14 +1357,31 @@ class ScalaTreeVisitor(
       } else {
         Space.EMPTY
       }
-      
-      // Create the name identifier with type from the Select node
+
+      // Create the name identifier with type from the Select node.
+      // sel.name.toString strips backticks for names with special characters (e.g. text/html(UTF-8)),
+      // so we reconstruct the backtick-quoted form when the source has one.
+      // nameSpan covers only the raw name (without backticks); the opening backtick sits at
+      // nameSpan.start-1 and the closing one at nameSpan.end in the source.
+      val nameStr = {
+        val ns = sel.nameSpan
+        if (ns.exists) {
+          val adjStart = Math.max(0, ns.start - offsetAdjustment)
+          val adjEnd = Math.max(0, ns.end - offsetAdjustment)
+          if (adjStart >= 0 && adjEnd <= source.length && adjEnd > adjStart) {
+            if (adjStart > 0 && source.charAt(adjStart - 1) == '`' && adjEnd < source.length && source.charAt(adjEnd) == '`')
+              "`" + source.substring(adjStart, adjEnd) + "`"
+            else
+              source.substring(adjStart, adjEnd)
+          } else sel.name.toString
+        } else sel.name.toString
+      }
       val name = new J.Identifier(
         Tree.randomId(),
         dotSpace,
         Markers.EMPTY,
         Collections.emptyList(),
-        sel.name.toString,
+        nameStr,
         typeOfTree(sel),
         variableTypeOfTree(sel)
       )
@@ -2787,7 +2809,32 @@ class ScalaTreeVisitor(
     }
     
     // Extract modifiers from text
-    val (modifiers, lastModEnd) = extractModifiersFromText(md.mods, modifierText)
+    val (modifiers, extractedLastModEnd) = extractModifiersFromText(md.mods, modifierText)
+    var lastModEnd = extractedLastModEnd
+
+    // `package object X` — the `package` keyword is not a Scala modifier, but for LST
+    // fidelity we emit it as a leading modifier and attach a PackageObject marker on the
+    // class declaration. Must come before `case` so ordering stays source-faithful.
+    val isPackageObject = md.mods.is(Flags.Package) && modifierText.contains("package")
+    if (isPackageObject) {
+      val packageIndex = findKeyword(modifierText, "package")
+      if (packageIndex >= 0) {
+        val packageSpace = if (packageIndex > lastModEnd) {
+          Space.format(modifierText.substring(lastModEnd, packageIndex))
+        } else {
+          Space.EMPTY
+        }
+        modifiers.add(new J.Modifier(
+          Tree.randomId(),
+          packageSpace,
+          Markers.EMPTY,
+          "package",
+          J.Modifier.Type.LanguageExtension,
+          Collections.emptyList()
+        ))
+        lastModEnd = packageIndex + "package".length
+      }
+    }
 
     // Check for case modifier on object definitions (e.g., `case object Foo`).
     // Skip if this is an enum case — `case` is the keyword, not a modifier.
@@ -3080,11 +3127,16 @@ class ScalaTreeVisitor(
       cursor = Math.max(cursor, md.span.end - offsetAdjustment)
     }
     
-    // Create the class declaration with SObject marker
+    // Create the class declaration with SObject marker (and PackageObject for `package object`)
+    val objectMarkers = if (isPackageObject) {
+      Markers.build(Arrays.asList(SObject.create(), PackageObject(UUID.randomUUID())))
+    } else {
+      Markers.build(Collections.singletonList(SObject.create()))
+    }
     new J.ClassDeclaration(
       Tree.randomId(),
       prefix,
-      Markers.build(Collections.singletonList(SObject.create())),
+      objectMarkers,
       Collections.emptyList(), // annotations
       modifiers,
       kind,
@@ -5327,7 +5379,22 @@ class ScalaTreeVisitor(
   }
 
   private def visitMethodParameter(vd: Trees.ValDef[?]): J = {
-    val prefix = extractPrefix(vd.span)
+    import dotty.tools.dotc.core.Flags
+    val paramModifiers = new util.ArrayList[J.Modifier]()
+    val prefix: Space = if (vd.mods != null && vd.mods.is(Flags.Implicit)) {
+      val spanStart = Math.max(0, vd.span.start - offsetAdjustment)
+      if (cursor < spanStart && spanStart <= source.length) {
+        val leading = source.substring(cursor, spanStart)
+        val implicitIdx = leading.indexOf("implicit")
+        if (implicitIdx >= 0) {
+          val modPrefix = if (implicitIdx > 0) Space.format(leading.substring(0, implicitIdx)) else Space.EMPTY
+          paramModifiers.add(new J.Modifier(Tree.randomId(), modPrefix, Markers.EMPTY,
+            "implicit", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+          cursor += implicitIdx + "implicit".length
+          Space.EMPTY
+        } else extractPrefix(vd.span)
+      } else extractPrefix(vd.span)
+    } else extractPrefix(vd.span)
     val paramStart = Math.max(0, vd.span.start - offsetAdjustment)
     val paramEnd = Math.max(0, vd.span.end - offsetAdjustment)
     val paramSource = if (paramStart < paramEnd && paramEnd <= source.length) source.substring(paramStart, paramEnd) else ""
@@ -5444,14 +5511,14 @@ class ScalaTreeVisitor(
       prefix,
       Markers.EMPTY,
       paramAnnotations,
-      Collections.emptyList(),
+      paramModifiers,
       typeExpr,
       null,
       Collections.emptyList(),
       Collections.singletonList(JRightPadded.build(variable))
     )
   }
-  
+
   private def visitTryTree(tryTree: Trees.Try[?]): J = {
     visitTryImpl(tryTree)
   }
@@ -5769,10 +5836,9 @@ class ScalaTreeVisitor(
       var guard: Expression = null
       var labelAfter = Space.EMPTY
       if (!caseDef.guard.isEmpty && caseDef.guard.span.exists) {
-        val guardSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 100, source.length)) else ""
-        val ifIdx = guardSearch.indexOf("if")
-        if (ifIdx > 0) labelAfter = Space.format(guardSearch.substring(0, ifIdx))
-        if (ifIdx >= 0) cursor = cursor + ifIdx + 2  // past "if"
+        val ifPos = positionOfNext("if")
+        if (ifPos > cursor) labelAfter = Space.format(source.substring(cursor, ifPos))
+        if (ifPos >= 0) cursor = ifPos + 2  // past "if"
         val guardResult = visitTree(caseDef.guard)
         guardResult match {
           case expr: Expression => guard = expr
@@ -5971,11 +6037,42 @@ class ScalaTreeVisitor(
   }
   
   /**
-   * Find the position of the next occurrence of a delimiter.
+   * Find the position of the next occurrence of a delimiter, skipping over line
+   * (`//...`) and block (`/* ... */`) comments. When the delimiter is a word
+   * (starts with a letter/digit/underscore), also enforces whole-word boundaries
+   * so e.g. `"if"` doesn't match inside identifiers like `notify`.
    */
   private def positionOfNext(delimiter: String, startFrom: Int = cursor): Int = {
-    val pos = source.indexOf(delimiter, startFrom)
-    if (pos >= 0) pos else -1
+    val isWord = delimiter.nonEmpty && (Character.isLetterOrDigit(delimiter.charAt(0)) || delimiter.charAt(0) == '_')
+    var inSingleLine = false
+    var inMultiLine = false
+    var i = startFrom
+    while (i <= source.length - delimiter.length) {
+      val c = source.charAt(i)
+      if (inSingleLine) {
+        if (c == '\n') inSingleLine = false
+        i += 1
+      } else if (inMultiLine) {
+        if (c == '*' && i + 1 < source.length && source.charAt(i + 1) == '/') {
+          inMultiLine = false
+          i += 2
+        } else i += 1
+      } else if (c == '/' && i + 1 < source.length && source.charAt(i + 1) == '/') {
+        inSingleLine = true
+        i += 2
+      } else if (c == '/' && i + 1 < source.length && source.charAt(i + 1) == '*') {
+        inMultiLine = true
+        i += 2
+      } else if (source.startsWith(delimiter, i)) {
+        if (!isWord) return i
+        val before = i == 0 || !(Character.isLetterOrDigit(source.charAt(i - 1)) || source.charAt(i - 1) == '_')
+        val afterPos = i + delimiter.length
+        val after = afterPos >= source.length || !(Character.isLetterOrDigit(source.charAt(afterPos)) || source.charAt(afterPos) == '_')
+        if (before && after) return i
+        i += 1
+      } else i += 1
+    }
+    -1
   }
   
   /**

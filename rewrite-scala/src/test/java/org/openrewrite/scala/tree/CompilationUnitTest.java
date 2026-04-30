@@ -148,6 +148,24 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Test
+    void packageObjectWithMembers() {
+        rewriteRun(
+          scala(
+            """
+            package com.example
+
+            package object pkg {
+              type Alias = String
+
+              val Constant: Int = 42
+            }
+            """,
+            spec -> spec.path("package.scala")
+          )
+        );
+    }
+
+    @Test
     void withTrailingWhitespace() {
         rewriteRun(
           scala(

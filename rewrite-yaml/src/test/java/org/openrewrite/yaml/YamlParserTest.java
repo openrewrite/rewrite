@@ -267,6 +267,25 @@ class YamlParserTest implements RewriteTest {
     }
 
     @Test
+    void asteriskPatternInsideBlockScalar() {
+        // Markdown bold text inside a literal block scalar must not be mangled
+        // by the asterisk placeholder preprocessing.
+        rewriteRun(
+          yaml(
+            """
+              jobs:
+                alert:
+                  steps:
+                    - name: Post alert
+                      run: |
+                        echo ":rotating_light: **CI Alert**: repo has been failing for **5 days**"
+                        echo "- **Branch:** main"
+              """
+          )
+        );
+    }
+
+    @Test
     void pipeLiteralInASequenceWithDoubleQuotes() {
         rewriteRun(
           yaml(

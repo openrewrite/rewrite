@@ -340,6 +340,17 @@ class GradleParserTest implements RewriteTest {
     }
 
     @Test
+    void kotlinDslWithUnresolvedCallableReference() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              kotlin { jvmToolchain { languageVersion.set(libs.versions.jdk.map(JavaLanguageVersion::of)) } }
+              """
+          )
+        );
+    }
+
+    @Test
     void escapedAndNonEscapedDollarSignsInSingleDoubleQuotes() {
         var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""

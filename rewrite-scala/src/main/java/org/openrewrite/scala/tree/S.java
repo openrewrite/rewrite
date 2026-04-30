@@ -299,6 +299,7 @@ public interface S extends J {
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
     final class TuplePattern implements S, Expression, TypedTree, VariableDeclarator {
@@ -687,6 +688,7 @@ public interface S extends J {
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class FunctionCall implements S, Expression, Statement, TypedTree {
 

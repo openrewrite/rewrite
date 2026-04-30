@@ -154,15 +154,13 @@ public static class TreeVisitorExtensions
 {
     public static ITreeVisitor<T> Combine<T>(this ITreeVisitor<T> first, ITreeVisitor<T> second) where T : class
     {
-        return new TreeVisitor<T>(first, second);
+        return new CombinedTreeVisitor<T>(first, second);
     }
-    private class TreeVisitor<T>(ITreeVisitor<T> first, ITreeVisitor<T> second) : ITreeVisitor<T>
+    public static ITreeVisitor<T> Combine<T>(this IEnumerable<ITreeVisitor<T>> visitors) where T : class => new CombinedTreeVisitor<T>(visitors);
+    public static ITreeVisitor<ExecutionContext> GetVisitor(this Recipe[] recipes) => recipes.Select(x => x.GetVisitor()).Combine();
+
+    private class CombinedTreeVisitor<T>(params IEnumerable<ITreeVisitor<T>> visitors) : ITreeVisitor<T>
     {
-        public Tree? Visit(Tree? tree, T p)
-        {
-            tree = first.Visit(tree, p);
-            tree = second.Visit(tree, p);
-            return tree;
-        }
+        public Tree? Visit(Tree? tree, T p) => visitors.Aggregate(tree, (current, visitor) => visitor.Visit(current, p));
     }
 }

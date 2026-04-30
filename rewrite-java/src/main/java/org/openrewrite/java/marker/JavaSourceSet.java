@@ -419,7 +419,7 @@ public class JavaSourceSet implements SourceSet {
                     Enumeration<JarEntry> entries = jarFile.entries();
                     while (entries.hasMoreElements()) {
                         String entryName = entries.nextElement().getName();
-                        if (entryName.endsWith(".class")) {
+                        if (entryName.endsWith(".class") && !isMetaInfEntry(entryName)) {
                             String s = entryNameToClassName(entryName);
                             if (isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
@@ -433,6 +433,9 @@ public class JavaSourceSet implements SourceSet {
                     public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
                         if (file.getFileName().toString().endsWith(".class")) {
                             String pathStr = file.isAbsolute() ? path.relativize(file).toString() : file.toString();
+                            if (isMetaInfEntry(pathStr)) {
+                                return java.nio.file.FileVisitResult.CONTINUE;
+                            }
                             String s = entryNameToClassName(pathStr);
                             if ((acceptPackage == null || s.startsWith(acceptPackage)) && isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
@@ -446,6 +449,17 @@ public class JavaSourceSet implements SourceSet {
             // Partial results better than no results
         }
         return types;
+    }
+
+    /**
+     * Per the JAR specification {@code META-INF/} is reserved for metadata (manifests, services, multi-release
+     * versioned entries, etc.) and never contains application classes. Any {@code .class} file under this directory
+     * would otherwise yield an FQN like {@code META-INF.versions.9.foo.Bar} that collides with the base-path entry in
+     * downstream consumers that dedupe by FQN.
+     */
+    static boolean isMetaInfEntry(String entryName) {
+        String normalized = entryName.replace('\\', '/');
+        return normalized.startsWith("META-INF/");
     }
 
     private static List<JavaType.FullyQualified> getJavaStandardLibraryTypes() {

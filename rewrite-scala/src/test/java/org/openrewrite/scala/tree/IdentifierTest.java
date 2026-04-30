@@ -65,6 +65,19 @@ class IdentifierTest implements RewriteTest {
     }
 
     @Test
+    void backtickIdentifierWithSpecialChars() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val x = Foo.`text/html(UTF-8)`
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void operatorIdentifier() {
         rewriteRun(
           scala("+")

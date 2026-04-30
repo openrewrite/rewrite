@@ -28,6 +28,7 @@ public class XmlPrinter<P> : XmlVisitor<PrintOutputCapture<P>>
 
     public override Xml VisitDocument(Document document, PrintOutputCapture<P> p)
     {
+        if (document.CharsetBomMarked) p.Append('\uFEFF');
         BeforeSyntax(document, p);
         if (document.Prolog != null) Visit(document.Prolog, p);
         Visit(document.Root, p);

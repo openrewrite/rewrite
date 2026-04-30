@@ -123,7 +123,7 @@ public class GoRewriteRpc extends RewriteRpc {
     public static class Builder implements Supplier<GoRewriteRpc> {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private List<RecipeBundleResolver> resolvers = Collections.emptyList();
-        private @Nullable Path goBinaryPath;
+        private Supplier<@Nullable Path> goBinaryPathSupplier = () -> null;
         private Duration timeout = Duration.ofSeconds(60);
         private @Nullable Path log;
         private boolean traceRpcMessages;
@@ -139,7 +139,20 @@ public class GoRewriteRpc extends RewriteRpc {
         }
 
         public Builder goBinaryPath(Path path) {
-            this.goBinaryPath = path;
+            return goBinaryPath(() -> path);
+        }
+
+        /**
+         * Supplies the path to the Go RPC binary. The supplier is invoked at most
+         * once, when the RPC is first started. Returning {@code null} uses the built-in
+         * fallback discovery (same as not configuring the path at all). Exceptions
+         * thrown by the supplier propagate out of the RPC-start call.
+         *
+         * @param goBinaryPathSupplier Supplier for the path to the Go RPC binary
+         * @return This builder
+         */
+        public Builder goBinaryPath(Supplier<@Nullable Path> goBinaryPathSupplier) {
+            this.goBinaryPathSupplier = goBinaryPathSupplier;
             return this;
         }
 
@@ -160,6 +173,7 @@ public class GoRewriteRpc extends RewriteRpc {
 
         @Override
         public GoRewriteRpc get() {
+            @Nullable Path goBinaryPath = goBinaryPathSupplier.get();
             String binaryPath;
             if (goBinaryPath != null) {
                 binaryPath = goBinaryPath.toString();

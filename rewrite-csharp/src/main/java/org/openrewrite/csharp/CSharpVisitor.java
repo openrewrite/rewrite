@@ -372,7 +372,12 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         }
         expressionStatement = (Cs.ExpressionStatement) tempStatement;
         expressionStatement = expressionStatement.withMarkers(visitMarkers(expressionStatement.getMarkers(), p));
-        return expressionStatement.getPadding().withExpression(visitRightPadded(expressionStatement.getPadding().getExpression(), CsRightPadded.Location.EXPRESSION_STATEMENT_EXPRESSION, p));
+        JRightPadded<Expression> expr = visitRightPadded(expressionStatement.getPadding().getExpression(), CsRightPadded.Location.EXPRESSION_STATEMENT_EXPRESSION, p);
+        if (expr == null) {
+            //noinspection DataFlowIssue
+            return null;
+        }
+        return expressionStatement.getPadding().withExpression(expr);
     }
 
     public J visitExternAlias(Cs.ExternAlias externAlias, P p) {

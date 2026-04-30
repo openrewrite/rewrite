@@ -15,6 +15,7 @@
  */
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using NuGet.Versioning;
 using OpenRewrite.Core;
 using OpenRewrite.Xml;
@@ -322,7 +323,8 @@ public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVers
 
     /// <summary>
     /// Resolves the target version using NuGet.Versioning.
-    /// Handles exact versions, NuGet version ranges, and "latest" keyword.
+    /// Handles exact versions, NuGet version ranges, "latest" keyword, and OpenRewrite
+    /// convention wildcards like "10.0.x" (equivalent to NuGet "10.0.*").
     /// </summary>
     internal static string? ResolveTargetVersion(
         string packageInclude,
@@ -331,14 +333,14 @@ public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVers
         string newVersionSpec,
         bool includePrerelease)
     {
+        // OpenRewrite convention: "10.0.x" is equivalent to NuGet's "10.0.*".
+        newVersionSpec = NormalizeVersionSpec(newVersionSpec);
+
         // Exact version: just return it if it's higher than current
         if (NuGetVersion.TryParse(newVersionSpec, out var exactVersion))
         {
-            if (currentVersion != null && NuGetVersion.TryParse(currentVersion, out var current))
-            {
-                if (exactVersion <= current)
-                    return null; // already at or above target
-            }
+            if (IsCurrentAtOrAbove(currentVersion, exactVersion))
+                return null;
             return exactVersion.ToNormalizedString();
         }
 
@@ -355,7 +357,7 @@ public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVers
             if (candidates.Count == 0) return null;
             var best = candidates.Max()!;
 
-            if (currentVersion != null && NuGetVersion.TryParse(currentVersion, out var current) && best <= current)
+            if (IsCurrentAtOrAbove(currentVersion, best))
                 return null;
 
             return best.ToNormalizedString();
@@ -365,22 +367,68 @@ public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVers
         if (VersionRange.TryParse(newVersionSpec, out var range))
         {
             var available = FetchAvailableVersions(packageInclude, marker);
-            if (available.Count == 0) return null;
+            NuGetVersion? best = null;
+            if (available.Count > 0)
+            {
+                var candidates = includePrerelease
+                    ? available
+                    : available.Where(v => !v.IsPrerelease).ToList();
 
-            var candidates = includePrerelease
-                ? available
-                : available.Where(v => !v.IsPrerelease).ToList();
+                best = range.FindBestMatch(candidates);
 
-            var best = range.FindBestMatch(candidates);
+                // The package exists on NuGet but has no version matching the range
+                // (e.g., Microsoft.AspNetCore.Mvc has no 10.0.x because it was consolidated
+                // into the shared framework). Don't upgrade — writing a non-existent
+                // version would cause NU1102 at restore time.
+                if (best == null)
+                    return null;
+            }
+            else
+            {
+                // We couldn't query NuGet (offline, private feed, or package not indexed).
+                // Fall back to the range's minimum version. That's still a valid concrete
+                // upgrade target when the current version is lower.
+                if (range.MinVersion != null)
+                    best = range.MinVersion;
+            }
+
             if (best == null) return null;
 
-            if (currentVersion != null && NuGetVersion.TryParse(currentVersion, out var current) && best <= current)
+            if (IsCurrentAtOrAbove(currentVersion, best))
                 return null;
 
             return best.ToNormalizedString();
         }
 
         return null;
+    }
+
+    // OpenRewrite wildcard convention: a trailing ".x" means "any component here".
+    // NuGet expresses the same with "*" (e.g., "10.0.*"). Normalize so downstream
+    // NuGet.Versioning parsers accept the input.
+    private static readonly Regex TrailingXWildcard =
+        new(@"\.x$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static string NormalizeVersionSpec(string spec) =>
+        TrailingXWildcard.Replace(spec, ".*");
+
+    // Returns true when the current version (exact or floating range) is known to
+    // be >= the proposed target. If current is unparseable or unknown, returns
+    // false so the upgrade proceeds.
+    private static bool IsCurrentAtOrAbove(string? currentVersion, NuGetVersion target)
+    {
+        if (currentVersion == null) return false;
+
+        if (NuGetVersion.TryParse(currentVersion, out var current))
+            return target <= current;
+
+        // Wildcard / range current version: compare against range.MinVersion as
+        // the lower bound of what MSBuild might resolve to.
+        var normalized = NormalizeVersionSpec(currentVersion);
+        if (VersionRange.TryParse(normalized, out var currentRange) && currentRange.MinVersion != null)
+            return target <= currentRange.MinVersion;
+
+        return false;
     }
 
     private static List<NuGetVersion> FetchAvailableVersions(string packageName, MSBuildProject? marker)

@@ -96,8 +96,7 @@ class AddDependencyTest implements RewriteTest {
                 </project>
                 """,
               """
-                <!--~~(doesnotexist:doesnotexist failed. Unable to download metadata. Tried repositories:
-                https://repo.maven.apache.org/maven2: HTTP 404)~~>--><project>
+                <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>

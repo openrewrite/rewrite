@@ -211,7 +211,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         beforeSyntax(range, GSpace.Location.RANGE_PREFIX, p);
         visit(range.getFrom(), p);
         visitSpace(range.getPadding().getInclusive().getBefore(), GSpace.Location.RANGE_INCLUSION, p);
-        p.append(range.getInclusive() ? ".." : "..>");
+        p.append(range.getInclusive() ? ".." : "..<");
         visit(range.getTo(), p);
         afterSyntax(range, p);
         return range;
@@ -287,6 +287,29 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             p.append("as");
             visitIdentifier(alias.getElement(), p);
             return i;
+        }
+
+        @Override
+        public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<P> p) {
+            if (!classDecl.getPadding().getKind().getMarkers().findFirst(Trait.class).isPresent()) {
+                return super.visitClassDeclaration(classDecl, p);
+            }
+            beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
+            visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
+            visit(classDecl.getLeadingAnnotations(), p);
+            for (J.Modifier m : classDecl.getModifiers()) {
+                visitModifier(m, p);
+            }
+            visit(classDecl.getPadding().getKind().getAnnotations(), p);
+            visitSpace(classDecl.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
+            p.append("trait");
+            visit(classDecl.getName(), p);
+            visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+            visitLeftPadded("extends", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, p);
+            visitContainer("extends", classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", null, p);
+            visit(classDecl.getBody(), p);
+            afterSyntax(classDecl, p);
+            return classDecl;
         }
 
         @Override

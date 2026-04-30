@@ -68,6 +68,13 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void closureArgumentOnNumericLiteralReceiver() {
+        rewriteRun(
+          groovy("50.times { 1 }")
+        );
+    }
+
+    @Test
     void noParentheses() {
         rewriteRun(
           groovy(
@@ -749,6 +756,29 @@ class MethodInvocationTest implements RewriteTest {
                   }
               }
               Util.<String>compare("A", "B")
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodNameStartingWithClassKeyword() {
+        rewriteRun(
+          groovy(
+            """
+              Object.className("foo")
+              """
+          )
+        );
+    }
+
+    @Test
+    void commandExpressionWithParenthesizedArgument() {
+        rewriteRun(
+          groovy(
+            """
+              def x
+              x foo(c)
               """
           )
         );

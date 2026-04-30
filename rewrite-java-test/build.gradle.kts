@@ -12,10 +12,10 @@ recipeDependencies {
 dependencies {
     implementation("org.assertj:assertj-core:3.+") // CVE-2026-24400 in 4.0.0-M1 and no higher versions available
     implementation(project(":rewrite-java"))
-    implementation(project(":rewrite-kotlin"))
-    implementation(project(":rewrite-groovy"))
     implementation(project(":rewrite-test"))
 
+    testImplementation(project(":rewrite-groovy"))
+    testImplementation(project(":rewrite-kotlin"))
     testImplementation("io.github.classgraph:classgraph:latest.release")
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
     testRuntimeOnly(project(":rewrite-java-21"))

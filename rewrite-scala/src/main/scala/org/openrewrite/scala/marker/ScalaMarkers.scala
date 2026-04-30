@@ -59,6 +59,16 @@ object SObject {
 }
 
 /**
+ * Marks a J.ClassDeclaration as a Scala `package object X { ... }`.
+ * The printer uses this to emit `package` before the `object` keyword.
+ * Attached in addition to SObject — a package object is still a singleton object.
+ */
+case class PackageObject(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
  * Marks a J.MethodDeclaration or J.Lambda whose body lambda represents a curried
  * parameter list rather than an actual lambda expression.
  *

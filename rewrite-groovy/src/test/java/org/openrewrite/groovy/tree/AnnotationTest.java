@@ -141,6 +141,20 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/286")
+    @Test
+    void nestedAnnotationsInListLiteral() {
+        rewriteRun(
+          groovy(
+            """
+              @Tags(categories = [@Tag("tag1"), @Tag("tag2")])
+              class Main {
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4254")
     @Test
     void groovyTransformAnnotation() {
@@ -276,17 +290,53 @@ class AnnotationTest implements RewriteTest {
           groovy(
             """
             package org.dummy
-            
+
             import groovy.transform.Synchronized
-            
+
             class Foo {
-            
+
                 @Synchronized
                 void bar() {
                     println('Hello World')
                 }
             }
             """
+          )
+        );
+    }
+
+    @Test
+    void immutableAndToString() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Immutable
+              import groovy.transform.ToString
+
+              @Immutable @ToString
+              class A {
+                  void foo() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void notYetImplementedAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.test.NotYetImplemented
+
+              class Foo {
+                  @NotYetImplemented
+                  void m() {
+                      println("hello")
+                  }
+              }
+              """
           )
         );
     }

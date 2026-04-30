@@ -233,4 +233,17 @@ class ClassDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void methodWithImplicitParameter() {
+        rewriteRun(
+            scala(
+                """
+                class Foo {
+                  def setup(implicit system: ActorSystem): Unit = {}
+                }
+                """
+            )
+        );
+    }
 }
