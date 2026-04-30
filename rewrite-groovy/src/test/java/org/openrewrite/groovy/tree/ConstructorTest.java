@@ -152,6 +152,20 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Test
+    void nonStaticInnerClassNamedArgs() {
+        rewriteRun(
+          groovy(
+            """
+              class T {
+                  class Reader { }
+                  def m() { new Reader(a: 1) }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void innerClassConstructorWithOnlySuperCall() {
         rewriteRun(
           groovy(
