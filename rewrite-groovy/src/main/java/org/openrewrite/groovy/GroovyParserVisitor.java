@@ -2530,6 +2530,11 @@ public class GroovyParserVisitor {
 
             List<JRightPadded<Expression>> args = new ArrayList<>(tuple.getExpressions().size());
             for (org.codehaus.groovy.ast.expr.Expression expression : tuple.getExpressions()) {
+                // Skip synthetic args (e.g. the implicit outer-`this` Groovy adds when
+                // constructing a non-static inner class from within the enclosing class)
+                if (!appearsInSource(expression)) {
+                    continue;
+                }
                 NamedArgumentListExpression namedArgList = (NamedArgumentListExpression) expression;
                 List<MapEntryExpression> mapEntryExpressions = namedArgList.getMapEntryExpressions();
                 for (int i = 0; i < mapEntryExpressions.size(); i++) {
