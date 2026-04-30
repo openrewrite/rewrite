@@ -867,19 +867,31 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
-        void skipsLocalInvalidArtifactsMissingJar(@TempDir Path localRepository) throws Exception {
-            Path localArtifact = localRepository.resolve("com/bad/bad-artifact");
+        void resolvesLocalPomWithoutPackagingAsBom(@TempDir Path localRepository) throws Exception {
+            // A cached BOM POM with no <packaging> element and no JAR (BOMs never have JARs) must resolve
+            // from cache rather than being silently skipped and falling through to a remote fetch.
+            // The non-empty <dependencyManagement> is the BOM signal that gates the inference.
+            Path localArtifact = localRepository.resolve("com/example/example-bom");
             assertThat(localArtifact.toFile().mkdirs()).isTrue();
             Files.createDirectories(localArtifact.resolve("1"));
 
-            Path localPom = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.pom");
+            Path localPom = localRepository.resolve("com/example/example-bom/1/example-bom-1.pom");
             Files.writeString(localPom,
               //language=xml
               """
                 <project>
-                  <groupId>com.bad</groupId>
-                  <artifactId>bad-artifact</artifactId>
+                  <groupId>com.example</groupId>
+                  <artifactId>example-bom</artifactId>
                   <version>1</version>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.example</groupId>
+                        <artifactId>some-lib</artifactId>
+                        <version>1.0</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
                 </project>
                 """
             );
@@ -891,10 +903,45 @@ class MavenPomDownloaderTest implements RewriteTest {
               .knownToExist(true)
               .build();
 
-            // Does not return invalid dependency.
+            Pom pom = new MavenPomDownloader(emptyMap(), ctx)
+              .download(new GroupArtifactVersion("com.example", "example-bom", "1"), null, null, List.of(mavenLocal));
+            assertThat(pom).isNotNull();
+            assertThat(pom.getPackaging())
+              .as("Unspecified packaging with no JAR but with dependencyManagement should be inferred as 'pom'")
+              .isEqualTo("pom");
+        }
+
+        @Test
+        void doesNotInferPomPackagingForBareArtifactWithoutDependencyManagement(@TempDir Path localRepository) {
+            // Safety boundary: when the POM has no <packaging>, no JAR, AND no <dependencyManagement>, it could
+            // be a sloppy jar artifact rather than a BOM. Refuse to infer pom packaging and fall through to the
+            // next repo so a remote (where available) can supply the missing JAR.
+            Path localArtifact = localRepository.resolve("com/bare/bare-artifact");
+            assertThat(localArtifact.toFile().mkdirs()).isTrue();
+            assertDoesNotThrow(() -> Files.createDirectories(localArtifact.resolve("1")));
+
+            Path localPom = localRepository.resolve("com/bare/bare-artifact/1/bare-artifact-1.pom");
+            assertDoesNotThrow(() -> Files.writeString(localPom,
+              //language=xml
+              """
+                <project>
+                  <groupId>com.bare</groupId>
+                  <artifactId>bare-artifact</artifactId>
+                  <version>1</version>
+                </project>
+                """
+            ));
+
+            MavenRepository mavenLocal = MavenRepository.builder()
+              .id("local")
+              .uri(localRepository.toUri().toString())
+              .snapshots(false)
+              .knownToExist(true)
+              .build();
+
             assertThrows(MavenDownloadingException.class, () ->
               new MavenPomDownloader(emptyMap(), ctx)
-                .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+                .download(new GroupArtifactVersion("com.bare", "bare-artifact", "1"), null, null, List.of(mavenLocal)));
         }
 
         @Test
