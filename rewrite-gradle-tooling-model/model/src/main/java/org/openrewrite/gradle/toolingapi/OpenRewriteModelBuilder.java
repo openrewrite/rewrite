@@ -82,7 +82,7 @@ public class OpenRewriteModelBuilder {
         } else if (Files.exists(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"))) {
             connector.useBuildDistribution();
         } else {
-            connector.useGradleVersion("8.12");
+            connector.useGradleVersion(defaultGradleVersion());
         }
         connector
                 // Uncomment to hit breakpoints inside OpenRewriteModelBuilder in unit tests
@@ -129,6 +129,37 @@ public class OpenRewriteModelBuilder {
                     throw new UncheckedIOException(e);
                 }
             }
+        }
+    }
+
+    /**
+     * Pick a Gradle distribution compatible with the JVM running the Tooling API client.
+     * The daemon defaults to the same JVM as the client, so the chosen distribution must support that Java version.
+     * See <a href="https://docs.gradle.org/current/userguide/compatibility.html">Gradle compatibility matrix</a>.
+     */
+    static String defaultGradleVersion() {
+        return defaultGradleVersion(javaSpecificationVersion());
+    }
+
+    static String defaultGradleVersion(int javaFeatureVersion) {
+        if (javaFeatureVersion >= 25) {
+            return "9.1.0";
+        }
+        if (javaFeatureVersion >= 24) {
+            return "8.14.3";
+        }
+        return "8.12";
+    }
+
+    private static int javaSpecificationVersion() {
+        String version = System.getProperty("java.specification.version", "8");
+        if (version.startsWith("1.")) {
+            version = version.substring(2);
+        }
+        try {
+            return Integer.parseInt(version);
+        } catch (NumberFormatException e) {
+            return 8;
         }
     }
 
