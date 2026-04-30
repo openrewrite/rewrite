@@ -394,4 +394,125 @@ class TraitClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void traitMethodCallsMethodOnAbstractGetter() {
+        rewriteRun(
+          groovy(
+            """
+              trait HasItems {
+                  abstract List<String> getItems()
+                  void addItem(String item) {
+                      items.add(item)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void traitMethodWithDefaultParameterReferencingConstant() {
+        rewriteRun(
+          groovy(
+            """
+              class Outer {
+                  static final String DEFAULT = "x"
+              }
+              trait Greeter {
+                  String greet(String name = Outer.DEFAULT) {
+                      "hello $name"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void traitMethodWithThisFieldAssignment() {
+        rewriteRun(
+          groovy(
+            """
+              trait HasFlag {
+                  boolean flag
+                  void setFlag(boolean flag) {
+                      this.flag = flag
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void traitMethodUsingThisClassName() {
+        rewriteRun(
+          groovy(
+            """
+              trait HasName {
+                  String myName() {
+                      this.class.name
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void traitMethodWithGStringPropertyInterpolation() {
+        rewriteRun(
+          groovy(
+            """
+              class Lang {
+                  String name = "java"
+              }
+              trait LangAware {
+                  abstract Lang getLanguage()
+                  String pathFor(String file) {
+                      "src/main/${language.name}/${file}.${language.name}"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void traitMethodWithArrowSwitchAndQualifiedEnumCase() {
+        rewriteRun(
+          groovy(
+            """
+              enum Kind { A, B }
+              trait Switcher {
+                  String pick(Kind k) {
+                      switch (k) {
+                          case Kind.A -> "a"
+                          case Kind.B -> "b"
+                          default -> "?"
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void traitMethodWithDefLocalFromImplicitReceiver() {
+        rewriteRun(
+          groovy(
+            """
+              trait FileMaker {
+                  abstract Object getTemporaryFolder()
+                  void make(String name) {
+                      def f = temporaryFolder.file(name)
+                      f.toString()
+                  }
+              }
+              """
+          )
+        );
+    }
 }
