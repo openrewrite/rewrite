@@ -975,6 +975,16 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 cursor++;
                 Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor);
                 texts.add(lineBreak);
+
+                // Java 23+ javac's DCText/DCComment getBody() strips per-line leading whitespace that
+                // older versions preserved; the cleaned source still carries that whitespace, so realign
+                // cursor by appending any source whitespace before node's next non-whitespace character.
+                if (i + 1 < node.length() && !Character.isWhitespace(node.charAt(i + 1))) {
+                    while (cursor < source.length() && source.charAt(cursor) != '\n' && Character.isWhitespace(source.charAt(cursor))) {
+                        text.append(source.charAt(cursor));
+                        cursor++;
+                    }
+                }
             } else if (source.charAt(cursor) != c && (source.startsWith(unicodeEscaped(c), cursor) || source.startsWith(unicodeEscaped(c).toLowerCase(), cursor) )) {
                 int escapedCharLength = unicodeEscaped(c).length();
                 text.append(source, cursor, cursor + escapedCharLength);
