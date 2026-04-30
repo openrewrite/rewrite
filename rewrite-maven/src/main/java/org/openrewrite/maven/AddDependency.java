@@ -235,10 +235,16 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     for (ResolvedDependency d : dependencies.get(Scope.Compile)) {
                         if (hasAcceptableTransitivity(d, acc) &&
                             groupId.equals(d.getGroupId()) &&
-                            artifactId.equals(d.getArtifactId()) &&
-                            (d.isTransitive() ||
-                                    (d.isDirect() && version.equals(d.getVersion())))
-                        ) {
+                            artifactId.equals(d.getArtifactId())) {
+                            if (d.isTransitive() || (d.isDirect() && version.equals(d.getVersion()))) {
+                                return maven;
+                            }
+                            if (d.isDirect() && (scope == null || Scope.fromName(scope) == Scope.Compile)) {
+                                // Direct compile-scope dependency at a different version — update keeping compile scope
+                                return new AddDependencyVisitor(
+                                        groupId, artifactId, version, versionPattern, null, releasesOnly,
+                                        type, classifier, optional, familyPatternCompiled, metadataFailures).visitNonNull(document, ctx);
+                            }
                             return maven;
                         }
                     }
@@ -249,7 +255,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 if ((resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) && dependencies.get(resolvedScopeEnum) != null) {
                     for (ResolvedDependency d : dependencies.get(resolvedScopeEnum)) {
                         if (hasAcceptableTransitivity(d, acc) &&
-                                groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId()) &&
+                                (d.isTransitive() ||
+                                        (d.isDirect() && version.equals(d.getVersion())))) {
                             return maven;
                         }
                     }
