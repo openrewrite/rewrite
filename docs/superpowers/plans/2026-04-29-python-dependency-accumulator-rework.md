@@ -522,10 +522,11 @@ private boolean matchesUpgrade(PythonDependencyFile trait) {
 }
 ```
 
-- [ ] **Step 5.4: Edit function inside `ensureComputed`.**
+- [ ] **Step 5.4: Edit function inside `ensureComputed`.** Note the map key uses `PythonResolutionResult.normalizeName(packageName)` to preserve existing behavior:
 
 ```java
-Map<String, String> upgrades = Collections.singletonMap(packageName, newVersion);
+Map<String, String> upgrades = Collections.singletonMap(
+        PythonResolutionResult.normalizeName(packageName), newVersion);
 Function<PythonDependencyFile, PythonDependencyFile> editFn =
         t -> t.withUpgradedVersions(upgrades, scope, groupName);
 ```
