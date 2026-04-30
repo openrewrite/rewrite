@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, npm, packageJson, pattern, template, tsx, typescript} from "../../../src/javascript";
+import {expr, ident, JavaScriptVisitor, npm, packageJson, pattern, template, tsx, typescript} from "../../../src/javascript";
 import {J, Type} from "../../../src/java";
 import {withDir} from "tmp-promise";
 
@@ -26,7 +26,7 @@ describe('lenient type matching in patterns', () => {
             const tempDir = repo.path;
 
             // Pattern with unconstrained captures for props, ref, and body
-            const pat = pattern`React.forwardRef((${capture('props')}, ${capture('ref')}) => ${capture('body')})`
+            const pat = pattern`React.forwardRef((${expr('props')}, ${expr('ref')}) => ${expr('body')})`
                 .configure({
                     context: [`import * as React from 'react'`],
                     dependencies: {'@types/react': '^18.0.0'}
@@ -91,7 +91,7 @@ describe('lenient type matching in patterns', () => {
 
     test('untyped function pattern matches typed function with return type', async () => {
         // Pattern with untyped function (no return type) should match typed function
-        const pat = pattern`function ${capture('name')}() { return "hello"; }`;
+        const pat = pattern`function ${ident('name')}() { return "hello"; }`;
 
         const testCode = `
 function greet(): string { return "hello"; }
@@ -123,13 +123,13 @@ function greet(): string { return "hello"; }
     test('untyped pattern matches and transforms with template replacement', async () => {
         // Pattern without type annotations matches typed code and replaces it with template
         // This demonstrates: matching untyped pattern against typed code + capturing + template replacement
-        const pat = pattern`forwardRef(function ${capture('name')}(props, ref) { return null; })`
+        const pat = pattern`forwardRef(function ${ident('name')}(props, ref) { return null; })`
             .configure({
                 context: [`import { forwardRef } from 'react'`]
             });
 
         // Template that uses the captured name as an identifier
-        const tmpl = template`console.log(${capture('name')})`;
+        const tmpl = template`console.log(${ident('name')})`;
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(methodInvocation: J.MethodInvocation, _p: any): Promise<J | undefined> {
@@ -158,7 +158,7 @@ function greet(): string { return "hello"; }
 
     test('strict type matching mode rejects untyped pattern against typed code', async () => {
         // Pattern with strict type matching (lenientTypeMatching: false) should NOT match typed function
-        const pat = pattern`function ${capture('name')}() { return "hello"; }`
+        const pat = pattern`function ${ident('name')}() { return "hello"; }`
             .configure({
                 lenientTypeMatching: false
             });
@@ -189,7 +189,7 @@ function greet(): string { return "hello"; }
 
     test('lenient type matching can be explicitly enabled', async () => {
         // Pattern with explicit lenient type matching should match typed function
-        const pat = pattern`function ${capture('name')}() { return "hello"; }`
+        const pat = pattern`function ${ident('name')}() { return "hello"; }`
             .configure({
                 lenientTypeMatching: true
             });
@@ -223,7 +223,7 @@ function greet(): string { return "hello"; }
 
     test('strict mode with matching types does match', async () => {
         // Pattern with strict type matching and matching return type SHOULD match
-        const pat = pattern`function ${capture('name')}(): string { return "hello"; }`
+        const pat = pattern`function ${ident('name')}(): string { return "hello"; }`
             .configure({
                 lenientTypeMatching: false
             });
@@ -261,7 +261,7 @@ function greet(): string { return "hello"; }
             const tempDir = repo.path;
 
             // Pattern uses the original import name
-            const pat = pattern`isDate(${capture('arg')})`
+            const pat = pattern`isDate(${expr('arg')})`
                 .configure({
                     context: [`import { isDate } from 'node:util/types'`],
                     lenientTypeMatching: false, // Strict type matching
@@ -319,7 +319,7 @@ function greet(): string { return "hello"; }
             const tempDir = repo.path;
 
             // Pattern uses the original import name, with lenient mode (default)
-            const pat = pattern`isDate(${capture('arg')})`
+            const pat = pattern`isDate(${expr('arg')})`
                 .configure({
                     context: [`import { isDate } from 'node:util/types'`],
                     // lenientTypeMatching defaults to true
@@ -375,7 +375,7 @@ function greet(): string { return "hello"; }
     test('aliased import matching without type attribution (import-based resolution)', async () => {
         // Pattern uses the original import name
         // Testing if parser tracks import origins (module + original name) without type attribution
-        const pat = pattern`isDate(${capture('arg')})`
+        const pat = pattern`isDate(${expr('arg')})`
             .configure({
                 context: [`import { isDate } from 'node:util/types'`]
                 // Note: NO dependencies - pattern won't have type attribution
@@ -419,7 +419,7 @@ function greet(): string { return "hello"; }
             const tempDir = repo.path;
 
             // Pattern uses named import: forwardRef()
-            const pat = pattern`forwardRef(${capture('fn')})`
+            const pat = pattern`forwardRef(${expr('fn')})`
                 .configure({
                     context: [`import { forwardRef } from 'react'`],
                     dependencies: {'@types/react': '^18.0.0'}

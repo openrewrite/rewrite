@@ -203,4 +203,7 @@ Each language module has `rpc.ts` with a Sender (visit tree → serialize to que
 4. Check `src/rpc/queue.ts` for deadlock in read/write operations
 
 ### Type Checking
-Run `npm run typecheck` frequently to catch type mismatches early.
+`npm run typecheck` only checks `src/` and `test/` via `tsc --noEmit`, but vitest type
+definitions are not resolved by `tsc` alone. This means type errors inside test files
+(e.g., incorrect generic inference on overloaded functions) can be missed locally while
+CI catches them. Prefer `npm test` (typecheck + vitest) as the final check before pushing.

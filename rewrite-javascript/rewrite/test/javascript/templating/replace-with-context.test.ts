@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from '../../../src/javascript';
+import {expr, JavaScriptVisitor, pattern, rewrite, template, typescript} from '../../../src/javascript';
 import {RecipeSpec, fromVisitor} from '../../../src/test';
 import {J} from '../../../src/java';
 
@@ -25,8 +25,8 @@ describe('replace with context', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                     const rule = rewrite(() => {
-                        const left = capture("left");
-                        const right = capture("right");
+                        const left = expr("left");
+                        const right = expr("right");
                         return {
                             before: [
                                 pattern`${left} == ${right}`,
@@ -53,13 +53,13 @@ describe('replace with context', () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                     const rule = rewrite(() => {
-                        const expr = capture();
+                        const e = expr();
                         return {
                             before: [
-                                pattern`${expr} || false`,
-                                pattern`false || ${expr}`
+                                pattern`${e} || false`,
+                                pattern`false || ${e}`
                             ],
-                            after: template`${expr}`
+                            after: template`${e}`
                         };
                     });
                     return await rule.tryOn(this.cursor, binary) || binary;

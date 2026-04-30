@@ -28,7 +28,7 @@
  *    visitor to use matchSequence logic instead of strict length comparison when variadic
  *    captures are present, similar to how method invocations are handled.
  */
-import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript} from "../../../src/javascript";
+import {expr, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {Cursor} from "../../../src";
@@ -52,7 +52,7 @@ describe('variadic pattern matching in containers', () => {
     }
 
     test('variadic capture in object destructuring pattern', async () => {
-        const props = capture({ variadic: true });
+        const props = expr({ variadic: true });
         const pat = pattern`function foo({${props}}) {}`;
 
         // The pattern has 1 element (variadic capture), but the target has 2+ elements
@@ -81,8 +81,8 @@ describe('variadic pattern matching in containers', () => {
     });
 
     test('variadic capture with required property in object destructuring', async () => {
-        const first = capture('first');
-        const rest = capture({ variadic: true });
+        const first = expr('first');
+        const rest = expr({ variadic: true });
         const pat = pattern`function foo({${first}, ${rest}}) {}`;
 
         // The pattern has 2 elements (first + variadic), but target has 3+ elements
@@ -108,7 +108,7 @@ describe('variadic pattern matching in containers', () => {
     });
 
     test('variadic capture in array destructuring pattern', async () => {
-        const elements = capture({ variadic: true });
+        const elements = expr({ variadic: true });
         const pat = pattern`function foo([${elements}]) {}`;
 
         // The pattern has 1 element (variadic capture), but the target has 2+ elements
@@ -138,7 +138,7 @@ describe('variadic pattern matching in containers', () => {
 
     test('variadic capture with min/max constraints in containers', async () => {
         // Test min constraint
-        const props1 = capture({ variadic: { min: 2 } });
+        const props1 = expr({ variadic: { min: 2 } });
         const pat1 = pattern`function foo({${props1}}) {}`;
 
         expect(await pat1.match(await parse('function foo({}) {}'), undefined!)).toBeUndefined();  // min not satisfied
@@ -147,7 +147,7 @@ describe('variadic pattern matching in containers', () => {
         expect(await pat1.match(await parse('function foo({a, b, c}) {}'), undefined!)).toBeDefined();    // more than min
 
         // Test max constraint
-        const props2 = capture({ variadic: { max: 2 } });
+        const props2 = expr({ variadic: { max: 2 } });
         const pat2 = pattern`function foo({${props2}}) {}`;
 
         expect(await pat2.match(await parse('function foo({}) {}'), undefined!)).toBeDefined();    // within max
@@ -162,7 +162,7 @@ describe('variadic pattern matching in containers', () => {
         let receivedCursor: any = null;
 
         // Capture with constraint that checks the array length and verifies cursor is present
-        const props = capture({
+        const props = expr({
             variadic: true,
             constraint: (nodes: J[], context) => {
                 receivedCursor = context.cursor;
@@ -201,10 +201,10 @@ describe('variadic pattern matching in containers', () => {
         // This test reproduces the issue where variadic captures in containers
         // are not properly expanded during template replacement
 
-        const propsWithBindings = capture({ variadic: true });
-        const ref = capture();
-        const body = capture({ variadic: true });
-        const name = capture();
+        const propsWithBindings = expr({ variadic: true });
+        const ref = expr();
+        const body = expr({ variadic: true });
+        const name = expr();
 
         // Pattern: forwardRef(function Name({...props}, ref) {...})
         const beforePattern = pattern`forwardRef(function ${name}({${propsWithBindings}}, ${ref}) {${body}})`;
@@ -239,10 +239,10 @@ describe('variadic pattern matching in containers', () => {
         // This test verifies that { ref: ${ref} } preserves the "ref:" property name
         // when replacing ${ref} with the captured value
 
-        const ref = capture();
-        const props = capture({ variadic: true });
-        const body = capture({ variadic: true });
-        const name = capture();
+        const ref = expr();
+        const props = expr({ variadic: true });
+        const body = expr({ variadic: true });
+        const name = expr();
 
         // Reuse the forwardRef pattern but with a template that has propertyName
         const beforePattern = pattern`forwardRef(function ${name}({${props}}, ${ref}) {${body}})`;

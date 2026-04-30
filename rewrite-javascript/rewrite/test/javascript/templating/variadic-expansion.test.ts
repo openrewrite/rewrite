@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {any, capture, JavaScriptVisitor, pattern, Pattern, template, Template, typescript} from "../../../src/javascript";
+import {any, expr, JavaScriptVisitor, pattern, Pattern, template, Template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 
 describe('variadic template expansion', () => {
@@ -36,7 +36,7 @@ describe('variadic template expansion', () => {
     }
 
     test('expand variadic capture - zero arguments', () => {
-        const args = capture({ variadic: true });
+        const args = expr({ variadic: true });
         const pat = pattern`foo(${args})`;
         const tmpl = template`bar(${args})`;
 
@@ -48,7 +48,7 @@ describe('variadic template expansion', () => {
     });
 
     test('expand variadic capture - single argument', () => {
-        const args = capture({ variadic: true });
+        const args = expr({ variadic: true });
         const pat = pattern`foo(${args})`;
         const tmpl = template`bar(${args})`;
 
@@ -60,7 +60,7 @@ describe('variadic template expansion', () => {
     });
 
     test('expand variadic capture - multiple arguments', () => {
-        const args = capture({ variadic: true });
+        const args = expr({ variadic: true });
         const pat = pattern`foo(${args})`;
         const tmpl = template`bar(${args})`;
 
@@ -72,8 +72,8 @@ describe('variadic template expansion', () => {
     });
 
     test('expand variadic with fixed arguments before', () => {
-        const first = capture();
-        const rest = capture({ variadic: true });
+        const first = expr();
+        const rest = expr({ variadic: true });
         const pat = pattern`foo(${first}, ${rest})`;
         const tmpl = template`bar(${first}, ${rest})`;
 
@@ -85,8 +85,8 @@ describe('variadic template expansion', () => {
     });
 
     test('expand variadic with fixed arguments after', () => {
-        const first = capture({ variadic: true });
-        const last = capture();
+        const first = expr({ variadic: true });
+        const last = expr();
         const pat = pattern`foo(${first}, ${last})`;
         const tmpl = template`bar(${first}, ${last})`;
 
@@ -99,7 +99,7 @@ describe('variadic template expansion', () => {
 
     test('match with any() before-middle-after - zero before, zero after', () => {
         const before = any({ variadic: true });
-        const middle = capture<J.Identifier>({constraint: node => node.simpleName === 'x'});
+        const middle = expr<J.Identifier>({constraint: node => node.simpleName === 'x'});
         const after = any({ variadic: true });
         const pat = pattern`foo(${before}, ${middle}, ${after})`;
         const tmpl = template`bar(${middle})`;
@@ -113,7 +113,7 @@ describe('variadic template expansion', () => {
 
     test('match with any() before-middle-after - one before, zero after', () => {
         const before = any({ variadic: true });
-        const middle = capture<J.Identifier>({constraint: node => node.simpleName === 'x'});
+        const middle = expr<J.Identifier>({constraint: node => node.simpleName === 'x'});
         const after = any({ variadic: true });
         const pat = pattern`foo(${before}, ${middle}, ${after})`;
         const tmpl = template`bar(${middle})`;
@@ -127,7 +127,7 @@ describe('variadic template expansion', () => {
 
     test('match with any() before-middle-after - zero before, one after', () => {
         const before = any({ variadic: true });
-        const middle = capture<J.Identifier>({constraint: node => node.simpleName === 'x'});
+        const middle = expr<J.Identifier>({constraint: node => node.simpleName === 'x'});
         const after = any({ variadic: true });
         const pat = pattern`foo(${before}, ${middle}, ${after})`;
         const tmpl = template`bar(${middle})`;
@@ -141,7 +141,7 @@ describe('variadic template expansion', () => {
 
     test('match with any() before-middle-after - one before, one after', () => {
         const before = any({ variadic: true });
-        const middle = capture<J.Identifier>({constraint: node => node.simpleName === 'x'});
+        const middle = expr<J.Identifier>({constraint: node => node.simpleName === 'x'});
         const after = any({ variadic: true });
         const pat = pattern`foo(${before}, ${middle}, ${after})`;
         const tmpl = template`bar(${middle})`;
@@ -154,7 +154,7 @@ describe('variadic template expansion', () => {
     });
 
     test('variadic followed by literal - should not consume literal', () => {
-        const args = capture({ variadic: true });
+        const args = expr({ variadic: true });
         const pat = pattern`foo(${args}, 'bar')`;
         const tmpl = template`baz(${args})`;
 
@@ -166,7 +166,7 @@ describe('variadic template expansion', () => {
     });
 
     test('variadic followed by literal - no match if literal missing', () => {
-        const args = capture({ variadic: true });
+        const args = expr({ variadic: true });
         const pat = pattern`foo(${args}, 'bar')`;
         const tmpl = template`baz(${args})`;
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, Pattern, pattern, Template, template, typescript} from "../../../src/javascript";
+import {expr, stmt, JavaScriptVisitor, Pattern, pattern, Template, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {create as produce} from "mutative";
 
@@ -44,7 +44,7 @@ describe('variadic statement matching and expansion', () => {
      }
 
     test('match block with zero leading statements using any()', () => {
-        const leadingStmts = capture({ variadic: true });
+        const leadingStmts = stmt({ variadic: true });
         const pat = pattern`{
             ${leadingStmts}
             return x;
@@ -72,7 +72,7 @@ describe('variadic statement matching and expansion', () => {
     });
 
     test('match block with one leading statement using any()', () => {
-        const leadingStmts = capture({ variadic: true });
+        const leadingStmts = stmt({ variadic: true });
         const pat = pattern`{
             ${leadingStmts}
             return x;
@@ -102,7 +102,7 @@ describe('variadic statement matching and expansion', () => {
     });
 
     test('match block with multiple leading statements using any()', () => {
-        const leadingStmts = capture({ variadic: true });
+        const leadingStmts = stmt({ variadic: true });
         const pat = pattern`{
             ${leadingStmts}
             return x;
@@ -134,7 +134,7 @@ describe('variadic statement matching and expansion', () => {
     });
 
     test('match block with trailing statements using any()', () => {
-        const trailingStmts = capture({ variadic: true });
+        const trailingStmts = stmt({ variadic: true });
         const pat = pattern`{
             console.log('start');
             ${trailingStmts}
@@ -164,8 +164,8 @@ describe('variadic statement matching and expansion', () => {
     });
 
     test('capture and reorder statements', () => {
-        const first = capture();
-        const second = capture();
+        const first = stmt();
+        const second = stmt();
         const pat = pattern`{
             ${first}
             ${second}
@@ -193,7 +193,7 @@ describe('variadic statement matching and expansion', () => {
     });
 
     test('match with variadic min constraint', () => {
-        const leadingStmts = capture({ variadic: { min: 1 } });
+        const leadingStmts = stmt({ variadic: { min: 1 } });
         const pat = pattern`{
             ${leadingStmts}
             return x;
@@ -230,7 +230,7 @@ describe('variadic statement matching and expansion', () => {
     });
 
     test('match with variadic max constraint', () => {
-        const leadingStmts = capture({ variadic: { max: 1 } });
+        const leadingStmts = stmt({ variadic: { max: 1 } });
         const pat = pattern`{
             ${leadingStmts}
             return x;
@@ -280,7 +280,7 @@ describe('variadic statement matching and expansion', () => {
     });
 
     test('match empty block with variadic capture', () => {
-        const stmts = capture({ variadic: true });
+        const stmts = stmt({ variadic: true });
         const pat = pattern`{
             ${stmts}
         }`;
@@ -304,7 +304,7 @@ describe('variadic statement matching and expansion', () => {
     });
 
     test('capture variadic statements for reuse', () => {
-        const stmts = capture({ variadic: true });
+        const stmts = stmt({ variadic: true });
         const pat = pattern`{
             try {
                 ${stmts}
@@ -344,8 +344,8 @@ describe('variadic statement matching and expansion', () => {
     });
 
     test('non-variadic capture should preserve trailing semicolons', () => {
-        // Bug report: using capture() (non-variadic) for function bodies loses trailing semicolons
-        const body = capture();
+        // Bug report: using stmt() (non-variadic) for function bodies loses trailing semicolons
+        const body = stmt();
         const pat = pattern`{${body}}`;
         const tmpl = template`{
             console.log('before');
@@ -370,7 +370,7 @@ describe('variadic statement matching and expansion', () => {
 
     test('variadic capture should preserve trailing semicolons', () => {
         // Variadic captures should also preserve semicolons and formatting
-        const body = capture({ variadic: true });
+        const body = stmt({ variadic: true });
         const pat = pattern`{${body}}`;
         const tmpl = template`{
             console.log('before');
@@ -395,7 +395,7 @@ describe('variadic statement matching and expansion', () => {
 
     test('function body capture with wrapper pattern should preserve semicolons', () => {
         // More complex example: extracting function body from wrapper pattern
-        const {args, body} = {args: capture(), body: capture({ variadic: true })};
+        const {args, body} = {args: expr(), body: stmt({ variadic: true })};
         const pat = pattern`{
             return wrapper(function(${args}) {${body}});
         }`;

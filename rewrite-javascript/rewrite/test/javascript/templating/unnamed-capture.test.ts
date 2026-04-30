@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
+import {expr, ident, JavaScriptVisitor, pattern, rewrite, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 
 describe('unnamed capture', () => {
@@ -24,15 +24,15 @@ describe('unnamed capture', () => {
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
 
-            protected override async visitExpression(expr: Expression, p: any): Promise<J | undefined> {
-                const left = capture();
-                const right = capture();
+            protected override async visitExpression(expression: Expression, p: any): Promise<J | undefined> {
+                const left = expr();
+                const right = expr();
 
                 //language=typescript
-                let m = await pattern`${left} + ${right}`.match(expr, this.cursor) ||
-                    await pattern`${left} * ${right}`.match(expr, this.cursor);
+                let m = await pattern`${left} + ${right}`.match(expression, this.cursor) ||
+                    await pattern`${left} * ${right}`.match(expression, this.cursor);
 
-                return m && await template`${right} + ${left}`.apply(expr, this.cursor, {values: m}) || expr;
+                return m && await template`${right} + ${left}`.apply(expression, this.cursor, {values: m}) || expression;
             }
         });
 
@@ -50,9 +50,9 @@ describe('unnamed capture', () => {
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
-                const obj = capture();
-                const property = capture();
-                const defaultValue = capture();
+                const obj = expr();
+                const property = ident();
+                const defaultValue = expr();
 
                 //language=typescript
                 return await rewrite(() => ({

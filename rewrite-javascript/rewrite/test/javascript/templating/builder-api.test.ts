@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, Capture, JavaScriptVisitor, Pattern, template, Template, typescript} from "../../../src/javascript";
+import {expr, Capture, JavaScriptVisitor, Pattern, template, Template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 
 describe('Builder API', () => {
@@ -31,7 +31,7 @@ describe('Builder API', () => {
         });
 
         test('creates template with code and parameters', () => {
-            const value = capture('value');
+            const value = expr('value');
             const tmpl = Template.builder()
                 .code('const x = ')
                 .param(value)
@@ -62,7 +62,7 @@ describe('Builder API', () => {
 
         test('handles conditional construction', async () => {
             const needsValidation = true;
-            const value = capture('value');
+            const value = expr('value');
 
             const builder = Template.builder().code('function validate(x) {');
             if (needsValidation) {
@@ -100,7 +100,7 @@ describe('Builder API', () => {
             const argCount = 3;
             for (let i = 0; i < argCount; i++) {
                 if (i > 0) builder.code(', ');
-                builder.param(capture(`arg${i}`));
+                builder.param(expr(`arg${i}`));
             }
             builder.code(')');
 
@@ -120,8 +120,8 @@ describe('Builder API', () => {
         });
 
         test('handles multiple consecutive param calls', () => {
-            const a = capture('a');
-            const b = capture('b');
+            const a = expr('a');
+            const b = expr('b');
             const tmpl = Template.builder()
                 .param(a)
                 .param(b)
@@ -179,7 +179,7 @@ describe('Builder API', () => {
         });
 
         test('creates pattern with code and captures', () => {
-            const value = capture('value');
+            const value = expr('value');
             const pat = Pattern.builder()
                 .code('const x = ')
                 .capture(value)
@@ -189,8 +189,8 @@ describe('Builder API', () => {
         });
 
         test('creates pattern equivalent to pattern literal', async () => {
-            const left = capture<Expression>('left');
-            const right = capture<Expression>('right');
+            const left = expr<Expression>('left');
+            const right = expr<Expression>('right');
 
             // Using builder
             const builderPat = Pattern.builder()
@@ -222,7 +222,7 @@ describe('Builder API', () => {
             const captures: Capture<J.Literal>[] = [];
             for (let i = 0; i < argCount; i++) {
                 if (i > 0) builder.code(', ');
-                const cap = capture<J.Literal>();
+                const cap = expr<J.Literal>();
                 captures.push(cap);
                 builder.capture(cap);
             }
@@ -283,8 +283,8 @@ describe('Builder API', () => {
         });
 
         test('handles multiple consecutive capture calls', () => {
-            const a = capture('a');
-            const b = capture('b');
+            const a = expr('a');
+            const b = expr('b');
             const pat = Pattern.builder()
                 .capture(a)
                 .capture(b)
@@ -294,7 +294,7 @@ describe('Builder API', () => {
         });
 
         test('pattern from builder can be configured', () => {
-            const value = capture('value');
+            const value = expr('value');
             const pat = Pattern.builder()
                 .code('const x = ')
                 .capture(value)
@@ -312,8 +312,8 @@ describe('Builder API', () => {
 
     describe('Builder API Integration', () => {
         test('pattern and template builders work together', async () => {
-            const left = capture('left');
-            const right = capture('right');
+            const left = expr('left');
+            const right = expr('right');
 
             const pat = Pattern.builder()
                 .capture(left)
@@ -349,7 +349,7 @@ describe('Builder API', () => {
             const builder = Pattern.builder().code('processArgs(');
             for (let i = 0; i < expectedArgs.length; i++) {
                 if (i > 0) builder.code(', ');
-                builder.capture(capture(expectedArgs[i]));
+                builder.capture(expr(expectedArgs[i]));
             }
             builder.code(')');
 
@@ -359,7 +359,7 @@ describe('Builder API', () => {
             const tmplBuilder = Template.builder().code('processArgs(');
             for (let i = expectedArgs.length - 1; i >= 0; i--) {
                 if (i < expectedArgs.length - 1) tmplBuilder.code(', ');
-                tmplBuilder.param(capture(expectedArgs[i]));
+                tmplBuilder.param(expr(expectedArgs[i]));
             }
             tmplBuilder.code(')');
 

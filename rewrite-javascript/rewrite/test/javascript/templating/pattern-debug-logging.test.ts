@@ -1,5 +1,5 @@
 import {type MockInstance} from 'vitest';
-import {capture, isExpressionStatement, JavaScriptParser, JS, pattern} from '../../../src/javascript';
+import {expr, isExpressionStatement, JavaScriptParser, JS, pattern} from '../../../src/javascript';
 import {J} from '../../../src/java';
 
 describe('Pattern Debug Logging', () => {
@@ -27,7 +27,7 @@ describe('Pattern Debug Logging', () => {
     });
 
     test('no debug logging by default', async () => {
-        const value = capture('value');
+        const value = expr('value');
         const pat = pattern`console.log(${value})`;
         const node = await parseExpression('console.log(42)');
 
@@ -38,7 +38,7 @@ describe('Pattern Debug Logging', () => {
     });
 
     test('call-level debug: { debug: true }', async () => {
-        const value = capture('value');
+        const value = expr('value');
         const pat = pattern`console.log(${value})`;
         const node = await parseExpression('console.log(42)');
 
@@ -53,7 +53,7 @@ describe('Pattern Debug Logging', () => {
     });
 
     test('pattern-level debug: pattern({ debug: true })', async () => {
-        const value = capture('value');
+        const value = expr('value');
         const pat = pattern({ debug: true })`console.log(${value})`;
         const node = await parseExpression('console.log(42)');
 
@@ -69,7 +69,7 @@ describe('Pattern Debug Logging', () => {
     test('global debug: PATTERN_DEBUG=true', async () => {
         process.env.PATTERN_DEBUG = 'true';
 
-        const value = capture('value');
+        const value = expr('value');
         const pat = pattern`console.log(${value})`;
         const node = await parseExpression('console.log(42)');
 
@@ -85,7 +85,7 @@ describe('Pattern Debug Logging', () => {
     test('precedence: call > pattern > global', async () => {
         process.env.PATTERN_DEBUG = 'true';
 
-        const value = capture('value');
+        const value = expr('value');
         // Pattern has debug: false, but global is true
         const pat = pattern({ debug: false })`console.log(${value})`;
         const node = await parseExpression('console.log(42)');
@@ -100,7 +100,7 @@ describe('Pattern Debug Logging', () => {
     test('explicit debug: false disables when global is true', async () => {
         process.env.PATTERN_DEBUG = 'true';
 
-        const value = capture('value');
+        const value = expr('value');
         const pat = pattern`console.log(${value})`;
         const node = await parseExpression('console.log(42)');
 
@@ -112,7 +112,7 @@ describe('Pattern Debug Logging', () => {
     });
 
     test('logs failure with path and explanation', async () => {
-        const value = capture('value');
+        const value = expr('value');
         const pat = pattern`console.log(${value})`;
         // Use console.error instead - should not match
         const node = await parseExpression('console.error(42)');
@@ -132,8 +132,8 @@ describe('Pattern Debug Logging', () => {
     });
 
     test('pattern source includes capture names', async () => {
-        const x = capture('x');
-        const y = capture('y');
+        const x = expr('x');
+        const y = expr('y');
         const pat = pattern({ debug: true })`foo(${x}, ${y})`;
         const node = await parseExpression('foo(1, 2)');
 
@@ -145,7 +145,7 @@ describe('Pattern Debug Logging', () => {
     });
 
     test('variadic captures show array format', async () => {
-        const args = capture({ variadic: true });
+        const args = expr({ variadic: true });
         const pat = pattern({ debug: true })`console.log(${args})`;
         const node = await parseExpression('console.log(1, 2, 3)');
 
@@ -160,8 +160,8 @@ describe('Pattern Debug Logging', () => {
     });
 
     test('shows path for nested mismatch', async () => {
-        const x = capture('x');
-        const y = capture('y');
+        const x = expr('x');
+        const y = expr('y');
         const pat = pattern({ debug: true })`${x} + ${y}`;
         // Pattern expects addition, but we provide subtraction
         const node = await parseExpression('a - b');

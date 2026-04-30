@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, template, typescript} from "../../../src/javascript";
+import {expr, JavaScriptVisitor, pattern, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
 
 describe('forwardRef pattern with replacement', () => {
@@ -23,7 +23,7 @@ describe('forwardRef pattern with replacement', () => {
     test('capture with property access', () => {
         // Test replacing forwardRef(Type) with Type
         // This captures the argument to forwardRef and replaces it with just the argument
-        const arg = capture();
+        const arg = expr();
         const pat = pattern`forwardRef(${arg})`;
         const tmpl = template`${arg}`;
 
@@ -62,7 +62,7 @@ describe('forwardRef pattern with replacement', () => {
     test('capture with nested property access in template', () => {
         // Test: forwardRef((props) => ...) becomes (props) => ...
         // This tests a more complex case where we're matching the full forwardRef pattern
-        const componentDef = capture();
+        const componentDef = expr();
         const pat = pattern`forwardRef(${componentDef})`;
         const tmpl = template`${componentDef}`;
 
@@ -104,7 +104,7 @@ describe('forwardRef pattern with replacement', () => {
 
     test('capture with property access in template', () => {
         // Test accessing properties of captured nodes in templates
-        const method = capture<J.MethodInvocation>('method');
+        const method = expr<J.MethodInvocation>('method');
         const pat = pattern`foo(${method})`;
 
         // Access the name property of the captured method invocation
@@ -148,7 +148,7 @@ describe('forwardRef pattern with replacement', () => {
 
     test('capture with array access in template', () => {
         // Test accessing array elements via bracket notation
-        const invocation = capture<J.MethodInvocation>('invocation');
+        const invocation = expr<J.MethodInvocation>('invocation');
         const pat = pattern`${invocation}`;
 
         // Access the first argument via array index

@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, pattern} from "../../../src/javascript";
+import {expr, pattern} from "../../../src/javascript";
 
 describe('Pattern Matching', () => {
     describe('Pattern', () => {
         test('creates a pattern with correct template parts and captures', () => {
-            const p = pattern`${capture()} + ${capture()}`;
+            const p = pattern`${expr()} + ${expr()}`;
             
             expect(p.templateParts).toBeDefined();
             expect(p.captures).toBeDefined();

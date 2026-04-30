@@ -16,7 +16,7 @@
 import { fromVisitor, RecipeSpec } from "../../../src/test";
 import { Cursor } from "../../../src";
 import {
-    capture,
+    expr,
     JavaScriptParser,
     JavaScriptVisitor,
     pattern,
@@ -63,7 +63,7 @@ describe('match extraction', () => {
 
             override async visitBinary(binary: J.Binary, _p: any): Promise<J | undefined> {
                 // Create capture objects
-                const left = capture(), right = capture();
+                const left = expr(), right = expr();
 
                 // Create a pattern that matches "a + b" using the capture objects
                 const m = await pattern`${left} + ${right}`.match(binary, this.cursor);
@@ -85,8 +85,8 @@ describe('match extraction', () => {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
 
                 const swapOperands = rewrite(() => ({
-                    before: pattern`${capture('left')} + ${capture('right')}`,
-                    after: template`${capture('right')} + ${capture('left')}`
+                    before: pattern`${expr('left')} + ${expr('right')}`,
+                    after: template`${expr('right')} + ${expr('left')}`
                 })
                 );
                 return await swapOperands.tryOn(this.cursor, binary);
@@ -104,7 +104,7 @@ describe('match extraction', () => {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                 if (binary.operator.element === J.Binary.Type.Addition) {
                     // Create capture objects without explicit names
-                    const { left, right } = { left: capture<Expression>(), right: capture<Expression>() };
+                    const { left, right } = { left: expr<Expression>(), right: expr<Expression>() };
 
                     // Create a pattern that matches "a + b" using the capture objects
                     const m = await pattern`${left} + ${right}`.match(binary, this.cursor);
@@ -137,10 +137,10 @@ describe('match extraction', () => {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
                 if (binary.operator.element === J.Binary.Type.Addition) {
                     // Use inline named captures
-                    const m = await pattern`${capture('left')} + ${capture('right')}`.match(binary, this.cursor);
+                    const m = await pattern`${expr('left')} + ${expr('right')}`.match(binary, this.cursor);
                     if (m) {
                         // Can retrieve by string name
-                        return await template`${capture('right')} + ${capture('left')}`.apply(binary, this.cursor, { values: m });
+                        return await template`${expr('right')} + ${expr('left')}`.apply(binary, this.cursor, { values: m });
                     }
                 }
                 return binary;
@@ -157,7 +157,7 @@ describe('match extraction', () => {
         // Verify that specifying a non-existent package causes npm install to fail
         const nonExistentPackage = 'this-package-definitely-does-not-exist-12345';
 
-        const pat = pattern`${capture('left')} + ${capture('right')}`
+        const pat = pattern`${expr('left')} + ${expr('right')}`
             .configure({
                 context: [`import { SomeType } from "${nonExistentPackage}"`],
                 dependencies: { [nonExistentPackage]: '^1.0.0' }

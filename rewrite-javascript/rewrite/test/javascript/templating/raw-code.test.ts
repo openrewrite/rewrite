@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, raw, rewrite, template, typescript, _} from "../../../src/javascript";
+import {expr, JavaScriptVisitor, pattern, raw, rewrite, template, typescript, _} from "../../../src/javascript";
 import {J} from "../../../src/java";
 
 describe('raw() function', () => {
@@ -23,7 +23,7 @@ describe('raw() function', () => {
     describe('construction-time string interpolation', () => {
         test('splices raw code directly into template', () => {
             const methodName = "info";
-            const msg = capture('msg');
+            const msg = expr('msg');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
@@ -51,7 +51,7 @@ describe('raw() function', () => {
         test('works with multiple raw() interpolations', () => {
             const obj = "console";
             const method = "log";
-            const msg = capture('msg');
+            const msg = expr('msg');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
@@ -78,7 +78,7 @@ describe('raw() function', () => {
 
         test('works with operators', () => {
             const operator = ">=";
-            const value = capture('value');
+            const value = expr('value');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
@@ -132,7 +132,7 @@ describe('raw() function', () => {
     describe('mixed with other parameters', () => {
         test('can mix raw() with capture()', () => {
             const prefix = "user";
-            const value = capture('value');
+            const value = expr('value');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
@@ -190,7 +190,7 @@ describe('raw() function', () => {
     describe('raw() in patterns', () => {
         test('matches pattern with raw() method name', async () => {
             const methodName = "log";
-            const msg = capture('msg');
+            const msg = expr('msg');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
@@ -215,7 +215,7 @@ describe('raw() function', () => {
         test('combines raw() in both pattern and template', async () => {
             const oldMethod = "warn";
             const newMethod = "error";
-            const msg = capture('msg');
+            const msg = expr('msg');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
@@ -266,7 +266,7 @@ describe('raw() function', () => {
         test('multiple raw() in single pattern', async () => {
             const obj = "console";
             const method = "log";
-            const msg = capture('msg');
+            const msg = expr('msg');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(invocation: J.MethodInvocation, p: any): Promise<J | undefined> {
@@ -290,8 +290,8 @@ describe('raw() function', () => {
 
         test('raw() with captures in complex pattern', async () => {
             const prefix = "user";
-            const field = capture('field');
-            const value = capture('value');
+            const field = expr('field');
+            const value = expr('value');
 
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
