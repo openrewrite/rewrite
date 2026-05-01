@@ -971,8 +971,12 @@ def _recipe_descriptor_to_dict(descriptor) -> dict:
             }
             for name, value, opt in descriptor.options
         ],
-        'dataTables': descriptor.data_tables,
+        'preconditions': [],
         'recipeList': [_recipe_descriptor_to_dict(r) for r in descriptor.recipe_list],
+        'dataTables': descriptor.data_tables,
+        'maintainers': [],
+        'contributors': [],
+        'examples': [],
     }
 
 
