@@ -26,3 +26,4 @@ recipeList:
   # Map notation has been deprecated in 9.1+
   - org.openrewrite.gradle.DependencyUseStringNotation
   - org.openrewrite.gradle.gradle9.UseMainClassProperty
+  - org.openrewrite.gradle.gradle9.UseMainClassPropertyForApplication
