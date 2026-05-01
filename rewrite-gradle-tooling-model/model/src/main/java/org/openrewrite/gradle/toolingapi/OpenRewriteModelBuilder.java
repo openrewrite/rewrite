@@ -83,7 +83,7 @@ public class OpenRewriteModelBuilder {
             gradleVersion = wrapperGradleVersion(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"));
             connector.useBuildDistribution();
         } else {
-            gradleVersion = System.getProperty("org.openrewrite.test.gradleVersion", "8.14.4");
+            gradleVersion = System.getProperty("org.openrewrite.test.gradleVersion", "8.14.3");
             connector.useGradleVersion(gradleVersion);
         }
         connector
