@@ -89,11 +89,6 @@ export abstract class Recipe {
 
     async descriptor(): Promise<RecipeDescriptor> {
         const optionsRecord: Record<string, OptionDescriptor> = (this as any).constructor[OPTIONS_KEY] || {}
-        // Java's `RecipeDescriptor.getXxx()` getters for collection-valued
-        // fields are treated as never-null by callers (matching what
-        // `Recipe.getDescriptor()` upholds locally). Always emit the
-        // collection keys, even when empty, so Jackson on the Java side
-        // never leaves them null.
         return {
             name: this.name,
             displayName: this.displayName,
