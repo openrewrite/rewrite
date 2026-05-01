@@ -90,16 +90,28 @@ public class OpenRewriteModelBuilder {
                 // .embedded(true)
                 .forProjectDirectory(projectDir);
         List<String> arguments = new ArrayList<>();
-        if (buildFile != null && buildFile.exists()) {
-            arguments.add("-b");
-            arguments.add(buildFile.getAbsolutePath());
-        }
         arguments.add("--init-script");
         Path init = projectDir.toPath().resolve("openrewrite-tooling.gradle").toAbsolutePath();
         arguments.add(init.toString());
+        // Gradle 9 dropped -b; point at a non-conventional build file via a temporary settings.gradle.
+        Path settings = null;
+        if (buildFile != null && buildFile.exists()) {
+            File abs = buildFile.getAbsoluteFile();
+            boolean atConventionalLocation = abs.equals(new File(projectDir, "build.gradle").getAbsoluteFile()) ||
+                    abs.equals(new File(projectDir, "build.gradle.kts").getAbsoluteFile());
+            Path projectPath = projectDir.toPath();
+            boolean settingsAlreadyExists = Files.exists(projectPath.resolve("settings.gradle")) ||
+                    Files.exists(projectPath.resolve("settings.gradle.kts"));
+            if (!atConventionalLocation && !settingsAlreadyExists) {
+                settings = projectPath.resolve("settings.gradle");
+            }
+        }
         try (ProjectConnection connection = connector.connect()) {
             ModelBuilder<OpenRewriteModelProxy> customModelBuilder = connection.model(OpenRewriteModelProxy.class);
             try {
+                if (settings != null) {
+                    Files.write(settings, ("rootProject.buildFileName = '" + buildFile.getName() + "'\n").getBytes(StandardCharsets.UTF_8));
+                }
                 if (initScript == null) {
                     if (System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath") != null) {
                         // code path only expected to be taken from within openrewrite/rewrite
@@ -123,6 +135,9 @@ public class OpenRewriteModelBuilder {
                 try {
                     if (Files.exists(init)) {
                         Files.delete(init);
+                    }
+                    if (settings != null && Files.exists(settings)) {
+                        Files.delete(settings);
                     }
                 } catch (IOException e) {
                     //noinspection ThrowFromFinallyBlock
