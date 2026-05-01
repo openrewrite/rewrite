@@ -99,11 +99,12 @@ public class OpenRewriteModelBuilder {
             File abs = buildFile.getAbsoluteFile();
             boolean atConventionalLocation = abs.equals(new File(projectDir, "build.gradle").getAbsoluteFile()) ||
                     abs.equals(new File(projectDir, "build.gradle.kts").getAbsoluteFile());
-            Path projectPath = projectDir.toPath();
-            boolean settingsAlreadyExists = Files.exists(projectPath.resolve("settings.gradle")) ||
-                    Files.exists(projectPath.resolve("settings.gradle.kts"));
-            if (!atConventionalLocation && !settingsAlreadyExists) {
-                settings = projectPath.resolve("settings.gradle");
+            if (!atConventionalLocation) {
+                Path projectPath = projectDir.toPath();
+                if (!Files.exists(projectPath.resolve("settings.gradle")) &&
+                        !Files.exists(projectPath.resolve("settings.gradle.kts"))) {
+                    settings = projectPath.resolve("settings.gradle");
+                }
             }
         }
         try (ProjectConnection connection = connector.connect()) {
