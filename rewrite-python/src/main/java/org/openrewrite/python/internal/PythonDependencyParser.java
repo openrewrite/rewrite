@@ -103,9 +103,8 @@ public class PythonDependencyParser {
         for (TomlValue value : doc.getValues()) {
             if (value instanceof Toml.Table) {
                 Toml.Table table = (Toml.Table) value;
-                Toml.Identifier nameId = table.getName();
-                if (nameId != null) {
-                    tables.put(nameId.getName(), table);
+                if (table.getName() != null) {
+                    tables.put(table.getName().getName(), table);
                 }
             }
         }
