@@ -27,10 +27,6 @@ def test_handle_parse_preserves_empty_text(tmp_path, monkeypatch):
 
 
 def test_recipe_descriptor_to_dict_emits_all_collection_keys():
-    """Java's RecipeDescriptor.getXxx() collection-valued getters are
-    treated as never-null by callers. Always emit the collection keys —
-    including the ones the Python dataclass doesn't model — so Jackson on
-    the Java side never leaves them null."""
     from rewrite.recipe import RecipeDescriptor
     from rewrite.rpc.server import _recipe_descriptor_to_dict
 
