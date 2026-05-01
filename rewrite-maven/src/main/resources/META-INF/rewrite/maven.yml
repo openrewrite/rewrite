@@ -160,35 +160,6 @@ recipeList:
       filePattern: "**/.mvn/wrapper/**"
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.maven.cleanup.AddSourceEncodingProperty
-displayName: Add UTF-8 source and reporting encoding properties
-description: >-
-  Adds `project.build.sourceEncoding` and `project.reporting.outputEncoding` set to `UTF-8` when missing.
-  An explicit encoding is required for reproducible builds and avoids platform-dependent compilation behavior.
-recipeList:
-  - org.openrewrite.maven.AddProperty:
-      key: project.build.sourceEncoding
-      value: UTF-8
-      preserveExistingValue: true
-  - org.openrewrite.maven.AddProperty:
-      key: project.reporting.outputEncoding
-      value: UTF-8
-      preserveExistingValue: true
----
-type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.maven.cleanup.UpgradePluginVersionsForReproducibleBuilds
-displayName: Upgrade Maven plugins to versions that honor `outputTimestamp`
-description: >-
-  Upgrades core Maven plugins to the minimum version known to honor `project.build.outputTimestamp`,
-  per the [Maven Reproducible Builds guide](https://maven.apache.org/guides/mini/guide-reproducible-builds.html).
-  Plugins are only upgraded; older versions ignore `outputTimestamp` and produce non-reproducible artifacts.
-recipeList:
-  - org.openrewrite.maven.UpgradePluginVersion:
-      groupId: org.apache.maven.plugins
-      artifactId: "maven-*-plugin"
-      newVersion: latest.release
----
-type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.maven.ReproducibleBuilds
 displayName: Apache Maven reproducible builds
 description: >-
@@ -198,6 +169,16 @@ description: >-
 recipeList:
   - org.openrewrite.maven.cleanup.ExplicitDependencyVersion
   - org.openrewrite.maven.cleanup.ExplicitPluginVersion
-  - org.openrewrite.maven.cleanup.UpgradePluginVersionsForReproducibleBuilds
-  - org.openrewrite.maven.cleanup.AddSourceEncodingProperty
+  - org.openrewrite.maven.UpgradePluginVersion:
+      groupId: org.apache.maven.plugins
+      artifactId: "maven-*-plugin"
+      newVersion: latest.release
+  - org.openrewrite.maven.AddProperty:
+      key: project.build.sourceEncoding
+      value: UTF-8
+      preserveExistingValue: true
+  - org.openrewrite.maven.AddProperty:
+      key: project.reporting.outputEncoding
+      value: UTF-8
+      preserveExistingValue: true
   - org.openrewrite.maven.cleanup.AddProjectBuildOutputTimestamp
