@@ -19,7 +19,7 @@ bodyContent
     ;
 
 attribute
-    : (Identifier | NULL) ASSIGN expression
+    : (Identifier | NULL | IF | IN) ASSIGN expression
     ;
 
 block
@@ -91,7 +91,7 @@ objectelem
     ;
 
 qualifiedIdentifier
-    : Identifier (DOT Identifier)*
+    : (Identifier | IF | IN) (DOT (Identifier | IF | IN))*
     ;
 
 // For Expressions

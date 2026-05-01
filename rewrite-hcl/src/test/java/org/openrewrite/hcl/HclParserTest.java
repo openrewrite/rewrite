@@ -16,6 +16,7 @@
 package org.openrewrite.hcl;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.hcl.Assertions.hcl;
@@ -30,6 +31,107 @@ class HclParserTest implements RewriteTest {
               tags = /*👇*/{
                 git_file =/*👇*/ "terraform/aws/👇.tf"
                 git_repo /*👇*/= "terragoat"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6446")
+    @Test
+    void usingIfAsAttributeName() {
+        rewriteRun(
+          hcl(
+            """
+              resource "not_a_real_one_for_sure" deny {
+                if = "a"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6446")
+    @Test
+    void usingInAsAttributeName() {
+        rewriteRun(
+          hcl(
+            """
+              resource "not_a_real_one_for_sure" deny {
+                in = "a"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6446")
+    @Test
+    void keywordsAsTopLevelAttributes() {
+        rewriteRun(
+          hcl(
+            """
+              if = "a"
+              in = "b"
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6446")
+    @Test
+    void keywordAttributeAlongsideForExpression() {
+        rewriteRun(
+          hcl(
+            """
+              filtered = [for x in items : x if x > 0]
+              if       = "still works"
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6446")
+    @Test
+    void keywordsAsObjectKeys() {
+        rewriteRun(
+          hcl(
+            """
+              tags = {
+                if = "a"
+                in = "b"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6446")
+    @Test
+    void keywordObjectKeyMixedWithRegularKeys() {
+        rewriteRun(
+          hcl(
+            """
+              tags = {
+                name = "x"
+                if   = "y"
+                env  = "z"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6446")
+    @Test
+    void keywordAttributeWithCommentAndUnusualSpacing() {
+        rewriteRun(
+          hcl(
+            """
+              # condition placeholder
+              block "x" {
+                if    = "a"
+                /* trailing */ in = "b"
               }
               """
           )

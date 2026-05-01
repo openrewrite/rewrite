@@ -71,7 +71,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 randomId(),
                 Space.format(prefix),
                 Markers.EMPTY,
-                c.Identifier() != null ? visitIdentifier(c.Identifier()) : visitIdentifier(c.NULL()),
+                visitIdentifier(attributeNameToken(c)),
                 new HclLeftPadded<>(
                         sourceBefore("="),
                         Hcl.Attribute.Type.Assignment,
@@ -80,6 +80,33 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 (Expression) visit(c.expression()),
                 null
         ));
+    }
+
+    private static TerminalNode attributeNameToken(HCLParser.AttributeContext ctx) {
+        if (ctx.Identifier() != null) {
+            return ctx.Identifier();
+        } else if (ctx.NULL() != null) {
+            return ctx.NULL();
+        } else if (ctx.IF() != null) {
+            return ctx.IF();
+        } else if (ctx.IN() != null) {
+            return ctx.IN();
+        }
+        throw new IllegalStateException("Unexpected attribute name token in: " + ctx.getText());
+    }
+
+    private static List<TerminalNode> qualifiedIdentifierNames(HCLParser.QualifiedIdentifierContext ctx) {
+        List<TerminalNode> names = new ArrayList<>();
+        for (int i = 0; i < ctx.getChildCount(); i++) {
+            ParseTree child = ctx.getChild(i);
+            if (child instanceof TerminalNode) {
+                int type = ((TerminalNode) child).getSymbol().getType();
+                if (type != HCLParser.DOT) {
+                    names.add((TerminalNode) child);
+                }
+            }
+        }
+        return names;
     }
 
     @Override
@@ -744,7 +771,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         if (ctx == null) {
             return null;
         }
-        List<TerminalNode> identifiers = ctx.Identifier();
+        List<TerminalNode> identifiers = qualifiedIdentifierNames(ctx);
         if (identifiers.size() == 1) {
             return visitIdentifier(identifiers.get(0));
         }
