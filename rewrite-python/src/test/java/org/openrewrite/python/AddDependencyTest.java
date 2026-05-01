@@ -17,14 +17,12 @@ package org.openrewrite.python;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.config.CompositeRecipe;
-import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
+import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.*;
@@ -70,18 +68,20 @@ class AddDependencyTest implements RewriteTest {
           ]
           """;
 
-        var ctx = new InMemoryExecutionContext();
         rewriteRun(
-          spec -> spec.executionContext(ctx).recipe(new CompositeRecipe(List.of(
+          spec -> spec.recipe(new CompositeRecipe(List.of(
             new AddDependency("flask", ">=2.0", null, null),
             new AddDependency("click", ">=8.0", null, null)
           ))).afterRecipe(run -> {
-              // Verify lock was regenerated with both new dependencies
-              Map<Path, String> updatedLocks = PythonDependencyExecutionContextView.view(ctx).getUpdatedLockFiles();
-              assertThat(updatedLocks).isNotEmpty();
-              String lockContent = updatedLocks.values().iterator().next();
-              assertThat(lockContent).contains("name = \"flask\"");
-              assertThat(lockContent).contains("name = \"click\"");
+              // Verify both recipes applied: pyproject has both flask and click in the changeset
+              List<String> pyprojectContents = run.getChangeset().getAllResults().stream()
+                      .filter(r -> r.getAfter() != null && r.getAfter().getSourcePath().endsWith("pyproject.toml"))
+                      .map(r -> r.getAfter().printAll())
+                      .collect(java.util.stream.Collectors.toList());
+              assertThat(pyprojectContents).isNotEmpty();
+              String pyprojectContent = pyprojectContents.get(0);
+              assertThat(pyprojectContent).contains("flask>=2.0");
+              assertThat(pyprojectContent).contains("click>=8.0");
           }),
           uv(tempDir,
             pyproject(
@@ -299,6 +299,48 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void markerResolvedDependenciesUpdatedAfterEdit(@TempDir Path tempDir) {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null)),
+          uv(tempDir,
+            pyproject(
+              """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = [
+                    "requests>=2.28.0",
+                ]
+                """,
+              """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = [
+                    "requests>=2.28.0",
+                    "flask>=2.0",
+                ]
+                """,
+              s -> s.afterRecipe(doc -> {
+                  PythonResolutionResult marker = doc.getMarkers()
+                          .findFirst(PythonResolutionResult.class).orElseThrow();
+                  assertThat(marker.getResolvedDependencies())
+                          .extracting(d -> PythonResolutionResult.normalizeName(d.getName()))
+                          .as("regenerated uv.lock should contain flask among resolved dependencies")
+                          .contains("flask");
+                  assertThat(marker.getDependencies())
+                          .filteredOn(d -> "flask".equals(PythonResolutionResult.normalizeName(d.getName())))
+                          .singleElement()
+                          .satisfies(d -> assertThat(d.getResolved())
+                                  .as("declared `flask` dep should be linked to its resolved entry")
+                                  .isNotNull());
+              })
+            )
+          )
+        );
+    }
+
+    @Test
     void uvLockRegenerationWorks() {
         String pyprojectWithFlask = """
               [project]
@@ -309,8 +351,8 @@ class AddDependencyTest implements RewriteTest {
                   "flask>=2.0",
               ]
               """;
-        org.openrewrite.python.internal.UvLockRegeneration.Result result =
-                org.openrewrite.python.internal.UvLockRegeneration.regenerate(pyprojectWithFlask);
+        org.openrewrite.python.internal.LockFileRegeneration.Result result =
+                org.openrewrite.python.internal.LockFileRegeneration.UV.regenerate(pyprojectWithFlask);
         assertThat(result.isSuccess()).as("uv lock should succeed: " + result.getErrorMessage()).isTrue();
         assertThat(result.getLockFileContent()).contains("name = \"flask\"");
     }
@@ -373,6 +415,20 @@ class AddDependencyTest implements RewriteTest {
               [packages]
               requests = ">=2.28.0"
               flask = ">=2.0"
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipWhenAlreadyPresentInPipfileAsQuotedKey() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("urllib3", ">=2.0", null, null)),
+          pipfile(
+            """
+              [packages]
+              requests = "*"
+              "urllib3" = "*"
               """
           )
         );

@@ -236,8 +236,8 @@ public class PythonDependencyParser {
         for (Toml value : groupsTable.getValues()) {
             if (value instanceof Toml.KeyValue) {
                 Toml.KeyValue kv = (Toml.KeyValue) value;
-                if (kv.getKey() instanceof Toml.Identifier && kv.getValue() instanceof Toml.Array) {
-                    String groupName = ((Toml.Identifier) kv.getKey()).getName();
+                String groupName = PyProjectHelper.extractKeyName(kv);
+                if (groupName != null && kv.getValue() instanceof Toml.Array) {
                     List<Dependency> deps = parseDependencyArraySkippingIncludes((Toml.Array) kv.getValue());
                     result.put(groupName, deps);
                 }
@@ -272,8 +272,8 @@ public class PythonDependencyParser {
         for (Toml value : table.getValues()) {
             if (value instanceof Toml.KeyValue) {
                 Toml.KeyValue kv = (Toml.KeyValue) value;
-                if (kv.getKey() instanceof Toml.Identifier && kv.getValue() instanceof Toml.Array) {
-                    String groupName = ((Toml.Identifier) kv.getKey()).getName();
+                String groupName = PyProjectHelper.extractKeyName(kv);
+                if (groupName != null && kv.getValue() instanceof Toml.Array) {
                     List<Dependency> deps = parseDependencyArray((Toml.Array) kv.getValue());
                     result.put(groupName, deps);
                 }
@@ -295,8 +295,8 @@ public class PythonDependencyParser {
         for (Toml value : pdmOverridesTable.getValues()) {
             if (value instanceof Toml.KeyValue) {
                 Toml.KeyValue kv = (Toml.KeyValue) value;
-                if (kv.getKey() instanceof Toml.Identifier && kv.getValue() instanceof Toml.Literal) {
-                    String pkgName = ((Toml.Identifier) kv.getKey()).getName();
+                String pkgName = PyProjectHelper.extractKeyName(kv);
+                if (pkgName != null && kv.getValue() instanceof Toml.Literal) {
                     Object val = ((Toml.Literal) kv.getValue()).getValue();
                     if (val instanceof String) {
                         result.add(new Dependency(pkgName, (String) val, null, null, null));
