@@ -158,3 +158,27 @@ recipeList:
       filePattern: "**/mvnw.cmd"
   - org.openrewrite.DeleteSourceFiles:
       filePattern: "**/.mvn/wrapper/**"
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.maven.ReproducibleBuilds
+displayName: Apache Maven reproducible builds
+description: >-
+  Configure a Maven project for [reproducible builds](https://maven.apache.org/guides/mini/guide-reproducible-builds.html):
+  pin dependency and plugin versions, set `project.build.outputTimestamp`, set explicit UTF-8 source encoding,
+  and upgrade core plugins to versions that honor the output timestamp.
+recipeList:
+  - org.openrewrite.maven.cleanup.ExplicitDependencyVersion
+  - org.openrewrite.maven.cleanup.ExplicitPluginVersion
+  - org.openrewrite.maven.UpgradePluginVersion:
+      groupId: org.apache.maven.plugins
+      artifactId: "maven-*-plugin"
+      newVersion: latest.release
+  - org.openrewrite.maven.AddProperty:
+      key: project.build.sourceEncoding
+      value: UTF-8
+      preserveExistingValue: true
+  - org.openrewrite.maven.AddProperty:
+      key: project.reporting.outputEncoding
+      value: UTF-8
+      preserveExistingValue: true
+  - org.openrewrite.maven.cleanup.AddProjectBuildOutputTimestamp
