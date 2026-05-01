@@ -224,6 +224,24 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2277")
+    @Test
+    void htmlCommentNestedAfterVersionTag() {
+        rewriteRun(
+          java(
+            """
+              /**
+              * @version 0.1
+              *    <!-- xml comment nested
+              *       * [someAuthor] fixed something
+              *    -->
+              **/
+              class Test {}
+              """
+          )
+        );
+    }
+
     // docRoot
     @Test
     void docRoot() {

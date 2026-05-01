@@ -1158,6 +1158,8 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 js.addAll(whitespaceBefore());
                 if (dt instanceof DCTree.DCText) {
                     js.addAll(visitText(((DCTree.DCText) dt).getBody()));
+                } else if (dt instanceof DCTree.DCComment) {
+                    js.addAll(visitText(((DCTree.DCComment) dt).getBody()));
                 } else {
                     js.add((Javadoc) scan(dt, emptyList()));
                 }
