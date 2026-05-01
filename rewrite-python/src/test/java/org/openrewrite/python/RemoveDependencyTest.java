@@ -297,4 +297,22 @@ class RemoveDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removeQuotedKeyFromPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("urllib3", null, null)),
+          pipfile(
+            """
+              [packages]
+              requests = "*"
+              "urllib3" = "*"
+              """,
+            """
+              [packages]
+              requests = "*"
+              """
+          )
+        );
+    }
 }

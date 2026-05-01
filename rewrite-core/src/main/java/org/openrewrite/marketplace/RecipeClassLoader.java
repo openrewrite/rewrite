@@ -71,6 +71,10 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.ipc.http.HttpSender",
             "org.openrewrite.java.JavadocVisitor",
             "org.openrewrite.java.internal.TypesInUse",
+            // Cursor-message wiring (TYPE_FACTORY_PROVIDER_KEY) passes a Provider
+            // implementation across the recipe/parent classloader boundary; the
+            // interface must be shared so the cast in JavaTemplateParser succeeds.
+            "org.openrewrite.java.internal.JavaTypeFactory",
             "org.openrewrite.maven.MavenDownloadingException",
             "org.openrewrite.maven.MavenDownloadingExceptions",
             "org.openrewrite.maven.MavenExecutionContextView",

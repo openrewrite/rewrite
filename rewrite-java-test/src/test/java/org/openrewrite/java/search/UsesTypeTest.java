@@ -21,6 +21,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class UsesTypeTest implements RewriteTest {
 
@@ -28,7 +29,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void usesTypeFindsImports() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Collections", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.Collections", false))),
           java(
             """
               import java.io.File;
@@ -52,7 +53,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void primitiveTypes() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("double", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("double", false))),
           java(
             """
               class Test {
@@ -72,7 +73,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void emptyConstructor() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.ArrayList", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.ArrayList", false))),
           java(
             """
               import java.util.ArrayList;
@@ -101,7 +102,7 @@ class UsesTypeTest implements RewriteTest {
     void usesTypeWildcardFindsImports() {
         rewriteRun(
           spec ->
-            spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.*", false))),
+            spec.recipe(toRecipe(() -> new UsesType<>("java.util.*", false))),
           java(
             """
               import java.io.File;
@@ -128,7 +129,7 @@ class UsesTypeTest implements RewriteTest {
     void usesRecursiveTypeWildcard() {
         rewriteRun(
           spec ->
-            spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java..*", false))),
+            spec.recipe(toRecipe(() -> new UsesType<>("java..*", false))),
           java(
             """
               import java.io.File;
@@ -152,7 +153,7 @@ class UsesTypeTest implements RewriteTest {
     void usesFullyQualifiedReference() {
         rewriteRun(
           spec ->
-            spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.*", false))),
+            spec.recipe(toRecipe(() -> new UsesType<>("java.util.*", false))),
           java(
             """
               import java.util.Set;
@@ -177,7 +178,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void usesTypeFindsInheritedTypes() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Collection", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.Collection", false))),
           java(
             """
               import java.util.List;
@@ -199,7 +200,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findImplicitTypes() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", true))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.List", true))),
           java(
             """
               import java.util.Collections;
@@ -223,7 +224,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findImplicitTypesFalse() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.List", false))),
           java(
             """
               import java.util.Collections;
@@ -240,7 +241,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findImplicitTypesParams() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", true))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.List", true))),
           java(
             """
               import java.util.Collections;
@@ -268,7 +269,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findImplicitTypesParamsFalse() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.List", false))),
           java(
             """
               import java.util.Collections;
@@ -286,7 +287,7 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findNestedType() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Map.Entry", false))),
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util.Map.Entry", false))),
           java(
             """
               import java.util.Map.Entry;
@@ -298,6 +299,154 @@ class UsesTypeTest implements RewriteTest {
               /*~~>*/import java.util.Map.Entry;
 
               class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fullWildcardMatchesAnyType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("*..*", false))),
+          java(
+            """
+              import java.util.HashMap;
+              class Test {
+                  HashMap<String, String> map = new HashMap<>();
+              }
+              """,
+            """
+              /*~~>*/import java.util.HashMap;
+              class Test {
+                  HashMap<String, String> map = new HashMap<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void packageRecursiveWildcardHit() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util..*", false))),
+          java(
+            """
+              import java.util.concurrent.ConcurrentHashMap;
+              class Test {
+                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
+              }
+              """,
+            """
+              /*~~>*/import java.util.concurrent.ConcurrentHashMap;
+              class Test {
+                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void packageRecursiveWildcardMiss() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("javax.swing..*", false))),
+          java(
+            """
+              import java.util.HashMap;
+              class Test {
+                  HashMap<String, String> map = new HashMap<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void subpackageWithNamePatternHit() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.util..*Map*", false))),
+          java(
+            """
+              import java.util.concurrent.ConcurrentHashMap;
+              class Test {
+                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
+              }
+              """,
+            """
+              /*~~>*/import java.util.concurrent.ConcurrentHashMap;
+              class Test {
+                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void subpackageWithNamePatternMiss() {
+        // The package prefix doesn't match — `javax.swing` doesn't appear in the closure of a
+        // file that only references `java.util.HashMap`.
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("javax.swing..*Frame*", false))),
+          java(
+            """
+              import java.util.HashMap;
+              class Test {
+                  HashMap<String, String> map = new HashMap<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void middleWildcardHit() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.*.ArrayList", false))),
+          java(
+            """
+              import java.util.ArrayList;
+              class Test {
+                  ArrayList<String> list = new ArrayList<>();
+              }
+              """,
+            """
+              /*~~>*/import java.util.ArrayList;
+              class Test {
+                  ArrayList<String> list = new ArrayList<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void middleWildcardMiss() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java.*.ArrayList", false))),
+          java(
+            """
+              import java.util.concurrent.ConcurrentHashMap;
+              class Test {
+                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleDotIsLiteralWithoutWildcard() {
+        // No '*' in the input means UsesType treats it as an exact FQN. Real Java FQNs never have
+        // consecutive dots, so this should miss every well-formed compilation unit.
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesType<>("java..util.ArrayList", false))),
+          java(
+            """
+              import java.util.ArrayList;
+              class Test {
+                  ArrayList<String> list = new ArrayList<>();
               }
               """
           )

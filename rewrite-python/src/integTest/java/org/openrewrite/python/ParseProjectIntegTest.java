@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.json.tree.Json;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.text.PlainText;
@@ -223,6 +224,47 @@ class ParseProjectIntegTest {
                 .orElseThrow();
         assertThat(reqsTxt).isInstanceOf(PlainText.class);
         assertThat(reqsTxt.getMarkers().findFirst(PythonResolutionResult.class)).isPresent();
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void includesPipfile() throws IOException {
+        Path projectDir = tempDir.resolve("with_pipfile");
+        Files.createDirectories(projectDir);
+
+        Files.writeString(projectDir.resolve("main.py"), "x = 1");
+        Files.writeString(projectDir.resolve("Pipfile"), """
+                [packages]
+                requests = ">=2.28.0"
+                """);
+        Files.writeString(projectDir.resolve("Pipfile.lock"), """
+                {
+                    "_meta": {"sources": [{"url": "https://pypi.org/simple"}]},
+                    "default": {"requests": {"version": "==2.31.0"}},
+                    "develop": {}
+                }
+                """);
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(Collectors.toList());
+
+        assertThat(sources)
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .contains("main.py", "Pipfile", "Pipfile.lock");
+
+        SourceFile pipfile = sources.stream()
+                .filter(sf -> sf.getSourcePath().getFileName().toString().equals("Pipfile"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(pipfile).isInstanceOf(Toml.Document.class);
+        assertThat(pipfile.getMarkers().findFirst(PythonResolutionResult.class)).isPresent();
+
+        SourceFile pipfileLock = sources.stream()
+                .filter(sf -> sf.getSourcePath().getFileName().toString().equals("Pipfile.lock"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(pipfileLock).isInstanceOf(Json.Document.class);
     }
 
     @Test

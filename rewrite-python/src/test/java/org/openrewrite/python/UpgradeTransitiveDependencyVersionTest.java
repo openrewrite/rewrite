@@ -411,6 +411,37 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradeQuotedPdmOverride() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("certifi", ">=2024.1.1")),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+
+              [tool.pdm.overrides]
+              "certifi" = ">=2023.1.1"
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+
+              [tool.pdm.overrides]
+              "certifi" = ">=2024.1.1"
+              """
+          )
+        );
+    }
+
+    @Test
     void skipPdmWhenDirectDependency() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("requests", ">=2.31.0")),

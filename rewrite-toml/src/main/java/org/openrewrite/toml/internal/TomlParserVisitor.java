@@ -134,13 +134,16 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
 
     @Override
     public Toml.Identifier visitSimpleKey(TomlParser.SimpleKeyContext ctx) {
-        return convert(ctx, (c, prefix) -> new Toml.Identifier(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                c.getText(),
-                c.getText()
-        ));
+        return convert(ctx, (c, prefix) -> {
+            String source = c.getText();
+            return new Toml.Identifier(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    source,
+                    unquoteSimpleKey(source)
+            );
+        });
     }
 
     @Override
@@ -160,6 +163,27 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                 text.toString(),
                 key.toString()
         );
+    }
+
+    /**
+     * Strip surrounding quotes from a TOML key's source text. Per the TOML spec
+     * a quoted key (basic-string {@code "foo"} or literal-string {@code 'foo'})
+     * names the same key as the unquoted form when only ASCII-identifier
+     * characters are involved; the quotes are purely syntactic. For escape
+     * processing parity with {@link Toml.Literal} string values we currently
+     * only strip the outer quote characters and do not unescape interior
+     * sequences — escaped key names are exceedingly rare in practice.
+     */
+    private static String unquoteSimpleKey(String source) {
+        if (source.length() < 2) {
+            return source;
+        }
+        char first = source.charAt(0);
+        char last = source.charAt(source.length() - 1);
+        if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+            return source.substring(1, source.length() - 1);
+        }
+        return source;
     }
 
     @Override

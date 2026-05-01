@@ -150,4 +150,35 @@ class ConstructorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void nonStaticInnerClassNamedArgs() {
+        rewriteRun(
+          groovy(
+            """
+              class T {
+                  class Reader { }
+                  def m() { new Reader(a: 1) }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void innerClassConstructorWithOnlySuperCall() {
+        rewriteRun(
+          groovy(
+            """
+              class Outer {
+                  class Inner extends Base {
+                      Inner(int x, int y) {
+                          super(x, y)
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }

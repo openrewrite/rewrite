@@ -59,4 +59,46 @@ class RangeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void exclusiveRightRange() {
+        rewriteRun(
+          groovy(
+            """
+              (1..<10).each { }
+              def a = 0..<10
+              def b = 0 ..< 10
+              def c = (-5)..<5
+              def d = a[0..<a.size()]
+              for (int i = 0; i < (1..<5).size(); i++) { }
+              """
+          )
+        );
+    }
+
+    @Test
+    void allRangeKinds() {
+        rewriteRun(
+          groovy(
+            """
+              def inclusive = 1..10
+              def inclusiveSpaces = 1 .. 10
+              def inclusiveNegative = -3..3
+              def inclusiveReverse = 10..1
+              def inclusiveChars = 'a'..'z'
+              def exclusiveEnd = 1..<10
+              def exclusiveEndSpaces = 1 ..< 10
+              def exclusiveEndNegative = (-5)..<5
+              def list = [10, 20, 30, 40, 50]
+              def slice1 = list[0..2]
+              def slice2 = list[0..<list.size()]
+              def slice3 = list[1..-1]
+              (0..5).each { }
+              (0..<5).each { }
+              for (i in 1..3) { }
+              for (j in 1..<3) { }
+              """
+          )
+        );
+    }
 }

@@ -280,6 +280,17 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void gStringWithIfElseExpression() {
+        rewriteRun(
+          groovy(
+            """
+              def x = "${if (true) { "a" } else { "b" }}"
+              """
+          )
+        );
+    }
+
+    @Test
     void mapLiteral() {
         rewriteRun(
           groovy(

@@ -27,6 +27,7 @@ import org.openrewrite.PathUtils;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SourceSet;
 
 import java.io.IOException;
@@ -36,6 +37,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
@@ -57,6 +59,87 @@ public class JavaSourceSet implements SourceSet {
      * Does not include java standard library types.
      */
     Map<String, List<JavaType.FullyQualified>> gavToTypes;
+
+    /**
+     * SPI for {@link #classpath} backings that can resolve a fully-qualified name
+     * without scanning the entire list. The default {@code ArrayList} backing does
+     * not implement this; lazy partition-backed implementations (e.g., V4 LST
+     * deserialization) do, allowing recipes to query the classpath in
+     * O(log n) per partition rather than forcing materialization of every entry.
+     * <p>
+     * Implementations must accept the FQN in {@code .}-separated form (nested
+     * classes use {@code .}, not {@code $}); {@link #findClasspathType(String)}
+     * normalizes input before delegating.
+     */
+    public interface ClasspathIndex {
+        Optional<JavaType.FullyQualified> findFullyQualified(String fqn);
+
+        /**
+         * Stream the types whose package name equals {@code packageName} (i.e.,
+         * top-level types in the package — sub-package types and nested-class
+         * entries do not match). Stream-based to allow short-circuit operations
+         * like {@link Stream#anyMatch} to terminate before all partitions are
+         * scanned.
+         */
+        Stream<JavaType.FullyQualified> typesInPackage(String packageName);
+
+        /**
+         * Return the {@code (classpath, gavToTypes)} subset with the given GAV keys
+         * removed, preserving lazy semantics where the implementation supports it.
+         * Default returns {@code null}, signalling the caller to fall back to
+         * identity-based filtering. Lazy backings that track GAV provenance can
+         * implement this to skip materialization of the entire classpath when
+         * recipes call {@link JavaSourceSet#removeTypesMatching(String, String)}
+         * or {@link JavaSourceSet#removeTypesForGav(String)}.
+         */
+        default @Nullable Subset withGavsRemoved(Set<String> gavKeysToRemove) {
+            return null;
+        }
+
+        /**
+         * Lazy-aware result of {@link ClasspathIndex#withGavsRemoved}: a paired
+         * {@code (classpath, gavToTypes)} view onto the surviving partitions.
+         */
+        interface Subset {
+            List<JavaType.FullyQualified> getClasspath();
+            Map<String, List<JavaType.FullyQualified>> getGavToTypes();
+        }
+    }
+
+    /**
+     * Resolve a fully-qualified type name through this source set's classpath.
+     * Equivalent to walking {@link #getClasspath()} and matching via
+     * {@link TypeUtils#fullyQualifiedNamesAreEqual(String, String)}, but uses the
+     * {@link ClasspathIndex} fast path when the backing list provides one.
+     * Recipes that previously hand-rolled the loop over {@code getClasspath()}
+     * should prefer this accessor.
+     */
+    public Optional<JavaType.FullyQualified> findClasspathType(String fqn) {
+        String normalized = fqn.indexOf('$') >= 0 ? fqn.replace('$', '.') : fqn;
+        if (classpath instanceof ClasspathIndex) {
+            return ((ClasspathIndex) classpath).findFullyQualified(normalized);
+        }
+        for (JavaType.FullyQualified fq : classpath) {
+            if (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), normalized)) {
+                return Optional.of(fq);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Stream the classpath types whose package name equals {@code packageName}.
+     * Uses the {@link ClasspathIndex} fast path when available; otherwise filters
+     * {@link #getClasspath()} via {@link JavaType.FullyQualified#getPackageName()}.
+     * Recipes that need to enumerate or test types in a specific package should
+     * prefer this over scanning the full classpath.
+     */
+    public Stream<JavaType.FullyQualified> classpathTypesInPackage(String packageName) {
+        if (classpath instanceof ClasspathIndex) {
+            return ((ClasspathIndex) classpath).typesInPackage(packageName);
+        }
+        return classpath.stream().filter(fq -> packageName.equals(fq.getPackageName()));
+    }
 
     /**
      * Add types for the given GAV key to this source set's classpath and gavToTypes mapping.
@@ -90,6 +173,12 @@ public class JavaSourceSet implements SourceSet {
         if (gavToTypes.isEmpty() || !gavToTypes.containsKey(gavKey)) {
             return this;
         }
+        if (classpath instanceof ClasspathIndex) {
+            ClasspathIndex.Subset subset = ((ClasspathIndex) classpath).withGavsRemoved(Collections.singleton(gavKey));
+            if (subset != null) {
+                return withClasspath(subset.getClasspath()).withGavToTypes(subset.getGavToTypes());
+            }
+        }
         Set<JavaType.FullyQualified> oldTypesSet = new HashSet<>(gavToTypes.get(gavKey));
 
         List<JavaType.FullyQualified> newClasspath = new ArrayList<>(classpath.size());
@@ -116,7 +205,7 @@ public class JavaSourceSet implements SourceSet {
         if (gavToTypes.isEmpty()) {
             return this;
         }
-        List<String> keysToRemove = new ArrayList<>();
+        Set<String> keysToRemove = new HashSet<>();
         for (String key : gavToTypes.keySet()) {
             String[] parts = key.split(":");
             if (parts.length >= 2 &&
@@ -127,6 +216,12 @@ public class JavaSourceSet implements SourceSet {
         }
         if (keysToRemove.isEmpty()) {
             return this;
+        }
+        if (classpath instanceof ClasspathIndex) {
+            ClasspathIndex.Subset subset = ((ClasspathIndex) classpath).withGavsRemoved(keysToRemove);
+            if (subset != null) {
+                return withClasspath(subset.getClasspath()).withGavToTypes(subset.getGavToTypes());
+            }
         }
         Set<JavaType.FullyQualified> typesToRemove = new HashSet<>();
         for (String key : keysToRemove) {

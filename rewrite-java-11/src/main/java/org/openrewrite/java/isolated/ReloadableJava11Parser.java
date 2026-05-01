@@ -37,7 +37,9 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
+import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.lombok.LombokSupport;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
@@ -67,6 +69,7 @@ import static java.util.stream.Collectors.toList;
 @NullMarked
 public class ReloadableJava11Parser implements JavaParser {
     private final JavaTypeCache typeCache;
+    private final JavaTypeFactory typeFactory;
 
     @Nullable
     private Collection<Path> classpath;
@@ -88,11 +91,13 @@ public class ReloadableJava11Parser implements JavaParser {
             @Nullable Collection<Input> dependsOn,
             Charset charset,
             Collection<NamedStyles> styles,
-            JavaTypeCache typeCache) {
+            JavaTypeCache typeCache,
+            @Nullable JavaTypeFactory typeFactory) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
         this.typeCache = typeCache;
+        this.typeFactory = typeFactory != null ? typeFactory : new DefaultJavaTypeFactory(typeCache);
 
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
@@ -184,7 +189,7 @@ public class ReloadableJava11Parser implements JavaParser {
                         input.getFileAttributes(),
                         input.getSource(ctx),
                         styles,
-                        typeCache,
+                        typeFactory,
                         ctx,
                         context
                 );
@@ -374,7 +379,7 @@ public class ReloadableJava11Parser implements JavaParser {
     public static class Builder extends JavaParser.Builder<ReloadableJava11Parser, Builder> {
         @Override
         public ReloadableJava11Parser build() {
-            return new ReloadableJava11Parser(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
+            return new ReloadableJava11Parser(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, javaTypeFactory);
         }
     }
 

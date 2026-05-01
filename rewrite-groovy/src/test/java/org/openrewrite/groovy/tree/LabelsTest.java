@@ -49,4 +49,19 @@ class LabelsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void labelBeforeAssert() {
+        rewriteRun(
+          //language=groovy
+          groovy(
+                """
+            def foo() {
+                then:
+                assert 1 == 0
+            }
+            """
+          )
+        );
+    }
 }

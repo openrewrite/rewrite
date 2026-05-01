@@ -40,7 +40,7 @@ import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.marker.*;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
@@ -110,7 +110,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                                          @Nullable FileAttributes fileAttributes,
                                          EncodingDetectingInputStream source,
                                          Collection<NamedStyles> styles,
-                                         JavaTypeCache typeCache,
+                                         JavaTypeFactory typeFactory,
                                          ExecutionContext ctx,
                                          Context context) {
         this.sourcePath = sourcePath;
@@ -121,7 +121,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         this.styles = styles;
         this.ctx = ctx;
         this.context = context;
-        this.typeMapping = new ReloadableJava25TypeMapping(typeCache);
+        this.typeMapping = new ReloadableJava25TypeMapping(typeFactory);
     }
 
     @Override

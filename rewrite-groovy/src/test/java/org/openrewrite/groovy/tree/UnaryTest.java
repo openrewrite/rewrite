@@ -70,4 +70,27 @@ class UnaryTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void negationOfParenthesizedPropertyAccess() {
+        rewriteRun(
+          groovy(
+            """
+              !(new String("a").bytes)
+              """
+          )
+        );
+    }
+
+    @Test
+    void negationOfParenthesizedPropertyAccessOnLocal() {
+        rewriteRun(
+          groovy(
+            """
+              def x = "a"
+              def b = !(x.bytes)
+              """
+          )
+        );
+    }
 }
