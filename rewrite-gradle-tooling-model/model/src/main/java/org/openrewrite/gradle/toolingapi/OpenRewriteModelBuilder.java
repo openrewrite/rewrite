@@ -117,29 +117,27 @@ public class OpenRewriteModelBuilder {
                 arguments.add(buildFile.getAbsolutePath());
             }
         }
-        try {
-            try (ProjectConnection connection = connector.connect()) {
-                ModelBuilder<OpenRewriteModelProxy> customModelBuilder = connection.model(OpenRewriteModelProxy.class);
-                if (initScript == null) {
-                    if (System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath") != null) {
-                        // code path only expected to be taken from within openrewrite/rewrite
-                        String generatedInitScript = generateInitScriptFromManifest();
-                        Files.write(init, generatedInitScript.getBytes(StandardCharsets.UTF_8));
-                    } else {
-                        // Use default init.gradle from resources
-                        try (InputStream is = OpenRewriteModel.class.getResourceAsStream("/init.gradle")) {
-                            if (is == null) {
-                                throw new IllegalStateException("Expected to find init.gradle on the classpath");
-                            }
-                            Files.copy(is, init);
-                        }
-                    }
+        try (ProjectConnection connection = connector.connect()) {
+            ModelBuilder<OpenRewriteModelProxy> customModelBuilder = connection.model(OpenRewriteModelProxy.class);
+            if (initScript == null) {
+                if (System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath") != null) {
+                    // code path only expected to be taken from within openrewrite/rewrite
+                    String generatedInitScript = generateInitScriptFromManifest();
+                    Files.write(init, generatedInitScript.getBytes(StandardCharsets.UTF_8));
                 } else {
-                    Files.write(init, initScript.getBytes());
+                    // Use default init.gradle from resources
+                    try (InputStream is = OpenRewriteModel.class.getResourceAsStream("/init.gradle")) {
+                        if (is == null) {
+                            throw new IllegalStateException("Expected to find init.gradle on the classpath");
+                        }
+                        Files.copy(is, init);
+                    }
                 }
-                customModelBuilder.withArguments(arguments);
-                return OpenRewriteModel.from(customModelBuilder.get());
+            } else {
+                Files.write(init, initScript.getBytes());
             }
+            customModelBuilder.withArguments(arguments);
+            return OpenRewriteModel.from(customModelBuilder.get());
         } finally {
             try {
                 if (Files.exists(init)) {
