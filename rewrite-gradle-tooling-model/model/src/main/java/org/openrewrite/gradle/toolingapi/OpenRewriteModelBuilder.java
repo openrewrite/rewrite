@@ -79,14 +79,11 @@ public class OpenRewriteModelBuilder {
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile, @Nullable String initScript) throws IOException {
         DefaultGradleConnector connector = (DefaultGradleConnector) GradleConnector.newConnector();
         String gradleVersion;
-        if (System.getProperty("org.openrewrite.test.gradleVersion") != null) {
-            gradleVersion = System.getProperty("org.openrewrite.test.gradleVersion");
-            connector.useGradleVersion(gradleVersion);
-        } else if (Files.exists(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"))) {
+        if (Files.exists(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"))) {
             gradleVersion = wrapperGradleVersion(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"));
             connector.useBuildDistribution();
         } else {
-            gradleVersion = "8.14.4";
+            gradleVersion = System.getProperty("org.openrewrite.test.gradleVersion", "8.14.4");
             connector.useGradleVersion(gradleVersion);
         }
         connector
@@ -99,6 +96,7 @@ public class OpenRewriteModelBuilder {
         Path init = projectDir.toPath().resolve("openrewrite-tooling.gradle").toAbsolutePath();
         arguments.add(init.toString());
         Path settings = null;
+        boolean settingsWritten = false;
         if (buildFile != null && buildFile.exists()) {
             if (isGradle9OrLater(gradleVersion)) {
                 // Gradle 9 dropped -b; for non-conventional build files write a temporary settings.gradle with rootProject.buildFileName.
@@ -110,6 +108,8 @@ public class OpenRewriteModelBuilder {
                     if (!Files.exists(projectPath.resolve("settings.gradle")) &&
                             !Files.exists(projectPath.resolve("settings.gradle.kts"))) {
                         settings = projectPath.resolve("settings.gradle");
+                        Files.write(settings, ("rootProject.buildFileName = '" + buildFile.getName() + "'\n").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
+                        settingsWritten = true;
                     }
                 }
             } else {
@@ -117,14 +117,9 @@ public class OpenRewriteModelBuilder {
                 arguments.add(buildFile.getAbsolutePath());
             }
         }
-        boolean settingsWritten = false;
-        try (ProjectConnection connection = connector.connect()) {
-            ModelBuilder<OpenRewriteModelProxy> customModelBuilder = connection.model(OpenRewriteModelProxy.class);
-            try {
-                if (settings != null) {
-                    Files.write(settings, ("rootProject.buildFileName = '" + buildFile.getName() + "'\n").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
-                    settingsWritten = true;
-                }
+        try {
+            try (ProjectConnection connection = connector.connect()) {
+                ModelBuilder<OpenRewriteModelProxy> customModelBuilder = connection.model(OpenRewriteModelProxy.class);
                 if (initScript == null) {
                     if (System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath") != null) {
                         // code path only expected to be taken from within openrewrite/rewrite
@@ -144,18 +139,18 @@ public class OpenRewriteModelBuilder {
                 }
                 customModelBuilder.withArguments(arguments);
                 return OpenRewriteModel.from(customModelBuilder.get());
-            } finally {
-                try {
-                    if (Files.exists(init)) {
-                        Files.delete(init);
-                    }
-                    if (settingsWritten) {
-                        Files.deleteIfExists(settings);
-                    }
-                } catch (IOException e) {
-                    //noinspection ThrowFromFinallyBlock
-                    throw new UncheckedIOException(e);
+            }
+        } finally {
+            try {
+                if (Files.exists(init)) {
+                    Files.delete(init);
                 }
+                if (settingsWritten) {
+                    Files.deleteIfExists(settings);
+                }
+            } catch (IOException e) {
+                //noinspection ThrowFromFinallyBlock
+                throw new UncheckedIOException(e);
             }
         }
     }
