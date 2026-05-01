@@ -99,7 +99,6 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     static class ProjectState {
         @Nullable SourceFile capturedDepsFile;
         @Nullable String capturedLockContent;
-        boolean depsFileMatches;
         @Nullable SourceFile modifiedDepsFile;
         LockFileRegeneration.@Nullable Result regenResult;
     }
@@ -142,7 +141,6 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 if (trait != null) {
                     ProjectState ps = acc.projects.computeIfAbsent(sourcePath, k -> new ProjectState());
                     ps.capturedDepsFile = sourceFile;
-                    ps.depsFileMatches = matchesRemoveDependency(trait);
                 }
                 return tree;
             }
@@ -156,9 +154,6 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        if (acc.projects.values().stream().noneMatch(ps -> ps.depsFileMatches)) {
-            return TreeVisitor.noop();
-        }
         return new TreeVisitor<Tree, ExecutionContext>() {
             final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
 
@@ -172,9 +167,9 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 Path sourcePath = sourceFile.getSourcePath();
 
                 ProjectState ps = acc.projects.get(sourcePath);
-                if (ps != null && ps.depsFileMatches) {
+                if (ps != null) {
                     PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
-                    if (trait != null) {
+                    if (trait != null && matchesRemoveDependency(trait)) {
                         ensureComputed(ps, trait);
                     }
                     if (ps.modifiedDepsFile != null) {
@@ -196,7 +191,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 if (lockPs == null) {
                     return tree;
                 }
-                if (lockPs.depsFileMatches && lockPs.modifiedDepsFile == null) {
+                if (lockPs.modifiedDepsFile == null) {
                     SourceFile depsTree = PyProjectHelper.getLiveDepsTree(ctx, depsPath);
                     if (depsTree == null) {
                         depsTree = lockPs.capturedDepsFile;
@@ -204,7 +199,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                     if (depsTree != null) {
                         Cursor synth = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), depsTree);
                         PythonDependencyFile trait = matcher.get(synth).orElse(null);
-                        if (trait != null) {
+                        if (trait != null && matchesRemoveDependency(trait)) {
                             ensureComputed(lockPs, trait);
                             if (lockPs.modifiedDepsFile != null) {
                                 PyProjectHelper.putLiveDepsTree(ctx, depsPath, lockPs.modifiedDepsFile);

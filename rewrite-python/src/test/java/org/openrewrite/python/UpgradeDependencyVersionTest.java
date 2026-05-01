@@ -322,4 +322,21 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void upgradeQuotedKeyInPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("urllib3", ">=2.0", null, null)),
+          pipfile(
+            """
+              [packages]
+              "urllib3" = ">=1.26"
+              """,
+            """
+              [packages]
+              "urllib3" = ">=2.0"
+              """
+          )
+        );
+    }
 }

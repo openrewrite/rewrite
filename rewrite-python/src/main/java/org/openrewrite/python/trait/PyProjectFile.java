@@ -304,11 +304,8 @@ public class PyProjectFile implements PythonDependencyFile {
                 if (!PyProjectHelper.isInsidePdmOverridesTable(getCursor())) {
                     return kv;
                 }
-                if (!(kv.getKey() instanceof Toml.Identifier)) {
-                    return kv;
-                }
-                String keyName = ((Toml.Identifier) kv.getKey()).getName();
-                if (!PythonResolutionResult.normalizeName(keyName).equals(normalizedName)) {
+                String keyName = PyProjectHelper.extractKeyName(kv);
+                if (keyName == null || !PythonResolutionResult.normalizeName(keyName).equals(normalizedName)) {
                     return kv;
                 }
                 if (!(kv.getValue() instanceof Toml.Literal)) {

@@ -421,6 +421,20 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void skipWhenAlreadyPresentInPipfileAsQuotedKey() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("urllib3", ">=2.0", null, null)),
+          pipfile(
+            """
+              [packages]
+              requests = "*"
+              "urllib3" = "*"
+              """
+          )
+        );
+    }
+
+    @Test
     void validateRequiresGroupName() {
         var recipe = new AddDependency("pytest", null, "project.optional-dependencies", null);
         assertThat(recipe.validate().isValid()).isFalse();

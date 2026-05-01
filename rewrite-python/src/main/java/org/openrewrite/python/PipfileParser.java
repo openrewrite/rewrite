@@ -11,6 +11,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.internal.PipfileLockParser;
+import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.internal.PythonResolutionLinker;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
@@ -132,10 +133,10 @@ public class PipfileParser implements Parser {
                 continue;
             }
             Toml.KeyValue kv = (Toml.KeyValue) value;
-            if (!(kv.getKey() instanceof Toml.Identifier)) {
+            String name = PyProjectHelper.extractKeyName(kv);
+            if (name == null) {
                 continue;
             }
-            String name = ((Toml.Identifier) kv.getKey()).getName();
             String versionConstraint = extractVersion(kv.getValue());
             if ("*".equals(versionConstraint)) {
                 versionConstraint = null;

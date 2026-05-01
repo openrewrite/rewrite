@@ -59,6 +59,18 @@ public class PyProjectHelper {
     }
 
     /**
+     * Read the unquoted key name from a TOML key-value, or {@code null} if the
+     * key isn't a plain {@link Toml.Identifier}. Quote stripping is handled by
+     * the TOML parser itself ({@code "urllib3"} and {@code urllib3} both expose
+     * {@code "urllib3"} via {@code getName()}).
+     */
+    public static @Nullable String extractKeyName(Toml.KeyValue kv) {
+        return kv.getKey() instanceof Toml.Identifier
+                ? ((Toml.Identifier) kv.getKey()).getName()
+                : null;
+    }
+
+    /**
      * Extract the package name from a PEP 508 dependency spec string.
      * The name is the first token before any version specifier, extras, or marker.
      */
