@@ -89,6 +89,11 @@ export abstract class Recipe {
 
     async descriptor(): Promise<RecipeDescriptor> {
         const optionsRecord: Record<string, OptionDescriptor> = (this as any).constructor[OPTIONS_KEY] || {}
+        // Java's `RecipeDescriptor.getXxx()` getters for collection-valued
+        // fields are treated as never-null by callers (matching what
+        // `Recipe.getDescriptor()` upholds locally). Always emit the
+        // collection keys, even when empty, so Jackson on the Java side
+        // never leaves them null.
         return {
             name: this.name,
             displayName: this.displayName,
@@ -96,14 +101,18 @@ export abstract class Recipe {
             description: this.description,
             tags: this.tags,
             estimatedEffortPerOccurrence: this.estimatedEffortPerOccurrence,
-            recipeList: await mapAsync(await this.recipeList(), async r => r.descriptor()),
             options: Object.entries(optionsRecord).map(([key, descriptor]) => ({
                 name: key,
                 value: (this as any)[key],
                 required: descriptor.required ?? true,
                 ...descriptor
             })),
-            dataTables: this.dataTables
+            preconditions: [],
+            recipeList: await mapAsync(await this.recipeList(), async r => r.descriptor()),
+            dataTables: this.dataTables,
+            maintainers: [],
+            contributors: [],
+            examples: []
         }
     }
 
@@ -135,9 +144,13 @@ export interface RecipeDescriptor {
     readonly description: string
     readonly tags: string[]
     readonly estimatedEffortPerOccurrence: Minutes
-    readonly recipeList: RecipeDescriptor[]
     readonly options: ({ name: string, value?: any } & OptionDescriptor)[]
+    readonly preconditions: RecipeDescriptor[]
+    readonly recipeList: RecipeDescriptor[]
     readonly dataTables: DataTableDescriptor[]
+    readonly maintainers: any[]
+    readonly contributors: any[]
+    readonly examples: any[]
 }
 
 export interface OptionDescriptor {

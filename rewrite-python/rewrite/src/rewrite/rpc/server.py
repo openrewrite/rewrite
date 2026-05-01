@@ -878,7 +878,13 @@ def _category_descriptor_to_dict(descriptor) -> dict:
 
 
 def _recipe_descriptor_to_dict(descriptor) -> dict:
-    """Convert a RecipeDescriptor to a dict for JSON serialization."""
+    """Convert a RecipeDescriptor to a dict for JSON serialization.
+
+    Java's `RecipeDescriptor.getXxx()` getters for collection-valued fields
+    are treated as never-null by callers (matching what `Recipe.getDescriptor()`
+    upholds locally). Always emit the collection keys, even when empty, so
+    Jackson on the Java side never leaves them null.
+    """
     return {
         'name': descriptor.name,
         'displayName': descriptor.display_name,
@@ -897,8 +903,12 @@ def _recipe_descriptor_to_dict(descriptor) -> dict:
             }
             for name, value, opt in descriptor.options
         ],
-        'dataTables': descriptor.data_tables,
+        'preconditions': [],
         'recipeList': [_recipe_descriptor_to_dict(r) for r in descriptor.recipe_list],
+        'dataTables': descriptor.data_tables,
+        'maintainers': [],
+        'contributors': [],
+        'examples': [],
     }
 
 
