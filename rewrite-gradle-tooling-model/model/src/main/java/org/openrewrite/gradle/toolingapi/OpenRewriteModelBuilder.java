@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -77,12 +78,16 @@ public class OpenRewriteModelBuilder {
      */
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile, @Nullable String initScript) throws IOException {
         DefaultGradleConnector connector = (DefaultGradleConnector) GradleConnector.newConnector();
+        String gradleVersion;
         if (System.getProperty("org.openrewrite.test.gradleVersion") != null) {
-            connector.useGradleVersion(System.getProperty("org.openrewrite.test.gradleVersion"));
+            gradleVersion = System.getProperty("org.openrewrite.test.gradleVersion");
+            connector.useGradleVersion(gradleVersion);
         } else if (Files.exists(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"))) {
+            gradleVersion = wrapperGradleVersion(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"));
             connector.useBuildDistribution();
         } else {
-            connector.useGradleVersion("8.14.4");
+            gradleVersion = "8.14.4";
+            connector.useGradleVersion(gradleVersion);
         }
         connector
                 // Uncomment to hit breakpoints inside OpenRewriteModelBuilder in unit tests
@@ -93,25 +98,32 @@ public class OpenRewriteModelBuilder {
         arguments.add("--init-script");
         Path init = projectDir.toPath().resolve("openrewrite-tooling.gradle").toAbsolutePath();
         arguments.add(init.toString());
-        // Gradle 9 dropped -b; point at a non-conventional build file via a temporary settings.gradle.
         Path settings = null;
         if (buildFile != null && buildFile.exists()) {
-            File abs = buildFile.getAbsoluteFile();
-            boolean atConventionalLocation = abs.equals(new File(projectDir, "build.gradle").getAbsoluteFile()) ||
-                    abs.equals(new File(projectDir, "build.gradle.kts").getAbsoluteFile());
-            if (!atConventionalLocation) {
-                Path projectPath = projectDir.toPath();
-                if (!Files.exists(projectPath.resolve("settings.gradle")) &&
-                        !Files.exists(projectPath.resolve("settings.gradle.kts"))) {
-                    settings = projectPath.resolve("settings.gradle");
+            if (isGradle9OrLater(gradleVersion)) {
+                // Gradle 9 dropped -b; for non-conventional build files write a temporary settings.gradle with rootProject.buildFileName.
+                File abs = buildFile.getAbsoluteFile();
+                boolean atConventionalLocation = abs.equals(new File(projectDir, "build.gradle").getAbsoluteFile()) ||
+                        abs.equals(new File(projectDir, "build.gradle.kts").getAbsoluteFile());
+                if (!atConventionalLocation) {
+                    Path projectPath = projectDir.toPath();
+                    if (!Files.exists(projectPath.resolve("settings.gradle")) &&
+                            !Files.exists(projectPath.resolve("settings.gradle.kts"))) {
+                        settings = projectPath.resolve("settings.gradle");
+                    }
                 }
+            } else {
+                arguments.add("-b");
+                arguments.add(buildFile.getAbsolutePath());
             }
         }
+        boolean settingsWritten = false;
         try (ProjectConnection connection = connector.connect()) {
             ModelBuilder<OpenRewriteModelProxy> customModelBuilder = connection.model(OpenRewriteModelProxy.class);
             try {
                 if (settings != null) {
-                    Files.write(settings, ("rootProject.buildFileName = '" + buildFile.getName() + "'\n").getBytes(StandardCharsets.UTF_8));
+                    Files.write(settings, ("rootProject.buildFileName = '" + buildFile.getName() + "'\n").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
+                    settingsWritten = true;
                 }
                 if (initScript == null) {
                     if (System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath") != null) {
@@ -137,8 +149,8 @@ public class OpenRewriteModelBuilder {
                     if (Files.exists(init)) {
                         Files.delete(init);
                     }
-                    if (settings != null && Files.exists(settings)) {
-                        Files.delete(settings);
+                    if (settingsWritten) {
+                        Files.deleteIfExists(settings);
                     }
                 } catch (IOException e) {
                     //noinspection ThrowFromFinallyBlock
@@ -146,6 +158,39 @@ public class OpenRewriteModelBuilder {
                 }
             }
         }
+    }
+
+    private static boolean isGradle9OrLater(@Nullable String version) {
+        if (version == null) {
+            return false;
+        }
+        int dot = version.indexOf('.');
+        try {
+            return Integer.parseInt(dot < 0 ? version : version.substring(0, dot)) >= 9;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    private static @Nullable String wrapperGradleVersion(Path wrapperProperties) {
+        try {
+            for (String line : Files.readAllLines(wrapperProperties, StandardCharsets.UTF_8)) {
+                if (line.startsWith("distributionUrl=")) {
+                    int idx = line.lastIndexOf("gradle-");
+                    if (idx < 0) {
+                        return null;
+                    }
+                    int start = idx + "gradle-".length();
+                    int end = start;
+                    while (end < line.length() && (Character.isDigit(line.charAt(end)) || line.charAt(end) == '.')) {
+                        end++;
+                    }
+                    return end > start ? line.substring(start, end) : null;
+                }
+            }
+        } catch (IOException ignored) {
+        }
+        return null;
     }
 
     /**
