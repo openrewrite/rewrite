@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -77,12 +78,13 @@ public class OpenRewriteModelBuilder {
      */
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile, @Nullable String initScript) throws IOException {
         DefaultGradleConnector connector = (DefaultGradleConnector) GradleConnector.newConnector();
-        if (System.getProperty("org.openrewrite.test.gradleVersion") != null) {
-            connector.useGradleVersion(System.getProperty("org.openrewrite.test.gradleVersion"));
-        } else if (Files.exists(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"))) {
+        String gradleVersion;
+        if (Files.exists(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"))) {
+            gradleVersion = wrapperGradleVersion(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"));
             connector.useBuildDistribution();
         } else {
-            connector.useGradleVersion(defaultGradleVersion());
+            gradleVersion = System.getProperty("org.openrewrite.test.gradleVersion", "8.14.3");
+            connector.useGradleVersion(gradleVersion);
         }
         connector
                 // Uncomment to hit breakpoints inside OpenRewriteModelBuilder in unit tests
@@ -90,74 +92,98 @@ public class OpenRewriteModelBuilder {
                 // .embedded(true)
                 .forProjectDirectory(projectDir);
         List<String> arguments = new ArrayList<>();
-        if (buildFile != null && buildFile.exists()) {
-            arguments.add("-b");
-            arguments.add(buildFile.getAbsolutePath());
-        }
         arguments.add("--init-script");
         Path init = projectDir.toPath().resolve("openrewrite-tooling.gradle").toAbsolutePath();
         arguments.add(init.toString());
+        Path settings = null;
+        boolean settingsWritten = false;
+        if (buildFile != null && buildFile.exists()) {
+            if (isGradle9OrLater(gradleVersion)) {
+                // Gradle 9 dropped -b; for non-conventional build files write a temporary settings.gradle with rootProject.buildFileName.
+                File abs = buildFile.getAbsoluteFile();
+                boolean atConventionalLocation = abs.equals(new File(projectDir, "build.gradle").getAbsoluteFile()) ||
+                        abs.equals(new File(projectDir, "build.gradle.kts").getAbsoluteFile());
+                if (!atConventionalLocation) {
+                    Path projectPath = projectDir.toPath();
+                    if (!Files.exists(projectPath.resolve("settings.gradle")) &&
+                            !Files.exists(projectPath.resolve("settings.gradle.kts"))) {
+                        settings = projectPath.resolve("settings.gradle");
+                        Files.write(settings, ("rootProject.buildFileName = '" + buildFile.getName() + "'\n").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
+                        settingsWritten = true;
+                    }
+                }
+            } else {
+                arguments.add("-b");
+                arguments.add(buildFile.getAbsolutePath());
+            }
+        }
         try (ProjectConnection connection = connector.connect()) {
             ModelBuilder<OpenRewriteModelProxy> customModelBuilder = connection.model(OpenRewriteModelProxy.class);
-            try {
-                if (initScript == null) {
-                    if (System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath") != null) {
-                        // code path only expected to be taken from within openrewrite/rewrite
-                        String generatedInitScript = generateInitScriptFromManifest();
-                        Files.write(init, generatedInitScript.getBytes(StandardCharsets.UTF_8));
-                    } else {
-                        // Use default init.gradle from resources
-                        try (InputStream is = OpenRewriteModel.class.getResourceAsStream("/init.gradle")) {
-                            if (is == null) {
-                                throw new IllegalStateException("Expected to find init.gradle on the classpath");
-                            }
-                            Files.copy(is, init);
-                        }
-                    }
+            if (initScript == null) {
+                if (System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath") != null) {
+                    // code path only expected to be taken from within openrewrite/rewrite
+                    String generatedInitScript = generateInitScriptFromManifest();
+                    Files.write(init, generatedInitScript.getBytes(StandardCharsets.UTF_8));
                 } else {
-                    Files.write(init, initScript.getBytes());
-                }
-                customModelBuilder.withArguments(arguments);
-                return OpenRewriteModel.from(customModelBuilder.get());
-            } finally {
-                try {
-                    if (Files.exists(init)) {
-                        Files.delete(init);
+                    // Use default init.gradle from resources
+                    try (InputStream is = OpenRewriteModel.class.getResourceAsStream("/init.gradle")) {
+                        if (is == null) {
+                            throw new IllegalStateException("Expected to find init.gradle on the classpath");
+                        }
+                        Files.copy(is, init);
                     }
-                } catch (IOException e) {
-                    //noinspection ThrowFromFinallyBlock
-                    throw new UncheckedIOException(e);
                 }
+            } else {
+                Files.write(init, initScript.getBytes());
+            }
+            customModelBuilder.withArguments(arguments);
+            return OpenRewriteModel.from(customModelBuilder.get());
+        } finally {
+            try {
+                if (Files.exists(init)) {
+                    Files.delete(init);
+                }
+                if (settingsWritten) {
+                    Files.deleteIfExists(settings);
+                }
+            } catch (IOException e) {
+                //noinspection ThrowFromFinallyBlock
+                throw new UncheckedIOException(e);
             }
         }
     }
 
-    /**
-     * Pick a Gradle distribution compatible with the JVM running the Tooling API client.
-     * The daemon defaults to the same JVM as the client, so the chosen distribution must support that Java version.
-     * See <a href="https://docs.gradle.org/current/userguide/compatibility.html">Gradle compatibility matrix</a>.
-     */
-    static String defaultGradleVersion() {
-        return defaultGradleVersion(javaSpecificationVersion());
-    }
-
-    static String defaultGradleVersion(int javaFeatureVersion) {
-        if (javaFeatureVersion >= 25) {
-            return "9.1.0";
+    private static boolean isGradle9OrLater(@Nullable String version) {
+        if (version == null) {
+            return false;
         }
-        return "8.14.3";
-    }
-
-    private static int javaSpecificationVersion() {
-        String version = System.getProperty("java.specification.version", "8");
-        if (version.startsWith("1.")) {
-            version = version.substring(2);
-        }
+        int dot = version.indexOf('.');
         try {
-            return Integer.parseInt(version);
+            return Integer.parseInt(dot < 0 ? version : version.substring(0, dot)) >= 9;
         } catch (NumberFormatException e) {
-            return 8;
+            return false;
         }
+    }
+
+    private static @Nullable String wrapperGradleVersion(Path wrapperProperties) {
+        try {
+            for (String line : Files.readAllLines(wrapperProperties, StandardCharsets.UTF_8)) {
+                if (line.startsWith("distributionUrl=")) {
+                    int idx = line.lastIndexOf("gradle-");
+                    if (idx < 0) {
+                        return null;
+                    }
+                    int start = idx + "gradle-".length();
+                    int end = start;
+                    while (end < line.length() && (Character.isDigit(line.charAt(end)) || line.charAt(end) == '.')) {
+                        end++;
+                    }
+                    return end > start ? line.substring(start, end) : null;
+                }
+            }
+        } catch (IOException ignored) {
+        }
+        return null;
     }
 
     /**
