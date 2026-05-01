@@ -16,9 +16,10 @@
 package org.openrewrite.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.AllArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
-import lombok.Value;
+import lombok.Getter;
+import lombok.ToString;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -36,48 +37,86 @@ import java.util.Set;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 
-@Value
+@Getter
+@ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@AllArgsConstructor(onConstructor = @__(@JsonCreator))
 public class RecipeDescriptor {
     @EqualsAndHashCode.Include
-    String name;
+    private final String name;
 
     @NlsRewrite.DisplayName
-    String displayName;
+    private final String displayName;
 
     @NlsRewrite.DisplayName
-    String instanceName;
+    private final String instanceName;
 
     @NlsRewrite.Description
-    String description;
+    private final String description;
 
-    Set<String> tags;
+    private final Set<String> tags;
 
     @Nullable
-    Duration estimatedEffortPerOccurrence;
+    private final Duration estimatedEffortPerOccurrence;
 
     @EqualsAndHashCode.Include
-    List<OptionDescriptor> options;
+    private final List<OptionDescriptor> options;
 
     @With
-    List<RecipeDescriptor> preconditions;
+    private final List<RecipeDescriptor> preconditions;
 
     @With
-    List<RecipeDescriptor> recipeList;
+    private final List<RecipeDescriptor> recipeList;
 
     @With
-    List<DataTableDescriptor> dataTables;
+    private final List<DataTableDescriptor> dataTables;
 
-    List<Maintainer> maintainers;
+    private final List<Maintainer> maintainers;
 
     @Deprecated(/* No longer populated */)
-    List<Contributor> contributors;
+    private final List<Contributor> contributors;
 
-    List<RecipeExample> examples;
+    private final List<RecipeExample> examples;
 
     @Deprecated
-    URI source;
+    private final URI source;
+
+    /**
+     * Recipes constructed locally always pass non-null collections (see
+     * {@link org.openrewrite.Recipe#createRecipeDescriptor()}). Polyglot RPC peers
+     * may omit empty collections from JSON, so normalize null to empty here to
+     * preserve the "never null" contract for collection-valued getters.
+     */
+    @JsonCreator
+    public RecipeDescriptor(
+            @JsonProperty("name") String name,
+            @JsonProperty("displayName") String displayName,
+            @JsonProperty("instanceName") String instanceName,
+            @JsonProperty("description") String description,
+            @JsonProperty("tags") @Nullable Set<String> tags,
+            @JsonProperty("estimatedEffortPerOccurrence") @Nullable Duration estimatedEffortPerOccurrence,
+            @JsonProperty("options") @Nullable List<OptionDescriptor> options,
+            @JsonProperty("preconditions") @Nullable List<RecipeDescriptor> preconditions,
+            @JsonProperty("recipeList") @Nullable List<RecipeDescriptor> recipeList,
+            @JsonProperty("dataTables") @Nullable List<DataTableDescriptor> dataTables,
+            @JsonProperty("maintainers") @Nullable List<Maintainer> maintainers,
+            @JsonProperty("contributors") @Nullable List<Contributor> contributors,
+            @JsonProperty("examples") @Nullable List<RecipeExample> examples,
+            @JsonProperty("source") URI source) {
+        this.name = name;
+        this.displayName = displayName;
+        this.instanceName = instanceName;
+        this.description = description;
+        this.tags = tags == null ? emptySet() : tags;
+        this.estimatedEffortPerOccurrence = estimatedEffortPerOccurrence;
+        this.options = options == null ? emptyList() : options;
+        this.preconditions = preconditions == null ? emptyList() : preconditions;
+        this.recipeList = recipeList == null ? emptyList() : recipeList;
+        this.dataTables = dataTables == null ? emptyList() : dataTables;
+        this.maintainers = maintainers == null ? emptyList() : maintainers;
+        this.contributors = contributors == null ? emptyList() : contributors;
+        this.examples = examples == null ? emptyList() : examples;
+        this.source = source;
+    }
 
     @Deprecated
     public RecipeDescriptor(String name, String displayName, String instanceName, String description,
