@@ -471,10 +471,15 @@ public class JavaSourceSet implements SourceSet {
                 version = pathParts.get(pathParts.size() - 3);
             } else if (pathParts.contains(".tt")) {
                 int ttIndex = pathParts.indexOf(".tt");
-                if (pathParts.size() - ttIndex > 3) {
-                    groupId = String.join(".", pathParts.subList(ttIndex + 1, pathParts.size() - 2));
-                    artifactId = pathParts.get(pathParts.size() - 2);
-                    version = pathParts.get(pathParts.size() - 1);
+                int last = pathParts.size() - 1;
+                // Legacy layout ends at the version directory; post-#7528 layout adds
+                // a trailing <artifact>-<version>.jar file inside the version directory.
+                int versionIndex = pathParts.get(last).endsWith(".jar") ? last - 1 : last;
+                int artifactIndex = versionIndex - 1;
+                if (artifactIndex - (ttIndex + 1) >= 1) {
+                    groupId = String.join(".", pathParts.subList(ttIndex + 1, artifactIndex));
+                    artifactId = pathParts.get(artifactIndex);
+                    version = pathParts.get(versionIndex);
                 }
             } else if (pathParts.size() >= 4) {
                 version = pathParts.get(pathParts.size() - 2);
