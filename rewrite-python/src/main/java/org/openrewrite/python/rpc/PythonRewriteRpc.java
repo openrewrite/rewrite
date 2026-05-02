@@ -599,7 +599,8 @@ public class PythonRewriteRpc extends RewriteRpc {
                     "-m", "rewrite.rpc.server",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                     metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
-                    traceRpcMessages ? "--trace-rpc-messages" : null
+                    traceRpcMessages ? "--trace-rpc-messages" : null,
+                    recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );
 
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);

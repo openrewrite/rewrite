@@ -26,6 +26,37 @@ def test_handle_parse_preserves_empty_text(tmp_path, monkeypatch):
     assert (tmp_path / "pkg" / "__init__.py").read_text(encoding="utf-8") == ""
 
 
+def test_pip_install_recipe_package_shape(tmp_path, monkeypatch):
+    import rewrite.rpc.server as server
+    import subprocess
+
+    install_dir = tmp_path / "recipes"
+    captured = {}
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(cmd, capture_output=False, text=False):
+        captured["cmd"] = cmd
+        return FakeCompletedProcess()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    server._pip_install_recipe_package(
+        "openrewrite-recipes-python", "1.2.3", install_dir
+    )
+
+    assert install_dir.exists()
+    assert captured["cmd"][1:] == [
+        "-m", "pip", "install",
+        "--target", str(install_dir),
+        "openrewrite-recipes-python==1.2.3",
+    ]
+    assert str(install_dir.resolve()) in __import__("sys").path
+
+
 def test_recipe_descriptor_to_dict_emits_all_collection_keys():
     from rewrite.recipe import RecipeDescriptor
     from rewrite.rpc.server import _recipe_descriptor_to_dict
