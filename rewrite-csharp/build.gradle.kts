@@ -313,7 +313,8 @@ val csharpPublish by tasks.registering(Exec::class) {
             findDotnet(), "nuget", "push",
             "dist/*.nupkg",
             "--source", "https://api.nuget.org/v3/index.json",
-            "--api-key", project.findProperty("nugetApiKey")?.toString() ?: ""
+            "--api-key", project.findProperty("nugetApiKey")?.toString() ?: "",
+            "--skip-duplicate"
         )
         logger.lifecycle("Publishing C# NuGet package (version: $nugetVersion)")
     }
