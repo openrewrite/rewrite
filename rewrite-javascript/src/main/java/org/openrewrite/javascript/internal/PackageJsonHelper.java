@@ -18,12 +18,16 @@ package org.openrewrite.javascript.internal;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.Tree;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonRightPadded;
+import org.openrewrite.json.tree.JsonValue;
+import org.openrewrite.json.tree.Space;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
@@ -235,5 +239,140 @@ public class PackageJsonHelper {
             return value == null ? null : value.toString();
         }
         return null;
+    }
+
+    // --- JSON mutation helpers -------------------------------------------
+
+    /**
+     * Add {@code name: version} to the given scope object inside {@code doc}.
+     * If the scope does not exist it is created. If {@code name} is already
+     * present the document is returned unchanged.
+     */
+    public static Json.Document addDependency(Json.Document doc, String name, String version, String scope) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+
+        Json.JsonObject existingScope = findObjectMember(root, scope);
+        if (existingScope == null) {
+            // Detect indent unit from the first root member's prefix (e.g. "\n  " → "  ").
+            String outerIndent = detectIndentUnit(root);
+            String innerIndent = outerIndent + outerIndent;
+
+            // The new dep member inside the scope gets prefix="\n" + innerIndent.
+            // Its after carries the closing-brace whitespace for the scope object: "\n" + outerIndent.
+            Json.Member depMember = makeMember(name, makeStringLiteral(version),
+                    Space.build("\n" + innerIndent, Collections.emptyList()));
+            JsonRightPadded<Json> depRP = JsonRightPadded.build((Json) depMember)
+                    .withAfter(Space.build("\n" + outerIndent, Collections.emptyList()));
+
+            Json.JsonObject scopeObj = new Json.JsonObject(
+                    Tree.randomId(), Space.SINGLE_SPACE,
+                    org.openrewrite.marker.Markers.EMPTY,
+                    Collections.singletonList(depRP));
+
+            // The new scope member at root level: prefix will be set by appendMember.
+            Json.Member newScopeMember = makeMember(scope, scopeObj, Space.EMPTY);
+
+            return doc.withValue(appendMember(root, newScopeMember));
+        }
+
+        // Member already present? Skip (Add semantics).
+        for (Json m : existingScope.getMembers()) {
+            if (m instanceof Json.Member && name.equals(literalString(((Json.Member) m).getKey()))) {
+                return doc;
+            }
+        }
+
+        Json.Member newDep = makeMember(name, makeStringLiteral(version), Space.EMPTY);
+        Json.JsonObject updatedScope = appendMember(existingScope, newDep);
+        return doc.withValue(replaceMember(root, scope, updatedScope));
+    }
+
+    /**
+     * Return the indent unit detected from the first member of {@code obj}.
+     * Falls back to two spaces if no members exist or prefix has no newline.
+     */
+    private static String detectIndentUnit(Json.JsonObject obj) {
+        List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
+        if (!members.isEmpty()) {
+            String ws = members.get(0).getElement().getPrefix().getWhitespace();
+            if (ws != null) {
+                int nl = ws.lastIndexOf('\n');
+                if (nl >= 0) {
+                    return ws.substring(nl + 1);
+                }
+            }
+        }
+        return "  ";
+    }
+
+    /**
+     * Append {@code newMember} to {@code obj}, transferring the trailing after-space
+     * from the previous last member to the new last member so that the closing brace
+     * keeps its indentation.
+     */
+    private static Json.JsonObject appendMember(Json.JsonObject obj, Json.Member newMember) {
+        List<JsonRightPadded<Json>> members = new ArrayList<>(obj.getPadding().getMembers());
+        if (members.isEmpty()) {
+            // Empty scope: use the object's own first-member indent (fallback).
+            members.add(JsonRightPadded.build((Json) newMember));
+        } else {
+            int prevLastIdx = members.size() - 1;
+            JsonRightPadded<Json> prevLast = members.get(prevLastIdx);
+
+            // The new member's prefix should match the existing members' indent.
+            Space copiedPrefix = prevLast.getElement().getPrefix();
+            Space trailingAfter = prevLast.getAfter();
+
+            Json.Member prefixedNewMember = newMember.withPrefix(copiedPrefix);
+            JsonRightPadded<Json> newRP = JsonRightPadded.build((Json) prefixedNewMember)
+                    .withAfter(trailingAfter);
+
+            // Previous last member loses its trailing newline (new member owns closing-brace whitespace).
+            members.set(prevLastIdx, prevLast.withAfter(Space.EMPTY));
+            members.add(newRP);
+        }
+        return obj.getPadding().withMembers(members);
+    }
+
+    private static Json.JsonObject replaceMember(Json.JsonObject root, String key, JsonValue newValue) {
+        List<JsonRightPadded<Json>> members = new ArrayList<>(root.getPadding().getMembers());
+        for (int i = 0; i < members.size(); i++) {
+            Json elem = members.get(i).getElement();
+            if (elem instanceof Json.Member &&
+                    key.equals(literalString(((Json.Member) elem).getKey()))) {
+                Json.Member oldMember = (Json.Member) elem;
+                Json.Member updated = oldMember.withValue(newValue);
+                members.set(i, members.get(i).withElement(updated));
+                break;
+            }
+        }
+        return root.getPadding().withMembers(members);
+    }
+
+    private static Json.Literal makeStringLiteral(String value) {
+        return new Json.Literal(
+                Tree.randomId(), Space.EMPTY,
+                org.openrewrite.marker.Markers.EMPTY,
+                "\"" + value + "\"", value);
+    }
+
+    /**
+     * Create a member with the given prefix on the member itself.
+     * If the value is a literal with no prefix whitespace, a single space is
+     * added so that the printed output reads {@code "key": "value"}.
+     */
+    private static Json.Member makeMember(String key, JsonValue value, Space prefix) {
+        Json.Literal keyLit = makeStringLiteral(key);
+        // Ensure there's a space between ':' and the value (standard JSON formatting).
+        JsonValue spacedValue = value;
+        if (value instanceof Json.Literal && ((Json.Literal) value).getPrefix() == Space.EMPTY) {
+            spacedValue = ((Json.Literal) value).withPrefix(Space.SINGLE_SPACE);
+        }
+        return new Json.Member(
+                Tree.randomId(), prefix,
+                org.openrewrite.marker.Markers.EMPTY,
+                JsonRightPadded.build(keyLit),
+                spacedValue);
     }
 }

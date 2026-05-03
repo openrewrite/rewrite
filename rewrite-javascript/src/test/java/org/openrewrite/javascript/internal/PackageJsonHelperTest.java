@@ -66,6 +66,42 @@ class PackageJsonHelperTest {
         assertThat(deps).extracting(Dependency::getVersionConstraint).containsExactly("^4.17.21", "^9.0.0");
     }
 
+    @Test
+    void addDependencyAppendsToExistingScope() {
+        Json.Document doc = parsePackageJson(
+                "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"dependencies\": {\n" +
+                "    \"uuid\": \"^9.0.0\"\n" +
+                "  }\n" +
+                "}\n");
+        Json.Document modified = PackageJsonHelper.addDependency(doc, "lodash", "^4.17.21", "dependencies");
+        assertThat(modified.printAll()).isEqualTo(
+                "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"dependencies\": {\n" +
+                "    \"uuid\": \"^9.0.0\",\n" +
+                "    \"lodash\": \"^4.17.21\"\n" +
+                "  }\n" +
+                "}\n");
+    }
+
+    @Test
+    void addDependencyCreatesMissingScope() {
+        Json.Document doc = parsePackageJson(
+                "{\n" +
+                "  \"name\": \"x\"\n" +
+                "}\n");
+        Json.Document modified = PackageJsonHelper.addDependency(doc, "lodash", "^4.17.21", "dependencies");
+        assertThat(modified.printAll()).isEqualTo(
+                "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"dependencies\": {\n" +
+                "    \"lodash\": \"^4.17.21\"\n" +
+                "  }\n" +
+                "}\n");
+    }
+
     private static Json.Document parsePackageJson(String content) {
         JsonParser parser = new JsonParser();
         return (Json.Document) parser.parseInputs(
