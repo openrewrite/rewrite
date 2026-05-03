@@ -289,6 +289,64 @@ public class PackageJsonHelper {
     }
 
     /**
+     * Remove the named dependency from each given scope in {@code doc}.
+     * If a scope ends up empty after removal, the scope member itself is dropped.
+     * Returns the document unchanged if no matching member was found in any scope.
+     */
+    public static Json.Document removeDependency(Json.Document doc, String name, Set<String> scopes) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+
+        List<JsonRightPadded<Json>> rootMembers = new ArrayList<>(root.getPadding().getMembers());
+        boolean changed = false;
+
+        for (int i = 0; i < rootMembers.size(); i++) {
+            Json elem = rootMembers.get(i).getElement();
+            if (!(elem instanceof Json.Member)) continue;
+            Json.Member m = (Json.Member) elem;
+            String key = literalString(m.getKey());
+            if (key == null || !scopes.contains(key)) continue;
+            if (!(m.getValue() instanceof Json.JsonObject)) continue;
+            Json.JsonObject scopeObj = (Json.JsonObject) m.getValue();
+
+            List<JsonRightPadded<Json>> kept = new ArrayList<>();
+            for (JsonRightPadded<Json> rp : scopeObj.getPadding().getMembers()) {
+                Json child = rp.getElement();
+                if (child instanceof Json.Member &&
+                        name.equals(literalString(((Json.Member) child).getKey()))) {
+                    continue;
+                }
+                kept.add(rp);
+            }
+            if (kept.size() == scopeObj.getPadding().getMembers().size()) {
+                continue;  // member not present in this scope
+            }
+            changed = true;
+            if (kept.isEmpty()) {
+                rootMembers.remove(i);
+                i--;
+                continue;
+            }
+            // Move the trailing whitespace from the original last member to the new last member
+            JsonRightPadded<Json> originalLast =
+                    scopeObj.getPadding().getMembers().get(scopeObj.getPadding().getMembers().size() - 1);
+            kept.set(kept.size() - 1, kept.get(kept.size() - 1).withAfter(originalLast.getAfter()));
+            Json.JsonObject newScope = scopeObj.getPadding().withMembers(kept);
+            rootMembers.set(i, rootMembers.get(i).withElement(m.withValue(newScope)));
+        }
+        if (!changed) return doc;
+
+        // If we removed a top-level member, also fix the trailing whitespace of the new last root member.
+        if (rootMembers.size() < root.getPadding().getMembers().size() && !rootMembers.isEmpty()) {
+            JsonRightPadded<Json> originalLast =
+                    root.getPadding().getMembers().get(root.getPadding().getMembers().size() - 1);
+            int last = rootMembers.size() - 1;
+            rootMembers.set(last, rootMembers.get(last).withAfter(originalLast.getAfter()));
+        }
+        return doc.withValue(root.getPadding().withMembers(rootMembers));
+    }
+
+    /**
      * Return the indent unit detected from the first member of {@code obj}.
      * Falls back to two spaces if no members exist or prefix has no newline.
      */

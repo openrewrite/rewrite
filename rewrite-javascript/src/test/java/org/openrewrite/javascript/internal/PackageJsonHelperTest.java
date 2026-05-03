@@ -102,6 +102,42 @@ class PackageJsonHelperTest {
                 "}\n");
     }
 
+    @Test
+    void removeDependencyDropsMember() {
+        Json.Document doc = parsePackageJson(
+                "{\n" +
+                "  \"dependencies\": {\n" +
+                "    \"lodash\": \"^4.17.21\",\n" +
+                "    \"uuid\": \"^9.0.0\"\n" +
+                "  }\n" +
+                "}\n");
+        Json.Document modified = PackageJsonHelper.removeDependency(
+                doc, "lodash", new java.util.LinkedHashSet<>(java.util.Arrays.asList("dependencies")));
+        assertThat(modified.printAll()).isEqualTo(
+                "{\n" +
+                "  \"dependencies\": {\n" +
+                "    \"uuid\": \"^9.0.0\"\n" +
+                "  }\n" +
+                "}\n");
+    }
+
+    @Test
+    void removeDependencyRemovesEmptyScope() {
+        Json.Document doc = parsePackageJson(
+                "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"dependencies\": {\n" +
+                "    \"lodash\": \"^4.17.21\"\n" +
+                "  }\n" +
+                "}\n");
+        Json.Document modified = PackageJsonHelper.removeDependency(
+                doc, "lodash", new java.util.LinkedHashSet<>(java.util.Arrays.asList("dependencies")));
+        assertThat(modified.printAll()).isEqualTo(
+                "{\n" +
+                "  \"name\": \"x\"\n" +
+                "}\n");
+    }
+
     private static Json.Document parsePackageJson(String content) {
         JsonParser parser = new JsonParser();
         return (Json.Document) parser.parseInputs(
