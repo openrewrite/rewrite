@@ -260,13 +260,26 @@ public class PackageJsonHelper {
         if (marker == null) {
             return pkg;
         }
-        if (pm != NodeResolutionResult.PackageManager.Npm
-                && pm != NodeResolutionResult.PackageManager.Bun) {
-            return pkg;
+        String npmV3;
+        switch (pm) {
+            case Npm:
+                npmV3 = lockContent;
+                break;
+            case Bun:
+                npmV3 = BunLockAdapter.toNpmV3(lockContent);
+                break;
+            case YarnClassic:
+                npmV3 = YarnClassicLockAdapter.toNpmV3(lockContent);
+                break;
+            case YarnBerry:
+                npmV3 = YarnBerryLockAdapter.toNpmV3(lockContent);
+                break;
+            case Pnpm:
+                npmV3 = PnpmLockAdapter.toNpmV3(lockContent);
+                break;
+            default:
+                return pkg; // unsupported PM
         }
-        String npmV3 = pm == NodeResolutionResult.PackageManager.Bun
-                ? BunLockAdapter.toNpmV3(lockContent)
-                : lockContent;
         LockFileParser.ParseResult parsed = LockFileParser.parse(npmV3);
 
         // Relink declared deps.
@@ -299,6 +312,19 @@ public class PackageJsonHelper {
                 .withBundledDependencies(bundledDeps)
                 .withResolvedDependencies(all);
         return pkg.withMarkers(pkg.getMarkers().setByType(updated));
+    }
+
+    private static boolean isOverlaySupported(NodeResolutionResult.PackageManager pm) {
+        switch (pm) {
+            case Npm:
+            case Bun:
+            case YarnClassic:
+            case YarnBerry:
+            case Pnpm:
+                return true;
+            default:
+                return false;
+        }
     }
 
     private static @Nullable List<NodeResolutionResult.Dependency> relink(
@@ -735,9 +761,7 @@ public class PackageJsonHelper {
         if (regen != null && regen.isSuccess()) {
             NodeResolutionResult marker = refreshed.getMarkers()
                     .findFirst(NodeResolutionResult.class).orElse(null);
-            if (marker != null
-                    && (marker.getPackageManager() == NodeResolutionResult.PackageManager.Npm
-                        || marker.getPackageManager() == NodeResolutionResult.PackageManager.Bun)) {
+            if (marker != null && isOverlaySupported(marker.getPackageManager())) {
                 try {
                     finalSource = overlayResolvedDeps(refreshed,
                             regen.getLockFileContent(), marker.getPackageManager());

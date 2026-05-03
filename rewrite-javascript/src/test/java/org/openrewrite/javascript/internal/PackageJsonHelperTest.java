@@ -313,6 +313,105 @@ class PackageJsonHelperTest {
         assertThat(after.getResolvedDependencies().get(0).getVersion()).isEqualTo("4.17.20");
     }
 
+    @Test
+    void overlayResolvedDepsDispatchesYarnClassic() {
+        Json.Document doc = parsePackageJson(
+                "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"dependencies\": { \"lodash\": \"^4.17.21\" }\n" +
+                "}\n");
+        NodeResolutionResult marker = new NodeResolutionResult(
+                UUID.randomUUID(), "x", null, null, ".", null,
+                asList(new Dependency("lodash", "^4.17.21", null)),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<NodeResolutionResult.ResolvedDependency>emptyList(),
+                NodeResolutionResult.PackageManager.YarnClassic,
+                null, null);
+        Json.Document withMarker = doc.withMarkers(doc.getMarkers().add(marker));
+
+        String yarnLock = "lodash@^4.17.21:\n" +
+                "  version \"4.17.21\"\n";
+        SourceFile result = PackageJsonHelper.overlayResolvedDeps(
+                withMarker, yarnLock, NodeResolutionResult.PackageManager.YarnClassic);
+        NodeResolutionResult m = result.getMarkers()
+                .findFirst(NodeResolutionResult.class).orElseThrow();
+        assertThat(m.getResolvedDependencies()).hasSize(1);
+        assertThat(m.getResolvedDependencies().get(0).getName()).isEqualTo("lodash");
+        assertThat(m.getDependencies().get(0).getResolved()).isNotNull();
+    }
+
+    @Test
+    void overlayResolvedDepsDispatchesYarnBerry() {
+        Json.Document doc = parsePackageJson(
+                "{\n" +
+                "  \"dependencies\": { \"lodash\": \"^4.17.21\" }\n" +
+                "}\n");
+        NodeResolutionResult marker = new NodeResolutionResult(
+                UUID.randomUUID(), "x", null, null, ".", null,
+                asList(new Dependency("lodash", "^4.17.21", null)),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<NodeResolutionResult.ResolvedDependency>emptyList(),
+                NodeResolutionResult.PackageManager.YarnBerry,
+                null, null);
+        Json.Document withMarker = doc.withMarkers(doc.getMarkers().add(marker));
+
+        String yarnLock = "__metadata:\n" +
+                "  version: 6\n" +
+                "\n" +
+                "\"lodash@npm:^4.17.21\":\n" +
+                "  version: 4.17.21\n" +
+                "  resolution: \"lodash@npm:4.17.21\"\n";
+        SourceFile result = PackageJsonHelper.overlayResolvedDeps(
+                withMarker, yarnLock, NodeResolutionResult.PackageManager.YarnBerry);
+        NodeResolutionResult m = result.getMarkers()
+                .findFirst(NodeResolutionResult.class).orElseThrow();
+        assertThat(m.getResolvedDependencies()).hasSize(1);
+        assertThat(m.getDependencies().get(0).getResolved()).isNotNull();
+    }
+
+    @Test
+    void overlayResolvedDepsDispatchesPnpm() {
+        Json.Document doc = parsePackageJson(
+                "{\n" +
+                "  \"dependencies\": { \"lodash\": \"^4.17.21\" }\n" +
+                "}\n");
+        NodeResolutionResult marker = new NodeResolutionResult(
+                UUID.randomUUID(), "x", null, null, ".", null,
+                asList(new Dependency("lodash", "^4.17.21", null)),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<NodeResolutionResult.ResolvedDependency>emptyList(),
+                NodeResolutionResult.PackageManager.Pnpm,
+                null, null);
+        Json.Document withMarker = doc.withMarkers(doc.getMarkers().add(marker));
+
+        String pnpmLock = "lockfileVersion: '6.0'\n" +
+                "\n" +
+                "dependencies:\n" +
+                "  lodash:\n" +
+                "    specifier: ^4.17.21\n" +
+                "    version: 4.17.21\n" +
+                "\n" +
+                "packages:\n" +
+                "  /lodash@4.17.21:\n" +
+                "    resolution: {integrity: sha512-x}\n";
+        SourceFile result = PackageJsonHelper.overlayResolvedDeps(
+                withMarker, pnpmLock, NodeResolutionResult.PackageManager.Pnpm);
+        NodeResolutionResult m = result.getMarkers()
+                .findFirst(NodeResolutionResult.class).orElseThrow();
+        assertThat(m.getResolvedDependencies()).hasSize(1);
+        assertThat(m.getResolvedDependencies().get(0).getVersion()).isEqualTo("4.17.21");
+        assertThat(m.getDependencies().get(0).getResolved()).isNotNull();
+    }
+
     private static Json.Document parsePackageJson(String content) {
         JsonParser parser = new JsonParser();
         return (Json.Document) parser.parseInputs(
