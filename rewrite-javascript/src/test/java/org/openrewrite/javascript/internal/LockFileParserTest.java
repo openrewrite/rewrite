@@ -42,4 +42,53 @@ class LockFileParserTest {
         assertThat(result.getTopLevel()).containsKey("lodash");
         assertThat(result.getTopLevel().get("lodash")).isSameAs(dep);
     }
+
+    @Test
+    void parsesScopedTopLevelPackage() {
+        String lock = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { },\n" +
+                "    \"node_modules/@types/node\": { \"version\": \"20.0.0\" }\n" +
+                "  }\n" +
+                "}";
+        LockFileParser.ParseResult result = LockFileParser.parse(lock);
+
+        assertThat(result.getAll()).hasSize(1);
+        assertThat(result.getAll().get(0).getName()).isEqualTo("@types/node");
+        assertThat(result.getAll().get(0).getVersion()).isEqualTo("20.0.0");
+        assertThat(result.getTopLevel()).containsKey("@types/node");
+    }
+
+    @Test
+    void parsesNestedDependency() {
+        String lock = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { },\n" +
+                "    \"node_modules/foo\": { \"version\": \"1.0.0\" },\n" +
+                "    \"node_modules/foo/node_modules/bar\": { \"version\": \"2.0.0\" }\n" +
+                "  }\n" +
+                "}";
+        LockFileParser.ParseResult result = LockFileParser.parse(lock);
+
+        assertThat(result.getAll()).extracting(d -> d.getName() + "@" + d.getVersion())
+                .containsExactlyInAnyOrder("foo@1.0.0", "bar@2.0.0");
+        // Only `foo` is top-level; `bar` is nested.
+        assertThat(result.getTopLevel().keySet()).containsExactly("foo");
+    }
+
+    @Test
+    void parsesScopedNestedPackage() {
+        String lock = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { },\n" +
+                "    \"node_modules/foo\": { \"version\": \"1.0.0\" },\n" +
+                "    \"node_modules/foo/node_modules/@scope/bar\": { \"version\": \"2.0.0\" }\n" +
+                "  }\n" +
+                "}";
+        LockFileParser.ParseResult result = LockFileParser.parse(lock);
+
+        assertThat(result.getAll()).extracting(d -> d.getName() + "@" + d.getVersion())
+                .containsExactlyInAnyOrder("foo@1.0.0", "@scope/bar@2.0.0");
+        assertThat(result.getTopLevel().keySet()).containsExactly("foo");
+    }
 }
