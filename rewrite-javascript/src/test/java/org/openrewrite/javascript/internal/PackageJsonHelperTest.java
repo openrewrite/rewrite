@@ -190,6 +190,33 @@ class PackageJsonHelperTest {
         assertThat(modified.printAll()).doesNotContain("old-pkg");
     }
 
+    @Test
+    void parseDependencyPathPnpmStyle() {
+        java.util.List<DependencyPathSegment> segs =
+                PackageJsonOverrides.parsePath("express>accepts");
+        assertThat(segs).extracting(DependencyPathSegment::getName).containsExactly("express", "accepts");
+    }
+
+    @Test
+    void parseDependencyPathScopedPackage() {
+        java.util.List<DependencyPathSegment> segs =
+                PackageJsonOverrides.parsePath("@types/node>foo");
+        assertThat(segs).extracting(DependencyPathSegment::getName).containsExactly("@types/node", "foo");
+    }
+
+    @Test
+    void upgradeTransitiveAddsNpmOverride() {
+        Json.Document doc = parsePackageJson(
+                "{\n" +
+                "  \"dependencies\": { \"lodash\": \"^4.17.20\" }\n" +
+                "}\n");
+        Json.Document modified = PackageJsonHelper.upgradeTransitive(
+                doc, NodeResolutionResult.PackageManager.Npm, "lodash", "^4.17.21",
+                java.util.Collections.<DependencyPathSegment>emptyList());
+        assertThat(modified.printAll()).contains("\"overrides\"");
+        assertThat(modified.printAll()).contains("\"lodash\": \"^4.17.21\"");
+    }
+
     private static Json.Document parsePackageJson(String content) {
         JsonParser parser = new JsonParser();
         return (Json.Document) parser.parseInputs(

@@ -506,6 +506,17 @@ public class PackageJsonHelper {
         return changed ? doc.withValue(root.getPadding().withMembers(rootMembers)) : doc;
     }
 
+    /**
+     * Apply a transitive-dependency override to {@code doc} for the given package manager.
+     * Delegates to {@link PackageJsonOverrides#applyOverride}.
+     */
+    public static Json.Document upgradeTransitive(Json.Document doc,
+                                                   NodeResolutionResult.PackageManager pm,
+                                                   String name, String newVersion,
+                                                   @Nullable List<DependencyPathSegment> path) {
+        return PackageJsonOverrides.applyOverride(doc, pm, name, newVersion, path);
+    }
+
     private static boolean isDeclaredScope(String name) {
         return "dependencies".equals(name)
                 || "devDependencies".equals(name)
