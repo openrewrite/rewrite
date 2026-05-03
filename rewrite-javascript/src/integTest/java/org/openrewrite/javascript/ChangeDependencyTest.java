@@ -17,9 +17,11 @@ package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 
 import static org.openrewrite.javascript.Assertions.npm;
 import static org.openrewrite.javascript.Assertions.packageJson;
@@ -56,6 +58,27 @@ class ChangeDependencyTest implements RewriteTest {
                                 "  \"name\": \"x\",\n" +
                                 "  \"dependencies\": {\n" +
                                 "    \"uuid\": \"^9.0.0\"\n" +
+                                "  }\n" +
+                                "}\n")));
+    }
+
+    @Test
+    void chainAddThenUpgradeAcrossRecipes(@TempDir Path tempDir) {
+        rewriteRun(
+                spec -> spec.recipe(new CompositeRecipe(Arrays.asList(
+                        new AddDependency("lodash", "^4.17.20", "dependencies"),
+                        new UpgradeDependencyVersion("lodash", null, "^4.17.21")
+                ))),
+                npm(tempDir,
+                        packageJson(
+                                "{\n" +
+                                "  \"name\": \"x\",\n" +
+                                "  \"dependencies\": {}\n" +
+                                "}\n",
+                                "{\n" +
+                                "  \"name\": \"x\",\n" +
+                                "  \"dependencies\": {\n" +
+                                "    \"lodash\": \"^4.17.21\"\n" +
                                 "  }\n" +
                                 "}\n")));
     }

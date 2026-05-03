@@ -163,11 +163,10 @@ class DependencyWorkspace {
     }
 
     /**
-     * Checks if a workspace is valid (has node_modules directory).
+     * Checks if a workspace is valid (package.json present; node_modules may be absent for empty deps).
      */
     private static boolean isWorkspaceValid(Path workspaceDir) {
-        return Files.exists(workspaceDir) &&
-                Files.isDirectory(workspaceDir.resolve("node_modules")) &&
+        return Files.isDirectory(workspaceDir) &&
                 Files.exists(workspaceDir.resolve("package.json"));
     }
 

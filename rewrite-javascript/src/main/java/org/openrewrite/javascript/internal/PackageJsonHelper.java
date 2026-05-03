@@ -284,8 +284,25 @@ public class PackageJsonHelper {
             }
         }
 
-        Json.Member newDep = makeMember(name, makeStringLiteral(version), Space.EMPTY);
-        Json.JsonObject updatedScope = appendMember(existingScope, newDep);
+        // Check if the existing scope is effectively empty (contains only Json.Empty placeholder).
+        // The TypeScript JSON parser represents {} as a single Json.Empty member.
+        boolean scopeEffectivelyEmpty = existingScope.getMembers().stream()
+                .allMatch(m -> m instanceof Json.Empty);
+
+        Json.JsonObject updatedScope;
+        if (scopeEffectivelyEmpty) {
+            // Replace the Json.Empty placeholder with a properly indented new member.
+            String outerIndent = detectIndentUnit(root);
+            String innerIndent = outerIndent + outerIndent;
+            Json.Member depMember = makeMember(name, makeStringLiteral(version),
+                    Space.build("\n" + innerIndent, Collections.emptyList()));
+            JsonRightPadded<Json> depRP = JsonRightPadded.build((Json) depMember)
+                    .withAfter(Space.build("\n" + outerIndent, Collections.emptyList()));
+            updatedScope = existingScope.getPadding().withMembers(Collections.singletonList(depRP));
+        } else {
+            Json.Member newDep = makeMember(name, makeStringLiteral(version), Space.EMPTY);
+            updatedScope = appendMember(existingScope, newDep);
+        }
         return doc.withValue(replaceMember(root, scope, updatedScope));
     }
 

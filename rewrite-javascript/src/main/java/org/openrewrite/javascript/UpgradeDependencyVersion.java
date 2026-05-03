@@ -172,8 +172,21 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                 ProjectState ps = acc.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
+                    // If scanner found no matches on the original tree, check the live tree:
+                    // a prior recipe (e.g. AddDependency) may have added the dep in this cycle.
+                    if (ps.matchedDeps != null && ps.matchedDeps.isEmpty()) {
+                        SourceFile liveTree = PackageJsonHelper.getLiveTree(ctx, p);
+                        if (liveTree != null) {
+                            ps.matchedDeps = findMatches(liveTree);
+                        }
+                    }
                     if (ps.matchedDeps != null && !ps.matchedDeps.isEmpty()) {
-                        ensureComputed(ps, sf);
+                        SourceFile effectiveSf = sf;
+                        SourceFile liveTree = PackageJsonHelper.getLiveTree(ctx, p);
+                        if (liveTree != null) {
+                            effectiveSf = liveTree;
+                        }
+                        ensureComputed(ps, effectiveSf);
                     }
                     if (ps.modifiedPackageJson != null) {
                         SourceFile out = ps.modifiedPackageJson;
@@ -193,6 +206,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (lockPs.modifiedPackageJson == null) {
                     SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, packagePath);
                     if (pkg == null) pkg = lockPs.capturedPackageJson;
+                    // If scanner found no matches on the original tree, recompute from live tree.
+                    if (lockPs.matchedDeps != null && lockPs.matchedDeps.isEmpty() && pkg != null) {
+                        lockPs.matchedDeps = findMatches(pkg);
+                    }
                     if (pkg != null && lockPs.matchedDeps != null && !lockPs.matchedDeps.isEmpty()) {
                         ensureComputed(lockPs, pkg);
                         if (lockPs.modifiedPackageJson != null) {
