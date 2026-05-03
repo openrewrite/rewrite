@@ -158,4 +158,44 @@ class PnpmLockAdapterTest {
         assertThat(result.getAll()).isEmpty();
         assertThat(result.getTopLevel()).isEmpty();
     }
+
+    @Test
+    void parsePackageKeyHandlesUnscopedSimple() {
+        var nv = PnpmLockAdapter.parsePackageKey("/lodash@4.17.21");
+        assertThat(nv).isNotNull();
+        assertThat(nv.name).isEqualTo("lodash");
+        assertThat(nv.version).isEqualTo("4.17.21");
+    }
+
+    @Test
+    void parsePackageKeyHandlesScopedSimple() {
+        var nv = PnpmLockAdapter.parsePackageKey("/@types/node@20.0.0");
+        assertThat(nv).isNotNull();
+        assertThat(nv.name).isEqualTo("@types/node");
+        assertThat(nv.version).isEqualTo("20.0.0");
+    }
+
+    @Test
+    void parsePackageKeyHandlesPeerDepSuffix() {
+        var nv = PnpmLockAdapter.parsePackageKey("/react-redux@8.0.5(react@18.2.0)");
+        assertThat(nv).isNotNull();
+        assertThat(nv.name).isEqualTo("react-redux");
+        assertThat(nv.version).isEqualTo("8.0.5");
+    }
+
+    @Test
+    void parsePackageKeyHandlesScopedWithPeerDepSuffix() {
+        var nv = PnpmLockAdapter.parsePackageKey("/@scope/foo@1.0.0(react@18.0.0)");
+        assertThat(nv).isNotNull();
+        assertThat(nv.name).isEqualTo("@scope/foo");
+        assertThat(nv.version).isEqualTo("1.0.0");
+    }
+
+    @Test
+    void parsePackageKeyReturnsNullForMalformed() {
+        assertThat(PnpmLockAdapter.parsePackageKey("not-a-valid-key")).isNull();
+        assertThat(PnpmLockAdapter.parsePackageKey("/no-version-suffix")).isNull();
+        assertThat(PnpmLockAdapter.parsePackageKey("")).isNull();
+        assertThat(PnpmLockAdapter.parsePackageKey(null)).isNull();
+    }
 }
