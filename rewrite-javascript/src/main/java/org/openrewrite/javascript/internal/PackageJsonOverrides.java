@@ -261,6 +261,10 @@ public final class PackageJsonOverrides {
             if (m instanceof Json.Member) {
                 Json.Member member = (Json.Member) m;
                 if (entryKey.equals(literalString(member.getKey()))) {
+                    // If already set to the same value, return unchanged to stay single-cycle
+                    if (entryValue.equals(literalString(member.getValue()))) {
+                        return doc;
+                    }
                     // Replace existing entry value
                     Json.JsonObject updated = replaceMemberValue(existingScope, entryKey, entryValue);
                     return doc.withValue(replaceMemberValue(root, topLevelKey, updated));
