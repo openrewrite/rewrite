@@ -550,4 +550,64 @@ public class PackageJsonHelper {
                 JsonRightPadded.build(keyLit),
                 spacedValue);
     }
+
+    // --- Edit-and-regenerate orchestration ---------------------------------
+
+    @lombok.Value
+    public static class EditAndRegenerateResult {
+        @Nullable SourceFile modifiedPackageJson;
+        LockFileRegeneration.@Nullable Result regenResult;
+
+        public boolean isChanged() { return modifiedPackageJson != null; }
+
+        public static EditAndRegenerateResult unchanged() {
+            return new EditAndRegenerateResult(null, null);
+        }
+
+        public static EditAndRegenerateResult changed(SourceFile modified,
+                                                      LockFileRegeneration.@Nullable Result regen) {
+            return new EditAndRegenerateResult(modified, regen);
+        }
+    }
+
+    /**
+     * Apply a recipe-specific edit to a package.json, refresh its declared-deps
+     * marker, and (when the marker carries a {@link NodeResolutionResult#getPackageManager()
+     * package manager} and a lock was captured at scan time) regenerate the lock
+     * file content via {@link LockFileRegeneration}.
+     */
+    public static EditAndRegenerateResult editAndRegenerate(
+            SourceFile packageJson,
+            java.util.function.Function<Json.Document, Json.Document> editFn,
+            @Nullable String capturedLockContent,
+            @Nullable Map<String, String> configFiles) {
+        if (!(packageJson instanceof Json.Document)) {
+            return EditAndRegenerateResult.unchanged();
+        }
+        Json.Document before = (Json.Document) packageJson;
+        Json.Document after = editFn.apply(before);
+        if (after == before) {
+            return EditAndRegenerateResult.unchanged();
+        }
+        SourceFile refreshed = refreshMarker(after);
+        LockFileRegeneration.Result regen = capturedLockContent == null ? null
+                : regenerateLockContent(refreshed, capturedLockContent, configFiles);
+        return EditAndRegenerateResult.changed(refreshed, regen);
+    }
+
+    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
+            SourceFile packageJson,
+            @Nullable String capturedLockContent,
+            @Nullable Map<String, String> configFiles) {
+        NodeResolutionResult marker = packageJson.getMarkers()
+                .findFirst(NodeResolutionResult.class).orElse(null);
+        if (marker == null || marker.getPackageManager() == null) {
+            return null;
+        }
+        LockFileRegeneration regen = LockFileRegeneration.forPackageManager(marker.getPackageManager());
+        if (regen == null) {
+            return null;
+        }
+        return regen.regenerate(packageJson.printAll(), capturedLockContent, configFiles);
+    }
 }
