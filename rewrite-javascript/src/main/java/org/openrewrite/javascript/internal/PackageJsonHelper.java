@@ -247,10 +247,10 @@ public class PackageJsonHelper {
 
     /**
      * Re-derive {@code resolvedDependencies} on the marker by parsing the given
-     * lock-file content. Supports npm and Bun. For other PMs, returns the input
-     * unchanged. If parsing fails, throws — the caller (typically
-     * {@link #editAndRegenerate}) is expected to catch and surface the failure
-     * via {@link org.openrewrite.marker.Markup#warn}.
+     * lock-file content. Supports npm, Bun, yarn classic, yarn berry, and pnpm.
+     * For other PMs, returns the input unchanged. If parsing fails, throws — the
+     * caller (typically {@link #editAndRegenerate}) is expected to catch and
+     * surface the failure via {@link org.openrewrite.marker.Markup#warn}.
      */
     public static SourceFile overlayResolvedDeps(SourceFile pkg,
                                                  String lockContent,
