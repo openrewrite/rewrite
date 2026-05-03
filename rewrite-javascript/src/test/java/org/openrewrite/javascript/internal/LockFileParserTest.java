@@ -57,6 +57,7 @@ class LockFileParserTest {
         assertThat(result.getAll().get(0).getName()).isEqualTo("@types/node");
         assertThat(result.getAll().get(0).getVersion()).isEqualTo("20.0.0");
         assertThat(result.getTopLevel()).containsKey("@types/node");
+        assertThat(result.getTopLevel().get("@types/node")).isSameAs(result.getAll().get(0));
     }
 
     @Test
