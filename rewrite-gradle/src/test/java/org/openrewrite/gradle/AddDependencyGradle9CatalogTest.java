@@ -29,8 +29,11 @@ class AddDependencyGradle9CatalogTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
+        // version=null avoids triggering MavenPomDownloader; the bug was about the
+        // recipe not making any change at all when libs.versions.toml is present on
+        // Gradle 9, so the version itself is incidental.
         spec.recipe(new AddDependency(
-                "org.projectlombok", "lombok", "1.18.30",
+                "org.projectlombok", "lombok", null,
                 null, "compileOnly", null,
                 null, null, null, Boolean.TRUE
         ));
@@ -68,7 +71,7 @@ class AddDependencyGradle9CatalogTest implements RewriteTest {
                         }
 
                         dependencies {
-                            compileOnly("org.projectlombok:lombok:1.18.30")
+                            compileOnly("org.projectlombok:lombok")
                         }
                         """
                 )
@@ -107,7 +110,7 @@ class AddDependencyGradle9CatalogTest implements RewriteTest {
                         }
 
                         dependencies {
-                            compileOnly("org.projectlombok:lombok:1.18.30")
+                            compileOnly("org.projectlombok:lombok")
                         }
                         """
                 )
