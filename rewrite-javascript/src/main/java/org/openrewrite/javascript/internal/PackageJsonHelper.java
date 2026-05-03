@@ -379,7 +379,18 @@ public class PackageJsonHelper {
             JsonRightPadded<Json> prevLast = members.get(prevLastIdx);
 
             // The new member's prefix should match the existing members' indent.
-            Space copiedPrefix = prevLast.getElement().getPrefix();
+            // RPC-parsed JSON (from the TypeScript PackageJsonParser) stores whitespace on the
+            // key literal's prefix rather than on the member itself — fall back to the key prefix
+            // when the member prefix is empty.
+            Space memberPrefix = prevLast.getElement().getPrefix();
+            if (memberPrefix.isEmpty() && prevLast.getElement() instanceof Json.Member) {
+                Json.Member prevMember = (Json.Member) prevLast.getElement();
+                Space keyPrefix = prevMember.getPadding().getKey().getElement().getPrefix();
+                if (!keyPrefix.isEmpty()) {
+                    memberPrefix = keyPrefix;
+                }
+            }
+            Space copiedPrefix = memberPrefix;
             Space trailingAfter = prevLast.getAfter();
 
             Json.Member prefixedNewMember = newMember.withPrefix(copiedPrefix);
