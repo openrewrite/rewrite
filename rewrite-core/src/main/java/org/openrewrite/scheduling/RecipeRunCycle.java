@@ -327,14 +327,20 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 }
 
                 if (isInBatch) {
-                    // Batch path: accumulate visitor names instead of executing
-                    RpcRecipe rpcRecipe = (RpcRecipe) recipe;
-                    batch.items.add(new BatchVisit.BatchVisitItem(rpcRecipe.getEditVisitor(), null));
-                    batch.recipeStacks.add(recipeStack);
-                    if (batch.originalBeforeBatch == null) {
-                        batch.originalBeforeBatch = src;
+                    // Batch path: accumulate visitor names instead of executing.
+                    // Only batch if the remote actually has a codec for this source file type;
+                    // otherwise the BatchVisit RPC fails on the remote side and the resulting
+                    // exception gets attached to the source as a Markup$Error, falsely marking
+                    // the file as modified.
+                    if (currentRpc.getLanguages().contains(src.getClass().getName())) {
+                        RpcRecipe rpcRecipe = (RpcRecipe) recipe;
+                        batch.items.add(new BatchVisit.BatchVisitItem(rpcRecipe.getEditVisitor(), null));
+                        batch.recipeStacks.add(recipeStack);
+                        if (batch.originalBeforeBatch == null) {
+                            batch.originalBeforeBatch = src;
+                        }
+                        batch.rpc = currentRpc;
                     }
-                    batch.rpc = currentRpc;
 
                     // If this is the last recipe in the batch, flush now
                     if (nextRpc != currentRpc) {
