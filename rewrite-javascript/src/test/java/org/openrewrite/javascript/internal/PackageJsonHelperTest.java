@@ -138,6 +138,26 @@ class PackageJsonHelperTest {
                 "}\n");
     }
 
+    @Test
+    void upgradeVersionUpdatesValue() {
+        Json.Document doc = parsePackageJson(
+                "{\n" +
+                "  \"dependencies\": {\n" +
+                "    \"lodash\": \"^4.17.20\"\n" +
+                "  }\n" +
+                "}\n");
+        Json.Document modified = PackageJsonHelper.upgradeVersion(
+                doc,
+                java.util.Collections.singletonList(new MatchedDependency("lodash", "dependencies", "^4.17.20")),
+                "^4.17.21");
+        assertThat(modified.printAll()).isEqualTo(
+                "{\n" +
+                "  \"dependencies\": {\n" +
+                "    \"lodash\": \"^4.17.21\"\n" +
+                "  }\n" +
+                "}\n");
+    }
+
     private static Json.Document parsePackageJson(String content) {
         JsonParser parser = new JsonParser();
         return (Json.Document) parser.parseInputs(
