@@ -253,6 +253,24 @@ val npmPublish = tasks.register<NpmTask>("npmPublish") {
     }
 
     workingDir.set(file("rewrite"))
+
+    // npm has no `--skip-duplicate`; the daily scheduled publish would fail with a 403
+    // whenever no new commit had landed since the previous run (the snapshot version is
+    // derived from the latest commit timestamp). Skip the task if the version already exists.
+    onlyIf {
+        val versionToCheck = extractVersionFromJar() ?: datedSnapshotVersion
+        val process = ProcessBuilder("npm", "view", "@openrewrite/rewrite@$versionToCheck", "version")
+            .directory(file("rewrite"))
+            .redirectErrorStream(true)
+            .start()
+        process.waitFor()
+        val output = process.inputStream.bufferedReader().readText().trim()
+        val alreadyPublished = output.contains(versionToCheck)
+        if (alreadyPublished) {
+            logger.lifecycle("Skipping npmPublish: @openrewrite/rewrite@$versionToCheck already published")
+        }
+        !alreadyPublished
+    }
 }
 
 tasks.named("publish") {

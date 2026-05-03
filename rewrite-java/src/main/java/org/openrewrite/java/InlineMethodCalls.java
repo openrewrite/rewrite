@@ -35,6 +35,7 @@ import static java.util.Objects.requireNonNull;
 @Value
 public class InlineMethodCalls extends Recipe {
     private static final Pattern TEMPLATE_IDENTIFIER = Pattern.compile("#\\{(\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*):any\\(.*?\\)}");
+    private static final Pattern BARE_METHOD_CALL = Pattern.compile("^\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\(");
 
     @Option(displayName = "Method pattern",
             description = "A method pattern that is used to find matching method invocations.",
@@ -199,6 +200,11 @@ public class InlineMethodCalls extends Recipe {
                         ((J.MethodInvocation) original).getSelect() == null &&
                         replacement.startsWith("this.")) {
                     templateString = replacement.substring(5);
+                } else if (original instanceof J.MethodInvocation &&
+                        ((J.MethodInvocation) original).getSelect() != null &&
+                        BARE_METHOD_CALL.matcher(replacement).find()) {
+                    // Original had a select but replacement is a bare method call; preserve the select
+                    templateString = "#{this:any()}." + replacement;
                 } else {
                     templateString = replacement.replaceAll("\\bthis\\b", "#{this:any()}");
                 }
