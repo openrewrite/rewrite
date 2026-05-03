@@ -43,7 +43,7 @@ class LockFileParserParityTest {
     void parityNpmTinyProject() throws Exception {
         String packageJson = "{\n" +
                 "  \"name\": \"parity-tiny\",\n" +
-                "  \"dependencies\": { \"is-even\": \"^1.0.0\" }\n" +
+                "  \"dependencies\": { \"is-even\": \"1.0.0\" }\n" +
                 "}\n";
         Set<String> javaSet = parseLockInJava(packageJson);
         Set<String> tsSet = parseMarkerViaRpc(packageJson);
@@ -76,7 +76,7 @@ class LockFileParserParityTest {
                 "}\n";
         Path workspace = DependencyWorkspace.getOrCreateWorkspace(packageJson);
         Path lockPath = workspace.resolve("package-lock.json");
-        String lockContent = new String(Files.readAllBytes(lockPath));
+        String lockContent = Files.readString(lockPath);
 
         ResolvedDependency javaExpress = LockFileParser.parse(lockContent).getAll().stream()
                 .filter(d -> "express".equals(d.getName())).findFirst().orElseThrow();
@@ -96,7 +96,7 @@ class LockFileParserParityTest {
     private static Set<String> parseLockInJava(String packageJson) throws Exception {
         Path workspace = DependencyWorkspace.getOrCreateWorkspace(packageJson);
         Path lockPath = workspace.resolve("package-lock.json");
-        String lockContent = new String(Files.readAllBytes(lockPath));
+        String lockContent = Files.readString(lockPath);
         return LockFileParser.parse(lockContent).getAll().stream()
                 .map(d -> d.getName() + "@" + d.getVersion())
                 .collect(Collectors.toSet());
