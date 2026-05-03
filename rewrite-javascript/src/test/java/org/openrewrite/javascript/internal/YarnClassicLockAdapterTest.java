@@ -155,4 +155,19 @@ class YarnClassicLockAdapterTest {
         assertThat(result.getAll()).isEmpty();
         assertThat(result.getTopLevel()).isEmpty();
     }
+
+    @Test
+    void toleratesWindowsLineEndings() {
+        String yarn = "# yarn lockfile v1\r\n" +
+                "\r\n" +
+                "lodash@^4.17.21:\r\n" +
+                "  version \"4.17.21\"\r\n" +
+                "  resolved \"...\"\r\n";
+        String npm = YarnClassicLockAdapter.toNpmV3(yarn);
+        LockFileParser.ParseResult result = LockFileParser.parse(npm);
+
+        assertThat(result.getAll()).hasSize(1);
+        assertThat(result.getAll().get(0).getName()).isEqualTo("lodash");
+        assertThat(result.getAll().get(0).getVersion()).isEqualTo("4.17.21");
+    }
 }
