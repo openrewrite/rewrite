@@ -34,6 +34,7 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * Shared utilities for npm dependency recipes operating on package.json files
@@ -526,6 +527,44 @@ public class PackageJsonHelper {
                                                    String name, String newVersion,
                                                    @Nullable List<DependencyPathSegment> path) {
         return PackageJsonOverrides.applyOverride(doc, pm, name, newVersion, path);
+    }
+
+    /**
+     * Compile a glob pattern (using {@code *} and {@code ?} wildcards) into a {@link Pattern}.
+     * Special regex characters in the glob are escaped before compiling.
+     */
+    public static Pattern compileGlobPattern(String glob) {
+        StringBuilder regex = new StringBuilder("^");
+        for (int i = 0; i < glob.length(); i++) {
+            char c = glob.charAt(i);
+            switch (c) {
+                case '*':
+                    regex.append(".*");
+                    break;
+                case '?':
+                    regex.append(".");
+                    break;
+                case '.':
+                case '(':
+                case ')':
+                case '[':
+                case ']':
+                case '{':
+                case '}':
+                case '+':
+                case '^':
+                case '$':
+                case '|':
+                case '\\':
+                    regex.append("\\").append(c);
+                    break;
+                default:
+                    regex.append(c);
+                    break;
+            }
+        }
+        regex.append("$");
+        return Pattern.compile(regex.toString());
     }
 
     private static boolean isDeclaredScope(String name) {

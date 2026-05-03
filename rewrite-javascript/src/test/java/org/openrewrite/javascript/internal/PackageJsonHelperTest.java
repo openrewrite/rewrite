@@ -217,6 +217,13 @@ class PackageJsonHelperTest {
         assertThat(modified.printAll()).contains("\"lodash\": \"^4.17.21\"");
     }
 
+    @Test
+    void compileGlobPatternMatchesWildcard() {
+        java.util.regex.Pattern p = PackageJsonHelper.compileGlobPattern("@types/*");
+        assertThat(p.matcher("@types/node").matches()).isTrue();
+        assertThat(p.matcher("react").matches()).isFalse();
+    }
+
     private static Json.Document parsePackageJson(String content) {
         JsonParser parser = new JsonParser();
         return (Json.Document) parser.parseInputs(

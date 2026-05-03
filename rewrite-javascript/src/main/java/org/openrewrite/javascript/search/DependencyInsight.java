@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
@@ -88,7 +89,7 @@ public class DependencyInsight extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        Pattern packageNameMatcher = compileGlobPattern(packageNamePattern);
+        Pattern packageNameMatcher = PackageJsonHelper.compileGlobPattern(packageNamePattern);
 
         return new JsonIsoVisitor<ExecutionContext>() {
             private @Nullable NodeResolutionResult resolution;
@@ -372,37 +373,4 @@ public class DependencyInsight extends Recipe {
         }
     }
 
-    private static Pattern compileGlobPattern(String glob) {
-        StringBuilder regex = new StringBuilder("^");
-        for (int i = 0; i < glob.length(); i++) {
-            char c = glob.charAt(i);
-            switch (c) {
-                case '*':
-                    regex.append(".*");
-                    break;
-                case '?':
-                    regex.append(".");
-                    break;
-                case '.':
-                case '(':
-                case ')':
-                case '[':
-                case ']':
-                case '{':
-                case '}':
-                case '+':
-                case '^':
-                case '$':
-                case '|':
-                case '\\':
-                    regex.append("\\").append(c);
-                    break;
-                default:
-                    regex.append(c);
-                    break;
-            }
-        }
-        regex.append("$");
-        return Pattern.compile(regex.toString());
-    }
 }
