@@ -22,6 +22,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LockFileParserTest {
 
@@ -156,5 +157,41 @@ class LockFileParserTest {
         LockFileParser.ParseResult result = LockFileParser.parse(lock);
         assertThat(result.getAll()).isEmpty();
         assertThat(result.getTopLevel()).isEmpty();
+    }
+
+    @Test
+    void toleratesUnknownExtraFields() {
+        String lock = "{\n" +
+                "  \"lockfileVersion\": 3,\n" +
+                "  \"name\": \"my-app\",\n" +
+                "  \"requires\": true,\n" +
+                "  \"newFutureField\": { \"foo\": \"bar\" },\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { },\n" +
+                "    \"node_modules/lodash\": {\n" +
+                "      \"version\": \"4.17.21\",\n" +
+                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\",\n" +
+                "      \"integrity\": \"sha512-...\",\n" +
+                "      \"unknownExtra\": 42\n" +
+                "    }\n" +
+                "  }\n" +
+                "}";
+        LockFileParser.ParseResult result = LockFileParser.parse(lock);
+        assertThat(result.getAll()).hasSize(1);
+        assertThat(result.getAll().get(0).getName()).isEqualTo("lodash");
+    }
+
+    @Test
+    void throwsOnMalformedJson() {
+        assertThatThrownBy(() -> LockFileParser.parse("{ not valid json"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("malformed lock JSON");
+    }
+
+    @Test
+    void throwsOnMissingPackagesKey() {
+        assertThatThrownBy(() -> LockFileParser.parse("{ \"lockfileVersion\": 3 }"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("packages");
     }
 }
