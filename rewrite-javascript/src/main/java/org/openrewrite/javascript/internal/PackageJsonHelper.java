@@ -242,6 +242,77 @@ public class PackageJsonHelper {
         return null;
     }
 
+    // --- Overlay helpers -------------------------------------------------
+
+    /**
+     * Re-derive {@code resolvedDependencies} on the marker by parsing the given
+     * lock-file content. Supports npm and Bun. For other PMs, returns the input
+     * unchanged. If parsing fails, throws — the caller (typically
+     * {@link #editAndRegenerate}) is expected to catch and surface the failure
+     * via {@link org.openrewrite.marker.Markup#warn}.
+     */
+    public static SourceFile overlayResolvedDeps(SourceFile pkg,
+                                                 String lockContent,
+                                                 NodeResolutionResult.PackageManager pm) {
+        NodeResolutionResult marker = pkg.getMarkers()
+                .findFirst(NodeResolutionResult.class).orElse(null);
+        if (marker == null) {
+            return pkg;
+        }
+        if (pm != NodeResolutionResult.PackageManager.Npm
+                && pm != NodeResolutionResult.PackageManager.Bun) {
+            return pkg;
+        }
+        String npmV3 = pm == NodeResolutionResult.PackageManager.Bun
+                ? BunLockAdapter.toNpmV3(lockContent)
+                : lockContent;
+        LockFileParser.ParseResult parsed = LockFileParser.parse(npmV3);
+
+        // Relink declared deps.
+        List<NodeResolutionResult.Dependency> deps =
+                relink(marker.getDependencies(), parsed.getTopLevel());
+        List<NodeResolutionResult.Dependency> devDeps =
+                relink(marker.getDevDependencies(), parsed.getTopLevel());
+        List<NodeResolutionResult.Dependency> peerDeps =
+                relink(marker.getPeerDependencies(), parsed.getTopLevel());
+        List<NodeResolutionResult.Dependency> optionalDeps =
+                relink(marker.getOptionalDependencies(), parsed.getTopLevel());
+        List<NodeResolutionResult.Dependency> bundledDeps =
+                relink(marker.getBundledDependencies(), parsed.getTopLevel());
+
+        // Relink transitive deps inside each ResolvedDependency.
+        List<NodeResolutionResult.ResolvedDependency> all = new ArrayList<>();
+        for (NodeResolutionResult.ResolvedDependency r : parsed.getAll()) {
+            all.add(r
+                    .withDependencies(relink(r.getDependencies(), parsed.getTopLevel()))
+                    .withDevDependencies(relink(r.getDevDependencies(), parsed.getTopLevel()))
+                    .withPeerDependencies(relink(r.getPeerDependencies(), parsed.getTopLevel()))
+                    .withOptionalDependencies(relink(r.getOptionalDependencies(), parsed.getTopLevel())));
+        }
+
+        NodeResolutionResult updated = marker
+                .withDependencies(deps)
+                .withDevDependencies(devDeps)
+                .withPeerDependencies(peerDeps)
+                .withOptionalDependencies(optionalDeps)
+                .withBundledDependencies(bundledDeps)
+                .withResolvedDependencies(all);
+        return pkg.withMarkers(pkg.getMarkers().setByType(updated));
+    }
+
+    private static @Nullable List<NodeResolutionResult.Dependency> relink(
+            @Nullable List<NodeResolutionResult.Dependency> deps,
+            Map<String, NodeResolutionResult.ResolvedDependency> topLevel) {
+        if (deps == null) {
+            return null;
+        }
+        List<NodeResolutionResult.Dependency> out = new ArrayList<>(deps.size());
+        for (NodeResolutionResult.Dependency d : deps) {
+            out.add(d.withResolved(topLevel.get(d.getName())));
+        }
+        return out;
+    }
+
     // --- JSON mutation helpers -------------------------------------------
 
     /**

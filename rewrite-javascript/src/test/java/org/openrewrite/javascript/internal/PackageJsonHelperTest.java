@@ -224,6 +224,52 @@ class PackageJsonHelperTest {
         assertThat(p.matcher("react").matches()).isFalse();
     }
 
+    @Test
+    void overlayResolvedDepsRelinksDeclaredDep() {
+        String json = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"dependencies\": { \"lodash\": \"^4.17.21\" }\n" +
+                "}\n";
+        Json.Document doc = parsePackageJson(json);
+        NodeResolutionResult marker = new NodeResolutionResult(
+                UUID.randomUUID(), "x", null, null, ".",
+                null,
+                asList(new Dependency("lodash", "^4.17.21", null)),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<NodeResolutionResult.ResolvedDependency>emptyList(),
+                NodeResolutionResult.PackageManager.Npm,
+                null, null);
+        Json.Document withMarker = doc.withMarkers(doc.getMarkers().add(marker));
+
+        String lock = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { },\n" +
+                "    \"node_modules/lodash\": { \"version\": \"4.17.21\", \"license\": \"MIT\" }\n" +
+                "  }\n" +
+                "}";
+        SourceFile result = PackageJsonHelper.overlayResolvedDeps(
+                withMarker, lock, NodeResolutionResult.PackageManager.Npm);
+
+        NodeResolutionResult resultMarker = result.getMarkers()
+                .findFirst(NodeResolutionResult.class).orElseThrow();
+        assertThat(resultMarker.getResolvedDependencies()).hasSize(1);
+        assertThat(resultMarker.getResolvedDependencies().get(0).getLicense()).isEqualTo("MIT");
+        assertThat(resultMarker.getDependencies().get(0).getResolved()).isNotNull();
+        assertThat(resultMarker.getDependencies().get(0).getResolved().getName()).isEqualTo("lodash");
+        assertThat(resultMarker.getDependencies().get(0).getResolved().getVersion()).isEqualTo("4.17.21");
+    }
+
+    @Test
+    void overlayResolvedDepsReturnsUnchangedWhenNoMarker() {
+        Json.Document doc = parsePackageJson("{\"name\":\"x\"}");
+        SourceFile result = PackageJsonHelper.overlayResolvedDeps(
+                doc, "{\"packages\":{}}", NodeResolutionResult.PackageManager.Npm);
+        assertThat(result).isSameAs(doc);
+    }
+
     private static Json.Document parsePackageJson(String content) {
         JsonParser parser = new JsonParser();
         return (Json.Document) parser.parseInputs(
