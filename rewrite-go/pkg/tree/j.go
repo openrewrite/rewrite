@@ -544,15 +544,16 @@ func (n *AssignmentOperation) WithVariable(variable Expression) *AssignmentOpera
 
 // MethodDeclaration represents a function or method declaration.
 type MethodDeclaration struct {
-	ID         uuid.UUID
-	Prefix     Space
-	Markers    Markers
-	Receiver   *Container[Statement] // nil for free functions; `(r *Type)` receiver
-	Name       *Identifier
-	Parameters Container[Statement] // parameter list in parentheses
-	ReturnType Expression           // nil for void functions; single type or *TypeList for multiple
-	Body       *Block               // nil for forward declarations
-	MethodType *JavaTypeMethod      // the method type signature (nullable)
+	ID                 uuid.UUID
+	Prefix             Space
+	Markers            Markers
+	LeadingAnnotations []*Annotation         // `//go:noinline` / `//go:nosplit` etc. on funcs
+	Receiver           *Container[Statement] // nil for free functions; `(r *Type)` receiver
+	Name               *Identifier
+	Parameters         Container[Statement]  // parameter list in parentheses
+	ReturnType         Expression            // nil for void functions; single type or *TypeList for multiple
+	Body               *Block                // nil for forward declarations
+	MethodType         *JavaTypeMethod       // the method type signature (nullable)
 }
 
 func (*MethodDeclaration) isTree()       {}
@@ -569,6 +570,12 @@ func (n *MethodDeclaration) WithPrefix(prefix Space) *MethodDeclaration {
 func (n *MethodDeclaration) WithMarkers(markers Markers) *MethodDeclaration {
 	c := *n
 	c.Markers = markers
+	return &c
+}
+
+func (n *MethodDeclaration) WithLeadingAnnotations(anns []*Annotation) *MethodDeclaration {
+	c := *n
+	c.LeadingAnnotations = anns
 	return &c
 }
 
@@ -867,6 +874,68 @@ func (n *Label) WithMarkers(markers Markers) *Label {
 	return &c
 }
 
+// Annotation represents annotation metadata attached to a declaration.
+// Mirrors org.openrewrite.java.tree.J.Annotation.
+//
+// Java has first-class `@Annotation(args)` syntax. Go has no `@`, but
+// has two analogous concepts that this type models uniformly:
+//
+//   1. Struct field tags. Each `key:"value"` pair in a struct field
+//      tag becomes one Annotation on the field's VariableDeclarations:
+//      AnnotationType = Identifier{Name: key},
+//      Arguments      = [Literal{Value: value}].
+//      The printer renders the run of struct-tag annotations on a
+//      VariableDeclarations whose parent is a StructType as a single
+//      backtick-wrapped tag.
+//
+//   2. Source directives like `//go:noinline`, `//go:generate`,
+//      `//lint:ignore`. Each directive becomes one Annotation on the
+//      enclosing MethodDeclaration / TypeDecl / VariableDeclarations:
+//      AnnotationType = Identifier{Name: "go:noinline"},
+//      Arguments      = [Literal(args)] when the directive carries
+//                       text after the keyword, else nil.
+//
+// In both cases, AnnotationType is an Expression (typically Identifier;
+// FieldAccess for qualified directives like `lint:ignore`).
+//
+// Recipes use AnnotationService to inspect / match / mutate, mirroring
+// Java's AnnotationService surface.
+type Annotation struct {
+	ID             uuid.UUID
+	Prefix         Space
+	Markers        Markers
+	AnnotationType Expression            // NameTree — Identifier or FieldAccess
+	Arguments      *Container[Expression] // nullable; tags always have one Literal
+}
+
+func (*Annotation) isTree()       {}
+func (*Annotation) isJ()          {}
+func (*Annotation) isExpression() {}
+
+func (n *Annotation) WithPrefix(prefix Space) *Annotation {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Annotation) WithMarkers(markers Markers) *Annotation {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *Annotation) WithAnnotationType(annotationType Expression) *Annotation {
+	c := *n
+	c.AnnotationType = annotationType
+	return &c
+}
+
+func (n *Annotation) WithArguments(arguments *Container[Expression]) *Annotation {
+	c := *n
+	c.Arguments = arguments
+	return &c
+}
+
 // Empty represents an empty statement or expression placeholder.
 type Empty struct {
 	ID      uuid.UUID
@@ -1073,13 +1142,14 @@ func (n *MethodInvocation) WithName(name *Identifier) *MethodInvocation {
 // For grouped declarations `var ( ... )` or `const ( ... )`, Specs is non-nil and
 // Variables/TypeExpr are unused.
 type VariableDeclarations struct {
-	ID        uuid.UUID
-	Prefix    Space
-	Markers   Markers
-	TypeExpr  Expression                        // the declared type (nil if inferred)
-	Varargs   *Space                            // non-nil for variadic params (`...T`); holds prefix of `...`
-	Variables []RightPadded[*VariableDeclarator] // the declared variables
-	Specs     *Container[Statement]             // non-nil for grouped `var ( ... )`; Before = space before `(`
+	ID                 uuid.UUID
+	Prefix             Space
+	Markers            Markers
+	LeadingAnnotations []*Annotation                       // struct field tags (one per `key:"value"` pair) or `//go:` directives
+	TypeExpr           Expression                          // the declared type (nil if inferred)
+	Varargs            *Space                              // non-nil for variadic params (`...T`); holds prefix of `...`
+	Variables          []RightPadded[*VariableDeclarator]  // the declared variables
+	Specs              *Container[Statement]               // non-nil for grouped `var ( ... )`; Before = space before `(`
 }
 
 func (*VariableDeclarations) isTree()      {}
@@ -1095,6 +1165,12 @@ func (n *VariableDeclarations) WithPrefix(prefix Space) *VariableDeclarations {
 func (n *VariableDeclarations) WithMarkers(markers Markers) *VariableDeclarations {
 	c := *n
 	c.Markers = markers
+	return &c
+}
+
+func (n *VariableDeclarations) WithLeadingAnnotations(anns []*Annotation) *VariableDeclarations {
+	c := *n
+	c.LeadingAnnotations = anns
 	return &c
 }
 

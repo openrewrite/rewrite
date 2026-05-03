@@ -253,40 +253,63 @@ public class GoModParser implements Parser {
     }
 
     private static List<ResolvedDependency> parseSumSibling(Path goModPath) {
-        List<ResolvedDependency> resolved = new ArrayList<>();
         Path sumPath = goModPath.resolveSibling("go.sum");
         java.io.File sumFile = sumPath.toFile();
         if (!sumFile.isFile()) {
+            return new ArrayList<>();
+        }
+        try {
+            String content = new String(java.nio.file.Files.readAllBytes(sumPath), java.nio.charset.StandardCharsets.UTF_8);
+            return parseSumContent(content);
+        } catch (java.io.IOException ignored) {
+            // go.sum read failures are non-fatal — return empty list
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Parse go.sum content (string) into the same shape as
+     * {@link #parseSumSibling(Path)}. Mirrors the Go-side
+     * {@code parser.ParseGoSum} for cross-language parity.
+     * <p>
+     * Malformed lines are logged and skipped — go.sum is best-effort
+     * metadata, not authoritative; one bad line shouldn't tank a parse.
+     */
+    public static List<ResolvedDependency> parseSumContent(@Nullable String content) {
+        List<ResolvedDependency> resolved = new ArrayList<>();
+        if (content == null || content.isEmpty()) {
             return resolved;
         }
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(sumFile))) {
-            // go.sum format: "<module> <version>[/go.mod] h1:<hash>"
-            // Each module version appears on two lines: one for the module zip, one for its go.mod file.
-            java.util.Map<String, String[]> byKey = new java.util.LinkedHashMap<>();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                Matcher m = GO_SUM_LINE.matcher(line);
-                if (!m.matches()) {
-                    continue;
-                }
-                String module = m.group(1);
-                String version = m.group(2);
-                boolean isGoMod = m.group(3) != null;
-                String hash = m.group(4);
-                String key = module + "@" + version;
-                String[] slot = byKey.computeIfAbsent(key, k -> new String[2]);
-                if (isGoMod) {
-                    slot[1] = "h1:" + hash;
-                } else {
-                    slot[0] = "h1:" + hash;
-                }
+        // go.sum format: "<module> <version>[/go.mod] h1:<hash>"
+        // Each module version appears on two lines: one for the module zip, one for its go.mod file.
+        java.util.Map<String, String[]> byKey = new java.util.LinkedHashMap<>();
+        String[] lines = content.split("\\r?\\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i];
+            if (line.trim().isEmpty()) {
+                continue;
             }
-            for (java.util.Map.Entry<String, String[]> e : byKey.entrySet()) {
-                String[] parts = e.getKey().split("@", 2);
-                resolved.add(new ResolvedDependency(parts[0], parts[1], e.getValue()[0], e.getValue()[1]));
+            Matcher m = GO_SUM_LINE.matcher(line);
+            if (!m.matches()) {
+                java.util.logging.Logger.getLogger(GoModParser.class.getName())
+                        .fine("go.sum line " + (i + 1) + ": skipping malformed entry: " + line);
+                continue;
             }
-        } catch (java.io.IOException ignored) {
-            // go.sum read failures are non-fatal — return whatever we collected
+            String module = m.group(1);
+            String version = m.group(2);
+            boolean isGoMod = m.group(3) != null;
+            String hash = m.group(4);
+            String key = module + "@" + version;
+            String[] slot = byKey.computeIfAbsent(key, k -> new String[2]);
+            if (isGoMod) {
+                slot[1] = "h1:" + hash;
+            } else {
+                slot[0] = "h1:" + hash;
+            }
+        }
+        for (java.util.Map.Entry<String, String[]> e : byKey.entrySet()) {
+            String[] parts = e.getKey().split("@", 2);
+            resolved.add(new ResolvedDependency(parts[0], parts[1], e.getValue()[0], e.getValue()[1]));
         }
         return resolved;
     }
