@@ -137,6 +137,29 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
     return response.get('result')
 
 
+def _require_tree(tree: Any, source_file_type: Optional[str]) -> Any:
+    """Validate that ``tree`` is a real Tree, not a generic dict fallback.
+
+    When the receiver encounters a ``value_type`` it has no codec for, it
+    falls back to returning a ``{'kind': value_type, ...}`` dict (see
+    ``RpcReceiveQueue._new_obj`` / ``_do_change``). That fallback is
+    appropriate for nested fragments the visitor framework never inspects
+    directly, but a top-level SourceFile *must* be a Tree — otherwise the
+    visitor crashes with a confusing ``AttributeError: 'dict' object has
+    no attribute 'is_acceptable'``. Raise the same "No RPC codec" error
+    that the ADD path raises so the failure mode is consistent regardless
+    of which RPC message shape Java used.
+    """
+    from rewrite import Tree
+    if isinstance(tree, Tree):
+        return tree
+    raise RuntimeError(
+        f"No RPC codec registered on the Python side for '{source_file_type}'. "
+        "The remote side has a codec and sent property messages that will not be consumed, "
+        "causing RPC queue desynchronization."
+    )
+
+
 def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) -> Any:
     """Fetch an object from Java and deserialize it using PythonRpcReceiver.
 
@@ -1199,6 +1222,8 @@ def handle_visit(params: dict) -> dict:
     if tree is None:
         raise ValueError(f"Tree not found: {tree_id}")
 
+    tree = _require_tree(tree, source_file_type)
+
     # Instantiate the visitor
     visitor = _instantiate_visitor(visitor_name, ctx)
 
@@ -1271,6 +1296,8 @@ def handle_batch_visit(params: dict) -> dict:
     tree = get_object_from_java(tree_id, source_file_type)
     if tree is None:
         raise ValueError(f"Tree not found: {tree_id}")
+
+    tree = _require_tree(tree, source_file_type)
 
     from rewrite.visitor import Cursor
     from rewrite.markers import SearchResult
