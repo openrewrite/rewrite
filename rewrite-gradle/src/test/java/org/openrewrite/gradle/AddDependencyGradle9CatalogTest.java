@@ -30,7 +30,7 @@ class AddDependencyGradle9CatalogTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new AddDependency(
-                "org.projectlombok", "lombok", "1.18.44",
+                "org.projectlombok", "lombok", "1.18.30",
                 null, "compileOnly", null,
                 null, null, null, Boolean.TRUE
         ));
@@ -43,7 +43,7 @@ class AddDependencyGradle9CatalogTest implements RewriteTest {
                 toml(
                         """
                         [versions]
-                        lombok = "1.18.44"
+                        lombok = "1.18.30"
 
                         [libraries]
                         lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
@@ -68,7 +68,7 @@ class AddDependencyGradle9CatalogTest implements RewriteTest {
                         }
 
                         dependencies {
-                            compileOnly("org.projectlombok:lombok:1.18.44")
+                            compileOnly("org.projectlombok:lombok:1.18.30")
                         }
                         """
                 )
@@ -82,7 +82,7 @@ class AddDependencyGradle9CatalogTest implements RewriteTest {
                 toml(
                         """
                         [versions]
-                        lombok = "1.18.44"
+                        lombok = "1.18.30"
 
                         [libraries]
                         lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
@@ -107,7 +107,7 @@ class AddDependencyGradle9CatalogTest implements RewriteTest {
                         }
 
                         dependencies {
-                            compileOnly("org.projectlombok:lombok:1.18.44")
+                            compileOnly("org.projectlombok:lombok:1.18.30")
                         }
                         """
                 )
