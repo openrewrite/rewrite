@@ -28,6 +28,7 @@ dependencies {
     api(project(":rewrite-java"))
     api(project(":rewrite-json"))
     implementation(project(":rewrite-yaml"))
+    implementation("org.yaml:snakeyaml:latest.release")
 
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
