@@ -366,7 +366,7 @@ public class PackageJsonHelper {
         Json.Literal keyLit = makeStringLiteral(key);
         // Ensure there's a space between ':' and the value (standard JSON formatting).
         JsonValue spacedValue = value;
-        if (value instanceof Json.Literal && ((Json.Literal) value).getPrefix() == Space.EMPTY) {
+        if (value instanceof Json.Literal && ((Json.Literal) value).getPrefix().getWhitespace().isEmpty()) {
             spacedValue = ((Json.Literal) value).withPrefix(Space.SINGLE_SPACE);
         }
         return new Json.Member(
