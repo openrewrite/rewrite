@@ -102,9 +102,6 @@ public class Assertions {
                             Toml.Document d = (Toml.Document) sourceFile;
                             if (d.getSourcePath().startsWith("gradle/") && d.getSourcePath().toString().endsWith(".versions.toml")) {
                                 Path versionCatalog = tempDirectory.resolve(d.getSourcePath());
-                                if (!tempDirectory.equals(versionCatalog.getParent()) && tempDirectory.equals(versionCatalog.getParent().getParent())) {
-                                    projectDir = versionCatalog.getParent();
-                                }
                                 Files.createDirectories(versionCatalog.getParent());
                                 Files.write(versionCatalog, d.printAllAsBytes());
                             }
