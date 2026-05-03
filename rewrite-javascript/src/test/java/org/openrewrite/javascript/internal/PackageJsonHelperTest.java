@@ -270,6 +270,49 @@ class PackageJsonHelperTest {
         assertThat(result).isSameAs(doc);
     }
 
+    @Test
+    void editAndRegenerateSkipsOverlayForUnsupportedPm() {
+        // For yarn/pnpm, regen happens (or fails) but no overlay runs — marker resolvedDependencies
+        // stays as it was. We test the npm/Bun positive path via integTest in Task 9/10.
+        // This unit test pins the negative path: an edit of a YarnClassic package.json should
+        // leave the marker's resolvedDependencies untouched even when overlayResolvedDeps would
+        // throw on the lock content (we pass "no lock" so no overlay is even attempted).
+        String json = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"dependencies\": { \"lodash\": \"^4.17.21\" }\n" +
+                "}\n";
+        Json.Document doc = parsePackageJson(json);
+        NodeResolutionResult.ResolvedDependency staleResolved = new NodeResolutionResult.ResolvedDependency(
+                "lodash", "4.17.20", null, null, null, null, null, null);
+        NodeResolutionResult marker = new NodeResolutionResult(
+                UUID.randomUUID(), "x", null, null, ".",
+                null,
+                asList(new Dependency("lodash", "^4.17.21", staleResolved)),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                Collections.<Dependency>emptyList(),
+                asList(staleResolved),
+                NodeResolutionResult.PackageManager.YarnClassic,
+                null, null);
+        Json.Document withMarker = doc.withMarkers(doc.getMarkers().add(marker));
+
+        // Use editAndRegenerate with capturedLockContent=null so no regen runs.
+        // The overlay path is skipped; the document round-trips unchanged.
+        PackageJsonHelper.EditAndRegenerateResult result = PackageJsonHelper.editAndRegenerate(
+                withMarker,
+                d -> PackageJsonHelper.addDependency(d, "uuid", "^9.0.0", "dependencies"),
+                null,
+                null);
+
+        assertThat(result.isChanged()).isTrue();
+        NodeResolutionResult after = result.getModifiedPackageJson().getMarkers()
+                .findFirst(NodeResolutionResult.class).orElseThrow();
+        // Stale resolved dep is preserved (we did not overlay).
+        assertThat(after.getResolvedDependencies()).hasSize(1);
+        assertThat(after.getResolvedDependencies().get(0).getVersion()).isEqualTo("4.17.20");
+    }
+
     private static Json.Document parsePackageJson(String content) {
         JsonParser parser = new JsonParser();
         return (Json.Document) parser.parseInputs(

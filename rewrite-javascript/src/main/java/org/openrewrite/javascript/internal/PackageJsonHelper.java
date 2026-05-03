@@ -19,6 +19,7 @@ import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.Tree;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
@@ -730,7 +731,23 @@ public class PackageJsonHelper {
         SourceFile refreshed = refreshMarker(after);
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
                 : regenerateLockContent(refreshed, capturedLockContent, configFiles);
-        return EditAndRegenerateResult.changed(refreshed, regen);
+        SourceFile finalSource = refreshed;
+        if (regen != null && regen.isSuccess()) {
+            NodeResolutionResult marker = refreshed.getMarkers()
+                    .findFirst(NodeResolutionResult.class).orElse(null);
+            if (marker != null
+                    && (marker.getPackageManager() == NodeResolutionResult.PackageManager.Npm
+                        || marker.getPackageManager() == NodeResolutionResult.PackageManager.Bun)) {
+                try {
+                    finalSource = overlayResolvedDeps(refreshed,
+                            regen.getLockFileContent(), marker.getPackageManager());
+                } catch (RuntimeException e) {
+                    finalSource = Markup.warn(refreshed,
+                            new RuntimeException("lock parse failed: " + e.getMessage()));
+                }
+            }
+        }
+        return EditAndRegenerateResult.changed(finalSource, regen);
     }
 
     public static LockFileRegeneration.@Nullable Result regenerateLockContent(
