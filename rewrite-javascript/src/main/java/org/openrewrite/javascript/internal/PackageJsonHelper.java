@@ -19,6 +19,7 @@ import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.json.JsonParser;
@@ -145,5 +146,94 @@ public class PackageJsonHelper {
             return reparsePlainText((PlainText) original, newContent);
         }
         return original;
+    }
+
+    // --- Marker refresh ---------------------------------------------------
+
+    /**
+     * Re-derive the {@code dependencies}/{@code devDependencies}/etc. lists on
+     * the marker by walking the modified document. {@code resolvedDependencies}
+     * and other fields carry over unchanged from the existing marker.
+     * Returns the source file unchanged when no marker is present.
+     */
+    public static SourceFile refreshMarker(SourceFile packageJson) {
+        if (!(packageJson instanceof Json.Document)) {
+            return packageJson;
+        }
+        NodeResolutionResult existing = packageJson.getMarkers()
+                .findFirst(NodeResolutionResult.class).orElse(null);
+        if (existing == null) {
+            return packageJson;
+        }
+        Json.Document doc = (Json.Document) packageJson;
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return packageJson;
+        }
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+
+        List<Dependency> deps = readScope(root, "dependencies", existing.getDependencies());
+        List<Dependency> devDeps = readScope(root, "devDependencies", existing.getDevDependencies());
+        List<Dependency> peerDeps = readScope(root, "peerDependencies", existing.getPeerDependencies());
+        List<Dependency> optDeps = readScope(root, "optionalDependencies", existing.getOptionalDependencies());
+        List<Dependency> bundledDeps = readScope(root, "bundledDependencies", existing.getBundledDependencies());
+
+        NodeResolutionResult updated = existing
+                .withDependencies(deps)
+                .withDevDependencies(devDeps)
+                .withPeerDependencies(peerDeps)
+                .withOptionalDependencies(optDeps)
+                .withBundledDependencies(bundledDeps);
+        return doc.withMarkers(doc.getMarkers().setByType(updated));
+    }
+
+    private static List<Dependency> readScope(Json.JsonObject root, String scopeName,
+                                              List<Dependency> previous) {
+        Json.JsonObject scope = findObjectMember(root, scopeName);
+        if (scope == null) {
+            return Collections.emptyList();
+        }
+        Map<String, Dependency> previousByName = new LinkedHashMap<>();
+        if (previous != null) {
+            for (Dependency d : previous) {
+                previousByName.put(d.getName(), d);
+            }
+        }
+        List<Dependency> out = new ArrayList<>();
+        for (Json m : scope.getMembers()) {
+            if (!(m instanceof Json.Member)) continue;
+            Json.Member member = (Json.Member) m;
+            String key = literalString(member.getKey());
+            String value = literalString(member.getValue());
+            if (key == null || value == null) continue;
+            Dependency prior = previousByName.get(key);
+            // Preserve resolved-dep linkage when version constraint is unchanged.
+            if (prior != null && value.equals(prior.getVersionConstraint())) {
+                out.add(prior);
+            } else {
+                out.add(new Dependency(key, value, null));
+            }
+        }
+        return out;
+    }
+
+    private static Json.@Nullable JsonObject findObjectMember(Json.JsonObject obj, String name) {
+        for (Json m : obj.getMembers()) {
+            if (m instanceof Json.Member) {
+                Json.Member member = (Json.Member) m;
+                if (name.equals(literalString(member.getKey()))
+                        && member.getValue() instanceof Json.JsonObject) {
+                    return (Json.JsonObject) member.getValue();
+                }
+            }
+        }
+        return null;
+    }
+
+    private static @Nullable String literalString(@Nullable Object node) {
+        if (node instanceof Json.Literal) {
+            Object value = ((Json.Literal) node).getValue();
+            return value == null ? null : value.toString();
+        }
+        return null;
     }
 }
