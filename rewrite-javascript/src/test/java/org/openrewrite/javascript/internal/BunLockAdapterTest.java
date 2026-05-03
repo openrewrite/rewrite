@@ -54,4 +54,54 @@ class BunLockAdapterTest {
         // only is-even is top-level
         assertThat(result.getTopLevel().keySet()).containsExactly("is-even");
     }
+
+    @Test
+    void preservesTransitiveMetadata() {
+        String bun = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"express\": [\"express@4.18.0\", \"\", {\n" +
+                "      \"dependencies\": { \"accepts\": \"^1.3.8\" },\n" +
+                "      \"devDependencies\": { \"mocha\": \"^10.0.0\" }\n" +
+                "    }, \"sha512-x\"]\n" +
+                "  }\n" +
+                "}";
+        String npm = BunLockAdapter.toNpmV3(bun);
+        LockFileParser.ParseResult result = LockFileParser.parse(npm);
+
+        var express = result.getAll().get(0);
+        assertThat(express.getDependencies())
+                .extracting(d -> d.getName() + "@" + d.getVersionConstraint())
+                .containsExactly("accepts@^1.3.8");
+        assertThat(express.getDevDependencies())
+                .extracting(d -> d.getName() + "@" + d.getVersionConstraint())
+                .containsExactly("mocha@^10.0.0");
+    }
+
+    @Test
+    void handlesScopedTopLevelPackage() {
+        String bun = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"@types/node\": [\"@types/node@20.0.0\", \"\", { }, \"sha512-x\"]\n" +
+                "  }\n" +
+                "}";
+        String npm = BunLockAdapter.toNpmV3(bun);
+        LockFileParser.ParseResult result = LockFileParser.parse(npm);
+
+        assertThat(result.getAll().get(0).getName()).isEqualTo("@types/node");
+        assertThat(result.getTopLevel()).containsKey("@types/node");
+    }
+
+    @Test
+    void handlesJsoncTrailingCommasAndComments() {
+        String bun = "{\n" +
+                "  // top-level comment\n" +
+                "  \"packages\": {\n" +
+                "    \"lodash\": [\"lodash@4.17.21\", \"\", { }, \"sha512-x\"], // trailing\n" +
+                "  },\n" +
+                "}";
+        String npm = BunLockAdapter.toNpmV3(bun);
+        LockFileParser.ParseResult result = LockFileParser.parse(npm);
+
+        assertThat(result.getAll().get(0).getName()).isEqualTo("lodash");
+    }
 }
