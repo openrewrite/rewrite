@@ -743,7 +743,7 @@ public class PackageJsonHelper {
                             regen.getLockFileContent(), marker.getPackageManager());
                 } catch (RuntimeException e) {
                     finalSource = Markup.warn(refreshed,
-                            new RuntimeException("lock parse failed: " + e.getMessage()));
+                            new RuntimeException("lock parse failed: " + e.getMessage(), e));
                 }
             }
         }
