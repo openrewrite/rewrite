@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /**
  * Regenerate a JavaScript project's lock file by running the package manager
@@ -173,18 +174,18 @@ public final class LockFileRegeneration {
     }
 
     private static void cleanupDirectory(Path dir) {
-        try {
-            if (Files.exists(dir)) {
-                Files.walk(dir)
-                        .sorted(Comparator.reverseOrder())
-                        .forEach(path -> {
-                            try {
-                                Files.delete(path);
-                            } catch (IOException e) {
-                                // Ignore
-                            }
-                        });
-            }
+        if (!Files.exists(dir)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(dir)) {
+            walk.sorted(Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            // Ignore
+                        }
+                    });
         } catch (IOException e) {
             // Ignore
         }

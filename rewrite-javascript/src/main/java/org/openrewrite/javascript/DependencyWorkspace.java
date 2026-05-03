@@ -29,6 +29,7 @@ import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static java.util.Collections.synchronizedMap;
 
@@ -174,18 +175,18 @@ class DependencyWorkspace {
      * Cleans up a directory, ignoring errors.
      */
     private static void cleanupDirectory(Path dir) {
-        try {
-            if (Files.exists(dir)) {
-                Files.walk(dir)
-                        .sorted(Comparator.reverseOrder()) // Delete files before directories
-                        .forEach(path -> {
-                            try {
-                                Files.delete(path);
-                            } catch (IOException e) {
-                                // Ignore
-                            }
-                        });
-            }
+        if (!Files.exists(dir)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(dir)) {
+            walk.sorted(Comparator.reverseOrder()) // Delete files before directories
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            // Ignore
+                        }
+                    });
         } catch (IOException e) {
             // Ignore cleanup errors
         }
@@ -204,13 +205,11 @@ class DependencyWorkspace {
      * LRU eviction even for pre-existing workspaces.
      */
     private static void initializeCacheFromDisk() {
-        try {
-            if (!Files.exists(WORKSPACE_BASE)) {
-                return;
-            }
-
-            Files.list(WORKSPACE_BASE)
-                    .filter(Files::isDirectory)
+        if (!Files.exists(WORKSPACE_BASE)) {
+            return;
+        }
+        try (Stream<Path> entries = Files.list(WORKSPACE_BASE)) {
+            entries.filter(Files::isDirectory)
                     .filter(dir -> !dir.getFileName().toString().contains(".tmp-")) // Skip temp dirs
                     .filter(DependencyWorkspace::isWorkspaceValid)
                     .sorted((a, b) -> {
