@@ -115,8 +115,9 @@ public final class YarnClassicLockAdapter {
     private static Block parseBlockHeader(String headerLine) {
         // strip trailing ':'
         String keys = headerLine.substring(0, headerLine.length() - 1);
-        // first key only (multi-key blocks share the same name)
-        String firstKey = keys.split(", ")[0].trim();
+        // first key only (multi-key blocks share the same name); split on first comma
+        int comma = keys.indexOf(',');
+        String firstKey = (comma >= 0 ? keys.substring(0, comma) : keys).trim();
         firstKey = unquote(firstKey);
         // extract package name from "name@constraint" — handle scoped names starting with '@'
         int atIdx = firstKey.startsWith("@") ? firstKey.indexOf('@', 1) : firstKey.indexOf('@');
