@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.javascript.internal.LockFileParserBridge;
+import org.openrewrite.javascript.internal.LockFileParser;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
 
@@ -78,7 +78,7 @@ class LockFileParserParityTest {
         Path lockPath = workspace.resolve("package-lock.json");
         String lockContent = new String(Files.readAllBytes(lockPath));
 
-        ResolvedDependency javaExpress = LockFileParserBridge.parse(lockContent).getAll().stream()
+        ResolvedDependency javaExpress = LockFileParser.parse(lockContent).getAll().stream()
                 .filter(d -> "express".equals(d.getName())).findFirst().orElseThrow();
 
         PackageJsonParser parser = new PackageJsonParser();
@@ -97,7 +97,7 @@ class LockFileParserParityTest {
         Path workspace = DependencyWorkspace.getOrCreateWorkspace(packageJson);
         Path lockPath = workspace.resolve("package-lock.json");
         String lockContent = new String(Files.readAllBytes(lockPath));
-        return LockFileParserBridge.parse(lockContent).getAll().stream()
+        return LockFileParser.parse(lockContent).getAll().stream()
                 .map(d -> d.getName() + "@" + d.getVersion())
                 .collect(Collectors.toSet());
     }

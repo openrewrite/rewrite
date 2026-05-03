@@ -33,7 +33,7 @@ import java.util.Map;
  * nested deps. The adapter rewrites those into npm-style {@code node_modules/<name>}
  * and {@code node_modules/parent/node_modules/child} keys.
  */
-final class BunLockAdapter {
+public final class BunLockAdapter {
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .configure(JsonParser.Feature.ALLOW_COMMENTS, true)

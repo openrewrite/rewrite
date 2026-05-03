@@ -33,7 +33,7 @@ import java.util.Map;
  * to the same npm v3 shape upstream by {@link BunLockAdapter}, so this
  * parser handles both PMs.
  */
-final class LockFileParser {
+public final class LockFileParser {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
