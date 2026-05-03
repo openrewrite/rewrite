@@ -27,6 +27,7 @@ dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
     api(project(":rewrite-json"))
+    implementation(project(":rewrite-yaml"))
 
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
@@ -36,7 +37,6 @@ dependencies {
     compileOnly(project(":rewrite-test"))
 
     testImplementation(project(":rewrite-test"))
-    testImplementation(project(":rewrite-yaml"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
     testRuntimeOnly(project(":rewrite-java-21"))
 }
