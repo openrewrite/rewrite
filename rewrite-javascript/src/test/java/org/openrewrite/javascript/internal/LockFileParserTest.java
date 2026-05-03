@@ -16,7 +16,10 @@
 package org.openrewrite.javascript.internal;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
+
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -91,5 +94,67 @@ class LockFileParserTest {
         assertThat(result.getAll()).extracting(d -> d.getName() + "@" + d.getVersion())
                 .containsExactlyInAnyOrder("foo@1.0.0", "@scope/bar@2.0.0");
         assertThat(result.getTopLevel().keySet()).containsExactly("foo");
+    }
+
+    @Test
+    void extractsTransitiveDependencies() {
+        String lock = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { },\n" +
+                "    \"node_modules/express\": {\n" +
+                "      \"version\": \"4.18.0\",\n" +
+                "      \"dependencies\": { \"accepts\": \"^1.3.8\", \"body-parser\": \"^1.20.0\" },\n" +
+                "      \"devDependencies\": { \"mocha\": \"^10.0.0\" },\n" +
+                "      \"peerDependencies\": { \"react\": \"*\" },\n" +
+                "      \"optionalDependencies\": { \"fsevents\": \"^2.0.0\" }\n" +
+                "    }\n" +
+                "  }\n" +
+                "}";
+        LockFileParser.ParseResult result = LockFileParser.parse(lock);
+        ResolvedDependency express = result.getAll().get(0);
+
+        assertThat(express.getDependencies())
+                .extracting(d -> d.getName() + "@" + d.getVersionConstraint())
+                .containsExactlyInAnyOrder("accepts@^1.3.8", "body-parser@^1.20.0");
+        assertThat(express.getDevDependencies())
+                .extracting(NodeResolutionResult.Dependency::getName).containsExactly("mocha");
+        assertThat(express.getPeerDependencies())
+                .extracting(NodeResolutionResult.Dependency::getName).containsExactly("react");
+        assertThat(express.getOptionalDependencies())
+                .extracting(NodeResolutionResult.Dependency::getName).containsExactly("fsevents");
+        // resolved is null at parse time; the relinking pass populates it.
+        assertThat(express.getDependencies()).allSatisfy(d ->
+                assertThat(d.getResolved()).isNull());
+    }
+
+    @Test
+    void extractsEnginesAndLicense() {
+        String lock = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { },\n" +
+                "    \"node_modules/lodash\": {\n" +
+                "      \"version\": \"4.17.21\",\n" +
+                "      \"engines\": { \"node\": \">=12\" },\n" +
+                "      \"license\": \"MIT\"\n" +
+                "    }\n" +
+                "  }\n" +
+                "}";
+        LockFileParser.ParseResult result = LockFileParser.parse(lock);
+        ResolvedDependency lodash = result.getAll().get(0);
+
+        assertThat(lodash.getEngines()).containsExactly(Map.entry("node", ">=12"));
+        assertThat(lodash.getLicense()).isEqualTo("MIT");
+    }
+
+    @Test
+    void skipsRootEntry() {
+        String lock = "{\n" +
+                "  \"packages\": {\n" +
+                "    \"\": { \"name\": \"my-app\", \"version\": \"1.0.0\" }\n" +
+                "  }\n" +
+                "}";
+        LockFileParser.ParseResult result = LockFileParser.parse(lock);
+        assertThat(result.getAll()).isEmpty();
+        assertThat(result.getTopLevel()).isEmpty();
     }
 }

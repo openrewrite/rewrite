@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Value;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
 
 import java.io.IOException;
@@ -70,10 +71,22 @@ final class LockFileParser {
             }
             JsonNode body = entry.getValue();
             String version = body.path("version").asText(null);
+
+            List<NodeResolutionResult.Dependency> deps =
+                    readDepObject(body.get("dependencies"));
+            List<NodeResolutionResult.Dependency> devDeps =
+                    readDepObject(body.get("devDependencies"));
+            List<NodeResolutionResult.Dependency> peerDeps =
+                    readDepObject(body.get("peerDependencies"));
+            List<NodeResolutionResult.Dependency> optionalDeps =
+                    readDepObject(body.get("optionalDependencies"));
+            Map<String, String> engines = readStringMap(body.get("engines"));
+            String license = body.path("license").asText(null);
+
             ResolvedDependency dep = new ResolvedDependency(
                     name, version,
-                    null, null, null, null,
-                    null, null);
+                    deps, devDeps, peerDeps, optionalDeps,
+                    engines, license);
             all.add(dep);
             if (isTopLevel(pathKey)) {
                 topLevel.put(name, dep);
@@ -101,5 +114,25 @@ final class LockFileParser {
         // Top-level entries have exactly one "node_modules/" segment.
         return pathKey.indexOf("node_modules/") == 0
                 && pathKey.indexOf("/node_modules/", "node_modules/".length()) < 0;
+    }
+
+    private static List<NodeResolutionResult.Dependency> readDepObject(JsonNode node) {
+        if (node == null || !node.isObject()) {
+            return null;
+        }
+        List<NodeResolutionResult.Dependency> out = new ArrayList<>();
+        node.fields().forEachRemaining(e ->
+                out.add(new NodeResolutionResult.Dependency(
+                        e.getKey(), e.getValue().asText(""), null)));
+        return out.isEmpty() ? null : out;
+    }
+
+    private static Map<String, String> readStringMap(JsonNode node) {
+        if (node == null || !node.isObject()) {
+            return null;
+        }
+        Map<String, String> out = new LinkedHashMap<>();
+        node.fields().forEachRemaining(e -> out.put(e.getKey(), e.getValue().asText("")));
+        return out.isEmpty() ? null : out;
     }
 }
