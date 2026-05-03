@@ -1413,6 +1413,10 @@ public interface Go extends J {
 
         @With
         @Getter
+        List<J.Annotation> leadingAnnotations;
+
+        @With
+        @Getter
         J.Identifier name;
 
         @Nullable
@@ -1468,7 +1472,7 @@ public interface Go extends J {
             }
 
             public Go.TypeDecl withAssign(@Nullable JLeftPadded<Space> assign) {
-                return t.assign == assign ? t : new Go.TypeDecl(t.padding, t.id, t.prefix, t.markers, t.name, assign, t.definition, t.specs);
+                return t.assign == assign ? t : new Go.TypeDecl(t.padding, t.id, t.prefix, t.markers, t.leadingAnnotations, t.name, assign, t.definition, t.specs);
             }
 
             public @Nullable JContainer<Statement> getSpecs() {
@@ -1476,7 +1480,7 @@ public interface Go extends J {
             }
 
             public Go.TypeDecl withSpecs(@Nullable JContainer<Statement> specs) {
-                return t.specs == specs ? t : new Go.TypeDecl(t.padding, t.id, t.prefix, t.markers, t.name, t.assign, t.definition, specs);
+                return t.specs == specs ? t : new Go.TypeDecl(t.padding, t.id, t.prefix, t.markers, t.leadingAnnotations, t.name, t.assign, t.definition, specs);
             }
         }
     }
