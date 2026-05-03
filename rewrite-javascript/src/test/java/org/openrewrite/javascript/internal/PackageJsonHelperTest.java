@@ -158,6 +158,38 @@ class PackageJsonHelperTest {
                 "}\n");
     }
 
+    @Test
+    void changeDependencyRenamesAndUpdatesVersion() {
+        Json.Document doc = parsePackageJson(
+                "{\n" +
+                "  \"dependencies\": {\n" +
+                "    \"old-pkg\": \"^1.0.0\"\n" +
+                "  }\n" +
+                "}\n");
+        Json.Document modified = PackageJsonHelper.changeDependency(
+                doc, "old-pkg", "new-pkg", "^2.0.0", "dependencies");
+        assertThat(modified.printAll()).isEqualTo(
+                "{\n" +
+                "  \"dependencies\": {\n" +
+                "    \"new-pkg\": \"^2.0.0\"\n" +
+                "  }\n" +
+                "}\n");
+    }
+
+    @Test
+    void changeDependencyPreservesVersionWhenNewVersionNull() {
+        Json.Document doc = parsePackageJson(
+                "{\n" +
+                "  \"dependencies\": {\n" +
+                "    \"old-pkg\": \"^1.0.0\"\n" +
+                "  }\n" +
+                "}\n");
+        Json.Document modified = PackageJsonHelper.changeDependency(
+                doc, "old-pkg", "new-pkg", null, null);
+        assertThat(modified.printAll()).contains("\"new-pkg\": \"^1.0.0\"");
+        assertThat(modified.printAll()).doesNotContain("old-pkg");
+    }
+
     private static Json.Document parsePackageJson(String content) {
         JsonParser parser = new JsonParser();
         return (Json.Document) parser.parseInputs(

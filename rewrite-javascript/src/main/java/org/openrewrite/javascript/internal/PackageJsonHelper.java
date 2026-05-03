@@ -454,6 +454,62 @@ public class PackageJsonHelper {
         return doc.withValue(root.getPadding().withMembers(rootMembers));
     }
 
+    public static Json.Document changeDependency(Json.Document doc,
+                                                 String oldName, String newName,
+                                                 @Nullable String newVersion,
+                                                 @Nullable String scope) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+
+        List<JsonRightPadded<Json>> rootMembers = new ArrayList<>(root.getPadding().getMembers());
+        boolean changed = false;
+
+        for (int i = 0; i < rootMembers.size(); i++) {
+            Json elem = rootMembers.get(i).getElement();
+            if (!(elem instanceof Json.Member)) continue;
+            Json.Member scopeMember = (Json.Member) elem;
+            String scopeKey = literalString(scopeMember.getKey());
+            if (scopeKey == null) continue;
+            if (scope != null && !scope.equals(scopeKey)) continue;
+            if (!isDeclaredScope(scopeKey)) continue;
+            if (!(scopeMember.getValue() instanceof Json.JsonObject)) continue;
+            Json.JsonObject scopeObj = (Json.JsonObject) scopeMember.getValue();
+
+            List<JsonRightPadded<Json>> children = new ArrayList<>(scopeObj.getPadding().getMembers());
+            for (int j = 0; j < children.size(); j++) {
+                Json child = children.get(j).getElement();
+                if (!(child instanceof Json.Member)) continue;
+                Json.Member depMember = (Json.Member) child;
+                if (!oldName.equals(literalString(depMember.getKey()))) continue;
+
+                Json.Literal oldKeyLit = (Json.Literal) depMember.getKey();
+                Json.Literal newKeyLit = makeStringLiteral(newName).withPrefix(oldKeyLit.getPrefix());
+
+                JsonValue newValue = depMember.getValue();
+                if (newVersion != null && depMember.getValue() instanceof Json.Literal) {
+                    Json.Literal oldValLit = (Json.Literal) depMember.getValue();
+                    newValue = makeStringLiteral(newVersion).withPrefix(oldValLit.getPrefix());
+                }
+                Json.Member updated = depMember.withKey(newKeyLit).withValue(newValue);
+                children.set(j, children.get(j).withElement(updated));
+                changed = true;
+            }
+            if (changed) {
+                rootMembers.set(i, rootMembers.get(i)
+                        .withElement(scopeMember.withValue(scopeObj.getPadding().withMembers(children))));
+            }
+        }
+        return changed ? doc.withValue(root.getPadding().withMembers(rootMembers)) : doc;
+    }
+
+    private static boolean isDeclaredScope(String name) {
+        return "dependencies".equals(name)
+                || "devDependencies".equals(name)
+                || "peerDependencies".equals(name)
+                || "optionalDependencies".equals(name)
+                || "bundledDependencies".equals(name);
+    }
+
     private static Json.Literal makeStringLiteral(String value) {
         return new Json.Literal(
                 Tree.randomId(), Space.EMPTY,
