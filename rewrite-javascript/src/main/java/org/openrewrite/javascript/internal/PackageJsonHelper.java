@@ -432,6 +432,7 @@ public class PackageJsonHelper {
             Json.JsonObject scope = (Json.JsonObject) m.getValue();
 
             List<JsonRightPadded<Json>> children = new ArrayList<>(scope.getPadding().getMembers());
+            boolean scopeChanged = false;
             for (int j = 0; j < children.size(); j++) {
                 Json child = children.get(j).getElement();
                 if (!(child instanceof Json.Member)) continue;
@@ -443,11 +444,12 @@ public class PackageJsonHelper {
                 Json.Literal oldLit = (Json.Literal) depMember.getValue();
                 newLit = newLit.withPrefix(oldLit.getPrefix());
                 children.set(j, children.get(j).withElement(depMember.withValue(newLit)));
-                changed = true;
+                scopeChanged = true;
             }
-            if (changed) {
+            if (scopeChanged) {
                 rootMembers.set(i, rootMembers.get(i)
                         .withElement(m.withValue(scope.getPadding().withMembers(children))));
+                changed = true;
             }
         }
         if (!changed) return doc;
@@ -476,6 +478,7 @@ public class PackageJsonHelper {
             Json.JsonObject scopeObj = (Json.JsonObject) scopeMember.getValue();
 
             List<JsonRightPadded<Json>> children = new ArrayList<>(scopeObj.getPadding().getMembers());
+            boolean scopeChanged = false;
             for (int j = 0; j < children.size(); j++) {
                 Json child = children.get(j).getElement();
                 if (!(child instanceof Json.Member)) continue;
@@ -492,11 +495,12 @@ public class PackageJsonHelper {
                 }
                 Json.Member updated = depMember.withKey(newKeyLit).withValue(newValue);
                 children.set(j, children.get(j).withElement(updated));
-                changed = true;
+                scopeChanged = true;
             }
-            if (changed) {
+            if (scopeChanged) {
                 rootMembers.set(i, rootMembers.get(i)
                         .withElement(scopeMember.withValue(scopeObj.getPadding().withMembers(children))));
+                changed = true;
             }
         }
         return changed ? doc.withValue(root.getPadding().withMembers(rootMembers)) : doc;
