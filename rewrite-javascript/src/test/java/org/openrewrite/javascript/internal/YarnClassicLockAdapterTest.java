@@ -37,4 +37,64 @@ class YarnClassicLockAdapterTest {
         assertThat(result.getAll().get(0).getVersion()).isEqualTo("4.17.21");
         assertThat(result.getTopLevel()).containsKey("lodash");
     }
+
+    @Test
+    void convertsMultiKeyBlock() {
+        // Two constraints resolving to the same version share a single block.
+        String yarn = "lodash@^4.17.21, lodash@^4.17.0:\n" +
+                "  version \"4.17.21\"\n" +
+                "  resolved \"...\"\n";
+        String npm = YarnClassicLockAdapter.toNpmV3(yarn);
+        LockFileParser.ParseResult result = LockFileParser.parse(npm);
+
+        assertThat(result.getAll()).hasSize(1);
+        assertThat(result.getAll().get(0).getName()).isEqualTo("lodash");
+        assertThat(result.getAll().get(0).getVersion()).isEqualTo("4.17.21");
+    }
+
+    @Test
+    void convertsScopedPackage() {
+        String yarn = "\"@types/node@^20.0.0\":\n" +
+                "  version \"20.0.0\"\n" +
+                "  resolved \"...\"\n";
+        String npm = YarnClassicLockAdapter.toNpmV3(yarn);
+        LockFileParser.ParseResult result = LockFileParser.parse(npm);
+
+        assertThat(result.getAll()).hasSize(1);
+        assertThat(result.getAll().get(0).getName()).isEqualTo("@types/node");
+        assertThat(result.getTopLevel()).containsKey("@types/node");
+    }
+
+    @Test
+    void extractsTransitiveDependencies() {
+        String yarn = "express@^4.18.0:\n" +
+                "  version \"4.18.0\"\n" +
+                "  resolved \"...\"\n" +
+                "  dependencies:\n" +
+                "    accepts \"^1.3.8\"\n" +
+                "    body-parser \"^1.20.0\"\n";
+        String npm = YarnClassicLockAdapter.toNpmV3(yarn);
+        LockFileParser.ParseResult result = LockFileParser.parse(npm);
+
+        var express = result.getAll().get(0);
+        assertThat(express.getDependencies())
+                .extracting(d -> d.getName() + "@" + d.getVersionConstraint())
+                .containsExactlyInAnyOrder("accepts@^1.3.8", "body-parser@^1.20.0");
+    }
+
+    @Test
+    void extractsTransitiveDependencyWithScopedName() {
+        // Scoped names in transitive deps require quoted keys in yarn.lock.
+        String yarn = "express@^4.18.0:\n" +
+                "  version \"4.18.0\"\n" +
+                "  dependencies:\n" +
+                "    \"@types/cookie\" \"^0.5.0\"\n";
+        String npm = YarnClassicLockAdapter.toNpmV3(yarn);
+        LockFileParser.ParseResult result = LockFileParser.parse(npm);
+
+        var express = result.getAll().get(0);
+        assertThat(express.getDependencies())
+                .extracting(d -> d.getName() + "@" + d.getVersionConstraint())
+                .containsExactly("@types/cookie@^0.5.0");
+    }
 }
