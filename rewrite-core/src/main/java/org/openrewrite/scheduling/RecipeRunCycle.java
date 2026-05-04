@@ -50,6 +50,7 @@ import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
 import static org.openrewrite.Recipe.PANIC;
 
@@ -746,11 +747,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     private static RecipeError wrapForAttribution(List<Recipe> recipeStack, @Nullable String sourcePath, Throwable t) {
-        List<String> recipePath = new ArrayList<>(recipeStack.size());
-        for (Recipe r : recipeStack) {
-            recipePath.add(r.getName());
-        }
-        return new RecipeError(recipePath, sourcePath, t);
+        return new RecipeError(recipeStack.stream().map(Recipe::getName).collect(toList()), sourcePath, t);
     }
 
     private static <S extends SourceFile> S addRecipesThatMadeChanges(List<Recipe> recipeStack, S afterFile) {
