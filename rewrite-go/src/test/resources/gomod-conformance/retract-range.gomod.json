@@ -1,0 +1,12 @@
+{
+  "modulePath": "example.com/withretractrange",
+  "goVersion": "1.22",
+  "toolchain": "",
+  "requires": [],
+  "replaces": [],
+  "excludes": [],
+  "retracts": [
+    {"versionRange": "[v1.0.0, v1.0.5]", "rationale": null}
+  ],
+  "resolvedDependencies": []
+}

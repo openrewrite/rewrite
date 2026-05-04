@@ -19,10 +19,13 @@ package parser
 import (
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/importer"
 	"go/parser"
 	"go/token"
 	"go/types"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -34,57 +37,127 @@ type GoParser struct {
 	// Importer resolves imported packages for type checking.
 	// Defaults to importer.Default() which resolves stdlib packages.
 	Importer types.Importer
+
+	// BuildContext drives `//go:build` and filename-suffix constraint
+	// evaluation in ParsePackage. Defaults to build.Default (the host's
+	// GOOS/GOARCH). Recipe authors that need cross-platform analysis can
+	// set this explicitly via NewGoParserWithBuildContext.
+	BuildContext build.Context
 }
 
 func NewGoParser() *GoParser {
 	return &GoParser{
-		Importer: importer.Default(),
+		Importer:     importer.Default(),
+		BuildContext: build.Default,
 	}
 }
 
-// Parse parses the given Go source code and returns a CompilationUnit.
+// NewGoParserWithBuildContext returns a parser that filters input files
+// against the given build context. Useful for recipes that need to
+// analyze code as it would compile under a specific GOOS/GOARCH/cgo
+// configuration. To switch contexts, build a new parser — A3 keeps
+// BuildContext immutable per parser to avoid cache-key complexity.
+func NewGoParserWithBuildContext(buildCtx build.Context) *GoParser {
+	return &GoParser{
+		Importer:     importer.Default(),
+		BuildContext: buildCtx,
+	}
+}
+
+// FileInput is one file given to ParsePackage.
+type FileInput struct {
+	Path    string
+	Content string
+}
+
+// Parse parses a single Go source file and returns its CompilationUnit.
+// Convenience wrapper around ParsePackage for the common one-file case;
+// type attribution that depends on sibling files in the same package
+// won't resolve here. Use ParsePackage when sibling files matter.
 func (gp *GoParser) Parse(sourcePath string, source string) (*tree.CompilationUnit, error) {
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, sourcePath, source, parser.ParseComments)
+	cus, err := gp.ParsePackage([]FileInput{{Path: sourcePath, Content: source}})
 	if err != nil {
-		return nil, fmt.Errorf("parse error: %w", err)
+		return nil, err
+	}
+	if len(cus) == 0 {
+		return nil, fmt.Errorf("no compilation unit produced")
+	}
+	return cus[0], nil
+}
+
+// ParsePackage parses every file in a single Go package together so
+// type-checking sees them as one unit. File A's reference to file B's
+// symbol resolves; the resulting CompilationUnits share a single
+// types.Info populated by one types.Config.Check call.
+//
+// All files MUST belong to the same package (same `package` clause).
+// Order in the returned slice matches the input order.
+func (gp *GoParser) ParsePackage(files []FileInput) ([]*tree.CompilationUnit, error) {
+	if len(files) == 0 {
+		return nil, nil
 	}
 
-	// Run type checking to populate type information
+	// Filter out files excluded by the build context — `//go:build` /
+	// `// +build` constraints and OS/arch filename suffixes. Skipped
+	// files don't appear in the output at all (they're as if they
+	// weren't passed in).
+	filtered := make([]FileInput, 0, len(files))
+	for _, f := range files {
+		if MatchBuildContext(gp.BuildContext, filepath.Base(f.Path), f.Content) {
+			filtered = append(filtered, f)
+		}
+	}
+	files = filtered
+	if len(files) == 0 {
+		return nil, nil
+	}
+
+	fset := token.NewFileSet()
+	asts := make([]*ast.File, 0, len(files))
+	for _, f := range files {
+		a, err := parser.ParseFile(fset, f.Path, f.Content, parser.ParseComments)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s: %w", f.Path, err)
+		}
+		asts = append(asts, a)
+	}
+
 	typeInfo := &types.Info{
 		Types:      make(map[ast.Expr]types.TypeAndValue),
 		Defs:       make(map[*ast.Ident]types.Object),
 		Uses:       make(map[*ast.Ident]types.Object),
 		Selections: make(map[*ast.SelectorExpr]*types.Selection),
 	}
-
 	conf := types.Config{
 		Importer: gp.Importer,
 		// Don't fail on type errors — we want partial type info even when
-		// imports can't be resolved (single-file mode).
-		Error: func(err error) {},
+		// some imports can't be resolved.
+		Error: func(error) {},
 	}
 
-	// Determine package name from the parsed file
+	// Use the first file's package name as the type-checker hint;
+	// types.Config.Check validates that all files agree.
 	pkgName := "main"
-	if file.Name != nil {
-		pkgName = file.Name.Name
+	if asts[0].Name != nil {
+		pkgName = asts[0].Name.Name
 	}
+	_, _ = conf.Check(pkgName, fset, asts, typeInfo)
 
-	// Type-check; errors are non-fatal (unresolvable imports are expected)
-	_, _ = conf.Check(pkgName, fset, []*ast.File{file}, typeInfo)
-
-	ctx := &parseContext{
-		src:      []byte(source),
-		fset:     fset,
-		file:     fset.File(file.Pos()),
-		astFile:  file,
-		cursor:   0,
-		typeInfo: typeInfo,
-		mapper:   newTypeMapper(),
+	mapper := newTypeMapper()
+	cus := make([]*tree.CompilationUnit, 0, len(files))
+	for i, f := range files {
+		ctx := &parseContext{
+			src:      []byte(f.Content),
+			fset:     fset,
+			file:     fset.File(asts[i].Pos()),
+			astFile:  asts[i],
+			cursor:   0,
+			typeInfo: typeInfo,
+			mapper:   mapper,
+		}
+		cus = append(cus, ctx.mapFile(asts[i], f.Path))
 	}
-
-	return ctx.mapFile(file, sourcePath), nil
+	return cus, nil
 }
 
 // parseContext holds the state needed during AST-to-LST mapping.
@@ -332,13 +405,16 @@ func (ctx *parseContext) mapGenDecl(decl *ast.GenDecl) tree.Statement {
 // mapVarConstDecl maps `var x int`, `var x = 5`, `const x = 5`, etc.
 func (ctx *parseContext) mapVarConstDecl(decl *ast.GenDecl) tree.Statement {
 	prefix := ctx.prefix(decl.Pos())
+	leadingAnns, prefix := extractDirectives(prefix)
 	keyword := decl.Tok.String()
 	ctx.skip(len(keyword))
 
 	if len(decl.Specs) == 1 && !decl.Lparen.IsValid() {
 		// Single declaration: var x int = 5
 		spec := decl.Specs[0].(*ast.ValueSpec)
-		return ctx.mapValueSpec(spec, prefix, keyword)
+		vd := ctx.mapValueSpec(spec, prefix, keyword)
+		vd.LeadingAnnotations = leadingAnns
+		return vd
 	}
 
 	// Grouped declaration: var ( ... ) or const ( ... )
@@ -375,10 +451,11 @@ func (ctx *parseContext) mapVarConstDecl(decl *ast.GenDecl) tree.Statement {
 
 	specs := &tree.Container[tree.Statement]{Before: lparenPrefix, Elements: elements}
 	return &tree.VariableDeclarations{
-		ID:      uuid.New(),
-		Prefix:  prefix,
-		Markers: tree.Markers{ID: uuid.New(), Entries: markerEntries},
-		Specs:   specs,
+		ID:                 uuid.New(),
+		Prefix:             prefix,
+		Markers:            tree.Markers{ID: uuid.New(), Entries: markerEntries},
+		LeadingAnnotations: leadingAnns,
+		Specs:              specs,
 	}
 }
 
@@ -468,10 +545,13 @@ func (ctx *parseContext) mapValueSpec(spec *ast.ValueSpec, prefix tree.Space, ke
 // mapTypeDecl maps a `type Name ...` declaration.
 func (ctx *parseContext) mapTypeDecl(decl *ast.GenDecl) tree.Statement {
 	prefix := ctx.prefixAndSkip(decl.Pos(), len("type"))
+	leadingAnns, prefix := extractDirectives(prefix)
 
 	if len(decl.Specs) == 1 && !decl.Lparen.IsValid() {
 		spec := decl.Specs[0].(*ast.TypeSpec)
-		return ctx.mapTypeSpec(spec, prefix)
+		td := ctx.mapTypeSpec(spec, prefix)
+		td.LeadingAnnotations = leadingAnns
+		return td
 	}
 
 	// Grouped type declaration: type ( ... )
@@ -501,9 +581,10 @@ func (ctx *parseContext) mapTypeDecl(decl *ast.GenDecl) tree.Statement {
 
 	specs := &tree.Container[tree.Statement]{Before: lparenPrefix, Elements: elements}
 	return &tree.TypeDecl{
-		ID:     uuid.New(),
-		Prefix: prefix,
-		Specs:  specs,
+		ID:                 uuid.New(),
+		Prefix:             prefix,
+		LeadingAnnotations: leadingAnns,
+		Specs:              specs,
 	}
 }
 
@@ -533,6 +614,7 @@ func (ctx *parseContext) mapTypeSpec(spec *ast.TypeSpec, prefix tree.Space) *tre
 // mapFuncDecl maps a function declaration.
 func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) *tree.MethodDeclaration {
 	prefix := ctx.prefixAndSkip(decl.Pos(), len("func"))
+	leadingAnns, prefix := extractDirectives(prefix)
 
 	var receiver *tree.Container[tree.Statement]
 	if decl.Recv != nil && len(decl.Recv.List) > 0 {
@@ -550,13 +632,14 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) *tree.MethodDeclaration
 	}
 
 	md := &tree.MethodDeclaration{
-		ID:         uuid.New(),
-		Prefix:     prefix,
-		Receiver:   receiver,
-		Name:       name,
-		Parameters: params,
-		ReturnType: returnType,
-		Body:       body,
+		ID:                 uuid.New(),
+		Prefix:             prefix,
+		LeadingAnnotations: leadingAnns,
+		Receiver:           receiver,
+		Name:               name,
+		Parameters:         params,
+		ReturnType:         returnType,
+		Body:               body,
 	}
 
 	// Type attribution for method declaration
@@ -772,16 +855,56 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 }
 
 // mapBlockStmt maps a block statement.
+//
+// Multi-statements-per-line (`_ = 1; _ = 2`) carry a literal `;` that
+// Go's tokenizer recognizes but doesn't surface as part of either
+// statement's AST. To round-trip the source, we look for an inline `;`
+// between this statement and the next, capture the leading whitespace
+// as RightPadded.After, mark the entry with a Semicolon marker, and
+// advance the cursor past the `;`. The Block printer emits `;` when
+// the marker is present.
 func (ctx *parseContext) mapBlockStmt(block *ast.BlockStmt) *tree.Block {
 	prefix := ctx.prefix(block.Lbrace)
 	ctx.skip(1) // "{"
 
 	var stmts []tree.RightPadded[tree.Statement]
-	for _, stmt := range block.List {
+	for i, stmt := range block.List {
 		mapped := ctx.mapStmt(stmt)
-		if mapped != nil {
-			stmts = append(stmts, tree.RightPadded[tree.Statement]{Element: mapped})
+		if mapped == nil {
+			continue
 		}
+		rp := tree.RightPadded[tree.Statement]{Element: mapped}
+
+		// Detect inline `;` separator. Go inserts implicit semicolons
+		// at end-of-line, so a literal `;` between two statements only
+		// appears when they share a source line (or when a `;` appears
+		// before the closing `}` on the last statement's line). We
+		// avoid scanning comments/strings for stray `;` bytes by
+		// gating on line numbers from the tokenizer.
+		stmtEndLine := ctx.file.Position(stmt.End()).Line
+		var nextStartLine int
+		if i+1 < len(block.List) {
+			nextStartLine = ctx.file.Position(block.List[i+1].Pos()).Line
+		} else {
+			nextStartLine = ctx.file.Position(block.Rbrace).Line
+		}
+		if stmtEndLine == nextStartLine {
+			// Same line — look for the explicit `;`.
+			boundary := 0
+			if i+1 < len(block.List) {
+				boundary = ctx.file.Offset(block.List[i+1].Pos())
+			} else {
+				boundary = ctx.file.Offset(block.Rbrace)
+			}
+			semiOffset := ctx.findNextBefore(';', boundary)
+			if semiOffset >= 0 {
+				rp.After = ctx.prefix(ctx.file.Pos(semiOffset))
+				ctx.skip(1) // consume ";"
+				rp.Markers = tree.AddMarker(rp.Markers, tree.NewSemicolon())
+			}
+		}
+
+		stmts = append(stmts, rp)
 	}
 
 	end := ctx.prefix(block.Rbrace)
@@ -1267,10 +1390,13 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *tree.ForLoop {
 	// Go's AST normalizes `for ; cond; {}` to Init=nil, Post=nil, same as `for cond {}`.
 	// We detect semicolons by looking at the source text between for keyword and body.
 	is3Clause := stmt.Init != nil || stmt.Post != nil
+	bodyStart := int(stmt.Body.Lbrace) - ctx.file.Base()
 	if !is3Clause {
-		// Check for semicolons in the source between cursor and the body brace
-		bodyStart := int(stmt.Body.Lbrace) - ctx.file.Base()
-		if ctx.findNextBefore(';', bodyStart) >= 0 {
+		// `for ; cond; {}` has no Init/Post in the AST but is still
+		// syntactically 3-clause. Detect by scanning for `;` in the
+		// header — but skip rune/string literals so a `';'` inside the
+		// condition (e.g. `for tok != ';'`) isn't mistaken for one.
+		if ctx.findNextPositionOf(';', bodyStart) >= 0 {
 			is3Clause = true
 		}
 	}
@@ -1279,7 +1405,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *tree.ForLoop {
 		// 3-clause for: for [init]; [cond]; [post] {}
 		if stmt.Init != nil {
 			init := ctx.mapStmt(stmt.Init)
-			semicolonOffset := ctx.findNext(';')
+			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
 			var after tree.Space
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -1289,7 +1415,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *tree.ForLoop {
 			control.Init = &initRP
 		} else {
 			// No init but semicolons present: `for ; cond; post {}`
-			semicolonOffset := ctx.findNext(';')
+			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
 			var after tree.Space
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -1301,7 +1427,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *tree.ForLoop {
 
 		if stmt.Cond != nil {
 			cond := ctx.mapExpr(stmt.Cond)
-			semicolonOffset := ctx.findNext(';')
+			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
 			after := tree.EmptySpace
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -1310,7 +1436,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *tree.ForLoop {
 			condRP := tree.RightPadded[tree.Expression]{Element: cond, After: after}
 			control.Condition = &condRP
 		} else {
-			semicolonOffset := ctx.findNext(';')
+			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
 			after := tree.EmptySpace
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -2376,14 +2502,247 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *tree.Block
 	return &tree.Block{ID: uuid.New(), Prefix: blockPrefix, Statements: stmts, End: end}
 }
 
-// mapStructTag maps a struct field tag (e.g., `json:"name"`).
-// Tags are stored as markers on the VariableDeclarations.
+// mapStructTag parses a struct field tag literal into a sequence of
+// Annotations — one per `key:"value"` pair — and attaches them to
+// vd.LeadingAnnotations.
+//
+// Mirrors `reflect.StructTag.Lookup` parsing semantics: leading spaces
+// between pairs are skipped (any number), keys run up to a colon,
+// values are double-quoted strings respecting Go escape sequences.
+//
+// Whitespace policy (Option 1, lossy on non-canonical input):
+//   - The space between the field type and the opening backtick goes
+//     onto the first annotation's Prefix.
+//   - Whitespace between two `key:"value"` pairs goes onto the next
+//     annotation's Prefix.
+//   - Whitespace IMMEDIATELY inside the backticks (e.g.,
+//     `  json:"x"  `) is dropped — gofmt produces zero inner padding,
+//     so this only affects hand-typed weird input. Roundtrip on
+//     gofmt'd input is exact.
 func (ctx *parseContext) mapStructTag(vd *tree.VariableDeclarations, tag *ast.BasicLit) {
-	tagLit := ctx.mapBasicLit(tag)
-	vd.Markers.Entries = append(vd.Markers.Entries, tree.StructTag{
-		Ident: uuid.New(),
-		Tag:   tagLit,
-	})
+	outerPrefix := ctx.prefix(tag.Pos())
+	ctx.skip(len(tag.Value))
+
+	// tag.Value includes the wrapping backticks (or quotes).
+	raw := tag.Value
+	if len(raw) >= 2 {
+		first, last := raw[0], raw[len(raw)-1]
+		if (first == '`' && last == '`') || (first == '"' && last == '"') {
+			raw = raw[1 : len(raw)-1]
+		}
+	}
+
+	pairs := parseStructTagPairs(raw)
+	if len(pairs) == 0 {
+		return
+	}
+
+	annotations := make([]*tree.Annotation, len(pairs))
+	for i, p := range pairs {
+		var annPrefix tree.Space
+		if i == 0 {
+			annPrefix = outerPrefix
+		} else {
+			annPrefix = tree.Space{Whitespace: p.PrefixWS}
+		}
+		annotations[i] = &tree.Annotation{
+			ID:     uuid.New(),
+			Prefix: annPrefix,
+			AnnotationType: &tree.Identifier{
+				ID:   uuid.New(),
+				Name: p.Key,
+			},
+			Arguments: &tree.Container[tree.Expression]{
+				Elements: []tree.RightPadded[tree.Expression]{
+					{Element: &tree.Literal{
+						ID:     uuid.New(),
+						Source: p.QuotedValue,
+						Value:  p.UnquotedValue,
+						Kind:   tree.StringLiteral,
+					}},
+				},
+			},
+		}
+	}
+	vd.LeadingAnnotations = annotations
+}
+
+// extractDirectives splits a Space's leading line-comments into Annotation
+// nodes when they match Go directive syntax (`//go:NAME [args]`,
+// `//lint:NAME [args]`). The returned residual Space holds whatever
+// wasn't extracted: the whitespace after the last extracted directive,
+// plus any comments past the first non-directive (or block-comment).
+//
+// Used by the parser at top-level decl entry points (func, type,
+// var/const) to populate `LeadingAnnotations` and shrink the decl's
+// own Prefix to the whitespace between last directive and keyword.
+func extractDirectives(s tree.Space) (anns []*tree.Annotation, residual tree.Space) {
+	if len(s.Comments) == 0 {
+		return nil, s
+	}
+	pendingPrefixWS := s.Whitespace
+	i := 0
+	for i < len(s.Comments) {
+		c := s.Comments[i]
+		if c.Kind != tree.LineComment {
+			break
+		}
+		name, args, ok := parseDirective(c.Text)
+		if !ok {
+			break
+		}
+		anns = append(anns, buildDirectiveAnnotation(name, args, tree.Space{Whitespace: pendingPrefixWS}))
+		pendingPrefixWS = c.Suffix
+		i++
+	}
+	if len(anns) == 0 {
+		return nil, s
+	}
+	residual = tree.Space{
+		Whitespace: pendingPrefixWS,
+		Comments:   s.Comments[i:],
+	}
+	return anns, residual
+}
+
+// parseDirective tries to parse a `//PREFIX:NAME [ARGS]` line into
+// (name, args, ok). The full directive name returned is `PREFIX:NAME`
+// — preserved exactly as authors write it (`go:noinline`,
+// `lint:ignore`). `args` is the trimmed text after the first space (or
+// "" when absent).
+//
+// Recognized prefixes: `go`, `lint`. (Other vendor-specific prefixes
+// like `nolint` aren't of the form `PREFIX:NAME` and are left as
+// regular comments.)
+func parseDirective(text string) (name, args string, ok bool) {
+	if !strings.HasPrefix(text, "//") {
+		return "", "", false
+	}
+	inner := text[2:]
+	colonIdx := strings.Index(inner, ":")
+	if colonIdx <= 0 {
+		return "", "", false
+	}
+	prefix := inner[:colonIdx]
+	if !isDirectivePrefix(prefix) {
+		return "", "", false
+	}
+	rest := inner[colonIdx+1:]
+	spaceIdx := strings.IndexAny(rest, " \t")
+	if spaceIdx < 0 {
+		if rest == "" {
+			return "", "", false
+		}
+		return prefix + ":" + rest, "", true
+	}
+	dirName := rest[:spaceIdx]
+	if dirName == "" {
+		return "", "", false
+	}
+	dirArgs := strings.TrimLeft(rest[spaceIdx:], " \t")
+	return prefix + ":" + dirName, dirArgs, true
+}
+
+func isDirectivePrefix(p string) bool {
+	switch p {
+	case "go", "lint":
+		return true
+	}
+	return false
+}
+
+func buildDirectiveAnnotation(name, args string, prefix tree.Space) *tree.Annotation {
+	ann := &tree.Annotation{
+		ID:     uuid.New(),
+		Prefix: prefix,
+		AnnotationType: &tree.Identifier{
+			ID:   uuid.New(),
+			Name: name,
+		},
+	}
+	if args != "" {
+		ann.Arguments = &tree.Container[tree.Expression]{
+			Before: tree.Space{Whitespace: " "},
+			Elements: []tree.RightPadded[tree.Expression]{
+				{Element: &tree.Literal{
+					ID:     uuid.New(),
+					Source: args,
+					Value:  args,
+					Kind:   tree.StringLiteral,
+				}},
+			},
+		}
+	}
+	return ann
+}
+
+// structTagPair is one parsed `key:"value"` pair from a struct tag.
+type structTagPair struct {
+	PrefixWS      string // whitespace consumed before this pair (used only for non-first pairs)
+	Key           string
+	QuotedValue   string // the value source including its surrounding quotes (e.g. `"name"`)
+	UnquotedValue string // the value contents after Go-string unquoting
+}
+
+// parseStructTagPairs scans a struct tag's contents (without the
+// surrounding backticks) into a sequence of `key:"value"` pairs.
+// Mirrors `reflect.StructTag.Lookup`'s scanning loop:
+//   - Skip ASCII whitespace.
+//   - Read key (printable, non-quote, non-colon, non-control).
+//   - Expect `:"`, read quoted string respecting `\` escapes.
+//
+// Returns whatever pairs it parsed up to the first malformed section;
+// gofmt'd input is always well-formed but defensive scanning matches
+// stdlib behavior.
+func parseStructTagPairs(tag string) []structTagPair {
+	var pairs []structTagPair
+	i := 0
+	for i < len(tag) {
+		// Skip leading whitespace.
+		prefStart := i
+		for i < len(tag) && (tag[i] == ' ' || tag[i] == '\t' || tag[i] == '\n' || tag[i] == '\r') {
+			i++
+		}
+		prefixWS := tag[prefStart:i]
+		if i == len(tag) {
+			break
+		}
+		// Read key.
+		keyStart := i
+		for i < len(tag) && tag[i] > ' ' && tag[i] != ':' && tag[i] != '"' && tag[i] != 0x7f {
+			i++
+		}
+		if i == keyStart || i+1 >= len(tag) || tag[i] != ':' || tag[i+1] != '"' {
+			break
+		}
+		key := tag[keyStart:i]
+		i++ // skip `:`
+		// Read quoted value.
+		valueStart := i
+		i++ // skip opening `"`
+		for i < len(tag) && tag[i] != '"' {
+			if tag[i] == '\\' {
+				i++
+			}
+			i++
+		}
+		if i >= len(tag) {
+			break
+		}
+		i++ // skip closing `"`
+		quotedValue := tag[valueStart:i]
+		unquoted, err := strconv.Unquote(quotedValue)
+		if err != nil {
+			break
+		}
+		pairs = append(pairs, structTagPair{
+			PrefixWS:      prefixWS,
+			Key:           key,
+			QuotedValue:   quotedValue,
+			UnquotedValue: unquoted,
+		})
+	}
+	return pairs
 }
 
 // mapFieldListAsInterfaceBody maps an interface's method list to a Block.
@@ -2516,6 +2875,65 @@ func (ctx *parseContext) findNextBefore(ch byte, before int) int {
 	for i := ctx.cursor; i < len(ctx.src) && i < before; i++ {
 		if ctx.src[i] == ch {
 			return i
+		}
+	}
+	return -1
+}
+
+// findNextPositionOf is like findNextBefore but skips over Go rune
+// literals ('...'), interpreted string literals ("..."), raw string literals
+// (`...`), and `//` / `/* */` comments while scanning. A `before` of 0 means
+// scan to end of src. Used for syntactic markers like `;` in a `for` header
+// that can otherwise hide inside a `';'` rune literal or a `/* ; */` comment.
+func (ctx *parseContext) findNextPositionOf(ch byte, before int) int {
+	end := len(ctx.src)
+	if before > 0 && before < end {
+		end = before
+	}
+	i := ctx.cursor
+	for i < end {
+		b := ctx.src[i]
+		switch {
+		case b == '\'' || b == '"':
+			quote := b
+			i++
+			for i < end {
+				c := ctx.src[i]
+				if c == '\\' && i+1 < end {
+					i += 2
+					continue
+				}
+				i++
+				if c == quote {
+					break
+				}
+			}
+		case b == '`':
+			i++
+			for i < end && ctx.src[i] != '`' {
+				i++
+			}
+			if i < end {
+				i++
+			}
+		case b == '/' && i+1 < end && ctx.src[i+1] == '/':
+			i += 2
+			for i < end && ctx.src[i] != '\n' {
+				i++
+			}
+		case b == '/' && i+1 < end && ctx.src[i+1] == '*':
+			i += 2
+			for i+1 < end && !(ctx.src[i] == '*' && ctx.src[i+1] == '/') {
+				i++
+			}
+			if i+1 < end {
+				i += 2
+			}
+		default:
+			if b == ch {
+				return i
+			}
+			i++
 		}
 	}
 	return -1

@@ -1,0 +1,16 @@
+{
+  "modulePath": "example.com/withsum",
+  "goVersion": "1.22",
+  "toolchain": "",
+  "requires": [
+    {"modulePath": "github.com/google/uuid", "version": "v1.6.0", "indirect": false},
+    {"modulePath": "golang.org/x/mod", "version": "v0.35.0", "indirect": true}
+  ],
+  "replaces": [],
+  "excludes": [],
+  "retracts": [],
+  "resolvedDependencies": [
+    {"modulePath": "github.com/google/uuid", "version": "v1.6.0", "moduleHash": "h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=", "goModHash": "h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo="},
+    {"modulePath": "golang.org/x/mod", "version": "v0.35.0", "moduleHash": "h1:Ww1D637e6Pg+Zb2KrWfHQUnH2dQRLBQyAtpr/haaJeM=", "goModHash": "h1:+GwiRhIInF8wPm+4AoT6L0FA1QWAad3OMdTRx4tFYlU="}
+  ]
+}

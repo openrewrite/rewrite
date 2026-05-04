@@ -21,15 +21,78 @@ import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 // GoVisitor traverses and optionally transforms an OpenRewrite LST.
 // Embed GoVisitor in a struct and override visit methods to customize behavior.
 // Set Self to the outer struct to enable virtual dispatch.
+//
+// Cursor: GoVisitor maintains the current cursor as state. Recipes that
+// need ancestor context call v.Cursor() inside any Visit* override (matches
+// the JavaVisitor.getCursor() pattern). The RPC layer seeds an initial
+// cursor via SetCursor before traversal begins.
+//
+// After-visits: a visit method can queue follow-up visitors via
+// DoAfterVisit. The recipe runner drains the queue once the main visit
+// returns and re-applies each queued visitor (transitively — afters can
+// queue afters). This mirrors JavaVisitor.doAfterVisit and is the canonical
+// way to compose side-effects like "add an import" after the main edit.
 type GoVisitor struct {
 	// Self must point to the outermost embedding struct for virtual dispatch.
 	// If nil, dispatches to the default implementations on GoVisitor itself.
 	Self interface{}
 
-	cursor *Cursor
+	cursor      *Cursor
+	afterVisits []AfterVisitor
+}
+
+// AfterVisitor is the interface a follow-up visitor must satisfy to
+// participate in DoAfterVisit. It's a structural alias for the
+// recipe.TreeVisitor interface — duplicated here to avoid an import
+// cycle between pkg/visitor and pkg/recipe.
+type AfterVisitor interface {
+	Visit(t tree.Tree, p any) tree.Tree
+}
+
+// Cursor returns the current cursor (the path from root to the node
+// currently being visited). Mirrors JavaVisitor.getCursor().
+func (v *GoVisitor) Cursor() *Cursor { return v.cursor }
+
+// SetCursor seeds the visitor with an initial cursor chain. The RPC layer
+// calls this with the chain reconstructed from a Visit request's cursor
+// IDs before invoking Visit. Recipes typically don't call this directly.
+func (v *GoVisitor) SetCursor(c *Cursor) { v.cursor = c }
+
+// DoAfterVisit queues a follow-up visitor to run after the main visit
+// completes. Mirrors JavaVisitor.doAfterVisit. Use this from inside any
+// Visit* override to compose side-effects like adding an import:
+//
+//	svc := service.ImportServiceFor(cu)
+//	v.DoAfterVisit(svc.AddImportVisitor("fmt", nil, false))
+//
+// The recipe runner drains the queue after Visit returns; queued
+// visitors can themselves queue more after-visitors (transitive).
+func (v *GoVisitor) DoAfterVisit(other AfterVisitor) {
+	v.afterVisits = append(v.afterVisits, other)
+}
+
+// AfterVisits returns the queued follow-up visitors, then clears the
+// queue. The recipe runner calls this once the main Visit returns and
+// applies each visitor to the modified tree, looping until empty.
+func (v *GoVisitor) AfterVisits() []AfterVisitor {
+	out := v.afterVisits
+	v.afterVisits = nil
+	return out
 }
 
 // Visit dispatches to the appropriate visit method based on the node's concrete type.
+//
+// Lifecycle:
+//   1. cursor is pushed for `t`.
+//   2. PreVisit(t, p) is called via virtual dispatch — subclasses
+//      (e.g. RPC sender/receiver) override it to handle cross-cutting
+//      fields (id, prefix, markers) once per node.
+//   3. The type-specific Visit* method is dispatched via virtual
+//      dispatch on the (possibly modified) tree returned by PreVisit.
+//   4. cursor pops on return.
+//
+// PreVisit returning nil short-circuits the visit — useful for
+// receivers that get DELETE state from the wire.
 func (v *GoVisitor) Visit(t tree.Tree, p any) tree.Tree {
 	if t == nil {
 		return nil
@@ -37,6 +100,11 @@ func (v *GoVisitor) Visit(t tree.Tree, p any) tree.Tree {
 
 	v.cursor = NewCursor(v.cursor, t)
 	defer func() { v.cursor = v.cursor.parent }()
+
+	t = v.self().PreVisit(t, p)
+	if t == nil {
+		return nil
+	}
 
 	switch n := t.(type) {
 	case *tree.CompilationUnit:
@@ -101,6 +169,8 @@ func (v *GoVisitor) Visit(t tree.Tree, p any) tree.Tree {
 		return v.self().VisitFallthrough(n, p)
 	case *tree.Empty:
 		return v.self().VisitEmpty(n, p)
+	case *tree.Annotation:
+		return v.self().VisitAnnotation(n, p)
 	case *tree.ArrayType:
 		return v.self().VisitArrayType(n, p)
 	case *tree.Parentheses:
@@ -162,6 +232,7 @@ func (v *GoVisitor) self() VisitorI {
 // VisitorI defines all overridable visit methods.
 type VisitorI interface {
 	Visit(t tree.Tree, p any) tree.Tree
+	PreVisit(t tree.Tree, p any) tree.Tree
 	VisitCompilationUnit(cu *tree.CompilationUnit, p any) tree.J
 	VisitIdentifier(ident *tree.Identifier, p any) tree.J
 	VisitLiteral(lit *tree.Literal, p any) tree.J
@@ -193,6 +264,7 @@ type VisitorI interface {
 	VisitGoto(g *tree.Goto, p any) tree.J
 	VisitFallthrough(f *tree.Fallthrough, p any) tree.J
 	VisitEmpty(empty *tree.Empty, p any) tree.J
+	VisitAnnotation(ann *tree.Annotation, p any) tree.J
 	VisitArrayType(at *tree.ArrayType, p any) tree.J
 	VisitParentheses(paren *tree.Parentheses, p any) tree.J
 	VisitTypeCast(tc *tree.TypeCast, p any) tree.J
@@ -223,6 +295,14 @@ type VisitorI interface {
 var _ VisitorI = (*GoVisitor)(nil)
 
 // --- Default visit implementations ---
+
+// PreVisit is the per-node hook called by Visit() before dispatching
+// to the type-specific Visit* method. The default implementation is
+// the identity function. RPC senders/receivers override it to
+// serialize/deserialize the cross-cutting `id`, `prefix`, and
+// `markers` fields once per node, mirroring Java's
+// JavaVisitor.preVisit pattern.
+func (v *GoVisitor) PreVisit(t tree.Tree, p any) tree.Tree { return t }
 
 func (v *GoVisitor) VisitCompilationUnit(cu *tree.CompilationUnit, p any) tree.J {
 	cu = cu.WithPrefix(v.self().VisitSpace(cu.Prefix, p))
@@ -312,6 +392,17 @@ func (v *GoVisitor) VisitAssignment(assign *tree.Assignment, p any) tree.J {
 func (v *GoVisitor) VisitMethodDeclaration(md *tree.MethodDeclaration, p any) tree.J {
 	md = md.WithPrefix(v.self().VisitSpace(md.Prefix, p))
 	md = md.WithMarkers(v.visitMarkers(md.Markers, p))
+	if len(md.LeadingAnnotations) > 0 {
+		anns := make([]*tree.Annotation, 0, len(md.LeadingAnnotations))
+		for _, a := range md.LeadingAnnotations {
+			visited := v.self().Visit(a, p)
+			if visited == nil {
+				continue
+			}
+			anns = append(anns, visited.(*tree.Annotation))
+		}
+		md = md.WithLeadingAnnotations(anns)
+	}
 	md = md.WithName(visitAndCast[*tree.Identifier](v, md.Name, p))
 	if md.Body != nil {
 		md = md.WithBody(visitAndCast[*tree.Block](v, md.Body, p))
@@ -323,6 +414,13 @@ func (v *GoVisitor) VisitFieldAccess(fa *tree.FieldAccess, p any) tree.J {
 	fa = fa.WithPrefix(v.self().VisitSpace(fa.Prefix, p))
 	fa = fa.WithMarkers(v.visitMarkers(fa.Markers, p))
 	fa = fa.WithTarget(visitExpression(v, fa.Target, p))
+	// Visit the selector identifier so recipes that traverse identifiers
+	// see the right-hand side of `target.Name` (e.g. the `Box` in
+	// `a.Box[int]{...}`). Mirrors JavaIsoVisitor.visitFieldAccess.
+	name := fa.Name
+	name.Before = v.self().VisitSpace(name.Before, p)
+	name.Element = visitAndCast[*tree.Identifier](v, name.Element, p)
+	fa.Name = name
 	return fa
 }
 
@@ -344,6 +442,17 @@ func (v *GoVisitor) VisitMethodInvocation(mi *tree.MethodInvocation, p any) tree
 func (v *GoVisitor) VisitVariableDeclarations(vd *tree.VariableDeclarations, p any) tree.J {
 	vd = vd.WithPrefix(v.self().VisitSpace(vd.Prefix, p))
 	vd = vd.WithMarkers(v.visitMarkers(vd.Markers, p))
+	if len(vd.LeadingAnnotations) > 0 {
+		anns := make([]*tree.Annotation, 0, len(vd.LeadingAnnotations))
+		for _, a := range vd.LeadingAnnotations {
+			visited := v.self().Visit(a, p)
+			if visited == nil {
+				continue
+			}
+			anns = append(anns, visited.(*tree.Annotation))
+		}
+		vd = vd.WithLeadingAnnotations(anns)
+	}
 	if vd.TypeExpr != nil {
 		vd.TypeExpr = visitExpression(v, vd.TypeExpr, p)
 	}
@@ -478,6 +587,22 @@ func (v *GoVisitor) VisitEmpty(empty *tree.Empty, p any) tree.J {
 	return empty
 }
 
+func (v *GoVisitor) VisitAnnotation(ann *tree.Annotation, p any) tree.J {
+	ann = ann.WithPrefix(v.self().VisitSpace(ann.Prefix, p))
+	ann = ann.WithMarkers(v.visitMarkers(ann.Markers, p))
+	if ann.AnnotationType != nil {
+		ann = ann.WithAnnotationType(visitExpression(v, ann.AnnotationType, p))
+	}
+	if ann.Arguments != nil {
+		args := *ann.Arguments
+		args.Before = v.self().VisitSpace(args.Before, p)
+		args.Markers = v.visitMarkers(args.Markers, p)
+		args.Elements = visitRightPaddedExpressionList(v, args.Elements, p)
+		ann = ann.WithArguments(&args)
+	}
+	return ann
+}
+
 func (v *GoVisitor) VisitArrayType(at *tree.ArrayType, p any) tree.J {
 	at = at.WithPrefix(v.self().VisitSpace(at.Prefix, p))
 	at = at.WithMarkers(v.visitMarkers(at.Markers, p))
@@ -511,12 +636,24 @@ func (v *GoVisitor) VisitArrayAccess(aa *tree.ArrayAccess, p any) tree.J {
 func (v *GoVisitor) VisitParameterizedType(pt *tree.ParameterizedType, p any) tree.J {
 	pt = pt.WithPrefix(v.self().VisitSpace(pt.Prefix, p))
 	pt = pt.WithMarkers(v.visitMarkers(pt.Markers, p))
+	if pt.Clazz != nil {
+		pt.Clazz = visitExpression(v, pt.Clazz, p)
+	}
+	if pt.TypeParameters != nil {
+		pt.TypeParameters.Before = v.self().VisitSpace(pt.TypeParameters.Before, p)
+		pt.TypeParameters.Elements = visitRightPaddedList(v, pt.TypeParameters.Elements, p)
+	}
 	return pt
 }
 
 func (v *GoVisitor) VisitIndexList(il *tree.IndexList, p any) tree.J {
 	il = il.WithPrefix(v.self().VisitSpace(il.Prefix, p))
 	il = il.WithMarkers(v.visitMarkers(il.Markers, p))
+	if il.Target != nil {
+		il.Target = visitExpression(v, il.Target, p)
+	}
+	il.Indices.Before = v.self().VisitSpace(il.Indices.Before, p)
+	il.Indices.Elements = visitRightPaddedList(v, il.Indices.Elements, p)
 	return il
 }
 
@@ -529,6 +666,11 @@ func (v *GoVisitor) VisitArrayDimension(ad *tree.ArrayDimension, p any) tree.J {
 func (v *GoVisitor) VisitComposite(c *tree.Composite, p any) tree.J {
 	c = c.WithPrefix(v.self().VisitSpace(c.Prefix, p))
 	c = c.WithMarkers(v.visitMarkers(c.Markers, p))
+	if c.TypeExpr != nil {
+		c.TypeExpr = visitExpression(v, c.TypeExpr, p)
+	}
+	c.Elements.Before = v.self().VisitSpace(c.Elements.Before, p)
+	c.Elements.Elements = visitRightPaddedList(v, c.Elements.Elements, p)
 	return c
 }
 
@@ -587,6 +729,17 @@ func (v *GoVisitor) VisitTypeList(tl *tree.TypeList, p any) tree.J {
 func (v *GoVisitor) VisitTypeDecl(td *tree.TypeDecl, p any) tree.J {
 	td = td.WithPrefix(v.self().VisitSpace(td.Prefix, p))
 	td = td.WithMarkers(v.visitMarkers(td.Markers, p))
+	if len(td.LeadingAnnotations) > 0 {
+		anns := make([]*tree.Annotation, 0, len(td.LeadingAnnotations))
+		for _, a := range td.LeadingAnnotations {
+			visited := v.self().Visit(a, p)
+			if visited == nil {
+				continue
+			}
+			anns = append(anns, visited.(*tree.Annotation))
+		}
+		td = td.WithLeadingAnnotations(anns)
+	}
 	return td
 }
 

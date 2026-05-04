@@ -1694,6 +1694,33 @@ def write_message(response: dict):
     os.write(sys.stdout.fileno(), header + content_bytes)
 
 
+def _init_pyroscope() -> None:
+    """Start continuous profiling when PYROSCOPE_SERVER_ADDRESS is set.
+
+    Tags inherited via PYROSCOPE_TAGS (k=v,k=v) are forwarded verbatim; a
+    `runtime=python` tag is added so flame graphs in the shared `modcli`
+    application can be sliced by which RPC subprocess produced them.
+    """
+    server = os.environ.get("PYROSCOPE_SERVER_ADDRESS")
+    if not server:
+        return
+    try:
+        import pyroscope  # type: ignore[import-not-found]
+    except ImportError:
+        logger.warning("PYROSCOPE_SERVER_ADDRESS set but pyroscope-io not installed; profiling disabled")
+        return
+    tags: Dict[str, str] = {"runtime": "python"}
+    for pair in os.environ.get("PYROSCOPE_TAGS", "").split(","):
+        if "=" in pair:
+            k, v = pair.split("=", 1)
+            tags[k.strip()] = v.strip()
+    pyroscope.configure(
+        application_name=os.environ.get("PYROSCOPE_APPLICATION_NAME", "modcli"),
+        server_address=server,
+        tags=tags,
+    )
+
+
 def main():
     """Main entry point for the RPC server."""
     global _trace_rpc
@@ -1704,6 +1731,8 @@ def main():
     parser.add_argument('--trace-rpc-messages', action='store_true', help='Enable RPC message tracing')
     parser.add_argument('--recipe-install-dir', help='Directory where recipe pip packages are installed')
     args = parser.parse_args()
+
+    _init_pyroscope()
 
     if args.recipe_install_dir:
         global _recipe_install_dir

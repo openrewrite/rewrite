@@ -456,13 +456,14 @@ func (n *TypeList) WithMarkers(markers Markers) *TypeList {
 // Covers: `type Foo struct{...}`, `type Foo interface{...}`, `type Foo int`, `type Foo = Bar`.
 // For grouped declarations `type ( ... )`, Specs is non-nil and Name/Definition are unused.
 type TypeDecl struct {
-	ID         uuid.UUID
-	Prefix     Space
-	Markers    Markers
-	Name       *Identifier
-	Assign     *LeftPadded[Space]    // non-nil for `type Foo = Bar`; Before = space before `=`
-	Definition Expression            // the type expression (nil for grouped)
-	Specs      *Container[Statement] // non-nil for grouped `type ( ... )`; Before = space before `(`
+	ID                 uuid.UUID
+	Prefix             Space
+	Markers            Markers
+	LeadingAnnotations []*Annotation         // `//go:generate ...` etc.
+	Name               *Identifier
+	Assign             *LeftPadded[Space]    // non-nil for `type Foo = Bar`; Before = space before `=`
+	Definition         Expression            // the type expression (nil for grouped)
+	Specs              *Container[Statement] // non-nil for grouped `type ( ... )`; Before = space before `(`
 }
 
 func (*TypeDecl) isTree()      {}
@@ -478,6 +479,12 @@ func (n *TypeDecl) WithPrefix(prefix Space) *TypeDecl {
 func (n *TypeDecl) WithMarkers(markers Markers) *TypeDecl {
 	c := *n
 	c.Markers = markers
+	return &c
+}
+
+func (n *TypeDecl) WithLeadingAnnotations(anns []*Annotation) *TypeDecl {
+	c := *n
+	c.LeadingAnnotations = anns
 	return &c
 }
 

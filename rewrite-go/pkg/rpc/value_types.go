@@ -68,6 +68,7 @@ func init() {
 	RegisterValueType(reflect.TypeOf((*tree.Continue)(nil)), "org.openrewrite.java.tree.J$Continue")
 	RegisterValueType(reflect.TypeOf((*tree.Label)(nil)), "org.openrewrite.java.tree.J$Label")
 	RegisterValueType(reflect.TypeOf((*tree.Empty)(nil)), "org.openrewrite.java.tree.J$Empty")
+	RegisterValueType(reflect.TypeOf((*tree.Annotation)(nil)), "org.openrewrite.java.tree.J$Annotation")
 	RegisterValueType(reflect.TypeOf((*tree.Unary)(nil)), "org.openrewrite.java.tree.J$Unary")
 	RegisterValueType(reflect.TypeOf((*tree.FieldAccess)(nil)), "org.openrewrite.java.tree.J$FieldAccess")
 	RegisterValueType(reflect.TypeOf((*tree.MethodInvocation)(nil)), "org.openrewrite.java.tree.J$MethodInvocation")
@@ -104,6 +105,16 @@ func init() {
 	RegisterValueType(reflect.TypeOf(tree.TrailingComma{}), "org.openrewrite.golang.marker.TrailingComma")
 	RegisterValueType(reflect.TypeOf(tree.SearchResult{}), "org.openrewrite.marker.SearchResult")
 	RegisterValueType(reflect.TypeOf(tree.ParseExceptionResult{}), "org.openrewrite.ParseExceptionResult")
+	RegisterValueType(reflect.TypeOf(tree.Semicolon{}), "org.openrewrite.java.marker.Semicolon")
+	RegisterValueType(reflect.TypeOf(tree.GoProject{}), "org.openrewrite.golang.marker.GoProject")
+	RegisterValueType(reflect.TypeOf(tree.GoResolutionResult{}), "org.openrewrite.golang.marker.GoResolutionResult")
+	// Inner-class types of GoResolutionResult; Java emits them via
+	// getAndSendListAsRef so each item's wire shape carries a valueType.
+	RegisterValueType(reflect.TypeOf(tree.GoRequire{}), "org.openrewrite.golang.marker.GoResolutionResult$Require")
+	RegisterValueType(reflect.TypeOf(tree.GoReplace{}), "org.openrewrite.golang.marker.GoResolutionResult$Replace")
+	RegisterValueType(reflect.TypeOf(tree.GoExclude{}), "org.openrewrite.golang.marker.GoResolutionResult$Exclude")
+	RegisterValueType(reflect.TypeOf(tree.GoRetract{}), "org.openrewrite.golang.marker.GoResolutionResult$Retract")
+	RegisterValueType(reflect.TypeOf(tree.GoResolvedDependency{}), "org.openrewrite.golang.marker.GoResolutionResult$ResolvedDependency")
 
 	// JavaType types
 	RegisterValueType(reflect.TypeOf((*tree.JavaTypeClass)(nil)), "org.openrewrite.java.tree.JavaType$Class")
@@ -161,6 +172,7 @@ func init() {
 	RegisterFactory("org.openrewrite.java.tree.J$Continue", func() any { return &tree.Continue{} })
 	RegisterFactory("org.openrewrite.java.tree.J$Label", func() any { return &tree.Label{} })
 	RegisterFactory("org.openrewrite.java.tree.J$Empty", func() any { return &tree.Empty{} })
+	RegisterFactory("org.openrewrite.java.tree.J$Annotation", func() any { return &tree.Annotation{} })
 	RegisterFactory("org.openrewrite.java.tree.J$Unary", func() any { return &tree.Unary{} })
 	RegisterFactory("org.openrewrite.java.tree.J$FieldAccess", func() any { return &tree.FieldAccess{} })
 	RegisterFactory("org.openrewrite.java.tree.J$MethodInvocation", func() any { return &tree.MethodInvocation{} })
@@ -209,6 +221,18 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.marker.TypeSwitchGuard", func() any { return tree.TypeSwitchGuard{} })
 	RegisterFactory("org.openrewrite.golang.marker.StructTag", func() any { return tree.StructTag{} })
 	RegisterFactory("org.openrewrite.golang.marker.TrailingComma", func() any { return tree.TrailingComma{} })
+	// Semicolon: RpcCodec on the Java side; sends only `id`. Replaces the
+	// previous GenericMarker fallback for the same Java FQN.
+	RegisterFactory("org.openrewrite.java.marker.Semicolon", func() any { return tree.Semicolon{} })
+	// GoProject + GoResolutionResult are RpcCodec on the Java side; codec
+	// dispatch lives in space_rpc.go's sendMarkerCodecFields / receiveMarkersCodec.
+	RegisterFactory("org.openrewrite.golang.marker.GoProject", func() any { return tree.GoProject{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult", func() any { return tree.GoResolutionResult{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$Require", func() any { return tree.GoRequire{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$Replace", func() any { return tree.GoReplace{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$Exclude", func() any { return tree.GoExclude{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$Retract", func() any { return tree.GoRetract{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$ResolvedDependency", func() any { return tree.GoResolvedDependency{} })
 
 	RegisterFactory("org.openrewrite.java.tree.Space", func() any { return tree.Space{} })
 	RegisterFactory("org.openrewrite.marker.Markers", func() any { return tree.Markers{} })
