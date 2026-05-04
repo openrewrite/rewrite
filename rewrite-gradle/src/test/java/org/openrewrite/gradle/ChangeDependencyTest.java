@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
@@ -373,6 +374,7 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void changeDependencyWithLowerVersionAfter() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null, null, true)),
