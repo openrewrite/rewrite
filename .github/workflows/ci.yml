@@ -36,6 +36,7 @@ jobs:
       - uses: s4u/maven-settings-action@v3.1.0
         with:
           mirrors: '[{"id": "moderne-cache", "name": "Moderne Artifactory Cache", "mirrorOf": "*", "url": "https://artifactory.moderne.ninja/artifactory/moderne-cache-3/"}]'
+          servers: '[{"id": "moderne-cache", "username": "${{ secrets.ARTIFACTORY_USERNAME }}", "password": "${{ secrets.ARTIFACTORY_PASSWORD }}"}]'
 
       - uses: openrewrite/gh-automation/.github/actions/build@main
 
