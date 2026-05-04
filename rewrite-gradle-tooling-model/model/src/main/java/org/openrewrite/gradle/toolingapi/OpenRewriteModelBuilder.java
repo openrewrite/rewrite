@@ -119,23 +119,25 @@ public class OpenRewriteModelBuilder {
         }
         try (ProjectConnection connection = connector.connect()) {
             ModelBuilder<OpenRewriteModelProxy> customModelBuilder = connection.model(OpenRewriteModelProxy.class);
+            String resolvedInitScript;
             if (initScript == null) {
                 if (System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath") != null) {
                     // code path only expected to be taken from within openrewrite/rewrite
-                    String generatedInitScript = generateInitScriptFromManifest();
-                    Files.write(init, generatedInitScript.getBytes(StandardCharsets.UTF_8));
+                    resolvedInitScript = generateInitScriptFromManifest();
                 } else {
                     // Use default init.gradle from resources
                     try (InputStream is = OpenRewriteModel.class.getResourceAsStream("/init.gradle")) {
                         if (is == null) {
                             throw new IllegalStateException("Expected to find init.gradle on the classpath");
                         }
-                        Files.copy(is, init);
+                        byte[] bytes = readAllBytes(is);
+                        resolvedInitScript = new String(bytes, StandardCharsets.UTF_8);
                     }
                 }
             } else {
-                Files.write(init, initScript.getBytes());
+                resolvedInitScript = initScript;
             }
+            Files.write(init, (resolvedInitScript + mirrorScriptSnippet()).getBytes(StandardCharsets.UTF_8));
             customModelBuilder.withArguments(arguments);
             return OpenRewriteModel.from(customModelBuilder.get());
         } finally {
@@ -151,6 +153,58 @@ public class OpenRewriteModelBuilder {
                 throw new UncheckedIOException(e);
             }
         }
+    }
+
+    /**
+     * When the env vars {@code REWRITE_GRADLE_MIRROR_URL}, {@code REWRITE_GRADLE_MIRROR_USERNAME}, and
+     * {@code REWRITE_GRADLE_MIRROR_PASSWORD} are all set, returns a Groovy init-script fragment that
+     * routes plugin and dependency resolution for the embedded Gradle build through that repository.
+     * If any var is missing, returns the empty string and the embedded Gradle resolves repositories
+     * exactly as the build files declare.
+     */
+    private static String mirrorScriptSnippet() {
+        String url = System.getenv("REWRITE_GRADLE_MIRROR_URL");
+        String user = System.getenv("REWRITE_GRADLE_MIRROR_USERNAME");
+        String pass = System.getenv("REWRITE_GRADLE_MIRROR_PASSWORD");
+        if (url == null || user == null || pass == null || url.isEmpty() || user.isEmpty() || pass.isEmpty()) {
+            return "";
+        }
+        return "\n\n" +
+                "def __rewriteMirrorUrl = '" + escapeGroovy(url) + "'\n" +
+                "def __rewriteMirrorUser = '" + escapeGroovy(user) + "'\n" +
+                "def __rewriteMirrorPass = '" + escapeGroovy(pass) + "'\n" +
+                "def __rewriteConfigureMirror = { container ->\n" +
+                "    container.clear()\n" +
+                "    container.maven {\n" +
+                "        url = __rewriteMirrorUrl\n" +
+                "        credentials {\n" +
+                "            username = __rewriteMirrorUser\n" +
+                "            password = __rewriteMirrorPass\n" +
+                "        }\n" +
+                "    }\n" +
+                "}\n" +
+                "allprojects {\n" +
+                "    buildscript.repositories { __rewriteConfigureMirror(delegate) }\n" +
+                "    repositories { __rewriteConfigureMirror(delegate) }\n" +
+                "}\n" +
+                "settingsEvaluated { settings ->\n" +
+                "    settings.pluginManagement.repositories { __rewriteConfigureMirror(delegate) }\n" +
+                "    try { settings.dependencyResolutionManagement.repositories { __rewriteConfigureMirror(delegate) } } catch (Throwable ignored) {}\n" +
+                "}\n";
+    }
+
+    private static String escapeGroovy(String s) {
+        return s.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
+    private static byte[] readAllBytes(InputStream in) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) != -1) {
+            out.write(buf, 0, n);
+        }
+        return out.toByteArray();
     }
 
     private static boolean isGradle9OrLater(@Nullable String version) {
