@@ -36,8 +36,13 @@ jobs:
       - uses: s4u/maven-settings-action@v3.1.0
         with:
           mirrors: '[{"id": "moderne-cache", "name": "Moderne Artifactory Cache", "mirrorOf": "*", "url": "https://artifactory.moderne.ninja/artifactory/moderne-cache-3/"}]'
+          servers: '[{"id": "moderne-cache", "username": "${{ secrets.ARTIFACTORY_USERNAME }}", "password": "${{ secrets.ARTIFACTORY_PASSWORD }}"}]'
 
       - uses: openrewrite/gh-automation/.github/actions/build@main
+        env:
+          REWRITE_GRADLE_MIRROR_URL: https://artifactory.moderne.ninja/artifactory/moderne-cache-3/
+          REWRITE_GRADLE_MIRROR_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+          REWRITE_GRADLE_MIRROR_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
 
       - if: failure() && github.event_name == 'schedule' && (github.repository_owner == 'openrewrite' || github.repository_owner == 'moderneinc')
         uses: openrewrite/gh-automation/.github/actions/slack-failure@main

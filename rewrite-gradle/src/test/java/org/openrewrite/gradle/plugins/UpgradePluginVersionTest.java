@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.plugins;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.semver.Semver;
@@ -159,6 +160,7 @@ class UpgradePluginVersionTest implements RewriteTest {
     }
 
     @Test
+    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void upgradeGradleSettingsPlugin() {
         rewriteRun(
           spec -> spec.recipe(new UpgradePluginVersion("com.gradle.enterprise", "3.10.x", null)),
