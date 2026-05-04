@@ -1390,10 +1390,13 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *tree.ForLoop {
 	// Go's AST normalizes `for ; cond; {}` to Init=nil, Post=nil, same as `for cond {}`.
 	// We detect semicolons by looking at the source text between for keyword and body.
 	is3Clause := stmt.Init != nil || stmt.Post != nil
+	bodyStart := int(stmt.Body.Lbrace) - ctx.file.Base()
 	if !is3Clause {
-		// Check for semicolons in the source between cursor and the body brace
-		bodyStart := int(stmt.Body.Lbrace) - ctx.file.Base()
-		if ctx.findNextBefore(';', bodyStart) >= 0 {
+		// `for ; cond; {}` has no Init/Post in the AST but is still
+		// syntactically 3-clause. Detect by scanning for `;` in the
+		// header — but skip rune/string literals so a `';'` inside the
+		// condition (e.g. `for tok != ';'`) isn't mistaken for one.
+		if ctx.findNextPositionOf(';', bodyStart) >= 0 {
 			is3Clause = true
 		}
 	}
@@ -1402,7 +1405,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *tree.ForLoop {
 		// 3-clause for: for [init]; [cond]; [post] {}
 		if stmt.Init != nil {
 			init := ctx.mapStmt(stmt.Init)
-			semicolonOffset := ctx.findNext(';')
+			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
 			var after tree.Space
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -1412,7 +1415,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *tree.ForLoop {
 			control.Init = &initRP
 		} else {
 			// No init but semicolons present: `for ; cond; post {}`
-			semicolonOffset := ctx.findNext(';')
+			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
 			var after tree.Space
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -1424,7 +1427,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *tree.ForLoop {
 
 		if stmt.Cond != nil {
 			cond := ctx.mapExpr(stmt.Cond)
-			semicolonOffset := ctx.findNext(';')
+			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
 			after := tree.EmptySpace
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -1433,7 +1436,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *tree.ForLoop {
 			condRP := tree.RightPadded[tree.Expression]{Element: cond, After: after}
 			control.Condition = &condRP
 		} else {
-			semicolonOffset := ctx.findNext(';')
+			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
 			after := tree.EmptySpace
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
@@ -2872,6 +2875,65 @@ func (ctx *parseContext) findNextBefore(ch byte, before int) int {
 	for i := ctx.cursor; i < len(ctx.src) && i < before; i++ {
 		if ctx.src[i] == ch {
 			return i
+		}
+	}
+	return -1
+}
+
+// findNextPositionOf is like findNextBefore but skips over Go rune
+// literals ('...'), interpreted string literals ("..."), raw string literals
+// (`...`), and `//` / `/* */` comments while scanning. A `before` of 0 means
+// scan to end of src. Used for syntactic markers like `;` in a `for` header
+// that can otherwise hide inside a `';'` rune literal or a `/* ; */` comment.
+func (ctx *parseContext) findNextPositionOf(ch byte, before int) int {
+	end := len(ctx.src)
+	if before > 0 && before < end {
+		end = before
+	}
+	i := ctx.cursor
+	for i < end {
+		b := ctx.src[i]
+		switch {
+		case b == '\'' || b == '"':
+			quote := b
+			i++
+			for i < end {
+				c := ctx.src[i]
+				if c == '\\' && i+1 < end {
+					i += 2
+					continue
+				}
+				i++
+				if c == quote {
+					break
+				}
+			}
+		case b == '`':
+			i++
+			for i < end && ctx.src[i] != '`' {
+				i++
+			}
+			if i < end {
+				i++
+			}
+		case b == '/' && i+1 < end && ctx.src[i+1] == '/':
+			i += 2
+			for i < end && ctx.src[i] != '\n' {
+				i++
+			}
+		case b == '/' && i+1 < end && ctx.src[i+1] == '*':
+			i += 2
+			for i+1 < end && !(ctx.src[i] == '*' && ctx.src[i+1] == '/') {
+				i++
+			}
+			if i+1 < end {
+				i += 2
+			}
+		default:
+			if b == ch {
+				return i
+			}
+			i++
 		}
 	}
 	return -1
