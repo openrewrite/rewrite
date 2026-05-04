@@ -18,20 +18,67 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GRADLE_SWITCHES: --console=plain --info --stacktrace --warning-mode=all --no-daemon
+
 jobs:
   build:
-    uses: openrewrite/gh-automation/.github/workflows/ci-gradle.yml@main
-    with:
-      java_version: |
-        25
-        21
-    secrets:
-      gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-      sonatype_username: ${{ secrets.SONATYPE_USERNAME }}
-      sonatype_token: ${{ secrets.SONATYPE_TOKEN}}
-      ossrh_signing_key: ${{ secrets.OSSRH_SIGNING_KEY }}
-      ossrh_signing_password: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
-      OPS_GITHUB_ACTIONS_WEBHOOK: ${{ secrets.OPS_GITHUB_ACTIONS_WEBHOOK }}
-      node_auth_token: ${{ secrets.NPM_TOKEN }}
-      pypi_token: ${{ secrets.PYPI_OPENREWRITE_PUBLISH }}
-      nuget_api_key: ${{ secrets.NUGET_API_KEY }}
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' || github.repository_owner == 'openrewrite' || github.repository_owner == 'moderneinc'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          show-progress: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            25
+            21
+
+      - uses: astral-sh/setup-uv@v7
+
+      # Route Maven resolution through Moderne's Artifactory cache to avoid
+      # Maven Central rate-limiting (HTTP 404 + Retry-After) under parallel test
+      # load. Picked up by MavenSettingsAutoLoadingExtension at test time. Must
+      # run after setup-java because that action overwrites ~/.m2/settings.xml.
+      - uses: s4u/maven-settings-action@v3.1.0
+        with:
+          mirrors: '[{"id": "moderne-cache", "name": "Moderne Artifactory Cache", "mirrorOf": "*", "url": "https://artifactory.moderne.ninja/artifactory/moderne-cache-3/"}]'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          develocity-access-key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+
+      - name: build
+        run: ./gradlew ${{ env.GRADLE_SWITCHES }} build
+
+      - name: slackNotificationOfFailure
+        if: failure() && github.event_name == 'schedule' && (github.repository_owner == 'openrewrite' || github.repository_owner == 'moderneinc')
+        uses: rtCamp/action-slack-notify@e31e87e03dd19038e411e38ae27cbad084a90661
+        continue-on-error: true
+        env:
+          SLACK_WEBHOOK: ${{ secrets.OPS_GITHUB_ACTIONS_WEBHOOK }}
+          MSG_MINIMAL: true
+          SLACK_MESSAGE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_USERNAME: ${{ github.repository }} CI failure
+          SLACK_COLOR: failure
+          SLACK_FOOTER: ''
+
+      - name: publish-snapshots
+        if: >
+          github.event_name != 'pull_request' &&
+          github.ref == 'refs/heads/main' &&
+          (github.repository_owner == 'openrewrite' || github.repository_owner == 'moderneinc')
+        run: ./gradlew ${{ env.GRADLE_SWITCHES }} snapshot publish -PforceSigning -x test
+        env:
+          ORG_GRADLE_PROJECT_sonatypeUsername: ${{ secrets.SONATYPE_USERNAME }}
+          ORG_GRADLE_PROJECT_sonatypePassword: ${{ secrets.SONATYPE_TOKEN }}
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.OSSRH_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
+          ORG_GRADLE_PROJECT_nodeAuthToken: ${{ secrets.NPM_TOKEN }}
+          ORG_GRADLE_PROJECT_pypiToken: ${{ secrets.PYPI_OPENREWRITE_PUBLISH }}
+          ORG_GRADLE_PROJECT_nugetApiKey: ${{ secrets.NUGET_API_KEY }}
