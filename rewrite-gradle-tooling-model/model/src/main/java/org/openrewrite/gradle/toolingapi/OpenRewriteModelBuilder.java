@@ -173,7 +173,12 @@ public class OpenRewriteModelBuilder {
                 "def __rewriteMirrorUrl = '" + escapeGroovy(url) + "'\n" +
                 "def __rewriteMirrorUser = '" + escapeGroovy(user) + "'\n" +
                 "def __rewriteMirrorPass = '" + escapeGroovy(pass) + "'\n" +
+                // Prepend Artifactory as a Maven Central proxy without removing any repository the
+                // build (or its plugins) declared. Gradle tries repositories in order and falls
+                // through on 404, so Central artifacts come from Artifactory while Plugin Portal-only
+                // markers (Nebula, Develocity, etc.) still resolve from gradlePluginPortal().
                 "def __rewriteConfigureMirror = { container ->\n" +
+                "    def existing = new ArrayList(container as Collection)\n" +
                 "    container.clear()\n" +
                 "    container.maven {\n" +
                 "        url = __rewriteMirrorUrl\n" +
@@ -182,6 +187,7 @@ public class OpenRewriteModelBuilder {
                 "            password = __rewriteMirrorPass\n" +
                 "        }\n" +
                 "    }\n" +
+                "    existing.each { container.add(it) }\n" +
                 "}\n" +
                 "allprojects {\n" +
                 "    buildscript.repositories { __rewriteConfigureMirror(delegate) }\n" +
