@@ -10,6 +10,10 @@ plugins {
 // the kotlin-stdlib alignment stays in lockstep across modules.
 val kotlinVersion = "2.3.20"
 
+recipeDependencies {
+    parserClasspath("jakarta.persistence:jakarta.persistence-api:3.1.0")
+}
+
 dependencies {
     compileOnly(project(":rewrite-core"))
     compileOnly(project(":rewrite-test"))
@@ -29,6 +33,7 @@ dependencies {
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
     testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin")
+    testRuntimeOnly("jakarta.persistence:jakarta.persistence-api:3.1.0")
 
     testImplementation("com.github.ajalt.clikt:clikt:3.5.0")
     testImplementation("com.squareup:javapoet:1.13.0")
