@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/grafana/pyroscope-go"
 
 	goparser "github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
@@ -257,7 +258,34 @@ func parseFlags() serverConfig {
 	return cfg
 }
 
+// initPyroscope starts continuous profiling when PYROSCOPE_SERVER_ADDRESS is
+// set. Tags inherited via PYROSCOPE_TAGS (k=v,k=v) are forwarded verbatim; a
+// runtime=go tag is added so flame graphs in the shared modcli application
+// can be sliced by which RPC subprocess produced them.
+func initPyroscope() {
+	server := os.Getenv("PYROSCOPE_SERVER_ADDRESS")
+	if server == "" {
+		return
+	}
+	appName := os.Getenv("PYROSCOPE_APPLICATION_NAME")
+	if appName == "" {
+		appName = "modcli"
+	}
+	tags := map[string]string{"runtime": "go"}
+	for _, pair := range strings.Split(os.Getenv("PYROSCOPE_TAGS"), ",") {
+		if i := strings.Index(pair, "="); i > 0 {
+			tags[strings.TrimSpace(pair[:i])] = strings.TrimSpace(pair[i+1:])
+		}
+	}
+	_, _ = pyroscope.Start(pyroscope.Config{
+		ApplicationName: appName,
+		ServerAddress:   server,
+		Tags:            tags,
+	})
+}
+
 func main() {
+	initPyroscope()
 	cfg := parseFlags()
 	s := newServer(cfg)
 	s.logger.Println("Go RPC server starting...")

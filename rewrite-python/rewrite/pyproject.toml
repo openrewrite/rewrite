@@ -41,6 +41,11 @@ publish = [
     "build>=1.0.0",
     "twine>=5.0.0",
 ]
+# Continuous profiling for production recipe-worker subprocesses; the RPC
+# server's _init_pyroscope() is a no-op when this isn't installed.
+profiling = [
+    "pyroscope-io>=0.8.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/openrewrite/rewrite"
