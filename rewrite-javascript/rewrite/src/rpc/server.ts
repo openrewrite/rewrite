@@ -31,6 +31,33 @@ import "../javascript";
 // Not possible to set the stack size when executing from npx for security reasons
 require('v8').setFlagsFromString('--stack-size=8000');
 
+function initPyroscope(logger: rpc.Logger): void {
+    const server = process.env.PYROSCOPE_SERVER_ADDRESS;
+    if (!server) {
+        return;
+    }
+    let Pyroscope: any;
+    try {
+        Pyroscope = require('@pyroscope/nodejs');
+    } catch {
+        logger.warn('PYROSCOPE_SERVER_ADDRESS set but @pyroscope/nodejs not installed; profiling disabled');
+        return;
+    }
+    const tags: Record<string, string> = {runtime: 'node'};
+    for (const pair of (process.env.PYROSCOPE_TAGS || '').split(',')) {
+        const eq = pair.indexOf('=');
+        if (eq > 0) {
+            tags[pair.slice(0, eq).trim()] = pair.slice(eq + 1).trim();
+        }
+    }
+    Pyroscope.init({
+        appName: process.env.PYROSCOPE_APPLICATION_NAME || 'modcli',
+        serverAddress: server,
+        tags,
+    });
+    Pyroscope.start();
+}
+
 interface ProgramOptions {
     logFile?: string;
     metricsCsv?: string;
@@ -96,6 +123,8 @@ async function main() {
         // because the Tracer type has a log method on it that matches this signature.
         log: (msg: string) => log && options.traceRpcMessages && log.write(`[js trace] ${msg}\n`)
     };
+
+    initPyroscope(logger);
 
     // Create the connection with the custom logger
     const connection = rpc.createMessageConnection(
