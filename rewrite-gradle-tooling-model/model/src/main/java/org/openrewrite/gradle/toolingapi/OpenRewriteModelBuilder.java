@@ -173,13 +173,14 @@ public class OpenRewriteModelBuilder {
                 "def __rewriteMirrorUrl = '" + escapeGroovy(url) + "'\n" +
                 "def __rewriteMirrorUser = '" + escapeGroovy(user) + "'\n" +
                 "def __rewriteMirrorPass = '" + escapeGroovy(pass) + "'\n" +
-                // Prepend Artifactory as a Maven Central proxy without removing any repository the
-                // build (or its plugins) declared. Gradle tries repositories in order and falls
-                // through on 404, so Central artifacts come from Artifactory while Plugin Portal-only
-                // markers (Nebula, Develocity, etc.) still resolve from gradlePluginPortal().
-                "def __rewriteConfigureMirror = { container ->\n" +
-                "    def existing = new ArrayList(container as Collection)\n" +
-                "    container.clear()\n" +
+                // Prepend Artifactory as a Maven Central proxy by adding it through Gradle lifecycle
+                // hooks that fire BEFORE the user's settings.gradle / build.gradle is evaluated.
+                // Doing it this way avoids clearing the repository container (which doesn't survive
+                // re-add) and avoids touching pluginManagement.repositories (where Gradle's default
+                // gradlePluginPortal() injection happens lazily after our settingsEvaluated hook
+                // would run). Gradle tries repositories in order and falls through on 404, so Central
+                // artifacts come from Artifactory while Plugin Portal markers still resolve normally.
+                "def __rewriteAddMirror = { container ->\n" +
                 "    container.maven {\n" +
                 "        url = __rewriteMirrorUrl\n" +
                 "        credentials {\n" +
@@ -187,15 +188,15 @@ public class OpenRewriteModelBuilder {
                 "            password = __rewriteMirrorPass\n" +
                 "        }\n" +
                 "    }\n" +
-                "    existing.each { container.add(it) }\n" +
                 "}\n" +
-                "allprojects {\n" +
-                "    buildscript.repositories { __rewriteConfigureMirror(delegate) }\n" +
-                "    repositories { __rewriteConfigureMirror(delegate) }\n" +
-                "}\n" +
-                "settingsEvaluated { settings ->\n" +
-                "    settings.pluginManagement.repositories { __rewriteConfigureMirror(delegate) }\n" +
-                "    try { settings.dependencyResolutionManagement.repositories { __rewriteConfigureMirror(delegate) } } catch (Throwable ignored) {}\n" +
+                "try {\n" +
+                "    gradle.beforeSettings { settings ->\n" +
+                "        try { __rewriteAddMirror(settings.dependencyResolutionManagement.repositories) } catch (Throwable ignored) {}\n" +
+                "    }\n" +
+                "} catch (Throwable ignored) {}\n" +
+                "gradle.beforeProject { project ->\n" +
+                "    __rewriteAddMirror(project.buildscript.repositories)\n" +
+                "    __rewriteAddMirror(project.repositories)\n" +
                 "}\n";
     }
 
