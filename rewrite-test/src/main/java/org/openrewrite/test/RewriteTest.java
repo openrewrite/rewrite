@@ -706,9 +706,9 @@ public interface RewriteTest extends SourceSpecs {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
             Throwable underlying = t instanceof RecipeError ? t.getCause() : t;
             if (underlying instanceof RecipeRunException) {
-                fail("Failed to run recipe at " + ((RecipeRunException) underlying).getCursor(), t);
+                fail("Failed to run recipe at " + ((RecipeRunException) underlying).getCursor(), underlying);
             }
-            fail("Failed to parse sources or run recipe", t);
+            fail("Failed to parse sources or run recipe", underlying);
         });
         for (Consumer<ExecutionContext> customizer : defaultExecutionContextCustomizers.values()) {
             customizer.accept(ctx);
