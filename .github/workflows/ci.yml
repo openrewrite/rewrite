@@ -30,12 +30,14 @@ jobs:
             21
           develocity_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
 
-      # Route Maven resolution through Moderne's Artifactory cache to avoid
-      # Maven Central rate-limiting (HTTP 404 + Retry-After) under parallel
-      # test load. Picked up by MavenSettingsAutoLoadingExtension at test time.
+      # Route Maven Central resolution through Moderne's Artifactory cache to
+      # avoid Maven Central rate-limiting (HTTP 404 + Retry-After) under parallel
+      # test load. Scoped to mirrorOf=central so Gradle Plugin Portal and other
+      # repositories continue to resolve directly. Picked up by
+      # MavenSettingsAutoLoadingExtension at test time.
       - uses: s4u/maven-settings-action@v3.1.0
         with:
-          mirrors: '[{"id": "moderne-cache", "name": "Moderne Artifactory Cache", "mirrorOf": "*", "url": "https://artifactory.moderne.ninja/artifactory/moderne-cache-3/"}]'
+          mirrors: '[{"id": "moderne-cache", "name": "Moderne Artifactory Cache", "mirrorOf": "central", "url": "https://artifactory.moderne.ninja/artifactory/moderne-cache-3/"}]'
 
       - uses: openrewrite/gh-automation/.github/actions/build@main
 
