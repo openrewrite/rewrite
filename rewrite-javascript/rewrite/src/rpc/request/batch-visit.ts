@@ -86,10 +86,23 @@ export class BatchVisit {
                         const visitor = await Visit.instantiateVisitor(
                             {visitor: item.visitor, visitorOptions: item.visitorOptions},
                             preparedRecipes, recipeCursors, p);
+                        // Snapshot ctx message keys so we can flag whether
+                        // the visitor put anything new into the context.
+                        const preKeys = new Set<string | symbol>(
+                            Reflect.ownKeys(p.messages) as (string | symbol)[]
+                        );
                         const after = await visitor.visit(tree, p, cursor);
 
                         const modified = after !== tree;
                         const deleted = after == null;
+
+                        let hasNewMessages = false;
+                        for (const k of Reflect.ownKeys(p.messages)) {
+                            if (!preKeys.has(k)) {
+                                hasNewMessages = true;
+                                break;
+                            }
+                        }
 
                         // Diff SearchResult IDs against the running set
                         let searchResultIds: string[];
@@ -101,7 +114,7 @@ export class BatchVisit {
                             for (const id of searchResultIds) knownIds.add(id);
                         }
 
-                        results.push({modified, deleted, hasNewMessages: false, searchResultIds});
+                        results.push({modified, deleted, hasNewMessages, searchResultIds});
 
                         if (deleted) {
                             localObjects.delete(request.treeId);

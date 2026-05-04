@@ -16,6 +16,7 @@
 package org.openrewrite.gradle.plugins;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.groovy.tree.G;
@@ -185,6 +186,7 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2697")
     @Test
+    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void withGradleEnterpriseConfigurationInSettings() {
         rewriteRun(
           spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
@@ -380,6 +382,7 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2697")
     @Test
+    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void withGradleEnterpriseConfigurationInSettingsKts() {
         rewriteRun(
           spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))

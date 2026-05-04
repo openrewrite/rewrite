@@ -137,6 +137,29 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
     return response.get('result')
 
 
+def _require_tree(tree: Any, source_file_type: Optional[str]) -> Any:
+    """Validate that ``tree`` is a real Tree, not a generic dict fallback.
+
+    When the receiver encounters a ``value_type`` it has no codec for, it
+    falls back to returning a ``{'kind': value_type, ...}`` dict (see
+    ``RpcReceiveQueue._new_obj`` / ``_do_change``). That fallback is
+    appropriate for nested fragments the visitor framework never inspects
+    directly, but a top-level SourceFile *must* be a Tree — otherwise the
+    visitor crashes with a confusing ``AttributeError: 'dict' object has
+    no attribute 'is_acceptable'``. Raise the same "No RPC codec" error
+    that the ADD path raises so the failure mode is consistent regardless
+    of which RPC message shape Java used.
+    """
+    from rewrite import Tree
+    if isinstance(tree, Tree):
+        return tree
+    raise RuntimeError(
+        f"No RPC codec registered on the Python side for '{source_file_type}'. "
+        "The remote side has a codec and sent property messages that will not be consumed, "
+        "causing RPC queue desynchronization."
+    )
+
+
 def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) -> Any:
     """Fetch an object from Java and deserialize it using PythonRpcReceiver.
 
@@ -1199,6 +1222,8 @@ def handle_visit(params: dict) -> dict:
     if tree is None:
         raise ValueError(f"Tree not found: {tree_id}")
 
+    tree = _require_tree(tree, source_file_type)
+
     # Instantiate the visitor
     visitor = _instantiate_visitor(visitor_name, ctx)
 
@@ -1271,6 +1296,8 @@ def handle_batch_visit(params: dict) -> dict:
     tree = get_object_from_java(tree_id, source_file_type)
     if tree is None:
         raise ValueError(f"Tree not found: {tree_id}")
+
+    tree = _require_tree(tree, source_file_type)
 
     from rewrite.visitor import Cursor
     from rewrite.markers import SearchResult
@@ -1667,6 +1694,33 @@ def write_message(response: dict):
     os.write(sys.stdout.fileno(), header + content_bytes)
 
 
+def _init_pyroscope() -> None:
+    """Start continuous profiling when PYROSCOPE_SERVER_ADDRESS is set.
+
+    Tags inherited via PYROSCOPE_TAGS (k=v,k=v) are forwarded verbatim; a
+    `runtime=python` tag is added so flame graphs in the shared `modcli`
+    application can be sliced by which RPC subprocess produced them.
+    """
+    server = os.environ.get("PYROSCOPE_SERVER_ADDRESS")
+    if not server:
+        return
+    try:
+        import pyroscope  # type: ignore[import-not-found]
+    except ImportError:
+        logger.warning("PYROSCOPE_SERVER_ADDRESS set but pyroscope-io not installed; profiling disabled")
+        return
+    tags: Dict[str, str] = {"runtime": "python"}
+    for pair in os.environ.get("PYROSCOPE_TAGS", "").split(","):
+        if "=" in pair:
+            k, v = pair.split("=", 1)
+            tags[k.strip()] = v.strip()
+    pyroscope.configure(
+        application_name=os.environ.get("PYROSCOPE_APPLICATION_NAME", "modcli"),
+        server_address=server,
+        tags=tags,
+    )
+
+
 def main():
     """Main entry point for the RPC server."""
     global _trace_rpc
@@ -1677,6 +1731,8 @@ def main():
     parser.add_argument('--trace-rpc-messages', action='store_true', help='Enable RPC message tracing')
     parser.add_argument('--recipe-install-dir', help='Directory where recipe pip packages are installed')
     args = parser.parse_args()
+
+    _init_pyroscope()
 
     if args.recipe_install_dir:
         global _recipe_install_dir

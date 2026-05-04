@@ -1,0 +1,7 @@
+module example.com/withreplace
+
+go 1.22
+
+replace github.com/x/y v1.2.3 => github.com/forked/y v1.2.4
+
+require github.com/x/y v1.2.3

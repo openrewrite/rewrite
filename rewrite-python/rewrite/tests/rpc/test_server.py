@@ -1,3 +1,24 @@
+def test_require_tree_rejects_dict_fallback():
+    """A top-level SourceFile must be a Tree. The receiver returns a generic
+    ``{'kind': value_type, ...}`` dict for value_types it has no codec for —
+    that fallback is fine for nested fragments but lets unknown source files
+    leak into the visitor framework, where they crash with
+    ``AttributeError: 'dict' object has no attribute 'is_acceptable'``.
+    Verify the guard converts that into the same "No RPC codec" error the
+    ADD path raises so the failure mode is consistent."""
+    import pytest
+    from rewrite.rpc.server import _require_tree
+
+    with pytest.raises(RuntimeError, match="No RPC codec registered"):
+        _require_tree(
+            {"kind": "org.openrewrite.docker.tree.Docker$Document"},
+            "org.openrewrite.docker.tree.Docker$Document",
+        )
+
+    with pytest.raises(RuntimeError, match="No RPC codec registered"):
+        _require_tree(None, "org.openrewrite.text.PlainText")
+
+
 def test_handle_parse_preserves_empty_text(tmp_path, monkeypatch):
     import rewrite.rpc.server as server
 
