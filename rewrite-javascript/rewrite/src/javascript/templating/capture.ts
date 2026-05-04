@@ -75,6 +75,8 @@ export const CAPTURE_CAPTURING_SYMBOL = Symbol('captureCapturing');
 export const CAPTURE_TYPE_SYMBOL = Symbol('captureType');
 // Symbol to identify RawCode instances
 export const RAW_CODE_SYMBOL = Symbol('rawCode');
+// Symbol to identify DerivedCapture instances
+export const DERIVED_CAPTURE_SYMBOL = Symbol('derivedCapture');
 
 export class CaptureImpl<T = any> implements Capture<T> {
     public readonly name: string;
@@ -351,6 +353,36 @@ function createCaptureProxy<T>(impl: CaptureImpl<T>): any {
     });
 }
 
+/**
+ * Represents a derived capture whose template substitution is computed from another capture's matched value.
+ *
+ * A derived capture is NOT used in patterns — it has no matching behavior.
+ * It IS used in templates — at application time, it resolves the source capture from the match result,
+ * passes it through the transform function, and uses the result as the substitution.
+ */
+export class DerivedCapture {
+    [DERIVED_CAPTURE_SYMBOL] = true;
+    [CAPTURE_NAME_SYMBOL]: string;
+    [CAPTURE_TYPE_SYMBOL]: string | Type | undefined;
+
+    constructor(
+        public readonly source: Capture,
+        public readonly transform: (node: J | J[]) => RawCode | J,
+        options?: { type?: string | Type }
+    ) {
+        this[CAPTURE_NAME_SYMBOL] = `derived_${source.getName()}_${DerivedCapture.nextId++}`;
+        if (options?.type) {
+            this[CAPTURE_TYPE_SYMBOL] = options.type;
+        }
+    }
+
+    getName(): string {
+        return this[CAPTURE_NAME_SYMBOL];
+    }
+
+    static nextId = 1;
+}
+
 // Overload 1: Options object with constraint (no variadic)
 export function capture<T = any>(
     options: CaptureOptions<T> & { variadic?: never }
@@ -387,6 +419,35 @@ export function capture<T = any>(nameOrOptions?: string | CaptureOptions<T>): Ca
 
 // Static counter for generating unique IDs for unnamed captures
 capture.nextUnnamedId = 1;
+
+/**
+ * Creates a derived capture whose template substitution is computed from another capture's matched value.
+ *
+ * A derived capture:
+ * - Is NOT used in patterns — it has no matching behavior
+ * - IS used in templates — at application time, it resolves the source capture, applies the transform, and uses the result
+ *
+ * @param source The capture whose matched value will be transformed
+ * @param transform Function that receives the matched node and returns a RawCode or J node for substitution
+ * @param options Optional configuration. Supports `type` for type attribution (same as regular captures).
+ * @returns A DerivedCapture that can be used in templates
+ *
+ * @example
+ * const unit = capture({ name: 'unit', constraint: ... });
+ * const temporalUnit = capture.derived(unit, (node) => {
+ *     const str = (node as J.Literal).value as string;
+ *     return raw(UNIT_MAP[str]);
+ * });
+ * // Use in template:
+ * template`${obj}.add({${temporalUnit}: ${amount}})`
+ *
+ * @example
+ * // With type attribution
+ * const derived = capture.derived(source, transform, { type: 'string' });
+ */
+capture.derived = function(source: Capture, transform: (node: J | J[]) => RawCode | J, options?: { type?: string | Type }): DerivedCapture {
+    return new DerivedCapture(source, transform, options);
+};
 
 /**
  * Creates a non-capturing pattern match for use in patterns.

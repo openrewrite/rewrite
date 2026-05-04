@@ -18,7 +18,7 @@ import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
 import {CaptureMarker, PlaceholderUtils, WRAPPER_FUNCTION_NAME} from './utils';
-import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
+import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, DerivedCapture, DERIVED_CAPTURE_SYMBOL, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
 import {JavaCoordinates} from './template';
 import {maybeAutoFormat} from '../format';
@@ -280,6 +280,21 @@ export class TemplateEngine {
         for (let i = 0; i < parameters.length; i++) {
             const param = parameters[i].value;
             const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
+
+            // DerivedCapture — generate type preamble only if it has a type annotation
+            if (param instanceof DerivedCapture ||
+                (param && typeof param === 'object' && param[DERIVED_CAPTURE_SYMBOL])) {
+                const captureType = param[CAPTURE_TYPE_SYMBOL];
+                if (captureType) {
+                    const typeString = typeof captureType === 'string'
+                        ? captureType
+                        : this.typeToString(captureType);
+                    if (typeString !== 'any') {
+                        preamble.push(`let ${placeholder}: ${typeString};`);
+                    }
+                }
+                continue;
+            }
 
             // Check for Capture (could be a Proxy, so check for symbol property)
             const isCapture = param instanceof CaptureImpl ||
