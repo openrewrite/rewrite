@@ -30,6 +30,12 @@ tasks.withType<Javadoc>().configureEach {
     exclude("**/G.java")
 }
 
+// Test fixtures for the GoMod conformance corpus are .gomod / .gosum / .json
+// files; none of these formats accept a leading license header.
+configure<nl.javadude.gradle.plugins.license.LicenseExtension> {
+    excludePatterns.addAll(listOf("**/*.gomod", "**/*.gosum", "**/*.json"))
+}
+
 val goBuild = tasks.register<Exec>("goBuild") {
     workingDir = projectDir
     // Use relative path to avoid absolute paths in cache key (Exec args are cache inputs)

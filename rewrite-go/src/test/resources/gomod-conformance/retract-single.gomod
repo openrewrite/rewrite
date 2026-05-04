@@ -1,0 +1,5 @@
+module example.com/withretract
+
+go 1.22
+
+retract v0.0.5 // accidentally deleted main.go

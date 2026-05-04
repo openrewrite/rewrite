@@ -1,1 +1,2 @@
-rewrite/test-classpath.txt
+test-classpath.txt
+/rpc
