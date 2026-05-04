@@ -24,6 +24,10 @@ import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class EffectiveMavenRepositoriesTest implements RewriteTest {
@@ -54,6 +58,21 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
         </settings>
       """), new InMemoryExecutionContext());
 
+    private static final Pattern EFFECTIVE_REPOS_COMMENT = Pattern.compile("<!--~~\\(([^)]*)\\)~~>-->");
+
+    /**
+     * The recipe annotates the POM with the effective repository URLs, which depend on the host's
+     * Maven settings (mirrors, proxies). To keep the test environment-agnostic, we extract the
+     * comment from the actual output and assert only on its shape (URL count) plus the unchanged body.
+     */
+    private static String expectedWithUrls(String actual, int expectedUrlCount, String body) {
+        Matcher m = EFFECTIVE_REPOS_COMMENT.matcher(actual);
+        assertThat(m.find()).as("expected effective repositories comment, got:\n%s", actual).isTrue();
+        long urlCount = m.group(1).lines().count();
+        assertThat(urlCount).as("number of effective repository URLs").isEqualTo(expectedUrlCount);
+        return m.group() + body;
+    }
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new EffectiveMavenRepositories(true));
@@ -71,13 +90,13 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
-              <!--~~(https://repo.maven.apache.org/maven2)~~>--><project>
+            spec -> spec.after(actual -> expectedWithUrls(actual, 1, """
+              <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
-              """
+              """))
           )
         );
     }
@@ -99,9 +118,8 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
                 </repositories>
               </project>
               """,
-            """
-              <!--~~(https://repo.spring.io/milestone
-              https://repo.maven.apache.org/maven2)~~>--><project>
+            spec -> spec.after(actual -> expectedWithUrls(actual, 2, """
+              <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -112,7 +130,7 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
                     </repository>
                 </repositories>
               </project>
-              """
+              """))
           )
         );
     }
@@ -130,14 +148,13 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
-              <!--~~(https://repo.spring.io/milestone
-              https://repo.maven.apache.org/maven2)~~>--><project>
+            spec -> spec.after(actual -> expectedWithUrls(actual, 2, """
+              <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
-              """
+              """))
           )
         );
     }
@@ -157,14 +174,13 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
-              <!--~~(https://repo.spring.io/milestone
-              https://repo.maven.apache.org/maven2)~~>--><project>
+            spec -> spec.after(actual -> expectedWithUrls(actual, 2, """
+              <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
-              """
+              """))
           )
         );
     }
@@ -176,13 +192,13 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
             .recipe(new EffectiveMavenRepositories(false))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setMavenSettings(SPRING_MILESTONES_SETTINGS, "repo"))
-            .dataTableAsCsv(EffectiveMavenRepositoriesTable.class.getName(), """
-              pomPath,repositoryUri
-              pom.xml,"https://repo.spring.io/milestone"
-              pom.xml,"https://repo.maven.apache.org/maven2"
-              module/pom.xml,"https://repo.spring.io/milestone"
-              module/pom.xml,"https://repo.maven.apache.org/maven2"
-              """)
+            .dataTable(EffectiveMavenRepositoriesTable.Row.class, rows -> {
+                assertThat(rows).hasSize(4);
+                assertThat(rows).extracting(EffectiveMavenRepositoriesTable.Row::getPomPath)
+                  .containsExactly("pom.xml", "pom.xml", "module/pom.xml", "module/pom.xml");
+                assertThat(rows).extracting(EffectiveMavenRepositoriesTable.Row::getRepositoryUri)
+                  .allSatisfy(uri -> assertThat(uri).startsWith("http"));
+            })
             .recipeExecutionContext(new InMemoryExecutionContext()),
           pomXml(
             """
