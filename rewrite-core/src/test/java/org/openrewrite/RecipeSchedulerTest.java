@@ -84,6 +84,79 @@ class RecipeSchedulerTest implements RewriteTest {
     }
 
     @Test
+    void onErrorReceivesRecipeErrorWithLeafRecipeAndSourcePath() {
+        List<RecipeError> captured = new java.util.ArrayList<>();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
+            if (t instanceof RecipeError) {
+                captured.add((RecipeError) t);
+            }
+        });
+        rewriteRun(
+          spec -> spec.executionContext(ctx).recipe(new BoomRecipe()),
+          text("hello", "~~(boom)~~>hello")
+        );
+        assertThat(captured).isNotEmpty().allSatisfy(err -> {
+            assertThat(err.getRecipeStack()).containsExactly("org.openrewrite.BoomRecipe");
+            assertThat(err.getSourcePath()).isEqualTo("file.txt");
+            // Cause is RecipeRunException (the visitor's throw site wrapper) which in turn wraps BoomException.
+            assertThat(err.getCause()).isInstanceOf(RecipeRunException.class);
+            assertThat(err.getCause().getCause()).isInstanceOf(BoomException.class);
+        });
+    }
+
+    @Test
+    void onErrorReceivesRecipeErrorWithFullStackForNestedRecipe() {
+        List<RecipeError> captured = new java.util.ArrayList<>();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
+            if (t instanceof RecipeError) {
+                captured.add((RecipeError) t);
+            }
+        });
+        var parent = new DeclarativeRecipe(
+          "io.example.parent",
+          "Parent recipe",
+          "Parent recipe wrapping a boom child.",
+          emptySet(),
+          null,
+          URI.create("dummy:recipe.yml"),
+          false,
+          emptyList()
+        );
+        parent.addUninitialized(new BoomRecipe());
+        parent.initialize(emptyList());
+        rewriteRun(
+          spec -> spec.executionContext(ctx).recipe(parent),
+          text("hello", "~~(boom)~~>hello")
+        );
+        assertThat(captured).isNotEmpty().allSatisfy(err -> {
+            assertThat(err.getRecipeStack())
+              .containsExactly("io.example.parent", "org.openrewrite.BoomRecipe");
+            assertThat(err.getRecipeName()).isEqualTo("org.openrewrite.BoomRecipe");
+            assertThat(err.getSourcePath()).isEqualTo("file.txt");
+        });
+    }
+
+    @Test
+    void onErrorWrapsErrorsThrownDuringGenerate() {
+        List<RecipeError> captured = new java.util.ArrayList<>();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
+            if (t instanceof RecipeError) {
+                captured.add((RecipeError) t);
+            }
+        });
+        rewriteRun(
+          spec -> spec.executionContext(ctx).recipe(new BoomGenerateRecipe(false))
+        );
+        assertThat(captured)
+          .singleElement()
+          .satisfies(err -> {
+              assertThat(err.getRecipeStack()).containsExactly("org.openrewrite.BoomGenerateRecipe");
+              assertThat(err.getSourcePath()).isEqualTo("error during generation");
+              assertThat(err.getCause()).isInstanceOf(BoomException.class);
+          });
+    }
+
+    @Test
     void exceptionDuringGenerate() {
         rewriteRun(
           spec -> spec.recipe(new BoomGenerateRecipe(false))

@@ -151,7 +151,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                 return source;
                             });
                         } catch (Throwable t) {
-                            after = handleError(recipe, source, after, t);
+                            after = handleError(recipeStack, source, after, t);
                             // We don't normally consider anything the scanning phase does to be a change
                             // But this simplifies error reporting so that exceptions can all be handled the same
                             assert after != null;
@@ -183,7 +183,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             batch.rpc.batchVisit(source, ctx, rootCursor, batch.items);
         } catch (Throwable t) {
             if (!batch.recipeStacks.isEmpty()) {
-                handleError(batch.recipeStacks.get(0).peek(), source, source, t);
+                handleError(batch.recipeStacks.get(0), source, source, t);
             }
         }
 
@@ -211,7 +211,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                     return source;
                                 });
                             } catch (Throwable t) {
-                                handleError(recipe, source, source, t);
+                                handleError(recipeStack, source, source, t);
                             }
                         }
                     }
@@ -243,7 +243,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                             madeChangesInThisCycle.add(recipe);
                         }
                     } catch (Throwable t) {
-                        handleError(recipe, new Quark(Tree.randomId(), Paths.get("error during generation"), Markers.EMPTY, null, null), null, t);
+                        handleError(recipeStack, new Quark(Tree.randomId(), Paths.get("error during generation"), Markers.EMPTY, null, null), null, t);
                     }
                 }
                 return acc;
@@ -316,7 +316,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 if (duration.compareTo(ctx.getMessage(ExecutionContext.RUN_TIMEOUT, Duration.ofMinutes(4))) > 0) {
                     if (thrownErrorOnTimeout.compareAndSet(false, true)) {
                         RecipeTimeoutException t = new RecipeTimeoutException(recipe);
-                        ctx.getOnError().accept(t);
+                        ctx.getOnError().accept(wrapForAttribution(recipeStack, src.getSourcePath().toString(), t));
                         ctx.getOnTimeout().accept(t, ctx);
                     }
                     return src;
@@ -382,7 +382,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 if (isInBatch) {
                     batch.clear();
                 }
-                after = handleError(recipe, src, after, t);
+                after = handleError(recipeStack, src, after, t);
             }
             if (after != null && after != src) {
                 after = addRecipesThatMadeChanges(recipeStack, after);
@@ -417,7 +417,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 if (!(t instanceof RecipeRunException)) {
                     source = Markup.error(source, t);
                 }
-                source = handleError(batch.recipeStacks.get(0).peek(), originalBefore, source, t);
+                source = handleError(batch.recipeStacks.get(0), originalBefore, source, t);
                 if (source != null && source != beforeError) {
                     source = addRecipesThatMadeChanges(batch.recipeStacks.get(0), source);
                 }
@@ -720,9 +720,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), ctx);
     }
 
-    private @Nullable SourceFile handleError(Recipe recipe, SourceFile sourceFile, @Nullable SourceFile after,
+    private @Nullable SourceFile handleError(List<Recipe> recipeStack, SourceFile sourceFile, @Nullable SourceFile after,
                                              Throwable t) {
-        ctx.getOnError().accept(t);
+        ctx.getOnError().accept(wrapForAttribution(recipeStack, sourceFile.getSourcePath().toString(), t));
 
         if (t instanceof RecipeRunException && after != null) {
             try {
@@ -738,11 +738,19 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         // This is so the error is associated with the original source file, and its original source path.
         errorsTable.insertRow(ctx, new SourcesFileErrors.Row(
                 sourceFile.getSourcePath().toString(),
-                recipe.getName(),
+                recipeStack.get(recipeStack.size() - 1).getName(),
                 ExceptionUtils.sanitizeStackTrace(t, RecipeScheduler.class)
         ));
 
         return after;
+    }
+
+    private static RecipeError wrapForAttribution(List<Recipe> recipeStack, @Nullable String sourcePath, Throwable t) {
+        List<String> recipePath = new ArrayList<>(recipeStack.size());
+        for (Recipe r : recipeStack) {
+            recipePath.add(r.getName());
+        }
+        return new RecipeError(recipePath, sourcePath, t);
     }
 
     private static <S extends SourceFile> S addRecipesThatMadeChanges(List<Recipe> recipeStack, S afterFile) {
