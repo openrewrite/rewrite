@@ -209,7 +209,7 @@ public class GradleWrapperScriptDownloader {
             binding.put("entryPointArgs", "-jar \"$APP_HOME/gradle/wrapper/gradle-wrapper.jar\"");
             binding.put("mainClassName", "");
         } else if (current.compareTo(GRADLE_9_0_M_2) >= 0) {
-            binding.put("classpath", "\"\\\\\\\"\\\\\\\"\"");
+            binding.put("classpath", "");
             binding.put("entryPointArgs", "-jar \"$APP_HOME/gradle/wrapper/gradle-wrapper.jar\"");
             binding.put("mainClassName", "");
         } else if (current.compareTo(GRADLE_9_0_M_1) >= 0) {
@@ -217,7 +217,7 @@ public class GradleWrapperScriptDownloader {
             binding.put("entryPointArgs", "");
             binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
         } else if (current.compareTo(GRADLE_8_14_RC_1) >= 0) {
-            binding.put("classpath", "\"\\\\\\\\\\\"\\\\\\\\\\\"\"");
+            binding.put("classpath", "");
             binding.put("entryPointArgs", "-jar \"$APP_HOME/gradle/wrapper/gradle-wrapper.jar\"");
             binding.put("mainClassName", "");
         } else if (current.compareTo(GRADLE_1_0_M_8) >= 0) {
@@ -281,8 +281,7 @@ public class GradleWrapperScriptDownloader {
     private static String renderTemplate(String source, Map<String, String> bindings, String lineSeparator) throws IOException, ClassNotFoundException {
         SimpleTemplateEngine engine = new SimpleTemplateEngine();
         return engine.createTemplate(source).make(new HashMap<>(bindings)).toString()
-          .replaceAll("\\R", lineSeparator)
-          .replace("CLASSPATH=\"\\\\\\\\\\\"\\\\\\\\\\\"", "CLASSPATH=\"\\\\\\\"\\\\\\\"");
+          .replaceAll("\\R", lineSeparator);
     }
 
     private static String hash(String text) {
