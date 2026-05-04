@@ -279,6 +279,7 @@ func (p *GoPrinter) VisitMethodInvocation(mi *tree.MethodInvocation, param any) 
 	if mi.Select != nil {
 		p.Visit(mi.Select.Element, out)
 		if mi.Name.Name != "" {
+			p.visitSpace(mi.Select.After, out)
 			out.Append(".")
 		}
 	}
