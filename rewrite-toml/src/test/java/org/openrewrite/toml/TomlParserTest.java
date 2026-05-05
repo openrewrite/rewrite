@@ -336,7 +336,24 @@ class TomlParserTest implements RewriteTest {
               physical.color = "orange"
               physical.shape = "round"
               site."google.com" = true
-              """
+              site.google.com = false
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                assertThat(doc.getValues()).hasSize(4);
+                Toml.KeyValue first = (Toml.KeyValue) doc.getValues().get(0);
+                assertThat(first.getKey()).isInstanceOf(Toml.DottedKey.class);
+                assertThat(first.getKey().getPath()).containsExactly("physical", "color");
+
+                // quoted segment with literal dot is one segment
+                Toml.KeyValue quoted = (Toml.KeyValue) doc.getValues().get(2);
+                assertThat(quoted.getKey()).isInstanceOf(Toml.DottedKey.class);
+                assertThat(quoted.getKey().getPath()).containsExactly("site", "google.com");
+
+                // bare three-segment form is distinct
+                Toml.KeyValue bare = (Toml.KeyValue) doc.getValues().get(3);
+                assertThat(bare.getKey()).isInstanceOf(Toml.DottedKey.class);
+                assertThat(bare.getKey().getPath()).containsExactly("site", "google", "com");
+            })
           )
         );
     }
@@ -363,7 +380,17 @@ class TomlParserTest implements RewriteTest {
               [ d.e.f ]          # same as [d.e.f]
               [ g .  h  . i ]    # same as [g.h.i]
               [ j . "ʞ" . 'l' ]  # same as [j."ʞ".'l']
-              """
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                assertThat(doc.getValues()).hasSize(4);
+                Toml.Table abc = (Toml.Table) doc.getValues().get(0);
+                assertThat(abc.getName()).isInstanceOf(Toml.DottedKey.class);
+                assertThat(abc.getName().getPath()).containsExactly("a", "b", "c");
+
+                Toml.Table jkl = (Toml.Table) doc.getValues().get(3);
+                assertThat(jkl.getName()).isInstanceOf(Toml.DottedKey.class);
+                assertThat(jkl.getName().getPath()).containsExactly("j", "ʞ", "l");
+            })
           )
         );
     }

@@ -176,6 +176,21 @@ public class SemanticallyEqual {
         }
 
         @Override
+        public Toml visitDottedKey(Toml.DottedKey dottedKey, Toml other) {
+            if (dottedKey == other) {
+                return null;
+            }
+            if (!(other instanceof Toml.DottedKey)) {
+                areEqual = false;
+                return null;
+            }
+            if (!dottedKey.getPath().equals(((Toml.DottedKey) other).getPath())) {
+                areEqual = false;
+            }
+            return null;
+        }
+
+        @Override
         public Toml visitEmpty(Toml.Empty empty, Toml other) {
             if (empty == other) {
                 return null;
@@ -214,18 +229,9 @@ public class SemanticallyEqual {
             if (key1 == null || key2 == null) {
                 return false;
             }
-
-            // Both keys must be of the same type
-            if (key1.getClass() != key2.getClass()) {
-                return false;
-            }
-
-            // Compare identifier keys
-            if (key1 instanceof Toml.Identifier && key2 instanceof Toml.Identifier) {
-                return ((Toml.Identifier) key1).getName().equals(((Toml.Identifier) key2).getName());
-            }
-
-            return false;
+            // Same canonical path counts as equal regardless of whether the key
+            // was authored as a simple key or a dotted key.
+            return key1.getPath().equals(key2.getPath());
         }
     }
 }
