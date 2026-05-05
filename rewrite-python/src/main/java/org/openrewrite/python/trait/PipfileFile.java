@@ -47,10 +47,10 @@ public class PipfileFile implements PythonDependencyFile {
                 if (!isInsideTargetTable(getCursor(), scope)) {
                     return kv;
                 }
-                if (!(kv.getKey() instanceof Toml.Identifier)) {
+                String pkgName = PyProjectHelper.extractKeyName(kv);
+                if (pkgName == null) {
                     return kv;
                 }
-                String pkgName = ((Toml.Identifier) kv.getKey()).getName();
                 String newVersion = PythonDependencyFile.getByNormalizedName(u, pkgName);
                 if (newVersion == null) {
                     return kv;
@@ -101,12 +101,9 @@ public class PipfileFile implements PythonDependencyFile {
                 }
                 List<Toml> newValues = map(t.getValues(), value -> {
                     if (value instanceof Toml.KeyValue) {
-                        Toml.KeyValue kv = (Toml.KeyValue) value;
-                        if (kv.getKey() instanceof Toml.Identifier) {
-                            String keyName = ((Toml.Identifier) kv.getKey()).getName();
-                            if (names.contains(PythonResolutionResult.normalizeName(keyName))) {
-                                return null;
-                            }
+                        String keyName = PyProjectHelper.extractKeyName((Toml.KeyValue) value);
+                        if (keyName != null && names.contains(PythonResolutionResult.normalizeName(keyName))) {
+                            return null;
                         }
                     }
                     return value;
@@ -131,11 +128,8 @@ public class PipfileFile implements PythonDependencyFile {
                 if (!isInsideTargetTable(getCursor(), scope)) {
                     return kv;
                 }
-                if (!(kv.getKey() instanceof Toml.Identifier)) {
-                    return kv;
-                }
-                String keyName = ((Toml.Identifier) kv.getKey()).getName();
-                if (!PythonResolutionResult.normalizeName(keyName).equals(normalizedOld)) {
+                String keyName = PyProjectHelper.extractKeyName(kv);
+                if (keyName == null || !PythonResolutionResult.normalizeName(keyName).equals(normalizedOld)) {
                     return kv;
                 }
                 Toml.Identifier newKey = ((Toml.Identifier) kv.getKey())
@@ -170,10 +164,10 @@ public class PipfileFile implements PythonDependencyFile {
                 if (!isInsideTargetTable(getCursor(), scope)) {
                     return kv;
                 }
-                if (!(kv.getKey() instanceof Toml.Identifier)) {
+                String pkgName = PyProjectHelper.extractKeyName(kv);
+                if (pkgName == null) {
                     return kv;
                 }
-                String pkgName = ((Toml.Identifier) kv.getKey()).getName();
                 String message = PythonDependencyFile.getByNormalizedName(msgs, pkgName);
                 if (message != null) {
                     return SearchResult.found(kv, message);
@@ -231,10 +225,9 @@ public class PipfileFile implements PythonDependencyFile {
                 if (table.getName() != null && tableName.equals(table.getName().getName())) {
                     for (Toml entry : table.getValues()) {
                         if (entry instanceof Toml.KeyValue) {
-                            Toml.KeyValue kv = (Toml.KeyValue) entry;
-                            if (kv.getKey() instanceof Toml.Identifier &&
-                                    PythonResolutionResult.normalizeName(
-                                            ((Toml.Identifier) kv.getKey()).getName()).equals(normalizedName)) {
+                            String keyName = PyProjectHelper.extractKeyName((Toml.KeyValue) entry);
+                            if (keyName != null &&
+                                    PythonResolutionResult.normalizeName(keyName).equals(normalizedName)) {
                                 return true;
                             }
                         }

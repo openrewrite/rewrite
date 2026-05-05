@@ -24,6 +24,7 @@ dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
     api(project(":rewrite-toml"))
+    implementation(project(":rewrite-json"))
 
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
@@ -126,6 +127,7 @@ testing {
             dependencies {
                 implementation(project())
                 implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-test"))
                 implementation("org.assertj:assertj-core:latest.release")
                 implementation("org.junit.platform:junit-platform-suite-api")

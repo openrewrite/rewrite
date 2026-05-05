@@ -22,15 +22,37 @@ import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT;
 
 public class RecipeScheduler {
+
+    @Nullable
+    private Supplier<Cursor> rootCursorProvider;
+
+    /**
+     * Set a provider for the root cursor used in each recipe cycle.
+     * The provider is called once per cycle to create a fresh root cursor.
+     * This allows injecting shared state (e.g., a type cache provider) that will be
+     * visible to all visitors and template parsers during the cycle.
+     * <p>
+     * If not set, a default root cursor is created with {@code new Cursor(null, Cursor.ROOT_VALUE)}.
+     *
+     * @param provider supplies a configured root cursor for each cycle
+     * @return this scheduler for chaining
+     */
+    public RecipeScheduler rootCursorProvider(Supplier<Cursor> provider) {
+        this.rootCursorProvider = provider;
+        return this;
+    }
 
     public RecipeRun scheduleRun(Recipe recipe,
                                  LargeSourceSet sourceSet,
@@ -70,7 +92,9 @@ public class RecipeScheduler {
                 // this root cursor is shared by all `TreeVisitor` instances used created from `getVisitor` and
                 // single source applicable tests so that data can be shared at the root (especially for caching
                 // use cases like sharing a `JavaTypeCache` between `JavaTemplate` parsers).
-                Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
+                Cursor rootCursor = rootCursorProvider != null
+                        ? rootCursorProvider.get()
+                        : new Cursor(null, Cursor.ROOT_VALUE);
                 try {
                     RecipeRunCycle<LargeSourceSet> cycle = createRecipeRunCycle(recipe, i, rootCursor, ctxWithWatch, recipeRunStats, searchResults, sourceFileResults, errorsTable);
                     ctxWithWatch.putCycle(cycle);

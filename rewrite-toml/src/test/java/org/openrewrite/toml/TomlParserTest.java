@@ -310,7 +310,20 @@ class TomlParserTest implements RewriteTest {
               "ʎǝʞ" = "value"
               'key2' = "value"
               'quoted "value"' = "value"
-              """
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                // Quoted-key identifier exposes the unquoted form as `name` and the
+                // verbatim source (with quotes) as `source`. The printer uses
+                // `source` so round-tripping preserves the original syntax.
+                assertThat(doc.getValues()).hasSize(5);
+                Toml.Identifier ipKey = (Toml.Identifier) ((Toml.KeyValue) doc.getValues().get(0)).getKey();
+                assertThat(ipKey.getName()).isEqualTo("127.0.0.1");
+                assertThat(ipKey.getSource()).isEqualTo("\"127.0.0.1\"");
+
+                Toml.Identifier literalKey = (Toml.Identifier) ((Toml.KeyValue) doc.getValues().get(3)).getKey();
+                assertThat(literalKey.getName()).isEqualTo("key2");
+                assertThat(literalKey.getSource()).isEqualTo("'key2'");
+            })
           )
         );
     }

@@ -173,6 +173,7 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     @Override
     public J visitTypeDecl(Go.TypeDecl typeDecl, RpcReceiveQueue q) {
         return typeDecl
+                .withLeadingAnnotations(q.receiveList(typeDecl.getLeadingAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
                 .withName(q.receive(typeDecl.getName(), el -> (J.Identifier) visitNonNull(el, q)))
                 .getPadding().withAssign(q.receive(typeDecl.getPadding().getAssign(), el -> visitLeftPadded(el, q)))
                 .withDefinition(q.receive(typeDecl.getDefinition(), el -> (Expression) visitNonNull(el, q)))

@@ -93,7 +93,11 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		if onChange != nil {
 			after = onChange(before)
 		} else if !isNilValue(before) && getValueType(before) != nil {
-			after = defaultReceiver.Visit(before, q)
+			if t, ok := before.(tree.Tree); ok {
+				after = defaultReceiver.Visit(t, q)
+			} else {
+				after = before
+			}
 		} else if msg.Value != nil {
 			after = msg.Value
 		} else {

@@ -509,6 +509,53 @@ class InlineMethodCallsTest implements RewriteTest {
     }
 
     @Test
+    void preserveSelectWhenReplacementIsBareMethodCall() {
+        //language=java
+        rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "Lib getTotalHits()",
+              "getTotalHitsCount()",
+              null,
+              null,
+              null)),
+          java(
+            """
+              class Lib {
+                  @Deprecated
+                  public int getTotalHits() {
+                      return getTotalHitsCount();
+                  }
+
+                  public int getTotalHitsCount() {
+                      return 0;
+                  }
+
+                  static int usage(Lib lib) {
+                      return lib.getTotalHits();
+                  }
+              }
+              """,
+            """
+              class Lib {
+                  @Deprecated
+                  public int getTotalHits() {
+                      return getTotalHitsCount();
+                  }
+
+                  public int getTotalHitsCount() {
+                      return 0;
+                  }
+
+                  static int usage(Lib lib) {
+                      return lib.getTotalHitsCount();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void sameArgumentUsedTwice() {
         //language=java
         rewriteRun(

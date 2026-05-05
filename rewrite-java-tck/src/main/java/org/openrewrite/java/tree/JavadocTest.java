@@ -2231,6 +2231,58 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Test
+    void plainAsciiJavadocRoundTrips() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * This is a regular ASCII comment.
+               * No changes should be made here.
+               */
+              public class Example {
+                  /**
+                   * Another regular method comment.
+                   */
+                  public void regularMethod() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void plainNonAsciiJavadocRoundTrips() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * Coração de leão.
+               * Mañana es otro día.
+               */
+              public class Example {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void htmlCommentFollowedByPlainTextInSameJavadoc() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * <!-- inline html comment -->
+               * Following plain text on its own line.
+               */
+              class Test {}
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5443")
     @Test
     void parsingIncorrectJavadocValueReference() {
@@ -2933,6 +2985,21 @@ class JavadocTest implements RewriteTest {
                   class Test {
                       Collection<String> field;
                   }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/7554")
+        @Test
+        void twoTripleSlashBlocksSeparatedByBlankLine() {
+            rewriteRun(
+              java(
+                """
+                  /// First doc-comment block.
+
+                  /// Second doc-comment block.
+                  class Test {}
                   """
               )
             );

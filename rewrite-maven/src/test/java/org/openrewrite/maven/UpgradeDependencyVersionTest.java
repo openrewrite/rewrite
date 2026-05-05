@@ -1761,6 +1761,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void deriveFromNexusUpgrade() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
@@ -1826,6 +1827,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void badManagedVersion() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),

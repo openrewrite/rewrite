@@ -60,7 +60,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.kotlin.internal.*;
 import org.openrewrite.kotlin.tree.K;
@@ -110,6 +112,7 @@ public class KotlinParser implements Parser {
     private final List<NamedStyles> styles;
     private final boolean logCompilationWarningsAndErrors;
     private final JavaTypeCache typeCache;
+    private final JavaTypeFactory typeFactory;
     private final String moduleName;
     private final KotlinLanguageLevel languageLevel;
     private final boolean isKotlinScript;
@@ -196,7 +199,7 @@ public class KotlinParser implements Parser {
                                             return ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new RuntimeException());
                                         }
 
-                                        KotlinTypeMapping typeMapping = new KotlinTypeMapping(typeCache, firSession, kotlinSource.getFirFile());
+                                        KotlinTypeMapping typeMapping = new KotlinTypeMapping(firSession, kotlinSource.getFirFile(), typeFactory);
                                         PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
                                         associations.initialize();
                                         KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, associations, styles, relativeTo, ctx);
@@ -273,6 +276,12 @@ public class KotlinParser implements Parser {
 
         private List<Input> dependsOn = emptyList();
         private JavaTypeCache typeCache = new JavaTypeCache();
+
+        @Nullable
+        private JavaTypeFactory typeFactory;
+
+        private JavaTypeFactory.@Nullable Provider typeFactoryProvider;
+
         private boolean logCompilationWarningsAndErrors;
         private final List<NamedStyles> styles = new ArrayList<>();
         private String moduleName = "main";
@@ -291,6 +300,8 @@ public class KotlinParser implements Parser {
             this.classpath = base.classpath;
             this.dependsOn = base.dependsOn;
             this.typeCache = base.typeCache;
+            this.typeFactory = base.typeFactory;
+            this.typeFactoryProvider = base.typeFactoryProvider;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
             this.moduleName = base.moduleName;
@@ -361,8 +372,26 @@ public class KotlinParser implements Parser {
             return this;
         }
 
+        /**
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} or
+         * {@link #typeFactoryProvider} instead. The cache becomes an implementation
+         * detail of the default {@link org.openrewrite.java.internal.DefaultJavaTypeFactory}.
+         */
+        @Deprecated
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;
+            return this;
+        }
+
+        @SuppressWarnings("unused")
+        public Builder typeFactory(JavaTypeFactory typeFactory) {
+            this.typeFactory = typeFactory;
+            return this;
+        }
+
+        @SuppressWarnings("unused")
+        public Builder typeFactoryProvider(JavaTypeFactory.Provider provider) {
+            this.typeFactoryProvider = provider;
             return this;
         }
 
@@ -393,7 +422,15 @@ public class KotlinParser implements Parser {
 
         @Override
         public KotlinParser build() {
-            return new KotlinParser(resolvedClasspath(), dependsOn, styles, logCompilationWarningsAndErrors, typeCache, moduleName, languageLevel, isKotlinScript, scriptImplicitReceivers, scriptDefaultImports);
+            Collection<Path> cp = resolvedClasspath();
+            JavaTypeFactory factory = typeFactory;
+            if (factory == null && typeFactoryProvider != null) {
+                factory = typeFactoryProvider.create(cp == null ? new ArrayList<>() : new ArrayList<>(cp), null);
+            }
+            if (factory == null) {
+                factory = new DefaultJavaTypeFactory(typeCache);
+            }
+            return new KotlinParser(cp, dependsOn, styles, logCompilationWarningsAndErrors, typeCache, factory, moduleName, languageLevel, isKotlinScript, scriptImplicitReceivers, scriptDefaultImports);
         }
 
         @Override

@@ -145,7 +145,13 @@ func (p *GoPrinter) VisitBlock(block *tree.Block, param any) tree.J {
 	out.Append("{")
 	for _, rp := range block.Statements {
 		p.Visit(rp.Element, out)
+		// If the source had `;` separating this statement from the
+		// next, the parser captured the leading space as After and
+		// stamped a Semicolon marker on the RightPadded.
 		p.visitSpace(rp.After, out)
+		if tree.FindMarker[tree.Semicolon](rp.Markers) != nil {
+			out.Append(";")
+		}
 	}
 	p.visitSpace(block.End, out)
 	out.Append("}")
@@ -205,6 +211,15 @@ func (p *GoPrinter) VisitAssignment(assign *tree.Assignment, param any) tree.J {
 
 func (p *GoPrinter) VisitMethodDeclaration(md *tree.MethodDeclaration, param any) tree.J {
 	out := param.(*PrintOutputCapture)
+	// Each leading annotation emits as a `//<name>[ <args>]` line. The
+	// annotation's Prefix supplies the whitespace before `//` (newline
+	// + indent for non-first directives). The newline that follows the
+	// last directive lives on md.Prefix below.
+	for _, ann := range md.LeadingAnnotations {
+		p.visitSpace(ann.Prefix, out)
+		out.Append("//")
+		p.printDirectiveBody(ann, out)
+	}
 	p.beforeSyntax(md.Prefix, md.Markers, out)
 	isInterfaceMethod := tree.FindMarker[tree.InterfaceMethod](md.Markers) != nil
 	if !isInterfaceMethod {
@@ -264,6 +279,7 @@ func (p *GoPrinter) VisitMethodInvocation(mi *tree.MethodInvocation, param any) 
 	if mi.Select != nil {
 		p.Visit(mi.Select.Element, out)
 		if mi.Name.Name != "" {
+			p.visitSpace(mi.Select.After, out)
 			out.Append(".")
 		}
 	}
@@ -293,6 +309,17 @@ func (p *GoPrinter) VisitMethodInvocation(mi *tree.MethodInvocation, param any) 
 
 func (p *GoPrinter) VisitVariableDeclarations(vd *tree.VariableDeclarations, param any) tree.J {
 	out := param.(*PrintOutputCapture)
+	// Non-struct context: any leading annotations are `//go:`-style
+	// directives, emitted before the var/const keyword. Struct-field
+	// context handles annotations later (after the type) as a
+	// backtick-wrapped tag.
+	if !p.insideStructType() {
+		for _, ann := range vd.LeadingAnnotations {
+			p.visitSpace(ann.Prefix, out)
+			out.Append("//")
+			p.printDirectiveBody(ann, out)
+		}
+	}
 	p.beforeSyntax(vd.Prefix, vd.Markers, out)
 	isGroupedSpec := tree.FindMarker[tree.GroupedSpec](vd.Markers) != nil
 	if !isGroupedSpec {
@@ -336,9 +363,23 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *tree.VariableDeclarations, par
 	if vd.TypeExpr != nil {
 		p.Visit(vd.TypeExpr, out)
 	}
-	// Then struct tag if present
-	if tag := tree.FindMarker[tree.StructTag](vd.Markers); tag != nil {
-		p.Visit(tag.Tag, out)
+	// Then struct tag, reconstructed from LeadingAnnotations (one
+	// Annotation per `key:"value"` pair). Only emitted when this
+	// VariableDeclarations is a struct field — non-struct positions
+	// don't allow tags syntactically. Inner-leading / inner-trailing
+	// whitespace is normalized to gofmt's canonical zero-padding (we
+	// chose Option 1 in the design discussion: lossy on non-canonical
+	// input, exact on gofmt'd input).
+	if len(vd.LeadingAnnotations) > 0 && p.insideStructType() {
+		first := vd.LeadingAnnotations[0]
+		p.visitSpace(first.Prefix, out)
+		out.Append("`")
+		p.printAnnotationBody(first, out)
+		for _, ann := range vd.LeadingAnnotations[1:] {
+			p.visitSpace(ann.Prefix, out)
+			p.printAnnotationBody(ann, out)
+		}
+		out.Append("`")
 	}
 	// Then initializers
 	firstInit := true
@@ -506,6 +547,78 @@ func (p *GoPrinter) VisitForEachControl(control *tree.ForEachControl, param any)
 	p.Visit(control.Iterable, out)
 	p.afterSyntax(control.Markers, out)
 	return control
+}
+
+// VisitAnnotation prints an Annotation in struct-tag form
+// (`key:"value"`) — including its leading whitespace via Prefix.
+// Backtick wrapping is the VariableDeclarations printer's job for
+// struct-field context; this method only emits the annotation's own
+// substring.
+func (p *GoPrinter) VisitAnnotation(ann *tree.Annotation, param any) tree.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ann.Prefix, ann.Markers, out)
+	p.printAnnotationBody(ann, out)
+	p.afterSyntax(ann.Markers, out)
+	return ann
+}
+
+// printAnnotationBody emits an annotation's body content in struct-tag
+// form (type, colon, arguments) without the leading Prefix. Used by
+// VariableDeclarations to lay out a backtick-wrapped struct tag where
+// the first annotation's Prefix lives outside the backticks.
+func (p *GoPrinter) printAnnotationBody(ann *tree.Annotation, out *PrintOutputCapture) {
+	if ann.AnnotationType != nil {
+		p.Visit(ann.AnnotationType, out)
+	}
+	if ann.Arguments != nil {
+		p.visitSpace(ann.Arguments.Before, out)
+		out.Append(":")
+		for _, rp := range ann.Arguments.Elements {
+			p.Visit(rp.Element, out)
+			p.visitSpace(rp.After, out)
+		}
+	}
+}
+
+// printDirectiveBody emits an annotation's body in source-directive
+// form: `<name>[ <args>]`. Used to render `//go:noinline`,
+// `//go:linkname x runtime.x`, `//lint:ignore`, etc., on
+// MethodDeclaration / TypeDecl / top-level VariableDeclarations. The
+// preceding `//` and the annotation's leading Prefix are emitted by
+// the caller; this helper only produces the substring after `//`.
+//
+// Arguments are emitted as their raw source (single Literal whose
+// Source field carries the rest-of-line text). The space between the
+// directive name and its arguments lives on the Arguments.Before slot
+// — typically a single space.
+func (p *GoPrinter) printDirectiveBody(ann *tree.Annotation, out *PrintOutputCapture) {
+	if ann.AnnotationType != nil {
+		p.Visit(ann.AnnotationType, out)
+	}
+	if ann.Arguments != nil {
+		p.visitSpace(ann.Arguments.Before, out)
+		for _, rp := range ann.Arguments.Elements {
+			p.Visit(rp.Element, out)
+			p.visitSpace(rp.After, out)
+		}
+	}
+}
+
+// insideStructType reports whether the cursor's value sits inside a
+// StructType ancestor — i.e., it's a struct field rather than a
+// top-level / local / parameter declaration. Drives the struct-tag
+// rendering decision in VisitVariableDeclarations.
+func (p *GoPrinter) insideStructType() bool {
+	c := p.Cursor()
+	if c == nil {
+		return false
+	}
+	for cur := c.Parent(); cur != nil; cur = cur.Parent() {
+		if _, ok := cur.Value().(*tree.StructType); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *GoPrinter) VisitUnary(unary *tree.Unary, param any) tree.J {
@@ -920,6 +1033,11 @@ func (p *GoPrinter) VisitInterfaceType(it *tree.InterfaceType, param any) tree.J
 
 func (p *GoPrinter) VisitTypeDecl(td *tree.TypeDecl, param any) tree.J {
 	out := param.(*PrintOutputCapture)
+	for _, ann := range td.LeadingAnnotations {
+		p.visitSpace(ann.Prefix, out)
+		out.Append("//")
+		p.printDirectiveBody(ann, out)
+	}
 	p.beforeSyntax(td.Prefix, td.Markers, out)
 	if tree.FindMarker[tree.GroupedSpec](td.Markers) == nil {
 		out.Append("type")

@@ -91,18 +91,6 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
     PythonDependencyFile withDependencySearchMarkers(Map<String, String> packageMessages, @Nullable String scope, @Nullable String groupName, ExecutionContext ctx);
 
     /**
-     * Post-process the modified source file, e.g. regenerate lock files.
-     * Called by recipes after a trait method modifies the tree.
-     * The default implementation returns the tree unchanged.
-     *
-     * @param ctx the execution context
-     * @return the post-processed source file
-     */
-    default SourceFile afterModification(ExecutionContext ctx) {
-        return getTree();
-    }
-
-    /**
      * Rewrite a PEP 508 dependency spec with a new version constraint.
      * Preserves extras and environment markers. The version is normalized
      * via {@link PyProjectHelper#normalizeVersionConstraint(String)},
