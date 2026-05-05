@@ -1180,6 +1180,13 @@ public class GroovyParserVisitor {
                         } else {
                             body = bodyVisitor.doVisit(method.getCode());
                         }
+                    } else if (annotations.stream().anyMatch(a -> TypeUtils.isOfClassType(a.getAnnotationType().getType(), "groovy.transform.Memoized"))) {
+                        // The @Memoized AST transformation moves the original body into a synthetic
+                        // `memoizedMethodPriv$<name>` method (optionally prefixed with `_` on naming collisions)
+                        // and replaces the original method body with cache-lookup logic that has no source
+                        // positions. Find the private helper and visit its body so source positions align.
+                        MethodNode original = findMemoizedOriginalMethod(method);
+                        body = bodyVisitor.doVisit(original != null ? original.getCode() : method.getCode());
                     } else {
                         body = bodyVisitor.doVisit(method.getCode());
                     }
@@ -1205,6 +1212,22 @@ public class GroovyParserVisitor {
         @SuppressWarnings({"ConstantConditions", "unchecked"})
         private <T> T pollQueue() {
             return (T) queue.poll();
+        }
+
+        private @Nullable MethodNode findMemoizedOriginalMethod(MethodNode method) {
+            String suffix = "memoizedMethodPriv$" + method.getName();
+            for (MethodNode candidate : method.getDeclaringClass().getMethods()) {
+                String name = candidate.getName();
+                int start = 0;
+                while (start < name.length() && name.charAt(start) == '_') {
+                    start++;
+                }
+                if (name.substring(start).equals(suffix) &&
+                        candidate.getParameters().length == method.getParameters().length) {
+                    return candidate;
+                }
+            }
+            return null;
         }
     }
 
