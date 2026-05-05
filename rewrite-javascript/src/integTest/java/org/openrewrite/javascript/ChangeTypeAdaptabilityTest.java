@@ -28,7 +28,8 @@ import static org.openrewrite.javascript.Assertions.javascript;
 
 /**
  * Prove that {@link ChangeType}, written for Java, does not fail on JavaScript source files
- * containing {@link JS.FunctionCall} nodes.
+ * containing nodes like {@link JS.FunctionCall} or {@link JS.ComputedPropertyMethodDeclaration}
+ * whose {@code withType(..)} throws {@link UnsupportedOperationException} by design.
  */
 class ChangeTypeAdaptabilityTest implements RewriteTest {
 
@@ -68,6 +69,38 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
                 assertThat(cu.getClasses().getFirst().getType())
                   .as("Expected JS ClassDeclaration to have type attribution")
                   .isNotNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void computedPropertyMethodDeclarationDoesNotThrow() {
+        AtomicBoolean hasComputedPropertyMethodDeclaration = new AtomicBoolean(false);
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("Foo", "Bar", false)),
+          javascript(
+            """
+              class Foo {
+                  ["bar"](): number { return 1; }
+              }
+              """,
+            """
+              class Bar {
+                  ["bar"](): number { return 1; }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                new JavaScriptVisitor<Integer>() {
+                    @Override
+                    public J visitComputedPropertyMethodDeclaration(JS.ComputedPropertyMethodDeclaration m, Integer p) {
+                        hasComputedPropertyMethodDeclaration.set(true);
+                        return super.visitComputedPropertyMethodDeclaration(m, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(hasComputedPropertyMethodDeclaration.get())
+                  .as("Expected parsed JavaScript to contain a JS.ComputedPropertyMethodDeclaration node")
+                  .isTrue();
             })
           )
         );
