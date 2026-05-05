@@ -439,8 +439,13 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         return null;
     }
 
+    /**
+     * Find a direct dependency of this configuration matching the given coordinates. This does not walk into the
+     * transitive closure of each direct dependency; use {@link #getResolved()} and iterate there if you need to
+     * match a transitive. Uses {@link #getDirectResolvedShallow()} so it does not trigger a full transitive download.
+     */
     public @Nullable ResolvedDependency findResolvedDependency(@Nullable String groupId, String artifactId) {
-        for (ResolvedDependency d : getDirectResolved()) {
+        for (ResolvedDependency d : getDirectResolvedShallow()) {
             ResolvedDependency dependency = d.findDependency(groupId == null ? "" : groupId, artifactId);
             if (dependency != null) {
                 return dependency;

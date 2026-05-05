@@ -558,10 +558,16 @@ class GradleProjectTest implements RewriteTest {
                   .extracting(GradleDependencyConstraint::getRequiredVersion)
                   .isEqualTo("2.19.2");
 
-                // Verify the runtimeClasspath has the updated resolved version
+                // Verify the runtimeClasspath has the updated resolved version. jackson-databind is a transitive
+                // of rewrite-core, so search the flat resolved list rather than findResolvedDependency (which is
+                // direct-only).
                 GradleDependencyConfiguration runtimeClasspath = updated.getConfiguration("runtimeClasspath");
                 assertThat(runtimeClasspath).isNotNull();
-                ResolvedDependency resolvedJackson = runtimeClasspath.findResolvedDependency("com.fasterxml.jackson.core", "jackson-databind");
+                ResolvedDependency resolvedJackson = runtimeClasspath.getResolved().stream()
+                  .filter(d -> "com.fasterxml.jackson.core".equals(d.getGroupId()) &&
+                    "jackson-databind".equals(d.getArtifactId()))
+                  .findFirst()
+                  .orElse(null);
                 assertThat(resolvedJackson).isNotNull()
                   .extracting(ResolvedDependency::getVersion)
                   .as("jackson-databind should be resolved to the constrained version")
