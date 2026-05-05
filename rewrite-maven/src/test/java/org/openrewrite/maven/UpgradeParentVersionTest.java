@@ -25,7 +25,11 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpgradeParentVersionTest implements RewriteTest {
@@ -302,4 +306,72 @@ class UpgradeParentVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void jacksonBomVersionRename() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new RenamePropertyKey(
+              "jackson-bom.version",
+              "jackson-2-bom.version"
+            ),
+            new UpgradeParentVersion(
+            "org.springframework.boot",
+            "spring-boot-starter-parent",
+            "4.0.X",
+            null,
+            null)),
+          mavenProject("jackson-bom-rename-demo",
+            pomXml(
+              """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>3.4.0</version>
+                      <relativePath/>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <properties>
+                      <java.version>17</java.version>
+                      <jackson-bom.version>2.21.2</jackson-bom.version>
+                  </properties>
+              </project>
+              """,
+              spec -> spec.after(pom -> {
+                  Matcher version = Pattern.compile("spring-boot-starter-parent</artifactId>\\s*<version>(4\\.0\\.\\d+(?:-[\\w\\.]+)?)</version>").matcher(pom);
+                  assertThat(version.find()).describedAs("Expected Spring Boot 4.0.x parent in %s", pom).isTrue();
+
+                  //language=xml
+                  return String.format("""
+                                        <?xml version="1.0" encoding="UTF-8"?>
+                                        <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                                                 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                                            <modelVersion>4.0.0</modelVersion>
+                                            <parent>
+                                                <groupId>org.springframework.boot</groupId>
+                                                <artifactId>spring-boot-starter-parent</artifactId>
+                                                <version>%s</version>
+                                                <relativePath/>
+                                            </parent>
+                                            <groupId>com.example</groupId>
+                                            <artifactId>demo</artifactId>
+                                            <version>0.0.1-SNAPSHOT</version>
+                                            <properties>
+                                                <java.version>17</java.version>
+                                                <jackson-2-bom.version>2.21.2</jackson-2-bom.version>
+                                            </properties>
+                                        </project>
+                                        """, version.group(1));
+              })
+            )
+          )
+        );
+    }
+
 }
