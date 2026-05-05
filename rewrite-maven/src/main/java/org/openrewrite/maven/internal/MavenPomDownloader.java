@@ -72,6 +72,8 @@ public class MavenPomDownloader {
     private static final String RELEASE = "RELEASE";
     private static final List<String> NAMED_VERSIONS = Arrays.asList(LATEST, RELEASE);
 
+    private static final String NEGATIVE_RESULT_MESSAGES = "org.openrewrite.maven.internal.MavenPomDownloader.negativeResultMessages";
+
 
     private final MavenPomCache mavenCache;
     private final Map<Path, Pom> projectPoms;
@@ -170,6 +172,15 @@ public class MavenPomDownloader {
         } finally {
             this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, String> negativeResultMessages() {
+        return (Map<String, String>) ctx.getMessages().computeIfAbsent(NEGATIVE_RESULT_MESSAGES, k -> new HashMap<String, String>());
+    }
+
+    private static String negativeResultKey(MavenRepository repo, GroupArtifactVersion gav) {
+        return repo.getUri() + '|' + gav.getGroupId() + ':' + gav.getArtifactId() + ':' + gav.getVersion();
     }
 
     private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {
@@ -326,9 +337,15 @@ public class MavenPomDownloader {
                     // If there was no fatal failure while attempting to find metadata and there was no metadata retrieved
                     // from the current repo, cache an empty result.
                     mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, null);
+                    String originalResponse = repositoryResponses.get(repo);
+                    if (originalResponse != null) {
+                        negativeResultMessages().put(negativeResultKey(repo, gav), originalResponse);
+                    }
                 }
             } else if (!result.isPresent()) {
-                repositoryResponses.put(repo, "Did not attempt to download because of a previous failure to retrieve from this repository.");
+                String originalResponse = negativeResultMessages().get(negativeResultKey(repo, gav));
+                repositoryResponses.put(repo, originalResponse != null ? originalResponse :
+                        "Did not attempt to download because of a previous failure to retrieve from this repository.");
             }
 
             // Merge metadata from repository and cache metadata result.
@@ -718,6 +735,7 @@ public class MavenPomDownloader {
                         if (e.isClientSideException()) {
                             //If the exception is a common, client-side exception, cache an empty result.
                             mavenCache.putPom(resolvedGav, null);
+                            negativeResultMessages().put(negativeResultKey(repo, gav), e.getMessage());
                         }
                     } catch (IOException | UncheckedIOException e) {
                         repositoryResponses.put(repo, e.getMessage());
@@ -727,7 +745,9 @@ public class MavenPomDownloader {
                 sample.stop(timer.tags("outcome", "cached").register(Metrics.globalRegistry));
                 return result.get();
             } else {
-                repositoryResponses.put(repo, "Did not attempt to download because of a previous failure to retrieve from this repository.");
+                String originalResponse = negativeResultMessages().get(negativeResultKey(repo, gav));
+                repositoryResponses.put(repo, originalResponse != null ? originalResponse :
+                        "Did not attempt to download because of a previous failure to retrieve from this repository.");
             }
         }
 

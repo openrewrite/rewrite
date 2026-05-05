@@ -800,6 +800,74 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
+        @Test
+        void replayOriginalMetadataFailureOnSubsequentCall() throws Exception {
+            try (var server = new MockWebServer()) {
+                server.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        return new MockResponse().setResponseCode(404).setBody("not found");
+                    }
+                });
+                server.start();
+
+                // given a repository that always 404s for metadata, and a downloader that shares an ExecutionContext
+                MavenRepository repository = MavenRepository.builder()
+                  .id("flaky")
+                  .uri("http://%s:%d/".formatted(server.getHostName(), server.getPort()))
+                  .knownToExist(true)
+                  .build();
+                var downloader = new MavenPomDownloader(emptyMap(), ctx);
+                var ga = new GroupArtifact("does.not", "exist");
+
+                // when downloadMetadata is invoked twice with the same context
+                String firstMessage = assertThrows(MavenDownloadingException.class,
+                  () -> downloader.downloadMetadata(ga, null, List.of(repository))).getMessage();
+                String secondMessage = assertThrows(MavenDownloadingException.class,
+                  () -> downloader.downloadMetadata(ga, null, List.of(repository))).getMessage();
+
+                // then the second failure replays the original 404, not a generic "did not attempt" notice
+                assertThat(firstMessage).contains("404");
+                assertThat(secondMessage)
+                  .contains("404")
+                  .doesNotContain("Did not attempt to download");
+            }
+        }
+
+        @Test
+        void replayOriginalPomFailureOnSubsequentCall() throws Exception {
+            try (var server = new MockWebServer()) {
+                server.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        return new MockResponse().setResponseCode(404).setBody("");
+                    }
+                });
+                server.start();
+
+                // given a repository that 404s for both POM and JAR, and a downloader that shares an ExecutionContext
+                MavenRepository repository = MavenRepository.builder()
+                  .id("flaky")
+                  .uri("http://%s:%d/".formatted(server.getHostName(), server.getPort()))
+                  .knownToExist(true)
+                  .build();
+                var downloader = new MavenPomDownloader(emptyMap(), ctx);
+                var gav = new GroupArtifactVersion("does.not", "exist", "1.0.0");
+
+                // when download is invoked twice with the same context
+                String firstMessage = assertThrows(MavenDownloadingException.class,
+                  () -> downloader.download(gav, null, null, List.of(repository))).getMessage();
+                String secondMessage = assertThrows(MavenDownloadingException.class,
+                  () -> downloader.download(gav, null, null, List.of(repository))).getMessage();
+
+                // then the second failure replays the original 404, not a generic "did not attempt" notice
+                assertThat(firstMessage).contains("404");
+                assertThat(secondMessage)
+                  .contains("404")
+                  .doesNotContain("Did not attempt to download");
+            }
+        }
+
         @SuppressWarnings("ConstantConditions")
         @Test
         void mergeMetadata() throws Exception {
