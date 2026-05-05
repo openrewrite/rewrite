@@ -74,11 +74,7 @@ public class RpcFixture : IDisposable
 
     private static ProcessStartInfo CreateJavaProcessStartInfo()
     {
-        var cpFile = Environment.GetEnvironmentVariable("RPC_TEST_SERVER_CLASSPATH")
-                     ?? throw new InvalidOperationException(
-                         "RPC_TEST_SERVER_CLASSPATH environment variable not set. " +
-                         "Run './gradlew :rewrite-csharp:rpcTestClasspath' to generate the classpath file.");
-
+        var cpFile = ResolveClasspathFile();
         var classpath = File.ReadAllText(cpFile).Trim();
         var psi = new ProcessStartInfo("java", "org.openrewrite.maven.rpc.JavaRewriteRpc")
         {
@@ -90,6 +86,100 @@ public class RpcFixture : IDisposable
         };
         psi.Environment["CLASSPATH"] = classpath;
         return psi;
+    }
+
+    /// <summary>
+    /// Resolves the rewrite-csharp RPC test server classpath file.
+    /// <p>
+    /// Order of resolution:
+    ///   1. <c>RPC_TEST_SERVER_CLASSPATH</c> env var, if it points at an existing file
+    ///      whose mtime isn't older than the SDK assembly that's currently loaded.
+    ///      A stale env var (pointing at an unrelated rewrite checkout's leftover
+    ///      classpath) silently linking the test process to outdated Java JARs is
+    ///      a recurring source of cryptic "recipe didn't fire" failures.
+    ///   2. The classpath file at a deterministic location relative to the loaded
+    ///      OpenRewrite SDK assembly: walk up from the assembly until we hit
+    ///      <c>rewrite-csharp/csharp/OpenRewrite/{bin,obj}</c>, then the classpath
+    ///      file is at <c>rewrite-csharp/build/rpc-test-server-classpath.txt</c>.
+    /// </summary>
+    private static string ResolveClasspathFile()
+    {
+        var sdkRelativeFile = AutoLocateClasspathFile();
+        var envFile = Environment.GetEnvironmentVariable("RPC_TEST_SERVER_CLASSPATH");
+
+        // Prefer the SDK-relative file when it exists and is at least as fresh as
+        // any env-pointed file — guards against a stale env var inherited from a
+        // different rewrite checkout.
+        if (sdkRelativeFile != null && File.Exists(sdkRelativeFile))
+        {
+            if (string.IsNullOrEmpty(envFile) || !File.Exists(envFile) ||
+                File.GetLastWriteTimeUtc(sdkRelativeFile) >=
+                File.GetLastWriteTimeUtc(envFile))
+            {
+                return sdkRelativeFile;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(envFile) && File.Exists(envFile))
+            return envFile;
+
+        if (sdkRelativeFile != null && File.Exists(sdkRelativeFile))
+            return sdkRelativeFile;
+
+        throw new InvalidOperationException(
+            "Cannot locate the Java RPC test server classpath. Either set " +
+            "RPC_TEST_SERVER_CLASSPATH, or run " +
+            "`./gradlew :rewrite-csharp:rpcTestClasspath` from the rewrite SDK " +
+            "checkout. Searched SDK-relative path: " +
+            (sdkRelativeFile ?? "(could not derive from loaded SDK assembly)"));
+    }
+
+    private static string? AutoLocateClasspathFile()
+    {
+        // Two layout cases to handle:
+        //   (a) Test runs INSIDE the rewrite SDK repo: walk up from the SDK assembly
+        //       until we find `<root>/rewrite-csharp/csharp/OpenRewrite/`.
+        //   (b) Test runs in a CONSUMING project (e.g. recipes-csharp) that pulls in
+        //       the SDK via ProjectReference. The DLL is copied to the test project's
+        //       bin/, so the assembly path doesn't reach the SDK source. Instead, walk
+        //       up from the assembly looking for an `external/openrewrite/rewrite`
+        //       symlink (the convention for source-linked SDK in Conductor / consumer
+        //       repos), then derive the classpath from the symlink target.
+        var sdkAssembly = typeof(OpenRewrite.CSharp.CSharpParser).Assembly.Location;
+        if (string.IsNullOrEmpty(sdkAssembly))
+            return null;
+
+        var dir = Path.GetDirectoryName(sdkAssembly);
+        while (dir != null)
+        {
+            // Case (a): inside the SDK repo.
+            if (Path.GetFileName(dir) == "OpenRewrite")
+            {
+                var parent = Path.GetDirectoryName(dir);
+                var grandparent = parent != null ? Path.GetDirectoryName(parent) : null;
+                if (parent != null && grandparent != null &&
+                    Path.GetFileName(parent) == "csharp" &&
+                    Path.GetFileName(grandparent) == "rewrite-csharp")
+                {
+                    return Path.Combine(grandparent, "build", "rpc-test-server-classpath.txt");
+                }
+            }
+
+            // Case (b): consuming repo with `external/openrewrite/rewrite` symlink.
+            var symlink = Path.Combine(dir, "external", "openrewrite", "rewrite");
+            if (Directory.Exists(symlink))
+            {
+                var sdkMarker = Path.Combine(symlink,
+                    "rewrite-csharp", "csharp", "OpenRewrite", "OpenRewrite.csproj");
+                if (File.Exists(sdkMarker))
+                {
+                    return Path.Combine(symlink,
+                        "rewrite-csharp", "build", "rpc-test-server-classpath.txt");
+                }
+            }
+            dir = Path.GetDirectoryName(dir);
+        }
+        return null;
     }
 
     public void Dispose()

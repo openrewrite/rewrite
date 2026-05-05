@@ -86,13 +86,17 @@ public abstract class RewriteTest
         foreach (var spec in specs)
         {
             SourceFile source;
+            var isCsFile = spec.SourcePath != null &&
+                           spec.SourcePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
             if (spec.SourcePath != null && IsCsprojPath(spec.SourcePath) && csprojParsed != null)
             {
                 source = csprojParsed[spec.SourcePath];
             }
-            else if (spec.SourcePath != null)
+            else if (spec.SourcePath != null && !isCsFile)
             {
-                // Remote-parsed source (e.g., XML via Java RPC)
+                // Remote-parsed source (e.g., XML via Java RPC). C# files always use local
+                // parsing — even with a custom source path — because the Java peer doesn't
+                // ship a C# parser.
                 var rpc = RewriteRpcServer.Current
                           ?? throw new InvalidOperationException(
                               $"Parsing {spec.SourcePath} requires an RPC connection. " +
@@ -103,10 +107,11 @@ public abstract class RewriteTest
             else
             {
                 // Local C# parsing
+                var localSourcePath = spec.SourcePath ?? "source.cs";
                 SemanticModel? semanticModel = null;
                 if (metadataReferences != null)
                 {
-                    var syntaxTree = CSharpSyntaxTree.ParseText(spec.Before, path: "source.cs");
+                    var syntaxTree = CSharpSyntaxTree.ParseText(spec.Before, path: localSourcePath);
                     var compilation = CSharpCompilation.Create("TestCompilation")
                         .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
                         .AddReferences(metadataReferences)
@@ -114,7 +119,7 @@ public abstract class RewriteTest
                     semanticModel = compilation.GetSemanticModel(syntaxTree);
                 }
 
-                source = parser.Parse(spec.Before, semanticModel: semanticModel);
+                source = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel);
 
                 // Verify no non-whitespace content leaked into Space fields
                 if (validations.WhitespaceInSpaces)

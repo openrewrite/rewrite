@@ -28,5 +28,8 @@ public class CsprojRecipeActivator : IRecipeActivator
         marketplace.Install(new UpgradeNuGetPackageVersion(), CsprojCategory);
         marketplace.Install(new ChangeDotNetTargetFramework(), CsprojCategory);
         marketplace.Install(new FindNuGetPackageReference(), CsprojCategory);
+        marketplace.Install(new RemoveMSBuildProperty(), CsprojCategory);
+        marketplace.Install(new RemoveDotNetCliToolReference(), CsprojCategory);
+        marketplace.Install(new AddFrameworkReference(), CsprojCategory);
     }
 }
