@@ -119,20 +119,8 @@ class AddSettingsPluginTest implements RewriteTest {
           spec -> spec.beforeRecipe(withToolingApi())
             .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, false, null)),
           settingsGradle(
+            "",
             """
-              pluginManagement {
-                  repositories {
-                      gradlePluginPortal()
-                  }
-              }
-              """,
-            """
-              pluginManagement {
-                  repositories {
-                      gradlePluginPortal()
-                  }
-              }
-
               plugins {
                   id 'com.gradle.enterprise' version '3.11.4' apply false
               }

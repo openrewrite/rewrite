@@ -193,20 +193,8 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
             ""
           ),
           settingsGradle(
-            """
-              pluginManagement {
-                  repositories {
-                      gradlePluginPortal()
-                  }
-              }
-              """,
+            "",
             interpolateResolvedVersion("""
-              pluginManagement {
-                  repositories {
-                      gradlePluginPortal()
-                  }
-              }
-
               plugins {
                   id 'com.gradle.enterprise' version '%s'
               }
@@ -400,20 +388,8 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
             ""
           ),
           settingsGradleKts(
-            """
-              pluginManagement {
-                  repositories {
-                      gradlePluginPortal()
-                  }
-              }
-              """,
+            "",
             interpolateResolvedVersionKts("""
-              pluginManagement {
-                  repositories {
-                      gradlePluginPortal()
-                  }
-              }
-
               plugins {
                   id("com.gradle.enterprise") version "%s"
               }
