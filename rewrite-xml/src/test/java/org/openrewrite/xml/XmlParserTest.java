@@ -765,4 +765,42 @@ class XmlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7554")
+    @Test
+    void malformedMissingRootCloseDoesNotThrow() {
+        // Inner element is never closed before EOF. Previously threw IndexOutOfBoundsException
+        // from advanceCursor when ANTLR error recovery synthesized closing-tag tokens past EOF.
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), "<root>\n<inner>\n    wrong format\n</root>")
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo("<root>\n<inner>\n    wrong format\n</root>");
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7554")
+    @Test
+    void malformedUnterminatedEndTagDoesNotThrow() {
+        // End-tag missing its '>' before EOF.
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), "<a></a")
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo("<a></a");
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7554")
+    @Test
+    void malformedBareAmpersandDoesNotThrow() {
+        // A bare '&' (not part of an entity reference) is invalid XML; the original
+        // text is preserved by falling back to a ParseError rather than silently dropping it.
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), "<a>McFarland & Company</a>")
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo("<a>McFarland & Company</a>");
+    }
 }

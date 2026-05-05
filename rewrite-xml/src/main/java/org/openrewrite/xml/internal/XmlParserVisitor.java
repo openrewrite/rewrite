@@ -336,25 +336,35 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         beforeTagDelimiterPrefix = prefix(ctx.SLASH_CLOSE());
                         advanceCursor(ctx.SLASH_CLOSE().getSymbol().getStopIndex() + 1);
                     } else {
-                        beforeTagDelimiterPrefix = prefix(ctx.CLOSE(0));
-                        advanceCursor(ctx.CLOSE(0).getSymbol().getStopIndex() + 1);
+                        beforeTagDelimiterPrefix = ctx.CLOSE(0) == null ? "" : prefix(ctx.CLOSE(0));
+                        if (ctx.CLOSE(0) != null) {
+                            advanceCursor(ctx.CLOSE(0).getSymbol().getStopIndex() + 1);
+                        }
 
                         content = ctx.content().stream()
                                 .map(this::visit)
                                 .map(Content.class::cast)
                                 .collect(toList());
 
-                        String closeTagPrefix = prefix(ctx.OPEN(1));
-                        advanceCursor(codePointCursor + 2);
+                        // ANTLR may synthesize missing closing-tag tokens during error recovery
+                        // on malformed input; tolerate any combination of null OPEN/Name/CLOSE.
+                        if (ctx.OPEN(1) != null || ctx.Name(1) != null || ctx.CLOSE(1) != null) {
+                            String closeTagPrefix = ctx.OPEN(1) == null ? "" : prefix(ctx.OPEN(1));
+                            advanceCursor(codePointCursor + 2);
 
-                        closeTag = new Xml.Tag.Closing(
-                                randomId(),
-                                closeTagPrefix,
-                                Markers.EMPTY,
-                                convert(ctx.Name(1), (n, p) -> n.getText()),
-                                prefix(ctx.CLOSE(1))
-                        );
-                        advanceCursor(codePointCursor + 1);
+                            String closeName = ctx.Name(1) == null ? "" :
+                                    convert(ctx.Name(1), (n, p) -> n.getText());
+                            String afterCloseName = ctx.CLOSE(1) == null ? "" : prefix(ctx.CLOSE(1));
+
+                            closeTag = new Xml.Tag.Closing(
+                                    randomId(),
+                                    closeTagPrefix,
+                                    Markers.EMPTY,
+                                    closeName,
+                                    afterCloseName
+                            );
+                            advanceCursor(codePointCursor + 1);
+                        }
                     }
 
                     return new Xml.Tag(randomId(), prefix, Markers.EMPTY, name, attributes,
@@ -468,15 +478,23 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
 
     /**
-     *  Advance both the cursor and the code point cursor
+     *  Advance both the cursor and the code point cursor.
+     *  Clamps to the end of source if a synthesized token (from ANTLR error recovery
+     *  on malformed input) would advance past the end of the source string.
      */
     @SuppressWarnings("UnusedReturnValue")
     private int advanceCursor(int newCodePointIndex) {
         if (newCodePointIndex <= codePointCursor) {
             return cursor;
         }
-        cursor = source.offsetByCodePoints(cursor, newCodePointIndex - codePointCursor);
-        codePointCursor = newCodePointIndex;
+        try {
+            cursor = source.offsetByCodePoints(cursor, newCodePointIndex - codePointCursor);
+            codePointCursor = newCodePointIndex;
+        } catch (IndexOutOfBoundsException e) {
+            int reachableCodePoints = source.codePointCount(cursor, source.length());
+            cursor = source.length();
+            codePointCursor += reachableCodePoints;
+        }
         return cursor;
     }
 
