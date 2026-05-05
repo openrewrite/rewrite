@@ -109,16 +109,37 @@ public class MavenArtifactDownloader {
             } else if ("file".equals(URI.create(uri).getScheme())) {
                 bodyStream = Files.newInputStream(Paths.get(URI.create(uri)));
             } else {
-                HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
-                try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
-                     InputStream body = response.getBody()) {
-                    if (!response.isSuccessful() || body == null) {
-                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s from %s. Response was %d",
-                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), uri, response.getCode()), null,
+                try {
+                    // Try anonymously first, mirroring Apache Maven's DeferredCredentialsProvider behavior
+                    byte[] responseBytes = null;
+                    int responseCode;
+                    try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(httpSender.get(uri).build()));
+                         InputStream body = response.getBody()) {
+                        responseCode = response.getCode();
+                        if (response.isSuccessful() && body != null) {
+                            responseBytes = readAllBytes(body);
+                        }
+                    }
+                    // Retry with credentials if the anonymous request failed with a 4xx and we have credentials
+                    if (responseBytes == null && responseCode >= 400 && responseCode < 500 && hasCredentials(dependency.getRepository())) {
+                        HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
+                        try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
+                             InputStream body = response.getBody()) {
+                            responseCode = response.getCode();
+                            if (response.isSuccessful() && body != null) {
+                                responseBytes = readAllBytes(body);
+                            }
+                        }
+                    }
+                    if (responseBytes == null) {
+                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s%s from %s. Response was %d",
+                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(),
+                                dependency.getClassifier() == null ? "" : ":" + dependency.getClassifier(),
+                                uri, responseCode), null,
                                 dependency.getRequested().getGav()));
                         return null;
                     }
-                    bodyStream = new ByteArrayInputStream(readAllBytes(body));
+                    bodyStream = new ByteArrayInputStream(responseBytes);
                 } catch (Throwable t) {
                     Throwable cause = t instanceof FailsafeException && t.getCause() != null ? t.getCause() : t;
                     throw new MavenDownloadingException("Unable to download dependency", cause,
@@ -130,14 +151,27 @@ public class MavenArtifactDownloader {
     }
 
     private HttpSender.Request.Builder applyAuthentication(MavenRepository repository, HttpSender.Request.Builder request) {
+        MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
+        if (authInfo != null && authInfo.getConfiguration() != null && authInfo.getConfiguration().getHttpHeaders() != null) {
+            for (MavenSettings.HttpHeader header : authInfo.getConfiguration().getHttpHeaders()) {
+                request.withHeader(header.getName(), header.getValue());
+            }
+        }
+        String[] credentials = resolveCredentials(repository);
+        if (credentials != null) {
+            return request.withBasicAuthentication(credentials[0], credentials[1]);
+        }
+        return request;
+    }
+
+    private boolean hasCredentials(MavenRepository repository) {
+        return resolveCredentials(repository) != null;
+    }
+
+    private String @Nullable [] resolveCredentials(MavenRepository repository) {
         String username, password;
         MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
         if (authInfo != null) {
-            if (authInfo.getConfiguration() != null && authInfo.getConfiguration().getHttpHeaders() != null) {
-                for (MavenSettings.HttpHeader header : authInfo.getConfiguration().getHttpHeaders()) {
-                    request.withHeader(header.getName(), header.getValue());
-                }
-            }
             username = authInfo.getUsername();
             password = authInfo.getPassword();
         } else {
@@ -146,8 +180,8 @@ public class MavenArtifactDownloader {
         }
         if (username != null && !username.contains("${") &&
                 password != null && !password.contains("${")) {
-            return request.withBasicAuthentication(username, password);
+            return new String[]{username, password};
         }
-        return request;
+        return null;
     }
 }

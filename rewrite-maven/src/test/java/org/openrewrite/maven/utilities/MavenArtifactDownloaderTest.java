@@ -133,7 +133,7 @@ class MavenArtifactDownloaderTest {
     }
 
     @Test
-    void fallsBackToAnonymousWhenCredentialsRejected(@TempDir Path tempDir) throws Exception {
+    void publicArtifactsResolveAnonymouslyEvenWhenCredentialsAreInvalid(@TempDir Path tempDir) throws Exception {
         byte[] jarBytes = {0x50, 0x4B, 0x03, 0x04}; // minimal ZIP magic bytes
 
         try (MockWebServer mockRepo = new MockWebServer()) {
@@ -141,7 +141,7 @@ class MavenArtifactDownloaderTest {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
                     if (request.getHeader("Authorization") != null) {
-                        return new MockResponse().setResponseCode(403); // Throw if used; it should not be called at all
+                        return new MockResponse().setResponseCode(401);
                     }
                     return new MockResponse().setResponseCode(200)
                       .setBody(new okio.Buffer().write(jarBytes));
@@ -158,8 +158,8 @@ class MavenArtifactDownloaderTest {
                     <servers>
                         <server>
                             <id>mock-repo</id>
-                            <username>${placeholder}</username>
-                            <password>${placeholder}</password>
+                            <username>bad-user</username>
+                            <password>bad-password</password>
                         </server>
                     </servers>
                 </settings>
@@ -184,6 +184,64 @@ class MavenArtifactDownloaderTest {
             assertThat(artifact).isNotNull();
             assertThat(error.get()).isNull();
             assertThat(mockRepo.getRequestCount()).isEqualTo(1);
+            assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNull();
+        }
+    }
+
+    @Test
+    void retriesWithCredentialsWhenAnonymousReturns401(@TempDir Path tempDir) throws Exception {
+        byte[] jarBytes = {0x50, 0x4B, 0x03, 0x04};
+
+        try (MockWebServer mockRepo = new MockWebServer()) {
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    if (request.getHeader("Authorization") == null) {
+                        return new MockResponse().setResponseCode(401);
+                    }
+                    return new MockResponse().setResponseCode(200)
+                      .setBody(new okio.Buffer().write(jarBytes));
+                }
+            });
+            mockRepo.start();
+
+            String repoUrl = "http://" + mockRepo.getHostName() + ":" + mockRepo.getPort();
+            MavenSettings settings = MavenSettings.parse(new Parser.Input(
+              Path.of("settings.xml"), () -> new ByteArrayInputStream(
+              //language=xml
+              """
+                <settings>
+                    <servers>
+                        <server>
+                            <id>mock-repo</id>
+                            <username>good-user</username>
+                            <password>good-password</password>
+                        </server>
+                    </servers>
+                </settings>
+                """.getBytes())), new InMemoryExecutionContext());
+
+            MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
+            AtomicReference<Throwable> error = new AtomicReference<>();
+            MavenArtifactDownloader downloader = new MavenArtifactDownloader(
+              artifactCache, settings, error::set);
+
+            MavenRepository repo = new MavenRepository(
+              "mock-repo", repoUrl, "true", "false", true, null, null, null, false);
+            GroupArtifactVersion gav = new GroupArtifactVersion("com.example", "test-lib", "1.0.0");
+            ResolvedDependency dep = ResolvedDependency.builder()
+              .repository(repo)
+              .gav(new ResolvedGroupArtifactVersion(repoUrl, gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null))
+              .requested(Dependency.builder().gav(gav).build())
+              .build();
+
+            Path artifact = downloader.downloadArtifact(dep);
+
+            assertThat(artifact).isNotNull();
+            assertThat(error.get()).isNull();
+            assertThat(mockRepo.getRequestCount()).isEqualTo(2);
+            assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNull();
+            assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNotNull();
         }
     }
 }
