@@ -29,7 +29,9 @@ import org.openrewrite.kotlin.KotlinParser;
 
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -66,12 +68,8 @@ public class GradleParser implements Parser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         if (groovyBuildParser == null) {
-            Collection<Path> buildscriptClasspath = base.buildscriptClasspath;
-            if (buildscriptClasspath == null) {
-                buildscriptClasspath = defaultClasspath(ctx);
-            }
             groovyBuildParser = GroovyParser.builder(base.groovyParser)
-                    .classpath(buildscriptClasspath)
+                    .classpath(mergeClasspath(base.buildscriptClasspath, ctx))
                     .compilerCustomizers(
                             new DefaultImportsCustomizer(),
                             config -> config.setScriptBaseClass("RewriteGradleProject")
@@ -79,12 +77,8 @@ public class GradleParser implements Parser {
                     .build();
         }
         if (kotlinBuildParser == null) {
-            Collection<Path> buildscriptClasspath = base.buildscriptClasspath;
-            if (buildscriptClasspath == null) {
-                buildscriptClasspath = defaultClasspath(ctx);
-            }
             kotlinBuildParser = KotlinParser.builder(base.kotlinParser)
-                    .classpath(buildscriptClasspath)
+                    .classpath(mergeClasspath(base.buildscriptClasspath, ctx))
                     .dependsOn(KTS_BUILD_STUBS)
                     .isKotlinScript(true)
                     .scriptImplicitReceivers("org.gradle.api.Project")
@@ -92,12 +86,8 @@ public class GradleParser implements Parser {
                     .build();
         }
         if (groovySettingsParser == null) {
-            Collection<Path> settingsClasspath = base.settingsClasspath;
-            if (settingsClasspath == null) {
-                settingsClasspath = defaultClasspath(ctx);
-            }
             groovySettingsParser = GroovyParser.builder(base.groovyParser)
-                    .classpath(settingsClasspath)
+                    .classpath(mergeClasspath(base.settingsClasspath, ctx))
                     .compilerCustomizers(
                             new DefaultImportsCustomizer(),
                             config -> config.setScriptBaseClass("RewriteSettings")
@@ -105,12 +95,8 @@ public class GradleParser implements Parser {
                     .build();
         }
         if (kotlinSettingsParser == null) {
-            Collection<Path> settingsClasspath = base.settingsClasspath;
-            if (settingsClasspath == null) {
-                settingsClasspath = defaultClasspath(ctx);
-            }
             kotlinSettingsParser = KotlinParser.builder(base.kotlinParser)
-                    .classpath(settingsClasspath)
+                    .classpath(mergeClasspath(base.settingsClasspath, ctx))
                     .dependsOn(KTS_SETTINGS_STUBS)
                     .isKotlinScript(true)
                     .scriptImplicitReceivers("org.gradle.api.initialization.Settings")
@@ -219,6 +205,21 @@ public class GradleParser implements Parser {
         public String getDslName() {
             return "gradle";
         }
+    }
+
+    /**
+     * Always include the default Gradle API stubs alongside any externally-provided classpath.
+     * The external classpath (e.g. settings buildscript dependencies) typically contains custom
+     * plugin jars but not the Gradle API itself, which is needed for correct type attribution
+     * of DSL methods like pluginManagement(), repositories(), gradlePluginPortal(), etc.
+     */
+    private Collection<Path> mergeClasspath(@Nullable Collection<Path> provided, ExecutionContext ctx) {
+        if (provided == null) {
+            return defaultClasspath(ctx);
+        }
+        Set<Path> merged = new LinkedHashSet<>(defaultClasspath(ctx));
+        merged.addAll(provided);
+        return merged;
     }
 
     private List<Path> defaultClasspath(ExecutionContext ctx) {
