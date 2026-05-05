@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
@@ -306,8 +305,7 @@ class AddRepositoryTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
-    void updateToSpringBoot30Snapshot() {
+    void updateToSpringBootSnapshot() {
         rewriteRun(
           spec -> spec.recipes(
             new AddRepository("boot-snapshots", "https://repo.spring.io/snapshot", null, null,
@@ -316,7 +314,7 @@ class AddRepositoryTest implements RewriteTest {
             new UpgradeParentVersion(
               "org.springframework.boot",
               "spring-boot-starter-parent",
-              "3.0.0-SNAPSHOT",
+              "4.0.0-SNAPSHOT",
               null,
               null)
           ),
@@ -326,7 +324,7 @@ class AddRepositoryTest implements RewriteTest {
                 <parent>
                   <groupId>org.springframework.boot</groupId>
                   <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>2.7.3</version>
+                  <version>3.4.0</version>
                 </parent>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -338,7 +336,7 @@ class AddRepositoryTest implements RewriteTest {
                 <parent>
                   <groupId>org.springframework.boot</groupId>
                   <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>3.0.0-SNAPSHOT</version>
+                  <version>4.0.0-SNAPSHOT</version>
                 </parent>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
