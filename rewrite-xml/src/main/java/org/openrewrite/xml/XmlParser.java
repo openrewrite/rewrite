@@ -22,18 +22,23 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.config.EditorConfigResolver;
 import org.openrewrite.internal.EncodingDetectingInputStream;
+
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.xml.internal.XmlParserVisitor;
 import org.openrewrite.xml.internal.grammar.XMLLexer;
 import org.openrewrite.xml.internal.grammar.XMLParser;
+import org.openrewrite.xml.style.EditorConfigStyleMapper;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -80,7 +85,9 @@ public class XmlParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
-        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+        ParsingExecutionContextView view = ParsingExecutionContextView.view(ctx);
+        ParsingEventListener parsingListener = view.getParsingListener();
+        EditorConfigResolver editorConfigResolver = view.getEditorConfigResolver();
         return acceptedInputs(sourceFiles).map(input -> {
             parsingListener.startedParsing(input);
             Path path = input.getRelativePath(relativeTo);
@@ -102,6 +109,17 @@ public class XmlParser implements Parser {
                         is.getCharset(),
                         is.isCharsetBomMarked()
                 ).visitDocument(parser.document());
+
+                if (editorConfigResolver != null && !input.isSynthetic() && input.getPath().isAbsolute()) {
+                    Map<String, String> ecProps = editorConfigResolver.resolve(input.getPath());
+                    if (!ecProps.isEmpty()) {
+                        NamedStyles ecStyles = EditorConfigStyleMapper.fromEditorConfig(ecProps);
+                        if (ecStyles != null) {
+                            document = document.withMarkers(document.getMarkers().add(ecStyles));
+                        }
+                    }
+                }
+
                 parsingListener.parsed(input, document);
                 return requirePrintEqualsInput(document, input, relativeTo, ctx);
             } catch (Throwable t) {
