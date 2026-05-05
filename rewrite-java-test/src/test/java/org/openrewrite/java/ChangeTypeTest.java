@@ -2507,13 +2507,143 @@ class ChangeTypeTest implements RewriteTest {
                 }
               }
               """,
-                """
+            """
+              import bar.A.Builder;
               import foo.A;
 
               class Test {
                 A test() {
                     bar.A.Builder b = A.builder();
                     return b.build();
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renameInnerClassWithinSameOuterClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A$Builder", "foo.A$Creator", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package foo;
+
+                  public class A {
+                    public static class Builder {}
+                    public static class Creator {}
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import foo.A;
+
+              class Test {
+                void test() {
+                    A.Builder x = new A.Builder();
+                }
+              }
+              """,
+            """
+              import foo.A;
+
+              class Test {
+                void test() {
+                    A.Creator x = new A.Creator();
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeTypeOfInnerCompletely() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.B$Builder", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package foo;
+
+                  public class A {
+                    public static class Builder {}
+                  }
+                  """,
+                """
+                  package bar;
+
+                  public class B {
+                    public static class Builder {}
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import foo.A;
+              import foo.A.Builder;
+
+              class Test {
+                void test() {
+                    A.Builder x = new A.Builder();
+                }
+              }
+              """,
+            """
+          import bar.B;
+
+          class Test {
+            void test() {
+                B.Builder x = new B.Builder();
+            }
+          }
+          """
+          )
+        );
+    }
+
+    @Test
+    void changeTypeOfInnerClassImplicitly() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A", "bar.B", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package foo;
+
+                  public class A {
+                    public static class Builder {}
+                  }
+                  """,
+                """
+                  package bar;
+
+                  public class B {
+                    public static class Builder {}
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import foo.A;
+              import foo.A.Builder;
+
+              class Test {
+                void test() {
+                    A.Builder x = new A.Builder();
+                }
+              }
+              """,
+            """
+              import bar.B;
+              import bar.B.Builder;
+
+              class Test {
+                void test() {
+                    B.Builder x = new B.Builder();
                 }
               }
               """

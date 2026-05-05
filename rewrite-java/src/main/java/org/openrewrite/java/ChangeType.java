@@ -195,12 +195,12 @@ public class ChangeType extends Recipe {
             return updateType(javaType);
         }
 
-        private void addImport(JavaType.FullyQualified owningClass) {
+        private void addImport(JavaType.FullyQualified owningClass, boolean onlyIfUsed) {
             if (importAlias != null) {
-                maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, importAlias.getSimpleName(), true);
+                maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, importAlias.getSimpleName(), onlyIfUsed);
             }
 
-            maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, null, true);
+            maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, null, onlyIfUsed);
         }
 
         @Override
@@ -230,6 +230,7 @@ public class ChangeType extends Recipe {
                 j = ((TypedTree) tree).withType(updateType(((TypedTree) tree).getType()));
             } else if (tree instanceof JavaSourceFile) {
                 JavaSourceFile sf = (JavaSourceFile) tree;
+                boolean outerClassImportRemoved = false;
                 if (targetType instanceof JavaType.FullyQualified) {
                     for (J.Import anImport : sf.getImports()) {
                         if (anImport.isStatic()) {
@@ -247,7 +248,10 @@ public class ChangeType extends Recipe {
                                 if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
                                     sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
                                 } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
+                                    JavaSourceFile sfBefore = sf;
                                     sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
+                                    // Track whether the outer class import was actually removed (not retained because still in use)
+                                    outerClassImportRemoved |= (sf != sfBefore);
                                 }
                             }
                         }
@@ -258,13 +262,21 @@ public class ChangeType extends Recipe {
                 if (fullyQualifiedTarget != null) {
                     JavaType.FullyQualified owningClass = fullyQualifiedTarget.getOwningClass();
                     if (!topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName())) {
-                        if (hasNoConflictingImport(sf)) {
-                            if (owningClass != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                                addImport(owningClass);
+                        if (!"java.lang".equals(fullyQualifiedTarget.getPackageName()) && hasNoConflictingImport(sf)) {
+                            if (owningClass != null) {
+                                // Force-add the outer class import when the original outer class import was
+                                // explicitly removed (meaning code used the outer class by name, e.g. "B" in "B.Builder").
+                                // When the outer class import was absent, the code uses only the simple inner class
+                                // name (e.g. just "Y"), so AddImport can decide based on actual references.
+                                addImport(owningClass, !outerClassImportRemoved);
                             }
-                            if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                                addImport(fullyQualifiedTarget);
-                            }
+                            // Force-add the inner class import only when the outer class was NOT removed:
+                            // if the outer class was removed and is being re-added, `import bar.B` already
+                            // makes `B.Builder` accessible — adding `import bar.B.Builder` would be redundant.
+                            // When only the inner class import existed (e.g. code uses simple name "Y"),
+                            // force-add when the owning class changed so FindTypes can locate the new type.
+                            boolean forceAddInnerImport = !outerClassImportRemoved && !owningClassSame(owningClass);
+                            addImport(fullyQualifiedTarget, !forceAddInnerImport);
                         }
                     }
                 }
@@ -287,6 +299,16 @@ public class ChangeType extends Recipe {
             }
 
             return j;
+        }
+
+        private boolean owningClassSame(JavaType.@Nullable FullyQualified owningClass) {
+            JavaType.FullyQualified originalOwningClass = originalType.getOwningClass();
+            if (originalOwningClass == null || owningClass == null) {
+                return true;
+            }
+
+            return originalOwningClass.getClassName().equals(owningClass.getClassName()) &&
+                    originalOwningClass.getPackageName().equals(owningClass.getPackageName());
         }
 
         @Override
@@ -411,7 +433,8 @@ public class ChangeType extends Recipe {
                                     method.getSimpleName().equals(anImport.getQualid().getSimpleName())) {
                                 JavaType.FullyQualified targetFqn = (JavaType.FullyQualified) targetType;
 
-                                addImport(targetFqn);
+                                // onlyIfUsed=true: the static import already proves the type is referenced.
+                                addImport(targetFqn, true);
                                 maybeAddImport((targetFqn).getFullyQualifiedName(), method.getName().getSimpleName());
                                 break;
                             }
