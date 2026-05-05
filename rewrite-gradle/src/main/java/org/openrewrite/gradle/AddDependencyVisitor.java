@@ -27,6 +27,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
@@ -80,7 +81,12 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
             }
 
             GradleDependencyConfiguration gdc = gradleProject.getConfiguration(configuration);
-            if (gdc == null || gdc.findRequestedDependency(groupId, artifactId) != null) {
+            if (gdc == null) {
+                return Markup.warn(sourceFile, new IllegalStateException(
+                        "GradleProject has no configuration named '" + configuration +
+                                "'. Available configurations: " + gradleProject.getNameToConfiguration().keySet()));
+            }
+            if (gdc.findRequestedDependency(groupId, artifactId) != null) {
                 return sourceFile;
             }
 
