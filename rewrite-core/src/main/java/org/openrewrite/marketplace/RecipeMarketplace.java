@@ -84,11 +84,11 @@ public class RecipeMarketplace {
                         break;
                     }
                 }
-                if (existingSubCategory != null) {
-                    existingSubCategory.merge(subCategory);
-                } else {
-                    categories.add(subCategory);
+                if (existingSubCategory == null) {
+                    existingSubCategory = new Category(subCategory.getDisplayName(), subCategory.getDescription());
+                    categories.add(existingSubCategory);
                 }
+                existingSubCategory.merge(subCategory);
             }
         }
 
