@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
@@ -305,7 +306,9 @@ class AddRepositoryTest implements RewriteTest {
     }
 
     @Test
-    void updateToSpringBootSnapshot() {
+    @DisabledIfEnvironmentVariable(named = "CI", matches = "true",
+      disabledReason = "Artifactory mirror does not proxy https://repo.spring.io/snapshot")
+    void updateToSpringBoot30Snapshot() {
         rewriteRun(
           spec -> spec.recipes(
             new AddRepository("boot-snapshots", "https://repo.spring.io/snapshot", null, null,
@@ -314,7 +317,7 @@ class AddRepositoryTest implements RewriteTest {
             new UpgradeParentVersion(
               "org.springframework.boot",
               "spring-boot-starter-parent",
-              "4.0.0-SNAPSHOT",
+              "3.0.0-SNAPSHOT",
               null,
               null)
           ),
@@ -324,7 +327,7 @@ class AddRepositoryTest implements RewriteTest {
                 <parent>
                   <groupId>org.springframework.boot</groupId>
                   <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>3.4.0</version>
+                  <version>2.7.3</version>
                 </parent>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -336,7 +339,7 @@ class AddRepositoryTest implements RewriteTest {
                 <parent>
                   <groupId>org.springframework.boot</groupId>
                   <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>4.0.0-SNAPSHOT</version>
+                  <version>3.0.0-SNAPSHOT</version>
                 </parent>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
