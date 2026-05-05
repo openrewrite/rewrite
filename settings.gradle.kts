@@ -39,6 +39,7 @@ val allProjects = listOf(
     "rewrite-toml",
     "rewrite-xml",
     "rewrite-yaml",
+    "rewrite-zig",
 )
 
 // Always included because their paths contain colons which can't be represented in IDE.properties

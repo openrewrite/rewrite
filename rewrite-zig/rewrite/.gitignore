@@ -1,0 +1,5 @@
+zig-out/
+.zig-cache/
+zig-cache/
+*.o
+*.dSYM/
