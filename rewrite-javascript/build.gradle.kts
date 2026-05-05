@@ -263,9 +263,8 @@ val npmPublish = tasks.register<NpmTask>("npmPublish") {
             .directory(file("rewrite"))
             .redirectErrorStream(true)
             .start()
-        process.waitFor()
         val output = process.inputStream.bufferedReader().readText().trim()
-        val alreadyPublished = output.contains(versionToCheck)
+        val alreadyPublished = process.waitFor() == 0 && output.lines().any { it.trim() == versionToCheck }
         if (alreadyPublished) {
             logger.lifecycle("Skipping npmPublish: @openrewrite/rewrite@$versionToCheck already published")
         }
