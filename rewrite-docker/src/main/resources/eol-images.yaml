@@ -395,6 +395,11 @@
   suggestedReplacement: 24 or 22
 
 - imageName: node
+  tagPatterns: ["20", "20-*", "20.*"]
+  eolDate: "2026-04-30"
+  suggestedReplacement: 24 or 22
+
+- imageName: node
   tagPatterns: ["21", "21-*", "21.*"]
   eolDate: "2024-06-01"
   suggestedReplacement: 24 or 22
