@@ -29,3 +29,4 @@ recipeList:
   - org.openrewrite.gradle.gradle9.UseMainClassPropertyForApplication
   # JavaPluginConvention was removed in Gradle 9; top-level sourceCompatibility / targetCompatibility no longer work
   - org.openrewrite.gradle.gradle9.UseJavaExtensionBlock
+  - org.openrewrite.gradle.gradle9.RewriteSpreadAllInConfigurationsBlock
