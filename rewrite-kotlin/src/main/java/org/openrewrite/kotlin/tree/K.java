@@ -1545,35 +1545,45 @@ public interface K extends J {
         @EqualsAndHashCode.Include
         UUID id;
 
-        J.Return expression;
+        J.@Nullable Return expression;
 
         J.@Nullable Identifier label;
 
         @Override
         public Space getPrefix() {
-            return expression.getPrefix();
+            return expression == null ? Space.EMPTY : expression.getPrefix();
         }
 
         @Override
         public <J2 extends J> J2 withPrefix(Space space) {
+            if (expression == null) {
+                //noinspection unchecked
+                return (J2) this;
+            }
             //noinspection unchecked
             return (J2) withExpression(expression.withPrefix(space));
         }
 
         @Override
         public Markers getMarkers() {
-            return expression.getMarkers();
+            return expression == null ? Markers.EMPTY : expression.getMarkers();
         }
 
         @Override
         public <J2 extends Tree> J2 withMarkers(Markers markers) {
+            if (expression == null) {
+                //noinspection unchecked
+                return (J2) this;
+            }
             //noinspection unchecked
             return (J2) withExpression(expression.withMarkers(markers));
         }
 
         @Override
         public @Nullable JavaType getType() {
-            //noinspection DataFlowIssue
+            if (expression == null || expression.getExpression() == null) {
+                return null;
+            }
             return expression.getExpression().getType();
         }
 
