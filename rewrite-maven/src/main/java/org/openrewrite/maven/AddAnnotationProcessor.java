@@ -220,6 +220,15 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                     // directory. baseDir is null when the aggregator is at the
                     // root (e.g. "pom.xml"); fall back to the empty path so
                     // root-level reactors still reach their children.
+                    //
+                    // Assumption: aggregator <modules> entries refer only to
+                    // POMs from the same reactor. An externally-ingested
+                    // aggregator that lists modules from its own out-of-LST
+                    // reactor will resolve to paths that almost always point
+                    // nowhere; in the rare case a co-ingested unrelated repo
+                    // happens to occupy a colliding path, two independent
+                    // POMs could be reactor-linked spuriously. Considered
+                    // negligible in practice.
                     Path baseDir = sourcePath.getParent();
                     Set<Path> resolvedSubmodules = new HashSet<>();
                     for (String sub : requestedSubs) {
@@ -269,7 +278,7 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                 // check and refuse to add the plugin. Targeting the visitor
                 // at this exact source path bypasses that guard.
                 boolean isGavCoincidentOrphan = !isParent && mrr.parentPomIsProjectPom();
-                String pluginFilePattern = isGavCoincidentOrphan ? sourcePath.toString() : null;
+                String pluginFilePattern = isGavCoincidentOrphan ? PathUtils.separatorsToUnix(sourcePath.toString()) : null;
                 tree = new AddPluginVisitor(isParent,
                         MAVEN_COMPILER_PLUGIN_GROUP_ID, MAVEN_COMPILER_PLUGIN_ARTIFACT_ID, null,
                         "<configuration><annotationProcessorPaths/></configuration>", null, null,
@@ -377,6 +386,12 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
      * {@code <configuration>} lacks {@code <annotationProcessorPaths>}, add the
      * missing structure so the path-adding visitor has somewhere to attach.
      * No-op when the structure is already present.
+     * <p>
+     * Considered delegating to {@code ChangePluginConfiguration} /
+     * {@code AddOrUpdateChild}, but both replace an existing {@code <configuration>}
+     * wholesale and would clobber sibling entries like {@code <source>} /
+     * {@code <target>}. This helper is intentionally a conservative,
+     * sibling-preserving fill-in.
      */
     private static Xml.Tag ensureAnnotationProcessorPathsTag(Xml.Tag plugin) {
         Xml.Tag config = plugin.getChild("configuration").orElse(null);

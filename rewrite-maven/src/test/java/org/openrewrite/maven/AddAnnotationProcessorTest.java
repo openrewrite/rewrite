@@ -1013,7 +1013,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
         }
 
         @Test
-        void addConfigurationToExistingPluginWithNoConfig() {
+        void addConfigurationToExistingPluginWithNoConfigAtPluginLevel() {
             // Single-module: plugin exists in build/plugins with NO <configuration>
             // block. Common when a module declares maven-compiler-plugin only to
             // set <source>/<target> elsewhere or for default lifecycle binding,
@@ -1067,7 +1067,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
         }
 
         @Test
-        void addAnnotationProcessorPathsToExistingConfiguration() {
+        void addAnnotationProcessorPathsToExistingConfigurationAtPluginLevel() {
             // Single-module: plugin exists with a <configuration> block but no
             // <annotationProcessorPaths>. Recipe must add the inner element
             // without disturbing other configuration entries.
