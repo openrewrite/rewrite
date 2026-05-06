@@ -1350,25 +1350,59 @@ def handle_batch_visit(params: dict) -> dict:
 
 
 def _collect_search_result_ids(tree) -> set:
-    """Collect all SearchResult marker UUIDs from a tree."""
+    """Collect all SearchResult marker UUIDs reachable from a tree.
+
+    Hand-rolled iterative walker. The previous implementation built a
+    ``TreeVisitor`` subclass and called ``.visit(tree, None)``, which threw
+    ``AttributeError: '_Collector' object has no attribute 'visit_compilation_unit'``
+    on every Python ``CompilationUnit`` it encountered (and similar errors for
+    other language-specific node types) because ``TreeVisitor`` is the
+    language-agnostic base class. That produced a per-file exception storm
+    measured at ~9k exceptions per medium baseline run. This walker doesn't
+    use the visitor framework at all — it traverses the LST node graph by
+    inspecting dataclass ``__dict__`` values directly, recursing only into
+    LST tree nodes (those with ``_id``) and the structural padding wrappers
+    (``JLeftPadded``/``JRightPadded``/``JContainer``) that link them.
+    """
     from rewrite.markers import SearchResult
+    from rewrite import Markers as _Markers
+    from rewrite.java.support_types import JLeftPadded, JRightPadded, JContainer
+
     ids = set()
     if tree is None:
         return ids
 
-    def _walk(node):
-        if hasattr(node, 'markers') and node.markers is not None:
-            for m in node.markers.markers:
+    _padding_types = (JLeftPadded, JRightPadded, JContainer)
+
+    seen = set()
+    stack = [tree]
+    while stack:
+        node = stack.pop()
+        nid = id(node)
+        if nid in seen:
+            continue
+        seen.add(nid)
+
+        markers = getattr(node, '_markers', None)
+        if isinstance(markers, _Markers):
+            for m in markers._markers:
                 if isinstance(m, SearchResult):
                     ids.add(str(m.id))
 
-    # Use the visitor framework to walk all nodes
-    from rewrite.visitor import TreeVisitor
-    class _Collector(TreeVisitor):
-        def pre_visit(self, tree, p):
-            _walk(tree)
-            return tree
-    _Collector().visit(tree, None)
+        node_dict = getattr(node, '__dict__', None)
+        if not node_dict:
+            continue
+        for key, value in node_dict.items():
+            if key == '_markers' or value is None:
+                continue
+            if isinstance(value, list):
+                for item in value:
+                    if item is None:
+                        continue
+                    if hasattr(item, '_id') or isinstance(item, _padding_types):
+                        stack.append(item)
+            elif hasattr(value, '_id') or isinstance(value, _padding_types):
+                stack.append(value)
     return ids
 
 
