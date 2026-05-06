@@ -84,6 +84,31 @@ class MigrateToGradle9Test implements RewriteTest {
     }
 
     @Test
+    void wrapsTopLevelCompatibilityIntoJavaBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              sourceCompatibility = '17'
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              java {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void useMainClassPropertyInKotlinDsl() {
         rewriteRun(
           buildGradleKts(
