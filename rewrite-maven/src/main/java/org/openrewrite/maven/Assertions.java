@@ -44,6 +44,16 @@ public class Assertions {
     private Assertions() {
     }
 
+    /**
+     * Loads {@code ~/.m2/settings.xml} into the {@link ExecutionContext} when nothing is already
+     * configured. Wired into every {@link #pomXml} {@code SourceSpec} so it also runs on a
+     * separately-supplied {@code recipeExecutionContext} (see
+     * <a href="https://github.com/moderneinc/customer-requests/issues/1395">customer-requests#1395</a>).
+     * <p>
+     * The same loading also fires once per JUnit container via
+     * {@code MavenSettingsAutoLoadingExtension}; both call sites are guarded by the
+     * {@code nothingConfigured} check so they're idempotent.
+     */
     static void customizeExecutionContext(ExecutionContext ctx) {
         MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
         boolean nothingConfigured = mctx.getSettings() == null &&
@@ -52,7 +62,6 @@ public class Assertions {
                                     mctx.getActiveProfiles().isEmpty() &&
                                     mctx.getMirrors().isEmpty();
         if (nothingConfigured) {
-            // Load Maven settings to pick up any mirrors, proxies etc. that might be required in corporate environments
             mctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(mctx));
         }
     }
