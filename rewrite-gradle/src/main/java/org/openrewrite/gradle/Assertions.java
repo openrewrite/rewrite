@@ -23,8 +23,6 @@ import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.tree.K;
-import org.openrewrite.maven.MavenExecutionContextView;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.UncheckedConsumer;
@@ -34,9 +32,6 @@ import org.openrewrite.text.PlainTextParser;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.function.Consumer;
-
-import static java.util.Collections.emptyList;
-import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 public class Assertions {
 
@@ -84,30 +79,6 @@ public class Assertions {
     public static UncheckedConsumer<List<SourceFile>> withToolingApi() {
         throw new UnsupportedOperationException("This method has moved to org.openrewrite.gradle.toolingapi.Assertions. " +
                                                 "Add a dependency on org.openrewrite.gradle.tooling:model to continue using it.");
-    }
-
-    /**
-     * Returns a {@link RecipeSpec} customizer that clears any Maven settings state injected
-     * into the {@link org.openrewrite.ExecutionContext} (mirrors, repositories, profiles,
-     * credentials, local repository, and the parsed {@code MavenSettings} itself), so a test
-     * can run against a "clean" context that reflects only what the build script declares.
-     * <p>
-     * Use this in modules whose test classpath auto-loads {@code ~/.m2/settings.xml} (e.g.
-     * via a JUnit extension that sets a mirror) when a specific test needs to verify
-     * behavior without those settings.
-     */
-    public static Consumer<RecipeSpec> withoutMavenSettings() {
-        return spec -> spec.executionContext(ctx -> {
-            MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
-            mctx.setMirrors(emptyList());
-            mctx.setRepositories(emptyList());
-            mctx.setActiveProfiles(emptyList());
-            mctx.setCredentials(emptyList());
-            mctx.setLocalRepository(MAVEN_LOCAL_DEFAULT);
-            // setMavenSettings(null) is a no-op, so clear the underlying message directly
-            mctx.pollMessage("org.openrewrite.maven.settings");
-            return ctx;
-        });
     }
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before) {
