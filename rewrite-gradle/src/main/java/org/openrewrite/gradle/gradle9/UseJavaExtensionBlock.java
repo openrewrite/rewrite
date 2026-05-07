@@ -18,7 +18,6 @@ package org.openrewrite.gradle.gradle9;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
@@ -28,12 +27,15 @@ import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.marker.Markers;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -41,6 +43,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -71,14 +75,14 @@ public class UseJavaExtensionBlock extends Recipe {
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 J visited = super.visit(tree, ctx);
-                Map<String, String> versionsToMove = getCursor().pollMessage(VERSIONS_KEY);
+                Map<String, Expression> versionsToMove = getCursor().pollMessage(VERSIONS_KEY);
                 if (!(visited instanceof G.CompilationUnit) || versionsToMove == null || versionsToMove.isEmpty()) {
                     return visited;
                 }
                 G.CompilationUnit cu = (G.CompilationUnit) visited;
 
-                String srcVal = versionsToMove.get(SOURCE);
-                String tgtVal = versionsToMove.get(TARGET);
+                Expression srcVal = versionsToMove.get(SOURCE);
+                Expression tgtVal = versionsToMove.get(TARGET);
                 if (srcVal != null && tgtVal == null) {
                     versionsToMove.put(TARGET, srcVal);
                 } else if (tgtVal != null && srcVal == null) {
@@ -105,10 +109,9 @@ public class UseJavaExtensionBlock extends Recipe {
                 if (name == null) {
                     return assignment;
                 }
-                String value = renderCompatibilityValue(assignment.getAssignment(), getCursor());
-                getCursor().getRoot().<Map<String, String>>computeMessageIfAbsent(
+                getCursor().getRoot().<Map<String, Expression>>computeMessageIfAbsent(
                         VERSIONS_KEY, k -> new LinkedHashMap<>()
-                ).put(name, value);
+                ).put(name, assignment.getAssignment());
                 return null;
             }
         });
@@ -153,13 +156,13 @@ public class UseJavaExtensionBlock extends Recipe {
                 existingLambda.withBody(existingBody.withStatements(merged))));
     }
 
-    private static Statement buildJavaBlock(Map<String, String> entries, ExecutionContext ctx) {
+    private static Statement buildJavaBlock(Map<String, Expression> entries, ExecutionContext ctx) {
         StringBuilder snippet = new StringBuilder("\njava {\n");
         if (entries.containsKey(SOURCE)) {
-            snippet.append("    sourceCompatibility = ").append(entries.get(SOURCE)).append("\n");
+            snippet.append("    sourceCompatibility = JavaVersion.VERSION_17\n");
         }
         if (entries.containsKey(TARGET)) {
-            snippet.append("    targetCompatibility = ").append(entries.get(TARGET)).append("\n");
+            snippet.append("    targetCompatibility = JavaVersion.VERSION_17\n");
         }
         snippet.append("}\n");
         G.CompilationUnit parsed = (G.CompilationUnit) GradleParser.builder().build()
@@ -169,15 +172,35 @@ public class UseJavaExtensionBlock extends Recipe {
         if (parsed.getStatements().isEmpty()) {
             throw new IllegalStateException("Parsed `java { }` block is empty");
         }
-        return parsed.getStatements().get(0);
+        Statement template = parsed.getStatements().get(0);
+        return (Statement) new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Assignment visitAssignment(J.Assignment a, Integer i) {
+                String name = compatibilityName(a);
+                if (name == null || !entries.containsKey(name)) {
+                    return super.visitAssignment(a, i);
+                }
+                Expression original = entries.get(name);
+                Integer version = extractVersion(original);
+                Space rhsPrefix = a.getAssignment().getPrefix();
+                Expression newRhs = version != null
+                        ? javaVersionEnumAccess(version, rhsPrefix)
+                        : original.withPrefix(rhsPrefix);
+                return a.withAssignment(newRhs);
+            }
+        }.visitNonNull(template, 0);
     }
 
-    private static String renderCompatibilityValue(Expression expr, Cursor cursor) {
-        Integer version = extractVersion(expr);
-        if (version != null) {
-            return enumForm(version);
-        }
-        return expr.withPrefix(Space.EMPTY).printTrimmed(cursor);
+    private static Expression javaVersionEnumAccess(int version, Space prefix) {
+        String enumName = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
+        JavaType.FullyQualified javaVersionType = JavaType.ShallowClass.build("org.gradle.api.JavaVersion");
+        return new J.FieldAccess(
+                Tree.randomId(),
+                prefix,
+                Markers.EMPTY,
+                new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "JavaVersion", javaVersionType, null),
+                new JLeftPadded<>(Space.EMPTY, new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), enumName, null, null), Markers.EMPTY),
+                javaVersionType);
     }
 
     private static @Nullable String compatibilityName(Statement s) {
@@ -271,9 +294,5 @@ public class UseJavaExtensionBlock extends Recipe {
         } catch (NumberFormatException ex) {
             return null;
         }
-    }
-
-    private static String enumForm(int version) {
-        return version <= 8 ? "JavaVersion.VERSION_1_" + version : "JavaVersion.VERSION_" + version;
     }
 }
