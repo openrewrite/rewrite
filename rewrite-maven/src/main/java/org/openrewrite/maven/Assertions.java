@@ -44,34 +44,37 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 public class Assertions {
+
+    /**
+     * Marker that suppresses the auto-loading of {@code ~/.m2/settings.xml} for a single test.
+     * Both {@link #customizeExecutionContext} and the JUnit-level
+     * {@code MavenSettingsAutoLoadingExtension} short-circuit when it is set.
+     */
+    private static final String SKIP_MAVEN_SETTINGS_AUTOLOAD = "org.openrewrite.maven.test.skipSettingsAutoload";
+
+    static boolean isMavenSettingsAutoloadSkipped(ExecutionContext ctx) {
+        return Boolean.TRUE.equals(ctx.getMessage(SKIP_MAVEN_SETTINGS_AUTOLOAD));
+    }
+
     private Assertions() {
     }
 
     /**
      * Returns a {@link RecipeSpec} customizer that prevents {@code ~/.m2/settings.xml} from
-     * influencing this test:
-     * <ul>
-     *   <li>clears any auto-loaded mirrors and seeds a non-null empty {@link MavenSettings}
-     *       sentinel on the parsing context, so {@link #customizeExecutionContext}'s
-     *       {@code nothingConfigured} guard short-circuits and won't reload from disk;</li>
-     *   <li>does the same on the recipe-execution context after the per-source customizer
-     *       had a chance to populate it.</li>
-     * </ul>
+     * influencing this test by clearing any already-loaded mirrors/settings on both the
+     * parsing and recipe-execution contexts and marking them so subsequent loaders skip.
      * Repositories, credentials, profiles, and local repository explicitly configured by the
-     * test are preserved.
+     * test are preserved (the marker is checked before any reload).
      * <p>
      * Use when a test verifies a failure path (e.g. "metadata download fails") that the
      * configured Maven mirror would otherwise mask.
      */
     public static Consumer<RecipeSpec> withoutMavenSettings() {
-        // A non-null empty MavenSettings serves as the sentinel that flips `nothingConfigured`
-        // to false in customizeExecutionContext, blocking the readMavenSettingsFromDisk reload.
-        MavenSettings sentinel = new MavenSettings(null, null, null, null, null);
         UnaryOperator<ExecutionContext> clear = ctx -> {
             MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
             mctx.setMirrors(emptyList());
-            // Bypass setMavenSettings(...) which would also overwrite repositories/credentials/etc.
-            mctx.putMessage("org.openrewrite.maven.settings", sentinel);
+            mctx.pollMessage("org.openrewrite.maven.settings");
+            mctx.putMessage(SKIP_MAVEN_SETTINGS_AUTOLOAD, true);
             return ctx;
         };
         return spec -> spec.executionContext(clear).recipeExecutionContext(clear);
@@ -85,9 +88,13 @@ public class Assertions {
      * <p>
      * The same loading also fires once per JUnit container via
      * {@code MavenSettingsAutoLoadingExtension}; both call sites are guarded by the
-     * {@code nothingConfigured} check so they're idempotent.
+     * {@code nothingConfigured} check so they're idempotent, and both honor the
+     * {@link #SKIP_MAVEN_SETTINGS_AUTOLOAD} opt-out marker.
      */
     static void customizeExecutionContext(ExecutionContext ctx) {
+        if (isMavenSettingsAutoloadSkipped(ctx)) {
+            return;
+        }
         MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
         boolean nothingConfigured = mctx.getSettings() == null &&
                                     mctx.getLocalRepository().equals(MAVEN_LOCAL_DEFAULT) &&

@@ -25,6 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.maven.Assertions.withoutMavenSettings;
 
 class UpgradePluginVersionTest implements RewriteTest {
 
@@ -208,17 +209,16 @@ class UpgradePluginVersionTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite/issues/5065")
         @Test
-        @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
         void repoUnreachable() {
             rewriteRun(
-              spec -> spec.recipe(new UpgradePluginVersion(
+              withoutMavenSettings().andThen(spec -> spec.recipe(new UpgradePluginVersion(
                 "io.quarkus",
                 "quarkus-maven-plugin",
                 "3.15.3.redhat-00002",
                 null,
                 null,
                 null
-              )),
+              ))),
               pomXml(
                 """
                   <project>
@@ -248,17 +248,16 @@ class UpgradePluginVersionTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite/issues/5065")
         @Test
-        @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
         void noNewerVersion() {
             rewriteRun(
-              spec -> spec.recipe(new UpgradePluginVersion(
+              withoutMavenSettings().andThen(spec -> spec.recipe(new UpgradePluginVersion(
                 "io.quarkus",
                 "quarkus-maven-plugin",
                 "3.15.3.redhat-00002",
                 null,
                 null,
                 null
-              )),
+              ))),
               pomXml(
                 """
                   <project>

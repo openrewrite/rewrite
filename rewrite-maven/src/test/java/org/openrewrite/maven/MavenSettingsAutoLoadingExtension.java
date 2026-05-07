@@ -45,6 +45,9 @@ public class MavenSettingsAutoLoadingExtension implements BeforeAllCallback {
     }
 
     private static void loadMavenSettings(ExecutionContext ctx) {
+        if (Assertions.isMavenSettingsAutoloadSkipped(ctx)) {
+            return;
+        }
         MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
         boolean nothingConfigured = mctx.getSettings() == null &&
                                     mctx.getLocalRepository().equals(MAVEN_LOCAL_DEFAULT) &&

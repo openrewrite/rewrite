@@ -44,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.maven.Assertions.withoutMavenSettings;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
 
@@ -1761,10 +1762,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void deriveFromNexusUpgrade() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+          withoutMavenSettings().andThen(spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))),
           pomXml(
             """
               <project>
@@ -1827,10 +1827,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void badManagedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+          withoutMavenSettings().andThen(spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))),
           pomXml(
             """
               <project>

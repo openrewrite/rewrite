@@ -36,16 +36,16 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.maven.Assertions.withoutMavenSettings;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class MavenDependencyFailuresTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void unresolvableParent() { // Dad said he was heading to the corner store for cigarettes, and hasn't been resolvable for the past 20 years :'(
         rewriteRun(
-          spec -> spec
+          withoutMavenSettings().andThen(spec -> spec
             .recipe(new UpgradeParentVersion(
               "*",
               "*",
@@ -59,7 +59,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
               )))
             .recipeExecutionContext(new InMemoryExecutionContext())
             .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            .expectedCyclesThatMakeChanges(1)),
           pomXml(
             """
               <project>
@@ -81,10 +81,9 @@ class MavenDependencyFailuresTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void unresolvableMavenMetadata() {
         rewriteRun(
-          spec -> spec
+          withoutMavenSettings().andThen(spec -> spec
             .recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").build())))
@@ -92,7 +91,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
             .cycles(1)
             .expectedCyclesThatMakeChanges(1)
             .dataTable(MavenMetadataFailures.Row.class, failures ->
-                assertThat(failures.stream().map(MavenMetadataFailures.Row::getMavenRepositoryUri).distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
+                assertThat(failures.stream().map(MavenMetadataFailures.Row::getMavenRepositoryUri).distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2"))),
           pomXml(
             """
               <project>
