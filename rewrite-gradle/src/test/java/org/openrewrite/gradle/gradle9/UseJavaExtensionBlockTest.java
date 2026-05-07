@@ -274,6 +274,39 @@ class UseJavaExtensionBlockTest implements RewriteTest {
         );
     }
 
+    @Test
+    void preservesUnresolvableVariableReference() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              ext {
+                  javaVersion = JavaVersion.VERSION_17
+              }
+
+              sourceCompatibility = javaVersion
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              ext {
+                  javaVersion = JavaVersion.VERSION_17
+              }
+
+              java {
+                  sourceCompatibility = javaVersion
+                  targetCompatibility = javaVersion
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class NoChange {
         @Test
