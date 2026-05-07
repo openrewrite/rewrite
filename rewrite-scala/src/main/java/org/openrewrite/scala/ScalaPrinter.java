@@ -1055,10 +1055,6 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visitRightPadded(newClass.getPadding().getEnclosing(), JRightPadded.Location.NEW_CLASS_ENCLOSING, ".", p);
         }
         p.append("new");
-        // Ensure space between "new" and the class name
-        if (newClass.getClazz() != null && newClass.getClazz().getPrefix().isEmpty()) {
-            p.append(" ");
-        }
         visit(newClass.getClazz(), p);
         // In Scala, constructors can be called without parentheses
         if (newClass.getPadding().getArguments() != null) {
@@ -1067,6 +1063,15 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visit(newClass.getBody(), p);
         afterSyntax(newClass, p);
         return newClass;
+    }
+
+    @Override
+    public J visitIntersectionType(J.IntersectionType intersectionType, PrintOutputCapture<P> p) {
+        // In Scala, parents of an anonymous class are joined with `with` (not Java's `&`).
+        beforeSyntax(intersectionType, Space.Location.INTERSECTION_TYPE_PREFIX, p);
+        visitContainer("", intersectionType.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "with", "", p);
+        afterSyntax(intersectionType, p);
+        return intersectionType;
     }
 
     @Override
