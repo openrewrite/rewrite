@@ -35,6 +35,7 @@ import org.openrewrite.scala.marker.Semicolon
 import org.openrewrite.scala.marker.TypeProjection
 import org.openrewrite.scala.marker.ScalaForLoop
 import org.openrewrite.scala.marker.BlockArgument
+import org.openrewrite.scala.marker.FunctionApplication
 import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.marker.PartialFunctionLiteral
@@ -408,17 +409,97 @@ class ScalaTreeVisitor(
       case innerApp: Trees.Apply[?] =>
         // Curried application: matrix(0)(1), List.fill(5)(0)
         visitMethodInvocation(app)
+      case sup: Trees.Super[?] =>
+        // super(args) — explicit super-constructor call
+        buildKeywordMethodInvocation(app, "super")
+      case th: Trees.This[?] =>
+        // this(args) — auxiliary constructor self-call
+        buildKeywordMethodInvocation(app, "this")
       case _ =>
-        // Other Apply forms (e.g., super(args), this(args)) — preserve full source
-        // for round-trip printing rather than throw.
+        // Other Apply forms with an expression callee. Model as J.MethodInvocation
+        // with a synthetic "apply" name (mirrors Scala's desugaring of `expr(args)`
+        // to `expr.apply(args)`) so method-finding recipes can still match.
         val prefix = extractPrefix(app.span)
-        val text = extractSource(app.span)
+        def asExpression(j: J): Expression = j match {
+          case e: Expression => e
+          case _ => new S.StatementExpression(Tree.randomId(), j)
+        }
+        val select = asExpression(visitTree(app.fun))
+        val openIdx = source.indexOf('(', cursor)
+        if (openIdx >= 0) cursor = openIdx + 1
+        val args = new util.ArrayList[JRightPadded[Expression]]()
+        for (i <- app.args.indices) {
+          val arg = app.args(i)
+          if (i > 0) {
+            val prevEnd = Math.max(0, app.args(i - 1).span.end - offsetAdjustment)
+            val commaIndex = source.indexOf(',', prevEnd)
+            if (commaIndex >= cursor) cursor = commaIndex + 1
+          }
+          val argExpr = asExpression(visitTree(arg))
+          val afterSpace = if (i == app.args.size - 1) {
+            val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+            val closePos = source.indexOf(')', Math.max(cursor, argEnd))
+            if (closePos > argEnd) Space.format(source.substring(argEnd, closePos)) else Space.EMPTY
+          } else Space.EMPTY
+          args.add(new JRightPadded(argExpr, afterSpace, Markers.EMPTY))
+        }
+        val closeParen = source.indexOf(')', cursor)
+        if (closeParen >= 0) cursor = closeParen + 1
         updateCursor(app.span.end)
-        new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, Collections.emptyList(),
-          text, typeFor(app.span), null)
+        val mt = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
+        val nameId = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+          Collections.emptyList(), "apply", null, null)
+        new J.MethodInvocation(Tree.randomId(), prefix,
+          Markers.build(Collections.singletonList(new FunctionApplication(Tree.randomId()))),
+          JRightPadded.build(select), null, nameId,
+          JContainer.build(Space.EMPTY, args, Markers.EMPTY), mt)
     }
   }
-  
+
+  /**
+   * Build a J.MethodInvocation for keyword-callee forms like {@code super(args)} and
+   * {@code this(args)}. The name carries the keyword text so recipes can match on it.
+   */
+  private def buildKeywordMethodInvocation(app: Trees.Apply[?], keyword: String): J.MethodInvocation = {
+    val prefix = extractPrefix(app.span)
+    // Advance past the keyword token in source
+    val kwIdx = source.indexOf(keyword, cursor)
+    if (kwIdx >= 0) cursor = kwIdx + keyword.length
+    val nameId = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+      Collections.emptyList(), keyword, null, null)
+    // Find `(`
+    val openIdx = source.indexOf('(', cursor)
+    val argsBefore = if (openIdx > cursor) Space.format(source.substring(cursor, openIdx)) else Space.EMPTY
+    if (openIdx >= 0) cursor = openIdx + 1
+    def asExpression(j: J): Expression = j match {
+      case e: Expression => e
+      case _ => new S.StatementExpression(Tree.randomId(), j)
+    }
+    val args = new util.ArrayList[JRightPadded[Expression]]()
+    for (i <- app.args.indices) {
+      val arg = app.args(i)
+      if (i > 0) {
+        val prevEnd = Math.max(0, app.args(i - 1).span.end - offsetAdjustment)
+        val commaIndex = source.indexOf(',', prevEnd)
+        if (commaIndex >= cursor) cursor = commaIndex + 1
+      }
+      val argExpr = asExpression(visitTree(arg))
+      val afterSpace = if (i == app.args.size - 1) {
+        val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+        val closePos = source.indexOf(')', Math.max(cursor, argEnd))
+        if (closePos > argEnd) Space.format(source.substring(argEnd, closePos)) else Space.EMPTY
+      } else Space.EMPTY
+      args.add(new JRightPadded(argExpr, afterSpace, Markers.EMPTY))
+    }
+    val closeParen = source.indexOf(')', cursor)
+    if (closeParen >= 0) cursor = closeParen + 1
+    updateCursor(app.span.end)
+    val mt = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
+    new J.MethodInvocation(Tree.randomId(), prefix, Markers.EMPTY,
+      null, null, nameId,
+      JContainer.build(argsBefore, args, Markers.EMPTY), mt)
+  }
+
   private def visitUnary(sel: Trees.Select[?]): J = {
     val expr = visitTree(sel.qualifier).asInstanceOf[Expression]
     val operator = mapUnaryOperator(sel.name.toString)
@@ -924,13 +1005,47 @@ class ScalaTreeVisitor(
           JContainer.build(Space.EMPTY, outerArgs, Markers.EMPTY), methodType)
 
       case _ =>
-        // Other function applications — preserve source
-        val text = extractSource(app.span)
-        updateCursor(app.span.end)
-        return new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY,
-          Collections.emptyList(), text, typeFor(app.span), null)
+        // Other function applications — model as J.MethodInvocation with synthetic
+        // "apply" name (mirrors Scala's `expr(args)` => `expr.apply(args)` desugaring)
+        // so method-finding recipes can match on it.
+        def asExpression(j: J): Expression = j match {
+          case e: Expression => e
+          case _ => new S.StatementExpression(Tree.randomId(), j)
+        }
+        val select = asExpression(visitTree(app.fun))
+        val openIdx = source.indexOf('(', cursor)
+        if (openIdx >= 0) cursor = openIdx + 1
+        val outerArgs = new util.ArrayList[JRightPadded[Expression]]()
+        for (i <- app.args.indices) {
+          val arg = app.args(i)
+          if (i > 0) {
+            val prevEnd = Math.max(0, app.args(i - 1).span.end - offsetAdjustment)
+            val commaIndex = source.indexOf(',', prevEnd)
+            if (commaIndex >= cursor) cursor = commaIndex + 1
+          }
+          val argExpr = asExpression(visitTree(arg))
+          val afterSpace = if (i == app.args.size - 1) {
+            val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+            val closePos = source.indexOf(')', Math.max(cursor, argEnd))
+            if (closePos > argEnd) Space.format(source.substring(argEnd, closePos)) else Space.EMPTY
+          } else Space.EMPTY
+          outerArgs.add(new JRightPadded(argExpr, afterSpace, Markers.EMPTY))
+        }
+        val closeParen = source.indexOf(')', cursor)
+        if (closeParen >= 0) cursor = closeParen + 1
+        if (app.span.exists) {
+          val end = Math.max(0, app.span.end - offsetAdjustment)
+          if (end > cursor && end <= source.length) cursor = end
+        }
+        val mt = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
+        val nameId = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+          Collections.emptyList(), "apply", null, null)
+        return new J.MethodInvocation(Tree.randomId(), prefix,
+          Markers.build(Collections.singletonList(new FunctionApplication(Tree.randomId()))),
+          JRightPadded.build(select), null, nameId,
+          JContainer.build(Space.EMPTY, outerArgs, Markers.EMPTY), mt)
     }
-    
+
     // Determine if this is a block argument call (no parentheses):
     //   list.foreach { x => println(x) }
     // vs a normal parenthesized call:
