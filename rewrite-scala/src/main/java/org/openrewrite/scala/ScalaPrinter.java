@@ -514,6 +514,24 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitPatternDefinition((S.PatternDefinition) tree, p);
         } else if (tree instanceof S.FunctionCall) {
             return visitFunctionCall((S.FunctionCall) tree, p);
+        } else if (tree instanceof S.SingletonType) {
+            return visitSingletonType((S.SingletonType) tree, p);
+        } else if (tree instanceof S.Alternative) {
+            return visitAlternative((S.Alternative) tree, p);
+        } else if (tree instanceof S.QualifiedSuper) {
+            return visitQualifiedSuper((S.QualifiedSuper) tree, p);
+        } else if (tree instanceof S.AnnotatedExpression) {
+            return visitAnnotatedExpression((S.AnnotatedExpression) tree, p);
+        } else if (tree instanceof S.RefinedType) {
+            return visitRefinedType((S.RefinedType) tree, p);
+        } else if (tree instanceof S.Macro) {
+            return visitMacro((S.Macro) tree, p);
+        } else if (tree instanceof S.ExtensionMethods) {
+            return visitExtensionMethods((S.ExtensionMethods) tree, p);
+        } else if (tree instanceof S.For) {
+            return visitFor((S.For) tree, p);
+        } else if (tree instanceof S.For.Enumerator) {
+            return visitForEnumerator((S.For.Enumerator) tree, p);
         }
         return super.visit(tree, p);
     }
@@ -1339,5 +1357,145 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         p.append(patDef.getText());
         afterSyntax(patDef, p);
         return patDef;
+    }
+
+    public J visitSingletonType(S.SingletonType singletonType, PrintOutputCapture<P> p) {
+        beforeSyntax(singletonType, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(singletonType.getQualifier(), p);
+        visitSpace(singletonType.getBeforeType(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append(".type");
+        afterSyntax(singletonType, p);
+        return singletonType;
+    }
+
+    public J visitAlternative(S.Alternative alternative, PrintOutputCapture<P> p) {
+        beforeSyntax(alternative, Space.Location.LANGUAGE_EXTENSION, p);
+        visitContainer("", alternative.getPadding().getPatterns(), JContainer.Location.LANGUAGE_EXTENSION, "|", "", p);
+        afterSyntax(alternative, p);
+        return alternative;
+    }
+
+    public J visitQualifiedSuper(S.QualifiedSuper qualifiedSuper, PrintOutputCapture<P> p) {
+        beforeSyntax(qualifiedSuper, Space.Location.LANGUAGE_EXTENSION, p);
+        if (qualifiedSuper.getQualifier() != null) {
+            visit(qualifiedSuper.getQualifier(), p);
+            p.append('.');
+        }
+        p.append("super");
+        if (qualifiedSuper.getMixName() != null) {
+            p.append('[');
+            visit(qualifiedSuper.getMixName(), p);
+            p.append(']');
+        }
+        afterSyntax(qualifiedSuper, p);
+        return qualifiedSuper;
+    }
+
+    public J visitAnnotatedExpression(S.AnnotatedExpression annotatedExpression, PrintOutputCapture<P> p) {
+        beforeSyntax(annotatedExpression, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(annotatedExpression.getExpression(), p);
+        visitSpace(annotatedExpression.getBeforeColon(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append(':');
+        visit(annotatedExpression.getAnnotation(), p);
+        afterSyntax(annotatedExpression, p);
+        return annotatedExpression;
+    }
+
+    public J visitRefinedType(S.RefinedType refinedType, PrintOutputCapture<P> p) {
+        beforeSyntax(refinedType, Space.Location.LANGUAGE_EXTENSION, p);
+        if (refinedType.getParent() != null) {
+            visit(refinedType.getParent(), p);
+        }
+        visit(refinedType.getRefinements(), p);
+        afterSyntax(refinedType, p);
+        return refinedType;
+    }
+
+    public J visitMacro(S.Macro macro, PrintOutputCapture<P> p) {
+        beforeSyntax(macro, Space.Location.LANGUAGE_EXTENSION, p);
+        switch (macro.getKind()) {
+            case Splice:
+                p.append("${");
+                visit(macro.getExpression(), p);
+                p.append('}');
+                break;
+            case QuoteBlock:
+                p.append("'{");
+                visit(macro.getExpression(), p);
+                p.append('}');
+                break;
+            case QuoteIdent:
+                p.append('\'');
+                visit(macro.getExpression(), p);
+                break;
+        }
+        afterSyntax(macro, p);
+        return macro;
+    }
+
+    public J visitExtensionMethods(S.ExtensionMethods ext, PrintOutputCapture<P> p) {
+        beforeSyntax(ext, Space.Location.LANGUAGE_EXTENSION, p);
+        p.append("extension");
+        visitContainer("(", ext.getPadding().getParameters(), JContainer.Location.LANGUAGE_EXTENSION, ",", ")", p);
+        visit(ext.getBody(), p);
+        afterSyntax(ext, p);
+        return ext;
+    }
+
+    public J visitFor(S.For forLoop, PrintOutputCapture<P> p) {
+        beforeSyntax(forLoop, Space.Location.LANGUAGE_EXTENSION, p);
+        p.append("for");
+        char open = forLoop.getOpenBracket();
+        char close = open == '(' ? ')' : '}';
+        JContainer<S.For.Enumerator> enums = forLoop.getPadding().getEnumerators();
+        visitSpace(enums.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append(open);
+        List<JRightPadded<S.For.Enumerator>> elems = enums.getPadding().getElements();
+        for (int i = 0; i < elems.size(); i++) {
+            JRightPadded<S.For.Enumerator> rp = elems.get(i);
+            visit(rp.getElement(), p);
+            visitSpace(rp.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            // Print ';' separator only if both this and next element are NOT guards.
+            // Scala's for-comprehensions don't separate guards with ';'.
+            if (i < elems.size() - 1) {
+                S.For.Enumerator next = elems.get(i + 1).getElement();
+                if (next.getKind() != S.For.Enumerator.Kind.Guard) {
+                    p.append(';');
+                }
+            }
+        }
+        p.append(close);
+        visitSpace(forLoop.getBeforeBody(), Space.Location.LANGUAGE_EXTENSION, p);
+        if (forLoop.isYielding()) {
+            p.append("yield");
+        }
+        visit(forLoop.getBody(), p);
+        afterSyntax(forLoop, p);
+        return forLoop;
+    }
+
+    public J visitForEnumerator(S.For.Enumerator enumerator, PrintOutputCapture<P> p) {
+        beforeSyntax(enumerator.getPrefix(), enumerator.getMarkers(), Space.Location.LANGUAGE_EXTENSION, p);
+        switch (enumerator.getKind()) {
+            case Generator:
+                if (enumerator.getLhs() != null) visit(enumerator.getLhs(), p);
+                visitSpace(enumerator.getBeforeOp(), Space.Location.LANGUAGE_EXTENSION, p);
+                p.append("<-");
+                visit(enumerator.getRhs(), p);
+                break;
+            case Guard:
+                p.append("if");
+                visitSpace(enumerator.getBeforeOp(), Space.Location.LANGUAGE_EXTENSION, p);
+                visit(enumerator.getRhs(), p);
+                break;
+            case Assignment:
+                if (enumerator.getLhs() != null) visit(enumerator.getLhs(), p);
+                visitSpace(enumerator.getBeforeOp(), Space.Location.LANGUAGE_EXTENSION, p);
+                p.append("=");
+                visit(enumerator.getRhs(), p);
+                break;
+        }
+        afterSyntax(enumerator.getMarkers(), p);
+        return enumerator;
     }
 }
