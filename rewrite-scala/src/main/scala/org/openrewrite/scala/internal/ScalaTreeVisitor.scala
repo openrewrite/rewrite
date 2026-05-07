@@ -450,7 +450,7 @@ class ScalaTreeVisitor(
         val nameId = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
           Collections.emptyList(), "apply", null, null)
         new J.MethodInvocation(Tree.randomId(), prefix,
-          Markers.build(Collections.singletonList(new FunctionApplication(Tree.randomId()))),
+          Markers.build(Collections.singletonList(FunctionApplication.create())),
           JRightPadded.build(select), null, nameId,
           JContainer.build(Space.EMPTY, args, Markers.EMPTY), mt)
     }
@@ -1041,7 +1041,7 @@ class ScalaTreeVisitor(
         val nameId = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
           Collections.emptyList(), "apply", null, null)
         return new J.MethodInvocation(Tree.randomId(), prefix,
-          Markers.build(Collections.singletonList(new FunctionApplication(Tree.randomId()))),
+          Markers.build(Collections.singletonList(FunctionApplication.create())),
           JRightPadded.build(select), null, nameId,
           JContainer.build(Space.EMPTY, outerArgs, Markers.EMPTY), mt)
     }
