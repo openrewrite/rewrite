@@ -17,7 +17,6 @@ package org.openrewrite.maven;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -30,6 +29,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.maven.Assertions.withoutMavenSettings;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("NewClassNamingConvention")
@@ -80,11 +80,12 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void dontAddDuplicateIfUpdateModelOnPriorRecipeCycleFailed() {
         rewriteRun(
-          spec -> spec
-            .recipe(addDependency("doesnotexist:doesnotexist:1", "com.google.common.math.IntMath")),
+          // Opt out of the auto-loaded ~/.m2/settings.xml so its mirror doesn't resolve
+          // the deliberately-non-existent coordinate the test asserts a 404 on.
+          withoutMavenSettings().andThen(spec -> spec
+            .recipe(addDependency("doesnotexist:doesnotexist:1", "com.google.common.math.IntMath"))),
           mavenProject("project",
             srcMainJava(
               java(usingGuavaIntMath)

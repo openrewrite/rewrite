@@ -84,6 +84,14 @@ public class RecipeSpec {
     @Nullable
     UnaryOperator<ExecutionContext> executionContextCustomizer;
 
+    /**
+     * Applied to the recipe-execution {@link ExecutionContext} after any per-{@code SourceSpec}
+     * customizers have run on it, letting a test clear or override state on a separately-supplied
+     * {@link #recipeExecutionContext}.
+     */
+    @Nullable
+    UnaryOperator<ExecutionContext> recipeExecutionContextCustomizer;
+
     @Nullable
     Path relativeTo;
 
@@ -198,6 +206,15 @@ public class RecipeSpec {
 
     public RecipeSpec recipeExecutionContext(ExecutionContext ctx) {
         this.recipeExecutionContext = ctx;
+        return this;
+    }
+
+    /**
+     * Register a customizer that mutates (or replaces) the recipe-execution {@link ExecutionContext}
+     * for this test, applied <em>after</em> any per-{@code SourceSpec} customizers have run on it.
+     */
+    public RecipeSpec recipeExecutionContext(UnaryOperator<ExecutionContext> customizer) {
+        this.recipeExecutionContextCustomizer = customizer;
         return this;
     }
 

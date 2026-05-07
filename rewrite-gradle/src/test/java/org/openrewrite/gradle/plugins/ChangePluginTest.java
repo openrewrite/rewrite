@@ -15,9 +15,9 @@
  */
 package org.openrewrite.gradle.plugins;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.gradle.Assertions;
 import org.openrewrite.gradle.ChangeDependency;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.semver.Semver;
@@ -67,13 +67,14 @@ class ChangePluginTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void changeApplyPluginSyntax() {
         rewriteRun(
-          spec -> spec.recipes(
+          // Opt out of the auto-loaded ~/.m2/settings.xml so its mirror doesn't resolve
+          // org.openrewrite:plugin (the recipe relies on that lookup failing).
+          Assertions.withoutMavenSettings().andThen(spec -> spec.recipes(
               new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null, null, true),
             new ChangePlugin("org.openrewrite.rewrite", "io.moderne.rewrite", null)
-          ),
+          )),
           buildGradle(
             """
               buildscript {

@@ -23,6 +23,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.maven.internal.RawPom;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
@@ -35,13 +36,45 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.emptyList;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 public class Assertions {
     private Assertions() {
+    }
+
+    /**
+     * Returns a {@link RecipeSpec} customizer that prevents {@code ~/.m2/settings.xml} from
+     * influencing this test:
+     * <ul>
+     *   <li>clears any auto-loaded mirrors and seeds a non-null empty {@link MavenSettings}
+     *       sentinel on the parsing context, so {@link #customizeExecutionContext}'s
+     *       {@code nothingConfigured} guard short-circuits and won't reload from disk;</li>
+     *   <li>does the same on the recipe-execution context after the per-source customizer
+     *       had a chance to populate it.</li>
+     * </ul>
+     * Repositories, credentials, profiles, and local repository explicitly configured by the
+     * test are preserved.
+     * <p>
+     * Use when a test verifies a failure path (e.g. "metadata download fails") that the
+     * configured Maven mirror would otherwise mask.
+     */
+    public static Consumer<RecipeSpec> withoutMavenSettings() {
+        // A non-null empty MavenSettings serves as the sentinel that flips `nothingConfigured`
+        // to false in customizeExecutionContext, blocking the readMavenSettingsFromDisk reload.
+        MavenSettings sentinel = new MavenSettings(null, null, null, null, null);
+        UnaryOperator<ExecutionContext> clear = ctx -> {
+            MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+            mctx.setMirrors(emptyList());
+            // Bypass setMavenSettings(...) which would also overwrite repositories/credentials/etc.
+            mctx.putMessage("org.openrewrite.maven.settings", sentinel);
+            return ctx;
+        };
+        return spec -> spec.executionContext(clear).recipeExecutionContext(clear);
     }
 
     /**

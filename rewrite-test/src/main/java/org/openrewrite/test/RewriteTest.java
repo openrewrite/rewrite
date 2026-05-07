@@ -427,6 +427,12 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
+        if (testMethodSpec.recipeExecutionContextCustomizer != null) {
+            recipeCtx = testMethodSpec.recipeExecutionContextCustomizer.apply(recipeCtx);
+        } else if (testClassSpec.recipeExecutionContextCustomizer != null) {
+            recipeCtx = testClassSpec.recipeExecutionContextCustomizer.apply(recipeCtx);
+        }
+
         LargeSourceSet lss;
         if (testMethodSpec.getSourceSet() != null) {
             lss = testMethodSpec.getSourceSet().apply(runnableSourceFiles);
