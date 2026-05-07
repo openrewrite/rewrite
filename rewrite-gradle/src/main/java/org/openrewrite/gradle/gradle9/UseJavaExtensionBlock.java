@@ -31,11 +31,9 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.marker.Markers;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -43,8 +41,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -158,13 +154,11 @@ public class UseJavaExtensionBlock extends Recipe {
 
     private static Statement buildJavaBlock(Map<String, Expression> entries, ExecutionContext ctx) {
         StringBuilder snippet = new StringBuilder("\njava {\n");
-        if (entries.containsKey(SOURCE)) {
-            snippet.append("    sourceCompatibility = JavaVersion.VERSION_17\n");
-        }
-        if (entries.containsKey(TARGET)) {
-            snippet.append("    targetCompatibility = JavaVersion.VERSION_17\n");
-        }
+        Set<String> needsReplacement = new HashSet<>();
+        appendEntry(snippet, SOURCE, entries, needsReplacement);
+        appendEntry(snippet, TARGET, entries, needsReplacement);
         snippet.append("}\n");
+
         G.CompilationUnit parsed = (G.CompilationUnit) GradleParser.builder().build()
                 .parse(ctx, snippet.toString())
                 .findFirst()
@@ -173,34 +167,36 @@ public class UseJavaExtensionBlock extends Recipe {
             throw new IllegalStateException("Parsed `java { }` block is empty");
         }
         Statement template = parsed.getStatements().get(0);
+        if (needsReplacement.isEmpty()) {
+            return template;
+        }
         return (Statement) new JavaIsoVisitor<Integer>() {
             @Override
             public J.Assignment visitAssignment(J.Assignment a, Integer i) {
                 String name = compatibilityName(a);
-                if (name == null || !entries.containsKey(name)) {
+                if (name == null || !needsReplacement.contains(name)) {
                     return super.visitAssignment(a, i);
                 }
-                Expression original = entries.get(name);
-                Integer version = extractVersion(original);
-                Space rhsPrefix = a.getAssignment().getPrefix();
-                Expression newRhs = version != null
-                        ? javaVersionEnumAccess(version, rhsPrefix)
-                        : original.withPrefix(rhsPrefix);
-                return a.withAssignment(newRhs);
+                return a.withAssignment(entries.get(name).withPrefix(a.getAssignment().getPrefix()));
             }
         }.visitNonNull(template, 0);
     }
 
-    private static Expression javaVersionEnumAccess(int version, Space prefix) {
-        String enumName = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
-        JavaType.FullyQualified javaVersionType = JavaType.ShallowClass.build("org.gradle.api.JavaVersion");
-        return new J.FieldAccess(
-                Tree.randomId(),
-                prefix,
-                Markers.EMPTY,
-                new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "JavaVersion", javaVersionType, null),
-                new JLeftPadded<>(Space.EMPTY, new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), enumName, null, null), Markers.EMPTY),
-                javaVersionType);
+    private static void appendEntry(StringBuilder snippet, String name, Map<String, Expression> entries, Set<String> needsReplacement) {
+        if (!entries.containsKey(name)) {
+            return;
+        }
+        Integer version = extractVersion(entries.get(name));
+        if (version != null) {
+            snippet.append("    ").append(name).append(" = ").append(enumForm(version)).append("\n");
+        } else {
+            snippet.append("    ").append(name).append(" = JavaVersion.VERSION_17\n");
+            needsReplacement.add(name);
+        }
+    }
+
+    private static String enumForm(int version) {
+        return version <= 8 ? "JavaVersion.VERSION_1_" + version : "JavaVersion.VERSION_" + version;
     }
 
     private static @Nullable String compatibilityName(Statement s) {
