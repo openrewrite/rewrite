@@ -16,7 +16,6 @@
 package org.openrewrite.gradle;
 
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -2179,9 +2178,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void cannotDownloadMetaDataWhenNoRepositoriesAreDefined() {
+        // Opt out of the auto-loaded ~/.m2/settings.xml so its mirror/repositories aren't
+        // injected into the ExecutionContext — the test needs an empty repository set.
         rewriteRun(
+          Assertions.withoutMavenSettings(),
           buildGradle(
             """
               plugins {

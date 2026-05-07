@@ -167,6 +167,12 @@ public interface RewriteTest extends SourceSpecs {
             ctx = defaultExecutionContext(sourceSpecs);
         }
 
+        if (testMethodSpec.executionContextCustomizer != null) {
+            ctx = testMethodSpec.executionContextCustomizer.apply(ctx);
+        } else if (testClassSpec.executionContextCustomizer != null) {
+            ctx = testClassSpec.executionContextCustomizer.apply(ctx);
+        }
+
         PrintOutputCapture.MarkerPrinter markerPrinter;
         if (testMethodSpec.getMarkerPrinter() != null) {
             markerPrinter = testMethodSpec.getMarkerPrinter();

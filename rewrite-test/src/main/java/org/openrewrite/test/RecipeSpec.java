@@ -37,6 +37,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.joining;
@@ -74,6 +75,14 @@ public class RecipeSpec {
      */
     @Nullable
     ExecutionContext recipeExecutionContext;
+
+    /**
+     * Applied to the {@link ExecutionContext} after {@link RewriteTest#defaultExecutionContextCustomizers}
+     * have run, allowing a single test to clear or override state injected by global customizers
+     * (e.g. an auto-loaded Maven settings mirror).
+     */
+    @Nullable
+    UnaryOperator<ExecutionContext> executionContextCustomizer;
 
     @Nullable
     Path relativeTo;
@@ -173,6 +182,17 @@ public class RecipeSpec {
 
     public RecipeSpec executionContext(ExecutionContext ctx) {
         this.executionContext = ctx;
+        return this;
+    }
+
+    /**
+     * Register a customizer that mutates (or replaces) the {@link ExecutionContext} used for
+     * this test, applied <em>after</em> {@link RewriteTest#defaultExecutionContextCustomizers}
+     * have run. Use this to clear or override state injected by global customizers for a
+     * specific test.
+     */
+    public RecipeSpec executionContext(UnaryOperator<ExecutionContext> customizer) {
+        this.executionContextCustomizer = customizer;
         return this;
     }
 
