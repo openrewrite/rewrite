@@ -2359,6 +2359,68 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doesNotDuplicateWhenChainedAfterChangeDependencyWithSemverSelector() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeDependencyGroupIdAndArtifactId(
+              "javax.ws.rs", "javax.ws.rs-api",
+              "jakarta.ws.rs", "jakarta.ws.rs-api",
+              "3.0.x", null),
+            new AddDependency(
+              "jakarta.ws.rs", "jakarta.ws.rs-api", "3.0.x", null,
+              null, true, null, null, null, false, null, null)
+          ),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.ws.rs</groupId>
+                              <artifactId>jakarta.ws.rs-api</artifactId>
+                              <version>3.0.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.ws.rs</groupId>
+                          <artifactId>javax.ws.rs-api</artifactId>
+                          <version>2.1.1</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.ws.rs</groupId>
+                              <artifactId>jakarta.ws.rs-api</artifactId>
+                              <version>3.0.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.ws.rs</groupId>
+                          <artifactId>jakarta.ws.rs-api</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null, null);
     }
