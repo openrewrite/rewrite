@@ -246,4 +246,16 @@ class ClassDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void annotatedFinalClass() {
+        rewriteRun(
+            scala(
+                """
+                @Module
+                final class Env
+                """
+            )
+        );
+    }
 }
