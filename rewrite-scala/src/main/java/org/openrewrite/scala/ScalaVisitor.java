@@ -133,6 +133,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return statementExpression.acceptScala(this, p);
     }
 
+    public J visitExpressionStatement(S.ExpressionStatement expressionStatement, P p) {
+        // Transparent — just visit the inner expression
+        return expressionStatement.acceptScala(this, p);
+    }
+
     public J visitTypeAscription(S.TypeAscription typeAscription, P p) {
         S.TypeAscription t = typeAscription;
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

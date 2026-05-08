@@ -85,6 +85,116 @@ class InfixOpTest implements RewriteTest {
     }
 
     @Test
+    void matchCaseWithExpression() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val x = 1 match {
+                case 1 => 2 + 3
+                case _ => 0
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void ifThenExpressionBody() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val x = if (true) 1 + 2 else 3
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void whileBodyExpression() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def run(): Unit = while (false) 1 + 2
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void tryWithExpressionBody() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val x = try 1 + 2 catch { case _: Throwable => 0 }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchCaseWithExpression() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val x = try { 1 } catch { case _: Throwable => 1 + 2 }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void tryFinallyWithExpression() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val x = try { 1 } finally 1 + 2
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void stringInfixAsBlockStatement() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def run(): Int = {
+                1 + 2
+                3
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void stringInfixInClassBody() {
+        rewriteRun(
+          scala(
+            """
+            class Test {
+              "name" - "x"
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void compoundAssignPlus() {
         rewriteRun(
           scala(

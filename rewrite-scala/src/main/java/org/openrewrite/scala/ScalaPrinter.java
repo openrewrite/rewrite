@@ -510,6 +510,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         } else if (tree instanceof S.StatementExpression) {
             // Transparent — visit the inner statement
             return visit(((S.StatementExpression) tree).getStatement(), p);
+        } else if (tree instanceof S.ExpressionStatement) {
+            // Transparent — visit the inner expression
+            return visit(((S.ExpressionStatement) tree).getExpression(), p);
         } else if (tree instanceof S.TypeAscription) {
             return visitTypeAscription((S.TypeAscription) tree, p);
         } else if (tree instanceof S.TypeAlias) {
