@@ -92,6 +92,19 @@ class LambdaTest implements RewriteTest {
     }
 
     @Test
+    void underscoreLambdaAsSecondArgument() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  foo(x => x.bar, _.toString)
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void lambdaWithBlock() {
         rewriteRun(
             scala(

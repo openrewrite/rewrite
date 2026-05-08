@@ -7086,8 +7086,13 @@ class ScalaTreeVisitor(
     }.toSet
     
     if (syntheticParams.nonEmpty) {
-      // Check if the source contains actual underscore placeholders
+      // Check if the source contains actual underscore placeholders.
+      // `extractSource` advances `cursor` to the span end, which would clobber
+      // the prefix extraction below — save and restore so leading whitespace
+      // (e.g. the space after a comma in `foo(a, _.toString)`) is preserved.
+      val savedCursor = cursor
       val funcSource = extractSource(func.span)
+      cursor = savedCursor
       val hasUnderscorePlaceholder = funcSource.contains("_")
       
       // If we have synthetic params and underscore in source, it's likely a placeholder lambda
