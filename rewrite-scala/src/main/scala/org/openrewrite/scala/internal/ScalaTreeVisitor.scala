@@ -3958,7 +3958,8 @@ class ScalaTreeVisitor(
     
     // Extract modifiers
     val (modifiers, lastModEnd) = extractModifiersFromText(td.mods, modifierText)
-    
+    var endOfModifiers = lastModEnd
+
     // Check for case modifier (special handling as it's not a traditional modifier)
     if (modifierText.contains("case")) {
       val caseIndex = modifierText.indexOf("case")
@@ -3977,54 +3978,38 @@ class ScalaTreeVisitor(
           J.Modifier.Type.LanguageExtension,
           Collections.emptyList()
         ))
+        endOfModifiers = Math.max(endOfModifiers, caseIndex + "case".length)
       }
     }
-    
-    // Find where "class" or "trait" keyword ends
-    val keywordLength = if (isTrait) "trait".length else if (isEnum) "enum".length else "class".length
-    val classKeywordPos = if (classIndex >= 0) {
-      cursor + classIndex + keywordLength
-    } else {
-      cursor
-    }
-    
-    // Extract space between "class" and the name
-    val nameStart = if (td.nameSpan.exists) {
-      Math.max(0, td.nameSpan.start - offsetAdjustment)
-    } else {
-      classKeywordPos
-    }
-    
-    val nameSpace = if (classKeywordPos < nameStart && nameStart <= source.length) {
-      Space.format(source.substring(classKeywordPos, nameStart))
-    } else {
-      Space.format(" ") // Default to single space
-    }
-    
-    // Extract class kind with proper prefix space
-    val kindPrefix = if (hasAnnotations && classIndex >= 0) {
-      // When we have annotations, the space between the last annotation and "class" goes here
-      Space.format(sourceSnippet.substring(0, classIndex))
-    } else if (!modifiers.isEmpty && classIndex > 0) {
-      val afterModifiers = if (modifierText.contains("case")) {
-        val caseIndex = modifierText.indexOf("case")
-        if (caseIndex >= 0) {
-          caseIndex + "case".length
-        } else {
-          lastModEnd
-        }
-      } else {
-        lastModEnd
-      }
-      if (afterModifiers < classIndex) {
-        Space.format(modifierText.substring(afterModifiers, classIndex))
-      } else {
-        Space.EMPTY
-      }
+
+    // Advance cursor past the modifier text, then use sourceBefore to capture the
+    // whitespace before the kind keyword and consume the keyword itself in one step.
+    // This avoids re-including modifier text in the kindPrefix (which would print
+    // modifiers like `final` twice).
+    val kindKeyword =
+      if (isEnumCaseClass) "case"
+      else if (isTrait) "trait"
+      else if (isEnum) "enum"
+      else "class"
+    val kindPrefix = if (classIndex >= 0) {
+      cursor += endOfModifiers
+      sourceBefore(kindKeyword)
     } else {
       Space.EMPTY
     }
-    
+
+    // Extract space between the kind keyword and the name
+    val nameStart = if (td.nameSpan.exists) {
+      Math.max(0, td.nameSpan.start - offsetAdjustment)
+    } else {
+      cursor
+    }
+    val nameSpace = if (cursor < nameStart && nameStart <= source.length) {
+      Space.format(source.substring(cursor, nameStart))
+    } else {
+      Space.format(" ") // Default to single space
+    }
+
     val kindType = if (isEnum) {
       J.ClassDeclaration.Kind.Type.Enum
     } else if (isTrait) {
@@ -4032,7 +4017,7 @@ class ScalaTreeVisitor(
     } else {
       J.ClassDeclaration.Kind.Type.Class
     }
-    
+
     val kind = new J.ClassDeclaration.Kind(
       Tree.randomId(),
       kindPrefix,
@@ -4040,10 +4025,7 @@ class ScalaTreeVisitor(
       Collections.emptyList(),
       kindType
     )
-    
-    // Update cursor to after "class" keyword
-    cursor = classKeywordPos
-    
+
     // Extract class name
     val name = ident(td.name.toString, nameSpace)
     
