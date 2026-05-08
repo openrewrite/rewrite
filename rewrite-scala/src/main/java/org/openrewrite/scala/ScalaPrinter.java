@@ -265,16 +265,23 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         for (int li = 0; li < labelPadding.size(); li++) {
             JRightPadded<J> lp = labelPadding.get(li);
             visit(lp.getElement(), p);
-            // The last label's after space is the space before "if" guard (if any)
-            if (li == labelPadding.size() - 1 && case_.getGuard() != null) {
-                visitSpace(lp.getAfter(), JRightPadded.Location.CASE.getAfterLocation(), p);
+            // The last label's after space is the space before "if" guard, or
+            // the space before "=>" when there is no guard.
+            if (li == labelPadding.size() - 1) {
+                Space afterLabel = lp.getAfter();
+                if (case_.getGuard() == null && afterLabel.getWhitespace().isEmpty() && afterLabel.getComments().isEmpty()) {
+                    p.append(' ');
+                } else {
+                    visitSpace(afterLabel, JRightPadded.Location.CASE.getAfterLocation(), p);
+                }
             }
         }
         if (case_.getGuard() != null) {
             p.append("if");
             visit(case_.getGuard(), p);
+            p.append(' ');
         }
-        p.append(" =>");
+        p.append("=>");
         if (case_.getPadding().getBody() != null) {
             visit(case_.getPadding().getBody().getElement(), p);
         }

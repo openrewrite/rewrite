@@ -215,6 +215,22 @@ class MatchTest implements RewriteTest {
     }
 
     @Test
+    void matchWithExtraWhitespaceBeforeArrow() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def handle(x: Any): String = x match {
+                case "a"   => "1"
+                case _ => "0"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void matchWithLineCommentContainingIfBeforeGuard() {
         rewriteRun(
           scala(

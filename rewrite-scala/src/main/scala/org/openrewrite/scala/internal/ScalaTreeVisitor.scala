@@ -5797,6 +5797,9 @@ class ScalaTreeVisitor(
           case expr: Expression => guard = expr
           case _ =>
         }
+      } else {
+        val arrowPos = source.indexOf("=>", cursor)
+        if (arrowPos >= cursor) labelAfter = Space.format(source.substring(cursor, arrowPos))
       }
       val labels = new util.ArrayList[JRightPadded[J]]()
       labels.add(JRightPadded.build(patternJ).withAfter(labelAfter))
