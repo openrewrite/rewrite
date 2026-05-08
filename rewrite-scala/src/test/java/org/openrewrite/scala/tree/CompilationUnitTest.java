@@ -178,6 +178,77 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Test
+    void indentedIfThenElse() {
+        rewriteRun(
+          scala(
+            """
+            val x =
+              if true then
+                1
+              else
+                2
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedWhileDo() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              var i = 0
+              while i < 10 do
+                i = i + 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedForYield() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              val xs =
+                for i <- 1 to 10
+                yield i * 2
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedTryCatch() {
+        rewriteRun(
+          scala(
+            """
+            val x =
+              try
+                42
+              catch
+                case _: Exception => 0
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedMatch() {
+        rewriteRun(
+          scala(
+            """
+            val x = 1 match
+              case 1 => "one"
+              case _ => "other"
+            """
+          )
+        );
+    }
+
+    @Test
     void withTrailingWhitespace() {
         rewriteRun(
           scala(

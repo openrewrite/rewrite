@@ -3287,12 +3287,16 @@ class ScalaTreeVisitor(
 
   private def visitIf(ifTree: Trees.If[?]): J = {
     val prefix = extractPrefix(ifTree.span)
-    
-    
+
+
     // Find where the condition parentheses start
     val adjustedStart = Math.max(0, ifTree.span.start - offsetAdjustment)
     val condStart = Math.max(0, ifTree.cond.span.start - offsetAdjustment)
-    
+
+    // Detect Scala 3 `if cond then ...` (no parens). The condition is not wrapped in untpd.Parens,
+    // and there is no `(` between `if` and the condition's start position.
+    val ifIsParenless = !ifTree.cond.isInstanceOf[untpd.Parens]
+
     // Extract space before parentheses and move cursor past "if" to the condition
     var beforeParenSpace = Space.EMPTY
     if (adjustedStart < condStart && cursor <= condStart) {
@@ -3302,12 +3306,17 @@ class ScalaTreeVisitor(
       val ifIndex = between.indexOf("if")
       if (ifIndex >= 0) {
         val afterIf = ifIndex + 2
-        val remainingStr = between.substring(afterIf)
-        val parenIndex = remainingStr.indexOf('(')
-        if (parenIndex >= 0) {
-          beforeParenSpace = Space.format(remainingStr.substring(0, parenIndex))
-          // Move cursor to the opening parenthesis
-          cursor = cursor + afterIf + parenIndex
+        if (ifIsParenless) {
+          // Move cursor just past the `if` keyword; the condition's prefix will absorb the space.
+          cursor = cursor + afterIf
+        } else {
+          val remainingStr = between.substring(afterIf)
+          val parenIndex = remainingStr.indexOf('(')
+          if (parenIndex >= 0) {
+            beforeParenSpace = Space.format(remainingStr.substring(0, parenIndex))
+            // Move cursor to the opening parenthesis
+            cursor = cursor + afterIf + parenIndex
+          }
         }
       }
     }
@@ -3373,7 +3382,22 @@ class ScalaTreeVisitor(
         // For non-parenthesized conditions, just move cursor to end
         cursor = Math.max(0, ifTree.cond.span.end - offsetAdjustment)
     }
-    
+
+    // For Scala 3 `if cond then ...`, advance the cursor past the `then` keyword
+    // (which sits between the condition and the then-branch). The space before `then`
+    // is absorbed into afterCondSpace; space after is the thenp's prefix.
+    if (ifIsParenless) {
+      val thenpStart = Math.max(0, ifTree.thenp.span.start - offsetAdjustment)
+      if (cursor < thenpStart && thenpStart <= source.length) {
+        val between = source.substring(cursor, thenpStart)
+        val thenIdx = between.indexOf("then")
+        if (thenIdx >= 0) {
+          afterCondSpace = Space.format(between.substring(0, thenIdx))
+          cursor = cursor + thenIdx + 4
+        }
+      }
+    }
+
     // Visit the then branch — in Scala, any expression is valid as then-branch
     val thenPart = visitTree(ifTree.thenp) match {
       case stmt: Statement => JRightPadded.build(stmt)
@@ -3423,11 +3447,15 @@ class ScalaTreeVisitor(
     
     // Update cursor to end of the if expression
     updateCursor(ifTree.span.end)
-    
+
+    val ifMarkers = if (ifIsParenless)
+      Markers.build(Collections.singletonList(new IndentedSyntax(UUID.randomUUID())))
+    else Markers.EMPTY
+
     new J.If(
       Tree.randomId(),
       prefix,
-      Markers.EMPTY,
+      ifMarkers,
       new J.ControlParentheses(
         Tree.randomId(),
         beforeParenSpace,
@@ -3441,11 +3469,14 @@ class ScalaTreeVisitor(
   
   private def visitWhileDo(whileTree: Trees.WhileDo[?]): J = {
     val prefix = extractPrefix(whileTree.span)
-    
+
     // Find where the condition parentheses start
     val adjustedStart = Math.max(0, whileTree.span.start - offsetAdjustment)
     val condStart = Math.max(0, whileTree.cond.span.start - offsetAdjustment)
-    
+
+    // Detect Scala 3 `while cond do ...` (no parens). Same shape as `if cond then`.
+    val whileIsParenless = !whileTree.cond.isInstanceOf[untpd.Parens]
+
     // Extract space before parentheses and move cursor past "while" to the condition
     var beforeParenSpace = Space.EMPTY
     if (adjustedStart < condStart && cursor <= condStart) {
@@ -3454,12 +3485,16 @@ class ScalaTreeVisitor(
       val whileIndex = between.indexOf("while")
       if (whileIndex >= 0) {
         val afterWhile = whileIndex + 5 // "while" is 5 chars
-        val remainingStr = between.substring(afterWhile)
-        val parenIndex = remainingStr.indexOf('(')
-        if (parenIndex >= 0) {
-          beforeParenSpace = Space.format(remainingStr.substring(0, parenIndex))
-          // Move cursor to the opening parenthesis
-          cursor = cursor + afterWhile + parenIndex
+        if (whileIsParenless) {
+          cursor = cursor + afterWhile
+        } else {
+          val remainingStr = between.substring(afterWhile)
+          val parenIndex = remainingStr.indexOf('(')
+          if (parenIndex >= 0) {
+            beforeParenSpace = Space.format(remainingStr.substring(0, parenIndex))
+            // Move cursor to the opening parenthesis
+            cursor = cursor + afterWhile + parenIndex
+          }
         }
       }
     }
@@ -3521,7 +3556,20 @@ class ScalaTreeVisitor(
       case _ =>
         cursor = Math.max(0, whileTree.cond.span.end - offsetAdjustment)
     }
-    
+
+    // Scala 3 `while cond do ...` — advance the cursor past the `do` keyword.
+    if (whileIsParenless) {
+      val bodyStart = Math.max(0, whileTree.body.span.start - offsetAdjustment)
+      if (cursor < bodyStart && bodyStart <= source.length) {
+        val between = source.substring(cursor, bodyStart)
+        val doIdx = between.indexOf("do")
+        if (doIdx >= 0) {
+          afterCondSpace = Space.format(between.substring(0, doIdx))
+          cursor = cursor + doIdx + 2
+        }
+      }
+    }
+
     // Visit the body — wrap non-Statement expressions (e.g. `while (cond) ()`)
     val body = visitTree(whileTree.body) match {
       case stmt: Statement => JRightPadded.build(stmt)
@@ -3532,10 +3580,14 @@ class ScalaTreeVisitor(
     // Update cursor to end of the while loop
     updateCursor(whileTree.span.end)
 
+    val whileMarkers = if (whileIsParenless)
+      Markers.build(Collections.singletonList(new IndentedSyntax(UUID.randomUUID())))
+    else Markers.EMPTY
+
     new J.WhileLoop(
       Tree.randomId(),
       prefix,
-      Markers.EMPTY,
+      whileMarkers,
       new J.ControlParentheses(
         Tree.randomId(),
         beforeParenSpace,
@@ -5583,14 +5635,18 @@ class ScalaTreeVisitor(
 
     // Handle catch handler
     val catches = new util.ArrayList[J.Try.Catch]()
+    var catchHasBraces = true
     if (!parsedTry.handler.isEmpty && parsedTry.handler.span.exists) {
       val catchSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 50, source.length)) else ""
       val catchIdx = catchSearch.indexOf("catch")
       val catchPrefix = if (catchIdx > 0) Space.format(catchSearch.substring(0, catchIdx)) else Space.EMPTY
       if (catchIdx >= 0) cursor = cursor + catchIdx + 5
-      val braceSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
+      // Scala 3 `catch case ... =>` (no braces) — only consume `{` if it appears before the first `case`.
+      val braceSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
       val braceIdx = braceSearch.indexOf('{')
-      if (braceIdx >= 0) cursor = cursor + braceIdx + 1
+      val firstCaseIdx = braceSearch.indexOf("case")
+      catchHasBraces = braceIdx >= 0 && (firstCaseIdx < 0 || braceIdx < firstCaseIdx)
+      if (catchHasBraces) cursor = cursor + braceIdx + 1
 
       // The handler should be a Match tree containing the case defs
       val cases: List[Trees.CaseDef[?]] = parsedTry.handler match {
@@ -5655,7 +5711,7 @@ class ScalaTreeVisitor(
         catches.add(new J.Try.Catch(Tree.randomId(), thisCatchPrefix, Markers.EMPTY, controlParens, caseBody))
       }
       // Extract end space before closing '}'  and set it on the last catch body
-      if (cursor < source.length) {
+      if (catchHasBraces && cursor < source.length) {
         val r = source.substring(cursor, Math.min(cursor + 50, source.length))
         val ci = r.indexOf('}')
         if (ci >= 0) {
@@ -5691,7 +5747,9 @@ class ScalaTreeVisitor(
     } else null
 
     updateCursor(parsedTry.span.end)
-    new J.Try(Tree.randomId(), prefix, Markers.EMPTY, null, body, catches, finallyBlock)
+    val tryMarkers = if (catchHasBraces) Markers.EMPTY
+      else Markers.build(Collections.singletonList(new IndentedSyntax(UUID.randomUUID())))
+    new J.Try(Tree.randomId(), prefix, tryMarkers, null, body, catches, finallyBlock)
   }
 
   private def visitTryImpl(tryTree: Trees.Try[?]): J.Try = {
@@ -5714,15 +5772,19 @@ class ScalaTreeVisitor(
     }
 
     val catches = new util.ArrayList[J.Try.Catch]()
+    var catchHasBraces = true
     if (tryTree.cases.nonEmpty) {
       // Extract space before "catch" keyword — this becomes the first Catch's prefix
       val catchSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 50, source.length)) else ""
       val catchIdx = catchSearch.indexOf("catch")
       val catchPrefix = if (catchIdx > 0) Space.format(catchSearch.substring(0, catchIdx)) else Space.EMPTY
       if (catchIdx >= 0) cursor = cursor + catchIdx + 5
-      val braceSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
+      // Scala 3 `catch case ... =>` (no braces) — only consume `{` if it appears before the first `case`.
+      val braceSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
       val braceIdx = braceSearch.indexOf('{')
-      if (braceIdx >= 0) cursor = cursor + braceIdx + 1
+      val firstCaseIdx = braceSearch.indexOf("case")
+      catchHasBraces = braceIdx >= 0 && (firstCaseIdx < 0 || braceIdx < firstCaseIdx)
+      if (catchHasBraces) cursor = cursor + braceIdx + 1
 
       for (caseDef <- tryTree.cases) {
         val casePrefix = extractPrefix(caseDef.span)
@@ -5782,7 +5844,7 @@ class ScalaTreeVisitor(
         catches.add(new J.Try.Catch(Tree.randomId(), thisCatchPrefix, Markers.EMPTY, controlParens, caseBody))
       }
       // Extract end space before closing '}' and set it on the last catch body
-      if (cursor < source.length) {
+      if (catchHasBraces && cursor < source.length) {
         val r = source.substring(cursor, Math.min(cursor + 50, source.length))
         val ci = r.indexOf('}')
         if (ci >= 0) {
@@ -5816,7 +5878,9 @@ class ScalaTreeVisitor(
     } else null
 
     updateCursor(tryTree.span.end)
-    new J.Try(Tree.randomId(), prefix, Markers.EMPTY, null, body, catches, finallyBlock)
+    val tryMarkers = if (catchHasBraces) Markers.EMPTY
+      else Markers.build(Collections.singletonList(new IndentedSyntax(UUID.randomUUID())))
+    new J.Try(Tree.randomId(), prefix, tryMarkers, null, body, catches, finallyBlock)
   }
 
   private def visitMatchTree(matchTree: Trees.Match[?]): J = {
@@ -5853,16 +5917,22 @@ class ScalaTreeVisitor(
 
     val ms = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 30, source.length)) else ""
     val mi = ms.indexOf("match"); if (mi >= 0) cursor = cursor + mi + 5
-    val bs = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
-    val bi = bs.indexOf('{'); if (bi >= 0) cursor = cursor + bi + 1
+    // Scala 3 `x match\n  case ...` has no `{` before the cases — detect that form.
+    val bs = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
+    val braceIdx = bs.indexOf('{')
+    val caseIdx = bs.indexOf("case")
+    val isBraceForm = braceIdx >= 0 && (caseIdx < 0 || braceIdx < caseIdx)
+    if (isBraceForm) cursor = cursor + braceIdx + 1
 
-    val casesBlock = buildCasesBlock(matchTree)
+    val casesBlock = buildCasesBlock(matchTree, isBraceForm)
     updateCursor(matchTree.span.end)
     val selectorParens = new J.ControlParentheses[Expression](Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(selector))
-    new J.Switch(Tree.randomId(), prefix, Markers.EMPTY, selectorParens, casesBlock)
+    val markers = if (isBraceForm) Markers.EMPTY
+      else Markers.build(Collections.singletonList(new IndentedSyntax(UUID.randomUUID())))
+    new J.Switch(Tree.randomId(), prefix, markers, selectorParens, casesBlock)
   }
 
-  private def buildCasesBlock(matchTree: Trees.Match[?]): J.Block = {
+  private def buildCasesBlock(matchTree: Trees.Match[?], hasClosingBrace: Boolean = true): J.Block = {
     val caseStatements = new util.ArrayList[JRightPadded[Statement]]()
     for (caseDef <- matchTree.cases) {
       val casePrefix = extractPrefix(caseDef.span)
@@ -5903,14 +5973,16 @@ class ScalaTreeVisitor(
       caseStatements.add(JRightPadded.build(jCase.asInstanceOf[Statement]))
     }
 
-    // Extract space before closing brace of match block
+    // Extract space before closing brace of match block (or up to span end for indented form)
     val matchEnd = Math.max(0, matchTree.span.end - offsetAdjustment)
     var matchEndSpace = Space.EMPTY
     if (cursor < matchEnd && matchEnd <= source.length) {
       val remaining = source.substring(cursor, matchEnd)
-      val closeIdx = remaining.lastIndexOf('}')
-      if (closeIdx > 0) {
-        matchEndSpace = Space.format(remaining.substring(0, closeIdx))
+      if (hasClosingBrace) {
+        val closeIdx = remaining.lastIndexOf('}')
+        if (closeIdx > 0) {
+          matchEndSpace = Space.format(remaining.substring(0, closeIdx))
+        }
       }
     }
     new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), caseStatements, matchEndSpace)
@@ -6336,16 +6408,18 @@ class ScalaTreeVisitor(
   /** Common parser for ForDo (complex) and ForYield. */
   private def buildSFor(prefix: Space, enums: List[Trees.Tree[?]], body: Trees.Tree[?],
                         yielding: Boolean, spanEnd: Int): S.For = {
-    // Find opening bracket: ( or {
-    val openIdx = {
+    // Find opening bracket: ( or {. If we encounter a non-whitespace character before either,
+    // we're in the Scala 3 paren-less form (e.g. `for i <- 1 to 10 yield ...`).
+    val (openIdx, openBracket): (Int, Char) = {
       var i = cursor
-      while (i < source.length && source.charAt(i) != '(' && source.charAt(i) != '{') i += 1
-      if (i < source.length) i else -1
+      while (i < source.length && source.charAt(i).isWhitespace) i += 1
+      if (i < source.length && (source.charAt(i) == '(' || source.charAt(i) == '{')) (i, source.charAt(i))
+      else (-1, ' ')  // ' ' sentinel: no bracket (Scala 3 indented form)
     }
-    val openBracket: Char = if (openIdx >= 0) source.charAt(openIdx) else '('
+    val isParenless = openBracket == ' '
     val beforeOpen: Space = if (openIdx > cursor) Space.format(source.substring(cursor, openIdx)) else Space.EMPTY
     if (openIdx >= 0) cursor = openIdx + 1
-    val closeChar = if (openBracket == '(') ')' else '}'
+    val closeChar = if (openBracket == '(') ')' else if (openBracket == '{') '}' else ' '
 
     import scala.jdk.CollectionConverters.*
     val enumsList = enums.asJava
@@ -6353,16 +6427,30 @@ class ScalaTreeVisitor(
     var i = 0
     while (i < enumsList.size) {
       val isLast = i + 1 == enumsList.size
-      // Compute the end position of enums (close bracket position)
-      val closeIdx = source.indexOf(closeChar, cursor)
-      rpEnums.add(buildForEnumerator(enumsList.get(i), isLast, if (closeIdx >= 0) closeIdx else spanEnd))
+      // Compute the end position of enums: close bracket for paren form; for paren-less,
+      // stop at `yield` (yielding form) or body start (do form), whichever isn't a keyword.
+      val enumEnd =
+        if (isParenless) {
+          val bodyStart = Math.max(0, body.span.start - offsetAdjustment)
+          if (yielding) {
+            val yieldIdx = source.indexOf("yield", cursor)
+            if (yieldIdx >= 0 && yieldIdx < bodyStart) yieldIdx else bodyStart
+          } else bodyStart
+        }
+        else {
+          val closeIdx = source.indexOf(closeChar, cursor)
+          if (closeIdx >= 0) closeIdx else spanEnd
+        }
+      rpEnums.add(buildForEnumerator(enumsList.get(i), isLast, enumEnd))
       i += 1
     }
     val enumerators = JContainer.build(beforeOpen, rpEnums, Markers.EMPTY)
 
-    // Find closing bracket
-    val closeIdx = source.indexOf(closeChar, cursor)
-    if (closeIdx >= 0) cursor = closeIdx + 1
+    // Find closing bracket (only in paren form)
+    if (!isParenless) {
+      val closeIdx = source.indexOf(closeChar, cursor)
+      if (closeIdx >= 0) cursor = closeIdx + 1
+    }
 
     // Capture space before body / `yield`
     val bodyStart = Math.max(0, body.span.start - offsetAdjustment)
