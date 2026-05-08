@@ -221,4 +221,19 @@ class LambdaTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void partialFunctionLiteralAsBlockArgumentToBareMethod() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  beLike {
+                    case y => y
+                  }
+                }
+                """
+            )
+        );
+    }
 }

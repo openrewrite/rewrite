@@ -754,7 +754,7 @@ class ScalaTreeVisitor(
         val argSpace = extractPrefix(arg.span)
         visitTree(arg) match {
           case expr: Expression =>
-            args.add(JRightPadded.build(expr))
+            args.add(JRightPadded.build(expr.withPrefix(argSpace).asInstanceOf[Expression]))
           case block: J.Block =>
             val blockExpr = new S.StatementExpression(Tree.randomId(), block.withPrefix(argSpace))
             args.add(JRightPadded.build(blockExpr.asInstanceOf[Expression]))
