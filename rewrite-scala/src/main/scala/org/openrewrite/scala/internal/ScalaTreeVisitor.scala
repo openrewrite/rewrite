@@ -3093,6 +3093,8 @@ class ScalaTreeVisitor(
           if (stat.span.exists && !isSynth && visitedSpans.add(stat.span.start)) {
             visitTree(stat) match {
               case stmt: Statement => statements.add(JRightPadded.build(stmt))
+              case expr: Expression =>
+                statements.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
               case _ =>
             }
           }
@@ -4363,6 +4365,8 @@ class ScalaTreeVisitor(
                   case null =>
                   case stmt: Statement =>
                     statements.add(JRightPadded.build(stmt))
+                  case expr: Expression =>
+                    statements.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
                   case _ =>
                 }
               }

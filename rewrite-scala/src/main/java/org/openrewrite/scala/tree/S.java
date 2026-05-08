@@ -518,6 +518,87 @@ public interface S extends J {
     }
 
     /**
+     * Wraps an Expression to make it usable as a Statement.
+     * In Scala, expressions can appear in statement position (e.g. inside a class
+     * body or a block), and we need to model that without losing the expression
+     * type. This wrapper is transparent — prefix, markers, and coordinates all
+     * delegate to the inner expression.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class ExpressionStatement implements S, Expression, Statement {
+
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        Expression expression;
+
+        public ExpressionStatement(UUID id, Expression expression) {
+            this.id = id;
+            this.expression = expression;
+        }
+
+        public ExpressionStatement withId(UUID id) {
+            return this.id == id ? this : new ExpressionStatement(id, expression);
+        }
+
+        public ExpressionStatement withExpression(Expression expression) {
+            return this.expression == expression ? this : new ExpressionStatement(id, expression);
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            J j = v.visit(getExpression(), p);
+            if (j instanceof ExpressionStatement) {
+                return j;
+            } else if (j instanceof Expression) {
+                return withExpression((Expression) j);
+            }
+            return j;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) withExpression(expression.withPrefix(space));
+        }
+
+        @Override
+        public Space getPrefix() {
+            return expression.getPrefix();
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <J2 extends Tree> J2 withMarkers(Markers markers) {
+            return (J2) withExpression(expression.withMarkers(markers));
+        }
+
+        @Override
+        public Markers getMarkers() {
+            return expression.getMarkers();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return expression.getType();
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) withExpression(expression.withType(type));
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
      * Represents Scala type ascription: {@code expr: Type}.
      * <p>
      * This is NOT a cast — it's a compile-time type annotation that narrows/widens

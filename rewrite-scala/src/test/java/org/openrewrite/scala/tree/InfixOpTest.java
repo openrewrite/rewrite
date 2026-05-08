@@ -85,6 +85,19 @@ class InfixOpTest implements RewriteTest {
     }
 
     @Test
+    void stringInfixInClassBody() {
+        rewriteRun(
+          scala(
+            """
+            class Test {
+              "name" - "x"
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void compoundAssignPlus() {
         rewriteRun(
           scala(
