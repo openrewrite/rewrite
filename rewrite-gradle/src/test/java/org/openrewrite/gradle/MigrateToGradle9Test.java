@@ -47,6 +47,11 @@ class MigrateToGradle9Test implements RewriteTest {
 
               dependencies {
                   implementation group: 'com.google.guava', name: 'guava', version: '31.1-jre'
+                  implementation("org.apache.httpcomponents:httpclient") {
+                      version = {
+                          strictly("4.5.13")
+                      }
+                  }
               }
 
               task doSomething(type: JavaExec) {
@@ -69,6 +74,11 @@ class MigrateToGradle9Test implements RewriteTest {
 
               dependencies {
                   implementation "com.google.guava:guava:31.1-jre"
+                  implementation("org.apache.httpcomponents:httpclient") {
+                      version {
+                          strictly("4.5.13")
+                      }
+                  }
               }
 
               task doSomething(type: JavaExec) {
