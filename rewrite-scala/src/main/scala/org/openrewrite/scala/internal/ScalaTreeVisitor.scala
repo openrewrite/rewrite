@@ -27,7 +27,7 @@ import org.openrewrite.java.marker.OmitParentheses
 import org.openrewrite.marker.Markers
 import org.openrewrite.scala.marker.Implicit
 import org.openrewrite.scala.marker.LambdaParameter
-import org.openrewrite.scala.marker.IndentedBlock
+import org.openrewrite.scala.marker.IndentedSyntax
 import org.openrewrite.scala.marker.OmitBraces
 import org.openrewrite.scala.marker.PackageObject
 import org.openrewrite.scala.marker.SObject
@@ -172,7 +172,11 @@ class ScalaTreeVisitor(
   }
   
   def getCursor: Int = cursor
-  
+
+  def getSourceText: String = source
+
+  def getOffsetAdjustment: Int = offsetAdjustment
+
   def updateCursor(position: Int): Unit = {
     val adjustedPosition = Math.max(0, position - offsetAdjustment)
     if (adjustedPosition > cursor && adjustedPosition <= source.length) {
@@ -3121,7 +3125,7 @@ class ScalaTreeVisitor(
         }
         
         val blockMarkers = if (isBraceless) {
-          Markers.build(Collections.singletonList(new IndentedBlock(Tree.randomId())))
+          Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
         } else Markers.EMPTY
 
         new J.Block(
@@ -4397,7 +4401,7 @@ class ScalaTreeVisitor(
           } else Space.EMPTY
 
           val classBlockMarkers = if (isClassBraceless) {
-            Markers.build(Collections.singletonList(new IndentedBlock(Tree.randomId())))
+            Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
           } else Markers.EMPTY
 
           new J.Block(

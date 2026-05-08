@@ -32,7 +32,7 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.scala.marker.BlockArgument;
-import org.openrewrite.scala.marker.IndentedBlock;
+import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TypeProjection;
@@ -588,6 +588,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         beforeSyntax(pkg, Space.Location.PACKAGE_PREFIX, p);
         p.append("package");
         visit(pkg.getExpression(), p);
+        if (pkg.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
+            p.append(':');
+        }
         // Note: No semicolon in Scala package declarations
         afterSyntax(pkg, p);
         return pkg;
@@ -860,7 +863,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return block;
         }
         // Scala 3 braceless (indentation-based) blocks use `:` instead of `{}`
-        if (block.getMarkers().findFirst(IndentedBlock.class).isPresent()) {
+        if (block.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
             beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
             p.append(':');
             visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);

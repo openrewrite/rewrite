@@ -166,6 +166,18 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Test
+    void indentedPackage() {
+        rewriteRun(
+          scala(
+            """
+            package com.example:
+              val x = 42
+            """
+          )
+        );
+    }
+
+    @Test
     void withTrailingWhitespace() {
         rewriteRun(
           scala(
