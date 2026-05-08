@@ -5856,9 +5856,12 @@ class ScalaTreeVisitor(
       val patternJ = visitTree(caseDef.pat) match { case j: J => j; case _ => ident("_", Space.format(" ")) }
 
       // Handle guard: `case x if condition =>`
-      // Store space-before-if in label's after space so the printer can emit it
+      // Store space-before-if in label's after space so the printer can emit it.
+      // Store space between guard expression end and `=>` in the statements
+      // container's `before` space (matching the Java printer's convention).
       var guard: Expression = null
       var labelAfter = Space.EMPTY
+      var guardArrowSpace = Space.EMPTY
       if (!caseDef.guard.isEmpty && caseDef.guard.span.exists) {
         val ifPos = positionOfNext("if")
         if (ifPos > cursor) labelAfter = Space.format(source.substring(cursor, ifPos))
@@ -5868,6 +5871,8 @@ class ScalaTreeVisitor(
           case expr: Expression => guard = expr
           case _ =>
         }
+        val arrowPos = source.indexOf("=>", cursor)
+        if (arrowPos >= cursor) guardArrowSpace = Space.format(source.substring(cursor, arrowPos))
       } else {
         val arrowPos = source.indexOf("=>", cursor)
         if (arrowPos >= cursor) labelAfter = Space.format(source.substring(cursor, arrowPos))
@@ -5881,8 +5886,10 @@ class ScalaTreeVisitor(
       val caseBodyJ = visitTree(caseDef.body) match { case j: J => JRightPadded.build(j); case _ => null }
       updateCursor(caseDef.span.end)
 
+      val statementsContainer: JContainer[Statement] =
+        JContainer.build(guardArrowSpace, java.util.Collections.emptyList[JRightPadded[Statement]](), Markers.EMPTY)
       val jCase = new J.Case(Tree.randomId(), casePrefix, Markers.EMPTY, J.Case.Type.Rule,
-        null, null, JContainer.build(Space.EMPTY, labels, Markers.EMPTY), guard, JContainer.empty(), caseBodyJ)
+        null, null, JContainer.build(Space.EMPTY, labels, Markers.EMPTY), guard, statementsContainer, caseBodyJ)
       caseStatements.add(JRightPadded.build(jCase.asInstanceOf[Statement]))
     }
 

@@ -276,7 +276,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         if (case_.getGuard() != null) {
             p.append("if");
             visit(case_.getGuard(), p);
-            p.append(' ');
+            Space guardArrowSpace = case_.getPadding().getStatements().getBefore();
+            if (guardArrowSpace.isEmpty()) {
+                p.append(' ');
+            } else {
+                visitSpace(guardArrowSpace, Space.Location.CASE, p);
+            }
         }
         p.append("=>");
         if (case_.getPadding().getBody() != null) {
