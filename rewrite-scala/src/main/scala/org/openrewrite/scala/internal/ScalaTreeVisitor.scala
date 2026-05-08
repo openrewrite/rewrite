@@ -5551,14 +5551,16 @@ class ScalaTreeVisitor(
           case _ => ("_", null)
         }
         updateCursor(caseDef.pat.span.end)
-        if (arrowIdx >= 0) { val a = source.indexOf("=>", cursor); if (a >= 0) cursor = a + 2 }
+        val arrowAbs = source.indexOf("=>", cursor)
+        val spaceBeforeArrow = if (arrowAbs >= cursor) Space.format(source.substring(cursor, arrowAbs)) else Space.EMPTY
+        if (arrowIdx >= 0 && arrowAbs >= 0) cursor = arrowAbs + 2
 
         val paramId = ident(paramName, Space.format(" "))
         val namedVar = new J.VariableDeclarations.NamedVariable(Tree.randomId(), Space.EMPTY, Markers.EMPTY, paramId, Collections.emptyList(), null, null)
         val varDecl = new J.VariableDeclarations(Tree.randomId(), casePrefix, Markers.EMPTY,
           Collections.emptyList(), Collections.emptyList(), paramType, null, Collections.emptyList(),
           Collections.singletonList(JRightPadded.build(namedVar)))
-        val controlParens = new J.ControlParentheses[J.VariableDeclarations](Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(varDecl))
+        val controlParens = new J.ControlParentheses[J.VariableDeclarations](Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(varDecl).withAfter(spaceBeforeArrow))
 
         val caseBody = visitTree(caseDef.body) match {
           case block: J.Block => block
@@ -5670,14 +5672,16 @@ class ScalaTreeVisitor(
           case _ => ("_", null)
         }
         updateCursor(caseDef.pat.span.end)
-        if (arrowIdx >= 0) { val a = source.indexOf("=>", cursor); if (a >= 0) cursor = a + 2 }
+        val arrowAbs = source.indexOf("=>", cursor)
+        val spaceBeforeArrow = if (arrowAbs >= cursor) Space.format(source.substring(cursor, arrowAbs)) else Space.EMPTY
+        if (arrowIdx >= 0 && arrowAbs >= 0) cursor = arrowAbs + 2
 
         val paramId = ident(paramName, Space.format(" "))
         val namedVar = new J.VariableDeclarations.NamedVariable(Tree.randomId(), Space.EMPTY, Markers.EMPTY, paramId, Collections.emptyList(), null, null)
         val varDecl = new J.VariableDeclarations(Tree.randomId(), casePrefix, Markers.EMPTY,
           Collections.emptyList(), Collections.emptyList(), paramType, null, Collections.emptyList(),
           Collections.singletonList(JRightPadded.build(namedVar)))
-        val controlParens = new J.ControlParentheses[J.VariableDeclarations](Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(varDecl))
+        val controlParens = new J.ControlParentheses[J.VariableDeclarations](Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(varDecl).withAfter(spaceBeforeArrow))
 
         val caseBody = visitTree(caseDef.body) match {
           case block: J.Block => block

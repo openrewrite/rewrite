@@ -152,6 +152,24 @@ class TryTest implements RewriteTest {
     }
 
     @Test
+    void catchWithExtraWhitespaceBeforeArrow() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def run(): Unit = try {
+                  println("risky")
+                } catch {
+                  case e: RuntimeException   => println("rt")
+                  case e: Exception          => println("ex")
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void tryWithTypedPattern() {
         rewriteRun(
           scala(

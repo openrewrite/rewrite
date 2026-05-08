@@ -212,7 +212,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     p.append("catch {");
                 }
                 // Print case with AST whitespace
-                J.VariableDeclarations varDecl = aCatch.getParameter().getTree();
+                JRightPadded<J.VariableDeclarations> paramPadded = aCatch.getParameter().getPadding().getTree();
+                J.VariableDeclarations varDecl = paramPadded.getElement();
                 visitSpace(varDecl.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
                 p.append("case");
                 if (!varDecl.getVariables().isEmpty()) {
@@ -222,7 +223,13 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     p.append(":");
                     visit(varDecl.getTypeExpression(), p);
                 }
-                p.append(" =>");
+                Space afterParam = paramPadded.getAfter();
+                if (afterParam.getWhitespace().isEmpty() && afterParam.getComments().isEmpty()) {
+                    p.append(' ');
+                } else {
+                    visitSpace(afterParam, Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+                }
+                p.append("=>");
                 for (Statement stmt : aCatch.getBody().getStatements()) {
                     visit(stmt, p);
                 }

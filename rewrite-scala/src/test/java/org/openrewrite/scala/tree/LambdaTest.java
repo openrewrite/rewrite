@@ -177,6 +177,19 @@ class LambdaTest implements RewriteTest {
     }
 
     @Test
+    void lambdaWithExtraWhitespaceBeforeArrow() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val f = (x: Int)   => x + 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void partialFunctionLiteralAsMapArgument() {
         rewriteRun(
             scala(
