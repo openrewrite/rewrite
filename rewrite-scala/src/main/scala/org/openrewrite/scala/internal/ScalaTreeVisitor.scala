@@ -197,6 +197,7 @@ class ScalaTreeVisitor(
       case postfixOp: untpd.PostfixOp => visitPostfixOp(postfixOp)
       case parens: untpd.Parens => visitParentheses(parens)
       case imp: Trees.Import[?] => visitImport(imp)
+      case exp: Trees.Export[?] => visitExport(exp)
       case pkg: Trees.PackageDef[?] => visitPackageDef(pkg)
       case newTree: Trees.New[?] => visitNew(newTree)
       case vd: Trees.ValDef[?] => visitValDef(vd)
@@ -2162,109 +2163,17 @@ class ScalaTreeVisitor(
   }
 
   private def visitImport(imp: Trees.Import[?]): J = {
-    // Check if this is a simple import (no braces) that can map to J.Import
-    if (isSimpleImport(imp)) {
-      // Extract the prefix - should only be whitespace/comments before "import"
-      val adjustedStart = Math.max(0, imp.span.start - offsetAdjustment)
-      val prefix = if (cursor < adjustedStart) {
-        val prefixText = source.substring(cursor, adjustedStart)
-        cursor = adjustedStart
-        Space.format(prefixText)
-      } else {
-        Space.EMPTY
-      }
-      
-      
-      // Set import context flag for identifier processing
-      val oldInImportContext = isInImportContext
-      isInImportContext = true
-      
-      // Save current cursor position and move it to the start of the import expression
-      // The import expression (imp.expr) should have its span starting after "import "
-      val savedCursor = cursor
-      if (imp.expr.span.exists) {
-        val exprStart = Math.max(0, imp.expr.span.start - offsetAdjustment)
-        cursor = exprStart
-      }
-      
-      // Visit the import expression to get the field access
-      val expr = visitTree(imp.expr)
-      
-      // Restore import context flag
-      isInImportContext = oldInImportContext
-      
-      // For imports, we need a FieldAccess that includes the selectors
-      // Build the qualid: for `import java.util.List`, expr=Select(Ident(java),util), selector=List
-      // For `import java.util`, expr=Ident(java), selector=util
-      var qualid: J.FieldAccess = expr match {
-        case fa: J.FieldAccess => fa
-        case id: J.Identifier if imp.selectors.nonEmpty =>
-          // Simple Ident root (e.g., `java` in `import java.util`)
-          // Build FieldAccess with the Ident as target and first selector as name
-          val selector = imp.selectors.head
-          selector match {
-            case is @ untpd.ImportSelector(sIdent: Trees.Ident[?], untpd.EmptyTree, untpd.EmptyTree) =>
-              if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
-              // For wildcard imports, read source to preserve * vs _
-              val selName = if (is.isWildcard) {
-                val adjustedEnd = Math.max(0, imp.span.end - offsetAdjustment)
-                if (adjustedEnd > 0 && adjustedEnd <= source.length && source.charAt(adjustedEnd - 1) == '*') "*" else "_"
-              } else sIdent.name.toString
-              val packagePrefix = extractFqn(imp.expr)
-              val fqn = if (packagePrefix.nonEmpty) packagePrefix + "." + selName else selName
-              val selectorType: JavaType = typeForFqn(fqn)
-              new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                id, JLeftPadded.build(ident(selName, Space.EMPTY, selectorType)), selectorType)
-            case _ =>
-              // Can't build valid FieldAccess
-              return visitUnknown(imp)
-          }
-        case other =>
-          return visitUnknown(imp)
-      }
-
-      // Handle selectors for multi-segment imports (e.g., `import java.util.List`)
-      // Skip if we already consumed the selector above (single Ident root case)
-      val alreadyHandledSelector = expr.isInstanceOf[J.Identifier] && imp.selectors.nonEmpty
-      if (!alreadyHandledSelector && imp.selectors.nonEmpty && imp.selectors.size == 1) {
-        val selector = imp.selectors.head
-        selector match {
-          case is @ untpd.ImportSelector(idTree: Trees.Ident[?], untpd.EmptyTree, untpd.EmptyTree) =>
-            if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
-            // For wildcard imports, use source character to preserve * vs _
-            val selectorName = if (is.isWildcard) {
-              // Read the actual wildcard char from source
-              val adjustedEnd = Math.max(0, imp.span.end - offsetAdjustment)
-              if (adjustedEnd > 0 && adjustedEnd <= source.length) {
-                val lastChar = source.charAt(adjustedEnd - 1)
-                if (lastChar == '*') "*" else "_"
-              } else idTree.name.toString
-            } else idTree.name.toString
-            val packagePrefix = extractFqn(imp.expr)
-            val fqn = if (packagePrefix.nonEmpty) packagePrefix + "." + selectorName else selectorName
-            val selectorType: JavaType = typeForFqn(fqn)
-            qualid = new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-              qualid,
-              JLeftPadded.build(ident(selectorName, Space.EMPTY, selectorType)),
-              selectorType)
-          case _ =>
-        }
-      }
-      
-      // Update cursor to the end of the import
-      if (imp.span.exists) {
-        val adjustedEnd = Math.max(0, imp.span.end - offsetAdjustment)
-        updateCursor(adjustedEnd)
-      }
-      
-      // Create J.Import
+    if (isSimpleImportOrExport(imp, "import")) {
+      val (prefix, qualid) = buildImportOrExportQualid(imp)
+      // J.Import requires a static-import flag and supports an alias slot;
+      // Scala has neither for simple imports.
       new J.Import(
         Tree.randomId(),
         prefix,
         Markers.EMPTY,
-        JLeftPadded.build(false), // static imports are not supported in Scala
+        JLeftPadded.build(false),
         qualid,
-        null // no alias for simple imports
+        null
       )
     } else {
       // Complex imports: braces, aliases (as/=>), wildcards with braces, etc.
@@ -2312,26 +2221,150 @@ class ScalaTreeVisitor(
       )
     }
   }
-  
-  private def isSimpleImport(imp: Trees.Import[?]): Boolean = {
-    // Check if this is a simple import without braces
-    if (imp.span.exists) {
-      val adjustedStart = Math.max(0, imp.span.start - offsetAdjustment)
-      val adjustedEnd = Math.max(0, imp.span.end - offsetAdjustment)
-      if (adjustedStart >= 0 && adjustedEnd <= source.length && adjustedEnd > adjustedStart) {
-        val importText = source.substring(adjustedStart, adjustedEnd)
-        // Not simple if:
-        // - has braces: import a.{B, C}
-        // - has rename: import a.{B as C} or import a.{B => C}
-        // - span doesn't contain "import" keyword (part of comma-separated import like `import A._, B._`)
-        !importText.contains("{") && !importText.contains(" as ") && !importText.contains("=>") &&
-          importText.trim.startsWith("import")
-      } else {
-        false
-      }
-    } else {
-      false
+
+  private def visitExport(exp: Trees.Export[?]): J = {
+    // Scala 3 export clauses share their AST shape with imports
+    // (Dotty: both extend `Trees.ImportOrExport` with `expr` + `selectors`),
+    // so we reuse the same qualid-building logic. Brace and alias forms are
+    // not yet modelled; visitUnknown throws so the gap surfaces in tests.
+    if (!isSimpleImportOrExport(exp, "export")) {
+      return visitUnknown(exp)
     }
+    val (prefix, qualid) = buildImportOrExportQualid(exp)
+    new S.Export(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      qualid
+    )
+  }
+
+  /**
+   * Build the `J.FieldAccess` qualid for a simple import or export — i.e. one
+   * with no braces and no aliases. Both `Trees.Import` and `Trees.Export` extend
+   * `Trees.ImportOrExport`, which exposes the shared `expr` and `selectors`
+   * members the construction depends on.
+   *
+   * Returns the leading `Space` (whitespace + comments before the keyword) and
+   * the qualid. Advances the cursor past the end of the import/export. If the
+   * shape can't be modelled, raises via `visitUnknown` so the caller sees a
+   * failure rather than a degraded value.
+   */
+  private def buildImportOrExportQualid(
+    tree: Trees.ImportOrExport[?]
+  ): (Space, J.FieldAccess) = {
+    val adjustedStart = Math.max(0, tree.span.start - offsetAdjustment)
+    val prefix = if (cursor < adjustedStart) {
+      val prefixText = source.substring(cursor, adjustedStart)
+      cursor = adjustedStart
+      Space.format(prefixText)
+    } else {
+      Space.EMPTY
+    }
+
+    // Identifier resolution inside an import/export path differs from regular
+    // expression context (e.g. `_` becomes `*` for wildcards), so flag the
+    // visit and restore the previous value when done.
+    val oldInImportContext = isInImportContext
+    isInImportContext = true
+
+    if (tree.expr.span.exists) {
+      val exprStart = Math.max(0, tree.expr.span.start - offsetAdjustment)
+      cursor = exprStart
+    }
+
+    val expr = visitTree(tree.expr)
+    isInImportContext = oldInImportContext
+
+    // Build the qualid: for `(import|export) java.util.List`, expr is
+    // Select(Ident(java), util) and the trailing selector is `List`.
+    // For `(import|export) java.util`, expr is Ident(java) and the only
+    // selector is `util`.
+    var qualid: J.FieldAccess = expr match {
+      case fa: J.FieldAccess => fa
+      case id: J.Identifier if tree.selectors.nonEmpty =>
+        val selector = tree.selectors.head
+        selector match {
+          case is @ untpd.ImportSelector(sIdent: Trees.Ident[?], untpd.EmptyTree, untpd.EmptyTree) =>
+            if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
+            val selName = wildcardOrName(is, sIdent, tree.span)
+            val selectorType: JavaType = lookupSelectorType(tree.expr, selName)
+            new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+              id, JLeftPadded.build(ident(selName, Space.EMPTY, selectorType)), selectorType)
+          case _ =>
+            return visitUnknown(tree)
+        }
+      case _ =>
+        return visitUnknown(tree)
+    }
+
+    // Multi-segment paths (e.g., `import java.util.List`): apply the trailing
+    // selector to the FieldAccess produced from the expression. Skipped if the
+    // single-Ident-root branch above already consumed it.
+    val alreadyHandledSelector = expr.isInstanceOf[J.Identifier] && tree.selectors.nonEmpty
+    if (!alreadyHandledSelector && tree.selectors.nonEmpty && tree.selectors.size == 1) {
+      val selector = tree.selectors.head
+      selector match {
+        case is @ untpd.ImportSelector(idTree: Trees.Ident[?], untpd.EmptyTree, untpd.EmptyTree) =>
+          if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
+          val selectorName = wildcardOrName(is, idTree, tree.span)
+          val selectorType: JavaType = lookupSelectorType(tree.expr, selectorName)
+          qualid = new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+            qualid,
+            JLeftPadded.build(ident(selectorName, Space.EMPTY, selectorType)),
+            selectorType)
+        case _ =>
+      }
+    }
+
+    if (tree.span.exists) {
+      val adjustedEnd = Math.max(0, tree.span.end - offsetAdjustment)
+      updateCursor(adjustedEnd)
+    }
+
+    (prefix, qualid)
+  }
+
+  /**
+   * For a wildcard selector, read the wildcard char from source so we preserve
+   * `*` (Scala 3) vs `_` (legacy) verbatim. For a named selector, return the
+   * name as written in the AST.
+   */
+  private def wildcardOrName(
+    is: untpd.ImportSelector,
+    idTree: Trees.Ident[?],
+    span: Spans.Span
+  ): String = {
+    if (!is.isWildcard) return idTree.name.toString
+    val adjustedEnd = Math.max(0, span.end - offsetAdjustment)
+    if (adjustedEnd > 0 && adjustedEnd <= source.length && source.charAt(adjustedEnd - 1) == '*') "*" else "_"
+  }
+
+  /**
+   * Best-effort type lookup for a selector by FQN. Useful for imports
+   * (`scala.collection.mutable` resolves to a known type); for exports the
+   * selector usually names a member of a local value, so this typically
+   * returns `null` — which is the desired behavior.
+   */
+  private def lookupSelectorType(expr: Trees.Tree[?], selectorName: String): JavaType = {
+    val packagePrefix = extractFqn(expr)
+    val fqn = if (packagePrefix.nonEmpty) packagePrefix + "." + selectorName else selectorName
+    typeForFqn(fqn)
+  }
+
+  /**
+   * True for an import or export with no braces and no rename arrows, whose
+   * span starts with the given keyword (filters out continuations of
+   * comma-separated forms like `import A._, B._`).
+   */
+  private def isSimpleImportOrExport(tree: Trees.ImportOrExport[?], keyword: String): Boolean = {
+    if (!tree.span.exists) return false
+    val adjustedStart = Math.max(0, tree.span.start - offsetAdjustment)
+    val adjustedEnd = Math.max(0, tree.span.end - offsetAdjustment)
+    if (adjustedStart < 0 || adjustedEnd > source.length || adjustedEnd <= adjustedStart) return false
+    val text = source.substring(adjustedStart, adjustedEnd)
+    !text.contains("{") && !text.contains(" as ") && !text.contains("=>") &&
+      text.trim.startsWith(keyword)
   }
   
   
