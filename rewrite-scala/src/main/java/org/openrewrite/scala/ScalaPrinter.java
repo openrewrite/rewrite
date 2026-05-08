@@ -223,12 +223,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     p.append(":");
                     visit(varDecl.getTypeExpression(), p);
                 }
-                Space afterParam = paramPadded.getAfter();
-                if (afterParam.getWhitespace().isEmpty() && afterParam.getComments().isEmpty()) {
-                    p.append(' ');
-                } else {
-                    visitSpace(afterParam, Space.Location.CONTROL_PARENTHESES_PREFIX, p);
-                }
+                visitSpace(paramPadded.getAfter(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
                 p.append("=>");
                 for (Statement stmt : aCatch.getBody().getStatements()) {
                     visit(stmt, p);
@@ -275,12 +270,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             // The last label's after space is the space before "if" guard, or
             // the space before "=>" when there is no guard.
             if (li == labelPadding.size() - 1) {
-                Space afterLabel = lp.getAfter();
-                if (case_.getGuard() == null && afterLabel.getWhitespace().isEmpty() && afterLabel.getComments().isEmpty()) {
-                    p.append(' ');
-                } else {
-                    visitSpace(afterLabel, JRightPadded.Location.CASE.getAfterLocation(), p);
-                }
+                visitSpace(lp.getAfter(), JRightPadded.Location.CASE.getAfterLocation(), p);
             }
         }
         if (case_.getGuard() != null) {
