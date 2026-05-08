@@ -23,6 +23,32 @@ import static org.openrewrite.scala.Assertions.scala;
 class VariableDeclarationsTest implements RewriteTest {
 
     @Test
+    void extraSpaceBetweenAnnotationAndVal() {
+        rewriteRun(
+          scala(
+            """
+            class Test {
+              @deprecated   val x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void extraSpaceBetweenModifierAndVal() {
+        rewriteRun(
+          scala(
+            """
+            class Test {
+              private   val x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void valDeclaration() {
         rewriteRun(
           scala("val x = 5")
