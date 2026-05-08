@@ -212,7 +212,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     p.append("catch {");
                 }
                 // Print case with AST whitespace
-                J.VariableDeclarations varDecl = aCatch.getParameter().getTree();
+                JRightPadded<J.VariableDeclarations> paramPadded = aCatch.getParameter().getPadding().getTree();
+                J.VariableDeclarations varDecl = paramPadded.getElement();
                 visitSpace(varDecl.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
                 p.append("case");
                 if (!varDecl.getVariables().isEmpty()) {
@@ -222,7 +223,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     p.append(":");
                     visit(varDecl.getTypeExpression(), p);
                 }
-                p.append(" =>");
+                visitSpace(paramPadded.getAfter(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+                p.append("=>");
                 for (Statement stmt : aCatch.getBody().getStatements()) {
                     visit(stmt, p);
                 }
@@ -265,16 +267,18 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         for (int li = 0; li < labelPadding.size(); li++) {
             JRightPadded<J> lp = labelPadding.get(li);
             visit(lp.getElement(), p);
-            // The last label's after space is the space before "if" guard (if any)
-            if (li == labelPadding.size() - 1 && case_.getGuard() != null) {
+            // The last label's after space is the space before "if" guard, or
+            // the space before "=>" when there is no guard.
+            if (li == labelPadding.size() - 1) {
                 visitSpace(lp.getAfter(), JRightPadded.Location.CASE.getAfterLocation(), p);
             }
         }
         if (case_.getGuard() != null) {
             p.append("if");
             visit(case_.getGuard(), p);
+            p.append(' ');
         }
-        p.append(" =>");
+        p.append("=>");
         if (case_.getPadding().getBody() != null) {
             visit(case_.getPadding().getBody().getElement(), p);
         }
