@@ -235,6 +235,36 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void multilineClassTypeParameters() {
+        rewriteRun(
+            scala(
+                """
+                class Foo[
+                    A,
+                    B
+                ]
+                """
+            )
+        );
+    }
+
+    @Test
+    void multilineWithClauses() {
+        rewriteRun(
+            scala(
+                """
+                trait B
+                trait C
+                trait D
+                class A extends B
+                    with C
+                    with D
+                """
+            )
+        );
+    }
+
+    @Test
     void methodWithImplicitParameter() {
         rewriteRun(
             scala(

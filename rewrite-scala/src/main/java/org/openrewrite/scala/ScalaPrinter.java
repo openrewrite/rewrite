@@ -830,8 +830,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             List<JRightPadded<J.TypeParameter>> elements = typeParams.getPadding().getElements();
             for (int i = 0; i < elements.size(); i++) {
                 visit(elements.get(i).getElement(), p);
+                visitSpace(elements.get(i).getAfter(), Space.Location.TYPE_PARAMETER_SUFFIX, p);
                 if (i < elements.size() - 1) {
-                    visitSpace(elements.get(i).getAfter(), Space.Location.TYPE_PARAMETER_SUFFIX, p);
                     p.append(',');
                 }
             }

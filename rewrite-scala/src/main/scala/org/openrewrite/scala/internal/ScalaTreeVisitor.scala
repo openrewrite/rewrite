@@ -4060,15 +4060,22 @@ class ScalaTreeVisitor(
         typeParams.zipWithIndex.foreach { case (tparam, idx) =>
           val jTypeParam = visitTypeParameter(tparam)
           val isLast = idx == typeParams.size - 1
-          
-          jTypeParams.add(JRightPadded.build(jTypeParam))
 
-          // Advance cursor past the comma so the next param's extractPrefix
-          // doesn't include it. The printer handles comma output.
-          if (!isLast && cursor < source.length) {
+          val afterParam: Space = if (!isLast && cursor < source.length) {
             val commaPos = source.indexOf(',', cursor)
-            if (commaPos >= 0) cursor = commaPos + 1
-          }
+            if (commaPos >= 0) {
+              val before = Space.format(source.substring(cursor, commaPos))
+              cursor = commaPos + 1
+              before
+            } else Space.EMPTY
+          } else if (isLast && cursor < source.length) {
+            // Capture whitespace between last type parameter and closing `]`
+            val closePos = source.indexOf(']', cursor)
+            if (closePos >= 0) Space.format(source.substring(cursor, closePos))
+            else Space.EMPTY
+          } else Space.EMPTY
+
+          jTypeParams.add(new JRightPadded(jTypeParam, afterParam, Markers.EMPTY))
         }
         
         // Update cursor to after closing bracket.
@@ -5059,20 +5066,29 @@ class ScalaTreeVisitor(
         cursor = cursor + bracketIdx + 1
 
         val jTypeParams = new util.ArrayList[JRightPadded[J.TypeParameter]]()
-        typeParams.foreach { tp =>
+        typeParams.zipWithIndex.foreach { case (tp, idx) =>
           val jtp = visitTypeParameter(tp)
+          val isLast = idx == typeParams.size - 1
           val afterParam = if (cursor < source.length) {
-            val s = source.substring(cursor, Math.min(cursor + 20, source.length))
-            val commaIdx = s.indexOf(',')
-            if (commaIdx >= 0) {
-              cursor = cursor + commaIdx + 1
-              Space.format(s.substring(0, commaIdx))
-            } else Space.EMPTY
+            if (!isLast) {
+              val s = source.substring(cursor, Math.min(cursor + 200, source.length))
+              val commaIdx = s.indexOf(',')
+              if (commaIdx >= 0) {
+                cursor = cursor + commaIdx + 1
+                Space.format(s.substring(0, commaIdx))
+              } else Space.EMPTY
+            } else {
+              // Capture whitespace between last type parameter and closing `]`
+              val s = source.substring(cursor, Math.min(cursor + 200, source.length))
+              val closeIdx = s.indexOf(']')
+              if (closeIdx >= 0) Space.format(s.substring(0, closeIdx))
+              else Space.EMPTY
+            }
           } else Space.EMPTY
           jTypeParams.add(new JRightPadded(jtp, afterParam, Markers.EMPTY))
         }
 
-        val afterSearch = source.substring(cursor, Math.min(cursor + 50, source.length))
+        val afterSearch = source.substring(cursor, Math.min(cursor + 200, source.length))
         val closeBracket = afterSearch.indexOf(']')
         if (closeBracket >= 0) {
           cursor = cursor + closeBracket + 1
