@@ -510,6 +510,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitTypeAscription((S.TypeAscription) tree, p);
         } else if (tree instanceof S.TypeAlias) {
             return visitTypeAlias((S.TypeAlias) tree, p);
+        } else if (tree instanceof S.Export) {
+            return visitExport((S.Export) tree, p);
         } else if (tree instanceof S.PatternDefinition) {
             return visitPatternDefinition((S.PatternDefinition) tree, p);
         } else if (tree instanceof S.FunctionCall) {
@@ -1355,6 +1357,21 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         p.append(typeAlias.getText());
         afterSyntax(typeAlias, p);
         return typeAlias;
+    }
+
+    public J visitExport(S.Export export, PrintOutputCapture<P> p) {
+        beforeSyntax(export, Space.Location.LANGUAGE_EXTENSION, p);
+        p.append("export ");
+        Expression clause = export.getExportClause();
+        if (clause instanceof J.FieldAccess && isWildcardImport((J.FieldAccess) clause)) {
+            J.FieldAccess fa = (J.FieldAccess) clause;
+            visitFieldAccessUpToWildcard(fa, p);
+            p.append("." + fa.getName().getSimpleName());
+        } else {
+            visit(clause, p);
+        }
+        afterSyntax(export, p);
+        return export;
     }
 
     public J visitPatternDefinition(S.PatternDefinition patDef, PrintOutputCapture<P> p) {

@@ -149,6 +149,19 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return t;
     }
 
+    public J visitExport(S.Export export, P p) {
+        S.Export e = export;
+        e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(e, p);
+        if (!(temp instanceof S.Export)) {
+            return temp;
+        }
+        e = (S.Export) temp;
+        e = e.withExportClause(visitAndCast(e.getExportClause(), p));
+        return e;
+    }
+
     public J visitPatternDefinition(S.PatternDefinition patDef, P p) {
         S.PatternDefinition pd = patDef;
         pd = pd.withPrefix(visitSpace(pd.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

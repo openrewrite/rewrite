@@ -628,6 +628,67 @@ public interface S extends J {
     }
 
     /**
+     * Represents a Scala 3 {@code export} clause, which re-exports a member of a
+     * value into the enclosing scope. Export clauses were introduced in Scala 3
+     * and have no Scala 2 equivalent.
+     * <p>
+     * The {@code exportClause} is the dotted path identifying what is exported,
+     * structured the same way as {@link J.Import#getQualid()} (i.e., a
+     * {@link J.FieldAccess} whose final segment is the exported name, or
+     * {@code "*"} / {@code "_"} for wildcards).
+     * <p>
+     * Examples:
+     * <ul>
+     *   <li>{@code export A.B.c}</li>
+     *   <li>{@code export A.B.*} (canonical Scala 3 wildcard)</li>
+     *   <li>{@code export A.B._} (legacy wildcard form still accepted by the compiler)</li>
+     * </ul>
+     * Brace-selector forms ({@code export A.{x, y}}) and aliased forms
+     * ({@code export A.{x as y}}) are not yet modelled and cause the parser to
+     * raise an exception.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class Export implements S, Statement {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        /**
+         * The exported path. For simple exports this is a {@link J.FieldAccess}
+         * built the same way as {@link J.Import#getQualid()}, where the final
+         * segment names the exported member (or {@code *} / {@code _} for
+         * wildcards). Typed as {@link Expression} to leave room for richer
+         * forms (named-export containers, etc.) once brace selectors are modelled.
+         */
+        @With @Getter
+        Expression exportClause;
+
+        public Export(UUID id, Space prefix, Markers markers, Expression exportClause) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.exportClause = exportClause;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitExport(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
      * Represents a Scala pattern definition (destructuring declaration).
      * <p>
      * Examples:

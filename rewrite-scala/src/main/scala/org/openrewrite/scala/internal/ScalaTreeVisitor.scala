@@ -197,6 +197,7 @@ class ScalaTreeVisitor(
       case postfixOp: untpd.PostfixOp => visitPostfixOp(postfixOp)
       case parens: untpd.Parens => visitParentheses(parens)
       case imp: Trees.Import[?] => visitImport(imp)
+      case exp: Trees.Export[?] => visitExport(exp)
       case pkg: Trees.PackageDef[?] => visitPackageDef(pkg)
       case newTree: Trees.New[?] => visitNew(newTree)
       case vd: Trees.ValDef[?] => visitValDef(vd)
@@ -2313,6 +2314,113 @@ class ScalaTreeVisitor(
     }
   }
   
+  private def visitExport(exp: Trees.Export[?]): J = {
+    // Scala 3 export clauses share their AST shape with imports
+    // (Dotty: both extend `ImportOrExport` with `expr` + `selectors`).
+    // We model the supported subset (no braces, no aliases) as an S.Export
+    // whose `exportClause` is a J.FieldAccess built the same way as
+    // J.Import's qualid. Brace/alias forms are rejected by visitUnknown
+    // so the gap is caught by tests rather than silently degraded.
+    if (!isSimpleExport(exp)) {
+      return visitUnknown(exp)
+    }
+
+    val adjustedStart = Math.max(0, exp.span.start - offsetAdjustment)
+    val prefix = if (cursor < adjustedStart) {
+      val prefixText = source.substring(cursor, adjustedStart)
+      cursor = adjustedStart
+      Space.format(prefixText)
+    } else {
+      Space.EMPTY
+    }
+
+    val oldInImportContext = isInImportContext
+    isInImportContext = true
+
+    if (exp.expr.span.exists) {
+      val exprStart = Math.max(0, exp.expr.span.start - offsetAdjustment)
+      cursor = exprStart
+    }
+
+    val expr = visitTree(exp.expr)
+    isInImportContext = oldInImportContext
+
+    var qualid: J.FieldAccess = expr match {
+      case fa: J.FieldAccess => fa
+      case id: J.Identifier if exp.selectors.nonEmpty =>
+        val selector = exp.selectors.head
+        selector match {
+          case is @ untpd.ImportSelector(sIdent: Trees.Ident[?], untpd.EmptyTree, untpd.EmptyTree) =>
+            if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
+            val selName = if (is.isWildcard) {
+              val adjustedEnd = Math.max(0, exp.span.end - offsetAdjustment)
+              if (adjustedEnd > 0 && adjustedEnd <= source.length && source.charAt(adjustedEnd - 1) == '*') "*" else "_"
+            } else sIdent.name.toString
+            new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+              id, JLeftPadded.build(ident(selName, Space.EMPTY)), null)
+          case _ =>
+            return visitUnknown(exp)
+        }
+      case _ =>
+        return visitUnknown(exp)
+    }
+
+    // Multi-segment exports (e.g., `export A.B.c`): apply the trailing selector
+    // to the FieldAccess produced from the expression. This mirrors visitImport.
+    val alreadyHandledSelector = expr.isInstanceOf[J.Identifier] && exp.selectors.nonEmpty
+    if (!alreadyHandledSelector && exp.selectors.nonEmpty && exp.selectors.size == 1) {
+      val selector = exp.selectors.head
+      selector match {
+        case is @ untpd.ImportSelector(idTree: Trees.Ident[?], untpd.EmptyTree, untpd.EmptyTree) =>
+          if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
+          val selectorName = if (is.isWildcard) {
+            val adjustedEnd = Math.max(0, exp.span.end - offsetAdjustment)
+            if (adjustedEnd > 0 && adjustedEnd <= source.length) {
+              val lastChar = source.charAt(adjustedEnd - 1)
+              if (lastChar == '*') "*" else "_"
+            } else idTree.name.toString
+          } else idTree.name.toString
+          qualid = new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+            qualid,
+            JLeftPadded.build(ident(selectorName, Space.EMPTY)),
+            null)
+        case _ =>
+      }
+    }
+
+    if (exp.span.exists) {
+      val adjustedEnd = Math.max(0, exp.span.end - offsetAdjustment)
+      updateCursor(adjustedEnd)
+    }
+
+    new S.Export(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      qualid
+    )
+  }
+
+  private def isSimpleExport(exp: Trees.Export[?]): Boolean = {
+    if (exp.span.exists) {
+      val adjustedStart = Math.max(0, exp.span.start - offsetAdjustment)
+      val adjustedEnd = Math.max(0, exp.span.end - offsetAdjustment)
+      if (adjustedStart >= 0 && adjustedEnd <= source.length && adjustedEnd > adjustedStart) {
+        val exportText = source.substring(adjustedStart, adjustedEnd)
+        // Not simple if:
+        // - has braces:  export a.{B, C}
+        // - has rename:  export a.{B as C} or export a.{B => C}
+        // - span doesn't start with `export` (continuation in a comma-separated form)
+        !exportText.contains("{") && !exportText.contains(" as ") && !exportText.contains("=>") &&
+          exportText.trim.startsWith("export")
+      } else {
+        false
+      }
+    } else {
+      false
+    }
+  }
+
   private def isSimpleImport(imp: Trees.Import[?]): Boolean = {
     // Check if this is a simple import without braces
     if (imp.span.exists) {
