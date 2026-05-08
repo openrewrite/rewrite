@@ -468,6 +468,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 J.VariableDeclarations vd = (J.VariableDeclarations) elem;
                 visitSpace(vd.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
                 visit(vd.getLeadingAnnotations(), p);
+                visit(vd.getModifiers(), p);
                 if (!vd.getVariables().isEmpty()) {
                     visit(vd.getVariables().get(0).getName(), p);
                 }

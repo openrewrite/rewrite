@@ -225,4 +225,17 @@ class MethodDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void implicitInSecondParamList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def apply(obj: String)(implicit c: Int): String = obj
+                }
+                """
+            )
+        );
+    }
 }
