@@ -114,6 +114,22 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void multilineParameterListWithClosingParenOnOwnLine() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def add(
+                      x: Int,
+                      y: Int
+                  ): Int = x + y
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void overrideMethod() {
         rewriteRun(
             scala(

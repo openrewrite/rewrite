@@ -5106,7 +5106,18 @@ class ScalaTreeVisitor(
               beforeComma
             } else Space.EMPTY
           } else Space.EMPTY
-        } else Space.EMPTY
+        } else {
+          // Capture whitespace between last parameter and closing `)` so
+          // multi-line parameter lists with `)` on its own line round-trip.
+          val paramEnd = Math.max(0, vd.span.end - offsetAdjustment)
+          val lookupStart = Math.max(cursor, paramEnd)
+          if (lookupStart < source.length) {
+            val remaining = source.substring(lookupStart, Math.min(lookupStart + 200, source.length))
+            val closeParen = remaining.indexOf(')')
+            if (closeParen >= 0) Space.format(remaining.substring(0, closeParen))
+            else Space.EMPTY
+          } else Space.EMPTY
+        }
         jParams.add(new JRightPadded(param.asInstanceOf[J], afterParam, Markers.EMPTY))
       }
 
@@ -5152,7 +5163,18 @@ class ScalaTreeVisitor(
                 beforeComma
               } else Space.EMPTY
             } else Space.EMPTY
-          } else Space.EMPTY
+          } else {
+            // Capture whitespace between last parameter and closing `)` so
+            // multi-line parameter lists with `)` on its own line round-trip.
+            val paramEnd = Math.max(0, vd.span.end - offsetAdjustment)
+            val lookupStart = Math.max(cursor, paramEnd)
+            if (lookupStart < source.length) {
+              val remaining = source.substring(lookupStart, Math.min(lookupStart + 200, source.length))
+              val closeParen = remaining.indexOf(')')
+              if (closeParen >= 0) Space.format(remaining.substring(0, closeParen))
+              else Space.EMPTY
+            } else Space.EMPTY
+          }
           jParams.add(new JRightPadded(param.asInstanceOf[Statement], afterParam, Markers.EMPTY))
         }
         val lastParamEnd = if (firstList.nonEmpty) Math.max(0, firstList.last.span.end - offsetAdjustment) else cursor

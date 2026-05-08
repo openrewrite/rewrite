@@ -352,8 +352,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             } else {
                 visit(element, p);
             }
+            visitSpace(param.getAfter(), JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
             if (i < paramList.size() - 1) {
-                visitSpace(param.getAfter(), JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
                 p.append(',');
             }
         }
@@ -485,8 +485,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             } else {
                 visit(elem, p);
             }
+            visitSpace(lp.getAfter(), JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
             if (j < lps.size() - 1) {
-                visitSpace(lp.getAfter(), JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
                 p.append(',');
             }
         }
