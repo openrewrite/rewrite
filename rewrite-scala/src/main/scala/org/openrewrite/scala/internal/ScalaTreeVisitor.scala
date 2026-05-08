@@ -3752,10 +3752,14 @@ class ScalaTreeVisitor(
     // Visit all statements in the block
     for (i <- block.stats.indices) {
       val stat = block.stats(i)
-      val visitResult = visitTree(stat)
+      val visitResult = visitTree(stat) match {
+        case expr: Expression if !expr.isInstanceOf[Statement] =>
+          new S.ExpressionStatement(Tree.randomId(), expr)
+        case other => other
+      }
       visitResult match {
         case null => // Skip null statements (e.g., package declarations)
-        case stmt: Statement => 
+        case stmt: Statement =>
           // Extract trailing space after this statement
           val statEnd = Math.max(0, stat.span.end - offsetAdjustment)
           val nextStart = if (i < block.stats.length - 1) {
@@ -5311,11 +5315,10 @@ class ScalaTreeVisitor(
         visitTree(rhs) match {
             case block: J.Block => block
             case expr: Expression =>
-              // Ensure expression can be used as Statement in the block.
-              // S.StatementExpression now accepts J, so wrap pure Expressions.
+              // Wrap Expression in S.ExpressionStatement so it can be used as a Statement.
               val stmtExpr: Statement = expr match {
                 case s: Statement => s
-                case _ => new S.StatementExpression(Tree.randomId(), expr)
+                case _ => new S.ExpressionStatement(Tree.randomId(), expr)
               }
               val statements = new util.ArrayList[JRightPadded[Statement]]()
               statements.add(JRightPadded.build(stmtExpr))
@@ -5547,16 +5550,17 @@ class ScalaTreeVisitor(
     }
 
     // Visit the try body
+    val omitBracesMarkers = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
     val body = visitTree(parsedTry.expr) match {
       case block: J.Block => block
-      case expr: Expression =>
-        val stmts = new util.ArrayList[JRightPadded[Statement]]()
-        stmts.add(JRightPadded.build(expr.asInstanceOf[Statement]))
-        new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), stmts, Space.EMPTY)
       case stmt: Statement =>
         val stmts = new util.ArrayList[JRightPadded[Statement]]()
         stmts.add(JRightPadded.build(stmt))
-        new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), stmts, Space.EMPTY)
+        new J.Block(Tree.randomId(), Space.EMPTY, omitBracesMarkers, JRightPadded.build(false), stmts, Space.EMPTY)
+      case expr: Expression =>
+        val stmts = new util.ArrayList[JRightPadded[Statement]]()
+        stmts.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
+        new J.Block(Tree.randomId(), Space.EMPTY, omitBracesMarkers, JRightPadded.build(false), stmts, Space.EMPTY)
       case _ => visitUnknown(parsedTry)
     }
 
@@ -5621,11 +5625,11 @@ class ScalaTreeVisitor(
 
         val caseBody = visitTree(caseDef.body) match {
           case block: J.Block => block
-          case expr: Expression =>
-            val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(expr.asInstanceOf[Statement]))
-            new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
           case stmt: Statement =>
             val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(stmt))
+            new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
+          case expr: Expression =>
+            val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
             new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
           case _ => new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), new util.ArrayList(), Space.EMPTY)
         }
@@ -5655,11 +5659,15 @@ class ScalaTreeVisitor(
       val fs = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 50, source.length)) else ""
       val fi = fs.indexOf("finally"); val fSpace = if (fi > 0) Space.format(fs.substring(0, fi)) else Space.EMPTY
       if (fi >= 0) cursor = cursor + fi + 7
+      val parsedFinallyOmitBraces = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
       val fb = visitTree(parsedTry.finalizer) match {
         case block: J.Block => block
+        case stmt: Statement =>
+          val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(stmt))
+          new J.Block(Tree.randomId(), Space.EMPTY, parsedFinallyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
         case expr: Expression =>
-          val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(expr.asInstanceOf[Statement]))
-          new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
+          val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
+          new J.Block(Tree.randomId(), Space.EMPTY, parsedFinallyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
         case _ => null
       }
       if (fb != null) JLeftPadded.build(fb).withBefore(fSpace) else null
@@ -5674,16 +5682,17 @@ class ScalaTreeVisitor(
     val tryStart = Math.max(0, tryTree.span.start - offsetAdjustment)
     if (tryStart >= cursor && tryStart + 3 <= source.length) cursor = tryStart + 3
 
+    val omitBracesMarkers = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
     val body = visitTree(tryTree.expr) match {
       case block: J.Block => block
-      case expr: Expression =>
-        val stmts = new util.ArrayList[JRightPadded[Statement]]()
-        stmts.add(JRightPadded.build(expr.asInstanceOf[Statement]))
-        new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), stmts, Space.EMPTY)
       case stmt: Statement =>
         val stmts = new util.ArrayList[JRightPadded[Statement]]()
         stmts.add(JRightPadded.build(stmt))
-        new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), stmts, Space.EMPTY)
+        new J.Block(Tree.randomId(), Space.EMPTY, omitBracesMarkers, JRightPadded.build(false), stmts, Space.EMPTY)
+      case expr: Expression =>
+        val stmts = new util.ArrayList[JRightPadded[Statement]]()
+        stmts.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
+        new J.Block(Tree.randomId(), Space.EMPTY, omitBracesMarkers, JRightPadded.build(false), stmts, Space.EMPTY)
       case _ => return visitUnknown(tryTree).asInstanceOf[J.Try]
     }
 
@@ -5742,11 +5751,11 @@ class ScalaTreeVisitor(
 
         val caseBody = visitTree(caseDef.body) match {
           case block: J.Block => block
-          case expr: Expression =>
-            val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(expr.asInstanceOf[Statement]))
-            new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
           case stmt: Statement =>
             val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(stmt))
+            new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
+          case expr: Expression =>
+            val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
             new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
           case _ => new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), new util.ArrayList(), Space.EMPTY)
         }
@@ -5775,14 +5784,15 @@ class ScalaTreeVisitor(
       val fs = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 50, source.length)) else ""
       val fi = fs.indexOf("finally"); val fSpace = if (fi > 0) Space.format(fs.substring(0, fi)) else Space.EMPTY
       if (fi >= 0) cursor = cursor + fi + 7
+      val finallyOmitBraces = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
       val fb = visitTree(tryTree.finalizer) match {
         case block: J.Block => block
-        case expr: Expression =>
-          val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(expr.asInstanceOf[Statement]))
-          new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
         case stmt: Statement =>
           val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(stmt))
-          new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
+          new J.Block(Tree.randomId(), Space.EMPTY, finallyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
+        case expr: Expression =>
+          val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
+          new J.Block(Tree.randomId(), Space.EMPTY, finallyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
         case _ => null
       }
       if (fb != null) JLeftPadded.build(fb).withBefore(fSpace) else null
