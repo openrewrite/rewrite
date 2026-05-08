@@ -1,0 +1,7 @@
+module example.com/withexclude
+
+go 1.22
+
+exclude github.com/bad v0.0.1
+
+require github.com/x/y v1.0.0

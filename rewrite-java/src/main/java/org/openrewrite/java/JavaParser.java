@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
 import org.openrewrite.java.internal.parser.TypeTable;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -231,6 +232,11 @@ public interface JavaParser extends Parser {
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
 
         @Nullable
+        protected JavaTypeFactory javaTypeFactory;
+
+        protected JavaTypeFactory.@Nullable Provider typeFactoryProvider;
+
+        @Nullable
         protected Collection<Input> dependsOn;
 
         protected Charset charset = Charset.defaultCharset();
@@ -246,8 +252,26 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        /**
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} or
+         * {@link #typeFactoryProvider} instead. The cache becomes an implementation
+         * detail of the default {@link org.openrewrite.java.internal.DefaultJavaTypeFactory}.
+         * For now, calls are still honored and the cache is wrapped into the default factory
+         * when no explicit factory is configured.
+         */
+        @Deprecated
         public B typeCache(JavaTypeCache javaTypeCache) {
             this.javaTypeCache = javaTypeCache;
+            return (B) this;
+        }
+
+        public B typeFactory(JavaTypeFactory javaTypeFactory) {
+            this.javaTypeFactory = javaTypeFactory;
+            return (B) this;
+        }
+
+        public B typeFactoryProvider(JavaTypeFactory.Provider provider) {
+            this.typeFactoryProvider = provider;
             return (B) this;
         }
 
@@ -343,6 +367,22 @@ public interface JavaParser extends Parser {
                 artifactNames = emptyList();
             }
             return classpath;
+        }
+
+        /**
+         * Resolve the {@link JavaTypeFactory} to use for this parser. An explicit factory
+         * set via {@link #typeFactory} wins; otherwise the {@link #typeFactoryProvider}
+         * (if any) is invoked with the resolved classpath. Returns {@code null} when
+         * neither is configured — the caller falls back to a default factory.
+         */
+        protected @Nullable JavaTypeFactory resolvedTypeFactory() {
+            if (javaTypeFactory != null) {
+                return javaTypeFactory;
+            }
+            if (typeFactoryProvider != null) {
+                return typeFactoryProvider.create(new ArrayList<>(resolvedClasspath()), null);
+            }
+            return null;
         }
 
         @Override

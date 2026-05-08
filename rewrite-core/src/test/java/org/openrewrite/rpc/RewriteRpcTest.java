@@ -451,6 +451,35 @@ class RewriteRpcTest implements RewriteTest {
           .isPresent();
     }
 
+    /**
+     * Source files whose type the remote does not advertise via GetLanguages must
+     * not be added to a BatchVisit. Without this gate the remote's receiver crashes
+     * on the unknown type and the resulting exception is attached to the file as a
+     * Markup.Error marker, falsely reporting the file as modified.
+     */
+    @Test
+    void batchSkipsSourceFilesNotInRemoteLanguages() {
+        // given
+        // Two consecutive same-RPC recipes are required for the batch path to kick in
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step1"));
+        Recipe r2 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step2"));
+
+        // Quark is not in the hardcoded GetLanguages list, so the batch path must skip it.
+        var quark = new org.openrewrite.quark.Quark(UUID.randomUUID(), Path.of("unknown.bin"), Markers.EMPTY, null, null);
+
+        var ctx = new InMemoryExecutionContext();
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(r1, r2)),
+          new InMemoryLargeSourceSet(List.of(quark)), ctx, 1, 1);
+
+        // then
+        assertThat(run.getChangeset().getAllResults())
+          .describedAs("Quark of an unsupported language type should pass through untouched")
+          .allSatisfy(result -> assertThat(result.getAfter().getMarkers().findFirst(Markup.Error.class))
+            .describedAs("No Markup.Error should be attached for an unsupported source type")
+            .isEmpty());
+    }
+
     @Test
     void getCursor() {
         var parent = new Cursor(null, Cursor.ROOT_VALUE);

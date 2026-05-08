@@ -18,7 +18,9 @@ package org.openrewrite.scala;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.scala.internal.*;
@@ -40,7 +42,7 @@ public class ScalaParserVisitor {
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
-    private final JavaTypeCache typeCache;
+    private final JavaTypeFactory typeFactory;
     private final ExecutionContext context;
     private final ScalaParseResult parseResult;
 
@@ -50,13 +52,14 @@ public class ScalaParserVisitor {
                               Charset charset,
                               boolean charsetBomMarked,
                               JavaTypeCache typeCache,
+                              @Nullable JavaTypeFactory typeFactory,
                               ExecutionContext context,
                               ScalaParseResult parseResult) {
         this.sourcePath = sourcePath;
         this.source = source;
         this.charset = charset;
         this.charsetBomMarked = charsetBomMarked;
-        this.typeCache = typeCache;
+        this.typeFactory = typeFactory != null ? typeFactory : new DefaultJavaTypeFactory(typeCache);
         this.context = context;
         this.parseResult = parseResult;
     }
@@ -67,7 +70,7 @@ public class ScalaParserVisitor {
     public S.CompilationUnit visitCompilationUnit(ScalaParseResult parseResult) {
         // Use the Scala AST converter to convert the parsed tree
         ScalaASTConverter converter = new ScalaASTConverter();
-        CompilationUnitResult result = converter.convertToCompilationUnit(parseResult, source, typeCache);
+        CompilationUnitResult result = converter.convertToCompilationUnit(parseResult, source, typeFactory);
 
         J.Package packageDecl = result.getPackageDecl();
         List<J.Import> imports = result.getImports();

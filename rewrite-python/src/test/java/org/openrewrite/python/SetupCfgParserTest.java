@@ -20,7 +20,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.python.internal.UvExecutor;
+import org.openrewrite.python.internal.PackageManagerExecutor;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.text.PlainText;
@@ -56,7 +56,7 @@ class SetupCfgParserTest {
 
     @Test
     void markerContainsDependenciesFromFreeze(@TempDir Path tempDir) throws IOException {
-        assumeTrue(UvExecutor.findUvExecutable() != null, "uv is not installed");
+        assumeTrue(PackageManagerExecutor.UV.find() != null, "uv is not installed");
 
         Files.writeString(tempDir.resolve("setup.cfg"), """
                 [metadata]

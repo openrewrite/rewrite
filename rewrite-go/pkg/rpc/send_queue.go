@@ -219,7 +219,9 @@ func (q *SendQueue) doChange(after, before any, onChange func(any)) {
 	if onChange != nil && !isNilValue(after) {
 		onChange(after)
 	} else if onChange == nil && !isNilValue(after) && getValueType(after) != nil {
-		defaultSender.Visit(after, q)
+		if t, ok := after.(tree.Tree); ok {
+			defaultSender.Visit(t, q)
+		}
 	}
 }
 

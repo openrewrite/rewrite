@@ -17,14 +17,15 @@
 package test
 
 import (
-	"fmt"
 	"math"
+	"path"
 	"strings"
 	"testing"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -34,7 +35,277 @@ type SourceSpec struct {
 	Before      string
 	After       *string // nil means no change expected (parse-print idempotence only)
 	Path        string
-	AfterRecipe func(t *testing.T, cu *tree.CompilationUnit) // optional post-parse assertion callback
+	Markers     []tree.Marker // markers attached to the parsed source after parse
+	AfterRecipe func(t *testing.T, cu *tree.CompilationUnit) // optional post-parse assertion callback (.go files only)
+}
+
+// Sources is the unit RewriteRun consumes. Single SourceSpecs and project
+// wrappers (GoProject, etc.) both satisfy it so the same harness call can
+// mix flat .go files with multi-file projects.
+type Sources interface {
+	Expand() []SourceSpec
+}
+
+// Expand makes a SourceSpec usable wherever a Sources is expected.
+func (s SourceSpec) Expand() []SourceSpec { return []SourceSpec{s} }
+
+// WithPath returns a copy of s with Path set. Use this in multi-package
+// projects so the test harness can locate each file's package directory.
+func (s SourceSpec) WithPath(p string) SourceSpec {
+	s.Path = p
+	return s
+}
+
+// WithAfterRecipe returns a copy of s with the post-parse callback set.
+// The callback fires after parsing (with type attribution wired) and
+// before recipe application; recipes can read s.Markers off the cu and
+// assert on resolved types.
+func (s SourceSpec) WithAfterRecipe(fn func(t *testing.T, cu *tree.CompilationUnit)) SourceSpec {
+	s.AfterRecipe = fn
+	return s
+}
+
+// project wraps a set of sources and tags each with a GoProject marker on
+// expansion. Mirrors Assertions.goProject(name, ...) on the Java side.
+type project struct {
+	name  string
+	inner []Sources
+}
+
+func (p project) Expand() []SourceSpec {
+	marker := tree.NewGoProject(p.name)
+	var out []SourceSpec
+	for _, s := range p.inner {
+		for _, ss := range s.Expand() {
+			ss.Markers = append(append([]tree.Marker{}, ss.Markers...), marker)
+			out = append(out, ss)
+		}
+	}
+	mergeGoSumIntoGoMod(out)
+	propagateModuleResolution(out)
+	return out
+}
+
+// propagateModuleResolution copies the go.mod's GoResolutionResult
+// marker onto every sibling .go SourceSpec in the project. Recipes
+// that need module context per file (e.g. RenamePackage's
+// fileBelongsTo check) can then read it directly off the
+// CompilationUnit's Markers without re-walking the project. Java does
+// the equivalent at parse time by attaching the parsed-go.mod marker
+// to each CU.
+func propagateModuleResolution(specs []SourceSpec) {
+	var mrr *tree.GoResolutionResult
+	for i := range specs {
+		if specs[i].Path == "go.mod" {
+			if found := FindGoResolutionResult(specs[i]); found != nil && found.ModulePath != "" {
+				mrr = found
+				break
+			}
+		}
+	}
+	if mrr == nil {
+		return
+	}
+	for i := range specs {
+		if !strings.HasSuffix(specs[i].Path, ".go") {
+			continue
+		}
+		// Skip if already present (e.g. caller pre-attached one).
+		alreadyHas := false
+		for _, m := range specs[i].Markers {
+			if _, ok := m.(tree.GoResolutionResult); ok {
+				alreadyHas = true
+				break
+			}
+		}
+		if alreadyHas {
+			continue
+		}
+		specs[i].Markers = append(append([]tree.Marker{}, specs[i].Markers...), *mrr)
+	}
+}
+
+// mergeGoSumIntoGoMod finds a sibling go.sum spec inside the same expanded
+// project and merges its parsed ResolvedDependencies into the sibling
+// go.mod's GoResolutionResult marker. Mirrors the Java side, where
+// GoModParser#parseSumSibling reads go.sum off disk during parse — but Go
+// tests don't write to disk, so we do the merge in memory.
+func mergeGoSumIntoGoMod(specs []SourceSpec) {
+	var sumIdx, modIdx, markerIdx = -1, -1, -1
+	for i, s := range specs {
+		switch s.Path {
+		case "go.sum":
+			sumIdx = i
+		case "go.mod":
+			modIdx = i
+			for j, m := range s.Markers {
+				if _, ok := m.(tree.GoResolutionResult); ok {
+					markerIdx = j
+				}
+			}
+		}
+	}
+	if sumIdx < 0 || modIdx < 0 || markerIdx < 0 {
+		return
+	}
+	resolved := parser.ParseGoSum(specs[sumIdx].Before)
+	if len(resolved) == 0 {
+		return
+	}
+	mrr := specs[modIdx].Markers[markerIdx].(tree.GoResolutionResult)
+	mrr.ResolvedDependencies = resolved
+	specs[modIdx].Markers[markerIdx] = mrr
+}
+
+// GoProject groups a go.mod and one or more .go SourceSpecs as siblings of
+// a single project. Every child receives a tree.GoProject marker. Mirrors
+// the Java-side Assertions.goProject(name, sources...).
+//
+// Example:
+//
+//	spec.RewriteRun(t,
+//	    test.GoProject("foo",
+//	        test.GoMod("module example.com/foo\ngo 1.22\n"),
+//	        test.Golang("package main\nfunc main(){}\n"),
+//	    ),
+//	)
+func GoProject(name string, sources ...Sources) Sources {
+	return project{name: name, inner: sources}
+}
+
+// GoMod creates a SourceSpec for go.mod content. The content is dedented
+// the same way Golang(...) is and parsed (via parser.ParseGoMod) at
+// construction time so the resulting tree.GoResolutionResult marker is
+// already attached to spec.Markers — recipes / tests can read module
+// path, requires, replaces, etc. without re-parsing.
+//
+// If the content fails to parse the spec is returned with no
+// GoResolutionResult marker; the test still round-trips the content
+// verbatim, mirroring the Java goMod test helper's behavior on bad input.
+//
+// When a sibling GoSum(...) exists in the same project, its parsed
+// ResolvedDependencies are merged into the GoResolutionResult marker at
+// project-expansion time (see project.Expand).
+func GoMod(before string, after ...string) SourceSpec {
+	content := TrimIndent(before)
+	spec := SourceSpec{
+		Before: content,
+		Path:   "go.mod",
+	}
+	if mrr, err := parser.ParseGoMod("go.mod", content); err == nil && mrr != nil {
+		spec.Markers = append(spec.Markers, *mrr)
+	}
+	if len(after) > 0 {
+		a := TrimIndent(after[0])
+		spec.After = &a
+	}
+	return spec
+}
+
+// GoSum creates a SourceSpec for go.sum content. The harness round-trips
+// the content verbatim (no recipe processing today) and, when a sibling
+// GoMod(...) is present in the same GoProject, merges the parsed
+// ResolvedDependencies into the GoMod's GoResolutionResult marker.
+func GoSum(before string, after ...string) SourceSpec {
+	content := TrimIndent(before)
+	spec := SourceSpec{
+		Before: content,
+		Path:   "go.sum",
+	}
+	if len(after) > 0 {
+		a := TrimIndent(after[0])
+		spec.After = &a
+	}
+	return spec
+}
+
+// FindGoResolutionResult walks a SourceSpec's markers for the parsed
+// go.mod marker. Returns nil if not present (e.g. on a Golang(...) source).
+func FindGoResolutionResult(spec SourceSpec) *tree.GoResolutionResult {
+	for _, m := range spec.Markers {
+		if mrr, ok := m.(tree.GoResolutionResult); ok {
+			return &mrr
+		}
+	}
+	return nil
+}
+
+// parsePackageGroups groups .go SourceSpecs by package directory and
+// parses each group together via parser.ParsePackage so files in the same
+// package share a types.Info — file A can see file B's symbols. Returns
+// a map from the spec's index in `flat` to its CompilationUnit so two
+// specs sharing the same Path don't clobber each other in the result.
+func parsePackageGroups(t *testing.T, p *parser.GoParser, flat []SourceSpec) map[int]*tree.CompilationUnit {
+	t.Helper()
+	type indexed struct {
+		idx   int
+		input parser.FileInput
+	}
+	byDir := map[string][]indexed{}
+	for i, s := range flat {
+		if !strings.HasSuffix(s.Path, ".go") {
+			continue
+		}
+		dir := path.Dir(s.Path)
+		byDir[dir] = append(byDir[dir], indexed{idx: i, input: parser.FileInput{Path: s.Path, Content: s.Before}})
+	}
+
+	out := map[int]*tree.CompilationUnit{}
+	for dir, group := range byDir {
+		// Pre-filter against BuildContext so post-parse `cus` aligns
+		// with the included subset of `group`.
+		included := make([]indexed, 0, len(group))
+		files := make([]parser.FileInput, 0, len(group))
+		for _, g := range group {
+			if !parser.MatchBuildContext(p.BuildContext, path.Base(g.input.Path), g.input.Content) {
+				continue
+			}
+			included = append(included, g)
+			files = append(files, g.input)
+		}
+		if len(files) == 0 {
+			continue
+		}
+		cus, err := p.ParsePackage(files)
+		if err != nil {
+			t.Fatalf("parse error in package %s: %v", dir, err)
+		}
+		for i, cu := range cus {
+			out[included[i].idx] = cu
+		}
+	}
+	return out
+}
+
+// buildProjectImporter scans a flattened source list for a go.mod with
+// a GoResolutionResult marker. If found, registers every sibling .go
+// file AND every go.mod-declared require with a ProjectImporter so:
+//   - intra-project imports type-check against real sources;
+//   - imports of declared third-party modules resolve to stub packages.
+// Returns nil when there's no module context — the caller should fall
+// back to importer.Default().
+func buildProjectImporter(flat []SourceSpec) *parser.ProjectImporter {
+	var mrr *tree.GoResolutionResult
+	for _, s := range flat {
+		if found := FindGoResolutionResult(s); found != nil && found.ModulePath != "" {
+			mrr = found
+			break
+		}
+	}
+	if mrr == nil {
+		return nil
+	}
+	pi := parser.NewProjectImporter(mrr.ModulePath, nil)
+	for _, req := range mrr.Requires {
+		pi.AddRequire(req.ModulePath)
+	}
+	for _, s := range flat {
+		if !strings.HasSuffix(s.Path, ".go") {
+			continue
+		}
+		pi.AddSource(s.Path, s.Before)
+	}
+	return pi
 }
 
 // Golang creates a SourceSpec for Go source code.
@@ -114,50 +385,12 @@ func TrimIndent(s string) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-// spaceValidator is a visitor that checks every Space it encounters
-// for non-whitespace content that would indicate a parser bug.
-type spaceValidator struct {
-	visitor.GoVisitor
-	errs []string
-}
-
-func (v *spaceValidator) VisitSpace(space tree.Space, p any) tree.Space {
-	if space.Whitespace != "" && !isWhitespaceOnly(space.Whitespace) {
-		v.errs = append(v.errs, fmt.Sprintf("Space.Whitespace contains non-whitespace: %q", truncate(space.Whitespace, 80)))
-	}
-	for i, c := range space.Comments {
-		if c.Suffix != "" && !isWhitespaceOnly(c.Suffix) {
-			v.errs = append(v.errs, fmt.Sprintf("Comment[%d].Suffix contains non-whitespace: %q", i, truncate(c.Suffix, 80)))
-		}
-		if c.Text != "" && !strings.HasPrefix(c.Text, "//") && !strings.HasPrefix(c.Text, "/*") {
-			v.errs = append(v.errs, fmt.Sprintf("Comment[%d].Text is not a comment: %q", i, truncate(c.Text, 80)))
-		}
-	}
-	return space
-}
-
 // ValidateSpaces walks the tree and returns errors for any Space that
 // contains non-whitespace content (which would indicate a parser bug).
+// Thin shim over golang.WhitespaceValidationService — recipes call the
+// service directly; tests use this name for source-level continuity.
 func ValidateSpaces(root tree.Tree) []string {
-	v := visitor.Init(&spaceValidator{})
-	v.Visit(root, nil)
-	return v.errs
-}
-
-func isWhitespaceOnly(s string) bool {
-	for _, c := range s {
-		if c != ' ' && c != '\t' && c != '\n' && c != '\r' {
-			return false
-		}
-	}
-	return true
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "..."
+	return (&golang.WhitespaceValidationService{}).Validate(root)
 }
 
 // JavaRecipeConfig holds config for a Java-delegated recipe test.
@@ -203,17 +436,62 @@ func (spec *RecipeSpec) WithJavaRpcClient(client *JavaRpcClient) *RecipeSpec {
 	return spec
 }
 
-// RewriteRun parses the source specs, checks parse-print idempotence,
-// and (if configured) applies a recipe and checks the result.
-func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...SourceSpec) {
+// RewriteRun parses each source, checks parse-print idempotence, attaches
+// any markers contributed by project wrappers (GoProject), and (if
+// configured) applies a recipe and checks the result. Accepts both bare
+// SourceSpec values and project wrappers like GoProject — they both
+// implement Sources.
+func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 	t.Helper()
+
+	// Flatten any project wrappers into a flat list of SourceSpecs, with
+	// project markers already attached.
+	var flat []SourceSpec
+	for _, s := range sources {
+		flat = append(flat, s.Expand()...)
+	}
 
 	p := parser.NewGoParser()
 
-	for _, src := range sources {
-		cu, err := p.Parse(src.Path, src.Before)
-		if err != nil {
-			t.Fatalf("parse error: %v", err)
+	// Only treat sources as a multi-file package when there's an explicit
+	// project context (a goMod sibling). Without it, bare Golang(...)
+	// specs may share the default Path="test.go" without intending to be
+	// siblings — preserve per-file parsing in that case.
+	var parsedByIdx map[int]*tree.CompilationUnit
+	if pi := buildProjectImporter(flat); pi != nil {
+		p.Importer = pi
+		parsedByIdx = parsePackageGroups(t, p, flat)
+	}
+
+	for i, src := range flat {
+		// Non-Go sources (e.g. go.mod) are not yet parsed on the Go side.
+		// We round-trip them verbatim so project layouts compose, but skip
+		// tree-walks and recipe application.
+		if !strings.HasSuffix(src.Path, ".go") {
+			if src.After != nil && *src.After != src.Before {
+				t.Errorf("non-Go source %q: harness cannot apply recipes to it yet", src.Path)
+			}
+			continue
+		}
+
+		var cu *tree.CompilationUnit
+		if parsedByIdx != nil {
+			cu = parsedByIdx[i]
+		}
+		if cu == nil {
+			// No project context (or project parse missed this source) —
+			// parse this file in isolation so two bare specs sharing a
+			// default Path don't clobber each other.
+			parsed, err := p.Parse(src.Path, src.Before)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+			cu = parsed
+		}
+
+		// Attach any project markers contributed by GoProject(...) wrappers.
+		for _, m := range src.Markers {
+			cu.Markers = tree.AddMarker(cu.Markers, m)
 		}
 
 		// Validate that no Space contains non-whitespace syntax
@@ -266,12 +544,14 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...SourceSpec) {
 func runRecipe(r recipe.Recipe, t tree.Tree) tree.Tree {
 	ctx := recipe.NewExecutionContext()
 
-	// Apply this recipe's own editor
+	// Apply this recipe's own editor, then drain any queued after-visits
+	// (e.g. ImportService.AddImportVisitor inserted via DoAfterVisit).
 	if editor := r.Editor(); editor != nil {
 		result := editor.Visit(t, ctx)
 		if result != nil {
 			t = result
 		}
+		t = visitor.DrainAfterVisits(editor, t, ctx)
 	}
 
 	// Apply sub-recipes

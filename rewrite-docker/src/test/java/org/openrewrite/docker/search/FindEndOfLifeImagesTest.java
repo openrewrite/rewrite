@@ -102,7 +102,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: ubuntu:16.04 (ended 2021-04-02, suggest noble (24.04)))~~>FROM ubuntu:16.04
+              ~~(EOL: ubuntu:16.04 (ended 2021-04-02, suggest plucky (26.04)))~~>FROM ubuntu:16.04
               RUN apt-get update
               """
           )
@@ -118,7 +118,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: ubuntu:bionic (ended 2023-05-31, suggest noble (24.04)))~~>FROM ubuntu:bionic
+              ~~(EOL: ubuntu:bionic (ended 2023-05-31, suggest plucky (26.04)))~~>FROM ubuntu:bionic
               RUN apt-get update
               """
           )

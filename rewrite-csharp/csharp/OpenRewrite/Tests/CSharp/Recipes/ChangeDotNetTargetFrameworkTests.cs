@@ -200,6 +200,64 @@ public class ChangeDotNetTargetFrameworkTests : RewriteTest
     }
 
     [Fact]
+    public void ChangeShortFormTargetFramework()
+    {
+        // net8 and net8.0 are equivalent TFMs — the recipe should match both forms.
+        RewriteRun(
+            spec => spec.SetRecipe(new ChangeDotNetTargetFramework
+            {
+                OldTargetFramework = "net8.0",
+                NewTargetFramework = "net9.0"
+            }),
+            CsProj(
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net9.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ChangeShortFormOldTargetFramework()
+    {
+        // Also works if user specifies short-form old TFM and file has dotted form.
+        RewriteRun(
+            spec => spec.SetRecipe(new ChangeDotNetTargetFramework
+            {
+                OldTargetFramework = "net8",
+                NewTargetFramework = "net9.0"
+            }),
+            CsProj(
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net9.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void NoChangeWhenTfmNotPresent()
     {
         RewriteRun(

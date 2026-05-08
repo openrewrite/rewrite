@@ -48,6 +48,14 @@ class MigrateToGradle9Test implements RewriteTest {
               dependencies {
                   implementation group: 'com.google.guava', name: 'guava', version: '31.1-jre'
               }
+
+              task doSomething(type: JavaExec) {
+                  main = "com.example.AppMain"
+              }
+
+              tasks.register("runEverything", JavaExec) {
+                  main = "com.example.AppMain"
+              }
               """,
             """
               plugins {
@@ -61,6 +69,65 @@ class MigrateToGradle9Test implements RewriteTest {
 
               dependencies {
                   implementation "com.google.guava:guava:31.1-jre"
+              }
+
+              task doSomething(type: JavaExec) {
+                  mainClass = "com.example.AppMain"
+              }
+
+              tasks.register("runEverything", JavaExec) {
+                  mainClass = "com.example.AppMain"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapsTopLevelCompatibilityIntoJavaBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              sourceCompatibility = '17'
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              java {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void useMainClassPropertyInKotlinDsl() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java`
+              }
+
+              tasks.register<JavaExec>("doSomething") {
+                  main = "com.example.AppMain"
+              }
+              """,
+            """
+              plugins {
+                  `java`
+              }
+
+              tasks.register<JavaExec>("doSomething") {
+                  mainClass = "com.example.AppMain"
               }
               """
           )

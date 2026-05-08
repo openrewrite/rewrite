@@ -24,6 +24,7 @@ import org.openrewrite.LargeSourceSet;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.xerial.snappy.Snappy;
 
@@ -103,7 +104,7 @@ public class JavaCompilationUnitState {
 //                .logCompilationWarningsAndErrors(true)
 
         typeCache = new MapJavaTypeCache();
-        JavaParser parser = javaParser.typeCache(typeCache).build();
+        JavaParser parser = javaParser.typeFactory(new DefaultJavaTypeFactory(typeCache)).build();
         sourceFiles = parser
                 .parse(inputs, null, new InMemoryExecutionContext())
                 .collect(toList());

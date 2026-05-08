@@ -299,6 +299,7 @@ public interface S extends J {
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
     final class TuplePattern implements S, Expression, TypedTree, VariableDeclarator {
@@ -687,6 +688,7 @@ public interface S extends J {
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class FunctionCall implements S, Expression, Statement, TypedTree {
 
@@ -792,6 +794,632 @@ public interface S extends J {
 
             public S.FunctionCall withArguments(JContainer<Expression> arguments) {
                 return t.arguments == arguments ? t : new S.FunctionCall(null, t.id, t.prefix, t.markers, t.function, arguments, t.methodType);
+            }
+        }
+    }
+
+    /**
+     * Represents a Scala singleton type: {@code foo.type}.
+     * The qualifier is any expression, typically an object/module reference.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class SingletonType implements S, TypeTree, Expression {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        Expression qualifier;
+
+        @With @Getter
+        Space beforeType;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public SingletonType(UUID id, Space prefix, Markers markers, Expression qualifier,
+                             Space beforeType, @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.qualifier = qualifier;
+            this.beforeType = beforeType;
+            this.type = type;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitSingletonType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * Represents a Scala pattern alternative: {@code p1 | p2 | p3}.
+     * Used in {@code case 1 | 2 | 3 => "small"} or {@code case _: A | _: B => ...}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class Alternative implements S, Expression {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        JContainer<Expression> patterns;
+
+        public static Alternative build(UUID id, Space prefix, Markers markers, JContainer<Expression> patterns) {
+            return new Alternative(null, id, prefix, markers, patterns);
+        }
+
+        public List<Expression> getPatterns() {
+            return patterns.getElements();
+        }
+
+        public Alternative withPatterns(List<Expression> patterns) {
+            return getPadding().withPatterns(JContainer.withElements(this.patterns, patterns));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitAlternative(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return null;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) this;
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Alternative t;
+
+            public JContainer<Expression> getPatterns() {
+                return t.patterns;
+            }
+
+            public Alternative withPatterns(JContainer<Expression> patterns) {
+                return t.patterns == patterns ? t : new Alternative(null, t.id, t.prefix, t.markers, patterns);
+            }
+        }
+    }
+
+    /**
+     * Represents a qualified Scala super reference: {@code super[Trait]},
+     * {@code Outer.super}, or {@code Outer.super[Trait]}.
+     * Plain {@code super} is modeled as {@code J.Identifier("super")}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class QualifiedSuper implements S, Expression {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        /**
+         * Optional outer qualifier: the {@code Outer} in {@code Outer.super[Trait]}.
+         */
+        @With @Getter
+        J.@Nullable Identifier qualifier;
+
+        /**
+         * Optional mix name: the {@code Trait} in {@code super[Trait]}.
+         */
+        @With @Getter
+        J.@Nullable Identifier mixName;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public QualifiedSuper(UUID id, Space prefix, Markers markers,
+                              J.@Nullable Identifier qualifier, J.@Nullable Identifier mixName,
+                              @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.qualifier = qualifier;
+            this.mixName = mixName;
+            this.type = type;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitQualifiedSuper(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * Represents an annotated Scala expression: {@code e: @ann}, e.g. {@code (n: @switch) match {...}}.
+     * The annotation's own prefix carries the space between {@code :} and {@code @}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class AnnotatedExpression implements S, Expression {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        Expression expression;
+
+        /**
+         * Space before the {@code :} separator.
+         */
+        @With @Getter
+        Space beforeColon;
+
+        @With @Getter
+        J.Annotation annotation;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public AnnotatedExpression(UUID id, Space prefix, Markers markers,
+                                   Expression expression, Space beforeColon, J.Annotation annotation,
+                                   @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.expression = expression;
+            this.beforeColon = beforeColon;
+            this.annotation = annotation;
+            this.type = type;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitAnnotatedExpression(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * Represents a Scala refined (structural) type:
+     * {@code Parent { def foo: Int; val bar: String }} or just {@code { def foo: Int }}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class RefinedType implements S, TypeTree, Expression {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        /**
+         * The parent type being refined (e.g., {@code Any}). Null if the refinement
+         * has no explicit parent.
+         */
+        @With @Getter
+        @Nullable
+        TypeTree parent;
+
+        /**
+         * The refinement block containing member declarations. The block's prefix is
+         * the space between the parent (if any) and the opening brace.
+         */
+        @With @Getter
+        J.Block refinements;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public RefinedType(UUID id, Space prefix, Markers markers,
+                           @Nullable TypeTree parent, J.Block refinements, @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.parent = parent;
+            this.refinements = refinements;
+            this.type = type;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitRefinedType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * Represents a Scala 3 inline/macro expression: {@code ${expr}} (splice) or
+     * {@code '{expr}} / {@code 'expr} (quote).
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class Macro implements S, Expression {
+
+        public enum Kind {
+            /** {@code ${expr}} */
+            Splice,
+            /** {@code '{expr}} */
+            QuoteBlock,
+            /** {@code 'name} (single-token quote) */
+            QuoteIdent
+        }
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        Kind kind;
+
+        @With @Getter
+        Expression expression;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public Macro(UUID id, Space prefix, Markers markers, Kind kind, Expression expression,
+                     @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.kind = kind;
+            this.expression = expression;
+            this.type = type;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitMacro(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * Represents a Scala 3 extension methods block:
+     * {@code extension (x: T) { def foo: Int = ...; def bar: String = ... }}.
+     * Models the first parameter clause; subsequent clauses (rare) currently fall
+     * into the parameters container as a flat list.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ExtensionMethods implements S, Statement {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        /**
+         * The extension parameter list, e.g., {@code (x: T)}. The container's before-space
+         * is the space before the {@code (} bracket.
+         */
+        JContainer<Statement> parameters;
+
+        /**
+         * The method declarations contained in the extension block.
+         */
+        @With @Getter
+        J.Block body;
+
+        public static ExtensionMethods build(UUID id, Space prefix, Markers markers,
+                                             JContainer<Statement> parameters, J.Block body) {
+            return new ExtensionMethods(null, id, prefix, markers, parameters, body);
+        }
+
+        public List<Statement> getParameters() {
+            return parameters.getElements();
+        }
+
+        public ExtensionMethods withParameters(List<Statement> parameters) {
+            return getPadding().withParameters(JContainer.withElements(this.parameters, parameters));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitExtensionMethods(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ExtensionMethods t;
+
+            public JContainer<Statement> getParameters() {
+                return t.parameters;
+            }
+
+            public ExtensionMethods withParameters(JContainer<Statement> parameters) {
+                return t.parameters == parameters ? t :
+                        new ExtensionMethods(null, t.id, t.prefix, t.markers, parameters, t.body);
+            }
+        }
+    }
+
+    /**
+     * Represents a Scala for-comprehension. Covers both for-yield ({@code for { x <- xs }
+     * yield expr}) and complex for-do ({@code for (x <- xs; y <- ys) body}).
+     * Simple single-generator for-do loops are still modeled as {@code J.ForEachLoop}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class For implements S, Expression, Statement {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        /**
+         * The enumerator clauses in source order. The container's before-space is the
+         * space before the opening delimiter ({@code (} or {@code {}).
+         */
+        JContainer<Enumerator> enumerators;
+
+        /**
+         * The character used to bracket the enumerators: {@code '('} or {@code '{'}.
+         */
+        @With @Getter
+        char openBracket;
+
+        /**
+         * Whether this comprehension uses {@code yield}.
+         */
+        @With @Getter
+        boolean yielding;
+
+        /**
+         * Space between the closing bracket and either the {@code yield} keyword (for yields)
+         * or the loop body (for for-do).
+         */
+        @With @Getter
+        Space beforeBody;
+
+        @With @Getter
+        J body;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public static For build(UUID id, Space prefix, Markers markers,
+                                JContainer<Enumerator> enumerators, char openBracket,
+                                boolean yielding, Space beforeBody, J body, @Nullable JavaType type) {
+            return new For(null, id, prefix, markers, enumerators, openBracket, yielding,
+                    beforeBody, body, type);
+        }
+
+        public List<Enumerator> getEnumerators() {
+            return enumerators.getElements();
+        }
+
+        public For withEnumerators(List<Enumerator> enumerators) {
+            return getPadding().withEnumerators(JContainer.withElements(this.enumerators, enumerators));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitFor(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final For t;
+
+            public JContainer<Enumerator> getEnumerators() {
+                return t.enumerators;
+            }
+
+            public For withEnumerators(JContainer<Enumerator> enumerators) {
+                return t.enumerators == enumerators ? t :
+                        new For(null, t.id, t.prefix, t.markers, enumerators, t.openBracket,
+                                t.yielding, t.beforeBody, t.body, t.type);
+            }
+        }
+
+        /**
+         * One enumerator clause: a generator ({@code x <- iter}), guard ({@code if cond}),
+         * or assignment ({@code y = expr}).
+         */
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        public static final class Enumerator implements J {
+
+            public enum Kind { Generator, Guard, Assignment }
+
+            @With @Getter @EqualsAndHashCode.Include
+            UUID id;
+
+            @With @Getter
+            Space prefix;
+
+            @With @Getter
+            Markers markers;
+
+            @With @Getter
+            Kind kind;
+
+            /**
+             * For generator/assignment, the variable pattern. For guard, null.
+             */
+            @With @Getter
+            @Nullable
+            J lhs;
+
+            /**
+             * Space before the operator ({@code <-}, {@code =}) or, for guards, after the
+             * {@code if} keyword.
+             */
+            @With @Getter
+            Space beforeOp;
+
+            /**
+             * For generator: iterable. For guard: condition. For assignment: right-hand value.
+             */
+            @With @Getter
+            Expression rhs;
+
+            public Enumerator(UUID id, Space prefix, Markers markers, Kind kind,
+                              @Nullable J lhs, Space beforeOp, Expression rhs) {
+                this.id = id;
+                this.prefix = prefix;
+                this.markers = markers;
+                this.kind = kind;
+                this.lhs = lhs;
+                this.beforeOp = beforeOp;
+                this.rhs = rhs;
+            }
+
+            @SuppressWarnings("unchecked")
+            @Override
+            public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+                return (R) ((ScalaVisitor<P>) v.adapt(ScalaVisitor.class))
+                        .visitForEnumerator(this, p);
+            }
+
+            @Override
+            public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
+                return v.isAdaptableTo(ScalaVisitor.class);
             }
         }
     }

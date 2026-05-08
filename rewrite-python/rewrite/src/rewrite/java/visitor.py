@@ -1389,3 +1389,59 @@ class JavaVisitor(TreeVisitor[J, P]):
         erroneous = temp_expr
         erroneous = erroneous.replace(markers=self.visit_markers(erroneous.markers, p))
         return erroneous
+
+
+class _TreeVisitorAsJavaVisitor(JavaVisitor):
+    """Adapts a generic ``TreeVisitor`` as a ``JavaVisitor``.
+
+    Returned by :meth:`TreeVisitor.adapt` when a Java LST node's ``accept``
+    is called with a non-Java visitor. The wrapper is-a ``JavaVisitor`` so
+    Java-specific dispatch (``visit_method_declaration`` and friends) finds
+    the default child-traversal implementations that ``JavaVisitor``
+    provides; ``pre_visit`` / ``post_visit`` / ``default_value`` /
+    ``is_acceptable`` plus ``_cursor`` / ``_visit_count`` / ``_after_visit``
+    are forwarded to the wrapped visitor so user-defined logic still runs
+    against the right state.
+    """
+
+    def __init__(self, wrapped: TreeVisitor):
+        self._wrapped = wrapped
+
+    @property
+    def _cursor(self):
+        return self._wrapped._cursor
+
+    @_cursor.setter
+    def _cursor(self, value):
+        self._wrapped._cursor = value
+
+    @property
+    def _visit_count(self):
+        return self._wrapped._visit_count
+
+    @_visit_count.setter
+    def _visit_count(self, value):
+        self._wrapped._visit_count = value
+
+    @property
+    def _after_visit(self):
+        return self._wrapped._after_visit
+
+    @_after_visit.setter
+    def _after_visit(self, value):
+        self._wrapped._after_visit = value
+
+    def pre_visit(self, tree, p):
+        return self._wrapped.pre_visit(tree, p)
+
+    def post_visit(self, tree, p):
+        return self._wrapped.post_visit(tree, p)
+
+    def default_value(self, tree, p):
+        return self._wrapped.default_value(tree, p)
+
+    def is_acceptable(self, source_file, p):
+        return self._wrapped.is_acceptable(source_file, p)
+
+
+TreeVisitor.register_adapter(JavaVisitor, _TreeVisitorAsJavaVisitor)

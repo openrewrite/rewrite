@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -48,19 +49,6 @@ func (v *methodTypeCollector) VisitMethodDeclaration(md *tree.MethodDeclaration,
 		v.methodTypes[md.Name.Name] = md.MethodType
 	}
 	return v.GoVisitor.VisitMethodDeclaration(md, p)
-}
-
-// methodInvocationCollector visits a tree and collects method invocation types.
-type methodInvocationCollector struct {
-	visitor.GoVisitor
-	methodTypes map[string]*tree.JavaTypeMethod
-}
-
-func (v *methodInvocationCollector) VisitMethodInvocation(mi *tree.MethodInvocation, p any) tree.J {
-	if mi.MethodType != nil && mi.Name != nil {
-		v.methodTypes[mi.Name.Name] = mi.MethodType
-	}
-	return v.GoVisitor.VisitMethodInvocation(mi, p)
 }
 
 func TestTypeAttributionLocalVars(t *testing.T) {
@@ -156,22 +144,7 @@ func main() {
 		t.Fatal(err)
 	}
 
-	v := visitor.Init(&methodInvocationCollector{methodTypes: make(map[string]*tree.JavaTypeMethod)})
-	v.Visit(cu, nil)
-
-	printlnType, ok := v.methodTypes["Println"]
-	if !ok {
-		t.Fatal("no method type for fmt.Println()")
-	}
-	if printlnType.Name != "Println" {
-		t.Errorf("expected method name 'Println', got '%s'", printlnType.Name)
-	}
-	if printlnType.DeclaringType == nil {
-		t.Fatal("expected declaring type for Println")
-	}
-	if printlnType.DeclaringType.FullyQualifiedName != "fmt" {
-		t.Errorf("expected declaring type 'fmt', got '%s'", printlnType.DeclaringType.FullyQualifiedName)
-	}
+	ExpectMethodType(t, cu, "Println", "fmt")
 }
 
 func TestTypeAttributionStructType(t *testing.T) {
@@ -192,24 +165,7 @@ func main() {
 		t.Fatal(err)
 	}
 
-	v := visitor.Init(&typeCollector{identTypes: make(map[string]tree.JavaType)})
-	v.Visit(cu, nil)
-
-	// "p" should have a type attributed to it
-	if pType, ok := v.identTypes["p"]; ok {
-		if cls, ok := pType.(*tree.JavaTypeClass); ok {
-			if cls.FullyQualifiedName != "main.Point" {
-				t.Errorf("expected p to be main.Point, got %s", cls.FullyQualifiedName)
-			}
-			if cls.Kind != "Class" {
-				t.Errorf("expected kind Class, got %s", cls.Kind)
-			}
-		} else {
-			t.Errorf("expected p to be class type, got %T", pType)
-		}
-	} else {
-		t.Error("no type attribution for p")
-	}
+	ExpectType(t, cu, "p", "main.Point")
 }
 
 func TestTypeAttributionGracefulDegradation(t *testing.T) {

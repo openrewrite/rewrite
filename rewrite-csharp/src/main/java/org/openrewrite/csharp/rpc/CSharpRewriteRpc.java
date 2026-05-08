@@ -184,7 +184,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private List<RecipeBundleResolver> resolvers = new ArrayList<>();
         private final Map<String, String> environment = new HashMap<>();
-        private Path dotnetPath = Paths.get("dotnet");
+        private static final Path DEFAULT_DOTNET_PATH = Paths.get("dotnet");
+        private Supplier<@Nullable Path> dotnetPathSupplier = () -> DEFAULT_DOTNET_PATH;
         private @Nullable Path csharpServerEntry;
         private @Nullable Path log;
         private Duration timeout = Duration.ofSeconds(60);
@@ -214,7 +215,20 @@ public class CSharpRewriteRpc extends RewriteRpc {
          * @return This builder
          */
         public Builder dotnetPath(Path dotnetPath) {
-            this.dotnetPath = dotnetPath;
+            return dotnetPath(() -> dotnetPath);
+        }
+
+        /**
+         * Supplies the path to the dotnet executable. The supplier is invoked at most
+         * once, when the RPC is first started. Returning {@code null} uses the built-in
+         * default (same as not configuring the path at all). Exceptions thrown by the
+         * supplier propagate out of the RPC-start call.
+         *
+         * @param dotnetPathSupplier Supplier for the path to the dotnet executable
+         * @return This builder
+         */
+        public Builder dotnetPath(Supplier<@Nullable Path> dotnetPathSupplier) {
+            this.dotnetPathSupplier = dotnetPathSupplier;
             return this;
         }
 
@@ -280,12 +294,17 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
         @Override
         public CSharpRewriteRpc get() {
+            Path dotnetPath = dotnetPathSupplier.get();
+            if (dotnetPath == null) {
+                dotnetPath = DEFAULT_DOTNET_PATH;
+            }
+
             Stream<@Nullable String> cmd;
 
             if (csharpServerEntry != null) {
                 // Explicit override (used by tests)
                 if (csharpServerEntry.toString().endsWith(".csproj")) {
-                    cmd = buildCsprojCommand(csharpServerEntry);
+                    cmd = buildCsprojCommand(dotnetPath, csharpServerEntry);
                 } else {
                     cmd = Stream.of(
                             dotnetPath.toString(),
@@ -299,7 +318,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 // dotnet tool exec which has auth issues with private feeds (dotnet/sdk#51375)
                 String version = StringUtils.readFully(
                         CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
-                cmd = buildToolPathCommand(version);
+                cmd = buildToolPathCommand(dotnetPath, version);
             }
 
             return startProcess(cmd);
@@ -341,7 +360,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
             }
         }
 
-        private Stream<@Nullable String> buildCsprojCommand(Path csproj) {
+        private Stream<@Nullable String> buildCsprojCommand(Path dotnetPath, Path csproj) {
             return Stream.of(
                     dotnetPath.toString(),
                     "run",
@@ -362,13 +381,13 @@ public class CSharpRewriteRpc extends RewriteRpc {
          * correctly. The tool-path is version-specific so multiple versions can coexist
          * without file-lock conflicts during parallel execution.
          */
-        private Stream<@Nullable String> buildToolPathCommand(String version) {
+        private Stream<@Nullable String> buildToolPathCommand(Path dotnetPath, String version) {
             Path toolPath = Paths.get(System.getProperty("user.home"),
                     ".dotnet", "rewrite-tools", version);
             Path toolExecutable = toolPath.resolve(TOOL_COMMAND);
 
             if (!Files.isRegularFile(toolExecutable)) {
-                installTool(version, toolPath);
+                installTool(dotnetPath, version, toolPath);
             }
 
             return Stream.of(
@@ -378,7 +397,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
             );
         }
 
-        private void installTool(String version, Path toolPath) {
+        private void installTool(Path dotnetPath, String version, Path toolPath) {
             try {
                 Files.createDirectories(toolPath);
 

@@ -9,7 +9,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -305,11 +304,8 @@ public class PyProjectFile implements PythonDependencyFile {
                 if (!PyProjectHelper.isInsidePdmOverridesTable(getCursor())) {
                     return kv;
                 }
-                if (!(kv.getKey() instanceof Toml.Identifier)) {
-                    return kv;
-                }
-                String keyName = ((Toml.Identifier) kv.getKey()).getName();
-                if (!PythonResolutionResult.normalizeName(keyName).equals(normalizedName)) {
+                String keyName = PyProjectHelper.extractKeyName(kv);
+                if (keyName == null || !PythonResolutionResult.normalizeName(keyName).equals(normalizedName)) {
                     return kv;
                 }
                 if (!(kv.getValue() instanceof Toml.Literal)) {
@@ -412,11 +408,6 @@ public class PyProjectFile implements PythonDependencyFile {
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
         return this;
-    }
-
-    @Override
-    public SourceFile afterModification(ExecutionContext ctx) {
-        return PyProjectHelper.regenerateLockAndRefreshMarker((Toml.Document) getTree(), ctx);
     }
 
     private static boolean isInsideTargetArray(Cursor cursor, @Nullable String scope, @Nullable String groupName) {

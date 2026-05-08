@@ -164,4 +164,94 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         f = f.getPadding().withArguments(visitContainer(f.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p));
         return f;
     }
+
+    public J visitSingletonType(S.SingletonType singletonType, P p) {
+        S.SingletonType s = singletonType;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withQualifier(visitAndCast(s.getQualifier(), p));
+        s = s.withBeforeType(visitSpace(s.getBeforeType(), Space.Location.LANGUAGE_EXTENSION, p));
+        return s;
+    }
+
+    public J visitAlternative(S.Alternative alternative, P p) {
+        S.Alternative a = alternative;
+        a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.getPadding().withPatterns(visitContainer(a.getPadding().getPatterns(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return a;
+    }
+
+    public J visitQualifiedSuper(S.QualifiedSuper qualifiedSuper, P p) {
+        S.QualifiedSuper q = qualifiedSuper;
+        q = q.withPrefix(visitSpace(q.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        q = q.withMarkers(visitMarkers(q.getMarkers(), p));
+        if (q.getQualifier() != null) {
+            q = q.withQualifier(visitAndCast(q.getQualifier(), p));
+        }
+        if (q.getMixName() != null) {
+            q = q.withMixName(visitAndCast(q.getMixName(), p));
+        }
+        return q;
+    }
+
+    public J visitAnnotatedExpression(S.AnnotatedExpression annotatedExpression, P p) {
+        S.AnnotatedExpression a = annotatedExpression;
+        a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withExpression(visitAndCast(a.getExpression(), p));
+        a = a.withBeforeColon(visitSpace(a.getBeforeColon(), Space.Location.LANGUAGE_EXTENSION, p));
+        a = a.withAnnotation(visitAndCast(a.getAnnotation(), p));
+        return a;
+    }
+
+    public J visitRefinedType(S.RefinedType refinedType, P p) {
+        S.RefinedType r = refinedType;
+        r = r.withPrefix(visitSpace(r.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        if (r.getParent() != null) {
+            r = r.withParent(visitAndCast(r.getParent(), p));
+        }
+        r = r.withRefinements(visitAndCast(r.getRefinements(), p));
+        return r;
+    }
+
+    public J visitMacro(S.Macro macro, P p) {
+        S.Macro m = macro;
+        m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withExpression(visitAndCast(m.getExpression(), p));
+        return m;
+    }
+
+    public J visitExtensionMethods(S.ExtensionMethods ext, P p) {
+        S.ExtensionMethods e = ext;
+        e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.getPadding().withParameters(visitContainer(e.getPadding().getParameters(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        e = e.withBody(visitAndCast(e.getBody(), p));
+        return e;
+    }
+
+    public J visitFor(S.For forLoop, P p) {
+        S.For f = forLoop;
+        f = f.withPrefix(visitSpace(f.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        f = f.getPadding().withEnumerators(visitContainer(f.getPadding().getEnumerators(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        f = f.withBeforeBody(visitSpace(f.getBeforeBody(), Space.Location.LANGUAGE_EXTENSION, p));
+        f = f.withBody(visitAndCast(f.getBody(), p));
+        return f;
+    }
+
+    public J visitForEnumerator(S.For.Enumerator enumerator, P p) {
+        S.For.Enumerator e = enumerator;
+        e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        if (e.getLhs() != null) {
+            e = e.withLhs(visitAndCast(e.getLhs(), p));
+        }
+        e = e.withBeforeOp(visitSpace(e.getBeforeOp(), Space.Location.LANGUAGE_EXTENSION, p));
+        e = e.withRhs(visitAndCast(e.getRhs(), p));
+        return e;
+    }
 }

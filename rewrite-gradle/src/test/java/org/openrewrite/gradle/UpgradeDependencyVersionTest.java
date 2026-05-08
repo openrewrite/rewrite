@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -878,6 +879,135 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
               dependencies {
                   implementation "com.google.guava:guava:${guavaVersion2}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCorruptSharedKotlinValVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation("com.fasterxml.jackson.core", "jackson-annotations", jacksonVersion)
+                  implementation("com.fasterxml.jackson.core", "jackson-core", jacksonVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation("com.fasterxml.jackson.core", "jackson-annotations", "2.21")
+                  implementation("com.fasterxml.jackson.core", "jackson-core", jacksonVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCorruptSharedExtProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  jacksonVersion = "2.17.3"
+              }
+
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-annotations:${jacksonVersion}"
+                  implementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  jacksonVersion = "2.17.3"
+              }
+
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-annotations:2.21"
+                  implementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCorruptSharedGradleProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null)),
+          properties(
+            """
+              jacksonVersion=2.17.3
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-annotations:${jacksonVersion}"
+                  implementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-annotations:2.21"
+                  implementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
               }
               """
           )
@@ -2049,6 +2179,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void cannotDownloadMetaDataWhenNoRepositoriesAreDefined() {
         rewriteRun(
           buildGradle(

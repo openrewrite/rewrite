@@ -86,6 +86,7 @@
     "vitest": "^4.0.18"
   },
   "optionalDependencies": {
+    "@pyroscope/nodejs": "^0.4.0",
     "prettier": "^3.7.4"
   },
   "bin": {

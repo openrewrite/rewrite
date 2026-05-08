@@ -43,9 +43,13 @@ describe("recipes", () => {
                     value: undefined
                 }
             ],
+            preconditions: [],
             recipeList: [],
             tags: [],
-            dataTables: []
+            dataTables: [],
+            maintainers: [],
+            contributors: [],
+            examples: []
         });
     });
 });

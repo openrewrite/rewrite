@@ -6,6 +6,13 @@ dependencies {
     api("org.openrewrite.tools:jgit:latest.release")
     implementation("org.openrewrite.tools:java-object-diff:latest.release")
     implementation("io.quarkus.gizmo:gizmo:1.0.+")
+    // Align the four org.ow2.asm artifacts to one version everywhere; gizmo
+    // would otherwise pin -util/-tree/-analysis to 9.3 in modules that don't
+    // request them directly.
+    implementation("org.ow2.asm:asm:latest.release")
+    implementation("org.ow2.asm:asm-util:latest.release")
+    implementation("org.ow2.asm:asm-tree:latest.release")
+    implementation("org.ow2.asm:asm-analysis:latest.release")
     api("com.fasterxml.jackson.core:jackson-core")
     api("com.fasterxml.jackson.core:jackson-databind")
     api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")

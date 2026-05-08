@@ -33,19 +33,37 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
     @Nullable
     private final Comparator<Content> tagComparator;
 
+    private final boolean allowDuplicates;
+
     public AddToTagVisitor(Xml.Tag scope, Xml.Tag tagToAdd) {
-        this(scope, tagToAdd, null);
+        this(scope, tagToAdd, null, false);
+    }
+
+    public AddToTagVisitor(Xml.Tag scope, Xml.Tag tagToAdd, boolean allowDuplicates) {
+        this(scope, tagToAdd, null, allowDuplicates);
     }
 
     public AddToTagVisitor(Xml.Tag scope, Xml.Tag tagToAdd, @Nullable Comparator<Content> tagComparator) {
+        this(scope, tagToAdd, tagComparator, false);
+    }
+
+    public AddToTagVisitor(Xml.Tag scope, Xml.Tag tagToAdd, @Nullable Comparator<Content> tagComparator, boolean allowDuplicates) {
         this.scope = scope;
         this.tagToAdd = tagToAdd;
         this.tagComparator = tagComparator;
+        this.allowDuplicates = allowDuplicates;
     }
 
     @Override
     public Xml visitTag(Xml.Tag t, P p) {
         if (scope.isScope(t)) {
+            if (!allowDuplicates && t.getContent() != null) {
+                for (Content existing : t.getContent()) {
+                    if (existing instanceof Xml.Tag && SemanticallyEqual.areEqual(existing, tagToAdd)) {
+                        return super.visitTag(t, p);
+                    }
+                }
+            }
             assert getCursor().getParent() != null;
             if (t.getClosing() == null) {
                 t = t.withClosing(autoFormat(new Xml.Tag.Closing(Tree.randomId(), "\n",

@@ -29,7 +29,9 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Singleton.singleton;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -238,6 +240,114 @@ class SingletonTest implements RewriteTest {
               """,
             spec -> spec.path("test.txt").noTrim()
           )
+        );
+    }
+
+    /**
+     * A scanning recipe whose scanner increments a static counter for each visited file.
+     * Used to prove that when it is used behind a Singleton precondition, the scanner
+     * runs once per file for the first recipe instance and is skipped entirely for later
+     * equivalent instances.
+     */
+    @EqualsAndHashCode(callSuper = false)
+    @Value
+    static class CountingScanRecipe extends ScanningRecipe<AtomicInteger> {
+        static final AtomicInteger SCAN_COUNT = new AtomicInteger();
+
+        @Override
+        public String getDisplayName() {
+            return "Counting scan recipe";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Tracks how many files its scanner visits via a shared static counter.";
+        }
+
+        @Override
+        public AtomicInteger getInitialValue(ExecutionContext ctx) {
+            return SCAN_COUNT;
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(AtomicInteger acc) {
+            return new TreeVisitor<>() {
+                @Override
+                public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    SCAN_COUNT.incrementAndGet();
+                    return tree;
+                }
+            };
+        }
+    }
+
+    @Test
+    void singletonPreconditionDeduplicatesAcrossNestingLevels() {
+        CountingScanRecipe.SCAN_COUNT.set(0);
+
+        // ChildWithCountingScanner appears twice: once at the top level of ParentRecipe, and once
+        // nested inside NestedWrapper. Recursive deduplication should keep the first occurrence
+        // and drop the nested one.
+        String childYaml = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.ChildWithCountingScanner
+          displayName: Child recipe with counting scanner behind Singleton
+          description: Uses Singleton precondition so scanning is skipped for duplicate instances.
+          preconditions:
+            - org.openrewrite.Singleton
+          recipeList:
+            - org.openrewrite.SingletonTest$CountingScanRecipe
+          """;
+
+        String nestedWrapperYaml = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.NestedWrapper
+          displayName: Wrapper that also pulls in the counting child
+          description: Embeds the counting child under a layer of nesting.
+          recipeList:
+            - org.openrewrite.ChildWithCountingScanner
+          """;
+
+        String parentYaml = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.ParentRecipe
+          displayName: Parent recipe that references the counting child at two different depths
+          description: Forces the Singleton-gated child to appear at different levels of the tree.
+          recipeList:
+            - org.openrewrite.ChildWithCountingScanner
+            - org.openrewrite.NestedWrapper
+          """;
+
+        Recipe recipe = Environment.builder()
+          .load(new YamlResourceLoader(
+            new ByteArrayInputStream(childYaml.getBytes(StandardCharsets.UTF_8)),
+            URI.create("child.yml"),
+            new Properties()))
+          .load(new YamlResourceLoader(
+            new ByteArrayInputStream(nestedWrapperYaml.getBytes(StandardCharsets.UTF_8)),
+            URI.create("nested-wrapper.yml"),
+            new Properties()))
+          .load(new YamlResourceLoader(
+            new ByteArrayInputStream(parentYaml.getBytes(StandardCharsets.UTF_8)),
+            URI.create("parent.yml"),
+            new Properties()))
+          .build()
+          .activateRecipes("org.openrewrite.ParentRecipe");
+
+        rewriteRun(
+          spec -> spec
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(0)
+            .recipe(recipe)
+            .validateRecipeSerialization(false)
+            .afterRecipe(run -> assertThat(CountingScanRecipe.SCAN_COUNT.get())
+              .as("scanner should run once per file exactly once across the whole tree; nested occurrence must be filtered by recursive singleton deduplication")
+              .isEqualTo(2)),
+          text("one", spec -> spec.path("a.txt")),
+          text("two", spec -> spec.path("b.txt"))
         );
     }
 }

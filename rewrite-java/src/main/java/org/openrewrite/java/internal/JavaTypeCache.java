@@ -25,9 +25,15 @@ public class JavaTypeCache implements Cloneable {
 
     AdaptiveRadixTree<Object> typeCache = new AdaptiveRadixTree<>();
 
+    @Nullable JavaTypeCache base;
+
     public <T> @Nullable T get(String signature) {
         //noinspection unchecked
-        return (T) typeCache.search(getKeyBytes(signature));
+        T result = (T) typeCache.search(getKeyBytes(signature));
+        if (result == null && base != null) {
+            return base.get(signature);
+        }
+        return result;
     }
 
     public void put(String signature, Object o) {
@@ -36,17 +42,29 @@ public class JavaTypeCache implements Cloneable {
 
     public void clear() {
         typeCache.clear();
+        // base is intentionally NOT cleared — it may be shared
     }
 
     @Override
     public JavaTypeCache clone() {
         try {
             JavaTypeCache clone = (JavaTypeCache) super.clone();
-            clone.typeCache = this.typeCache.copy();
+            clone.base = this;
+            clone.typeCache = new AdaptiveRadixTree<>();
             return clone;
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Create a new cache with the given base for read-through lookups.
+     * Writes go to the new cache's overlay; reads fall through to the base on miss.
+     */
+    public static JavaTypeCache withBase(JavaTypeCache base) {
+        JavaTypeCache cache = new JavaTypeCache();
+        cache.base = base;
+        return cache;
     }
 
     private static final @Nullable Field STRING_VALUE;

@@ -333,6 +333,26 @@ func (m *typeMapper) mapObject(obj types.Object) tree.JavaType {
 	if fn, ok := obj.(*types.Func); ok {
 		return m.mapMethodObject(fn)
 	}
+	// Package-alias identifiers (the `y` in `y.Hello()` after
+	// `import "github.com/x/y"`) come back as *types.PkgName, whose .Type()
+	// is the Invalid sentinel. Map them to a JavaTypeClass tagged with the
+	// imported package's path so recipes can recognize the reference even
+	// when the package's symbols aren't loaded.
+	if pn, ok := obj.(*types.PkgName); ok {
+		imported := pn.Imported()
+		if imported == nil {
+			return nil
+		}
+		// JavaType.FullyQualified.Kind is a fixed enum (Class, Enum,
+		// Interface, Annotation, Record, Value) without a Package value.
+		// Map package aliases to "Class" with the import path as the FQN;
+		// recipes can recognize package references by the FQN containing
+		// path separators (e.g. "github.com/x/y").
+		return &tree.JavaTypeClass{
+			Kind:               "Class",
+			FullyQualifiedName: imported.Path(),
+		}
+	}
 	return m.mapType(obj.Type())
 }
 

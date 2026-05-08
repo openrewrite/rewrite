@@ -276,6 +276,11 @@ func (r *builtTemplateRecipe) EstimatedEffortPerOccurrence() time.Duration { ret
 func (r *builtTemplateRecipe) Editor() recipe.TreeVisitor  { return r.editor }
 func (r *builtTemplateRecipe) RecipeList() []recipe.Recipe  { return nil }
 func (r *builtTemplateRecipe) Options() []recipe.OptionDescriptor { return nil }
+func (r *builtTemplateRecipe) Preconditions() []recipe.Recipe              { return nil }
+func (r *builtTemplateRecipe) DataTables() []recipe.DataTableDescriptor    { return nil }
+func (r *builtTemplateRecipe) Maintainers() []recipe.Maintainer            { return nil }
+func (r *builtTemplateRecipe) Contributors() []recipe.Contributor          { return nil }
+func (r *builtTemplateRecipe) Examples() []recipe.Example                  { return nil }
 
 // --- Embeddable TemplateRecipe struct ---
 
