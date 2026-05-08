@@ -9,10 +9,14 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.python.internal.LockFileRegeneration;
+import org.openrewrite.python.internal.PipfileLockParser;
 import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.internal.PythonResolutionLinker;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
+import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
@@ -41,11 +45,42 @@ public class PipfileParser implements Parser {
             if (marker == null) {
                 return sf;
             }
+            marker = resolveFromLockFile(marker, doc, relativeTo);
             return doc.withMarkers(doc.getMarkers().addIfAbsent(marker));
         });
     }
 
-    static @Nullable PythonResolutionResult createMarker(Toml.Document doc) {
+    private static PythonResolutionResult resolveFromLockFile(PythonResolutionResult marker,
+                                                              Toml.Document doc,
+                                                              @Nullable Path relativeTo) {
+        Path sourcePath = doc.getSourcePath();
+        Path pipfileDir = relativeTo != null
+                ? relativeTo.resolve(sourcePath).getParent()
+                : sourcePath.getParent();
+
+        if (pipfileDir == null) {
+            return marker;
+        }
+
+        List<ResolvedDependency> resolvedDeps = PipfileLockParser.findAndParse(pipfileDir, relativeTo);
+        if (!resolvedDeps.isEmpty()) {
+            return PythonResolutionLinker.applyPipfile(marker, resolvedDeps);
+        }
+
+        // No Pipfile.lock found — try regenerating it from the Pipfile contents.
+        LockFileRegeneration.Result result = LockFileRegeneration.PIPENV.regenerate(doc.printAll());
+        if (!result.isSuccess() || result.getLockFileContent() == null) {
+            return marker;
+        }
+
+        resolvedDeps = PipfileLockParser.parse(result.getLockFileContent());
+        if (resolvedDeps.isEmpty()) {
+            return marker;
+        }
+        return PythonResolutionLinker.applyPipfile(marker, resolvedDeps);
+    }
+
+    public static @Nullable PythonResolutionResult createMarker(Toml.Document doc) {
         Map<String, Toml.Table> tables = indexTables(doc);
 
         Toml.Table packagesTable = tables.get("packages");
@@ -98,10 +133,10 @@ public class PipfileParser implements Parser {
                 continue;
             }
             Toml.KeyValue kv = (Toml.KeyValue) value;
-            if (!(kv.getKey() instanceof Toml.Identifier)) {
+            String name = PyProjectHelper.extractKeyName(kv);
+            if (name == null) {
                 continue;
             }
-            String name = ((Toml.Identifier) kv.getKey()).getName();
             String versionConstraint = extractVersion(kv.getValue());
             if ("*".equals(versionConstraint)) {
                 versionConstraint = null;

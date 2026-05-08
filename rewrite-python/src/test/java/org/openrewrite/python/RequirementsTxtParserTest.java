@@ -21,7 +21,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.python.internal.UvExecutor;
+import org.openrewrite.python.internal.PackageManagerExecutor;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
@@ -222,7 +222,7 @@ class RequirementsTxtParserTest {
 
     @Test
     void markerContainsDependenciesFromFreeze() {
-        assumeTrue(UvExecutor.findUvExecutable() != null, "uv is not installed");
+        assumeTrue(PackageManagerExecutor.UV.find() != null, "uv is not installed");
 
         String requirements = "requests>=2.28.0\n";
 

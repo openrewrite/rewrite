@@ -49,6 +49,18 @@ class AssertTest implements RewriteTest {
         );
     }
 
+    @Test
+    void withGStringMessageAfterComma() {
+        rewriteRun(
+          groovy(
+            """
+              def x = 1
+              assert x == 2, "value is ${x}"
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/6374")
     @Test
     void withMessageAndSpaceBeforeColon() {

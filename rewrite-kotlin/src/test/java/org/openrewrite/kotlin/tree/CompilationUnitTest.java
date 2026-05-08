@@ -22,6 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlinScript;
 
 class CompilationUnitTest implements RewriteTest {
 
@@ -65,6 +66,18 @@ class CompilationUnitTest implements RewriteTest {
               // C2
               """,
             SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Test
+    void unresolvedCallableReference() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none()),
+          kotlinScript(
+            """
+              kotlin { jvmToolchain { languageVersion.set(libs.versions.jdk.map(JavaLanguageVersion::of)) } }
+              """
           )
         );
     }

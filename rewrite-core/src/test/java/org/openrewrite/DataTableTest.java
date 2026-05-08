@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -98,6 +99,77 @@ class DataTableTest implements RewriteTest {
     }
 
     @Test
+    void compositeRecipeUnionsChildDataTables() {
+        Recipe child1 = toRecipe();
+        new TableA(child1);
+        Recipe child2 = toRecipe();
+        new TableB(child2);
+        Recipe parent = new CompositeRecipe(List.of(child1, child2));
+
+        assertThat(parent.getDataTableDescriptors())
+          .extracting(DataTableDescriptor::getName)
+          .containsExactly(
+            TableA.class.getName(),
+            TableB.class.getName(),
+            "org.openrewrite.table.SourcesFileResults",
+            "org.openrewrite.table.SearchResults",
+            "org.openrewrite.table.SourcesFileErrors",
+            "org.openrewrite.table.RecipeRunStats");
+    }
+
+    @Test
+    void compositeRecipeDedupesByName() {
+        Recipe child1 = toRecipe();
+        new TableA(child1);
+        Recipe child2 = toRecipe();
+        new TableA(child2);
+        Recipe parent = new CompositeRecipe(List.of(child1, child2));
+
+        assertThat(parent.getDataTableDescriptors())
+          .extracting(DataTableDescriptor::getName)
+          .containsExactly(
+            TableA.class.getName(),
+            "org.openrewrite.table.SourcesFileResults",
+            "org.openrewrite.table.SearchResults",
+            "org.openrewrite.table.SourcesFileErrors",
+            "org.openrewrite.table.RecipeRunStats");
+    }
+
+    @Test
+    void compositeRecipeOwnDataTablesPrecedeChildren() {
+        Recipe child = toRecipe();
+        new TableA(child);
+        new TableB(child);
+        Recipe parent = toRecipe();
+        new TableA(parent);
+        Recipe composite = new CompositeRecipe(List.of(parent, child));
+
+        // TableA is contributed by parent first via CompositeRecipe -> parent's own,
+        // then TableB comes from child. putIfAbsent-by-name preserves the first instance.
+        assertThat(composite.getDataTableDescriptors())
+          .extracting(DataTableDescriptor::getName)
+          .containsExactly(
+            TableA.class.getName(),
+            TableB.class.getName(),
+            "org.openrewrite.table.SourcesFileResults",
+            "org.openrewrite.table.SearchResults",
+            "org.openrewrite.table.SourcesFileErrors",
+            "org.openrewrite.table.RecipeRunStats");
+    }
+
+    @Test
+    void compositeRecipeWalksMultipleLevels() {
+        Recipe grandchild = toRecipe();
+        new TableC(grandchild);
+        Recipe child = new CompositeRecipe(List.of(grandchild));
+        Recipe parent = new CompositeRecipe(List.of(child));
+
+        assertThat(parent.getDataTableDescriptors())
+          .extracting(DataTableDescriptor::getName)
+          .contains(TableC.class.getName());
+    }
+
+    @Test
     void recipeUsedInPreconditionDoesNotEmitDataTableRows() {
         Recipe preconditionRecipe = toRecipe(r -> new PlainTextVisitor<>() {
             final WordTable wordTable = new WordTable(r);
@@ -144,6 +216,45 @@ class DataTableTest implements RewriteTest {
 
             @Column(displayName = "Text", description = "The text of the word.")
             String text;
+        }
+    }
+
+    @JsonIgnoreType
+    static class TableA extends DataTable<TableA.Row> {
+        public TableA(Recipe recipe) {
+            super(recipe, "A", "A.");
+        }
+
+        @Value
+        static class Row {
+            @Column(displayName = "Value", description = "value")
+            String value;
+        }
+    }
+
+    @JsonIgnoreType
+    static class TableB extends DataTable<TableB.Row> {
+        public TableB(Recipe recipe) {
+            super(recipe, "B", "B.");
+        }
+
+        @Value
+        static class Row {
+            @Column(displayName = "Value", description = "value")
+            String value;
+        }
+    }
+
+    @JsonIgnoreType
+    static class TableC extends DataTable<TableC.Row> {
+        public TableC(Recipe recipe) {
+            super(recipe, "C", "C.");
+        }
+
+        @Value
+        static class Row {
+            @Column(displayName = "Value", description = "value")
+            String value;
         }
     }
 }

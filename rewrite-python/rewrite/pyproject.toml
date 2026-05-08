@@ -22,7 +22,6 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "cbor2>=5.6.5",
     "more_itertools>=10.0.0",
     "ty-types>=0.0.31",  # Type inference CLI for Python type attribution
     "parso>=0.7.1,<0.8",  # Python 2/3 parser with CST support (0.8+ dropped Python 2.7 grammar)
@@ -40,6 +39,11 @@ dev = [
 publish = [
     "build>=1.0.0",
     "twine>=5.0.0",
+]
+# Continuous profiling for production recipe-worker subprocesses; the RPC
+# server's _init_pyroscope() is a no-op when this isn't installed.
+profiling = [
+    "pyroscope-io>=0.8.0",
 ]
 
 [project.urls]

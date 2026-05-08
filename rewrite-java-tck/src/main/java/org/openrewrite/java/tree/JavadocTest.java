@@ -1544,6 +1544,89 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Test
+    void preCodeBlockWithNewlineAfterOpeningTag() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * <p>Example:
+               *
+               * <pre><code>
+               *   class Outer {
+               *     static class Inner {
+               *     }
+               *   }
+               * </code></pre>
+               */
+              public @interface Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preCodeBlockTwoInstances() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * <pre><code>
+               *   first block
+               * </code></pre>
+               *
+               * <pre><code>
+               *   second block
+               * </code></pre>
+               */
+              public @interface Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preCodeBlockWithInlineLiteralTag() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * Defines a Hilt component.
+               *
+               * <p>Example defining a root component, {@code ParentComponent}:
+               *
+               * <pre><code>
+               *   {@literal @}ParentScoped
+               *   {@literal @}DefineComponent
+               *   interface ParentComponent {}
+               * </code></pre>
+               */
+              public @interface Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preCodeBlockSameLineAsText() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * Some text <pre><code>
+               *   content
+               * </code></pre>
+               */
+              public @interface Test {
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1409")
     @Test
     void trailingWhitespaceWithWhitespaceOnEmptyLine() {
@@ -2126,6 +2209,75 @@ class JavadocTest implements RewriteTest {
               */
               class Test {
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineHtmlCommentInBlockTag() {
+        rewriteRun(
+          java(
+            """
+              /**
+              * @version 0.1
+              *    <!-- xml comment nested
+              *       * [someAuthor] fixed something
+              *    -->
+              **/
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void plainAsciiJavadocRoundTrips() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * This is a regular ASCII comment.
+               * No changes should be made here.
+               */
+              public class Example {
+                  /**
+                   * Another regular method comment.
+                   */
+                  public void regularMethod() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void plainNonAsciiJavadocRoundTrips() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * Coração de leão.
+               * Mañana es otro día.
+               */
+              public class Example {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void htmlCommentFollowedByPlainTextInSameJavadoc() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * <!-- inline html comment -->
+               * Following plain text on its own line.
+               */
+              class Test {}
               """
           )
         );
@@ -2833,6 +2985,21 @@ class JavadocTest implements RewriteTest {
                   class Test {
                       Collection<String> field;
                   }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/7554")
+        @Test
+        void twoTripleSlashBlocksSeparatedByBlankLine() {
+            rewriteRun(
+              java(
+                """
+                  /// First doc-comment block.
+
+                  /// Second doc-comment block.
+                  class Test {}
                   """
               )
             );

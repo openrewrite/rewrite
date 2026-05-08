@@ -95,6 +95,12 @@ class TreeVisitor(ABC, Generic[T, P]):
     _cursor: Cursor = Cursor(None, "root")
     _after_visit: Optional[List[TreeVisitor[Any, P]]] = None
 
+    # Maps a language-specific visitor base class (e.g. JavaVisitor, PythonVisitor)
+    # to a class that wraps a generic TreeVisitor as that visitor type. Populated
+    # by language modules at import time via :meth:`register_adapter`. See
+    # :meth:`adapt` for the use-case.
+    _adapter_registry: ClassVar[Dict[Type['TreeVisitor[Any, Any]'], Type['TreeVisitor[Any, Any]']]] = {}
+
     @classmethod
     def noop(cls):
         return NoopVisitor()
@@ -196,20 +202,75 @@ class TreeVisitor(ABC, Generic[T, P]):
 
         A visitor is adaptable if:
         1. It is already an instance of the target type, OR
-        2. It is a base TreeVisitor (not a language-specific visitor)
-
-        This is a simplified implementation. Full adaptation support
-        would check tree type hierarchies like Java does.
+        2. A registered adapter exists for the target type (the bare-TreeVisitor
+           case — see :meth:`adapt`), OR
+        3. The visitor is itself an adapter wrapping a generic TreeVisitor.
         """
         if isinstance(self, adapt_to):
             return True
-        # Base TreeVisitor is adaptable to any visitor type
-        # (its tree type is Tree, which is a supertype of all tree types)
-        return type(self).__mro__[1] == TreeVisitor or type(self) == TreeVisitor
+        if getattr(self, '_wrapped', None) is not None:
+            return True
+        for cls in adapt_to.__mro__:
+            if cls in TreeVisitor._adapter_registry:
+                return True
+        return False
 
     def adapt(self, tree_type, visitor_type: Type[TV]) -> TV:
-        # FIXME implement the visitor adapting
+        """Return a visitor of ``visitor_type`` that delegates to ``self``.
+
+        Language-specific LST nodes route through this when their ``accept``
+        is called with a non-language-specific visitor — e.g. ``J.accept`` does
+        ``self.accept_java(v.adapt(J, JavaVisitor), p)``. Without an adapter,
+        a bare ``TreeVisitor`` would flow into ``accept_java`` and fail with
+        ``AttributeError`` on the first language-specific dispatch (e.g.
+        ``visit_compilation_unit``), since the bare base class doesn't
+        implement those methods.
+
+        The returned adapter is-a ``visitor_type`` (so the language-specific
+        ``visit_*`` defaults are available for child traversal), but it
+        forwards ``pre_visit`` / ``post_visit`` / ``default_value`` /
+        ``is_acceptable`` and the ``_cursor`` / ``_visit_count`` /
+        ``_after_visit`` state to the wrapped visitor — so any user-defined
+        logic on the original generic visitor still runs against the right
+        cursor and observes traversal via its own ``pre_visit`` / ``post_visit``.
+
+        If ``self`` is already an instance of ``visitor_type`` (the common case
+        where the user passed a language-specific visitor), no adapter is
+        created. If ``self`` is itself an adapter wrapping some other visitor,
+        the wrapped visitor is unwrapped first so we don't stack adapters when
+        a single recipe traversal crosses language boundaries (e.g. visiting a
+        Py node from inside a JavaVisitor adapter chain).
+
+        Adapter classes are registered by each language's visitor module via
+        :meth:`register_adapter`; if no adapter is registered for the requested
+        visitor type, ``self`` is returned unchanged for backwards
+        compatibility.
+        """
+        if isinstance(self, visitor_type):
+            return cast(TV, self)
+        target: TreeVisitor = self
+        wrapped = getattr(self, '_wrapped', None)
+        if wrapped is not None:
+            target = wrapped
+            if isinstance(target, visitor_type):
+                return cast(TV, target)
+        for cls in visitor_type.__mro__:
+            adapter_cls = TreeVisitor._adapter_registry.get(cls)
+            if adapter_cls is not None:
+                return cast(TV, adapter_cls(target))
         return cast(TV, self)
+
+    @classmethod
+    def register_adapter(cls, target_visitor_type: Type['TreeVisitor[Any, Any]'],
+                         adapter_cls: Type['TreeVisitor[Any, Any]']) -> None:
+        """Register an adapter class that wraps a generic TreeVisitor as ``target_visitor_type``.
+
+        Each language module (``rewrite.java.visitor``, ``rewrite.python.visitor``,
+        ...) calls this once at import time to make its language visitor reachable
+        via :meth:`adapt`. The adapter must subclass ``target_visitor_type`` and
+        accept a single ``wrapped`` argument in its constructor.
+        """
+        cls._adapter_registry[target_visitor_type] = adapter_cls
 
 
 class NoopVisitor(TreeVisitor[Tree, P]):

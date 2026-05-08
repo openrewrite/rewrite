@@ -113,6 +113,19 @@ func TestParseCommentInsideEmptyDelimiters(t *testing.T) {
 		`))
 }
 
+func TestParseBlockCommentBeforeSelector(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			import "unsafe"
+
+			func f(x int) {
+				unsafe /* a comment */ .Alignof(x)
+			}
+		`))
+}
+
 func TestParseMultilineBlockComment(t *testing.T) {
 	NewRecipeSpec().RewriteRun(t,
 		Golang(`

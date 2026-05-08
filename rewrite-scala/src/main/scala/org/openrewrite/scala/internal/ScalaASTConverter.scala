@@ -18,7 +18,7 @@ package org.openrewrite.scala.internal
 import dotty.tools.dotc.ast.Trees
 import dotty.tools.dotc.core.Contexts.*
 import org.openrewrite.Tree
-import org.openrewrite.java.internal.JavaTypeCache
+import org.openrewrite.java.internal.JavaTypeFactory
 import org.openrewrite.java.tree.*
 import org.openrewrite.marker.Markers
 
@@ -51,7 +51,7 @@ class ScalaASTConverter {
   /**
    * Converts a Scala parse result to compilation unit components.
    */
-  def convertToCompilationUnit(parseResult: ScalaParseResult, source: String, typeCache: JavaTypeCache = null): CompilationUnitResult = {
+  def convertToCompilationUnit(parseResult: ScalaParseResult, source: String, typeFactory: JavaTypeFactory = null): CompilationUnitResult = {
     val imports = new util.ArrayList[J.Import]()
     val statements = new util.ArrayList[Statement]()
     var packageDecl: J.Package = null
@@ -67,8 +67,8 @@ class ScalaASTConverter {
     }
 
     // Build type mapping from typed tree if available
-    val mapping: Option[ScalaTypeMapping] = if (typeCache != null) {
-      parseResult.typedTree.map(tpd => new ScalaTypeMapping(typeCache, tpd))
+    val mapping: Option[ScalaTypeMapping] = if (typeFactory != null) {
+      parseResult.typedTree.map(tpd => new ScalaTypeMapping(typeFactory, tpd))
     } else None
 
     val visitor = new ScalaTreeVisitor(source, offsetAdjustment, mapping)

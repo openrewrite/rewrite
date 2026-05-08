@@ -37,3 +37,7 @@ dist/
 CLAUDE.local.md
 
 /.claude/settings.local.json
+
+# Moderne CLI
+.moderne/*
+!.moderne/context/

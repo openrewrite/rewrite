@@ -380,40 +380,41 @@ class DeclarativeRecipeTest implements RewriteTest {
 
         int threadCount = 10;
         int iterations = 100;
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        var startLatch = new CountDownLatch(1);
-        var doneLatch = new CountDownLatch(threadCount);
-        var errors = new ConcurrentLinkedQueue<Throwable>();
+        try (ExecutorService executor = Executors.newFixedThreadPool(threadCount)) {
+            var startLatch = new CountDownLatch(1);
+            var doneLatch = new CountDownLatch(threadCount);
+            var errors = new ConcurrentLinkedQueue<Throwable>();
 
-        for (int i = 0; i < threadCount; i++) {
-            final int threadIdx = i;
-            executor.submit(() -> {
-                try {
-                    startLatch.await();
-                    for (int j = 0; j < iterations; j++) {
-                        if (threadIdx % 2 == 0) {
-                            // Reader threads: iterate via getDataTableDescriptors and getDescriptor
-                            dr.getDataTableDescriptors();
-                            dr.getDescriptor();
-                        } else {
-                            // Writer threads: re-initialize to modify recipeList concurrently
-                            dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
-                            dr.initialize(List.of());
+            for (int i = 0; i < threadCount; i++) {
+                final int threadIdx = i;
+                executor.submit(() -> {
+                    try {
+                        startLatch.await();
+                        for (int j = 0; j < iterations; j++) {
+                            if (threadIdx % 2 == 0) {
+                                // Reader threads: iterate via getDataTableDescriptors and getDescriptor
+                                dr.getDataTableDescriptors();
+                                dr.getDescriptor();
+                            } else {
+                                // Writer threads: re-initialize to modify recipeList concurrently
+                                dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
+                                dr.initialize(List.of());
+                            }
                         }
+                    } catch (Throwable t) {
+                        errors.add(t);
+                    } finally {
+                        doneLatch.countDown();
                     }
-                } catch (Throwable t) {
-                    errors.add(t);
-                } finally {
-                    doneLatch.countDown();
-                }
-            });
+                });
+            }
+
+            startLatch.countDown();
+            doneLatch.await();
+            executor.shutdown();
+
+            assertThat(errors).as("Concurrent access to getDataTableDescriptors/getDescriptor should not throw").isEmpty();
         }
-
-        startLatch.countDown();
-        doneLatch.await();
-        executor.shutdown();
-
-        assertThat(errors).as("Concurrent access to getDataTableDescriptors/getDescriptor should not throw").isEmpty();
     }
 
     @Test
@@ -427,32 +428,33 @@ class DeclarativeRecipeTest implements RewriteTest {
         int expectedSize = dr.getRecipeList().size();
 
         int threadCount = 20;
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        var startLatch = new CountDownLatch(1);
-        var doneLatch = new CountDownLatch(threadCount);
-        var errors = new ConcurrentLinkedQueue<Throwable>();
+        try (ExecutorService executor = Executors.newFixedThreadPool(threadCount)) {
+            var startLatch = new CountDownLatch(1);
+            var doneLatch = new CountDownLatch(threadCount);
+            var errors = new ConcurrentLinkedQueue<Throwable>();
 
-        for (int i = 0; i < threadCount; i++) {
-            executor.submit(() -> {
-                try {
-                    startLatch.await();
-                    for (int j = 0; j < 50; j++) {
-                        dr.initialize(List.of());
+            for (int i = 0; i < threadCount; i++) {
+                executor.submit(() -> {
+                    try {
+                        startLatch.await();
+                        for (int j = 0; j < 50; j++) {
+                            dr.initialize(List.of());
+                        }
+                    } catch (Throwable t) {
+                        errors.add(t);
+                    } finally {
+                        doneLatch.countDown();
                     }
-                } catch (Throwable t) {
-                    errors.add(t);
-                } finally {
-                    doneLatch.countDown();
-                }
-            });
+                });
+            }
+
+            startLatch.countDown();
+            doneLatch.await();
+            executor.shutdown();
+
+            assertThat(errors).as("Concurrent initialize() should not throw").isEmpty();
+            assertThat(dr.getRecipeList()).as("Concurrent initialize() should not duplicate recipes").hasSize(expectedSize);
         }
-
-        startLatch.countDown();
-        doneLatch.await();
-        executor.shutdown();
-
-        assertThat(errors).as("Concurrent initialize() should not throw").isEmpty();
-        assertThat(dr.getRecipeList()).as("Concurrent initialize() should not duplicate recipes").hasSize(expectedSize);
     }
 
     @Test
@@ -541,14 +543,14 @@ class DeclarativeRecipeTest implements RewriteTest {
     void selfReferencingRecipeDetectedAsCycle() {
         // Test that a recipe referencing itself is detected as a cycle
         var selfReferencing = new DeclarativeRecipe(
-            "org.openrewrite.SelfReferencing",
-            "Self Referencing Recipe",
-            "A recipe that references itself",
-            emptySet(),
-            null,
-            URI.create("test"),
-            false,
-            emptyList()
+          "org.openrewrite.SelfReferencing",
+          "Self Referencing Recipe",
+          "A recipe that references itself",
+          emptySet(),
+          null,
+          URI.create("test"),
+          false,
+          emptyList()
         );
 
         // Add itself as a sub-recipe
@@ -556,34 +558,34 @@ class DeclarativeRecipeTest implements RewriteTest {
 
         // Initialize should throw RecipeIntrospectionException when cycle is detected
         assertThatThrownBy(() -> selfReferencing.initialize(List.of(selfReferencing)))
-            .isInstanceOf(RecipeIntrospectionException.class)
-            .hasMessageContaining("creates a cycle")
-            .hasMessageContaining("org.openrewrite.SelfReferencing -> org.openrewrite.SelfReferencing");
+          .isInstanceOf(RecipeIntrospectionException.class)
+          .hasMessageContaining("creates a cycle")
+          .hasMessageContaining("org.openrewrite.SelfReferencing -> org.openrewrite.SelfReferencing");
     }
 
     @Test
     void mutuallyRecursiveRecipesDetectedAsCycle() {
         // Test that mutually recursive recipes are detected as a cycle
         var recipeA = new DeclarativeRecipe(
-            "org.openrewrite.RecipeA",
-            "Recipe A",
-            "Recipe A that references Recipe B",
-            emptySet(),
-            null,
-            URI.create("test"),
-            false,
-            emptyList()
+          "org.openrewrite.RecipeA",
+          "Recipe A",
+          "Recipe A that references Recipe B",
+          emptySet(),
+          null,
+          URI.create("test"),
+          false,
+          emptyList()
         );
 
         var recipeB = new DeclarativeRecipe(
-            "org.openrewrite.RecipeB",
-            "Recipe B",
-            "Recipe B that references Recipe A",
-            emptySet(),
-            null,
-            URI.create("test"),
-            false,
-            emptyList()
+          "org.openrewrite.RecipeB",
+          "Recipe B",
+          "Recipe B that references Recipe A",
+          emptySet(),
+          null,
+          URI.create("test"),
+          false,
+          emptyList()
         );
 
         // A references B
@@ -594,10 +596,10 @@ class DeclarativeRecipeTest implements RewriteTest {
 
         // Initialize should throw RecipeIntrospectionException when cycle is detected
         assertThatThrownBy(() -> recipeA.initialize(List.of(recipeA, recipeB)))
-            .isInstanceOf(RecipeIntrospectionException.class)
-            .hasMessageContaining("creates a cycle")
-            .hasMessageContaining("RecipeA")
-            .hasMessageContaining("RecipeB");
+          .isInstanceOf(RecipeIntrospectionException.class)
+          .hasMessageContaining("creates a cycle")
+          .hasMessageContaining("RecipeA")
+          .hasMessageContaining("RecipeB");
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/6698")
@@ -786,36 +788,36 @@ class DeclarativeRecipeTest implements RewriteTest {
     void deeperCyclicReferencesDetectedAsCycle() {
         // Test that deeper cyclic references (A -> B -> C -> A) are detected as a cycle
         var recipeA = new DeclarativeRecipe(
-            "org.openrewrite.RecipeA",
-            "Recipe A",
-            "Recipe A that references Recipe B",
-            emptySet(),
-            null,
-            URI.create("test"),
-            false,
-            emptyList()
+          "org.openrewrite.RecipeA",
+          "Recipe A",
+          "Recipe A that references Recipe B",
+          emptySet(),
+          null,
+          URI.create("test"),
+          false,
+          emptyList()
         );
 
         var recipeB = new DeclarativeRecipe(
-            "org.openrewrite.RecipeB",
-            "Recipe B",
-            "Recipe B that references Recipe C",
-            emptySet(),
-            null,
-            URI.create("test"),
-            false,
-            emptyList()
+          "org.openrewrite.RecipeB",
+          "Recipe B",
+          "Recipe B that references Recipe C",
+          emptySet(),
+          null,
+          URI.create("test"),
+          false,
+          emptyList()
         );
 
         var recipeC = new DeclarativeRecipe(
-            "org.openrewrite.RecipeC",
-            "Recipe C",
-            "Recipe C that references Recipe A",
-            emptySet(),
-            null,
-            URI.create("test"),
-            false,
-            emptyList()
+          "org.openrewrite.RecipeC",
+          "Recipe C",
+          "Recipe C that references Recipe A",
+          emptySet(),
+          null,
+          URI.create("test"),
+          false,
+          emptyList()
         );
 
         // A references B
@@ -829,12 +831,12 @@ class DeclarativeRecipeTest implements RewriteTest {
 
         // Initialize should throw RecipeIntrospectionException when cycle is detected
         assertThatThrownBy(() -> recipeA.initialize(List.of(recipeA, recipeB, recipeC)))
-            .isInstanceOf(RecipeIntrospectionException.class)
-            .hasMessageContaining("creates a cycle")
-            // The cycle path should show A -> B -> C -> A
-            .hasMessageContaining("RecipeA")
-            .hasMessageContaining("RecipeB")
-            .hasMessageContaining("RecipeC");
+          .isInstanceOf(RecipeIntrospectionException.class)
+          .hasMessageContaining("creates a cycle")
+          // The cycle path should show A -> B -> C -> A
+          .hasMessageContaining("RecipeA")
+          .hasMessageContaining("RecipeB")
+          .hasMessageContaining("RecipeC");
     }
 
     // Uses separate RecipeRunCycles for scan and edit to verify that the accumulator
@@ -843,16 +845,16 @@ class DeclarativeRecipeTest implements RewriteTest {
     @Test
     void scanningRecipeAccumulatorSurvivesAcrossRecipeRunCycles() {
         var recipe = new DeclarativeRecipe(
-                "test.WithPrecondition", "With precondition", "Test with precondition.",
-                emptySet(), null, URI.create("test"), true, emptyList()
+          "test.WithPrecondition", "With precondition", "Test with precondition.",
+          emptySet(), null, URI.create("test"), true, emptyList()
         );
         recipe.addPrecondition(new Singleton());
         recipe.addUninitialized(new CountingRecipe());
         recipe.initialize(List.of());
 
         List<SourceFile> sources = List.of(
-                PlainText.builder().id(Tree.randomId()).sourcePath(Paths.get("file1.txt")).text("hello").build(),
-                PlainText.builder().id(Tree.randomId()).sourcePath(Paths.get("file2.txt")).text("world").build()
+          PlainText.builder().id(Tree.randomId()).sourcePath(Paths.get("file1.txt")).text("hello").build(),
+          PlainText.builder().id(Tree.randomId()).sourcePath(Paths.get("file2.txt")).text("world").build()
         );
 
         var rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
@@ -860,31 +862,50 @@ class DeclarativeRecipeTest implements RewriteTest {
         Recipe noop = Recipe.noop();
 
         // Cycle 1: scan (simulates first yield batch on the platform)
-        var scanCycle = new RecipeRunCycle<LargeSourceSet>(
-                recipe, 1, rootCursor, ctx,
-                new RecipeRunStats(noop), new SearchResults(noop),
-                new SourcesFileResults(noop), new SourcesFileErrors(noop),
-                LargeSourceSet::edit
+        var scanCycle = new RecipeRunCycle<>(
+          recipe, 1, rootCursor, ctx,
+          new RecipeRunStats(noop), new SearchResults(noop),
+          new SourcesFileResults(noop), new SourcesFileErrors(noop),
+          LargeSourceSet::edit
         );
         ctx.putCycle(scanCycle);
         scanCycle.scanSources(new InMemoryLargeSourceSet(sources));
 
         // Cycle 2: edit (simulates new RecipeRunCycle after worker yield — new RecipeStack, fresh getRecipeList() calls)
-        var editCycle = new RecipeRunCycle<LargeSourceSet>(
-                recipe, 1, rootCursor, ctx,
-                new RecipeRunStats(noop), new SearchResults(noop),
-                new SourcesFileResults(noop), new SourcesFileErrors(noop),
-                LargeSourceSet::edit
+        var editCycle = new RecipeRunCycle<>(
+          recipe, 1, rootCursor, ctx,
+          new RecipeRunStats(noop), new SearchResults(noop),
+          new SourcesFileResults(noop), new SourcesFileErrors(noop),
+          LargeSourceSet::edit
         );
         ctx.putCycle(editCycle);
         LargeSourceSet edited = editCycle.editSources(new InMemoryLargeSourceSet(sources));
 
         List<SourceFile> results = edited.getChangeset().getAllResults().stream()
-                .map(Result::getAfter)
-                .filter(Objects::nonNull)
-                .toList();
+          .map(Result::getAfter)
+          .filter(Objects::nonNull)
+          .toList();
 
         assertThat(results).anyMatch(sf -> ((PlainText) sf).getText().contains("[scanned:"));
+    }
+
+    @Test
+    void recipeDescriptorFiltersSingletonDuplicates() {
+        var leaf = new DeclarativeRecipe("leaf", "leaf", "", emptySet(),
+          null, URI.create("test"), false, emptyList());
+        leaf.addPrecondition(new Singleton());
+        leaf.initialize(List.of());
+
+        var root = new DeclarativeRecipe("root", "root", "", emptySet(),
+          null, URI.create("test"), false, emptyList());
+        root.addUninitialized(leaf);
+        root.addUninitialized(leaf);
+        root.initialize(List.of());
+
+        assertThat(root.getDescriptor().getRecipeList())
+          .hasSize(1)
+          .first()
+          .satisfies(r -> assertThat(r.getName()).isEqualTo("leaf"));
     }
 
     static class CountingRecipe extends ScanningRecipe<List<String>> {

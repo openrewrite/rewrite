@@ -343,4 +343,17 @@ class AssignmentTest implements RewriteTest {
         );
     }
 
+    @Test
+    void destructuringAssignmentToExistingVariables() {
+        rewriteRun(
+          groovy(
+            """
+              def key = 'k'
+              def elemAttrs = [:]
+              (key, elemAttrs) = ['x', [:]]
+              """
+          )
+        );
+    }
+
 }

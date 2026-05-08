@@ -159,4 +159,55 @@ class NewClassTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void newAnonymousClassWithMixin() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              trait Greeter { def greet(): String }
+              trait Logger { def log(msg: String): Unit }
+              val x = new Greeter with Logger {
+                def greet(): String = "hi"
+                def log(msg: String): Unit = println(msg)
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void newEmptyAnonymousClass() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val empty = new {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void newAnonymousClassWithThreeMixins() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              trait A { def a(): Int }
+              trait B { def b(): Int }
+              trait C { def c(): Int }
+              val x = new A with B with C {
+                def a(): Int = 1
+                def b(): Int = 2
+                def c(): Int = 3
+              }
+            }
+            """
+          )
+        );
+    }
 }

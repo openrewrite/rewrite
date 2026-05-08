@@ -15,7 +15,9 @@
  */
 package org.openrewrite.golang.rpc;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -174,8 +176,10 @@ class GolangRecipeIntegTest implements RewriteTest {
 
         // Reset to simulate fresh session, then install recipes (like CLI does)
         rpc.reset();
-        rpc.installRecipes(
-                new java.io.File("/Users/jonathan/Projects/github/moderneinc/recipes-go/recipes-code-quality"));
+        java.io.File recipesPath = resolveRecipesGoPath();
+        Assumptions.assumeTrue(recipesPath != null,
+                "recipes-go checkout not found; set -Drecipes.go.path=<path> or RECIPES_GO_PATH env to enable");
+        rpc.installRecipes(recipesPath);
 
         var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
         Tree result = recipe.getVisitor().visit(cu, new InMemoryExecutionContext());
@@ -362,5 +366,69 @@ class GolangRecipeIntegTest implements RewriteTest {
               """
           )
         );
+    }
+
+    /**
+     * Locate a local recipes-code-quality checkout for the full-CLI-path test.
+     * Resolution order: -Drecipes.go.path system property, RECIPES_GO_PATH env
+     * var, then a sibling lookup walking up from the current working dir.
+     * Returns null if none found OR if its go.mod replace points at a
+     * rewrite-go directory that doesn't exist on this machine — caller skips.
+     */
+    private static java.io.@Nullable File resolveRecipesGoPath() {
+        java.io.File candidate = locateRecipesGoPath();
+        return candidate != null && replaceTargetExists(candidate) ? candidate : null;
+    }
+
+    private static java.io.@Nullable File locateRecipesGoPath() {
+        String prop = System.getProperty("recipes.go.path");
+        if (prop == null || prop.isEmpty()) {
+            prop = System.getenv("RECIPES_GO_PATH");
+        }
+        if (prop != null && !prop.isEmpty()) {
+            java.io.File f = new java.io.File(prop);
+            return f.isDirectory() ? f : null;
+        }
+        java.io.File cur = new java.io.File(System.getProperty("user.dir")).getAbsoluteFile();
+        while (cur != null) {
+            for (String rel : new String[]{
+                    "moderneinc/recipes-go/.worktrees/golang/recipes-code-quality",
+                    "recipes-go/recipes-code-quality"
+            }) {
+                java.io.File c = new java.io.File(cur, rel);
+                if (c.isDirectory()) {
+                    return c;
+                }
+            }
+            cur = cur.getParentFile();
+        }
+        return null;
+    }
+
+    /**
+     * Confirm that the rewrite-go directory referenced by the recipes-go
+     * go.mod replace actually exists on this machine. Worktree layouts can
+     * cause the relative replace to point at a non-existent path; in that
+     * case the install would fail mid-`go mod tidy` with a confusing error.
+     */
+    private static boolean replaceTargetExists(java.io.File recipesGoDir) {
+        try {
+            java.nio.file.Path goMod = recipesGoDir.toPath().resolve("go.mod");
+            for (String line : java.nio.file.Files.readAllLines(goMod)) {
+                String t = line.trim();
+                if (!t.startsWith("replace ")) continue;
+                int arrow = t.indexOf("=>");
+                if (arrow < 0) continue;
+                String target = t.substring(arrow + 2).trim();
+                if (target.contains("@")) continue;
+                java.nio.file.Path resolved = recipesGoDir.toPath().resolve(target).normalize();
+                if (target.contains("rewrite-go") && !java.nio.file.Files.isDirectory(resolved)) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (java.io.IOException e) {
+            return false;
+        }
     }
 }

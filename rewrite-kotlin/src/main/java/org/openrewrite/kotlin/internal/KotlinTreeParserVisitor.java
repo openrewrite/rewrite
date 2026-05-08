@@ -269,13 +269,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitCallableReferenceExpression(KtCallableReferenceExpression expression, ExecutionContext data) {
-        FirElement firElement = psiElementAssociations.primary(expression.getCallableReference());
-        if (!(firElement instanceof FirResolvedCallableReference || firElement instanceof FirCallableReferenceAccess)) {
+        FirElement exprFir = psiElementAssociations.primary(expression);
+        if (!(exprFir instanceof FirCallableReferenceAccess)) {
             throw new UnsupportedOperationException(java.lang.String.format("Unsupported callable reference: fir class: %s, fir: %s, psi class: %s.",
-                    firElement == null ? "null" : firElement.getClass().getName(),
-                    PsiTreePrinter.print(psiElementAssociations.primary(expression)),
+                    exprFir == null ? "null" : exprFir.getClass().getName(),
+                    PsiTreePrinter.print(exprFir),
                     expression.getClass().getName()));
         }
+        FirElement firElement = psiElementAssociations.primary(expression.getCallableReference());
         JavaType.Method methodReferenceType = null;
         JavaType.Variable fieldReferenceType = null;
         if (firElement instanceof FirResolvedCallableReference) {

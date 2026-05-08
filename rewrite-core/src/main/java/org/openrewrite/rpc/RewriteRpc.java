@@ -176,11 +176,29 @@ public class RewriteRpc {
         jsonRpc.rpc("GetLanguages", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
+                // Advertise every SourceFile type Java has a receiver for so that
+                // remote peers know they can hand any of these off to Java for
+                // visiting. Each entry is gated by ifOnClasspath so the actual
+                // set narrows to whichever rewrite-* modules are loaded in this
+                // process.
                 return Stream.of(
                         ifOnClasspath("org.openrewrite.text.PlainText"),
                         ifOnClasspath("org.openrewrite.json.tree.Json$Document"),
+                        ifOnClasspath("org.openrewrite.yaml.tree.Yaml$Documents"),
+                        ifOnClasspath("org.openrewrite.xml.tree.Xml$Document"),
+                        ifOnClasspath("org.openrewrite.hcl.tree.Hcl$ConfigFile"),
+                        ifOnClasspath("org.openrewrite.properties.tree.Properties$File"),
+                        ifOnClasspath("org.openrewrite.toml.tree.Toml$Document"),
+                        ifOnClasspath("org.openrewrite.protobuf.tree.Proto$Document"),
+                        ifOnClasspath("org.openrewrite.docker.tree.Docker$File"),
                         ifOnClasspath("org.openrewrite.java.tree.J$CompilationUnit"),
-                        ifOnClasspath("org.openrewrite.javascript.tree.JS$CompilationUnit")
+                        ifOnClasspath("org.openrewrite.javascript.tree.JS$CompilationUnit"),
+                        ifOnClasspath("org.openrewrite.kotlin.tree.K$CompilationUnit"),
+                        ifOnClasspath("org.openrewrite.groovy.tree.G$CompilationUnit"),
+                        ifOnClasspath("org.openrewrite.csharp.tree.Cs$CompilationUnit"),
+                        ifOnClasspath("org.openrewrite.python.tree.Py$CompilationUnit"),
+                        ifOnClasspath("org.openrewrite.golang.tree.Go$CompilationUnit"),
+                        ifOnClasspath("org.openrewrite.scala.tree.S$CompilationUnit")
                 ).filter(Objects::nonNull).toArray(String[]::new);
             }
 

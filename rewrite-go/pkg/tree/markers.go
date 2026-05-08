@@ -109,6 +109,40 @@ type Markup struct {
 
 func (m Markup) ID() uuid.UUID { return m.Ident }
 
+// GoProject identifies the Go project (logical grouping of go.mod + .go
+// files) a source belongs to. Mirrors org.openrewrite.golang.marker.GoProject
+// on the Java side.
+type GoProject struct {
+	Ident       uuid.UUID
+	ProjectName string
+}
+
+func (m GoProject) ID() uuid.UUID { return m.Ident }
+
+// Semicolon marks a RightPadded element that is followed by an explicit
+// `;` separator in the source — i.e. multiple statements on one line:
+// `_ = 1; _ = 2`. Go inserts implicit semicolons at end-of-line so most
+// files don't need this marker; it's only emitted when the source
+// literally has a `;` between statements that the printer must
+// reproduce.
+//
+// Mirrors org.openrewrite.java.marker.Semicolon on the Java side.
+type Semicolon struct {
+	Ident uuid.UUID
+}
+
+func (m Semicolon) ID() uuid.UUID { return m.Ident }
+
+// NewSemicolon creates a Semicolon marker with a fresh UUID.
+func NewSemicolon() Semicolon {
+	return Semicolon{Ident: uuid.New()}
+}
+
+// NewGoProject creates a GoProject marker with a new UUID.
+func NewGoProject(projectName string) GoProject {
+	return GoProject{Ident: uuid.New(), ProjectName: projectName}
+}
+
 // NewSearchResult creates a SearchResult marker with a new UUID.
 func NewSearchResult(description string) SearchResult {
 	return SearchResult{Ident: uuid.New(), Description: description}

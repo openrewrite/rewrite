@@ -27,7 +27,7 @@ func sendRightPadded(s Sender, rp any, q *SendQueue) {
 	elem := rightPaddedElement(rp)
 	if _, ok := elem.(tree.J); ok {
 		q.GetAndSend(rp, func(v any) any { return rightPaddedElement(v) },
-			func(v any) { s.Visit(v, q) })
+			func(v any) { s.Visit(v.(tree.Tree), q) })
 	} else {
 		// Non-J elements (primitives, etc.) are sent as raw values
 		q.GetAndSend(rp, func(v any) any { return rightPaddedElement(v) }, nil)
@@ -67,7 +67,7 @@ func sendLeftPadded(s Sender, lp any, q *SendQueue) {
 			func(v any) { sendSpace(v.(tree.Space), q) })
 	case tree.J:
 		q.GetAndSend(lp, func(v any) any { return leftPaddedElement(v) },
-			func(v any) { s.Visit(v, q) })
+			func(v any) { s.Visit(v.(tree.Tree), q) })
 	default:
 		// Primitives (strings, enums, bools) are sent as raw values with nil onChange
 		q.GetAndSend(lp, func(v any) any { return leftPaddedElement(v) }, nil)
@@ -98,7 +98,7 @@ func receiveRightPadded(r Receiver, q *ReceiveQueue, before any) any {
 	// Element
 	elem := q.Receive(rightPaddedElement(before), func(v any) any {
 		if _, ok := v.(tree.J); ok {
-			return r.Visit(v, q)
+			return r.Visit(v.(tree.Tree), q)
 		}
 		return v
 	})
@@ -136,7 +136,7 @@ func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
 			return receiveSpace(v.(tree.Space), q)
 		}
 		if _, ok := v.(tree.J); ok {
-			return r.Visit(v, q)
+			return r.Visit(v.(tree.Tree), q)
 		}
 		return v
 	})

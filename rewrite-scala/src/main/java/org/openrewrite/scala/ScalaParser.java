@@ -21,7 +21,9 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.scala.internal.ScalaCompilerContext;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.style.NamedStyles;
@@ -44,6 +46,7 @@ public class ScalaParser implements Parser {
 
     private final boolean logCompilationWarningsAndErrors;
     private final JavaTypeCache typeCache;
+    private final JavaTypeFactory typeFactory;
 
     private static final Pattern PACKAGE_PATTERN = Pattern.compile("\\bpackage\\s+([.\\w]+)");
     private static final Pattern CLASS_PATTERN = Pattern.compile("(class|object|trait|case\\s+class)\\s*(<[^>]*>)?\\s+(\\w+)");
@@ -116,6 +119,7 @@ public class ScalaParser implements Parser {
                             source.getCharset(),
                             source.isCharsetBomMarked(),
                             typeCache,
+                            typeFactory,
                             ctx,
                             parseResult.getParseResult()
                         );
@@ -170,6 +174,12 @@ public class ScalaParser implements Parser {
         protected @Nullable Collection<String> artifactNames = Collections.emptyList();
 
         private JavaTypeCache typeCache = new JavaTypeCache();
+
+        @Nullable
+        private JavaTypeFactory typeFactory;
+
+        private JavaTypeFactory.@Nullable Provider typeFactoryProvider;
+
         private boolean logCompilationWarningsAndErrors = false;
         private final List<NamedStyles> styles = new ArrayList<>();
 
@@ -182,6 +192,8 @@ public class ScalaParser implements Parser {
             this.classpath = base.classpath;
             this.artifactNames = base.artifactNames;
             this.typeCache = base.typeCache;
+            this.typeFactory = base.typeFactory;
+            this.typeFactoryProvider = base.typeFactoryProvider;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
         }
@@ -222,9 +234,27 @@ public class ScalaParser implements Parser {
             return this;
         }
 
+        /**
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} or
+         * {@link #typeFactoryProvider} instead. The cache becomes an implementation
+         * detail of the default {@link DefaultJavaTypeFactory}.
+         */
+        @Deprecated
         @SuppressWarnings("unused")
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;
+            return this;
+        }
+
+        @SuppressWarnings("unused")
+        public Builder typeFactory(JavaTypeFactory typeFactory) {
+            this.typeFactory = typeFactory;
+            return this;
+        }
+
+        @SuppressWarnings("unused")
+        public Builder typeFactoryProvider(JavaTypeFactory.Provider provider) {
+            this.typeFactoryProvider = provider;
             return this;
         }
 
@@ -245,7 +275,15 @@ public class ScalaParser implements Parser {
 
         @Override
         public ScalaParser build() {
-            return new ScalaParser(resolvedClasspath(), logCompilationWarningsAndErrors, typeCache);
+            Collection<Path> cp = resolvedClasspath();
+            JavaTypeFactory factory = typeFactory;
+            if (factory == null && typeFactoryProvider != null) {
+                factory = typeFactoryProvider.create(cp == null ? new ArrayList<>() : new ArrayList<>(cp), null);
+            }
+            if (factory == null) {
+                factory = new DefaultJavaTypeFactory(typeCache);
+            }
+            return new ScalaParser(cp, logCompilationWarningsAndErrors, typeCache, factory);
         }
 
         @Override

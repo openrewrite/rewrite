@@ -37,6 +37,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaStyle;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.Style;
@@ -576,6 +577,11 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         private void setJVMClassNames() {
+            if (classpath instanceof JavaSourceSet.ClasspathIndex) {
+                ((JavaSourceSet.ClasspathIndex) classpath).typesInPackage("java.lang")
+                        .forEach(fqn -> jvmClasspathNames.add(fqn.getClassName()));
+                return;
+            }
             for (JavaType.FullyQualified fqn : classpath) {
                 // first check `getFullyQualifiedName()` to avoid unnecessary allocations
                 if (fqn.getFullyQualifiedName().startsWith("java.lang.") && "java.lang".equals(fqn.getPackageName())) {
@@ -592,6 +598,27 @@ public class ImportLayoutStyle implements JavaStyle {
                 checkPackageForClasses.add(packageOrOuterClassName(anImport));
                 nameToPackages.computeIfAbsent(anImport.getElement().getClassName(), p -> new HashSet<>(3))
                                 .add(anImport.getElement().getPackageName());
+            }
+
+            if (classpath instanceof JavaSourceSet.ClasspathIndex) {
+                JavaSourceSet.ClasspathIndex idx = (JavaSourceSet.ClasspathIndex) classpath;
+                for (String pkgOrFqn : checkPackageForClasses) {
+                    idx.typesInPackage(pkgOrFqn).forEach(t ->
+                            nameToPackages.computeIfAbsent(t.getClassName(), p -> new HashSet<>(3)).add(pkgOrFqn));
+                    idx.findFullyQualified(pkgOrFqn).ifPresent(fq -> {
+                        for (JavaType.Variable member : fq.getMembers()) {
+                            if (member.hasFlags(Flag.Static)) {
+                                nameToPackages.computeIfAbsent(member.getName(), p -> new HashSet<>(3)).add(pkgOrFqn);
+                            }
+                        }
+                        for (JavaType.Method method : fq.getMethods()) {
+                            if (method.hasFlags(Flag.Static)) {
+                                nameToPackages.computeIfAbsent(method.getName(), p -> new HashSet<>(3)).add(pkgOrFqn);
+                            }
+                        }
+                    });
+                }
+                return nameToPackages;
             }
 
             for (JavaType.FullyQualified classGraphFqn : classpath) {

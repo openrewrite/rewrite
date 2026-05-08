@@ -24,6 +24,7 @@ import org.openrewrite.gradle.internal.DefaultImportsCustomizer;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.kotlin.KotlinParser;
 
 import java.nio.file.Path;
@@ -166,6 +167,16 @@ public class GradleParser implements Parser {
 
         public Builder kotlinParser(KotlinParser.Builder kotlinParser) {
             this.kotlinParser = kotlinParser;
+            return this;
+        }
+
+        /**
+         * Forward a {@link JavaTypeFactory.Provider} to both the Groovy and Kotlin
+         * sub-parsers so either DSL variant produces types from the caller's factory.
+         */
+        public Builder typeFactoryProvider(JavaTypeFactory.Provider provider) {
+            this.groovyParser.typeFactoryProvider(provider);
+            this.kotlinParser.typeFactoryProvider(provider);
             return this;
         }
 
