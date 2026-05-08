@@ -2263,6 +2263,102 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doesNotDuplicateWhenManagedVersionSatisfiesSemverSelector() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:28.X", "com.google.common.math.IntMath")),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>28.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject(
+            "server",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addsWhenSameGaExistsWithDifferentClassifier() {
+        var addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null,
+          null, true, null, null, "tests", false, null, null);
+        rewriteRun(
+          spec -> spec.recipe(addDep),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>29.0-jre</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>29.0-jre</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>29.0-jre</version>
+                          <classifier>tests</classifier>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null, null);
     }
