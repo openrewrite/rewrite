@@ -114,6 +114,54 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void multilineTypeParameters() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f[
+                      A,
+                      B
+                  ](x: A): A = x
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void multilineCurriedParameterList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(a: Int)(
+                      b: Int,
+                      c: Int
+                  ): Int = a + b + c
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void multilineParameterListWithClosingParenOnOwnLine() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def add(
+                      x: Int,
+                      y: Int
+                  ): Int = x + y
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void overrideMethod() {
         rewriteRun(
             scala(
