@@ -301,9 +301,6 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             }
         }
         if (!defAlreadyPrinted) {
-            if (!method.getModifiers().isEmpty()) {
-                p.append(" ");
-            }
             p.append("def");
         }
         visit(method.getName(), p);
@@ -348,9 +345,6 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 if (!varDecl.getVariables().isEmpty() &&
                     varDecl.getVariables().get(0).getPadding().getInitializer() != null) {
                     JLeftPadded<Expression> init = varDecl.getVariables().get(0).getPadding().getInitializer();
-                    if (init.getBefore().isEmpty()) {
-                        p.append(" ");
-                    }
                     visitLeftPadded("=", init, JLeftPadded.Location.VARIABLE_INITIALIZER, p);
                 }
             } else {
@@ -972,39 +966,34 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitVariableDeclarations(J.VariableDeclarations multiVariable, PrintOutputCapture<P> p) {
         beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
         visit(multiVariable.getLeadingAnnotations(), p);
-        
-        // If we have annotations, ensure space after them before modifiers/val/var
-        if (!multiVariable.getLeadingAnnotations().isEmpty()) {
-            p.append(" ");
-        }
-        
+
         // Check if this is a lambda parameter - if so, don't print val/var
         boolean isLambdaParam = multiVariable.getMarkers().findFirst(
             org.openrewrite.scala.marker.LambdaParameter.class).isPresent();
-        
-        // Print modifiers, but handle Final specially since Scala uses val/var.
-        // The implicit Final modifier (keyword=null) prints as "val".
-        // An explicit "final" modifier prints normally.
-        // The "lazy" modifier is a LanguageExtension and prints via visitModifier.
-        boolean isVal = false;
-        boolean hasVisibleModifier = false;
 
+        // Print modifiers, but handle Final specially since Scala uses val/var.
+        // The implicit Final modifier (keyword=null) marks val; (keyword="given") marks given.
+        // Its prefix carries the source whitespace between the last visible modifier (or annotations)
+        // and the val/given keyword.
+        // An explicit "final" modifier prints normally.
+        boolean hasVisibleModifier = false;
         String valVarKeyword = "var";
+        Space valVarPrefix = null;
+        boolean annotationGapBridged = false;
         for (J.Modifier m : multiVariable.getModifiers()) {
-            if (m.getType() == J.Modifier.Type.Final) {
-                // Any Final modifier means this is a val (or given)
-                isVal = true;
-                if ("given".equals(m.getKeyword())) {
-                    valVarKeyword = "given";
-                } else {
+            if (m.getType() == J.Modifier.Type.Final && !"final".equals(m.getKeyword())) {
+                // Implicit Final marking val/given — capture prefix, don't visit.
+                valVarKeyword = "given".equals(m.getKeyword()) ? "given" : "val";
+                valVarPrefix = m.getPrefix();
+            } else {
+                if (m.getType() == J.Modifier.Type.Final && "final".equals(m.getKeyword())) {
+                    // Explicit "final" keyword still implies val (Scala val is implicitly final).
                     valVarKeyword = "val";
                 }
-                // Only print the modifier if it has an explicit "final" keyword
-                if ("final".equals(m.getKeyword())) {
-                    visit(m, p);
-                    hasVisibleModifier = true;
+                if (!hasVisibleModifier && !multiVariable.getLeadingAnnotations().isEmpty() && m.getPrefix().isEmpty()) {
+                    p.append(" ");
+                    annotationGapBridged = true;
                 }
-            } else {
                 visit(m, p);
                 hasVisibleModifier = true;
             }
@@ -1012,7 +1001,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
         // Print val/var/given (unless it's a lambda parameter)
         if (!isLambdaParam) {
-            if (hasVisibleModifier) {
+            if (valVarPrefix != null) {
+                visitSpace(valVarPrefix, Space.Location.MODIFIER_PREFIX, p);
+            } else if (hasVisibleModifier) {
+                p.append(" ");
+            } else if (!annotationGapBridged && !multiVariable.getLeadingAnnotations().isEmpty()) {
                 p.append(" ");
             }
             p.append(valVarKeyword);

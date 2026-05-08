@@ -2474,6 +2474,9 @@ class ScalaTreeVisitor(
     var hasExplicitFinal = false
     var hasExplicitLazy = false
     
+    // Track the position right after the last modifier keyword (excluding any trailing whitespace).
+    // Used later to compute beforeValVar — the whitespace between the last modifier and val/var/given.
+    var lastModifierKeywordEnd = -1
     if (adjustedStart >= 0 && adjustedEnd <= source.length && adjustedStart < adjustedEnd) {
       val sourceSnippet = source.substring(adjustedStart, adjustedEnd)
 
@@ -2498,6 +2501,7 @@ class ScalaTreeVisitor(
           keyword, J.Modifier.Type.Private, Collections.emptyList()
         ))
         modifierEndPos = leadingWs + keyLen
+        lastModifierKeywordEnd = modifierEndPos
         if (modifierEndPos < sourceSnippet.length && sourceSnippet.charAt(modifierEndPos) == ' ') modifierEndPos += 1
       } else if (trimmedSnippet.startsWith("protected")) {
         var keyword = "protected"
@@ -2512,6 +2516,7 @@ class ScalaTreeVisitor(
           keyword, J.Modifier.Type.Protected, Collections.emptyList()
         ))
         modifierEndPos = leadingWs + keyLen
+        lastModifierKeywordEnd = modifierEndPos
         if (modifierEndPos < sourceSnippet.length && sourceSnippet.charAt(modifierEndPos) == ' ') modifierEndPos += 1
       }
       
@@ -2526,27 +2531,33 @@ class ScalaTreeVisitor(
           hasExplicitFinal = true
           modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
             "final", J.Modifier.Type.Final, Collections.emptyList()))
+          lastModifierKeywordEnd = modifierEndPos + "final".length
           modifierEndPos += "final ".length
         } else if (remaining.startsWith("lazy ")) {
           hasExplicitLazy = true
           modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
             "lazy", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+          lastModifierKeywordEnd = modifierEndPos + "lazy".length
           modifierEndPos += "lazy ".length
         } else if (remaining.startsWith("implicit ")) {
           modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
             "implicit", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+          lastModifierKeywordEnd = modifierEndPos + "implicit".length
           modifierEndPos += "implicit ".length
         } else if (remaining.startsWith("override ")) {
           modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
             "override", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+          lastModifierKeywordEnd = modifierEndPos + "override".length
           modifierEndPos += "override ".length
         } else if (remaining.startsWith("abstract ")) {
           modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
             "abstract", J.Modifier.Type.Abstract, Collections.emptyList()))
+          lastModifierKeywordEnd = modifierEndPos + "abstract".length
           modifierEndPos += "abstract ".length
         } else if (remaining.startsWith("sealed ")) {
           modifiers.add(new J.Modifier(Tree.randomId(), modSpace, Markers.EMPTY,
             "sealed", J.Modifier.Type.Sealed, Collections.emptyList()))
+          lastModifierKeywordEnd = modifierEndPos + "sealed".length
           modifierEndPos += "sealed ".length
         } else {
           scanning = false
@@ -2567,13 +2578,11 @@ class ScalaTreeVisitor(
       }
       
       if (keywordStart >= 0) {
-        // Extract space before val/var (after modifiers or annotations)
-        if (keywordStart > 0) {
-          beforeValVar = Space.format(afterModifiers.substring(0, keywordStart))
-        } else if (hasAnnotations && modifierEndPos == 0) {
-          // When we have annotations but no other modifiers, the space is already in beforeValVar
-          // since cursor is positioned after annotations
-          beforeValVar = Space.EMPTY
+        // Whitespace between the last modifier keyword (or start of snippet, if none) and val/var/given.
+        val totalKeywordPos = modifierEndPos + keywordStart
+        val gapStart = if (lastModifierKeywordEnd >= 0) lastModifierKeywordEnd else 0
+        if (gapStart < totalKeywordPos) {
+          beforeValVar = Space.format(sourceSnippet.substring(gapStart, totalKeywordPos))
         }
         
         // Move cursor past all modifiers and the keyword
@@ -2608,7 +2617,7 @@ class ScalaTreeVisitor(
       val finalKeyword = if (isGiven) "given" else null
       modifiers.add(new J.Modifier(
         Tree.randomId(),
-        if (modifiers.isEmpty) beforeValVar else Space.SINGLE_SPACE,
+        beforeValVar,
         Markers.EMPTY,
         finalKeyword,
         J.Modifier.Type.Final,
@@ -5040,11 +5049,13 @@ class ScalaTreeVisitor(
       }
     }
 
-    val (modifiers, _) = extractModifiersFromText(dd.mods, modifierText)
+    val (modifiers, lastModEnd) = extractModifiersFromText(dd.mods, modifierText)
 
-    // If annotations but no modifiers, capture the space between annotations and "def"
-    if (hasAnnotations && modifiers.isEmpty() && modifierText.nonEmpty && modifierText.trim().isEmpty) {
-      modifiers.add(new J.Modifier(Tree.randomId(), Space.format(modifierText), Markers.EMPTY,
+    // Always capture the whitespace between the last modifier (or start) and "def"
+    // as the prefix of a synthetic "def" LanguageExtension modifier.
+    if (defIndex >= 0) {
+      val defPrefixText = if (lastModEnd <= modifierText.length) modifierText.substring(lastModEnd) else ""
+      modifiers.add(new J.Modifier(Tree.randomId(), Space.format(defPrefixText), Markers.EMPTY,
         "def", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
     }
 
@@ -5494,12 +5505,16 @@ class ScalaTreeVisitor(
     } else null
 
     // Handle default value
+    var initBefore: Space = Space.EMPTY
     val initializer: Expression = if (vd.rhs != untpd.EmptyTree && vd.rhs.span.exists) {
       val rhsStart = Math.max(0, vd.rhs.span.start - offsetAdjustment)
       if (cursor < rhsStart) {
         val before = source.substring(cursor, rhsStart)
         val eqIdx = before.indexOf('=')
-        if (eqIdx >= 0) cursor = cursor + eqIdx + 1
+        if (eqIdx >= 0) {
+          initBefore = Space.format(before.substring(0, eqIdx))
+          cursor = cursor + eqIdx + 1
+        }
       }
       visitTree(vd.rhs) match {
         case expr: Expression => expr
@@ -5513,7 +5528,7 @@ class ScalaTreeVisitor(
       Markers.EMPTY,
       paramName,
       Collections.emptyList(),
-      if (initializer != null) JLeftPadded.build(initializer) else null,
+      if (initializer != null) new JLeftPadded(initBefore, initializer, Markers.EMPTY) else null,
       variableTypeOfTree(vd)
     )
 
