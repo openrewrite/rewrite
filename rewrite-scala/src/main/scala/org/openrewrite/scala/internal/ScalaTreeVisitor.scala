@@ -4863,9 +4863,22 @@ class ScalaTreeVisitor(
       // The AST has one block, so the inner braces are lost in the round-trip
     }
 
-    // Detect parameterless methods (def name: Type = ...) — no parens in source
+    // Detect parameterless methods (def name: Type = ...) — no parens in source.
+    // Use nameSpan when available so symbolic names like `*` or `+:` are skipped
+    // correctly (otherwise the alpha-only name scan stops at the first char and
+    // mistakes the body's opening `(` for a parameter list).
     var hasParensInSource = true
-    if (adjustedStart < adjustedEnd && adjustedEnd <= source.length) {
+    if (dd.nameSpan.exists) {
+      val nameEnd = Math.max(0, dd.nameSpan.end - offsetAdjustment)
+      var i = nameEnd
+      while (i < source.length && source.charAt(i).isWhitespace) i += 1
+      if (i < source.length) {
+        val nextCh = source.charAt(i)
+        if (nextCh == ':' || nextCh == '=') {
+          hasParensInSource = false
+        }
+      }
+    } else if (adjustedStart < adjustedEnd && adjustedEnd <= source.length) {
       val defSource = source.substring(adjustedStart, adjustedEnd)
       val defIdx = defSource.indexOf("def ")
       if (defIdx >= 0) {

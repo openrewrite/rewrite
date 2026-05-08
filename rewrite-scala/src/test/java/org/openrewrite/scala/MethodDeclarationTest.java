@@ -173,4 +173,17 @@ class MethodDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void symbolicNameWithTupleBody() {
+        rewriteRun(
+            scala(
+                """
+                class Foo {
+                  def * = (1, 2, 3)
+                }
+                """
+            )
+        );
+    }
 }
