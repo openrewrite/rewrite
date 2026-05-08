@@ -33,87 +33,87 @@ class AddDependencyGradle9CatalogTest implements RewriteTest {
         // recipe not making any change at all when libs.versions.toml is present on
         // Gradle 9, so the version itself is incidental.
         spec.recipe(new AddDependency(
-                "org.projectlombok", "lombok", null,
-                null, "compileOnly", null,
-                null, null, null, Boolean.TRUE
+          "org.projectlombok", "lombok", null,
+          null, "compileOnly", null,
+          null, null, null, Boolean.TRUE
         ));
     }
 
     @Test
     void gradle9_catalogPresent_addDependencyShouldEditBuildKts() {
         rewriteRun(
-                spec -> spec.beforeRecipe(withToolingApi("9.0.0")),
-                toml(
-                        """
-                        [versions]
-                        lombok = "1.18.30"
-
-                        [libraries]
-                        lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
-                        """,
-                        spec -> spec.path("gradle/libs.versions.toml")
-                ),
-                buildGradleKts(
-                        """
-                        plugins {
-                            java
-                        }
-                        repositories {
-                            mavenCentral()
-                        }
-                        """,
-                        """
-                        plugins {
-                            java
-                        }
-                        repositories {
-                            mavenCentral()
-                        }
-
-                        dependencies {
-                            compileOnly("org.projectlombok:lombok")
-                        }
-                        """
-                )
+          spec -> spec.beforeRecipe(withToolingApi("9.0.0")),
+          toml(
+            """
+              [versions]
+              lombok = "1.18.30"
+              
+              [libraries]
+              lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+              repositories {
+                  mavenCentral()
+              }
+              """,
+            """
+              plugins {
+                  java
+              }
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  compileOnly("org.projectlombok:lombok")
+              }
+              """
+          )
         );
     }
 
     @Test
     void gradle8_catalogPresent_addDependencyEditsBuildKts() {
         rewriteRun(
-                spec -> spec.beforeRecipe(withToolingApi("8.14.3")),
-                toml(
-                        """
-                        [versions]
-                        lombok = "1.18.30"
-
-                        [libraries]
-                        lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
-                        """,
-                        spec -> spec.path("gradle/libs.versions.toml")
-                ),
-                buildGradleKts(
-                        """
-                        plugins {
-                            java
-                        }
-                        repositories {
-                            mavenCentral()
-                        }
-                        """,
-                        """
-                        plugins {
-                            java
-                        }
-                        repositories {
-                            mavenCentral()
-                        }
-
-                        dependencies {
-                            compileOnly("org.projectlombok:lombok")
-                        }
-                        """
-                )
+          spec -> spec.beforeRecipe(withToolingApi("8.14.3")),
+          toml(
+            """
+              [versions]
+              lombok = "1.18.30"
+              
+              [libraries]
+              lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+              }
+              repositories {
+                  mavenCentral()
+              }
+              """,
+            """
+              plugins {
+                  java
+              }
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  compileOnly("org.projectlombok:lombok")
+              }
+              """
+          )
         );
     }
 }
