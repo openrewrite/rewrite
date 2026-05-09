@@ -58,5 +58,21 @@ public class AffectedModulesDataTable extends DataTable<AffectedModulesDataTable
                         "`build-file-changed`, `source-changed`, `module-dep-of-affected`, " +
                         "or `repo-root-bailout:<path>`.")
         String reason;
+
+        @Column(displayName = "Trigger path",
+                description = "Repository-relative path of the changed file that caused this row. " +
+                        "For cascade rows (`module-dep-of-affected`) this is the file in the " +
+                        "upstream affected module. For `repo-root-bailout` rows this is the " +
+                        "root file that triggered the bailout. May be empty when no specific " +
+                        "trigger applies (e.g. synthetic root fallback).")
+        String triggerPath;
+
+        @Column(displayName = "Via",
+                description = "Immediate upstream module that propagated the impact to this row. " +
+                        "Empty for direct rows (`source-changed`, `build-file-changed`, " +
+                        "`repo-root-bailout`); for `module-dep-of-affected` rows this is the " +
+                        "module whose change cascaded here. Lets a consumer reconstruct the " +
+                        "module-DAG path from a changed file to a reached module.")
+        String via;
     }
 }

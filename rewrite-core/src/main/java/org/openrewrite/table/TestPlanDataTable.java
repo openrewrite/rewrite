@@ -66,5 +66,15 @@ public class TestPlanDataTable extends DataTable<TestPlanDataTable.Row> {
         @Column(displayName = "Runner",
                 description = "Build tool that should execute the test: `gradle` or `mvn`.")
         String runner;
+
+        @Column(displayName = "Path",
+                description = "Trail from the selected test class to a changed file, segments " +
+                        "separated by ` -> `. Always starts with the test class's simple name " +
+                        "and ends with the simple name of an edited file that justifies the " +
+                        "selection. When reachability data is available, intermediate segments " +
+                        "name the call/inheritance hops the BFS traversed (e.g. " +
+                        "`FooTest -> FooRecipe -> SomeIsoVisitor -> SomeVisitor`); without " +
+                        "reachability the path collapses to `TestClass -> ChangedFile`.")
+        String path;
     }
 }

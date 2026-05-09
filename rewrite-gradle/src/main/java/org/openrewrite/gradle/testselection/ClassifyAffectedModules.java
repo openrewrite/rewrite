@@ -369,8 +369,27 @@ public class ClassifyAffectedModules extends ScanningRecipe<ClassifyAffectedModu
                 .map(r -> (ChangedFilesDataTable.Row) r)
                 .collect(java.util.stream.Collectors.toList());
 
-        if (changes.isEmpty() || acc.modulesByPath.isEmpty()) {
+        if (changes.isEmpty()) {
             return emptyList();
+        }
+        if (acc.modulesByPath.isEmpty()) {
+            // No build-file markers landed in the LST corpus. This happens on
+            // single-module repos where `mod build` omitted the root build.gradle[.kts]
+            // / pom.xml (observed on openrewrite/rewrite-migrate-java and junit-team/junit4).
+            // Fall back to a synthetic root module so source-tree edits still get
+            // attributed rather than silently producing an empty test plan.
+            // Multi-module repos retain their real modulesByPath population from the
+            // scanner; this branch only triggers when markers are entirely absent.
+            for (ChangedFilesDataTable.Row change : changes) {
+                String path = normalize(change.getPath());
+                if (path.contains("/src/") || path.startsWith("src/")) {
+                    acc.modulesByPath.put("", new ModuleInfo(""));
+                    break;
+                }
+            }
+            if (acc.modulesByPath.isEmpty()) {
+                return emptyList();
+            }
         }
 
         // Resolve Maven sibling dependencies: for each module's collected G:A refs,
@@ -425,6 +444,18 @@ public class ClassifyAffectedModules extends ScanningRecipe<ClassifyAffectedModu
         String pathWithinRoot = stripPrefix(path, rootModule);
 
         if (atRepoRoot) {
+            // Source files directly at the repo root (single-module layout where
+            // sources live at <repo>/src/main/java/... rather than under a subdir)
+            // belong to the root module itself. Attribute them as source-changes
+            // rather than dropping through to classifyRepoRootPath, which would
+            // see an "unknown root file" and emit a full-repo bailout.
+            if (pathWithinRoot.startsWith("src/")) {
+                emit(acc, rootModule, "source-changed", path, "", emitted, ctx);
+                for (String downstream : transitiveDependentsOf(acc, rootModule)) {
+                    emit(acc, downstream, "module-dep-of-affected", path, rootModule, emitted, ctx);
+                }
+                return;
+            }
             RepoRootKind kind = classifyRepoRootPath(pathWithinRoot);
             switch (kind) {
                 case NO_OP:
@@ -440,16 +471,16 @@ public class ClassifyAffectedModules extends ScanningRecipe<ClassifyAffectedModu
         String relativeToModule = stripPrefix(path, owning);
         String fileName = fileNameOf(relativeToModule);
         if (isBuildFileName(fileName) && !relativeToModule.contains("/")) {
-            emit(acc, owning, "build-file-changed", emitted, ctx);
+            emit(acc, owning, "build-file-changed", path, "", emitted, ctx);
             for (String downstream : transitiveDependentsOf(acc, owning)) {
-                emit(acc, downstream, "module-dep-of-affected", emitted, ctx);
+                emit(acc, downstream, "module-dep-of-affected", path, owning, emitted, ctx);
             }
             return;
         }
         if (isUnderSrcTree(relativeToModule)) {
-            emit(acc, owning, "source-changed", emitted, ctx);
+            emit(acc, owning, "source-changed", path, "", emitted, ctx);
             for (String downstream : transitiveDependentsOf(acc, owning)) {
-                emit(acc, downstream, "module-dep-of-affected", emitted, ctx);
+                emit(acc, downstream, "module-dep-of-affected", path, owning, emitted, ctx);
             }
             return;
         }
@@ -457,13 +488,21 @@ public class ClassifyAffectedModules extends ScanningRecipe<ClassifyAffectedModu
         // File is in a module directory but not recognized as source or build file.
         // Conservative: treat like a build-file change to the owning module — cascade
         // to transitive dependents so nothing gets silently dropped.
-        emit(acc, owning, "source-changed", emitted, ctx);
+        emit(acc, owning, "source-changed", path, "", emitted, ctx);
         for (String downstream : transitiveDependentsOf(acc, owning)) {
-            emit(acc, downstream, "module-dep-of-affected", emitted, ctx);
+            emit(acc, downstream, "module-dep-of-affected", path, owning, emitted, ctx);
         }
     }
 
+    /**
+     * Emit one {@link AffectedModulesDataTable.Row}. Dedup is on
+     * {@code (module, reason)} — only the first observed {@code (triggerPath, via)}
+     * wins for a given (module, reason) pair, keeping row count proportional to
+     * the module DAG rather than the changed-files set. Downstream consumers
+     * dedupe further when assembling the test plan.
+     */
     private void emit(Accumulator acc, String modulePath, String reason,
+                      String triggerPath, String via,
                       Set<String> emitted, ExecutionContext ctx) {
         // Only emit for modules we actually know about.
         if (!acc.modulesByPath.containsKey(modulePath)) {
@@ -471,7 +510,8 @@ public class ClassifyAffectedModules extends ScanningRecipe<ClassifyAffectedModu
         }
         String key = modulePath + "\0" + reason;
         if (emitted.add(key)) {
-            affectedModules.insertRow(ctx, new AffectedModulesDataTable.Row(modulePath, reason));
+            affectedModules.insertRow(ctx,
+                    new AffectedModulesDataTable.Row(modulePath, reason, triggerPath, via));
         }
     }
 
@@ -481,7 +521,8 @@ public class ClassifyAffectedModules extends ScanningRecipe<ClassifyAffectedModu
         for (String modulePath : acc.modulesByPath.keySet()) {
             String key = modulePath + "\0" + reason;
             if (emitted.add(key)) {
-                affectedModules.insertRow(ctx, new AffectedModulesDataTable.Row(modulePath, reason));
+                affectedModules.insertRow(ctx,
+                        new AffectedModulesDataTable.Row(modulePath, reason, triggerPath, ""));
             }
         }
     }

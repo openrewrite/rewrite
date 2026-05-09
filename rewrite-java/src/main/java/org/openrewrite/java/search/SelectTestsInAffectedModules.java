@@ -104,6 +104,8 @@ public class SelectTestsInAffectedModules extends ScanningRecipe<SelectTestsInAf
         final Set<String> affectedModules = new HashSet<>();
         /** Module -> reason, preserved from the upstream table for propagation. */
         final Map<String, String> moduleReasons = new HashMap<>();
+        /** Module -> trigger path (the changed file that ultimately caused this module to be flagged). */
+        final Map<String, String> moduleTriggerPaths = new HashMap<>();
         /** Module path -> inferred runner ("gradle" | "mvn"). Populated as build files are seen. */
         final Map<String, String> moduleRunner = new HashMap<>();
         /** Tests discovered during scanning; resolved/emitted in generate(). */
@@ -117,6 +119,14 @@ public class SelectTestsInAffectedModules extends ScanningRecipe<SelectTestsInAf
          * symbol. Populated from {@code ReachabilityDataTable} in {@code getInitialValue}.
          */
         final Set<String> reachableClasses = new HashSet<>();
+        /**
+         * Per-class reachability chain back to a seed, formatted as " -> "-joined
+         * {@code Class.method} segments (newest hop first → oldest). Populated by
+         * walking {@code ReachabilityDataTable} rows in {@code getInitialValue}; an
+         * empty value means "reachable but no chain reconstructable" so the via
+         * column still records the upstream module without invented hops.
+         */
+        final Map<String, String> reachabilityChain = new HashMap<>();
         /**
          * {@code true} if the {@code ReachabilityDataTable} had at least one row.
          * Without it, Phase 2 falls back to Phase 1 module-dep behavior so callers
@@ -138,6 +148,7 @@ public class SelectTestsInAffectedModules extends ScanningRecipe<SelectTestsInAf
         String testClass;
         String language;
         String reason;
+        String path;
     }
 
     @Override
@@ -163,6 +174,9 @@ public class SelectTestsInAffectedModules extends ScanningRecipe<SelectTestsInAf
                 String existing = acc.moduleReasons.get(module);
                 if (existing == null || reasonPriority(newReason) > reasonPriority(existing)) {
                     acc.moduleReasons.put(module, newReason);
+                    // Track the trigger/via that won alongside the reason — these are
+                    // the same shape as the upstream row, so promotion is atomic.
+                    acc.moduleTriggerPaths.put(module, nullToEmpty(row.getTriggerPath()));
                 }
             });
         }
@@ -173,14 +187,31 @@ public class SelectTestsInAffectedModules extends ScanningRecipe<SelectTestsInAf
         // still works for callers that don't schedule ComputeReachability.
         @SuppressWarnings("deprecation")
         Stream<?> reachabilityRows = store.getRows(REACHABILITY_TABLE_NAME, null);
+        // Buffer rows so we can do two passes: (1) collect reachableClasses for the
+        // existence test, (2) reconstruct each class's chain by following viaClass
+        // pointers. The table is bounded by the BFS frontier, so this is fine.
+        Map<String, ChainHop> hopByClass = new HashMap<>();
         try (Stream<?> rows = reachabilityRows) {
             rows.forEach(raw -> {
                 acc.reachabilityProduced = true;
                 String sourceClass = readStringProp(raw, "getSourceClass");
-                if (sourceClass != null && !sourceClass.isEmpty()) {
-                    acc.reachableClasses.add(sourceClass);
+                if (sourceClass == null || sourceClass.isEmpty()) {
+                    return;
                 }
+                acc.reachableClasses.add(sourceClass);
+                String sourceMethod = readStringProp(raw, "getSourceMethod");
+                String viaClass = readStringProp(raw, "getViaClass");
+                String viaMethod = readStringProp(raw, "getViaMethod");
+                String hopKind = readStringProp(raw, "getHopKind");
+                // Keep the shortest path per class — first row wins because BFS emits
+                // shallower depths first; subsequent rows for the same class would be
+                // longer paths into the same destination.
+                hopByClass.putIfAbsent(sourceClass,
+                        new ChainHop(sourceMethod, viaClass, viaMethod, hopKind));
             });
+        }
+        for (String reached : acc.reachableClasses) {
+            acc.reachabilityChain.put(reached, buildChain(reached, hopByClass));
         }
 
         // Phase 2: bailout detection. A single row with reason starting with "reachability-"
@@ -222,6 +253,72 @@ public class SelectTestsInAffectedModules extends ScanningRecipe<SelectTestsInAf
     private static final String REACHABILITY_TABLE_NAME =
             "org.openrewrite.analysis.testselection.table.ReachabilityDataTable";
 
+    /**
+     * One reachability hop, captured at parse time from a {@code ReachabilityDataTable}
+     * row so we can walk the chain backward without re-reading the row stream.
+     * {@link #buildChain} follows {@link #viaClass}/{@link #viaMethod} until it sees
+     * {@code hopKind == "seed"}.
+     */
+    @Value
+    private static class ChainHop {
+        @Nullable String sourceMethod;
+        @Nullable String viaClass;
+        @Nullable String viaMethod;
+        @Nullable String hopKind;
+    }
+
+    /** Cap chain length so a pathological cycle can't blow up the via column. */
+    private static final int MAX_CHAIN_HOPS = 8;
+
+    /**
+     * Reconstruct the BFS chain for a reached class. Format is
+     * {@code "Class.method -> Class.method -> ..."} starting at the reached class
+     * (deepest hop) and ending at the seed; segments use simple class names to keep
+     * the column readable. Returns an empty string when the chain can't be walked
+     * (e.g. the class has no row in the hop map — only happens for an inconsistent
+     * data table).
+     */
+    private static String buildChain(String reached, Map<String, ChainHop> hopByClass) {
+        ChainHop hop = hopByClass.get(reached);
+        if (hop == null) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        appendSegment(out, reached, hop.sourceMethod);
+        String cursor = reached;
+        Set<String> visited = new HashSet<>();
+        visited.add(cursor);
+        for (int i = 0; i < MAX_CHAIN_HOPS; i++) {
+            if ("seed".equals(hop.hopKind) || hop.viaClass == null || hop.viaClass.isEmpty()) {
+                break;
+            }
+            if (!visited.add(hop.viaClass)) {
+                break;
+            }
+            out.append(" -> ");
+            appendSegment(out, hop.viaClass, hop.viaMethod);
+            ChainHop next = hopByClass.get(hop.viaClass);
+            if (next == null) {
+                break;
+            }
+            hop = next;
+            cursor = hop.viaClass == null ? cursor : hop.viaClass;
+        }
+        return out.toString();
+    }
+
+    private static void appendSegment(StringBuilder out, String fqn, @Nullable String method) {
+        int dot = fqn.lastIndexOf('.');
+        out.append(dot < 0 ? fqn : fqn.substring(dot + 1));
+        if (method != null && !method.isEmpty()) {
+            out.append('.').append(method);
+        }
+    }
+
+    private static String nullToEmpty(@Nullable String s) {
+        return s == null ? "" : s;
+    }
+
     /** FQN of {@code org.openrewrite.analysis.testselection.table.BailoutReasonsDataTable}. */
     private static final String BAILOUT_TABLE_NAME =
             "org.openrewrite.analysis.testselection.table.BailoutReasonsDataTable";
@@ -251,7 +348,21 @@ public class SelectTestsInAffectedModules extends ScanningRecipe<SelectTestsInAf
                 JavaSourceFile cu = (JavaSourceFile) tree;
 
                 String module = moduleOf(cu, sourcePath);
-                if (module == null || !acc.affectedModules.contains(module)) {
+                if (module == null) {
+                    return tree;
+                }
+                boolean directMatch = acc.affectedModules.contains(module);
+                // Fallback-mode match: when the classifier couldn't build a module DAG
+                // (no build-file markers in the LST -- single-module repos where
+                // mod build omitted build.gradle.kts / pom.xml), it emits a lone
+                // synthetic root module "" with no name. ClassifyAffectedModules uses
+                // filesystem paths for module identity; this recipe uses JavaProject
+                // projectName. The two disagree at the root of a single-module repo,
+                // so we accept "" as a wildcard when it's the ONLY affected module.
+                boolean fallbackMatch = !directMatch
+                        && acc.affectedModules.size() == 1
+                        && acc.affectedModules.contains("");
+                if (!directMatch && !fallbackMatch) {
                     return tree;
                 }
 
@@ -264,7 +375,9 @@ public class SelectTestsInAffectedModules extends ScanningRecipe<SelectTestsInAf
                 // Collect test classes. We walk the CU directly rather than using a
                 // full JavaIsoVisitor traversal because we only care about top-level
                 // class declarations with at least one @Test-annotated method.
-                String reason = acc.moduleReasons.getOrDefault(module, "module-dep-changed");
+                String reasonKey = directMatch ? module : "";
+                String reason = acc.moduleReasons.getOrDefault(reasonKey, "module-dep-changed");
+                String moduleTrigger = acc.moduleTriggerPaths.getOrDefault(reasonKey, "");
                 AnnotationMatcher[] matchers = new AnnotationMatcher[TEST_ANNOTATION_PATTERNS.length];
                 for (int i = 0; i < TEST_ANNOTATION_PATTERNS.length; i++) {
                     matchers[i] = new AnnotationMatcher(TEST_ANNOTATION_PATTERNS[i]);
@@ -280,23 +393,44 @@ public class SelectTestsInAffectedModules extends ScanningRecipe<SelectTestsInAf
                             String fqn = classDecl.getType().getFullyQualifiedName();
                             String key = module + "::" + fqn;
 
-                            // Phase 2 filter: for module-dep-of-affected modules, only
-                            // include tests that reach a changed symbol. Applied only when
-                            // reachability data was actually produced (so callers that never
-                            // ran ComputeReachability still get Phase 1 behavior) and no
-                            // bailout was raised (in which case we also fall back to Phase 1).
-                            String effectiveReason = reason;
-                            if (isModuleDepOfAffected(reason) &&
-                                    acc.reachabilityProduced &&
-                                    !acc.reachabilityBailedOut) {
-                                if (!acc.reachableClasses.contains(fqn)) {
-                                    return super.visitClassDeclaration(classDecl, c);
-                                }
-                                effectiveReason = "reachable-from-changed";
+                            // Reachability is the foundation: for any module whose
+                            // selection was driven by a *symbol-level* change (source
+                            // edits, transitive dep on a source-edited module), include
+                            // a test only when the BFS proves it reaches a changed
+                            // symbol. Two carve-outs keep the conservative behavior:
+                            //   * reachability data wasn't produced (Phase 1-only
+                            //     callers, or no symbols to seed from) → run everything.
+                            //   * the analysis bailed out → run everything.
+                            //   * reason indicates a non-symbol diff (build-file-changed,
+                            //     repo-root-bailout) → run everything; the call graph
+                            //     can't see classpath shifts or whole-repo bailouts.
+                            //
+                            // Known limitation: reflection / DI containers / annotation
+                            // processors / Kotlin metadata-driven dispatch can route
+                            // execution through edges the static call graph misses.
+                            // Tests that depend on those mechanisms will be silently
+                            // dropped here. Plan: build framework-aware adapters so the
+                            // call graph picks them up; until then this is the trade-off
+                            // we accept in exchange for not running tens of thousands of
+                            // tests on every same-module edit.
+                            if (acc.reachabilityProduced &&
+                                    !acc.reachabilityBailedOut &&
+                                    !isWholeModuleConservativeReason(reason) &&
+                                    !acc.reachableClasses.contains(fqn)) {
+                                return super.visitClassDeclaration(classDecl, c);
                             }
 
+                            // Build the combined path: <TestSimple> -> [chain] -> <TriggerSimple>.
+                            // The chain (when present) already starts at the test class and walks
+                            // back through reachability hops; we append the trigger file's simple
+                            // name if it isn't already the chain's tail so the path always ends
+                            // at a recognizable changed-file name.
+                            String chain = acc.reachabilityChain.getOrDefault(fqn, "");
+                            String path = buildPath(fqn, chain, moduleTrigger);
+
                             if (acc.emittedKeys.add(key)) {
-                                acc.pending.add(new PendingRow(module, fqn, language, effectiveReason));
+                                acc.pending.add(new PendingRow(
+                                        module, fqn, language, reason, path));
                             }
                         }
                         return super.visitClassDeclaration(classDecl, c);
@@ -318,10 +452,68 @@ public class SelectTestsInAffectedModules extends ScanningRecipe<SelectTestsInAf
                     "", // testMethod: blank in v1 — class-level selection
                     row.getReason(),
                     row.getLanguage(),
-                    runner
+                    runner,
+                    row.getPath()
             ));
         }
         return emptyList();
+    }
+
+    /**
+     * Combine the per-class reachability chain (when available) with the trigger
+     * file's simple name into a single human-readable path. The result always
+     * starts at the test class's simple name and ends at a changed-file name,
+     * giving the user an at-a-glance answer to "why is this test selected?"
+     *
+     * <p>Behavior:</p>
+     * <ul>
+     *   <li>Reachability chain present → use it (already begins with the test
+     *       class's simple name and walks back through hops). Append the
+     *       trigger file's simple name only if it isn't already the chain's
+     *       tail, so we don't duplicate {@code "MavenVisitor -> MavenVisitor"}.</li>
+     *   <li>No chain → fall back to {@code "TestSimple -> TriggerFileSimple"}.</li>
+     *   <li>No trigger path either → just the test class's simple name.</li>
+     * </ul>
+     */
+    private static String buildPath(String testClassFqn, String chain, String triggerPath) {
+        String testSimple = simpleName(testClassFqn);
+        String triggerSimple = triggerFileSimpleName(triggerPath);
+        String head = (chain == null || chain.isEmpty()) ? testSimple : chain;
+        if (triggerSimple == null || triggerSimple.isEmpty()) {
+            return head;
+        }
+        // Chain segments use simple-class names (optionally with ".method" suffix)
+        // joined by " -> ". Treat the trigger as already-present when the last
+        // segment names the same class — with or without a method suffix.
+        int lastSep = head.lastIndexOf(" -> ");
+        String tail = lastSep < 0 ? head : head.substring(lastSep + 4);
+        int dot = tail.indexOf('.');
+        String tailClass = dot < 0 ? tail : tail.substring(0, dot);
+        if (tailClass.equals(triggerSimple)) {
+            return head;
+        }
+        return head + " -> " + triggerSimple;
+    }
+
+    /**
+     * Extract the trigger file's simple name (basename without extension), e.g.
+     * {@code "rewrite-maven/src/main/java/org/openrewrite/maven/MavenVisitor.java"}
+     * → {@code "MavenVisitor"}. Returns the empty string for a null or empty
+     * input so callers can use it as a no-op tail.
+     */
+    private static String triggerFileSimpleName(@Nullable String triggerPath) {
+        if (triggerPath == null || triggerPath.isEmpty()) {
+            return "";
+        }
+        int slash = triggerPath.lastIndexOf('/');
+        String file = slash < 0 ? triggerPath : triggerPath.substring(slash + 1);
+        int dot = file.lastIndexOf('.');
+        return dot < 0 ? file : file.substring(0, dot);
+    }
+
+    private static String simpleName(String fqn) {
+        int dot = fqn.lastIndexOf('.');
+        return dot < 0 ? fqn : fqn.substring(dot + 1);
     }
 
     @Override
@@ -332,14 +524,25 @@ public class SelectTestsInAffectedModules extends ScanningRecipe<SelectTestsInAf
     }
 
     /**
-     * True when the {@link AffectedModulesDataTable} reason indicates this module was
-     * brought in solely because it depends on another affected module (as opposed to
-     * having its own source / build-file change). Phase 2 reachability filtering is
-     * only applied to these modules; modules with source-level changes still run every
-     * test as they could be impacted in ways the call graph can't see (e.g. reflection).
+     * True when the upstream classification doesn't have a symbol-level diff to
+     * reach from — running the call-graph filter would drop every test in the
+     * module. We instead include all of the module's tests as a conservative
+     * fallback. Specifically:
+     * <ul>
+     *   <li>{@code build-file-changed} — only the build file (pom.xml,
+     *       build.gradle*) was edited. Classpath / dependency / plugin shifts
+     *       can change runtime behavior in ways the call graph doesn't see, and
+     *       there are no Java symbol changes to seed reachability with.</li>
+     *   <li>{@code repo-root-bailout:*} — the classifier couldn't compute the
+     *       affected-modules set cleanly. Whole-repo safety net — run
+     *       everything in any reachable module.</li>
+     * </ul>
      */
-    private static boolean isModuleDepOfAffected(String reason) {
-        return "module-dep-of-affected".equals(reason) || "module-dep-changed".equals(reason);
+    private static boolean isWholeModuleConservativeReason(@Nullable String reason) {
+        if (reason == null) {
+            return false;
+        }
+        return "build-file-changed".equals(reason) || reason.startsWith("repo-root-bailout:");
     }
 
     /**

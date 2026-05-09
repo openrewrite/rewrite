@@ -52,7 +52,7 @@ class SelectTestsInAffectedModulesTest implements RewriteTest {
         DataTableExecutionContextView.view(ctx).setDataTableStore(store);
         AffectedModulesDataTable table = new AffectedModulesDataTable(Recipe.noop());
         for (String module : modules) {
-            store.insertRow(table, ctx, new AffectedModulesDataTable.Row(module, "module-dep-changed"));
+            store.insertRow(table, ctx, new AffectedModulesDataTable.Row(module, "module-dep-changed", "", ""));
         }
         return ctx;
     }
@@ -321,7 +321,7 @@ class SelectTestsInAffectedModulesTest implements RewriteTest {
 
         AffectedModulesDataTable mods = new AffectedModulesDataTable(Recipe.noop());
         store.insertRow(mods, ctx,
-                new AffectedModulesDataTable.Row(module, "module-dep-of-affected"));
+                new AffectedModulesDataTable.Row(module, "module-dep-of-affected", "rewrite-foo/src/main/java/Foo.java", "rewrite-foo"));
 
         ReachabilityFixtureTable reachTable = new ReachabilityFixtureTable(Recipe.noop());
         store.insertRow(reachTable, ctx,
@@ -335,7 +335,7 @@ class SelectTestsInAffectedModulesTest implements RewriteTest {
         DataTableExecutionContextView.view(ctx).setDataTableStore(store);
         AffectedModulesDataTable mods = new AffectedModulesDataTable(Recipe.noop());
         store.insertRow(mods, ctx,
-                new AffectedModulesDataTable.Row(module, "module-dep-of-affected"));
+                new AffectedModulesDataTable.Row(module, "module-dep-of-affected", "rewrite-foo/src/main/java/Foo.java", "rewrite-foo"));
 
         BailoutFixtureTable bailoutTable = new BailoutFixtureTable(Recipe.noop());
         store.insertRow(bailoutTable, ctx,
@@ -350,9 +350,11 @@ class SelectTestsInAffectedModulesTest implements RewriteTest {
                         .executionContext(ctxWithModuleDepAndReachable("foo", "com.example.ReachableTest"))
                         .dataTable(TestPlanDataTable.Row.class, rows -> {
                             // Only ReachableTest should be emitted — UnreachableTest is pruned.
+                            // Reason is preserved as-is (the upstream module-level signal);
+                            // reachability is just a filter, no longer a relabeling step.
                             assertThat(rows).singleElement().satisfies(r -> {
                                 assertThat(r.getTestClass()).isEqualTo("com.example.ReachableTest");
-                                assertThat(r.getReason()).isEqualTo("reachable-from-changed");
+                                assertThat(r.getReason()).isEqualTo("module-dep-of-affected");
                             });
                         }),
                 mavenProject("foo",
@@ -427,16 +429,28 @@ class SelectTestsInAffectedModulesTest implements RewriteTest {
      * test in the module is still selected regardless of reachability data. Phase 2
      * narrowing only applies to {@code module-dep-of-affected} rows.
      */
+    /**
+     * Reachability is the foundation for selection in <em>every</em> affected
+     * module — including ones with their own source edits. A large module that
+     * happened to receive a source change should not drop every one of its
+     * tests on the runner; we want only the tests that the BFS proves reach
+     * the changed code.
+     *
+     * <p>Trade-off: tests that route through reflection, DI, annotation
+     * processors, or Kotlin metadata-driven dispatch can be silently dropped.
+     * That's the explicit current bargain — framework-aware adapters are a
+     * subsequent phase.</p>
+     */
     @Test
-    void phase2_sourceChangedStillSelectsAllTests() {
+    void phase2_sourceChangedFiltersByReachability() {
         ExecutionContext ctx = new InMemoryExecutionContext();
         InMemoryDataTableStore store = new InMemoryDataTableStore();
         DataTableExecutionContextView.view(ctx).setDataTableStore(store);
         AffectedModulesDataTable mods = new AffectedModulesDataTable(Recipe.noop());
-        store.insertRow(mods, ctx, new AffectedModulesDataTable.Row("foo", "source-changed"));
+        store.insertRow(mods, ctx, new AffectedModulesDataTable.Row("foo", "source-changed", "foo/src/main/java/Foo.java", ""));
 
-        // Also seed a reachability row that names ONLY ReachableTest — but because
-        // the reason is source-changed, both tests should still be emitted.
+        // Reachability seeds only ReachableTest. With reachability now applied
+        // to source-changed modules too, OtherTest should be filtered out.
         ReachabilityFixtureTable reachTable = new ReachabilityFixtureTable(Recipe.noop());
         store.insertRow(reachTable, ctx,
                 new ReachabilityFixtureTable.Row("com.example.ReachableTest", "", "com.example.Something", "", 1));
@@ -445,8 +459,64 @@ class SelectTestsInAffectedModulesTest implements RewriteTest {
                 spec -> spec
                         .executionContext(ctx)
                         .dataTable(TestPlanDataTable.Row.class, rows ->
+                                assertThat(rows).singleElement().satisfies(r -> {
+                                    assertThat(r.getTestClass()).isEqualTo("com.example.ReachableTest");
+                                    // Reason still describes the module-level signal —
+                                    // we don't relabel as "reachable-from-changed" now
+                                    // that the path column already shows the chain.
+                                    assertThat(r.getReason()).isEqualTo("source-changed");
+                                })),
+                mavenProject("foo",
+                        srcTestJava(
+                                java(
+                                        """
+                                          package com.example;
+                                          import org.junit.jupiter.api.Test;
+                                          public class ReachableTest {
+                                              @Test
+                                              void t() {}
+                                          }
+                                          """
+                                ),
+                                java(
+                                        """
+                                          package com.example;
+                                          import org.junit.jupiter.api.Test;
+                                          public class OtherTest {
+                                              @Test
+                                              void t() {}
+                                          }
+                                          """
+                                )
+                        )
+                )
+        );
+    }
+
+    /**
+     * Reachability still does not gate {@code build-file-changed} modules:
+     * editing a pom.xml / build.gradle has no Java-symbol diff to seed the
+     * BFS with, so we keep the module's tests in conservatively. Anything
+     * else would silently drop every test on a dependency-version bump.
+     */
+    @Test
+    void buildFileChangedSkipsReachabilityFilter() {
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        InMemoryDataTableStore store = new InMemoryDataTableStore();
+        DataTableExecutionContextView.view(ctx).setDataTableStore(store);
+        AffectedModulesDataTable mods = new AffectedModulesDataTable(Recipe.noop());
+        store.insertRow(mods, ctx, new AffectedModulesDataTable.Row("foo", "build-file-changed", "foo/pom.xml", ""));
+        // Reachability rows from some other module — should be ignored here.
+        ReachabilityFixtureTable reachTable = new ReachabilityFixtureTable(Recipe.noop());
+        store.insertRow(reachTable, ctx,
+                new ReachabilityFixtureTable.Row("com.example.UnrelatedTest", "", "com.example.X", "", 1));
+
+        rewriteRun(
+                spec -> spec
+                        .executionContext(ctx)
+                        .dataTable(TestPlanDataTable.Row.class, rows ->
                                 assertThat(rows).hasSize(2).allSatisfy(r ->
-                                        assertThat(r.getReason()).isEqualTo("source-changed"))),
+                                        assertThat(r.getReason()).isEqualTo("build-file-changed"))),
                 mavenProject("foo",
                         srcTestJava(
                                 java(
@@ -511,12 +581,14 @@ class SelectTestsInAffectedModulesTest implements RewriteTest {
      * A module can appear in AffectedModulesDataTable with multiple reasons — for
      * example, {@code source-changed} because its own source was edited AND
      * {@code module-dep-of-affected} because the cascade added it as a transitive
-     * dependent of another edited module. In that case SelectTestsInAffectedModules
-     * must keep the more conservative reason (source-changed) so every test in the
-     * module is selected. If the put-last-wins map accidentally picked
-     * module-dep-of-affected, the reachability filter would silently drop tests
-     * that should have been included (empirically observed: 74 rewrite-kotlin tests
-     * in the Phase 2 dogfood on openrewrite/rewrite, 2026-04-22).
+     * dependent of another edited module. The priority merge keeps the most
+     * informative reason (source-changed) so the user sees the strongest signal
+     * for why the module was included.
+     *
+     * <p>Note: under the current "reachability is the foundation" rule, both
+     * reasons would have produced the same set of selected tests anyway —
+     * reachability filters in either case. The priority merge therefore affects
+     * the {@code reason} label, not the row count.</p>
      */
     @Test
     void sourceChangedOverridesModuleDepOfAffectedForSameModule() {
@@ -527,8 +599,8 @@ class SelectTestsInAffectedModulesTest implements RewriteTest {
         // Emit module-dep-of-affected FIRST, then source-changed. The put-last-wins
         // bug would have left source-changed as the winning reason purely by
         // iteration order; the priority merge ensures it wins on merit.
-        store.insertRow(table, ctx, new AffectedModulesDataTable.Row("foo", "module-dep-of-affected"));
-        store.insertRow(table, ctx, new AffectedModulesDataTable.Row("foo", "source-changed"));
+        store.insertRow(table, ctx, new AffectedModulesDataTable.Row("foo", "module-dep-of-affected", "bar/src/main/java/Bar.java", "bar"));
+        store.insertRow(table, ctx, new AffectedModulesDataTable.Row("foo", "source-changed", "foo/src/main/java/Foo.java", ""));
 
         rewriteRun(
                 spec -> spec
@@ -567,8 +639,8 @@ class SelectTestsInAffectedModulesTest implements RewriteTest {
         InMemoryDataTableStore store = new InMemoryDataTableStore();
         DataTableExecutionContextView.view(ctx).setDataTableStore(store);
         AffectedModulesDataTable table = new AffectedModulesDataTable(Recipe.noop());
-        store.insertRow(table, ctx, new AffectedModulesDataTable.Row("foo", "source-changed"));
-        store.insertRow(table, ctx, new AffectedModulesDataTable.Row("foo", "module-dep-of-affected"));
+        store.insertRow(table, ctx, new AffectedModulesDataTable.Row("foo", "source-changed", "foo/src/main/java/Foo.java", ""));
+        store.insertRow(table, ctx, new AffectedModulesDataTable.Row("foo", "module-dep-of-affected", "bar/src/main/java/Bar.java", "bar"));
 
         rewriteRun(
                 spec -> spec
