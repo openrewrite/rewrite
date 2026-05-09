@@ -43,8 +43,6 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -606,19 +604,27 @@ public class RewriteRpc {
             // Send the request and get the future
             CompletableFuture<JsonRpcSuccess> future = jsonRpc.send(JsonRpcRequest.newRequest(method, body));
 
-            // Poll for completion while checking if process is alive
+            // future.get(timeout) from a FJP worker triggers ManagedBlocker compensation,
+            // which spawns helper threads that can leak per-thread RewriteRpc state.
+            // Poll non-blockingly + Thread.sleep so FJP doesn't compensate.
             long totalTimeoutMs = timeout.toMillis();
-            long checkIntervalMs = 500; // Check every 500ms
+            long pollIntervalMs = 1;
+            long livenessIntervalMs = 500;
             long elapsedMs = 0;
-
+            long lastLivenessMs = 0;
             while (elapsedMs < totalTimeoutMs) {
-                try {
-                    // Try to get the result with a short timeout
-                    return future.get(checkIntervalMs, TimeUnit.MILLISECONDS).getResult(responseType);
-                } catch (TimeoutException e) {
+                JsonRpcSuccess result = future.getNow(null);
+                if (result != null) {
+                    return result.getResult(responseType);
+                }
+                if (future.isCompletedExceptionally()) {
+                    return future.get().getResult(responseType);
+                }
+                Thread.sleep(pollIntervalMs);
+                elapsedMs += pollIntervalMs;
+                if (elapsedMs - lastLivenessMs >= livenessIntervalMs) {
                     checkLiveness();
-                    elapsedMs += checkIntervalMs;
-                    // Continue waiting if process is still alive and we haven't hit total timeout
+                    lastLivenessMs = elapsedMs;
                 }
             }
 
