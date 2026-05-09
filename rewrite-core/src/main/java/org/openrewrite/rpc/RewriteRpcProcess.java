@@ -71,7 +71,7 @@ public class RewriteRpcProcess extends Thread {
 
     public RewriteRpcProcess(String... command) {
         this.command = command;
-        this.setName("JavaScriptRewriteRpcProcess");
+        this.setName("RewriteRpcProcess");
         this.setDaemon(false);
     }
 
@@ -168,6 +168,13 @@ public class RewriteRpcProcess extends Thread {
             }
         }
 
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                shutdown();
+            } catch (Throwable ignored) {
+            }
+        }, "rpc-shutdown"));
+
         SimpleModule module = new SimpleModule();
         module.addSerializer(Path.class, new PathSerializer());
         module.addDeserializer(Path.class, new PathDeserializer());
@@ -191,7 +198,7 @@ public class RewriteRpcProcess extends Thread {
                 }
                 int exitCode = process.exitValue();
                 if (exitCode != 0 && exitCode != 1 && exitCode != 143) { // 143 = SIGTERM
-                    throw new RuntimeException("JavaScript Rewrite RPC process crashed with exit code: " + exitCode);
+                    throw new RuntimeException("Rewrite RPC process crashed with exit code: " + exitCode);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
