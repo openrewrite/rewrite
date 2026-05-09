@@ -297,8 +297,11 @@ public class RewriteRpc {
 
         String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
                 .getClass().getName();
-        VisitResponse response = send("Visit", new Visit(visitorName, sourceFileType, null,
+        Supplier<VisitResponse> doSend = () -> send("Visit", new Visit(visitorName, sourceFileType, null,
                 tree.getId().toString(), pId, cursorIds), VisitResponse.class);
+        VisitResponse response = p instanceof ExecutionContext
+                ? RewriteRpcExecutionContextView.view((ExecutionContext) p).withInFlightSlot(doSend)
+                : doSend.get();
         return response.isModified() ?
                 getObject(tree.getId().toString(), sourceFileType) :
                 tree;
@@ -314,14 +317,18 @@ public class RewriteRpc {
 
         String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
                 .getClass().getName();
-        return send("BatchVisit", new BatchVisit(sourceFileType, treeId, pId, cursorIds, visitors),
+        Supplier<BatchVisitResponse> doSend = () -> send("BatchVisit",
+                new BatchVisit(sourceFileType, treeId, pId, cursorIds, visitors),
                 BatchVisitResponse.class);
+        return p instanceof ExecutionContext
+                ? RewriteRpcExecutionContextView.view((ExecutionContext) p).withInFlightSlot(doSend)
+                : doSend.get();
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
         String ctxId = maybeUnwrapExecutionContext(ctx);
-        GenerateResponse response = send("Generate", new Generate(remoteRecipeId, ctxId),
-                GenerateResponse.class);
+        GenerateResponse response = RewriteRpcExecutionContextView.view(ctx).withInFlightSlot(() ->
+                send("Generate", new Generate(remoteRecipeId, ctxId), GenerateResponse.class));
         if (!response.getIds().isEmpty()) {
             List<SourceFile> generated = new ArrayList<>(response.getIds().size());
             for (int i = 0; i < response.getIds().size(); i++) {
@@ -452,7 +459,8 @@ public class RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (ids == null) {
                     // FIXME handle `TimeoutException` gracefully
-                    ids = send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+                    ids = RewriteRpcExecutionContextView.view(ctx).withInFlightSlot(() ->
+                            send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class));
                     assert ids.size() == inputList.size();
                 }
 
