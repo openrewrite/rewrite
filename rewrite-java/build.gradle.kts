@@ -100,4 +100,8 @@ tasks.named<ShadowJar>("shadowJar").configure {
     dependsOn(checkstyle)
     configurations = listOf(checkstyle)
     relocate("com.puppycrawl.tools.checkstyle", "org.openrewrite.tools.checkstyle")
+    // Avoid leaking the bundled checkstyle's META-INF/maven/com.puppycrawl.tools/checkstyle/
+    // metadata, which would otherwise cause tools that read pom.properties to misidentify
+    // this jar as com.puppycrawl.tools:checkstyle.
+    exclude("META-INF/maven/**")
 }
