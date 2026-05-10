@@ -17,7 +17,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import {MessageConnection} from "vscode-jsonrpc/node";
 import {Recipe, RecipeDescriptor, ScanningRecipe} from "../../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
-import {Check, CheckArg, CompositePrecondition} from "../../preconditions";
+import {Check, CheckArg, CompositePrecondition, RecipeRef} from "../../preconditions";
 import {RpcRecipe} from "../recipe";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
@@ -157,6 +157,14 @@ export class PrepareRecipe {
                 operands.push(entry);
             }
             return {op: condition.op, operands};
+        }
+        // Common case: helpers like usesMethod / usesType return a lightweight
+        // RecipeRef so the recipe author can declare a precondition without
+        // firing an RPC at editor() time. The Java host's
+        // PreparedRecipeCache.instantiateVisitor constructs the named recipe
+        // via Jackson and uses its visitor.
+        if (condition instanceof RecipeRef) {
+            return {visitorName: condition.recipeName, visitorOptions: {...condition.options}};
         }
         if (condition instanceof RpcRecipe) {
             return {visitorName: phase === "edit" ? condition.editVisitor : condition.scanVisitor!};

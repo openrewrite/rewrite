@@ -16,7 +16,8 @@
 import {RecipeSpec} from "../src/test";
 import {javascript} from "../src/javascript";
 import {ConditionalFindIdentifier, FindIdentifierWithPathPrecondition} from "../fixtures/path-precondition";
-import {and, check, CompositePrecondition, not, or} from "../src/preconditions";
+import {and, check, CompositePrecondition, not, or, RecipeRef} from "../src/preconditions";
+import {findMethods, findTypes, hasSourcePath, usesMethod, usesType} from "../src/javascript/preconditions";
 import {ExecutionContext} from "../src/execution";
 import {TreeVisitor} from "../src/visitor";
 import {Cursor, Tree} from "../src/tree";
@@ -163,5 +164,50 @@ describe('Preconditions composites (in-process)', () => {
         expect(composite).toBeInstanceOf(CompositePrecondition);
         expect(composite.op).toBe("or");
         expect(composite.operands).toHaveLength(2);
+    });
+
+    test('RecipeRef helpers are lazy and identifiable', () => {
+        // Helpers must NOT fire any RPC when called — they just bundle a
+        // recipe name + options for later wire emission.
+        const refs = [
+            hasSourcePath("**/foo.ts"),
+            usesMethod("*..* tostring(..)"),
+            usesType("java.util.List"),
+            findMethods("*..* fromstring(..)"),
+            findTypes("java.util.Map"),
+        ];
+
+        for (const ref of refs) {
+            expect(ref).toBeInstanceOf(RecipeRef);
+        }
+
+        expect(refs[0].recipeName).toBe("org.openrewrite.FindSourceFiles");
+        expect(refs[0].options).toEqual({filePattern: "**/foo.ts"});
+
+        expect(refs[1].recipeName).toBe("org.openrewrite.java.search.HasMethod");
+        expect(refs[1].options).toEqual({methodPattern: "*..* tostring(..)", matchOverrides: false});
+
+        expect(refs[2].recipeName).toBe("org.openrewrite.java.search.HasType");
+        expect(refs[2].options).toEqual({fullyQualifiedTypeName: "java.util.List", checkAssignability: false});
+
+        expect(refs[3].recipeName).toBe("org.openrewrite.java.search.FindMethods");
+        expect(refs[4].recipeName).toBe("org.openrewrite.java.search.FindTypes");
+    });
+
+    test('RecipeRef short-circuits to "matches" in-process', async () => {
+        // Wire-only — direct in-process callers should still run the
+        // wrapped editor since the host isn't available to evaluate the
+        // gate for real.
+        const editor = new RecordingVisitor();
+        await (await check(usesMethod("*..* nope(..)"), editor))
+            .visit(stubSourceFile(), {} as ExecutionContext);
+        expect(editor.calls).toBe(1);
+    });
+
+    test('Or with RecipeRef operands also short-circuits to "matches"', async () => {
+        const editor = new RecordingVisitor();
+        await (await check(or(usesMethod("*..* a()"), usesType("X")), editor))
+            .visit(stubSourceFile(), {} as ExecutionContext);
+        expect(editor.calls).toBe(1);
     });
 });

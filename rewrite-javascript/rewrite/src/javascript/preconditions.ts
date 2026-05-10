@@ -13,29 +13,73 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RewriteRpc} from "../rpc/rewrite-rpc";
-import {UsesMethod, UsesType} from "./search";
-import {ExecutionContext} from "../execution";
-import {TreeVisitor} from "../visitor";
-import {IsSourceFile} from "../search";
-import {RpcRecipe} from "../rpc/recipe";
+import {RecipeRef} from "../preconditions";
 
-export function hasSourcePath(filePattern: string): Promise<RpcRecipe> | TreeVisitor<any, ExecutionContext> {
-    return RewriteRpc.get() ? RewriteRpc.get()!.prepareRecipe("org.openrewrite.FindSourceFiles", {
-        filePattern
-    }) : new IsSourceFile(filePattern);
+/**
+ * Match source files by path glob.
+ *
+ * Returns a {@link RecipeRef} placeholder. The framework introspects a
+ * ``check(hasSourcePath(...), editor)`` wrapper at PrepareRecipe time
+ * and emits the recipe identity directly in
+ * ``editPreconditions``; the Java host's ``PreparedRecipeCache.instantiateVisitor``
+ * constructs the recipe and uses its visitor — no extra RPC round-trip
+ * needed at editor() construction time, so unit tests can call
+ * ``recipe.editor()`` without an active RPC connection.
+ *
+ * Delegates to {@code org.openrewrite.FindSourceFiles}.
+ */
+export function hasSourcePath(filePattern: string): RecipeRef {
+    return new RecipeRef("org.openrewrite.FindSourceFiles", {filePattern});
 }
 
-export function usesMethod(methodPattern: string, matchOverrides: boolean = false): Promise<RpcRecipe> | TreeVisitor<any, ExecutionContext> {
-    return RewriteRpc.get() ? RewriteRpc.get()!.prepareRecipe("org.openrewrite.java.search.HasMethod", {
-        methodPattern,
-        matchOverrides
-    }) : new UsesMethod(methodPattern);
+/**
+ * Match files using a specific method.
+ *
+ * Returns a {@link RecipeRef} placeholder; see {@link hasSourcePath} for
+ * the introspection / lazy-evaluation pattern.
+ *
+ * ``methodPattern`` follows the OpenRewrite method-pattern syntax:
+ * ``<receiver-type> <method-name>(<args>)`` — e.g.
+ * ``"*..* tostring(..)"`` or ``"java.util.Collections emptyList()"``.
+ *
+ * Delegates to {@code org.openrewrite.java.search.HasMethod}.
+ */
+export function usesMethod(methodPattern: string, matchOverrides: boolean = false): RecipeRef {
+    return new RecipeRef("org.openrewrite.java.search.HasMethod", {methodPattern, matchOverrides});
 }
 
-export function usesType(fullyQualifiedType: string): Promise<RpcRecipe> | TreeVisitor<any, ExecutionContext> {
-    return RewriteRpc.get() ? RewriteRpc.get()!.prepareRecipe("org.openrewrite.java.search.HasType", {
-        fullyQualifiedType,
-        checkAssignability: false
-    }) : new UsesType(fullyQualifiedType);
+/**
+ * Match files using a specific type.
+ *
+ * Returns a {@link RecipeRef} placeholder; see {@link hasSourcePath} for
+ * the introspection / lazy-evaluation pattern.
+ *
+ * Delegates to {@code org.openrewrite.java.search.HasType}.
+ */
+export function usesType(fullyQualifiedTypeName: string, checkAssignability: boolean = false): RecipeRef {
+    return new RecipeRef("org.openrewrite.java.search.HasType", {fullyQualifiedTypeName, checkAssignability});
+}
+
+/**
+ * Find and mark methods matching a pattern.
+ *
+ * Returns a {@link RecipeRef} placeholder; see {@link hasSourcePath} for
+ * the introspection / lazy-evaluation pattern.
+ *
+ * Delegates to {@code org.openrewrite.java.search.FindMethods}.
+ */
+export function findMethods(methodPattern: string, matchOverrides: boolean = false): RecipeRef {
+    return new RecipeRef("org.openrewrite.java.search.FindMethods", {methodPattern, matchOverrides});
+}
+
+/**
+ * Find and mark usages of a type.
+ *
+ * Returns a {@link RecipeRef} placeholder; see {@link hasSourcePath} for
+ * the introspection / lazy-evaluation pattern.
+ *
+ * Delegates to {@code org.openrewrite.java.search.FindTypes}.
+ */
+export function findTypes(fullyQualifiedTypeName: string): RecipeRef {
+    return new RecipeRef("org.openrewrite.java.search.FindTypes", {fullyQualifiedTypeName});
 }

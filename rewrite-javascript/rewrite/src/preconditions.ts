@@ -19,12 +19,39 @@ import {Recipe} from "./recipe";
 import {ExecutionContext} from "./execution";
 
 /**
+ * Recipe-identity placeholder for use as a precondition.
+ *
+ * Captures a Java recipe class name + options without instantiating the
+ * recipe or firing an RPC. The framework introspects a
+ * ``check(RecipeRef, editor)`` wrapper at PrepareRecipe time and emits
+ * the recipe identity directly in
+ * ``PrepareRecipeResponse.editPreconditions``. The Java host's
+ * ``PreparedRecipeCache.instantiateVisitor`` constructs the recipe via
+ * Jackson and uses its visitor.
+ *
+ * This avoids requiring the recipe author to do an RPC at ``editor()``
+ * construction time, which would otherwise block in-process unit tests
+ * that don't have an active RPC connection.
+ *
+ * Helpers in ``@openrewrite/rewrite/javascript/preconditions``
+ * (``usesMethod``, ``usesType``, ``hasSourcePath``, ``findMethods``,
+ * ``findTypes``) return ``RecipeRef`` instances.
+ */
+export class RecipeRef {
+    constructor(
+        readonly recipeName: string,
+        readonly options: Readonly<Record<string, any>> = {}
+    ) {
+    }
+}
+
+/**
  * Composite of nested precondition operands joined by an operator.
  *
  * Mirrors Java's ``Preconditions.or``/``and``/``not``: a gate that
  * short-circuits over its operands. ``op`` is one of ``"or"`` / ``"and"`` /
- * ``"not"``. Operands may be ``TreeVisitor``, ``Recipe``, or another
- * ``CompositePrecondition``.
+ * ``"not"``. Operands may be ``TreeVisitor``, ``Recipe``, ``RecipeRef``,
+ * or another ``CompositePrecondition``.
  *
  * The framework promotes the composite to a structured wire entry at
  * PrepareRecipe time; the Java host's ``RewriteRpc.matchAll`` rebuilds
@@ -39,7 +66,7 @@ export class CompositePrecondition {
     }
 }
 
-export type CheckArg = Recipe | TreeVisitor<any, ExecutionContext> | CompositePrecondition;
+export type CheckArg = Recipe | TreeVisitor<any, ExecutionContext> | RecipeRef | CompositePrecondition;
 
 export async function check<T extends Tree>(
     checkCondition: CheckArg | Promise<CheckArg> | boolean,
@@ -96,8 +123,8 @@ export class Check<T extends Tree> extends TreeVisitor<T, ExecutionContext> {
     }
 
     async isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): Promise<boolean> {
-        if (this.check instanceof CompositePrecondition) {
-            // Composites have no in-process is_acceptable — defer to the wrapped editor.
+        if (this.check instanceof RecipeRef || this.check instanceof CompositePrecondition) {
+            // RecipeRef / Composite have no in-process is_acceptable — defer to the wrapped editor.
             return this.v.isAcceptable(sourceFile, ctx);
         }
         return await (await this.checkVisitor()).isAcceptable(sourceFile, ctx) &&
@@ -108,6 +135,17 @@ export class Check<T extends Tree> extends TreeVisitor<T, ExecutionContext> {
         // if tree isn't an instanceof of SourceFile, then a precondition visitor may
         // not be able to do its work because it may assume we are starting from the root level
         if (!isSourceFile(tree)) {
+            return parent !== undefined
+                ? this.v.visit<R>(tree, ctx, parent)
+                : this.v.visit<R>(tree, ctx);
+        }
+
+        // In-process fallback: a RecipeRef is a wire-only placeholder with no
+        // ``visit`` of its own — treat as "always matches" so the wrapped
+        // editor still runs in unit tests and direct in-process calls. The
+        // wire-side optimization (skip the visit RPC when the precondition
+        // rejects the file) lives in optimizePreconditions.
+        if (this.check instanceof RecipeRef) {
             return parent !== undefined
                 ? this.v.visit<R>(tree, ctx, parent)
                 : this.v.visit<R>(tree, ctx);
@@ -176,6 +214,12 @@ async function operandMatches(
     ctx: ExecutionContext,
     parent?: Cursor
 ): Promise<boolean> {
+    if (operand instanceof RecipeRef) {
+        // Wire-only — treat as "always matches" in-process so the wrapped
+        // editor still runs in unit tests. The host evaluates the gate
+        // for real once the response goes over the wire.
+        return true;
+    }
     if (operand instanceof CompositePrecondition) {
         return evaluateComposite(operand, tree, ctx, parent);
     }
