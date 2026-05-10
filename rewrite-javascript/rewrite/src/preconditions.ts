@@ -18,8 +18,31 @@ import {Cursor, isSourceFile, SourceFile, Tree} from './tree';
 import {Recipe} from "./recipe";
 import {ExecutionContext} from "./execution";
 
+/**
+ * Composite of nested precondition operands joined by an operator.
+ *
+ * Mirrors Java's ``Preconditions.or``/``and``/``not``: a gate that
+ * short-circuits over its operands. ``op`` is one of ``"or"`` / ``"and"`` /
+ * ``"not"``. Operands may be ``TreeVisitor``, ``Recipe``, or another
+ * ``CompositePrecondition``.
+ *
+ * The framework promotes the composite to a structured wire entry at
+ * PrepareRecipe time; the Java host's ``RewriteRpc.matchAll`` rebuilds
+ * the visitor via the matching ``Preconditions`` factory so the gate runs
+ * locally and the visit RPC is skipped for files the gate rejects.
+ */
+export class CompositePrecondition {
+    constructor(
+        readonly op: "or" | "and" | "not",
+        readonly operands: ReadonlyArray<CheckArg>
+    ) {
+    }
+}
+
+export type CheckArg = Recipe | TreeVisitor<any, ExecutionContext> | CompositePrecondition;
+
 export async function check<T extends Tree>(
-    checkCondition: Recipe | Promise<Recipe> | TreeVisitor<T, ExecutionContext> | Promise<TreeVisitor<T, ExecutionContext>> | boolean,
+    checkCondition: CheckArg | Promise<CheckArg> | boolean,
     v: TreeVisitor<T, ExecutionContext> | Promise<TreeVisitor<T, ExecutionContext>>
 ): Promise<TreeVisitor<T, ExecutionContext>> {
     const resolvedCheck = await checkCondition;
@@ -31,15 +54,52 @@ export async function check<T extends Tree>(
     return new Check(resolvedCheck, resolvedV);
 }
 
+/**
+ * OR-compose precondition checks. Mirrors Java's
+ * ``Preconditions.or(visitor...)``: the gate matches if any operand
+ * matches. Requires at least two operands; a single-operand OR has no
+ * value over a bare ``check``.
+ */
+export function or(...operands: CheckArg[]): CompositePrecondition {
+    if (operands.length < 2) {
+        throw new Error("Preconditions.or requires at least two operands");
+    }
+    return new CompositePrecondition("or", operands);
+}
+
+/**
+ * AND-compose precondition checks. The outer ``editPreconditions`` list
+ * is already AND-composed by the host, so this is mainly useful as an
+ * operand of ``or``/``not``.
+ */
+export function and(...operands: CheckArg[]): CompositePrecondition {
+    if (operands.length < 2) {
+        throw new Error("Preconditions.and requires at least two operands");
+    }
+    return new CompositePrecondition("and", operands);
+}
+
+/**
+ * Negate a precondition check. Mirrors Java's ``Preconditions.not(visitor)``:
+ * the gate matches iff the operand does not.
+ */
+export function not(operand: CheckArg): CompositePrecondition {
+    return new CompositePrecondition("not", [operand]);
+}
+
 export class Check<T extends Tree> extends TreeVisitor<T, ExecutionContext> {
     constructor(
-        readonly check: TreeVisitor<T, ExecutionContext> | Recipe,
+        readonly check: CheckArg,
         readonly v: TreeVisitor<T, ExecutionContext>
     ) {
         super();
     }
 
     async isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): Promise<boolean> {
+        if (this.check instanceof CompositePrecondition) {
+            // Composites have no in-process is_acceptable — defer to the wrapped editor.
+            return this.v.isAcceptable(sourceFile, ctx);
+        }
         return await (await this.checkVisitor()).isAcceptable(sourceFile, ctx) &&
             await this.v.isAcceptable(sourceFile, ctx);
     }
@@ -53,12 +113,11 @@ export class Check<T extends Tree> extends TreeVisitor<T, ExecutionContext> {
                 : this.v.visit<R>(tree, ctx);
         }
 
-        const checkResult = parent !== undefined
-            ? await (await this.checkVisitor()).visit(tree, ctx, parent)
-            : await (await this.checkVisitor()).visit(tree, ctx);
+        const matched = this.check instanceof CompositePrecondition
+            ? await evaluateComposite(this.check, tree, ctx, parent)
+            : await this.runLeafCheck(tree, ctx, parent);
 
-        // If check visitor modified the tree (returned something different), run the main visitor
-        if (checkResult !== (tree as unknown as T)) {
+        if (matched) {
             return parent !== undefined
                 ? this.v.visit<R>(tree, ctx, parent)
                 : this.v.visit<R>(tree, ctx);
@@ -67,7 +126,62 @@ export class Check<T extends Tree> extends TreeVisitor<T, ExecutionContext> {
         return tree as unknown as R;
     }
 
-    private async checkVisitor(): Promise<TreeVisitor<any, ExecutionContext>> {
-        return this.check instanceof Recipe ? this.check.editor() : this.check;
+    private async runLeafCheck(tree: Tree, ctx: ExecutionContext, parent?: Cursor): Promise<boolean> {
+        const checkResult = parent !== undefined
+            ? await (await this.checkVisitor()).visit(tree, ctx, parent)
+            : await (await this.checkVisitor()).visit(tree, ctx);
+        return checkResult !== (tree as unknown as T);
     }
+
+    private async checkVisitor(): Promise<TreeVisitor<any, ExecutionContext>> {
+        return this.check instanceof Recipe ? this.check.editor() : (this.check as TreeVisitor<any, ExecutionContext>);
+    }
+}
+
+/**
+ * Evaluate a {@link CompositePrecondition} in-process for unit tests and
+ * direct callers that don't have a live RPC. Mirrors Java's
+ * ``Preconditions.or``/``and``/``not`` semantics. Returns ``true`` iff the
+ * gate would let the wrapped visitor run.
+ */
+async function evaluateComposite(
+    composite: CompositePrecondition,
+    tree: Tree,
+    ctx: ExecutionContext,
+    parent?: Cursor
+): Promise<boolean> {
+    const operands = composite.operands;
+    switch (composite.op) {
+        case "or":
+            for (const operand of operands) {
+                if (await operandMatches(operand, tree, ctx, parent)) return true;
+            }
+            return false;
+        case "and":
+            for (const operand of operands) {
+                if (!(await operandMatches(operand, tree, ctx, parent))) return false;
+            }
+            return true;
+        case "not":
+            if (operands.length !== 1) {
+                throw new Error("CompositePrecondition op=not requires exactly one operand");
+            }
+            return !(await operandMatches(operands[0], tree, ctx, parent));
+    }
+}
+
+async function operandMatches(
+    operand: CheckArg,
+    tree: Tree,
+    ctx: ExecutionContext,
+    parent?: Cursor
+): Promise<boolean> {
+    if (operand instanceof CompositePrecondition) {
+        return evaluateComposite(operand, tree, ctx, parent);
+    }
+    const visitor = operand instanceof Recipe ? await operand.editor() : operand;
+    const result = parent !== undefined
+        ? await visitor.visit(tree, ctx, parent)
+        : await visitor.visit(tree, ctx);
+    return result !== tree;
 }

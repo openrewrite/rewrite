@@ -16,6 +16,10 @@
 import {RecipeSpec} from "../src/test";
 import {javascript} from "../src/javascript";
 import {ConditionalFindIdentifier, FindIdentifierWithPathPrecondition} from "../fixtures/path-precondition";
+import {and, check, CompositePrecondition, not, or} from "../src/preconditions";
+import {ExecutionContext} from "../src/execution";
+import {TreeVisitor} from "../src/visitor";
+import {Cursor, Tree} from "../src/tree";
 
 describe('Preconditions', () => {
     test('visitor precondition - should only mark identifiers in matching path', async () => {
@@ -59,5 +63,105 @@ describe('Preconditions', () => {
         await spec.rewriteRun(
             javascript('const bar = 1;')
         );
+    });
+});
+
+/**
+ * Stub source-file sentinel: only ``isSourceFile(tree)`` needs to be true
+ * inside ``Check.visit``; the wrapper doesn't read source-file fields.
+ */
+const stubSourceFile = (): Tree => ({
+    kind: "org.openrewrite.tree.SourceFile",
+    id: "00000000-0000-0000-0000-000000000000",
+    markers: {kind: "org.openrewrite.marker.Markers", id: "00000000-0000-0000-0000-000000000000", markers: []},
+    sourcePath: "stub",
+    charsetName: undefined,
+    charsetBomMarked: false,
+    checksum: undefined,
+    fileAttributes: undefined
+} as unknown as Tree);
+
+class RecordingVisitor extends TreeVisitor<any, ExecutionContext> {
+    calls = 0;
+
+    async visit<R extends any>(tree: Tree, _: ExecutionContext, _parent?: Cursor): Promise<R | undefined> {
+        this.calls++;
+        return tree as R;
+    }
+}
+
+class MarkingVisitor extends TreeVisitor<any, ExecutionContext> {
+    calls = 0;
+
+    async visit<R extends any>(tree: Tree, _: ExecutionContext, _parent?: Cursor): Promise<R | undefined> {
+        this.calls++;
+        return ({...(tree as any)}) as R;
+    }
+}
+
+describe('Preconditions composites (in-process)', () => {
+    test('or short-circuits on the first matching operand', async () => {
+        const matching = new MarkingVisitor();
+        const nonMatching = new RecordingVisitor();
+        const editor = new RecordingVisitor();
+
+        const wrapped = await check(or(matching, nonMatching), editor);
+        await wrapped.visit(stubSourceFile(), {} as ExecutionContext);
+
+        expect(matching.calls).toBe(1);
+        expect(nonMatching.calls).toBe(0);
+        expect(editor.calls).toBe(1);
+    });
+
+    test('or skips editor when no operand matches', async () => {
+        const a = new RecordingVisitor();
+        const b = new RecordingVisitor();
+        const editor = new RecordingVisitor();
+
+        const wrapped = await check(or(a, b), editor);
+        await wrapped.visit(stubSourceFile(), {} as ExecutionContext);
+
+        expect(a.calls).toBe(1);
+        expect(b.calls).toBe(1);
+        expect(editor.calls).toBe(0);
+    });
+
+    test('and runs editor only when all operands match', async () => {
+        const matchA = new MarkingVisitor();
+        const matchB = new MarkingVisitor();
+        const editor = new RecordingVisitor();
+
+        const wrapped = await check(and(matchA, matchB), editor);
+        await wrapped.visit(stubSourceFile(), {} as ExecutionContext);
+        expect(editor.calls).toBe(1);
+
+        const editor2 = new RecordingVisitor();
+        const wrapped2 = await check(and(matchA, new RecordingVisitor()), editor2);
+        await wrapped2.visit(stubSourceFile(), {} as ExecutionContext);
+        expect(editor2.calls).toBe(0);
+    });
+
+    test('not inverts a single-operand match', async () => {
+        const matching = new MarkingVisitor();
+        const editor1 = new RecordingVisitor();
+        await (await check(not(matching), editor1)).visit(stubSourceFile(), {} as ExecutionContext);
+        expect(editor1.calls).toBe(0);
+
+        const nonMatching = new RecordingVisitor();
+        const editor2 = new RecordingVisitor();
+        await (await check(not(nonMatching), editor2)).visit(stubSourceFile(), {} as ExecutionContext);
+        expect(editor2.calls).toBe(1);
+    });
+
+    test('or/and require at least two operands', () => {
+        expect(() => or(new RecordingVisitor())).toThrow(/at least two operands/);
+        expect(() => and(new RecordingVisitor())).toThrow(/at least two operands/);
+    });
+
+    test('CompositePrecondition is a plain class', () => {
+        const composite = or(new RecordingVisitor(), new MarkingVisitor());
+        expect(composite).toBeInstanceOf(CompositePrecondition);
+        expect(composite.op).toBe("or");
+        expect(composite.operands).toHaveLength(2);
     });
 });
