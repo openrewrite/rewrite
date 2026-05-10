@@ -78,13 +78,21 @@ class RecipeRef:
     construction time, which would otherwise block in-process unit tests
     that don't have an active RPC connection.
 
+    If ``local_visitor`` is provided, in-process callers (without an active
+    RPC connection) evaluate the gate against that visitor instead of
+    short-circuiting to "always matches". This preserves real filtering
+    behavior in unit tests while still letting the host evaluate the gate
+    over the wire when an RPC connection is present.
+
     Helpers in :mod:`rewrite.python.preconditions` (``uses_method``,
     ``uses_type``, ``has_source_path``, ``find_methods``, ``find_types``)
-    return ``RecipeRef`` instances.
+    return ``RecipeRef`` instances populated with the matching native
+    Python visitor where one exists.
     """
 
     recipe_name: str
     options: Dict[str, Any] = field(default_factory=dict)
+    local_visitor: Optional[TreeVisitor[Any, ExecutionContext]] = None
 
 
 # Type accepted by Check / Preconditions.check for the gate visitor.
@@ -168,14 +176,22 @@ class Check(TreeVisitor[Tree, ExecutionContext]):
     ) -> Optional[Tree]:
         if not isinstance(tree, SourceFile):
             return self._v.visit(tree, p, parent)
-        # In-process fallback: a RecipeRef is a wire-only placeholder with no
-        # ``visit`` of its own — treat as "always matches" so the wrapped
-        # editor still runs in unit tests and direct in-process calls. The
-        # Java-side optimization (skip the visit RPC when the precondition
-        # rejects the file) lives in handle_prepare_recipe and the
-        # RecipeRunCycle batch path for the wire path.
+        # In-process fallback for a RecipeRef: if a local_visitor was
+        # provided, evaluate the gate against it (preserves real filtering
+        # for unit tests); otherwise treat as "always matches" so the
+        # wrapped editor still runs. Wire-side optimization (skip the
+        # visit RPC when the precondition rejects the file) lives in
+        # handle_prepare_recipe and the RecipeRunCycle batch path and is
+        # independent of local_visitor.
         if isinstance(self._check, RecipeRef):
-            return self._v.visit(tree, p, parent)
+            if self._check.local_visitor is None:
+                return self._v.visit(tree, p, parent)
+            local_after = self._check.local_visitor.visit(
+                tree, _suppressing(p), parent
+            )
+            if local_after is not tree:
+                return self._v.visit(tree, p, parent)
+            return tree
         if isinstance(self._check, CompositePrecondition):
             if _evaluate_composite(self._check, tree, _suppressing(p), parent):
                 return self._v.visit(tree, p, parent)
@@ -227,7 +243,12 @@ def _operand_matches(
     from rewrite.recipe import Recipe
 
     if isinstance(operand, RecipeRef):
-        return True
+        # If a local_visitor is bundled, evaluate against it for real;
+        # otherwise short-circuit to "always matches" (the host evaluates
+        # the gate over the wire when an RPC connection is available).
+        if operand.local_visitor is None:
+            return True
+        return operand.local_visitor.visit(tree, ctx, parent) is not tree
     if isinstance(operand, CompositePrecondition):
         return _evaluate_composite(operand, tree, ctx, parent)
     if isinstance(operand, Recipe):

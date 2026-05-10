@@ -284,18 +284,50 @@ def test_not_inverts_match():
     assert editor2.calls == 1
 
 
-def test_or_treats_recipe_ref_operands_as_match():
-    """RecipeRefs are wire-only — in-process they should pass through."""
-    from rewrite.python.preconditions import uses_method
+def test_or_with_recipe_ref_without_local_visitor_short_circuits():
+    """A bare RecipeRef without a local_visitor short-circuits to "matches"
+    in-process so the wrapped editor still runs."""
+    from rewrite.preconditions import RecipeRef
+
+    bare = RecipeRef("org.openrewrite.java.search.HasMethod", {"methodPattern": "*..* a()"})
+    bare2 = RecipeRef("org.openrewrite.java.search.HasMethod", {"methodPattern": "*..* b()"})
 
     editor = _RecordingVisitor()
-    wrapped = Preconditions.check(
-        Preconditions.or_(uses_method("*..* a()"), uses_method("*..* b()")),
-        editor,
-    )
+    wrapped = Preconditions.check(Preconditions.or_(bare, bare2), editor)
 
     wrapped.visit(_stub_source_file(), InMemoryExecutionContext())
     assert editor.calls == 1
+
+
+def test_recipe_ref_with_local_visitor_evaluates_for_real():
+    """Helpers like uses_method bundle a native local visitor so unit tests
+    without an active RPC connection still see real filtering. The stub
+    source file has no method invocations, so the gate fails and the
+    editor is skipped."""
+    from rewrite.python.preconditions import uses_method
+
+    editor = _RecordingVisitor()
+    wrapped = Preconditions.check(uses_method("*..* nope()"), editor)
+
+    wrapped.visit(_stub_source_file(), InMemoryExecutionContext())
+    assert editor.calls == 0
+
+
+def test_helpers_populate_local_visitor():
+    """Spot-check that helpers bundle a native visitor for offline eval."""
+    from rewrite.python.preconditions import (
+        find_methods,
+        find_types,
+        has_source_path,
+        uses_method,
+        uses_type,
+    )
+
+    assert has_source_path("**/*.py").local_visitor is not None
+    assert uses_method("*..* a(..)").local_visitor is not None
+    assert uses_type("foo.Bar").local_visitor is not None
+    assert find_methods("*..* a(..)").local_visitor is not None
+    assert find_types("foo.Bar").local_visitor is not None
 
 
 def test_or_requires_at_least_two_operands():
