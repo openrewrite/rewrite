@@ -59,6 +59,79 @@ public class PreconditionsTest : RewriteTest
             CSharp("class Foo { }")
         );
     }
+
+    /// <summary>
+    /// Or matches when any operand matches: the rename should run because
+    /// "Foo" matches one of the two precondition class names.
+    /// </summary>
+    [Fact]
+    public void OrMatchesWhenAnyOperandMatches()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new OrPreconditionedRenameRecipe
+            {
+                ClassNames = ["Missing", "Foo"],
+                From = "Foo",
+                To = "Bar"
+            }),
+            CSharp(
+                "class Foo { }",
+                "class Bar { }"
+            )
+        );
+    }
+
+    /// <summary>
+    /// Or skips the inner visitor when no operand matches.
+    /// </summary>
+    [Fact]
+    public void OrSkipsWhenNoOperandMatches()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new OrPreconditionedRenameRecipe
+            {
+                ClassNames = ["Missing", "Absent"],
+                From = "Foo",
+                To = "Bar"
+            }),
+            CSharp("class Foo { }")
+        );
+    }
+
+    /// <summary>
+    /// Or requires at least two operands; calling with fewer should throw.
+    /// </summary>
+    [Fact]
+    public void OrRequiresAtLeastTwoOperands()
+    {
+        var recipe = new FindClassRecipe { ClassName = "Foo" };
+        Assert.Throws<ArgumentException>(() =>
+            OpenRewrite.Core.Preconditions.Or(recipe.GetVisitor()));
+    }
+}
+
+/// <summary>
+/// A recipe that renames a class, but only if any of several precondition
+/// recipes (FindClass for each name) matches. Exercises Preconditions.Or.
+/// </summary>
+file class OrPreconditionedRenameRecipe : OpenRewrite.Core.Recipe
+{
+    public required string[] ClassNames { get; init; }
+    public required string From { get; init; }
+    public required string To { get; init; }
+
+    public override string DisplayName => "Or-preconditioned rename class";
+    public override string Description => "Renames a class only if any precondition recipe matches.";
+
+    public override OpenRewrite.Core.ITreeVisitor<ExecutionContext> GetVisitor()
+    {
+        var operands = ClassNames
+            .Select(n => (OpenRewrite.Core.ITreeVisitor<ExecutionContext>)new FindClassVisitor(n))
+            .ToArray();
+        return OpenRewrite.Core.Preconditions.Check(
+            OpenRewrite.Core.Preconditions.Or(operands),
+            new RenameClassVisitor(From, To));
+    }
 }
 
 /// <summary>

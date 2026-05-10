@@ -78,4 +78,34 @@ public static class Preconditions
     {
         return new AndVisitor(recipes.Select(x => x.GetVisitor()).ToArray());
     }
+
+    /// <summary>
+    /// Combines multiple precondition visitors with OR semantics. The combined
+    /// precondition matches if any visitor matches (modifies the tree). Mirrors
+    /// Java's <c>org.openrewrite.Preconditions.or</c>.
+    /// </summary>
+    public static ITreeVisitor<ExecutionContext> Or(
+        params ITreeVisitor<ExecutionContext>[] visitors)
+    {
+        if (visitors.Length < 2)
+        {
+            throw new ArgumentException("Preconditions.Or requires at least two operands", nameof(visitors));
+        }
+        return new OrVisitor(visitors);
+    }
+
+    public static ITreeVisitor<ExecutionContext> Or(this ITreeVisitor<ExecutionContext> first, params ITreeVisitor<ExecutionContext>[] others)
+    {
+        return Or(others.Prepend(first).ToArray());
+    }
+
+    public static ITreeVisitor<ExecutionContext> Or(
+        params Recipe[] recipes)
+    {
+        if (recipes.Length < 2)
+        {
+            throw new ArgumentException("Preconditions.Or requires at least two operands", nameof(recipes));
+        }
+        return new OrVisitor(recipes.Select(x => x.GetVisitor()).ToArray());
+    }
 }
