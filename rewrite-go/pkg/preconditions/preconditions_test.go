@@ -141,11 +141,49 @@ func TestNotInvertsMatch(t *testing.T) {
 	}
 }
 
-func TestRecipeRefOperandShortCircuitsToMatch(t *testing.T) {
+func TestBareRecipeRefShortCircuitsToMatch(t *testing.T) {
+	// A bare RecipeRef without a LocalVisitor short-circuits to "matches"
+	// in-process so the wrapped editor still runs. The host evaluates the
+	// gate for real once the response goes over the wire.
+	editor := &recordingVisitor{}
+	bare := &RecipeRef{
+		RecipeName: "org.openrewrite.java.search.HasMethod",
+		Options:    map[string]any{"methodPattern": "*..* nope(..)"},
+	}
+	Check(bare, editor).Visit(newSourceFile(), nil)
+	if editor.calls != 1 {
+		t.Errorf("editor calls (bare RecipeRef) = %d, want 1", editor.calls)
+	}
+}
+
+func TestRecipeRefWithLocalVisitorEvaluatesForReal(t *testing.T) {
+	// Helpers like UsesMethod populate a native LocalVisitor so unit
+	// tests without an active RPC connection still see real filtering.
+	// An empty CompilationUnit has no method invocations, so the gate
+	// fails and the editor is skipped.
 	editor := &recordingVisitor{}
 	Check(UsesMethod("*..* tostring(..)"), editor).Visit(newSourceFile(), nil)
-	if editor.calls != 1 {
-		t.Errorf("editor calls (RecipeRef in-process) = %d, want 1", editor.calls)
+	if editor.calls != 0 {
+		t.Errorf("editor calls (RecipeRef with LocalVisitor) = %d, want 0", editor.calls)
+	}
+}
+
+func TestHelpersPopulateLocalVisitor(t *testing.T) {
+	// Spot-check that helpers bundle a TreeVisitor for offline eval.
+	if HasSourcePath("**/*.go").LocalVisitor == nil {
+		t.Errorf("HasSourcePath did not populate LocalVisitor")
+	}
+	if UsesMethod("*..* a(..)").LocalVisitor == nil {
+		t.Errorf("UsesMethod did not populate LocalVisitor")
+	}
+	if UsesType("foo.Bar").LocalVisitor == nil {
+		t.Errorf("UsesType did not populate LocalVisitor")
+	}
+	if FindMethods("*..* a(..)").LocalVisitor == nil {
+		t.Errorf("FindMethods did not populate LocalVisitor")
+	}
+	if FindTypes("foo.Bar").LocalVisitor == nil {
+		t.Errorf("FindTypes did not populate LocalVisitor")
 	}
 }
 

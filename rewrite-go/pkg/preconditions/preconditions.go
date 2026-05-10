@@ -47,14 +47,21 @@ import (
 //   - *Composite (nested composites)
 type CheckArg any
 
-// RecipeRef is a wire-only placeholder that names a Java recipe by class
+// RecipeRef is a wire-side placeholder that names a Java recipe by class
 // name + options. Helpers like UsesMethod and UsesType return *RecipeRef
 // so a recipe author can declare a precondition without firing an RPC at
 // Editor() time. The Java host's PreparedRecipeCache.instantiateVisitor
 // constructs the named recipe via Jackson and uses its visitor.
+//
+// LocalVisitor is optional. When provided, in-process callers (without
+// an active RPC connection) evaluate the gate against it instead of
+// short-circuiting to "always matches" — this preserves real filtering
+// behavior in unit tests while still letting the host evaluate the
+// gate over the wire when an RPC connection is present.
 type RecipeRef struct {
-	RecipeName string
-	Options    map[string]any
+	RecipeName   string
+	Options      map[string]any
+	LocalVisitor recipe.TreeVisitor
 }
 
 // Composite combines nested precondition operands with an operator.
@@ -107,9 +114,14 @@ func operandMatches(operand CheckArg, t tree.Tree, p any) bool {
 	case nil:
 		return true
 	case *RecipeRef:
-		// Wire-only — in-process callers (tests) treat as "matches" so
-		// the wrapped visitor still runs.
-		return true
+		// If a LocalVisitor was bundled, evaluate against it for real;
+		// otherwise short-circuit to "always matches" so the wrapped
+		// visitor still runs in unit tests. The host evaluates the
+		// gate for real once the response goes over the wire.
+		if op.LocalVisitor == nil {
+			return true
+		}
+		return runVisitor(op.LocalVisitor, t, p)
 	case *Composite:
 		return evaluateComposite(op, t, p)
 	case recipe.Recipe:
@@ -196,47 +208,62 @@ func Not(operand CheckArg) *Composite {
 	return &Composite{Op: "not", Operands: []CheckArg{operand}}
 }
 
-// HasSourcePath matches source files by path glob.
-// Delegates to org.openrewrite.FindSourceFiles on the Java host.
+// HasSourcePath matches source files by path glob. Delegates to
+// org.openrewrite.FindSourceFiles on the Java host. Bundles a native
+// IsSourceFileVisitor so unit tests without an active RPC connection
+// still see real filtering.
 func HasSourcePath(filePattern string) *RecipeRef {
 	return &RecipeRef{
-		RecipeName: "org.openrewrite.FindSourceFiles",
-		Options:    map[string]any{"filePattern": filePattern},
+		RecipeName:   "org.openrewrite.FindSourceFiles",
+		Options:      map[string]any{"filePattern": filePattern},
+		LocalVisitor: NewIsSourceFile(filePattern),
 	}
 }
 
-// UsesMethod matches files using a specific method.
-// Delegates to org.openrewrite.java.search.HasMethod on the Java host.
+// UsesMethod matches files using a specific method. Delegates to
+// org.openrewrite.java.search.HasMethod on the Java host. Bundles a
+// native UsesMethodVisitor so unit tests without an active RPC
+// connection still see real filtering.
 func UsesMethod(methodPattern string) *RecipeRef {
 	return &RecipeRef{
-		RecipeName: "org.openrewrite.java.search.HasMethod",
-		Options:    map[string]any{"methodPattern": methodPattern, "matchOverrides": false},
+		RecipeName:   "org.openrewrite.java.search.HasMethod",
+		Options:      map[string]any{"methodPattern": methodPattern, "matchOverrides": false},
+		LocalVisitor: NewUsesMethod(methodPattern),
 	}
 }
 
-// UsesType matches files using a specific type.
-// Delegates to org.openrewrite.java.search.HasType on the Java host.
+// UsesType matches files using a specific type. Delegates to
+// org.openrewrite.java.search.HasType on the Java host. Bundles a
+// native UsesTypeVisitor so unit tests without an active RPC
+// connection still see real filtering.
 func UsesType(fullyQualifiedType string) *RecipeRef {
 	return &RecipeRef{
-		RecipeName: "org.openrewrite.java.search.HasType",
-		Options:    map[string]any{"fullyQualifiedTypeName": fullyQualifiedType, "checkAssignability": false},
+		RecipeName:   "org.openrewrite.java.search.HasType",
+		Options:      map[string]any{"fullyQualifiedTypeName": fullyQualifiedType, "checkAssignability": false},
+		LocalVisitor: NewUsesType(fullyQualifiedType),
 	}
 }
 
-// FindMethods finds and marks methods matching a pattern.
-// Delegates to org.openrewrite.java.search.FindMethods on the Java host.
+// FindMethods finds and marks methods matching a pattern. Delegates
+// to org.openrewrite.java.search.FindMethods on the Java host. Bundles
+// a native UsesMethodVisitor so unit tests without an active RPC
+// connection still see real filtering.
 func FindMethods(methodPattern string) *RecipeRef {
 	return &RecipeRef{
-		RecipeName: "org.openrewrite.java.search.FindMethods",
-		Options:    map[string]any{"methodPattern": methodPattern, "matchOverrides": false},
+		RecipeName:   "org.openrewrite.java.search.FindMethods",
+		Options:      map[string]any{"methodPattern": methodPattern, "matchOverrides": false},
+		LocalVisitor: NewUsesMethod(methodPattern),
 	}
 }
 
-// FindTypes finds and marks usages of a type.
-// Delegates to org.openrewrite.java.search.FindTypes on the Java host.
+// FindTypes finds and marks usages of a type. Delegates to
+// org.openrewrite.java.search.FindTypes on the Java host. Bundles a
+// native UsesTypeVisitor so unit tests without an active RPC
+// connection still see real filtering.
 func FindTypes(fullyQualifiedType string) *RecipeRef {
 	return &RecipeRef{
-		RecipeName: "org.openrewrite.java.search.FindTypes",
-		Options:    map[string]any{"fullyQualifiedTypeName": fullyQualifiedType},
+		RecipeName:   "org.openrewrite.java.search.FindTypes",
+		Options:      map[string]any{"fullyQualifiedTypeName": fullyQualifiedType},
+		LocalVisitor: NewUsesType(fullyQualifiedType),
 	}
 }
