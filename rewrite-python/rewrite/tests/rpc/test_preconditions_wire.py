@@ -235,6 +235,54 @@ class TestPrepareRecipeWithPreconditions:
         instantiated = server._instantiate_visitor(f"edit:{prepared_id}", ctx)
         assert instantiated is cached
 
+    def test_recipe_ref_emits_class_name_and_options(self, isolated_server):
+        """uses_method/uses_type return a RecipeRef; the wire entry should
+        carry the Java recipe class name and options directly so that the
+        host's PreparedRecipeCache can construct the recipe via Jackson."""
+        server = isolated_server
+
+        from rewrite.python.preconditions import uses_method
+
+        class _RecipeRefWrapper(Recipe):
+            @property
+            def name(self):
+                return "test.precondition.RecipeRefWrapper"
+
+            @property
+            def display_name(self):
+                return "Recipe ref wrapper"
+
+            @property
+            def description(self):
+                return "Editor wraps in Preconditions.check around a RecipeRef from uses_method."
+
+            def editor(self):
+                return Preconditions.check(
+                    uses_method("*..* tostring(..)"), _BareEditor()
+                )
+
+        _install(server, _RecipeRefWrapper)
+        resp = server.handle_prepare_recipe(
+            {"id": "test.precondition.RecipeRefWrapper"}
+        )
+
+        precs = resp["editPreconditions"]
+        # Baseline language gate + the RecipeRef precondition.
+        assert len(precs) == 2
+        assert precs[0]["visitorName"] == (
+            "org.openrewrite.rpc.internal.FindTreesOfType"
+        )
+        assert precs[1]["visitorName"] == "org.openrewrite.java.search.HasMethod"
+        assert precs[1]["visitorOptions"] == {
+            "methodPattern": "*..* tostring(..)",
+            "matchOverrides": False,
+        }
+
+        # Bare editor cached so dispatch via _instantiate_visitor returns it.
+        prepared_id = resp["id"]
+        assert prepared_id in server._prepared_editor_overrides
+        assert isinstance(server._prepared_editor_overrides[prepared_id], _BareEditor)
+
     def test_check_with_unserializable_visitor_falls_back(self, isolated_server):
         """A Check wrapping a generic TreeVisitor (no recipe identity, no
         java_recipe_name, no PreparedJavaRecipe) cannot be propagated to the
