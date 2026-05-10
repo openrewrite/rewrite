@@ -135,19 +135,27 @@ public class PreconditionsTest : RewriteTest
 
         Assert.Equal("org.openrewrite.java.search.FindMethods", findMethods.RecipeName);
         Assert.Equal("org.openrewrite.java.search.FindTypes", findTypes.RecipeName);
+
+        // And each is bundled with a native LocalVisitor so unit tests
+        // without an active RPC connection still see real filtering.
+        Assert.NotNull(hasPath.LocalVisitor);
+        Assert.NotNull(usesType.LocalVisitor);
+        Assert.NotNull(usesMethod.LocalVisitor);
+        Assert.NotNull(findMethods.LocalVisitor);
+        Assert.NotNull(findTypes.LocalVisitor);
     }
 
     /// <summary>
-    /// In-process: a Check wrapping a RecipeRef runs the wrapped editor
-    /// (the host evaluates the gate over the wire; in-process callers
-    /// fall back to "always matches" so unit tests aren't blocked by
-    /// the lack of an RPC connection).
+    /// In-process: a bare RecipeRef without a LocalVisitor short-circuits
+    /// to "matches" so the wrapped editor still runs (the host
+    /// evaluates the gate over the wire when an RPC connection is
+    /// available).
     /// </summary>
     [Fact]
-    public void RecipeRefShortCircuitsToMatchInProcess()
+    public void BareRecipeRefShortCircuitsToMatchInProcess()
     {
         RewriteRun(
-            spec => spec.SetRecipe(new RecipeRefGatedRenameRecipe
+            spec => spec.SetRecipe(new BareRecipeRefGatedRenameRecipe
             {
                 From = "Foo",
                 To = "Bar"
@@ -161,21 +169,23 @@ public class PreconditionsTest : RewriteTest
 }
 
 /// <summary>
-/// A recipe that gates rename via a UsesType RecipeRef. Without an
-/// active RPC connection, the in-process gate short-circuits to "matches"
-/// so the rename runs.
+/// A recipe that gates rename via a bare RecipeRef (no LocalVisitor).
+/// Without an active RPC connection, the in-process gate short-circuits
+/// to "matches" so the rename runs.
 /// </summary>
-file class RecipeRefGatedRenameRecipe : OpenRewrite.Core.Recipe
+file class BareRecipeRefGatedRenameRecipe : OpenRewrite.Core.Recipe
 {
     public required string From { get; init; }
     public required string To { get; init; }
 
-    public override string DisplayName => "RecipeRef-gated rename";
-    public override string Description => "Renames a class, gated by a UsesType RecipeRef precondition.";
+    public override string DisplayName => "Bare-RecipeRef-gated rename";
+    public override string Description => "Renames a class, gated by a bare RecipeRef without a LocalVisitor.";
 
     public override OpenRewrite.Core.ITreeVisitor<ExecutionContext> GetVisitor() =>
         OpenRewrite.Core.Preconditions.Check(
-            OpenRewrite.Java.Search.Preconditions.UsesType("System.Object"),
+            new OpenRewrite.Core.RecipeRef(
+                "org.openrewrite.java.search.HasType",
+                new Dictionary<string, object?> { ["fullyQualifiedTypeName"] = "Some.Missing.Type" }),
             new RenameClassVisitor(From, To));
 }
 

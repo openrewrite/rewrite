@@ -48,21 +48,39 @@ public class RecipeRef : TreeVisitor<Tree, ExecutionContext>
     public string RecipeName { get; }
     public IReadOnlyDictionary<string, object?> Options { get; }
 
-    public RecipeRef(string recipeName, IReadOnlyDictionary<string, object?>? options = null)
+    /// <summary>
+    /// Optional native visitor for in-process gate evaluation. Helpers
+    /// like <c>UsesType</c> / <c>UsesMethod</c> populate this so unit
+    /// tests without an active RPC connection still see real filtering
+    /// instead of unconditionally short-circuiting to "always matches".
+    /// </summary>
+    public ITreeVisitor<ExecutionContext>? LocalVisitor { get; }
+
+    public RecipeRef(
+        string recipeName,
+        IReadOnlyDictionary<string, object?>? options = null,
+        ITreeVisitor<ExecutionContext>? localVisitor = null)
     {
         RecipeName = recipeName;
         Options = options ?? new Dictionary<string, object?>();
+        LocalVisitor = localVisitor;
     }
 
     /// <summary>
-    /// In-process fallback: a RecipeRef is a wire-only placeholder, but
-    /// callers (tests) without an active RPC need a sensible default.
-    /// Return a different tree so the wrapping <see cref="Check"/> takes
-    /// the "matches" branch and runs the wrapped editor.
+    /// In-process fallback. When a <see cref="LocalVisitor"/> was
+    /// provided, delegate to it for real filtering; otherwise return
+    /// a marked tree so the wrapping <see cref="Check"/> takes the
+    /// "matches" branch and runs the wrapped editor (the host
+    /// evaluates the gate over the wire when an RPC connection is
+    /// available).
     /// </summary>
     public override Tree? Visit(Tree? tree, ExecutionContext ctx)
     {
         if (tree == null) return null;
+        if (LocalVisitor != null)
+        {
+            return LocalVisitor.Visit(tree, ctx);
+        }
         return SearchResult.Found(tree);
     }
 }

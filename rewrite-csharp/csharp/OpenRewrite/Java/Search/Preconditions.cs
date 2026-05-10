@@ -34,7 +34,9 @@ public static class Preconditions
 {
     /// <summary>
     /// Match source files by path glob. Delegates to
-    /// <c>org.openrewrite.FindSourceFiles</c> on the Java host.
+    /// <c>org.openrewrite.FindSourceFiles</c> on the Java host. Bundles
+    /// a native <see cref="IsSourceFile"/> visitor so unit tests
+    /// without an active RPC connection still see real filtering.
     /// </summary>
     public static RecipeRef HasSourcePath(string filePattern)
     {
@@ -43,12 +45,15 @@ public static class Preconditions
             new Dictionary<string, object?>
             {
                 ["filePattern"] = filePattern
-            });
+            },
+            new IsSourceFile(filePattern));
     }
 
     /// <summary>
     /// Match files using a specific type. Delegates to
     /// <c>org.openrewrite.java.search.HasType</c> on the Java host.
+    /// Bundles a native <see cref="UsesType"/> visitor so unit tests
+    /// without an active RPC connection still see real filtering.
     /// </summary>
     public static RecipeRef UsesType(string fullyQualifiedTypeName, bool checkAssignability = false)
     {
@@ -58,7 +63,8 @@ public static class Preconditions
             {
                 ["fullyQualifiedTypeName"] = fullyQualifiedTypeName,
                 ["checkAssignability"] = checkAssignability
-            });
+            },
+            new UsesType(fullyQualifiedTypeName));
     }
 
     /// <summary>
@@ -67,6 +73,8 @@ public static class Preconditions
     /// <c>&lt;receiver-type&gt; &lt;method-name&gt;(&lt;args&gt;)</c>
     /// — e.g. <c>"*..* tostring(..)"</c>. Delegates to
     /// <c>org.openrewrite.java.search.HasMethod</c> on the Java host.
+    /// Bundles a native <see cref="UsesMethod"/> visitor so unit tests
+    /// without an active RPC connection still see real filtering.
     /// </summary>
     public static RecipeRef UsesMethod(string methodPattern, bool matchOverrides = false)
     {
@@ -76,12 +84,15 @@ public static class Preconditions
             {
                 ["methodPattern"] = methodPattern,
                 ["matchOverrides"] = matchOverrides
-            });
+            },
+            new UsesMethod(methodPattern, matchOverrides));
     }
 
     /// <summary>
     /// Find and mark methods matching a pattern. Delegates to
     /// <c>org.openrewrite.java.search.FindMethods</c> on the Java host.
+    /// Bundles a native <see cref="UsesMethod"/> visitor so unit tests
+    /// without an active RPC connection still see real filtering.
     /// </summary>
     public static RecipeRef FindMethods(string methodPattern, bool matchOverrides = false)
     {
@@ -91,12 +102,15 @@ public static class Preconditions
             {
                 ["methodPattern"] = methodPattern,
                 ["matchOverrides"] = matchOverrides
-            });
+            },
+            new UsesMethod(methodPattern, matchOverrides));
     }
 
     /// <summary>
     /// Find and mark usages of a type. Delegates to
     /// <c>org.openrewrite.java.search.FindTypes</c> on the Java host.
+    /// Bundles a native <see cref="UsesType"/> visitor so unit tests
+    /// without an active RPC connection still see real filtering.
     /// </summary>
     public static RecipeRef FindTypes(string fullyQualifiedTypeName)
     {
@@ -105,6 +119,7 @@ public static class Preconditions
             new Dictionary<string, object?>
             {
                 ["fullyQualifiedTypeName"] = fullyQualifiedTypeName
-            });
+            },
+            new UsesType(fullyQualifiedTypeName));
     }
 }
