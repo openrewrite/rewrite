@@ -283,6 +283,64 @@ class TestPrepareRecipeWithPreconditions:
         assert prepared_id in server._prepared_editor_overrides
         assert isinstance(server._prepared_editor_overrides[prepared_id], _BareEditor)
 
+    def test_or_emits_composite_wire_entry(self, isolated_server):
+        """Preconditions.or_ over RecipeRefs becomes a single composite wire entry
+        with op="or" and operands carrying each leaf precondition."""
+        server = isolated_server
+
+        from rewrite.python.preconditions import uses_method, uses_type
+
+        class _OrWrapper(Recipe):
+            @property
+            def name(self):
+                return "test.precondition.OrWrapper"
+
+            @property
+            def display_name(self):
+                return "Or wrapper"
+
+            @property
+            def description(self):
+                return "Editor wraps in Preconditions.or over two RecipeRefs."
+
+            def editor(self):
+                return Preconditions.check(
+                    Preconditions.or_(
+                        uses_method("*..* filemode(..)"),
+                        uses_type("tarfile"),
+                    ),
+                    _BareEditor(),
+                )
+
+        _install(server, _OrWrapper)
+        resp = server.handle_prepare_recipe(
+            {"id": "test.precondition.OrWrapper"}
+        )
+
+        precs = resp["editPreconditions"]
+        # Baseline language gate + composite OR.
+        assert len(precs) == 2
+        assert precs[0]["visitorName"] == (
+            "org.openrewrite.rpc.internal.FindTreesOfType"
+        )
+        composite = precs[1]
+        assert composite["op"] == "or"
+        assert len(composite["operands"]) == 2
+        assert composite["operands"][0]["visitorName"] == (
+            "org.openrewrite.java.search.HasMethod"
+        )
+        assert composite["operands"][0]["visitorOptions"] == {
+            "methodPattern": "*..* filemode(..)",
+            "matchOverrides": False,
+        }
+        assert composite["operands"][1]["visitorName"] == (
+            "org.openrewrite.java.search.HasType"
+        )
+        assert composite["operands"][1]["visitorOptions"] == {
+            "fullyQualifiedTypeName": "tarfile",
+            "checkAssignability": False,
+        }
+
     def test_check_with_unserializable_visitor_falls_back(self, isolated_server):
         """A Check wrapping a generic TreeVisitor (no recipe identity, no
         java_recipe_name, no PreparedJavaRecipe) cannot be propagated to the

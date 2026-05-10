@@ -24,7 +24,7 @@ from .markers import *
 from .parser import *
 from .result import *
 from .style import *
-from .preconditions import Check, Preconditions, RecipeCheck, RecipeRef
+from .preconditions import Check, CompositePrecondition, Preconditions, RecipeCheck, RecipeRef
 from .tree import Checksum, FileAttributes, SourceFile, Tree, PrintOutputCapture, PrinterFactory
 from .utils import random_id, list_find, list_map, list_map_last
 from .visitor import Cursor, TreeVisitor
@@ -66,6 +66,7 @@ __all__ = [
 
     # Preconditions
     'Check',
+    'CompositePrecondition',
     'Preconditions',
     'RecipeCheck',
     'RecipeRef',

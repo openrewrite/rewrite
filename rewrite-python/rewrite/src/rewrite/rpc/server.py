@@ -1257,8 +1257,7 @@ def _extract_preconditions_from_editor(editor_visitor):
 
 def _check_wire_entry(check) -> Optional[Dict[str, Any]]:
     """Translate a single :class:`Check` to a precondition wire entry."""
-    from rewrite.preconditions import RecipeCheck, RecipeRef
-    from rewrite.rpc.java_recipe import PreparedJavaRecipe
+    from rewrite.preconditions import RecipeCheck
 
     if isinstance(check, RecipeCheck):
         recipe = check.recipe
@@ -1271,7 +1270,30 @@ def _check_wire_entry(check) -> Optional[Dict[str, Any]]:
             return {'visitorName': java_name, 'visitorOptions': dict(options)}
         return None
 
-    condition = check.check
+    return _condition_wire_entry(check.check)
+
+
+def _condition_wire_entry(condition) -> Optional[Dict[str, Any]]:
+    """Translate a precondition condition (operand) to a wire entry.
+
+    Mirrors ``PrepareRecipeResponse.Precondition``: leaves carry
+    ``visitorName`` + ``visitorOptions``; composites carry ``op`` +
+    ``operands`` (a list of nested wire entries). Returns ``None`` when
+    the condition can't be serialized — the caller leaves the wrapper
+    intact so the gate runs Python-side as a fallback.
+    """
+    from rewrite.preconditions import CompositePrecondition, RecipeRef
+    from rewrite.rpc.java_recipe import PreparedJavaRecipe
+
+    if isinstance(condition, CompositePrecondition):
+        operands: List[Dict[str, Any]] = []
+        for operand in condition.operands:
+            entry = _condition_wire_entry(operand)
+            if entry is None:
+                return None
+            operands.append(entry)
+        return {'op': condition.op, 'operands': operands}
+
     # Common case: helpers like uses_method/uses_type return a lightweight
     # RecipeRef so the recipe author can declare a precondition without firing
     # an RPC at editor() time. Java's PreparedRecipeCache.instantiateVisitor

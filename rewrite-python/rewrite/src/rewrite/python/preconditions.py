@@ -35,12 +35,19 @@ callable in unit tests without an active RPC connection.
 from __future__ import annotations
 
 from rewrite.preconditions import RecipeRef
+from rewrite.python.search import IsSourceFile, UsesMethod, UsesType
 
 
 def has_source_path(file_pattern: str) -> RecipeRef:
-    """Match source files by path glob (delegates to ``org.openrewrite.FindSourceFiles``)."""
+    """Match source files by path glob (delegates to ``org.openrewrite.FindSourceFiles``).
+
+    Bundles a native :class:`IsSourceFile` visitor so unit tests without
+    an active RPC connection still see real filtering behavior.
+    """
     return RecipeRef(
-        "org.openrewrite.FindSourceFiles", {"filePattern": file_pattern}
+        "org.openrewrite.FindSourceFiles",
+        {"filePattern": file_pattern},
+        IsSourceFile(file_pattern),
     )
 
 
@@ -56,39 +63,58 @@ def uses_method(method_pattern: str, match_overrides: bool = False) -> RecipeRef
 
         uses_method("*..* tostring(..)")
         uses_method("java.util.Collections emptyList()")
+
+    Bundles a native :class:`UsesMethod` visitor so unit tests without
+    an active RPC connection still see real filtering behavior.
     """
     return RecipeRef(
         "org.openrewrite.java.search.HasMethod",
         {"methodPattern": method_pattern, "matchOverrides": match_overrides},
+        UsesMethod(method_pattern),
     )
 
 
 def uses_type(
     fully_qualified_type: str, check_assignability: bool = False
 ) -> RecipeRef:
-    """Match files using a specific type (delegates to ``org.openrewrite.java.search.HasType``)."""
+    """Match files using a specific type (delegates to ``org.openrewrite.java.search.HasType``).
+
+    Bundles a native :class:`UsesType` visitor so unit tests without
+    an active RPC connection still see real filtering behavior.
+    """
     return RecipeRef(
         "org.openrewrite.java.search.HasType",
         {
             "fullyQualifiedTypeName": fully_qualified_type,
             "checkAssignability": check_assignability,
         },
+        UsesType(fully_qualified_type),
     )
 
 
 def find_methods(
     method_pattern: str, match_overrides: bool = False
 ) -> RecipeRef:
-    """Find and mark methods matching a pattern (delegates to ``org.openrewrite.java.search.FindMethods``)."""
+    """Find and mark methods matching a pattern (delegates to ``org.openrewrite.java.search.FindMethods``).
+
+    Bundles a native :class:`UsesMethod` visitor so unit tests without
+    an active RPC connection still see real filtering behavior.
+    """
     return RecipeRef(
         "org.openrewrite.java.search.FindMethods",
         {"methodPattern": method_pattern, "matchOverrides": match_overrides},
+        UsesMethod(method_pattern),
     )
 
 
 def find_types(fully_qualified_type: str) -> RecipeRef:
-    """Find and mark usages of a type (delegates to ``org.openrewrite.java.search.FindTypes``)."""
+    """Find and mark usages of a type (delegates to ``org.openrewrite.java.search.FindTypes``).
+
+    Bundles a native :class:`UsesType` visitor so unit tests without
+    an active RPC connection still see real filtering behavior.
+    """
     return RecipeRef(
         "org.openrewrite.java.search.FindTypes",
         {"fullyQualifiedTypeName": fully_qualified_type},
+        UsesType(fully_qualified_type),
     )

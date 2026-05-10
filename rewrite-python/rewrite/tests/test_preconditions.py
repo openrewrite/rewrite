@@ -208,6 +208,133 @@ def test_recipe_check_rejects_scanning_recipe():
         Preconditions.check(_ScanRecipe(), _RecordingVisitor())
 
 
+def test_or_short_circuits_on_first_match():
+    matching = _MarkingVisitor()
+    nonmatching = _RecordingVisitor()
+    editor = _RecordingVisitor()
+
+    composite = Preconditions.or_(matching, nonmatching)
+    wrapped = Preconditions.check(composite, editor)
+
+    sf = _stub_source_file()
+    ctx = InMemoryExecutionContext()
+    wrapped.visit(sf, ctx)
+
+    assert matching.calls == 1
+    assert nonmatching.calls == 0, "OR should short-circuit after first match"
+    assert editor.calls == 1
+
+
+def test_or_skips_editor_when_no_operand_matches():
+    a = _RecordingVisitor()
+    b = _RecordingVisitor()
+    editor = _RecordingVisitor()
+
+    composite = Preconditions.or_(a, b)
+    wrapped = Preconditions.check(composite, editor)
+
+    sf = _stub_source_file()
+    ctx = InMemoryExecutionContext()
+    result = wrapped.visit(sf, ctx)
+
+    assert a.calls == 1
+    assert b.calls == 1
+    assert editor.calls == 0
+    assert result is sf
+
+
+def test_and_runs_editor_only_when_all_match():
+    matching_a = _MarkingVisitor()
+    matching_b = _MarkingVisitor()
+    nonmatching = _RecordingVisitor()
+    editor = _RecordingVisitor()
+
+    # All match -> editor runs.
+    wrapped = Preconditions.check(Preconditions.and_(matching_a, matching_b), editor)
+    sf = _stub_source_file()
+    ctx = InMemoryExecutionContext()
+    wrapped.visit(sf, ctx)
+    assert editor.calls == 1
+
+    # One non-matching short-circuits to false.
+    editor2 = _RecordingVisitor()
+    wrapped2 = Preconditions.check(
+        Preconditions.and_(matching_a, nonmatching), editor2
+    )
+    wrapped2.visit(_stub_source_file(), ctx)
+    assert editor2.calls == 0
+
+
+def test_not_inverts_match():
+    matching = _MarkingVisitor()
+    nonmatching = _RecordingVisitor()
+    editor = _RecordingVisitor()
+
+    # not(match) -> editor skipped.
+    Preconditions.check(Preconditions.not_(matching), editor).visit(
+        _stub_source_file(), InMemoryExecutionContext()
+    )
+    assert editor.calls == 0
+
+    # not(no-match) -> editor runs.
+    editor2 = _RecordingVisitor()
+    Preconditions.check(Preconditions.not_(nonmatching), editor2).visit(
+        _stub_source_file(), InMemoryExecutionContext()
+    )
+    assert editor2.calls == 1
+
+
+def test_or_with_recipe_ref_without_local_visitor_short_circuits():
+    """A bare RecipeRef without a local_visitor short-circuits to "matches"
+    in-process so the wrapped editor still runs."""
+    from rewrite.preconditions import RecipeRef
+
+    bare = RecipeRef("org.openrewrite.java.search.HasMethod", {"methodPattern": "*..* a()"})
+    bare2 = RecipeRef("org.openrewrite.java.search.HasMethod", {"methodPattern": "*..* b()"})
+
+    editor = _RecordingVisitor()
+    wrapped = Preconditions.check(Preconditions.or_(bare, bare2), editor)
+
+    wrapped.visit(_stub_source_file(), InMemoryExecutionContext())
+    assert editor.calls == 1
+
+
+def test_recipe_ref_with_local_visitor_evaluates_for_real():
+    """Helpers like uses_method bundle a native local visitor so unit tests
+    without an active RPC connection still see real filtering. The stub
+    source file has no method invocations, so the gate fails and the
+    editor is skipped."""
+    from rewrite.python.preconditions import uses_method
+
+    editor = _RecordingVisitor()
+    wrapped = Preconditions.check(uses_method("*..* nope()"), editor)
+
+    wrapped.visit(_stub_source_file(), InMemoryExecutionContext())
+    assert editor.calls == 0
+
+
+def test_helpers_populate_local_visitor():
+    """Spot-check that helpers bundle a native visitor for offline eval."""
+    from rewrite.python.preconditions import (
+        find_methods,
+        find_types,
+        has_source_path,
+        uses_method,
+        uses_type,
+    )
+
+    assert has_source_path("**/*.py").local_visitor is not None
+    assert uses_method("*..* a(..)").local_visitor is not None
+    assert uses_type("foo.Bar").local_visitor is not None
+    assert find_methods("*..* a(..)").local_visitor is not None
+    assert find_types("foo.Bar").local_visitor is not None
+
+
+def test_or_requires_at_least_two_operands():
+    with pytest.raises(ValueError, match="at least two operands"):
+        Preconditions.or_(_RecordingVisitor())
+
+
 def test_check_is_acceptable_ands_both_legs():
     class _Reject(TreeVisitor[Tree, Any]):
         def is_acceptable(self, sf, p):
