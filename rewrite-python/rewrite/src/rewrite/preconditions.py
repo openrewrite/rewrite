@@ -32,7 +32,8 @@ needs accumulator state that a stateless precondition check cannot provide.
 
 from __future__ import annotations
 
-from typing import Any, Optional, Union, TYPE_CHECKING, cast
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional, Union, TYPE_CHECKING
 
 from rewrite.execution import DelegatingExecutionContext, ExecutionContext
 from rewrite.tree import SourceFile, Tree
@@ -40,6 +41,35 @@ from rewrite.visitor import Cursor, TreeVisitor
 
 if TYPE_CHECKING:
     from rewrite.recipe import Recipe
+
+
+@dataclass(frozen=True)
+class RecipeRef:
+    """Recipe-identity placeholder for use as a precondition.
+
+    Captures a Java recipe class name + options without instantiating the
+    recipe or firing an RPC. The framework introspects a
+    ``Preconditions.check(RecipeRef, editor)`` wrapper at PrepareRecipe
+    time and emits the recipe identity directly in
+    ``PrepareRecipeResponse.editPreconditions``. The Java host's
+    ``PreparedRecipeCache.instantiateVisitor`` constructs the recipe via
+    Jackson and uses its ``getVisitor()``.
+
+    This avoids requiring the recipe author to do an RPC at ``editor()``
+    construction time, which would otherwise block in-process unit tests
+    that don't have an active RPC connection.
+
+    Helpers in :mod:`rewrite.python.preconditions` (``uses_method``,
+    ``uses_type``, ``has_source_path``, ``find_methods``, ``find_types``)
+    return ``RecipeRef`` instances.
+    """
+
+    recipe_name: str
+    options: Dict[str, Any] = field(default_factory=dict)
+
+
+# Type accepted by Check / Preconditions.check for the gate visitor.
+CheckArg = Union[TreeVisitor[Any, ExecutionContext], "Recipe", RecipeRef]
 
 
 class _DataTableSuppressingExecutionContext(DelegatingExecutionContext):
@@ -83,14 +113,14 @@ class Check(TreeVisitor[Tree, ExecutionContext]):
 
     def __init__(
         self,
-        check: TreeVisitor[Any, ExecutionContext],
+        check: CheckArg,
         v: TreeVisitor[Any, ExecutionContext],
     ) -> None:
         self._check = check
         self._v = v
 
     @property
-    def check(self) -> TreeVisitor[Any, ExecutionContext]:
+    def check(self) -> CheckArg:
         return self._check
 
     @property
@@ -98,6 +128,9 @@ class Check(TreeVisitor[Tree, ExecutionContext]):
         return self._v
 
     def is_acceptable(self, source_file: SourceFile, p: ExecutionContext) -> bool:
+        if isinstance(self._check, RecipeRef):
+            # RecipeRef has no in-process is_acceptable — defer to the wrapped editor.
+            return self._v.is_acceptable(source_file, p)
         return self._check.is_acceptable(source_file, p) and self._v.is_acceptable(
             source_file, p
         )
@@ -109,6 +142,14 @@ class Check(TreeVisitor[Tree, ExecutionContext]):
         parent: Optional[Cursor] = None,
     ) -> Optional[Tree]:
         if not isinstance(tree, SourceFile):
+            return self._v.visit(tree, p, parent)
+        # In-process fallback: a RecipeRef is a wire-only placeholder with no
+        # ``visit`` of its own — treat as "always matches" so the wrapped
+        # editor still runs in unit tests and direct in-process calls. The
+        # Java-side optimization (skip the visit RPC when the precondition
+        # rejects the file) lives in handle_prepare_recipe and the
+        # RecipeRunCycle batch path for the wire path.
+        if isinstance(self._check, RecipeRef):
             return self._v.visit(tree, p, parent)
         condition_after = self._check.visit(tree, _suppressing(p), parent)
         if condition_after is not tree:
@@ -129,8 +170,6 @@ class RecipeCheck(Check):
         recipe: "Recipe",
         v: TreeVisitor[Any, ExecutionContext],
     ) -> None:
-        # Local import: Recipe imports from rewrite.preconditions for the
-        # forward reference, so we resolve the editor at construction time.
         from rewrite.recipe import ScanningRecipe
 
         if isinstance(recipe, ScanningRecipe):
@@ -152,34 +191,38 @@ class Preconditions:
 
     Usage::
 
-        from rewrite.preconditions import Preconditions
+        from rewrite import Preconditions
         from rewrite.python.preconditions import uses_method
 
         class ReplaceArrayTostring(Recipe):
             def editor(self):
                 return Preconditions.check(
-                    uses_method("array tostring()"),
+                    uses_method("*..* tostring(..)"),
                     self._tostring_visitor(),
                 )
     """
 
     @staticmethod
     def check(
-        check: Union[TreeVisitor[Any, ExecutionContext], "Recipe"],
+        check: CheckArg,
         v: TreeVisitor[Any, ExecutionContext],
     ) -> Check:
         """Wrap ``v`` with a precondition check.
 
-        Accepts either a ``TreeVisitor`` or a ``Recipe`` for ``check``. When a
-        ``Recipe`` is supplied, its ``editor()`` is used as the precondition
-        visitor (``ScanningRecipe`` is rejected — see :class:`RecipeCheck`).
+        ``check`` may be:
+          * a :class:`TreeVisitor` — runs in-process as the gate
+          * a :class:`Recipe` — its ``editor()`` is used as the gate
+            (``ScanningRecipe`` is rejected; see :class:`RecipeCheck`)
+          * a :class:`RecipeRef` — placeholder for a Java search recipe
+            (typically returned by ``uses_method``/``uses_type``); the
+            framework emits the recipe identity in the
+            ``editPreconditions`` wire slot at PrepareRecipe time so the
+            host evaluates it locally without a Python RPC
 
-        The return is always a :class:`Check` instance. Recipe-form returns a
-        :class:`RecipeCheck` so the framework can recover the originating
-        recipe at wire-serialization time.
+        The return is always a :class:`Check` instance.
         """
         from rewrite.recipe import Recipe
 
         if isinstance(check, Recipe):
             return RecipeCheck(check, v)
-        return Check(cast(TreeVisitor[Any, ExecutionContext], check), v)
+        return Check(check, v)

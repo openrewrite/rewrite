@@ -1257,7 +1257,7 @@ def _extract_preconditions_from_editor(editor_visitor):
 
 def _check_wire_entry(check) -> Optional[Dict[str, Any]]:
     """Translate a single :class:`Check` to a precondition wire entry."""
-    from rewrite.preconditions import RecipeCheck
+    from rewrite.preconditions import RecipeCheck, RecipeRef
     from rewrite.rpc.java_recipe import PreparedJavaRecipe
 
     if isinstance(check, RecipeCheck):
@@ -1272,6 +1272,15 @@ def _check_wire_entry(check) -> Optional[Dict[str, Any]]:
         return None
 
     condition = check.check
+    # Common case: helpers like uses_method/uses_type return a lightweight
+    # RecipeRef so the recipe author can declare a precondition without firing
+    # an RPC at editor() time. Java's PreparedRecipeCache.instantiateVisitor
+    # constructs the named Recipe via Jackson and uses its visitor.
+    if isinstance(condition, RecipeRef):
+        return {
+            'visitorName': condition.recipe_name,
+            'visitorOptions': dict(condition.options),
+        }
     if isinstance(condition, PreparedJavaRecipe):
         return {'visitorName': condition.edit_visitor, 'visitorOptions': None}
     java_name = getattr(condition, 'java_recipe_name', None)
@@ -1430,10 +1439,8 @@ def handle_batch_visit(params: dict) -> dict:
         modified = after is not before
         deleted = after is None
 
-        # Diff SearchResult IDs against the running set. Trees are immutable, so
-        # a visitor that returns the same reference cannot have added new
-        # SearchResults — skip the full-tree walk in that case.
-        if deleted or not modified:
+        # Diff SearchResult IDs against the running set
+        if deleted:
             search_result_ids = []
         else:
             after_ids = _collect_search_result_ids(after)
