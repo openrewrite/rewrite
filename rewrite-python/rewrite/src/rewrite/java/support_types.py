@@ -16,6 +16,12 @@ if TYPE_CHECKING:
 
 P = TypeVar('P')
 
+# Cached on first use to avoid the import-machinery cost of repeating
+# `from .visitor import JavaVisitor` inside is_acceptable / accept on every
+# visited Java node (millions of calls per recipe run). The lazy-then-cached
+# pattern preserves the original circular-import workaround.
+_JavaVisitor: Any = None
+
 
 class J(Tree):
     @property
@@ -24,12 +30,18 @@ class J(Tree):
         ...
 
     def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool:
-        from .visitor import JavaVisitor
-        return v.is_adaptable_to(JavaVisitor)
+        global _JavaVisitor
+        if _JavaVisitor is None:
+            from .visitor import JavaVisitor
+            _JavaVisitor = JavaVisitor
+        return v.is_adaptable_to(_JavaVisitor)
 
     def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]:
-        from .visitor import JavaVisitor
-        return self.accept_java(v.adapt(J, JavaVisitor), p)
+        global _JavaVisitor
+        if _JavaVisitor is None:
+            from .visitor import JavaVisitor
+            _JavaVisitor = JavaVisitor
+        return self.accept_java(v.adapt(J, _JavaVisitor), p)
 
     def accept_java(self, v: 'JavaVisitor[P]', p: P) -> Optional['J']:
         ...
