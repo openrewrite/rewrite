@@ -1317,8 +1317,10 @@ def handle_batch_visit(params: dict) -> dict:
         modified = after is not before
         deleted = after is None
 
-        # Diff SearchResult IDs against the running set
-        if deleted:
+        # Diff SearchResult IDs against the running set. Trees are immutable, so
+        # a visitor that returns the same reference cannot have added new
+        # SearchResults — skip the full-tree walk in that case.
+        if deleted or not modified:
             search_result_ids = []
         else:
             after_ids = _collect_search_result_ids(after)
