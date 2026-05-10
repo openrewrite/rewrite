@@ -988,6 +988,19 @@ public class RewriteRpcServer
             }
             return new Precondition { Op = composite.Op, Operands = operands };
         }
+        // Common case: helpers like UsesMethod / UsesType return a
+        // lightweight RecipeRef so the recipe author can declare a
+        // precondition without firing an RPC at GetVisitor() time.
+        // Java's PreparedRecipeCache.instantiateVisitor constructs the
+        // named recipe via Jackson and uses its visitor.
+        if (condition is RecipeRef recipeRef)
+        {
+            return new Precondition
+            {
+                VisitorName = recipeRef.RecipeName,
+                VisitorOptions = recipeRef.Options.ToDictionary(kvp => kvp.Key, kvp => kvp.Value!)
+            };
+        }
         // Leaf with no wire identity — the Java host can't evaluate it
         // remotely. Leave the wrapper intact so the gate runs C#-side.
         return null;

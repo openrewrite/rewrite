@@ -14,57 +14,97 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
-using OpenRewrite.Core.Rpc;
-using OpenRewrite.CSharp.Rpc;
-using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Java.Search;
 
 /// <summary>
-/// Search-based precondition visitors that delegate to Java's implementations via RPC.
-/// Requires an active RPC connection to a Java process.
+/// Search-based precondition helpers that name a Java recipe to evaluate
+/// the gate over the wire.
+///
+/// Each helper returns a <see cref="RecipeRef"/> placeholder that carries
+/// the Java recipe class name + options. The framework introspects a
+/// <c>Preconditions.Check(RecipeRef, editor)</c> wrapper at PrepareRecipe
+/// time and emits the recipe identity directly in
+/// <c>editPreconditions</c>; the Java host's <c>PreparedRecipeCache.instantiateVisitor</c>
+/// constructs the recipe and uses its visitor — no extra RPC round-trip
+/// needed at <c>GetVisitor()</c> construction time, so unit tests can call
+/// <c>recipe.GetVisitor()</c> without an active RPC connection to a Java host.
 /// </summary>
 public static class Preconditions
 {
     /// <summary>
-    /// Creates a UsesType precondition that delegates to Java's
-    /// org.openrewrite.java.search.HasType via RPC.
+    /// Match source files by path glob. Delegates to
+    /// <c>org.openrewrite.FindSourceFiles</c> on the Java host.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when no RPC connection is available.</exception>
-    public static ITreeVisitor<ExecutionContext> UsesType(string fullyQualifiedTypeName)
+    public static RecipeRef HasSourcePath(string filePattern)
     {
-        var rpc = RewriteRpcServer.Current
-                  ?? throw new InvalidOperationException("UsesType requires an RPC connection to Java");
+        return new RecipeRef(
+            "org.openrewrite.FindSourceFiles",
+            new Dictionary<string, object?>
+            {
+                ["filePattern"] = filePattern
+            });
+    }
 
-        var response = rpc.PrepareRecipeOnRemote(
+    /// <summary>
+    /// Match files using a specific type. Delegates to
+    /// <c>org.openrewrite.java.search.HasType</c> on the Java host.
+    /// </summary>
+    public static RecipeRef UsesType(string fullyQualifiedTypeName, bool checkAssignability = false)
+    {
+        return new RecipeRef(
             "org.openrewrite.java.search.HasType",
             new Dictionary<string, object?>
             {
                 ["fullyQualifiedTypeName"] = fullyQualifiedTypeName,
-                ["checkAssignability"] = false
-            }
-        );
-        return new RpcVisitor(rpc, response.EditVisitor);
+                ["checkAssignability"] = checkAssignability
+            });
     }
 
     /// <summary>
-    /// Creates a UsesMethod precondition that delegates to Java's
-    /// org.openrewrite.java.search.HasMethod via RPC.
+    /// Match files using a specific method. <paramref name="methodPattern"/>
+    /// follows the OpenRewrite method-pattern syntax
+    /// <c>&lt;receiver-type&gt; &lt;method-name&gt;(&lt;args&gt;)</c>
+    /// — e.g. <c>"*..* tostring(..)"</c>. Delegates to
+    /// <c>org.openrewrite.java.search.HasMethod</c> on the Java host.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when no RPC connection is available.</exception>
-    public static ITreeVisitor<ExecutionContext> UsesMethod(string methodPattern)
+    public static RecipeRef UsesMethod(string methodPattern, bool matchOverrides = false)
     {
-        var rpc = RewriteRpcServer.Current
-                  ?? throw new InvalidOperationException("UsesMethod requires an RPC connection to Java");
-
-        var response = rpc.PrepareRecipeOnRemote(
+        return new RecipeRef(
             "org.openrewrite.java.search.HasMethod",
             new Dictionary<string, object?>
             {
                 ["methodPattern"] = methodPattern,
-                ["matchOverrides"] = false
-            }
-        );
-        return new RpcVisitor(rpc, response.EditVisitor);
+                ["matchOverrides"] = matchOverrides
+            });
+    }
+
+    /// <summary>
+    /// Find and mark methods matching a pattern. Delegates to
+    /// <c>org.openrewrite.java.search.FindMethods</c> on the Java host.
+    /// </summary>
+    public static RecipeRef FindMethods(string methodPattern, bool matchOverrides = false)
+    {
+        return new RecipeRef(
+            "org.openrewrite.java.search.FindMethods",
+            new Dictionary<string, object?>
+            {
+                ["methodPattern"] = methodPattern,
+                ["matchOverrides"] = matchOverrides
+            });
+    }
+
+    /// <summary>
+    /// Find and mark usages of a type. Delegates to
+    /// <c>org.openrewrite.java.search.FindTypes</c> on the Java host.
+    /// </summary>
+    public static RecipeRef FindTypes(string fullyQualifiedTypeName)
+    {
+        return new RecipeRef(
+            "org.openrewrite.java.search.FindTypes",
+            new Dictionary<string, object?>
+            {
+                ["fullyQualifiedTypeName"] = fullyQualifiedTypeName
+            });
     }
 }

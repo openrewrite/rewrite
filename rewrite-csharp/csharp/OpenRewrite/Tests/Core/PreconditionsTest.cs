@@ -108,6 +108,75 @@ public class PreconditionsTest : RewriteTest
         Assert.Throws<ArgumentException>(() =>
             OpenRewrite.Core.Preconditions.Or(recipe.GetVisitor()));
     }
+
+    /// <summary>
+    /// RecipeRef helpers must NOT fire any RPC at construction time —
+    /// they just bundle a recipe name + options for later wire emission.
+    /// </summary>
+    [Fact]
+    public void RecipeRefHelpersAreLazy()
+    {
+        // None of these calls require an RPC connection; they just
+        // construct lightweight placeholders.
+        var hasPath = OpenRewrite.Java.Search.Preconditions.HasSourcePath("**/*.cs");
+        var usesType = OpenRewrite.Java.Search.Preconditions.UsesType("System.Console");
+        var usesMethod = OpenRewrite.Java.Search.Preconditions.UsesMethod("*..* WriteLine(..)");
+        var findMethods = OpenRewrite.Java.Search.Preconditions.FindMethods("*..* Write(..)");
+        var findTypes = OpenRewrite.Java.Search.Preconditions.FindTypes("System.IO.File");
+
+        Assert.Equal("org.openrewrite.FindSourceFiles", hasPath.RecipeName);
+        Assert.Equal("**/*.cs", hasPath.Options["filePattern"]);
+
+        Assert.Equal("org.openrewrite.java.search.HasType", usesType.RecipeName);
+        Assert.Equal("System.Console", usesType.Options["fullyQualifiedTypeName"]);
+
+        Assert.Equal("org.openrewrite.java.search.HasMethod", usesMethod.RecipeName);
+        Assert.Equal("*..* WriteLine(..)", usesMethod.Options["methodPattern"]);
+
+        Assert.Equal("org.openrewrite.java.search.FindMethods", findMethods.RecipeName);
+        Assert.Equal("org.openrewrite.java.search.FindTypes", findTypes.RecipeName);
+    }
+
+    /// <summary>
+    /// In-process: a Check wrapping a RecipeRef runs the wrapped editor
+    /// (the host evaluates the gate over the wire; in-process callers
+    /// fall back to "always matches" so unit tests aren't blocked by
+    /// the lack of an RPC connection).
+    /// </summary>
+    [Fact]
+    public void RecipeRefShortCircuitsToMatchInProcess()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new RecipeRefGatedRenameRecipe
+            {
+                From = "Foo",
+                To = "Bar"
+            }),
+            CSharp(
+                "class Foo { }",
+                "class Bar { }"
+            )
+        );
+    }
+}
+
+/// <summary>
+/// A recipe that gates rename via a UsesType RecipeRef. Without an
+/// active RPC connection, the in-process gate short-circuits to "matches"
+/// so the rename runs.
+/// </summary>
+file class RecipeRefGatedRenameRecipe : OpenRewrite.Core.Recipe
+{
+    public required string From { get; init; }
+    public required string To { get; init; }
+
+    public override string DisplayName => "RecipeRef-gated rename";
+    public override string Description => "Renames a class, gated by a UsesType RecipeRef precondition.";
+
+    public override OpenRewrite.Core.ITreeVisitor<ExecutionContext> GetVisitor() =>
+        OpenRewrite.Core.Preconditions.Check(
+            OpenRewrite.Java.Search.Preconditions.UsesType("System.Object"),
+            new RenameClassVisitor(From, To));
 }
 
 /// <summary>
