@@ -33,7 +33,7 @@ needs accumulator state that a stateless precondition check cannot provide.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Union, TYPE_CHECKING
+from typing import Any, Dict, Optional, Tuple, Union, TYPE_CHECKING
 
 from rewrite.execution import DelegatingExecutionContext, ExecutionContext
 from rewrite.tree import SourceFile, Tree
@@ -41,6 +41,25 @@ from rewrite.visitor import Cursor, TreeVisitor
 
 if TYPE_CHECKING:
     from rewrite.recipe import Recipe
+
+
+@dataclass(frozen=True)
+class CompositePrecondition:
+    """Composite of nested preconditions for use with :class:`Preconditions`.
+
+    Mirrors Java's ``Preconditions.or``/``and``/``not``: a gate that
+    short-circuits over its operands. ``op`` is one of ``"or"``, ``"and"``,
+    ``"not"``. Operands may be :class:`RecipeRef`, :class:`TreeVisitor`,
+    :class:`Recipe`, or another :class:`CompositePrecondition`.
+
+    The framework promotes the composite to a structured wire entry at
+    PrepareRecipe time; the Java host's ``RewriteRpc.matchAll`` rebuilds
+    the visitor via the matching ``Preconditions`` factory so the gate runs
+    locally and the visit RPC is skipped for files the gate rejects.
+    """
+
+    op: str
+    operands: Tuple[Any, ...]
 
 
 @dataclass(frozen=True)
@@ -69,7 +88,12 @@ class RecipeRef:
 
 
 # Type accepted by Check / Preconditions.check for the gate visitor.
-CheckArg = Union[TreeVisitor[Any, ExecutionContext], "Recipe", RecipeRef]
+CheckArg = Union[
+    TreeVisitor[Any, ExecutionContext],
+    "Recipe",
+    RecipeRef,
+    CompositePrecondition,
+]
 
 
 class _DataTableSuppressingExecutionContext(DelegatingExecutionContext):
@@ -128,8 +152,9 @@ class Check(TreeVisitor[Tree, ExecutionContext]):
         return self._v
 
     def is_acceptable(self, source_file: SourceFile, p: ExecutionContext) -> bool:
-        if isinstance(self._check, RecipeRef):
-            # RecipeRef has no in-process is_acceptable — defer to the wrapped editor.
+        if isinstance(self._check, (RecipeRef, CompositePrecondition)):
+            # RecipeRef / Composite have no in-process is_acceptable — defer
+            # to the wrapped editor.
             return self._v.is_acceptable(source_file, p)
         return self._check.is_acceptable(source_file, p) and self._v.is_acceptable(
             source_file, p
@@ -151,10 +176,63 @@ class Check(TreeVisitor[Tree, ExecutionContext]):
         # RecipeRunCycle batch path for the wire path.
         if isinstance(self._check, RecipeRef):
             return self._v.visit(tree, p, parent)
+        if isinstance(self._check, CompositePrecondition):
+            if _evaluate_composite(self._check, tree, _suppressing(p), parent):
+                return self._v.visit(tree, p, parent)
+            return tree
         condition_after = self._check.visit(tree, _suppressing(p), parent)
         if condition_after is not tree:
             return self._v.visit(tree, p, parent)
         return tree
+
+
+def _evaluate_composite(
+    composite: "CompositePrecondition",
+    tree: Tree,
+    ctx: ExecutionContext,
+    parent: Optional[Cursor],
+) -> bool:
+    """Evaluate a CompositePrecondition in-process for tests/direct calls.
+
+    Mirrors Java's ``Preconditions.or``/``and``/``not`` semantics. Returns
+    ``True`` iff the gate would let the wrapped visitor run. RecipeRef
+    operands are treated as "always matches" because they're wire-only
+    placeholders — the host evaluates them on the Java side once the
+    response goes over the wire; in-process callers don't have a live RPC.
+    """
+    op = composite.op
+    if op == "or":
+        for operand in composite.operands:
+            if _operand_matches(operand, tree, ctx, parent):
+                return True
+        return False
+    if op == "and":
+        for operand in composite.operands:
+            if not _operand_matches(operand, tree, ctx, parent):
+                return False
+        return True
+    if op == "not":
+        if len(composite.operands) != 1:
+            raise ValueError("CompositePrecondition op=not requires exactly one operand")
+        return not _operand_matches(composite.operands[0], tree, ctx, parent)
+    raise ValueError(f"Unknown CompositePrecondition op={op!r}")
+
+
+def _operand_matches(
+    operand: Any,
+    tree: Tree,
+    ctx: ExecutionContext,
+    parent: Optional[Cursor],
+) -> bool:
+    from rewrite.recipe import Recipe
+
+    if isinstance(operand, RecipeRef):
+        return True
+    if isinstance(operand, CompositePrecondition):
+        return _evaluate_composite(operand, tree, ctx, parent)
+    if isinstance(operand, Recipe):
+        operand = operand.editor()
+    return operand.visit(tree, ctx, parent) is not tree
 
 
 class RecipeCheck(Check):
@@ -226,3 +304,40 @@ class Preconditions:
         if isinstance(check, Recipe):
             return RecipeCheck(check, v)
         return Check(check, v)
+
+    @staticmethod
+    def or_(*checks: CheckArg) -> CompositePrecondition:
+        """OR-compose precondition checks.
+
+        Mirrors Java's ``Preconditions.or(visitor...)``. The gate matches if
+        any operand matches; the framework promotes this to a structured
+        wire entry so the Java host re-composes via ``Preconditions.or`` and
+        evaluates the gate locally before the visit RPC.
+
+        At least two operands are required; a single-operand OR is the same
+        as a bare ``Preconditions.check`` and would be a footgun to allow.
+        """
+        if len(checks) < 2:
+            raise ValueError("Preconditions.or_ requires at least two operands")
+        return CompositePrecondition("or", tuple(checks))
+
+    @staticmethod
+    def and_(*checks: CheckArg) -> CompositePrecondition:
+        """AND-compose precondition checks.
+
+        Mirrors Java's ``Preconditions.and(visitor...)``. Note that the
+        outer ``editPreconditions`` list is already AND-composed by
+        the host, so this is mainly useful as an operand of ``or_``/``not_``.
+        """
+        if len(checks) < 2:
+            raise ValueError("Preconditions.and_ requires at least two operands")
+        return CompositePrecondition("and", tuple(checks))
+
+    @staticmethod
+    def not_(check: CheckArg) -> CompositePrecondition:
+        """Negate a precondition check.
+
+        Mirrors Java's ``Preconditions.not(visitor)``: the gate matches iff
+        the operand does not.
+        """
+        return CompositePrecondition("not", (check,))

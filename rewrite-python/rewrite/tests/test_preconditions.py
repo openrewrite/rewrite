@@ -208,6 +208,101 @@ def test_recipe_check_rejects_scanning_recipe():
         Preconditions.check(_ScanRecipe(), _RecordingVisitor())
 
 
+def test_or_short_circuits_on_first_match():
+    matching = _MarkingVisitor()
+    nonmatching = _RecordingVisitor()
+    editor = _RecordingVisitor()
+
+    composite = Preconditions.or_(matching, nonmatching)
+    wrapped = Preconditions.check(composite, editor)
+
+    sf = _stub_source_file()
+    ctx = InMemoryExecutionContext()
+    wrapped.visit(sf, ctx)
+
+    assert matching.calls == 1
+    assert nonmatching.calls == 0, "OR should short-circuit after first match"
+    assert editor.calls == 1
+
+
+def test_or_skips_editor_when_no_operand_matches():
+    a = _RecordingVisitor()
+    b = _RecordingVisitor()
+    editor = _RecordingVisitor()
+
+    composite = Preconditions.or_(a, b)
+    wrapped = Preconditions.check(composite, editor)
+
+    sf = _stub_source_file()
+    ctx = InMemoryExecutionContext()
+    result = wrapped.visit(sf, ctx)
+
+    assert a.calls == 1
+    assert b.calls == 1
+    assert editor.calls == 0
+    assert result is sf
+
+
+def test_and_runs_editor_only_when_all_match():
+    matching_a = _MarkingVisitor()
+    matching_b = _MarkingVisitor()
+    nonmatching = _RecordingVisitor()
+    editor = _RecordingVisitor()
+
+    # All match -> editor runs.
+    wrapped = Preconditions.check(Preconditions.and_(matching_a, matching_b), editor)
+    sf = _stub_source_file()
+    ctx = InMemoryExecutionContext()
+    wrapped.visit(sf, ctx)
+    assert editor.calls == 1
+
+    # One non-matching short-circuits to false.
+    editor2 = _RecordingVisitor()
+    wrapped2 = Preconditions.check(
+        Preconditions.and_(matching_a, nonmatching), editor2
+    )
+    wrapped2.visit(_stub_source_file(), ctx)
+    assert editor2.calls == 0
+
+
+def test_not_inverts_match():
+    matching = _MarkingVisitor()
+    nonmatching = _RecordingVisitor()
+    editor = _RecordingVisitor()
+
+    # not(match) -> editor skipped.
+    Preconditions.check(Preconditions.not_(matching), editor).visit(
+        _stub_source_file(), InMemoryExecutionContext()
+    )
+    assert editor.calls == 0
+
+    # not(no-match) -> editor runs.
+    editor2 = _RecordingVisitor()
+    Preconditions.check(Preconditions.not_(nonmatching), editor2).visit(
+        _stub_source_file(), InMemoryExecutionContext()
+    )
+    assert editor2.calls == 1
+
+
+def test_or_treats_recipe_ref_operands_as_match():
+    """RecipeRefs are wire-only — in-process they should pass through."""
+    from rewrite.python.preconditions import uses_method
+
+    editor = _RecordingVisitor()
+    wrapped = Preconditions.check(
+        Preconditions.or_(uses_method("*..* a()"), uses_method("*..* b()")),
+        editor,
+    )
+
+    wrapped.visit(_stub_source_file(), InMemoryExecutionContext())
+    assert editor.calls == 1
+
+
+def test_or_requires_at_least_two_operands():
+    with pytest.raises(ValueError, match="at least two operands"):
+        Preconditions.or_(_RecordingVisitor())
+
+
 def test_check_is_acceptable_ands_both_legs():
     class _Reject(TreeVisitor[Tree, Any]):
         def is_acceptable(self, sf, p):
