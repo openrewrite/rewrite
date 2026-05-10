@@ -69,6 +69,9 @@ public class RewriteRpcProcess extends Thread {
     @Setter
     private @Nullable Path stderrRedirect;
 
+    @Nullable
+    private Thread shutdownHook;
+
     public RewriteRpcProcess(String... command) {
         this.command = command;
         this.setName("RewriteRpcProcess");
@@ -168,12 +171,15 @@ public class RewriteRpcProcess extends Thread {
             }
         }
 
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+        // Hold a reference so shutdown() can deregister the hook; otherwise each
+        // RPC process leaks its full RewriteRpc graph via ApplicationShutdownHooks.
+        shutdownHook = new Thread(() -> {
             try {
                 shutdown();
             } catch (Throwable ignored) {
             }
-        }, "rpc-shutdown"));
+        }, "rpc-shutdown");
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
 
         SimpleModule module = new SimpleModule();
         module.addSerializer(Path.class, new PathSerializer());
@@ -188,6 +194,14 @@ public class RewriteRpcProcess extends Thread {
     }
 
     public void shutdown() {
+        if (shutdownHook != null) {
+            try {
+                Runtime.getRuntime().removeShutdownHook(shutdownHook);
+            } catch (IllegalStateException ignored) {
+                // JVM is already shutting down (e.g. shutdown() invoked from the hook itself).
+            }
+            shutdownHook = null;
+        }
         if (process != null && process.isAlive()) {
             process.destroy();
             try {
