@@ -1439,8 +1439,10 @@ def handle_batch_visit(params: dict) -> dict:
         modified = after is not before
         deleted = after is None
 
-        # Diff SearchResult IDs against the running set
-        if deleted:
+        # Diff SearchResult IDs against the running set. When the visitor
+        # didn't modify the tree, no new SearchResult markers were added
+        # — skip the full-tree walk in that case.
+        if deleted or not modified:
             search_result_ids = []
         else:
             after_ids = _collect_search_result_ids(after)
