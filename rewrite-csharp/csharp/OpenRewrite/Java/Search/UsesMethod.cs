@@ -46,14 +46,17 @@ public class UsesMethod : JavaVisitor<ExecutionContext>
 
     public override J? Visit(Tree? tree, ExecutionContext ctx)
     {
-        if (tree is not SourceFile sf) return tree as J;
-        _found = false;
-        base.Visit(tree, ctx);
-        if (_found)
+        if (tree is SourceFile sf)
         {
-            return SearchResult.Found(sf) as J;
+            _found = false;
+            base.Visit(tree, ctx);
+            if (_found)
+            {
+                return SearchResult.Found(sf) as J;
+            }
+            return sf as J;
         }
-        return sf as J;
+        return base.Visit(tree, ctx);
     }
 
     public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
