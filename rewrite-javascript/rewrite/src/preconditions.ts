@@ -33,14 +33,22 @@ import {ExecutionContext} from "./execution";
  * construction time, which would otherwise block in-process unit tests
  * that don't have an active RPC connection.
  *
+ * If ``localVisitor`` is provided, in-process callers (without an active
+ * RPC connection) evaluate the gate against that visitor instead of
+ * short-circuiting to "always matches". This preserves real filtering
+ * behavior in unit tests while still letting the host evaluate the gate
+ * over the wire when an RPC connection is present.
+ *
  * Helpers in ``@openrewrite/rewrite/javascript/preconditions``
  * (``usesMethod``, ``usesType``, ``hasSourcePath``, ``findMethods``,
- * ``findTypes``) return ``RecipeRef`` instances.
+ * ``findTypes``) return ``RecipeRef`` instances populated with the
+ * matching native TS visitor where one exists.
  */
 export class RecipeRef {
     constructor(
         readonly recipeName: string,
-        readonly options: Readonly<Record<string, any>> = {}
+        readonly options: Readonly<Record<string, any>> = {},
+        readonly localVisitor?: TreeVisitor<any, ExecutionContext>
     ) {
     }
 }
@@ -140,12 +148,21 @@ export class Check<T extends Tree> extends TreeVisitor<T, ExecutionContext> {
                 : this.v.visit<R>(tree, ctx);
         }
 
-        // In-process fallback: a RecipeRef is a wire-only placeholder with no
-        // ``visit`` of its own — treat as "always matches" so the wrapped
-        // editor still runs in unit tests and direct in-process calls. The
-        // wire-side optimization (skip the visit RPC when the precondition
-        // rejects the file) lives in optimizePreconditions.
+        // In-process fallback for a RecipeRef: if a localVisitor was
+        // provided, evaluate the gate against it (preserves real filtering
+        // for unit tests); otherwise treat as "always matches" so the
+        // wrapped editor still runs. Wire-side optimization (skip the
+        // visit RPC when the precondition rejects the file) lives in
+        // optimizePreconditions and is independent of localVisitor.
         if (this.check instanceof RecipeRef) {
+            if (this.check.localVisitor !== undefined) {
+                const localResult = parent !== undefined
+                    ? await this.check.localVisitor.visit(tree, ctx, parent)
+                    : await this.check.localVisitor.visit(tree, ctx);
+                if (localResult === (tree as unknown as T)) {
+                    return tree as unknown as R;
+                }
+            }
             return parent !== undefined
                 ? this.v.visit<R>(tree, ctx, parent)
                 : this.v.visit<R>(tree, ctx);
@@ -215,10 +232,17 @@ async function operandMatches(
     parent?: Cursor
 ): Promise<boolean> {
     if (operand instanceof RecipeRef) {
-        // Wire-only — treat as "always matches" in-process so the wrapped
+        // If a localVisitor was provided, evaluate against it for real;
+        // otherwise short-circuit to "always matches" so the wrapped
         // editor still runs in unit tests. The host evaluates the gate
         // for real once the response goes over the wire.
-        return true;
+        if (operand.localVisitor === undefined) {
+            return true;
+        }
+        const result = parent !== undefined
+            ? await operand.localVisitor.visit(tree, ctx, parent)
+            : await operand.localVisitor.visit(tree, ctx);
+        return result !== tree;
     }
     if (operand instanceof CompositePrecondition) {
         return evaluateComposite(operand, tree, ctx, parent);

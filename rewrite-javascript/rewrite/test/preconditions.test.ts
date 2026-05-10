@@ -194,20 +194,40 @@ describe('Preconditions composites (in-process)', () => {
         expect(refs[4].recipeName).toBe("org.openrewrite.java.search.FindTypes");
     });
 
-    test('RecipeRef short-circuits to "matches" in-process', async () => {
-        // Wire-only — direct in-process callers should still run the
-        // wrapped editor since the host isn't available to evaluate the
-        // gate for real.
+    test('RecipeRef without localVisitor short-circuits to "matches"', async () => {
+        // Construct a RecipeRef directly without bundling a native
+        // visitor — in-process callers should fall back to "always
+        // matches" so the wrapped editor still runs (the host evaluates
+        // the gate for real once the response goes over the wire).
         const editor = new RecordingVisitor();
-        await (await check(usesMethod("*..* nope(..)"), editor))
+        const refWithoutLocal = new RecipeRef("org.openrewrite.java.search.HasMethod", {
+            methodPattern: "*..* nope(..)",
+            matchOverrides: false,
+        });
+        await (await check(refWithoutLocal, editor))
             .visit(stubSourceFile(), {} as ExecutionContext);
         expect(editor.calls).toBe(1);
     });
 
-    test('Or with RecipeRef operands also short-circuits to "matches"', async () => {
+    test('RecipeRef with localVisitor evaluates the gate for real', async () => {
+        // Helpers like usesMethod populate a native local visitor so
+        // unit tests still see real filtering behavior. The stub source
+        // file has no method invocations, so the gate fails and the
+        // editor is skipped.
         const editor = new RecordingVisitor();
-        await (await check(or(usesMethod("*..* a()"), usesType("X")), editor))
+        await (await check(usesMethod("*..* nope(..)"), editor))
             .visit(stubSourceFile(), {} as ExecutionContext);
-        expect(editor.calls).toBe(1);
+        expect(editor.calls).toBe(0);
+    });
+
+    test('helpers populate localVisitor for real in-process filtering', () => {
+        // Spot-check that helpers bundle a TreeVisitor for offline
+        // eval. The actual filtering behavior is exercised by the
+        // RecipeSpec / fixture tests at the top of this file.
+        expect(hasSourcePath("**/*.ts").localVisitor).toBeDefined();
+        expect(usesMethod("*..* a(..)").localVisitor).toBeDefined();
+        expect(usesType("X").localVisitor).toBeDefined();
+        expect(findMethods("*..* a(..)").localVisitor).toBeDefined();
+        expect(findTypes("X").localVisitor).toBeDefined();
     });
 });
