@@ -222,3 +222,21 @@ func UsesType(fullyQualifiedType string) *RecipeRef {
 		Options:    map[string]any{"fullyQualifiedTypeName": fullyQualifiedType, "checkAssignability": false},
 	}
 }
+
+// FindMethods finds and marks methods matching a pattern.
+// Delegates to org.openrewrite.java.search.FindMethods on the Java host.
+func FindMethods(methodPattern string) *RecipeRef {
+	return &RecipeRef{
+		RecipeName: "org.openrewrite.java.search.FindMethods",
+		Options:    map[string]any{"methodPattern": methodPattern, "matchOverrides": false},
+	}
+}
+
+// FindTypes finds and marks usages of a type.
+// Delegates to org.openrewrite.java.search.FindTypes on the Java host.
+func FindTypes(fullyQualifiedType string) *RecipeRef {
+	return &RecipeRef{
+		RecipeName: "org.openrewrite.java.search.FindTypes",
+		Options:    map[string]any{"fullyQualifiedTypeName": fullyQualifiedType},
+	}
+}
