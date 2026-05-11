@@ -35,6 +35,9 @@ import static org.openrewrite.Tree.randomId;
 
 class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
 
+    private static final PropertyPlaceholderHelper PROPERTY_PLACEHOLDER_HELPER = new PropertyPlaceholderHelper(
+            "#{", "}", null);
+
     @Value
     static class TemplateMatchResult {
         boolean match;
@@ -62,16 +65,13 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
     }
 
     private static J[] createTemplateParameters(String code, Set<String> genericTypes) {
-        PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper(
-                "#{", "}", null);
-
         Map<String, JavaType.GenericTypeVariable> generics = TypeParameter.parseGenericTypes(genericTypes);
         List<J> parameters = new ArrayList<>();
         String substituted = code;
         Map<String, String> typedPatternByName = new HashMap<>();
         while (true) {
             String previous = substituted;
-            substituted = propertyPlaceholderHelper.replacePlaceholders(substituted, key -> {
+            substituted = PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(substituted, key -> {
                 String s;
                 if (!key.isEmpty()) {
                     MatcherPatternNode ctx = TemplateParameterParser.parseMatcherPattern(key);

@@ -42,12 +42,12 @@ import static org.openrewrite.java.ParenthesizeVisitor.maybeParenthesize;
 public class Substitutions {
     private static final Pattern PATTERN_COMMENT = Pattern.compile("__p(\\d+)__");
     private static final List<String> VALID_MATCHERS = Arrays.asList("any", "anyArray");
+    private static final PropertyPlaceholderHelper PROPERTY_PLACEHOLDER_HELPER = new PropertyPlaceholderHelper(
+            "#{", "}", null);
 
     private final String code;
     private final Set<String> genericTypes;
     private final Object[] parameters;
-    private final PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper(
-            "#{", "}", null);
     @Getter
     private final Set<JavaType.GenericTypeVariable> typeVariables = newSetFromMap(new IdentityHashMap<>());
 
@@ -60,7 +60,7 @@ public class Substitutions {
         while (true) {
             Map<String, String> typedPatternByName = new HashMap<>();
             String previous = substituted;
-            substituted = propertyPlaceholderHelper.replacePlaceholders(substituted, key -> {
+            substituted = PROPERTY_PLACEHOLDER_HELPER.replacePlaceholders(substituted, key -> {
                 String s;
                 if (!key.isEmpty()) {
                     MatcherPatternNode ctx = TemplateParameterParser.parseMatcherPattern(key);

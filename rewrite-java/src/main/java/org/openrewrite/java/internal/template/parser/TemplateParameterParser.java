@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 
@@ -189,27 +190,11 @@ public final class TemplateParameterParser {
     }
 
     public static MatcherPatternNode parseMatcherPattern(String input) {
-        MatcherPatternNode cached = MATCHER_PATTERN_CACHE.get(input);
-        if (cached != null) {
-            return cached;
-        }
-        TemplateParameterParser p = new TemplateParameterParser(new TemplateParameterLexer(input));
-        MatcherPatternNode result = p.matcherPattern();
-        p.expectEof();
-        MatcherPatternNode existing = MATCHER_PATTERN_CACHE.putIfAbsent(input, result);
-        return existing != null ? existing : result;
+        return cached(MATCHER_PATTERN_CACHE, input, TemplateParameterParser::matcherPattern);
     }
 
     public static GenericPatternNode parseGenericPattern(String input) {
-        GenericPatternNode cached = GENERIC_PATTERN_CACHE.get(input);
-        if (cached != null) {
-            return cached;
-        }
-        TemplateParameterParser p = new TemplateParameterParser(new TemplateParameterLexer(input));
-        GenericPatternNode result = p.genericPattern();
-        p.expectEof();
-        GenericPatternNode existing = GENERIC_PATTERN_CACHE.putIfAbsent(input, result);
-        return existing != null ? existing : result;
+        return cached(GENERIC_PATTERN_CACHE, input, TemplateParameterParser::genericPattern);
     }
 
     public static TypeNode parseType(String input) {
@@ -217,6 +202,18 @@ public final class TemplateParameterParser {
         TypeNode result = p.type();
         p.expectEof();
         return result;
+    }
+
+    private static <T> T cached(ConcurrentMap<String, T> cache, String input, Function<TemplateParameterParser, T> rule) {
+        T hit = cache.get(input);
+        if (hit != null) {
+            return hit;
+        }
+        TemplateParameterParser p = new TemplateParameterParser(new TemplateParameterLexer(input));
+        T parsed = rule.apply(p);
+        p.expectEof();
+        T winner = cache.putIfAbsent(input, parsed);
+        return winner != null ? winner : parsed;
     }
 
     private MatcherPatternNode matcherPattern() {
