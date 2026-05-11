@@ -36,6 +36,19 @@ class ExportTest implements RewriteTest {
     }
 
     @Test
+    void exportExtraSpaceAfterKeyword() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              export  Foo.x
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void nestedPathExport() {
         rewriteRun(
           scala(

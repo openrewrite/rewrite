@@ -58,6 +58,17 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void classConstructorParameterTypeNoSpaceAfterColon() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(x:Int)
+                """
+            )
+        );
+    }
+
+    @Test
     void classWithMultipleParameters() {
         rewriteRun(
             scala(

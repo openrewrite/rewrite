@@ -21,7 +21,7 @@ import org.openrewrite.Tree
 import org.openrewrite.java.internal.JavaTypeFactory
 import org.openrewrite.java.tree.*
 import org.openrewrite.marker.Markers
-import org.openrewrite.scala.marker.{IndentedSyntax, PackageBraces}
+import org.openrewrite.scala.marker.{IndentedSyntax, PackageBraces, PackageSemicolon}
 
 import java.util
 import java.util.{Collections, List as JList, UUID}
@@ -200,8 +200,9 @@ class ScalaASTConverter {
     val nextChar = if (scanIdx < srcText.length) srcText.charAt(scanIdx) else 0.toChar
     val hasIndentedColon = nextChar == ':'
     val hasBraces = nextChar == '{'
+    val hasSemicolon = nextChar == ';'
     val cursorAfter =
-      if (hasIndentedColon || hasBraces) scanIdx + 1 + srcOffset
+      if (hasIndentedColon || hasBraces || hasSemicolon) scanIdx + 1 + srcOffset
       else packageEndPos
 
     // Update the visitor's cursor to after the package declaration
@@ -212,14 +213,17 @@ class ScalaASTConverter {
     // Create package expression
     val packageExpr: Expression = TypeTree.build(packageName)
 
-    val markers = if (hasIndentedColon) {
-      Markers.build(Collections.singletonList(new IndentedSyntax(UUID.randomUUID())))
+    val markerList = new util.ArrayList[org.openrewrite.marker.Marker]()
+    if (hasIndentedColon) {
+      markerList.add(new IndentedSyntax(UUID.randomUUID()))
     } else if (hasBraces) {
       val beforeBrace = srcText.substring(scanStart, scanIdx)
-      Markers.build(Collections.singletonList(PackageBraces(UUID.randomUUID(), beforeBrace, "")))
-    } else {
-      Markers.EMPTY
+      markerList.add(PackageBraces(UUID.randomUUID(), beforeBrace, ""))
     }
+    if (hasSemicolon) {
+      markerList.add(PackageSemicolon(UUID.randomUUID()))
+    }
+    val markers = if (markerList.isEmpty) Markers.EMPTY else Markers.build(markerList)
 
     new J.Package(
       Tree.randomId(),
