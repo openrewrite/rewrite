@@ -5568,45 +5568,14 @@ class ScalaTreeVisitor(
       }
     }
 
-    // Scan source between current cursor and the parameter name for modifiers:
-    // val, var, private, protected (and qualified forms like private[scope]), override.
-    val paramModifiers = new util.ArrayList[J.Modifier]()
-    if (cursor < nameStart && nameStart <= source.length) {
+    // Scan source between the current cursor and the parameter name for modifiers
+    // (`val`/`var`, access modifiers, `override`, `final`).
+    val paramModifiers = if (cursor < nameStart && nameStart <= source.length) {
       val modText = source.substring(cursor, nameStart)
-      val modKeywords = List(
-        ("override", J.Modifier.Type.LanguageExtension),
-        ("private", J.Modifier.Type.Private),
-        ("protected", J.Modifier.Type.Protected),
-        ("final", J.Modifier.Type.Final),
-        ("val", J.Modifier.Type.LanguageExtension),
-        ("var", J.Modifier.Type.LanguageExtension)
-      )
-      val present = modKeywords.flatMap { case (kw, mt) =>
-        val p = findKeyword(modText, kw)
-        if (p >= 0) Some((p, kw, mt)) else None
-      }.sortBy(_._1)
-
-      var lastEnd = 0
-      for ((pos, kw, mt) <- present) {
-        val spaceBefore = if (pos > lastEnd) Space.format(modText.substring(lastEnd, pos)) else Space.EMPTY
-        var fullKw = kw
-        var kwLen = kw.length
-        if ((kw == "private" || kw == "protected") && pos + kwLen < modText.length) {
-          val afterKw = modText.substring(pos + kwLen)
-          if (afterKw.startsWith("[")) {
-            val close = afterKw.indexOf(']')
-            if (close >= 0) {
-              fullKw = kw + afterKw.substring(0, close + 1)
-              kwLen = kw.length + close + 1
-            }
-          }
-        }
-        paramModifiers.add(new J.Modifier(Tree.randomId(), spaceBefore, Markers.EMPTY,
-          fullKw, mt, Collections.emptyList()))
-        lastEnd = pos + kwLen
-      }
-      cursor = cursor + lastEnd
-    }
+      val (mods, consumed) = parseModifierKeywords(modText, constructorParamModifierKeywords)
+      cursor += consumed
+      mods
+    } else new util.ArrayList[J.Modifier]()
 
     // Space between modifiers (or annotations) and the parameter name.
     val namePrefix = if (cursor < nameStart && nameStart <= source.length) {
@@ -6981,73 +6950,78 @@ class ScalaTreeVisitor(
     -1
   }
 
-  private def extractModifiersFromText(mods: untpd.Modifiers, modifierText: String): (util.ArrayList[J.Modifier], Int) = {
-    import dotty.tools.dotc.core.Flags
+  /**
+   * Parse modifier keywords out of a raw text window — the source text between the
+   * cursor and the keyword that ends the modifier list (`class`/`def`/the parameter
+   * name, etc.). Recognises whole-word occurrences only, sorts by source position,
+   * captures the inter-modifier whitespace, and expands `private[scope]` /
+   * `protected[scope]` qualified-access suffixes.
+   *
+   * Returns the parsed modifiers along with the offset within `text` where the
+   * last consumed modifier ended — callers use that to advance their cursor.
+   */
+  private def parseModifierKeywords(
+      text: String,
+      keywords: List[(String, J.Modifier.Type)]
+  ): (util.ArrayList[J.Modifier], Int) = {
     val modifierList = new util.ArrayList[J.Modifier]()
-    
-    // The order matters - we'll add them in the order they appear in source
-    val modifierKeywords = List(
-      ("private", Flags.Private, J.Modifier.Type.Private),
-      ("protected", Flags.Protected, J.Modifier.Type.Protected),
-      ("abstract", Flags.Abstract, J.Modifier.Type.Abstract),
-      ("final", Flags.Final, J.Modifier.Type.Final),
-      ("override", Flags.Override, J.Modifier.Type.LanguageExtension),
-      ("implicit", Flags.Implicit, J.Modifier.Type.LanguageExtension),
-      ("sealed", Flags.Sealed, J.Modifier.Type.Sealed),
-      ("lazy", Flags.Lazy, J.Modifier.Type.LanguageExtension)
-      // Skip "case" for now - needs special handling
-    )
-    
-    // Create a list of (position, keyword, type) for modifiers that are present.
-    // Check both the compiler flags AND the source text - qualified access like
-    // private[testing] may not always set the simple Private/Protected flag.
-    val presentModifiers = modifierKeywords.flatMap { case (keyword, flag, modType) =>
-      val pos = findKeyword(modifierText, keyword)
-      if (pos >= 0 && (mods.is(flag) || modifierText.contains(keyword))) {
-        Some((pos, keyword, modType))
-      } else None
-    }.sortBy(_._1) // Sort by position in source
-    
-    // Build modifiers with proper spacing
+    val present = keywords.flatMap { case (kw, mt) =>
+      val pos = findKeyword(text, kw)
+      if (pos >= 0) Some((pos, kw, mt)) else None
+    }.sortBy(_._1)
+
     var lastEnd = 0
-    for ((pos, keyword, modType) <- presentModifiers) {
-      // Space before this modifier
-      val spaceBefore = if (pos > lastEnd) {
-        Space.format(modifierText.substring(lastEnd, pos))
-      } else {
-        Space.EMPTY
-      }
-      
-      // Check for scope qualifier like private[testing] or protected[this]
-      var fullKeyword = keyword
-      var keywordLen = keyword.length
-      if ((keyword == "private" || keyword == "protected") && pos + keywordLen < modifierText.length) {
-        val afterKeyword = modifierText.substring(pos + keywordLen)
-        if (afterKeyword.startsWith("[")) {
-          val closeBracket = afterKeyword.indexOf(']')
-          if (closeBracket >= 0) {
-            fullKeyword = keyword + afterKeyword.substring(0, closeBracket + 1)
-            keywordLen = keyword.length + closeBracket + 1
+    for ((pos, kw, mt) <- present) {
+      val spaceBefore = if (pos > lastEnd) Space.format(text.substring(lastEnd, pos)) else Space.EMPTY
+
+      // `private[scope]` / `protected[scope]` qualified access
+      var fullKw = kw
+      var kwLen = kw.length
+      if ((kw == "private" || kw == "protected") && pos + kwLen < text.length) {
+        val afterKw = text.substring(pos + kwLen)
+        if (afterKw.startsWith("[")) {
+          val close = afterKw.indexOf(']')
+          if (close >= 0) {
+            fullKw = kw + afterKw.substring(0, close + 1)
+            kwLen = kw.length + close + 1
           }
         }
       }
 
       modifierList.add(new J.Modifier(
-        Tree.randomId(),
-        spaceBefore,
-        Markers.EMPTY,
-        fullKeyword,
-        modType,
-        Collections.emptyList()
-      ))
-
-      lastEnd = pos + keywordLen
+        Tree.randomId(), spaceBefore, Markers.EMPTY, fullKw, mt, Collections.emptyList()))
+      lastEnd = pos + kwLen
     }
-    
-    // Don't advance cursor here - callers handle cursor positioning
-    // based on the classIndex/keyword position they've already computed.
-    
     (modifierList, lastEnd)
+  }
+
+  /** Definition-level modifiers (class/object/trait/def/val). Skips `case` — needs special handling. */
+  private val definitionModifierKeywords: List[(String, J.Modifier.Type)] = List(
+    ("private", J.Modifier.Type.Private),
+    ("protected", J.Modifier.Type.Protected),
+    ("abstract", J.Modifier.Type.Abstract),
+    ("final", J.Modifier.Type.Final),
+    ("override", J.Modifier.Type.LanguageExtension),
+    ("implicit", J.Modifier.Type.LanguageExtension),
+    ("sealed", J.Modifier.Type.Sealed),
+    ("lazy", J.Modifier.Type.LanguageExtension)
+  )
+
+  /** Modifiers legal on a class/trait primary-constructor parameter. */
+  private val constructorParamModifierKeywords: List[(String, J.Modifier.Type)] = List(
+    ("override", J.Modifier.Type.LanguageExtension),
+    ("private", J.Modifier.Type.Private),
+    ("protected", J.Modifier.Type.Protected),
+    ("final", J.Modifier.Type.Final),
+    ("val", J.Modifier.Type.LanguageExtension),
+    ("var", J.Modifier.Type.LanguageExtension)
+  )
+
+  private def extractModifiersFromText(mods: untpd.Modifiers, modifierText: String): (util.ArrayList[J.Modifier], Int) = {
+    // `mods` is unused: `findKeyword` already enforces whole-word matching against the
+    // source text, which is authoritative — Dotty flags drift for qualified access like
+    // `private[scope]`, where the simple `Flags.Private` bit may not be set.
+    parseModifierKeywords(modifierText, definitionModifierKeywords)
   }
   
   private def constantToJavaType(const: Constant): JavaType.Primitive = const.tag match {
