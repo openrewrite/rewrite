@@ -17,20 +17,12 @@ package org.openrewrite.gradle.gradle9;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.tree.K;
 
 import java.nio.file.Paths;
@@ -62,25 +54,23 @@ public class UseMainClassPropertyForApplication extends Recipe {
 
             @Override
             public J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+                if (!isMainClassName(assignment.getVariable())) {
+                    return assignment;
+                }
                 if (getCursor().getNearestMessage(IN_APPLICATION) != null) {
                     Expression variable = assignment.getVariable();
                     if (variable instanceof J.Identifier) {
-                        J.Identifier id = (J.Identifier) variable;
-                        if ("mainClassName".equals(id.getSimpleName())) {
-                            return assignment.withVariable(id.withSimpleName("mainClass"));
-                        }
+                        return assignment.withVariable(((J.Identifier) variable).withSimpleName("mainClass"));
                     } else if (variable instanceof J.FieldAccess) {
                         J.FieldAccess fieldAccess = (J.FieldAccess) variable;
-                        if ("mainClassName".equals(fieldAccess.getSimpleName())) {
-                            return assignment.withVariable(
-                                    fieldAccess.withName(fieldAccess.getName().withSimpleName("mainClass"))
-                            );
-                        }
+                        return assignment.withVariable(
+                                fieldAccess.withName(fieldAccess.getName().withSimpleName("mainClass"))
+                        );
                     }
                     return assignment;
                 }
 
-                if (getCursor().firstEnclosing(J.Lambda.class) == null && isMainClassName(assignment.getVariable())) {
+                if (getCursor().firstEnclosing(J.Lambda.class) == null) {
                     Expression rhs = assignment.getAssignment();
                     if (rhs instanceof J.Literal && ((J.Literal) rhs).getValueSource() != null) {
                         String valueSource = ((J.Literal) rhs).getValueSource();
@@ -101,7 +91,7 @@ public class UseMainClassPropertyForApplication extends Recipe {
                     return super.visitVariableDeclarations(multiVariable, ctx);
                 }
                 J.VariableDeclarations.NamedVariable variable = variables.get(0);
-                if (!"mainClassName".equals(variable.getSimpleName())) {
+                if (!isMainClassName(variable)) {
                     return super.visitVariableDeclarations(multiVariable, ctx);
                 }
                 Expression initializer = variable.getInitializer();
@@ -115,8 +105,7 @@ public class UseMainClassPropertyForApplication extends Recipe {
             private J parseApplicationBlock(ExecutionContext ctx, String valueSource, Space prefix) {
                 String snippet = "application {\n    mainClass = " + valueSource + "\n}";
                 JavaSourceFile sourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                boolean isKotlinDsl = sourceFile != null &&
-                        sourceFile.getSourcePath().toString().endsWith(".gradle.kts");
+                boolean isKotlinDsl = sourceFile instanceof K.CompilationUnit;
                 if (isKotlinDsl) {
                     Statement statement = GradleParser.builder().build()
                             .parseInputs(Collections.singletonList(
@@ -138,11 +127,13 @@ public class UseMainClassPropertyForApplication extends Recipe {
                         .withPrefix(prefix);
             }
 
-            private boolean isMainClassName(Expression variable) {
+            private boolean isMainClassName(Tree variable) {
                 if (variable instanceof J.Identifier) {
                     return "mainClassName".equals(((J.Identifier) variable).getSimpleName());
                 } else if (variable instanceof J.FieldAccess) {
                     return "mainClassName".equals(((J.FieldAccess) variable).getSimpleName());
+                } else if (variable instanceof J.VariableDeclarations.NamedVariable) {
+                    return "mainClassName".equals(((J.VariableDeclarations.NamedVariable) variable).getSimpleName());
                 }
                 return false;
             }
