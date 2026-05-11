@@ -315,7 +315,7 @@ class ScalaTreeVisitor(
     val prefix = extractPrefix(id.span)
     val sourceText = extractSource(id.span) // Extract source to move cursor
     var simpleName = id.name.toString
-    
+
     // Special handling for wildcard imports: convert Scala's "_" to Java's "*"
     // This is needed because J.Import expects "*" for wildcard imports
     if (simpleName == "_" && isInImportContext) {
@@ -332,6 +332,10 @@ class ScalaTreeVisitor(
       )
       wildcard
     } else {
+      // Preserve backtick-quoted form when source uses it — id.name.toString strips the backticks.
+      if (sourceText.startsWith("`") && sourceText.endsWith("`") && sourceText.length >= 2) {
+        simpleName = sourceText
+      }
       ident(simpleName, prefix, typeOfTree(id), variableTypeOfTree(id))
     }
   }
@@ -2717,13 +2721,27 @@ class ScalaTreeVisitor(
         ident(vd.name.toString, afterValVar)
       }
     } else {
-      ident(vd.name.toString, afterValVar, typeOfTree(vd), variableTypeOfTree(vd))
+      // Preserve backtick-quoted form when source uses it — vd.name.toString strips the backticks.
+      // The opening backtick (if any) was already consumed into afterValVar by the index-based
+      // search above, so cursor sits at the raw name and we check around it for matching backticks.
+      val rawName = vd.name.toString
+      if (isBacktickQuotedNameAt(cursor, rawName.length)) {
+        // Move the opening backtick out of afterValVar (back) and onto the identifier name itself.
+        val afterValVarStr = afterValVar.getWhitespace
+        val newAfterValVar = if (afterValVarStr.endsWith("`")) Space.format(afterValVarStr.dropRight(1)) else afterValVar
+        ident("`" + rawName + "`", newAfterValVar, typeOfTree(vd), variableTypeOfTree(vd))
+      } else {
+        ident(rawName, afterValVar, typeOfTree(vd), variableTypeOfTree(vd))
+      }
     }
 
     // Update cursor past the name only if we haven't parsed a type and it's not a tuple pattern
     // If we parsed a type or a tuple pattern, the cursor is already past them
     if (typeExpression == null && !isTuplePattern) {
-      cursor = cursor + vd.name.toString.length
+      val rawName = vd.name.toString
+      // Backtick-quoted name has a trailing backtick to skip past.
+      val extra = if (isBacktickQuotedNameAt(cursor, rawName.length)) 1 else 0
+      cursor = cursor + rawName.length + extra
     }
     
     // Handle initializer
@@ -6067,13 +6085,18 @@ class ScalaTreeVisitor(
 
   private def visitNamedArg(namedArg: Trees.NamedArg[?]): J.Assignment = {
     val prefix = extractPrefix(namedArg.span)
-    // Create name identifier — don't use extractPrefix since we're manually tracking
     val nameText = namedArg.name.toString
-    val nameId = ident(nameText)
 
-    // Advance past name and find "="
-    val nameStart = Math.max(0, namedArg.span.start - offsetAdjustment)
-    cursor = Math.max(cursor, nameStart + nameText.length)
+    // Detect backtick-quoted name and preserve the backticks on the identifier.
+    // namedArg.name.toString strips them, but the source may show `name`.
+    val spanStart = Math.max(0, namedArg.span.start - offsetAdjustment)
+    val isBacktickQuoted = isBacktickQuotedNameAt(spanStart + 1, nameText.length)
+    val displayName = if (isBacktickQuoted) "`" + nameText + "`" else nameText
+    val nameId = ident(displayName)
+
+    // Advance past name (and surrounding backticks if any), then find "="
+    val nameLen = if (isBacktickQuoted) nameText.length + 2 else nameText.length
+    cursor = Math.max(cursor, spanStart + nameLen)
     val eqSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
     val eqIdx = eqSearch.indexOf('=')
     val beforeEq = if (eqIdx > 0) Space.format(eqSearch.substring(0, eqIdx)) else Space.EMPTY
@@ -6544,6 +6567,17 @@ class ScalaTreeVisitor(
    */
   private def visitSyntheticTypeTree(tt: Trees.TypeTree[?]): J =
     new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY)
+
+  /**
+   * Returns `true` when the raw-name slice starting at `rawNameStart` (the first non-backtick
+   * char of the identifier) is surrounded by backticks in the source. `Name.toString` strips
+   * them, so callers check this to re-attach the backticks for round-trip fidelity.
+   */
+  private def isBacktickQuotedNameAt(rawNameStart: Int, rawNameLen: Int): Boolean = {
+    val end = rawNameStart + rawNameLen
+    rawNameStart > 0 && end < source.length &&
+      source.charAt(rawNameStart - 1) == '`' && source.charAt(end) == '`'
+  }
 
   private def visitUnknown(tree: Trees.Tree[?]): Nothing = {
     val adjStart = Math.max(0, tree.span.start - offsetAdjustment)

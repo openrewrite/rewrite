@@ -78,6 +78,19 @@ class IdentifierTest implements RewriteTest {
     }
 
     @Test
+    void backtickIdentifierAsNamedArgument() {
+        rewriteRun(
+          scala(
+            """
+              object O {
+                f(`type` = "x")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void operatorIdentifier() {
         rewriteRun(
           scala("+")
