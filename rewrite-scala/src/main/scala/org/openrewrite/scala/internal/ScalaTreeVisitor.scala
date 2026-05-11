@@ -5577,13 +5577,17 @@ class ScalaTreeVisitor(
       mods
     } else new util.ArrayList[J.Modifier]()
 
-    // Space between modifiers (or annotations) and the parameter name.
-    val namePrefix = if (cursor < nameStart && nameStart <= source.length) {
-      Space.format(source.substring(cursor, nameStart))
-    } else Space.EMPTY
-
-    val paramName = ident(vd.name.toString, namePrefix, variableTypeOfTree(vd))
-    if (vd.nameSpan.exists) cursor = Math.max(cursor, vd.nameSpan.end - offsetAdjustment)
+    // Space between modifiers (or annotations) and the parameter name. Use the backtick-aware
+    // helper so `case class CC(`type`: String)` keeps both backticks — `vd.name.toString` strips
+    // them, and the closing backtick lives one past `vd.nameSpan.end`.
+    val (namePrefix, displayName, nameEndCursor) = if (vd.nameSpan.exists) {
+      val rawNameLen = Math.max(0, vd.nameSpan.end - vd.nameSpan.start)
+      backtickAwareName(cursor, nameStart, rawNameLen, vd.name.toString)
+    } else {
+      (Space.EMPTY, vd.name.toString, cursor)
+    }
+    val paramName = ident(displayName, namePrefix, variableTypeOfTree(vd))
+    cursor = Math.max(cursor, nameEndCursor)
 
     // Type ascription `: Type`
     val paramEnd = Math.max(0, vd.span.end - offsetAdjustment)
