@@ -21,9 +21,10 @@ import org.openrewrite.Tree
 import org.openrewrite.java.internal.JavaTypeFactory
 import org.openrewrite.java.tree.*
 import org.openrewrite.marker.Markers
+import org.openrewrite.scala.marker.{IndentedSyntax, PackageBraces, PackageSemicolon}
 
 import java.util
-import java.util.{Collections, List as JList}
+import java.util.{Collections, List as JList, UUID}
 
 /**
  * Result of converting a Scala AST to compilation unit components.
@@ -123,6 +124,27 @@ class ScalaASTConverter {
               case other =>
             }
         }
+
+        // For braced package syntax, consume the closing `}` so it doesn't leak into
+        // EOF whitespace, and record the space before it on the marker for re-emission.
+        if (packageDecl != null) {
+          val bracesMarker = packageDecl.getMarkers.findFirst(classOf[PackageBraces])
+          if (bracesMarker.isPresent) {
+            val srcText = visitor.getSourceText
+            val srcOffset = visitor.getOffsetAdjustment
+            val startIdx = visitor.getCursor - srcOffset
+            var i = startIdx
+            while (i < srcText.length && srcText.charAt(i) != '}') {
+              i += 1
+            }
+            if (i < srcText.length && srcText.charAt(i) == '}') {
+              val afterBody = srcText.substring(startIdx, i)
+              val updated = bracesMarker.get.copy(afterBody = afterBody)
+              packageDecl = packageDecl.withMarkers(packageDecl.getMarkers.computeByType(updated, (_: PackageBraces, n: PackageBraces) => n))
+              visitor.updateCursor(i + 1 + srcOffset)
+            }
+          }
+        }
       case imp: Trees.Import[?] =>
         // Top-level import - simple ones as J.Import, complex ones as statements
         val converted = visitor.visitTree(imp)
@@ -165,18 +187,48 @@ class ScalaASTConverter {
     // This includes "package" keyword + package name
     val packageEndPos = pkgDef.pid.span.end
 
+    // Detect Scala 3 indented package syntax: `package foo.bar:` followed by an indented region,
+    // or braced package syntax: `package foo.bar { ... }`. In each case consume the delimiter
+    // and tag the J.Package with the appropriate marker so the printer re-emits it.
+    val srcText = visitor.getSourceText
+    val srcOffset = visitor.getOffsetAdjustment
+    val scanStart = packageEndPos - srcOffset
+    var scanIdx = scanStart
+    while (scanIdx < srcText.length && (srcText.charAt(scanIdx) == ' ' || srcText.charAt(scanIdx) == '\t')) {
+      scanIdx += 1
+    }
+    val nextChar = if (scanIdx < srcText.length) srcText.charAt(scanIdx) else 0.toChar
+    val hasIndentedColon = nextChar == ':'
+    val hasBraces = nextChar == '{'
+    val hasSemicolon = nextChar == ';'
+    val cursorAfter =
+      if (hasIndentedColon || hasBraces || hasSemicolon) scanIdx + 1 + srcOffset
+      else packageEndPos
+
     // Update the visitor's cursor to after the package declaration
     // This is crucial to prevent the package text from being included
     // in the prefix of subsequent statements
-    visitor.updateCursor(packageEndPos)
+    visitor.updateCursor(cursorAfter)
 
     // Create package expression
     val packageExpr: Expression = TypeTree.build(packageName)
 
+    val markerList = new util.ArrayList[org.openrewrite.marker.Marker]()
+    if (hasIndentedColon) {
+      markerList.add(new IndentedSyntax(UUID.randomUUID()))
+    } else if (hasBraces) {
+      val beforeBrace = srcText.substring(scanStart, scanIdx)
+      markerList.add(PackageBraces(UUID.randomUUID(), beforeBrace, ""))
+    }
+    if (hasSemicolon) {
+      markerList.add(PackageSemicolon(UUID.randomUUID()))
+    }
+    val markers = if (markerList.isEmpty) Markers.EMPTY else Markers.build(markerList)
+
     new J.Package(
       Tree.randomId(),
       prefix,
-      Markers.EMPTY,
+      markers,
       packageExpr.withPrefix(Space.build(" ", Collections.emptyList())),
       Collections.emptyList()
     )

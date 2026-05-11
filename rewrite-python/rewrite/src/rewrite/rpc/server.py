@@ -602,6 +602,8 @@ def handle_reset(params: dict) -> bool:
     remote_objects.clear()
     remote_refs.clear()
     _prepared_recipes.clear()
+    _prepared_editor_overrides.clear()
+    _prepared_edit_preconditions.clear()
     _execution_contexts.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
@@ -1051,6 +1053,16 @@ def _serialize_value(value) -> Any:
 
 # Prepared recipes storage - maps recipe IDs to recipe instances
 _prepared_recipes: Dict[str, Any] = {}
+# Cached bare-editor visitors keyed by prepared recipe id. Populated at
+# PrepareRecipe time when recipe.editor() returns a Preconditions.check
+# wrapper: we strip the wrapper, register the precondition's wire identity
+# in editPreconditions (so the host evaluates it Java-side), and store the
+# bare editor here. When BatchVisit / Visit dispatches edit:<id> back, we
+# return this bare editor so the precondition does not double-run.
+_prepared_editor_overrides: Dict[str, Any] = {}
+# Per-recipe-edit-phase precondition wire entries collected at PrepareRecipe
+# time from a Preconditions.check(...) wrapper around recipe.editor().
+_prepared_edit_preconditions: Dict[str, List[Dict[str, Any]]] = {}
 # Execution contexts storage - maps context IDs to ExecutionContext instances
 _execution_contexts: Dict[str, Any] = {}
 # Accumulator storage for ScanningRecipes - maps recipe IDs to accumulators
@@ -1143,11 +1155,32 @@ def handle_prepare_recipe(params: dict) -> dict:
     from rewrite.recipe import ScanningRecipe
     is_scanning = isinstance(recipe, ScanningRecipe)
 
+    # Introspect recipe.editor() once at prepare time. If the recipe wrapped
+    # its editor in Preconditions.check(...), we extract the precondition's
+    # wire identity (so the Java host can evaluate it locally and skip the
+    # visit RPC for non-matching files) and cache the bare editor (so a
+    # subsequent dispatch via _instantiate_visitor returns the unwrapped
+    # editor — otherwise the precondition would also run Python-side and
+    # double the cost).
+    edit_preconditions: List[Dict[str, Any]] = list(_get_preconditions(recipe, 'edit'))
+    if not is_scanning:
+        try:
+            editor_visitor = recipe.editor()
+        except Exception:
+            editor_visitor = None
+        if editor_visitor is not None:
+            extracted = _extract_preconditions_from_editor(editor_visitor)
+            if extracted is not None:
+                bare_editor, wire_entries = extracted
+                _prepared_editor_overrides[prepared_id] = bare_editor
+                edit_preconditions.extend(wire_entries)
+    _prepared_edit_preconditions[prepared_id] = edit_preconditions
+
     response = {
         'id': prepared_id,
         'descriptor': _recipe_descriptor_to_dict(descriptor),
         'editVisitor': f'edit:{prepared_id}',
-        'editPreconditions': _get_preconditions(recipe, 'edit'),
+        'editPreconditions': edit_preconditions,
         'scanVisitor': f'scan:{prepared_id}' if is_scanning else None,
         'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
     }
@@ -1164,15 +1197,126 @@ def handle_prepare_recipe(params: dict) -> dict:
 
 
 def _get_preconditions(recipe, phase: str) -> List[dict]:
-    """Get preconditions for a recipe phase.
+    """Baseline preconditions for a recipe phase.
 
-    For now, we add a type precondition to ensure only Python files are visited.
+    Always includes the language gate (only visit Python source files). Recipe-
+    declared preconditions from a ``Preconditions.check(...)`` wrapper around
+    ``recipe.editor()`` are added on top by ``handle_prepare_recipe`` — see
+    :func:`_extract_preconditions_from_editor`.
     """
-    # Add precondition to only visit Python source files
     return [{
         'visitorName': 'org.openrewrite.rpc.internal.FindTreesOfType',
         'visitorOptions': {'type': 'org.openrewrite.python.tree.Py'}
     }]
+
+
+def _extract_preconditions_from_editor(editor_visitor):
+    """Walk a ``Preconditions.check(...)`` wrapper chain on an editor result.
+
+    If ``editor_visitor`` is a :class:`rewrite.preconditions.Check`, returns a
+    tuple ``(bare_editor, [precondition_wire_entry, ...])`` where ``bare_editor``
+    is the innermost non-Check visitor and the wire entries describe each
+    precondition in evaluation order. Returns ``None`` if no Check wrapper
+    is present.
+
+    Each precondition wire entry has shape ``{'visitorName': str,
+    'visitorOptions': dict | None}`` matching ``PrepareRecipeResponse.Precondition``.
+
+    Supported precondition shapes:
+      * ``RecipeCheck`` — uses the wrapped recipe's wire identity
+        (``edit:<id>``) when known.
+      * ``Check`` wrapping a :class:`PreparedJavaRecipe` — uses its
+        ``edit_visitor`` directly.
+      * ``Check`` wrapping a recipe with ``java_recipe_name`` — emits the
+        Java recipe name and options for Java-side instantiation.
+
+    Anything else (a generic in-process ``TreeVisitor`` for unit tests) is
+    not propagated to the wire — those would have to round-trip back to
+    Python anyway, which defeats the point of the precondition optimization.
+    For the in-process / test path the wrapper still works because Python
+    keeps using the wrapper (no override cached); see :class:`Check.visit`.
+    """
+    from rewrite.preconditions import Check, RecipeCheck
+
+    if not isinstance(editor_visitor, Check):
+        return None
+
+    wire_entries: List[Dict[str, Any]] = []
+    inner: Any = editor_visitor
+    while isinstance(inner, Check):
+        wire = _check_wire_entry(inner)
+        if wire is None:
+            # Cannot serialize this check to the wire; abort the optimization
+            # for this editor. Returning None leaves the wrapper intact so
+            # the precondition runs Python-side as a fallback.
+            return None
+        wire_entries.append(wire)
+        inner = inner.wrapped
+    return inner, wire_entries
+
+
+def _check_wire_entry(check) -> Optional[Dict[str, Any]]:
+    """Translate a single :class:`Check` to a precondition wire entry."""
+    from rewrite.preconditions import RecipeCheck
+
+    if isinstance(check, RecipeCheck):
+        recipe = check.recipe
+        prepared_id = _find_prepared_id(recipe)
+        if prepared_id is not None:
+            return {'visitorName': f'edit:{prepared_id}', 'visitorOptions': None}
+        java_name = getattr(recipe, 'java_recipe_name', None)
+        if java_name is not None:
+            options = getattr(recipe, 'delegates_to_options', {})
+            return {'visitorName': java_name, 'visitorOptions': dict(options)}
+        return None
+
+    return _condition_wire_entry(check.check)
+
+
+def _condition_wire_entry(condition) -> Optional[Dict[str, Any]]:
+    """Translate a precondition condition (operand) to a wire entry.
+
+    Mirrors ``PrepareRecipeResponse.Precondition``: leaves carry
+    ``visitorName`` + ``visitorOptions``; composites carry ``op`` +
+    ``operands`` (a list of nested wire entries). Returns ``None`` when
+    the condition can't be serialized — the caller leaves the wrapper
+    intact so the gate runs Python-side as a fallback.
+    """
+    from rewrite.preconditions import CompositePrecondition, RecipeRef
+    from rewrite.rpc.java_recipe import PreparedJavaRecipe
+
+    if isinstance(condition, CompositePrecondition):
+        operands: List[Dict[str, Any]] = []
+        for operand in condition.operands:
+            entry = _condition_wire_entry(operand)
+            if entry is None:
+                return None
+            operands.append(entry)
+        return {'op': condition.op, 'operands': operands}
+
+    # Common case: helpers like uses_method/uses_type return a lightweight
+    # RecipeRef so the recipe author can declare a precondition without firing
+    # an RPC at editor() time. Java's PreparedRecipeCache.instantiateVisitor
+    # constructs the named Recipe via Jackson and uses its visitor.
+    if isinstance(condition, RecipeRef):
+        return {
+            'visitorName': condition.recipe_name,
+            'visitorOptions': dict(condition.options),
+        }
+    if isinstance(condition, PreparedJavaRecipe):
+        return {'visitorName': condition.edit_visitor, 'visitorOptions': None}
+    java_name = getattr(condition, 'java_recipe_name', None)
+    if java_name is not None:
+        options = getattr(condition, 'delegates_to_options', {})
+        return {'visitorName': java_name, 'visitorOptions': dict(options)}
+    return None
+
+
+def _find_prepared_id(recipe) -> Optional[str]:
+    for prep_id, prep_recipe in _prepared_recipes.items():
+        if prep_recipe is recipe:
+            return prep_id
+    return None
 
 
 def handle_visit(params: dict) -> dict:
@@ -1317,8 +1461,10 @@ def handle_batch_visit(params: dict) -> dict:
         modified = after is not before
         deleted = after is None
 
-        # Diff SearchResult IDs against the running set
-        if deleted:
+        # Diff SearchResult IDs against the running set. When the visitor
+        # didn't modify the tree, no new SearchResult markers were added
+        # — skip the full-tree walk in that case.
+        if deleted or not modified:
             search_result_ids = []
         else:
             after_ids = _collect_search_result_ids(after)
@@ -1401,6 +1547,13 @@ def _instantiate_visitor(visitor_name: str, ctx):
             acc = _recipe_accumulators[recipe_id]
             return recipe.editor_with_data(acc)
 
+        # If the recipe wrapped its editor in Preconditions.check(...) and we
+        # captured the bare editor at PrepareRecipe time, return it here so
+        # the precondition does not double-run on the Python side. The host
+        # has already evaluated it via the editPreconditions wire slot.
+        override = _prepared_editor_overrides.get(recipe_id)
+        if override is not None:
+            return override
         return recipe.editor()
 
     elif visitor_name.startswith('scan:'):

@@ -36,12 +36,66 @@ class VariableDeclarationsTest implements RewriteTest {
     }
 
     @Test
+    void annotationNewlineBeforeModifier() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              @deprecated
+              private var x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void extraSpaceBetweenModifierAndVal() {
         rewriteRun(
           scala(
             """
             class Test {
               private   val x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void modifierExtraSpaceBeforeVar() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              private  var x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void annotationExtraSpaceBeforeVar() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              @deprecated  var x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void annotationNewlineBeforeVar() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              @deprecated
+              var x = 1
             }
             """
           )

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.scala.tree;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -29,6 +30,32 @@ class MethodDeclarationTest implements RewriteTest {
                 """
                 object Test {
                   private   def hello(): Int = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void extraSpaceBeforeReturnTypeColon() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo : Int = 5
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void extraSpaceBeforeReturnTypeColonWithParens() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo()  :  Int = 5
                 }
                 """
             )
@@ -68,6 +95,46 @@ class MethodDeclarationTest implements RewriteTest {
                 """
                 object Test {
                   def hello(): Unit = println("Hello")
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void methodParameterTypeNoSpaceAfterColon() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo(x:Int) = x
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void methodExtraSpaceBeforeEquals() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo()  = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void methodNewlineBeforeEquals() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo()
+                    = 1
                 }
                 """
             )
@@ -185,6 +252,32 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void curriedMethodExtraSpaceBeforeEquals() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def add(x: Int)(y: Int)  = x + y
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void curriedMethodParameterTypeNoSpaceAfterColon() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def add(x:Int)(y:Int) = x + y
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void multilineParameterListWithClosingParenOnOwnLine() {
         rewriteRun(
             scala(
@@ -224,5 +317,74 @@ class MethodDeclarationTest implements RewriteTest {
                 """
             )
         );
+    }
+
+    @Test
+    void implicitInSecondParamList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def apply(obj: String)(implicit c: Int): String = obj
+                }
+                """
+            )
+        );
+    }
+
+    @Nested
+    class ExtensionMethods implements RewriteTest {
+
+        @Test
+        void simpleExtensionWithSpaceBeforeParen() {
+            rewriteRun(
+                scala(
+                    """
+                    extension (x: Int) {
+                      def foo = x + 1
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void simpleExtensionNoSpaceBeforeParen() {
+            rewriteRun(
+                scala(
+                    """
+                    extension(x: Int) {
+                      def foo = x + 1
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void extensionWithMultipleSpaces() {
+            rewriteRun(
+                scala(
+                    """
+                    extension   (x: Int) {
+                      def foo = x + 1
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void extensionParameterTypeNoSpaceAfterColon() {
+            rewriteRun(
+                scala(
+                    """
+                    extension (x:Int) {
+                      def doubled = x * 2
+                    }
+                    """
+                )
+            );
+        }
     }
 }

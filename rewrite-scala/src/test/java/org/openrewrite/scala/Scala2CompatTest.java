@@ -1136,4 +1136,22 @@ class Scala2CompatTest implements RewriteTest {
             }
         }
     }
+
+    @Test
+    void forComprehensionWithBlockBody() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  for {
+                    _ <- Some(1)
+                    field <- Some(2)
+                  } {
+                    println(field)
+                  }
+                }
+                """
+            )
+        );
+    }
 }

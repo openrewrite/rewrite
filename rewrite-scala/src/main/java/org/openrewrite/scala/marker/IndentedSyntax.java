@@ -20,14 +20,15 @@ import org.openrewrite.marker.Marker;
 import java.util.UUID;
 
 /**
- * Marks a {@link org.openrewrite.java.tree.J.Block} that uses Scala 3 braceless
- * (indentation-based) syntax. The block is delimited by {@code :} and indentation
- * rather than {@code {}} braces.
+ * Marks an LST element that uses Scala 3 indentation-based syntax, where the body
+ * is introduced by {@code :} and indentation rather than {@code {}} braces. Applied
+ * to a {@link org.openrewrite.java.tree.J.Block} for braceless blocks, and to a
+ * {@link org.openrewrite.java.tree.J.Package} for an indented package region.
  */
-public class IndentedBlock implements Marker {
+public class IndentedSyntax implements Marker {
     private final UUID id;
 
-    public IndentedBlock(UUID id) {
+    public IndentedSyntax(UUID id) {
         this.id = id;
     }
 
@@ -37,7 +38,7 @@ public class IndentedBlock implements Marker {
     }
 
     @Override
-    public IndentedBlock withId(UUID id) {
-        return new IndentedBlock(id);
+    public IndentedSyntax withId(UUID id) {
+        return new IndentedSyntax(id);
     }
 }

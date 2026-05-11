@@ -62,9 +62,24 @@ public class RecipeCheck : Check
 }
 
 /// <summary>
+/// Marker interface for composite precondition visitors (Or / And / Not).
+/// Exposes the operator and operands so the RPC server's PrepareRecipe
+/// introspection can emit the matching nested wire entry, mirroring
+/// Java's <c>org.openrewrite.Preconditions.or</c> / <c>and</c> / <c>not</c>.
+/// </summary>
+public interface IComposite
+{
+    /// <summary>The composite operator: <c>"or"</c>, <c>"and"</c>, or <c>"not"</c>.</summary>
+    string Op { get; }
+
+    /// <summary>The nested precondition operands.</summary>
+    IReadOnlyList<ITreeVisitor<ExecutionContext>> Operands { get; }
+}
+
+/// <summary>
 /// Negates a precondition: matches when the inner visitor does NOT modify the tree.
 /// </summary>
-internal class NotVisitor : TreeVisitor<Tree, ExecutionContext>
+public class NotVisitor : TreeVisitor<Tree, ExecutionContext>, IComposite
 {
     private readonly ITreeVisitor<ExecutionContext> _visitor;
 
@@ -72,6 +87,9 @@ internal class NotVisitor : TreeVisitor<Tree, ExecutionContext>
     {
         _visitor = visitor;
     }
+
+    public string Op => "not";
+    public IReadOnlyList<ITreeVisitor<ExecutionContext>> Operands => new[] { _visitor };
 
     public override Tree? Visit(Tree? tree, ExecutionContext ctx)
     {
@@ -88,7 +106,7 @@ internal class NotVisitor : TreeVisitor<Tree, ExecutionContext>
 /// Combines multiple precondition visitors with AND semantics.
 /// All must match (modify the tree) for the result to be modified.
 /// </summary>
-internal class AndVisitor : TreeVisitor<Tree, ExecutionContext>
+public class AndVisitor : TreeVisitor<Tree, ExecutionContext>, IComposite
 {
     private readonly ITreeVisitor<ExecutionContext>[] _visitors;
 
@@ -96,6 +114,9 @@ internal class AndVisitor : TreeVisitor<Tree, ExecutionContext>
     {
         _visitors = visitors;
     }
+
+    public string Op => "and";
+    public IReadOnlyList<ITreeVisitor<ExecutionContext>> Operands => _visitors;
 
     public override Tree? Visit(Tree? tree, ExecutionContext ctx)
     {
@@ -109,5 +130,37 @@ internal class AndVisitor : TreeVisitor<Tree, ExecutionContext>
             }
         }
         return t2;
+    }
+}
+
+/// <summary>
+/// Combines multiple precondition visitors with OR semantics.
+/// Returns the first operand's modified result if any matches; otherwise
+/// returns the original tree unchanged. Mirrors Java's
+/// <c>org.openrewrite.Preconditions.or</c>.
+/// </summary>
+public class OrVisitor : TreeVisitor<Tree, ExecutionContext>, IComposite
+{
+    private readonly ITreeVisitor<ExecutionContext>[] _visitors;
+
+    public OrVisitor(ITreeVisitor<ExecutionContext>[] visitors)
+    {
+        _visitors = visitors;
+    }
+
+    public string Op => "or";
+    public IReadOnlyList<ITreeVisitor<ExecutionContext>> Operands => _visitors;
+
+    public override Tree? Visit(Tree? tree, ExecutionContext ctx)
+    {
+        foreach (var v in _visitors)
+        {
+            var t2 = v.Visit(tree, ctx);
+            if (t2 != tree)
+            {
+                return t2;
+            }
+        }
+        return tree;
     }
 }

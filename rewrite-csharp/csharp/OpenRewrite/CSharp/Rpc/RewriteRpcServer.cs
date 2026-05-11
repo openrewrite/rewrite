@@ -924,6 +924,28 @@ public class RewriteRpcServer
             var innerVisitor = visitor;
             if (visitor is Check check)
             {
+                // Try to emit the precondition's wire identity so the Java
+                // host can evaluate it locally and skip the visit RPC for
+                // non-matching files. RecipeCheck is the only shape we can
+                // serialize today (recipe identity); Check wrapping a bare
+                // visitor or a composite has no recipe-name to point Java
+                // at, so we fall through and let the gate run C#-side.
+                if (check is RecipeCheck recipeCheck && _preparedRecipes.Values.Contains(recipeCheck.Recipe))
+                {
+                    var entry = ConditionWireEntry(recipeCheck.Precondition);
+                    if (entry != null)
+                    {
+                        response.EditPreconditions.Add(entry);
+                    }
+                }
+                else
+                {
+                    var entry = ConditionWireEntry(check.Precondition);
+                    if (entry != null)
+                    {
+                        response.EditPreconditions.Add(entry);
+                    }
+                }
                 innerVisitor = check.Visitor;
             }
 
@@ -941,6 +963,47 @@ public class RewriteRpcServer
         {
             // Some recipes may fail during GetVisitor() — skip precondition detection
         }
+    }
+
+    /// <summary>
+    /// Translate a precondition condition (operand) to a wire entry.
+    /// Composites recurse into <c>op</c> + <c>operands</c>; leaves carry
+    /// <c>visitorName</c>. Returns <c>null</c> when the condition can't be
+    /// serialized (e.g. an opaque local visitor with no recipe identity);
+    /// the caller leaves the wrapper intact so the gate runs C#-side.
+    /// </summary>
+    private Precondition? ConditionWireEntry(ITreeVisitor<ExecutionContext> condition)
+    {
+        if (condition is IComposite composite)
+        {
+            var operands = new List<Precondition>(composite.Operands.Count);
+            foreach (var operand in composite.Operands)
+            {
+                var nested = ConditionWireEntry(operand);
+                if (nested == null)
+                {
+                    return null;
+                }
+                operands.Add(nested);
+            }
+            return new Precondition { Op = composite.Op, Operands = operands };
+        }
+        // Common case: helpers like UsesMethod / UsesType return a
+        // lightweight RecipeRef so the recipe author can declare a
+        // precondition without firing an RPC at GetVisitor() time.
+        // Java's PreparedRecipeCache.instantiateVisitor constructs the
+        // named recipe via Jackson and uses its visitor.
+        if (condition is RecipeRef recipeRef)
+        {
+            return new Precondition
+            {
+                VisitorName = recipeRef.RecipeName,
+                VisitorOptions = recipeRef.Options.ToDictionary(kvp => kvp.Key, kvp => kvp.Value!)
+            };
+        }
+        // Leaf with no wire identity — the Java host can't evaluate it
+        // remotely. Leave the wrapper intact so the gate runs C#-side.
+        return null;
     }
 
     private static Recipe InstantiateWithOptions(Type recipeType, Dictionary<string, object?> options)
@@ -1558,10 +1621,21 @@ public class DelegatesTo
     public Dictionary<string, object?> Options { get; set; } = new();
 }
 
+/// <summary>
+/// Either a leaf (a single visitor identified by <see cref="VisitorName"/> +
+/// optional <see cref="VisitorOptions"/>) or a composite of nested
+/// preconditions joined by <see cref="Op"/> ("or" / "and" / "not"). When
+/// <see cref="Op"/> is null the entry is a leaf and the visitor fields
+/// carry the gate identity; when <see cref="Op"/> is set, <see cref="Operands"/>
+/// carries the children and the visitor fields are ignored. Mirrors the
+/// Java DTO <c>org.openrewrite.rpc.request.PrepareRecipeResponse.Precondition</c>.
+/// </summary>
 public class Precondition
 {
-    public string VisitorName { get; set; } = "";
-    public Dictionary<string, object> VisitorOptions { get; set; } = [];
+    public string? VisitorName { get; set; }
+    public Dictionary<string, object>? VisitorOptions { get; set; }
+    public string? Op { get; set; }
+    public List<Precondition>? Operands { get; set; }
 }
 
 public class GenerateRequest

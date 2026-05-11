@@ -334,12 +334,28 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     // the file as modified.
                     if (currentRpc.getLanguages().contains(src.getClass().getName())) {
                         RpcRecipe rpcRecipe = (RpcRecipe) recipe;
-                        batch.items.add(new BatchVisit.BatchVisitItem(rpcRecipe.getEditVisitor(), null));
-                        batch.recipeStacks.add(recipeStack);
-                        if (batch.originalBeforeBatch == null) {
-                            batch.originalBeforeBatch = src;
+                        // Evaluate the precondition locally before batching. The non-batch
+                        // path runs the precondition via getVisitor()'s Preconditions.check
+                        // wrapper; the batch path bypasses that wrapper because it dispatches
+                        // editVisitor names directly. Without this gate, every batched recipe
+                        // would visit every file regardless of preconditions, defeating the
+                        // optimization.
+                        TreeVisitor<?, ExecutionContext> precondition = rpcRecipe.getEditPreconditionVisitor();
+                        boolean preconditionPasses = true;
+                        if (precondition != null) {
+                            //noinspection unchecked
+                            TreeVisitor<Tree, ExecutionContext> typed =
+                                    (TreeVisitor<Tree, ExecutionContext>) precondition;
+                            preconditionPasses = typed.visit(src, ctx, rootCursor) != src;
                         }
-                        batch.rpc = currentRpc;
+                        if (preconditionPasses) {
+                            batch.items.add(new BatchVisit.BatchVisitItem(rpcRecipe.getEditVisitor(), null));
+                            batch.recipeStacks.add(recipeStack);
+                            if (batch.originalBeforeBatch == null) {
+                                batch.originalBeforeBatch = src;
+                            }
+                            batch.rpc = currentRpc;
+                        }
                     }
 
                     // If this is the last recipe in the batch, flush now
