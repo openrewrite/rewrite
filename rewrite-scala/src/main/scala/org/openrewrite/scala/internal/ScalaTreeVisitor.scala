@@ -4390,19 +4390,29 @@ class ScalaTreeVisitor(
     // For classes without explicit body, we should NOT print empty braces
     val hasExplicitBody = td.rhs match {
       case tmpl: Trees.Template[?] =>
-        // A class has an explicit body if:
-        // 1. The template has any body statements, OR
-        // 2. There's a "{" in the source (even for empty bodies)
-        if (tmpl.body.nonEmpty) {
-          // If there are body statements, we definitely have a body
-          true
-        } else if (td.span.exists) {
-          // For empty bodies, check if there's a "{" in the entire class span
-          val classStart = Math.max(0, td.span.start - offsetAdjustment)
+        if (td.span.exists) {
+          // Body delimiters must appear after the class header, constructor, and parent clauses.
+          // Blocks inside parent constructor arguments are still within td.span, but are not class bodies.
           val classEnd = Math.max(0, td.span.end - offsetAdjustment)
-          if (classStart < classEnd && classEnd <= source.length) {
-            val classSource = source.substring(classStart, classEnd)
-            classSource.contains("{")
+          if (cursor < classEnd && classEnd <= source.length) {
+            val afterHeader = source.substring(cursor, classEnd)
+            afterHeader.contains("{") || {
+              var foundBracelessBody = false
+              var idx = afterHeader.indexOf(':')
+              while (idx >= 0 && !foundBracelessBody) {
+                if (idx + 1 >= afterHeader.length) {
+                  foundBracelessBody = true
+                } else {
+                  val afterColon = afterHeader.substring(idx + 1)
+                  val nextNonSpace = afterColon.indexWhere(c => c != ' ' && c != '\t')
+                  foundBracelessBody = nextNonSpace < 0 ||
+                    afterColon.charAt(nextNonSpace) == '\n' ||
+                    afterColon.charAt(nextNonSpace) == '\r'
+                }
+                if (!foundBracelessBody) idx = afterHeader.indexOf(':', idx + 1)
+              }
+              foundBracelessBody
+            }
           } else {
             false
           }

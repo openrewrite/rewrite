@@ -236,6 +236,17 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void caseClassExtendsConstructorWithBlockArgument() {
+        rewriteRun(
+            scala(
+                """
+                case class A(x: Int) extends B({ x })
+                """
+            )
+        );
+    }
+
+    @Test
     void multilineClassTypeParameters() {
         rewriteRun(
             scala(
