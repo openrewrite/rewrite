@@ -148,7 +148,21 @@ public class EncodingDetectingInputStream extends InputStream {
                 bos.write(buffer, 0, n);
             }
 
-            return bos.toString();
+            Charset detectedCharset = getCharset();
+            String result = bos.toString();
+
+            // If the detected charset can't re-encode the content, the detection
+            // was likely wrong — fall back to UTF-8. This catches cases where
+            // UTF-8 files with CJK content are misdetected as Windows-1252,
+            // since Windows-1252 has undefined byte positions that produce
+            // U+FFFD (which can't be re-encoded as Windows-1252).
+            if (detectedCharset != StandardCharsets.UTF_8 &&
+                    !detectedCharset.newEncoder().canEncode(result)) {
+                charset = StandardCharsets.UTF_8;
+                return new String(bos.toByteArray(), StandardCharsets.UTF_8);
+            }
+
+            return result;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
