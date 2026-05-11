@@ -1531,14 +1531,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             JRightPadded<S.For.Enumerator> rp = elems.get(i);
             visit(rp.getElement(), p);
             visitSpace(rp.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
-            // Print ';' separator only if both this and next element are NOT guards.
-            // Scala's for-comprehensions don't separate guards with ';'.
-            // In paren-less form, enumerators are separated by newlines (whitespace), not ';'.
-            if (i < elems.size() - 1 && !parenless) {
-                S.For.Enumerator next = elems.get(i + 1).getElement();
-                if (next.getKind() != S.For.Enumerator.Kind.Guard) {
-                    p.append(';');
-                }
+            // An explicit ';' separator is preserved via a Semicolon marker on the
+            // JRightPadded. Newline-separated generators have no marker and no ';'.
+            if (rp.getMarkers().findFirst(Semicolon.class).isPresent()) {
+                p.append(';');
             }
         }
         if (!parenless) {

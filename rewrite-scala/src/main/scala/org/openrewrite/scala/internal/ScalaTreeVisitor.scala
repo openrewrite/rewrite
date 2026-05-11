@@ -6419,13 +6419,28 @@ class ScalaTreeVisitor(
         s"For enumerator rhs did not produce an Expression: ${rhsTree.getClass.getSimpleName}")
     }
 
-    // Determine the after-space (before `;` separator or, for the last enumerator,
-    // before the closing bracket). For an enumerator followed by a guard, there is
-    // no `;` in the source — the guard's prefix captures the whitespace.
+    // Determine the after-space and whether an explicit `;` separator was present.
+    // Scala for-comprehensions allow `;` between generators, but newline-separated
+    // generators have no `;`. Track this via the Semicolon marker so the printer
+    // can round-trip correctly.
+    var rpMarkers: Markers = Markers.EMPTY
     val after: Space = if (!isLast) {
-      val sep = source.indexOf(';', cursor)
-      if (sep >= 0 && sep < closeBracketPos) {
+      // Look for `;` before any non-whitespace char and before the next enumerator.
+      // If only whitespace separates this enumerator from the next, there was no `;`.
+      val sep = {
+        var idx = -1
+        var j = cursor
+        while (idx < 0 && j < closeBracketPos) {
+          val c = source.charAt(j)
+          if (c == ';') idx = j
+          else if (!c.isWhitespace) j = closeBracketPos // stop scanning
+          else j += 1
+        }
+        idx
+      }
+      if (sep >= 0) {
         val s = if (sep > cursor) Space.format(source.substring(cursor, sep)) else Space.EMPTY
+        rpMarkers = Markers.EMPTY.add(new Semicolon(UUID.randomUUID()))
         cursor = sep + 1
         s
       } else Space.EMPTY
@@ -6440,7 +6455,7 @@ class ScalaTreeVisitor(
 
     val enumerator = new S.For.Enumerator(Tree.randomId(), enumPrefix, Markers.EMPTY,
       kind, lhs, beforeOp, rhs)
-    JRightPadded.build(enumerator).withAfter(after)
+    new JRightPadded(enumerator, after, rpMarkers)
   }
 
   /** Common parser for ForDo (complex) and ForYield. */
