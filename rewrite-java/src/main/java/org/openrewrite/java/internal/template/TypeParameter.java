@@ -15,119 +15,108 @@
  */
 package org.openrewrite.java.internal.template;
 
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.java.internal.ThrowingErrorListener;
-import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
-import org.openrewrite.java.internal.grammar.TemplateParameterParser;
-import org.openrewrite.java.internal.grammar.TemplateParameterParserBaseVisitor;
+import org.openrewrite.java.internal.template.parser.TemplateParameterParser;
+import org.openrewrite.java.internal.template.parser.TemplateParameterParser.GenericPatternNode;
+import org.openrewrite.java.internal.template.parser.TemplateParameterParser.TypeNode;
+import org.openrewrite.java.internal.template.parser.TemplateParameterParser.TypeParameterNode;
 import org.openrewrite.java.tree.JavaType;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.*;
 
 public class TypeParameter {
 
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
 
-    public static TemplateParameterParser parser(String value) {
-        ThrowingErrorListener errorListener = new ThrowingErrorListener(value);
-        TemplateParameterLexer lexer = new TemplateParameterLexer(CharStreams.fromString(value));
-        lexer.removeErrorListeners();
-        lexer.addErrorListener(errorListener);
-        TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(lexer));
-        parser.removeErrorListeners();
-        parser.addErrorListener(errorListener);
-        return parser;
-    }
-
-    public static JavaType toJavaType(TemplateParameterParser.@Nullable TypeContext type, Map<String, JavaType.GenericTypeVariable> genericTypes) {
+    public static JavaType toJavaType(@Nullable TypeNode type, Map<String, JavaType.GenericTypeVariable> genericTypes) {
         if (type == null) {
             return TYPE_OBJECT;
         }
 
         // FIXME handle `$` separator
-        return type.accept(new TemplateParameterParserBaseVisitor<JavaType>() {
-            @Override
-            public JavaType visitType(TemplateParameterParser.TypeContext ctx) {
-                JavaType type1 = ctx.typeName().accept(this);
-                if (!ctx.typeParameter().isEmpty()) {
-                    List<JavaType> typeParameters = new ArrayList<>();
-                    for (TemplateParameterParser.TypeParameterContext param : ctx.typeParameter()) {
-                        typeParameters.add(param.accept(this));
-                    }
-                    type1 = new JavaType.Parameterized(null, (JavaType.FullyQualified) type1, typeParameters);
-                }
-                for (TemplateParameterParser.TypeArrayContext unused : ctx.typeArray()) {
-                    type1 = new JavaType.Array(null, type1, null);
-                }
-                return type1;
+        JavaType result = resolveTypeName(type.typeName(), genericTypes);
+        if (!type.typeParameters().isEmpty()) {
+            List<JavaType> typeParameters = new ArrayList<>(type.typeParameters().size());
+            for (TypeParameterNode param : type.typeParameters()) {
+                typeParameters.add(toJavaTypeParameter(param, genericTypes));
             }
+            result = new JavaType.Parameterized(null, (JavaType.FullyQualified) result, typeParameters);
+        }
+        for (int i = 0; i < type.arrayDepth(); i++) {
+            result = new JavaType.Array(null, result, null);
+        }
+        return result;
+    }
 
-            @Override
-            public JavaType visitTypeName(TemplateParameterParser.TypeNameContext ctx) {
-                String fqn = ctx.FullyQualifiedName() != null ? ctx.FullyQualifiedName().getText() : ctx.Identifier().getText();
-                JavaType type;
-                if (fqn.contains(".")) {
-                    type = JavaType.ShallowClass.build(fqn);
-                } else if (genericTypes.containsKey(fqn)) {
-                    type = genericTypes.get(fqn);
-                } else if ("String".equals(fqn)) {
-                    type = JavaType.ShallowClass.build("java.lang.String");
-                } else if ("Object".equals(fqn)) {
-                    type = TYPE_OBJECT;
-                } else if ((type = JavaType.Primitive.fromKeyword(fqn)) != null) {
-                    // empty
-                } else {
-                    throw new IllegalArgumentException("Unknown type " + fqn + ". Make sure all types are fully qualified.");
-                }
-                return type;
-            }
+    private static JavaType resolveTypeName(String fqn, Map<String, JavaType.GenericTypeVariable> genericTypes) {
+        if (fqn.indexOf('.') >= 0) {
+            return JavaType.ShallowClass.build(fqn);
+        }
+        if (genericTypes.containsKey(fqn)) {
+            return genericTypes.get(fqn);
+        }
+        if ("String".equals(fqn)) {
+            return JavaType.ShallowClass.build("java.lang.String");
+        }
+        if ("Object".equals(fqn)) {
+            return TYPE_OBJECT;
+        }
+        JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
+        if (primitive != null) {
+            return primitive;
+        }
+        throw new IllegalArgumentException("Unknown type " + fqn + ". Make sure all types are fully qualified.");
+    }
 
-            @Override
-            public JavaType visitTypeParameter(TemplateParameterParser.TypeParameterContext ctx) {
-                JavaType type1 = super.visitTypeParameter(ctx);
-                if (ctx.variance() != null) {
-                    JavaType.GenericTypeVariable.Variance variance = ctx.variance().Extends() != null ?
-                            JavaType.GenericTypeVariable.Variance.COVARIANT : JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
-                    type1 = new JavaType.GenericTypeVariable(null, ctx.variance().WILDCARD().getText(), variance, singletonList(type1));
-                } else if (ctx.WILDCARD() != null) {
-                    type1 = new JavaType.GenericTypeVariable(null, ctx.WILDCARD().getText(), JavaType.GenericTypeVariable.Variance.INVARIANT, emptyList());
-                }
-                return type1;
-            }
-        });
+    private static JavaType toJavaTypeParameter(TypeParameterNode node, Map<String, JavaType.GenericTypeVariable> genericTypes) {
+        if (node.isWildcard()) {
+            return new JavaType.GenericTypeVariable(null, "?", JavaType.GenericTypeVariable.Variance.INVARIANT, emptyList());
+        }
+        JavaType bound = toJavaType(node.type(), genericTypes);
+        if (node.variance() != null) {
+            JavaType.GenericTypeVariable.Variance variance = node.variance() == TemplateParameterParser.Variance.EXTENDS ?
+                    JavaType.GenericTypeVariable.Variance.COVARIANT :
+                    JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
+            return new JavaType.GenericTypeVariable(null, "?", variance, singletonList(bound));
+        }
+        return bound;
     }
 
     public static Map<String, JavaType.GenericTypeVariable> parseGenericTypes(Set<String> genericTypes) {
-        Map<String, List<TemplateParameterParser.GenericPatternContext>> contexts = genericTypes.stream()
-                .map(e -> parser(e).genericPattern())
-                .collect(groupingBy(e -> e.genericName().getText()));
-        if (contexts.values().stream().anyMatch(e -> e.size() > 1)) {
-            throw new IllegalArgumentException("Found duplicated generic type.");
+        Map<String, GenericPatternNode> contexts = new LinkedHashMap<>();
+        for (String e : genericTypes) {
+            GenericPatternNode pattern = TemplateParameterParser.parseGenericPattern(e);
+            if (contexts.put(pattern.genericName(), pattern) != null) {
+                throw new IllegalArgumentException("Found duplicated generic type.");
+            }
         }
 
-        Map<String, JavaType.GenericTypeVariable> genericTypesMap = contexts.keySet().stream()
-                .collect(toMap(e -> e,
-                        e -> new JavaType.GenericTypeVariable(null, e, JavaType.GenericTypeVariable.Variance.INVARIANT, emptyList())));
+        Map<String, JavaType.GenericTypeVariable> genericTypesMap = new LinkedHashMap<>();
+        for (String name : contexts.keySet()) {
+            genericTypesMap.put(name,
+                    new JavaType.GenericTypeVariable(null, name, JavaType.GenericTypeVariable.Variance.INVARIANT, emptyList()));
+        }
 
-        for (String name : genericTypesMap.keySet()) {
-            JavaType.GenericTypeVariable genericType = genericTypesMap.get(name);
-            TemplateParameterParser.GenericPatternContext context = contexts.get(name).get(0);
-            List<JavaType> bounds = context.type().stream()
-                    .map(e -> toJavaType(e, genericTypesMap))
-                    .collect(toList());
-            if (!bounds.isEmpty()) {
-                //noinspection ResultOfMethodCallIgnored
-                genericType.unsafeSet(name, JavaType.GenericTypeVariable.Variance.COVARIANT, bounds);
+        for (Map.Entry<String, JavaType.GenericTypeVariable> entry : genericTypesMap.entrySet()) {
+            String name = entry.getKey();
+            JavaType.GenericTypeVariable genericType = entry.getValue();
+            List<TypeNode> rawBounds = contexts.get(name).bounds();
+            if (rawBounds.isEmpty()) {
+                continue;
             }
+            List<JavaType> bounds = new ArrayList<>(rawBounds.size());
+            for (TypeNode b : rawBounds) {
+                bounds.add(toJavaType(b, genericTypesMap));
+            }
+            //noinspection ResultOfMethodCallIgnored
+            genericType.unsafeSet(name, JavaType.GenericTypeVariable.Variance.COVARIANT, bounds);
         }
         return genericTypesMap;
     }

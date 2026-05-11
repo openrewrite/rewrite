@@ -18,10 +18,11 @@ package org.openrewrite.java;
 import lombok.Value;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.java.internal.grammar.TemplateParameterParser;
-import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypedPatternContext;
 import org.openrewrite.java.internal.template.TemplateParameter;
 import org.openrewrite.java.internal.template.TypeParameter;
+import org.openrewrite.java.internal.template.parser.TemplateParameterParser;
+import org.openrewrite.java.internal.template.parser.TemplateParameterParser.MatcherPatternNode;
+import org.openrewrite.java.internal.template.parser.TemplateParameterParser.TypedPatternNode;
 import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -73,21 +74,20 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
             substituted = propertyPlaceholderHelper.replacePlaceholders(substituted, key -> {
                 String s;
                 if (!key.isEmpty()) {
-                    TemplateParameterParser.MatcherPatternContext ctx = TypeParameter.parser(key).matcherPattern();
+                    MatcherPatternNode ctx = TemplateParameterParser.parseMatcherPattern(key);
                     if (ctx.typedPattern() == null) {
-                        String paramName = ctx.parameterName().Identifier().getText();
+                        String paramName = ctx.parameterName();
                         s = typedPatternByName.get(paramName);
                         if (s == null) {
                             throw new IllegalArgumentException("The parameter " + paramName + " must be defined before it is referenced.");
                         }
                     } else {
-                        TypedPatternContext typedPattern = ctx.typedPattern();
+                        TypedPatternNode typedPattern = ctx.typedPattern();
                         JavaType type = typedParameter(key, typedPattern, generics);
                         s = TypeUtils.toString(type);
 
-                        String name = null;
-                        if (typedPattern.parameterName() != null) {
-                            name = typedPattern.parameterName().Identifier().getText();
+                        String name = typedPattern.parameterName();
+                        if (name != null) {
                             typedPatternByName.put(name, s);
                         }
 
@@ -109,8 +109,8 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         return parameters.toArray(new J[0]);
     }
 
-    private static JavaType typedParameter(String key, TypedPatternContext typedPattern, Map<String, JavaType.GenericTypeVariable> generics) {
-        String matcherName = typedPattern.patternType().matcherName().Identifier().getText();
+    private static JavaType typedParameter(String key, TypedPatternNode typedPattern, Map<String, JavaType.GenericTypeVariable> generics) {
+        String matcherName = typedPattern.patternType().matcherName();
         if ("any".equals(matcherName)) {
             return TypeParameter.toJavaType(typedPattern.patternType().type(), generics);
         } else if ("anyArray".equals(matcherName)) {

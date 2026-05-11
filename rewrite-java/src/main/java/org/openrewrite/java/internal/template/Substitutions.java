@@ -23,8 +23,10 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.internal.grammar.TemplateParameterParser;
-import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypeContext;
+import org.openrewrite.java.internal.template.parser.TemplateParameterParser;
+import org.openrewrite.java.internal.template.parser.TemplateParameterParser.MatcherPatternNode;
+import org.openrewrite.java.internal.template.parser.TemplateParameterParser.TypeNode;
+import org.openrewrite.java.internal.template.parser.TemplateParameterParser.TypedPatternNode;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
@@ -61,10 +63,10 @@ public class Substitutions {
             substituted = propertyPlaceholderHelper.replacePlaceholders(substituted, key -> {
                 String s;
                 if (!key.isEmpty()) {
-                    TemplateParameterParser.MatcherPatternContext ctx = TypeParameter.parser(key).matcherPattern();
-                    TemplateParameterParser.TypedPatternContext typedPattern = ctx.typedPattern();
+                    MatcherPatternNode ctx = TemplateParameterParser.parseMatcherPattern(key);
+                    TypedPatternNode typedPattern = ctx.typedPattern();
                     if (typedPattern == null) {
-                        String paramName = ctx.parameterName().Identifier().getText();
+                        String paramName = ctx.parameterName();
                         s = typedPatternByName.get(paramName);
                         if (s == null) {
                             throw new IllegalArgumentException("The parameter " + paramName + " must be defined before it is referenced.");
@@ -72,9 +74,8 @@ public class Substitutions {
                     } else {
                         int i = index.getAndIncrement();
                         s = substituteTypedPattern(key, i, typedPattern, generics);
-                        if (ctx.typedPattern().parameterName() != null) {
-                            String paramName = ctx.typedPattern().parameterName().Identifier().getText();
-                            typedPatternByName.put(paramName, s);
+                        if (typedPattern.parameterName() != null) {
+                            typedPatternByName.put(typedPattern.parameterName(), s);
                         }
                         requiredParameters.incrementAndGet();
                     }
@@ -99,14 +100,14 @@ public class Substitutions {
         return substituted;
     }
 
-    private String substituteTypedPattern(String key, int index, TemplateParameterParser.TypedPatternContext typedPattern, Map<String, JavaType.GenericTypeVariable> generics) {
+    private String substituteTypedPattern(String key, int index, TypedPatternNode typedPattern, Map<String, JavaType.GenericTypeVariable> generics) {
         if (index >= parameters.length) {
             throw new IllegalArgumentException("This template requires more parameters.");
         }
         Object parameter = parameters[index];
         String s;
-        TypeContext param = typedPattern.patternType().type();
-        String matcherName = typedPattern.patternType().matcherName().Identifier().getText();
+        TypeNode param = typedPattern.patternType().type();
+        String matcherName = typedPattern.patternType().matcherName();
         if (!VALID_MATCHERS.contains(matcherName)) {
             throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
         }

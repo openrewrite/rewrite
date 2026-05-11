@@ -12,11 +12,14 @@ val antlrGeneration by configurations.creating {
 tasks.register<JavaExec>("generateAntlrSources") {
     mainClass.set("org.antlr.v4.Tool")
 
+    // Only AnnotationSignature still uses ANTLR; the TemplateParameter grammar
+    // was replaced with a hand-rolled parser to remove ATN simulation overhead
+    // (see org.openrewrite.java.internal.template.parser).
     args = listOf(
         "-o", "src/main/java/org/openrewrite/java/internal/grammar",
         "-package", "org.openrewrite.java.internal.grammar",
         "-visitor"
-    ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
+    ) + fileTree("src/main/antlr").matching { include("AnnotationSignature*.g4") }.map { it.path }
 
     classpath = antlrGeneration
 

@@ -17,6 +17,8 @@ package org.openrewrite.internal;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PropertyPlaceholderHelperTest {
@@ -164,5 +166,62 @@ class PropertyPlaceholderHelperTest {
             default -> null;
         });
         assertThat(s).isEqualTo("ohjon");
+    }
+
+    @Test
+    void cachesParsedSegmentsAcrossCalls() {
+        var helper = new PropertyPlaceholderHelper("#{", "}", null);
+        helper.clearParsedTemplateCache();
+        var template = "assertThat(#{any(java.lang.Object)}).isNotNull()";
+        var resolver = new AtomicInteger();
+        for (int i = 0; i < 1_000; i++) {
+            var s = helper.replacePlaceholders(template, k -> "any(java.lang.Object)".equals(k) ?
+                    "x" + resolver.incrementAndGet() :
+                    null);
+            assertThat(s).startsWith("assertThat(x").endsWith(").isNotNull()");
+        }
+        // The template string is parsed exactly once and its segments are
+        // cached for subsequent calls.
+        assertThat(helper.parsedTemplateCacheSize()).isEqualTo(1);
+        assertThat(resolver.get()).isEqualTo(1_000);
+    }
+
+    @Test
+    void cacheIsSharedAcrossInstancesWithSameConfiguration() {
+        // Two separate helper instances with the same prefix/suffix share the
+        // cache, so a template parsed by one instance is reused by the next.
+        var first = new PropertyPlaceholderHelper("#{", "}", null);
+        first.clearParsedTemplateCache();
+        first.replacePlaceholders("hello #{name}!", k -> "world");
+        assertThat(first.parsedTemplateCacheSize()).isEqualTo(1);
+
+        var second = new PropertyPlaceholderHelper("#{", "}", null);
+        assertThat(second.parsedTemplateCacheSize()).isEqualTo(1);
+        assertThat(second.replacePlaceholders("hello #{name}!", k -> "Claude"))
+                .isEqualTo("hello Claude!");
+        assertThat(second.parsedTemplateCacheSize()).isEqualTo(1);
+    }
+
+    @Test
+    void cachedAndUncachedAgreeOnComplexTemplates() {
+        // Stress-test: a template with literal text, multiple placeholders,
+        // an escaped placeholder, and a default-value placeholder. The result
+        // should match expectations whether the template is parsed fresh or
+        // served from the cache.
+        var helper = new PropertyPlaceholderHelper("${", "}", ":");
+        helper.clearParsedTemplateCache();
+        var template = "head ${a} mid ${b:fallback} tail \\${literal} end";
+        var first = helper.replacePlaceholders(template, k -> switch (k) {
+            case "a" -> "ALPHA";
+            case "b" -> null;
+            default -> null;
+        });
+        var second = helper.replacePlaceholders(template, k -> switch (k) {
+            case "a" -> "ALPHA";
+            case "b" -> null;
+            default -> null;
+        });
+        assertThat(first).isEqualTo("head ALPHA mid fallback tail ${literal} end");
+        assertThat(second).isEqualTo(first);
     }
 }

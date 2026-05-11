@@ -18,7 +18,7 @@ package org.openrewrite.java.internal.template;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.openrewrite.java.internal.grammar.TemplateParameterParser;
+import org.openrewrite.java.internal.template.parser.TemplateParameterParser;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -44,8 +44,7 @@ class TypeParameterTest {
       "short"
     })
     void primitive(String name) {
-        TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
+        JavaType type = TypeParameter.toJavaType(TemplateParameterParser.parseType(name), emptyMap());
         assertThat(type).isSameAs(JavaType.Primitive.fromKeyword(name));
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
     }
@@ -56,8 +55,7 @@ class TypeParameterTest {
       "String",
     })
     void javaLang(String name) {
-        TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
+        JavaType type = TypeParameter.toJavaType(TemplateParameterParser.parseType(name), emptyMap());
         assertThat(type).isInstanceOf(JavaType.Class.class);
         assertThat(TypeUtils.toString(type)).isEqualTo("java.lang." + name);
     }
@@ -77,8 +75,7 @@ class TypeParameterTest {
       "java.util.List<java.lang.String>[]",
     })
     void arrays(String name) {
-        TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
+        JavaType type = TypeParameter.toJavaType(TemplateParameterParser.parseType(name), emptyMap());
         assertThat(type).isInstanceOf(JavaType.Array.class);
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
     }
@@ -88,8 +85,7 @@ class TypeParameterTest {
       "java.util.List",
     })
     void qualified(String name) {
-        TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
+        JavaType type = TypeParameter.toJavaType(TemplateParameterParser.parseType(name), emptyMap());
         assertThat(type).isInstanceOf(JavaType.Class.class);
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
     }
@@ -105,8 +101,7 @@ class TypeParameterTest {
       "java.util.List<java.util.List<? super java.lang.Integer>>",
     })
     void parameterized(String name) {
-        TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
+        JavaType type = TypeParameter.toJavaType(TemplateParameterParser.parseType(name), emptyMap());
         assertThat(type).isInstanceOf(JavaType.Parameterized.class);
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
     }
@@ -120,8 +115,7 @@ class TypeParameterTest {
       "java.util.List<java.util.List<? super java.lang.Integer>>",
     })
     void parameterizedWithModifierShouldNeverHideParametrizedType(String name) {
-        TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
+        JavaType type = TypeParameter.toJavaType(TemplateParameterParser.parseType(name), emptyMap());
         JavaType.Parameterized pType = (JavaType.Parameterized) type;
         assertThat(pType.withFullyQualifiedName("test")).isInstanceOf(JavaType.Parameterized.class);
         assertThat(pType.withFullyQualifiedName("test")).isNotSameAs(pType);
@@ -133,8 +127,7 @@ class TypeParameterTest {
       "java.util.List<?>",
     })
     void unbounded(String name) {
-        TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
+        JavaType type = TypeParameter.toJavaType(TemplateParameterParser.parseType(name), emptyMap());
         assertThat(type).isInstanceOf(JavaType.Parameterized.class);
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
     }
