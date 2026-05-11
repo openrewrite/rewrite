@@ -166,6 +166,19 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Test
+    void packageWithBraces() {
+        rewriteRun(
+          scala(
+            """
+            package foo.bar {
+              val x = 42
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void indentedPackage() {
         rewriteRun(
           scala(
