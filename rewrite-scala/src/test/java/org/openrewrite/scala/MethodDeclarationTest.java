@@ -37,6 +37,32 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void extraSpaceBeforeReturnTypeColon() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo : Int = 5
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void extraSpaceBeforeReturnTypeColonWithParens() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo()  :  Int = 5
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void extraSpaceBeforeParameterDefaultEquals() {
         rewriteRun(
             scala(
