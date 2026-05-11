@@ -23,6 +23,28 @@ import static org.openrewrite.scala.Assertions.scala;
 class CompilationUnitTest implements RewriteTest {
 
     @Test
+    void packageWithSemicolonBeforeImport() {
+        rewriteRun(
+          scala(
+            """
+            package foo;import bar.X
+            """
+          )
+        );
+    }
+
+    @Test
+    void packageWithSemicolonBeforeStatement() {
+        rewriteRun(
+          scala(
+            """
+            package foo;class Bar
+            """
+          )
+        );
+    }
+
+    @Test
     void emptyFile() {
         rewriteRun(
           scala("")
@@ -161,6 +183,102 @@ class CompilationUnitTest implements RewriteTest {
             }
             """,
             spec -> spec.path("package.scala")
+          )
+        );
+    }
+
+    @Test
+    void packageWithBraces() {
+        rewriteRun(
+          scala(
+            """
+            package foo.bar {
+              val x = 42
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedPackage() {
+        rewriteRun(
+          scala(
+            """
+            package com.example:
+              val x = 42
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedIfThenElse() {
+        rewriteRun(
+          scala(
+            """
+            val x =
+              if true then
+                1
+              else
+                2
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedWhileDo() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              var i = 0
+              while i < 10 do
+                i = i + 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedForYield() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              val xs =
+                for i <- 1 to 10
+                yield i * 2
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedTryCatch() {
+        rewriteRun(
+          scala(
+            """
+            val x =
+              try
+                42
+              catch
+                case _: Exception => 0
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedMatch() {
+        rewriteRun(
+          scala(
+            """
+            val x = 1 match
+              case 1 => "one"
+              case _ => "other"
+            """
           )
         );
     }

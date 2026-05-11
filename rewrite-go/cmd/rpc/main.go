@@ -39,6 +39,7 @@ import (
 	"github.com/grafana/pyroscope-go"
 
 	goparser "github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/preconditions"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
@@ -87,6 +88,12 @@ type server struct {
 
 	// Prepared recipe instances keyed by unique ID
 	preparedRecipes map[string]recipe.Recipe
+
+	// Bare editor cached at PrepareRecipe time when an editor was wrapped in
+	// preconditions.Check(...). Subsequent dispatch via instantiateVisitor
+	// returns the unwrapped editor — otherwise the precondition would also
+	// run Go-side and double the cost. Keyed by the prepared recipe ID.
+	preparedEditorOverrides map[string]recipe.TreeVisitor
 
 	// Per-prepared-recipe accumulator for ScanningRecipe. Lazily created on
 	// the first scan Visit call. Lifetime = prepared recipe instance; freed
@@ -172,8 +179,9 @@ func newServer(cfg serverConfig) *server {
 		remoteRefs:           make(map[int]any),
 		reverseRemoteObjects: make(map[string]any),
 		reverseRemoteRefs:    make(map[int]any),
-		preparedRecipes:      make(map[string]recipe.Recipe),
-		preparedAccumulators: make(map[string]any),
+		preparedRecipes:         make(map[string]recipe.Recipe),
+		preparedEditorOverrides: make(map[string]recipe.TreeVisitor),
+		preparedAccumulators:    make(map[string]any),
 		preparedContexts:     make(map[string]*recipe.ExecutionContext),
 		batchSize:            1000,
 		traceReceive:         cfg.traceRpcMessages,
@@ -911,6 +919,7 @@ func (s *server) handleReset() bool {
 	s.reverseRemoteObjects = make(map[string]any)
 	s.reverseRemoteRefs = make(map[int]any)
 	s.preparedRecipes = make(map[string]recipe.Recipe)
+	s.preparedEditorOverrides = make(map[string]recipe.TreeVisitor)
 	s.preparedAccumulators = make(map[string]any)
 	s.preparedContexts = make(map[string]*recipe.ExecutionContext)
 	return true
@@ -1283,6 +1292,26 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 		ScanPreconditions: []any{},
 	}
 
+	// Introspect Editor() once at prepare time. If the recipe wrapped its
+	// editor in preconditions.Check(...), extract the precondition's wire
+	// identity (so the Java host can evaluate it locally and skip the
+	// visit RPC for non-matching files) and cache the bare editor (so a
+	// subsequent dispatch via instantiateVisitor returns the unwrapped
+	// editor — otherwise the precondition would also run Go-side and
+	// double the cost).
+	if instance != nil {
+		if _, isScan := instance.(recipe.ScanningRecipe); !isScan {
+			if editor := instance.Editor(); editor != nil {
+				if checkV, ok := editor.(*preconditions.CheckVisitor); ok {
+					if entry, ok := preconditionWireEntry(checkV.Check); ok {
+						resp.EditPreconditions = append(resp.EditPreconditions, entry)
+						s.preparedEditorOverrides[recipeID] = checkV.V
+					}
+				}
+			}
+		}
+	}
+
 	// Check if this is a scanning recipe
 	if instance != nil {
 		if _, isScan := instance.(recipe.ScanningRecipe); isScan {
@@ -1302,6 +1331,37 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 	}
 
 	return resp, nil
+}
+
+// preconditionWireEntry translates a precondition condition (operand) to
+// a wire entry matching org.openrewrite.rpc.request.PrepareRecipeResponse.Precondition.
+//
+// Leaves carry visitorName + visitorOptions; composites carry op +
+// operands (a list of nested wire entries). Returns ok=false when the
+// condition can't be serialized (e.g. an opaque local TreeVisitor with
+// no recipe identity) — the caller leaves the wrapper intact so the
+// gate runs Go-side as a fallback.
+func preconditionWireEntry(condition preconditions.CheckArg) (map[string]any, bool) {
+	switch c := condition.(type) {
+	case *preconditions.RecipeRef:
+		entry := map[string]any{"visitorName": c.RecipeName}
+		if len(c.Options) > 0 {
+			entry["visitorOptions"] = c.Options
+		}
+		return entry, true
+	case *preconditions.Composite:
+		operands := make([]any, 0, len(c.Operands))
+		for _, operand := range c.Operands {
+			nested, ok := preconditionWireEntry(operand)
+			if !ok {
+				return nil, false
+			}
+			operands = append(operands, nested)
+		}
+		return map[string]any{"op": c.Op, "operands": operands}, true
+	default:
+		return nil, false
+	}
 }
 
 // visitRequest is the parameter type for Visit.
@@ -1455,6 +1515,12 @@ func (s *server) instantiateVisitor(visitorName string, ctx *recipe.ExecutionCon
 		if sr, ok := r.(recipe.ScanningRecipe); ok {
 			acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
 			return sr.EditorWithData(acc)
+		}
+		// If the recipe wrapped its editor in preconditions.Check(...) and
+		// we captured the bare editor at PrepareRecipe time, return it here
+		// so the precondition isn't re-evaluated Go-side.
+		if bare, ok := s.preparedEditorOverrides[recipeID]; ok {
+			return bare
 		}
 		return r.Editor()
 	case "scan":

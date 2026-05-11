@@ -407,8 +407,7 @@ public class RewriteRpc {
 
         List<TreeVisitor<?, ExecutionContext>> visitors = new ArrayList<>(preconditions.size());
         for (PrepareRecipeResponse.Precondition p : preconditions) {
-            visitors.add(preparedRecipes.instantiateVisitor(
-                    p.getVisitorName(), p.getVisitorOptions()));
+            visitors.add(buildPreconditionVisitor(p));
         }
 
         return new TreeVisitor<Tree, ExecutionContext>() {
@@ -427,6 +426,35 @@ public class RewriteRpc {
                 return t;
             }
         };
+    }
+
+    @SuppressWarnings("unchecked")
+    private TreeVisitor<?, ExecutionContext> buildPreconditionVisitor(PrepareRecipeResponse.Precondition p) {
+        String op = p.getOp();
+        if (op == null) {
+            return preparedRecipes.instantiateVisitor(p.getVisitorName(), p.getVisitorOptions());
+        }
+        List<PrepareRecipeResponse.Precondition> operands = p.getOperands();
+        if (operands == null || operands.isEmpty()) {
+            throw new IllegalStateException("Composite precondition op=" + op + " requires non-empty operands");
+        }
+        TreeVisitor<?, ExecutionContext>[] children = new TreeVisitor[operands.size()];
+        for (int i = 0; i < operands.size(); i++) {
+            children[i] = buildPreconditionVisitor(operands.get(i));
+        }
+        switch (op) {
+            case "or":
+                return Preconditions.or(children);
+            case "and":
+                return Preconditions.and(children);
+            case "not":
+                if (children.length != 1) {
+                    throw new IllegalStateException("Composite precondition op=not requires exactly one operand, got " + children.length);
+                }
+                return Preconditions.not(children[0]);
+            default:
+                throw new IllegalStateException("Unknown composite precondition op=" + op);
+        }
     }
 
     public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo,

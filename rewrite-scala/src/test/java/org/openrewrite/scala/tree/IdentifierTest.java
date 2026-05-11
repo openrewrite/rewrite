@@ -78,6 +78,42 @@ class IdentifierTest implements RewriteTest {
     }
 
     @Test
+    void backtickIdentifierAcrossContexts() {
+        rewriteRun(
+          scala(
+            """
+              import foo.`type`
+              import foo.{`type` => t}
+
+              class `My Class`
+              object `My Object`
+              class `Foo`
+
+              case class CC(`type`: String)
+
+              object O {
+                val `type` = 1
+                var `var name` = 2
+                val withType: `Foo` = new `Foo`
+                val ref = `type`
+
+                def `my method`() = 1
+                def `other`() = 1
+                val call = `other`()
+
+                def f(`type`: Int): Int = `type`
+                val named = f(`type` = 5)
+
+                val lambda = (`type`: Int) => `type` + 1
+                val xs = for (`type` <- List(1, 2)) yield `type`
+                val sel = List(1).`type`
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void operatorIdentifier() {
         rewriteRun(
           scala("+")
