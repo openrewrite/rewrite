@@ -32,6 +32,17 @@ class ImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void importExtraSpaceAfterKeyword() {
+        rewriteRun(
+          scala(
+            """
+            import  scala.collection.mutable
+            """
+          )
+        );
+    }
     
     @Test
     void singleImportNoNewline() {
