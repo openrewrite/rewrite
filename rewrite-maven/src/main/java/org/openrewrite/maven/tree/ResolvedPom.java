@@ -598,6 +598,43 @@ public class ResolvedPom {
                 throw new MavenParsingException("Parent version must always specify a version " + gav);
             }
 
+            // When the version still contains unresolved placeholders (e.g. ${revision} from
+            // Maven CI-friendly versions), the normal VersionRequirement flow treats it as a
+            // "direct" version and returns it as-is. This happens when a dependency POM in the
+            // local repository was installed without the flatten-maven-plugin, so its <parent>
+            // version still contains the raw placeholder. We cannot resolve the property because
+            // it is defined in the parent POM itself (chicken-and-egg).
+            // Instead, query the repository metadata for available versions of this GA and use
+            // the latest release/version to locate the parent POM.
+            if (gav.getVersion().contains("${")) {
+                GroupArtifact ga = new GroupArtifact(gav.getGroupId(), gav.getArtifactId());
+                try {
+                    MavenMetadata metadata = downloader.downloadMetadata(ga, null, repositories);
+                    String resolvedVersion = null;
+                    if (metadata.getVersioning() != null) {
+                        if (metadata.getVersioning().getRelease() != null &&
+                                !metadata.getVersioning().getRelease().isEmpty()) {
+                            resolvedVersion = metadata.getVersioning().getRelease();
+                        } else if (metadata.getVersioning().getLatest() != null &&
+                                !metadata.getVersioning().getLatest().isEmpty()) {
+                            resolvedVersion = metadata.getVersioning().getLatest();
+                        } else {
+                            List<String> versions = metadata.getVersioning().getVersions();
+                            if (versions != null && !versions.isEmpty()) {
+                                resolvedVersion = versions.get(versions.size() - 1);
+                            }
+                        }
+                    }
+                    if (resolvedVersion != null && !resolvedVersion.contains("${")) {
+                        return downloader.download(
+                                gav.withVersion(resolvedVersion),
+                                pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+                    }
+                } catch (MavenDownloadingException e) {
+                    // Metadata not available, fall through to normal resolution
+                }
+            }
+
             VersionRequirement newRequirement = VersionRequirement.fromVersion(gav.getVersion(), 0);
             GroupArtifact ga = new GroupArtifact(gav.getGroupId(), gav.getArtifactId());
             String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
