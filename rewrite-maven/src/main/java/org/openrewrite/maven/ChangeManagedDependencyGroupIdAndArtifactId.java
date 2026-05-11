@@ -30,6 +30,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
+import static java.util.Collections.emptySet;
 import static java.util.Collections.max;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Validated.test;
@@ -214,10 +215,15 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 }
             }
 
+            @SuppressWarnings("ConstantConditions")
             private Set<String> getSafeVersionPlaceholdersToChange(String groupId, String artifactId, ExecutionContext ctx) {
                 MavenResolutionResult result = getResolutionResult();
                 final ResolvedPom resolvedPom = result.getPom();
                 Pom requestedPom = resolvedPom.getRequested();
+                // Pom fields default to emptyList() via @Builder.Default, but deserialization can leave them null
+                if (requestedPom.getDependencyManagement() == null) {
+                    return emptySet();
+                }
                 Set<String> relevantProperties = requestedPom.getDependencyManagement().stream()
                         .filter(md -> isProperty(md.getVersion()) &&
                                 matchesGlob(resolvedPom.getValue(md.getGroupId()), groupId) &&
