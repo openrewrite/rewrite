@@ -15,6 +15,7 @@
  */
 package org.openrewrite.rpc;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
 
@@ -22,7 +23,6 @@ import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
 
 public class RewriteRpcExecutionContextView extends DelegatingExecutionContext {
-    private static final String MAX_IN_FLIGHT = "org.openrewrite.rpc.maxInFlight";
     private static final String IN_FLIGHT_SEMAPHORE = "org.openrewrite.rpc.inFlightSemaphore";
 
     public RewriteRpcExecutionContextView(ExecutionContext delegate) {
@@ -37,30 +37,56 @@ public class RewriteRpcExecutionContextView extends DelegatingExecutionContext {
     }
 
     /**
-     * Cap on concurrent in-flight RPC requests across this run, sized to the
-     * memory headroom of the host running rewrite-rpc subprocesses. Each
+     * Install a {@link Semaphore} that caps the number of concurrent in-flight
+     * rewrite-rpc requests this {@link ExecutionContext} participates in. Each
      * permit covers one actively-executing visit/parse/generate/print; idle
-     * subprocesses do not consume a permit. Default is unlimited so that
-     * out-of-the-box OpenRewrite behavior is unchanged; callers (e.g. a host
-     * that knows its own memory budget) opt in by setting an explicit cap.
+     * subprocesses do not consume a permit.
+     * <p>
+     * Pass the <strong>same</strong> {@code Semaphore} instance into multiple
+     * {@code ExecutionContext}s (e.g. one per parallel recipe-run task) to
+     * give them a single shared concurrency budget. This is the intended way
+     * to enforce a host-wide cap when many independent {@code ExecutionContext}s
+     * exist on the same JVM.
+     * <p>
+     * If no semaphore is installed, in-flight calls are unbounded — the
+     * out-of-the-box OpenRewrite default.
      */
-    public RewriteRpcExecutionContextView setMaxInFlight(int maxInFlight) {
-        putMessage(MAX_IN_FLIGHT, maxInFlight);
+    public RewriteRpcExecutionContextView setInFlightSemaphore(Semaphore inFlightSemaphore) {
+        putMessage(IN_FLIGHT_SEMAPHORE, inFlightSemaphore);
         return this;
     }
 
-    public int getMaxInFlight() {
-        return getMessage(MAX_IN_FLIGHT, Integer.MAX_VALUE);
+    public @Nullable Semaphore getInFlightSemaphore() {
+        return getMessage(IN_FLIGHT_SEMAPHORE);
     }
 
     /**
-     * Run {@code work} while holding one of the in-flight RPC permits. The
-     * semaphore is created lazily on first call and shared across every
-     * thread that observes this ExecutionContext.
+     * Convenience for the single-context case: install a fresh {@code Semaphore}
+     * with the given number of permits. The semaphore is created here and is
+     * scoped to this {@code ExecutionContext} only; child contexts that view
+     * the same delegate share it, but a separately-constructed
+     * {@code InMemoryExecutionContext} elsewhere does <em>not</em>.
+     * <p>
+     * For a host-wide cap spanning multiple parallel runs, construct one
+     * {@code Semaphore} yourself at the orchestrator level and install it
+     * via {@link #setInFlightSemaphore(Semaphore)} on every participating
+     * context.
+     */
+    public RewriteRpcExecutionContextView setMaxInFlight(int permits) {
+        return setInFlightSemaphore(new Semaphore(permits));
+    }
+
+    /**
+     * Run {@code work} while holding one in-flight RPC permit, if a semaphore
+     * has been installed via {@link #setInFlightSemaphore(Semaphore)} or
+     * {@link #setMaxInFlight(int)}. If none is installed, {@code work} runs
+     * without throttling.
      */
     public <T> T withInFlightSlot(Supplier<T> work) {
-        Semaphore slots = computeMessageIfAbsent(IN_FLIGHT_SEMAPHORE,
-                k -> new Semaphore(getMaxInFlight()));
+        Semaphore slots = getInFlightSemaphore();
+        if (slots == null) {
+            return work.get();
+        }
         slots.acquireUninterruptibly();
         try {
             return work.get();
