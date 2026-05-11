@@ -23,6 +23,28 @@ import static org.openrewrite.scala.Assertions.scala;
 class CompilationUnitTest implements RewriteTest {
 
     @Test
+    void packageWithSemicolonBeforeImport() {
+        rewriteRun(
+          scala(
+            """
+            package foo;import bar.X
+            """
+          )
+        );
+    }
+
+    @Test
+    void packageWithSemicolonBeforeStatement() {
+        rewriteRun(
+          scala(
+            """
+            package foo;class Bar
+            """
+          )
+        );
+    }
+
+    @Test
     void emptyFile() {
         rewriteRun(
           scala("")

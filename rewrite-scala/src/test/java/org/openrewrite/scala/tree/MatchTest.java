@@ -55,6 +55,36 @@ class MatchTest implements RewriteTest {
     }
 
     @Test
+    void matchExtraSpaceBeforeKeyword() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val r = 1  match {
+                case _ => 0
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchExtraSpaceBeforeBrace() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val r = 1 match  {
+                case _ => 0
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void matchWithGuard() {
         rewriteRun(
           scala(
