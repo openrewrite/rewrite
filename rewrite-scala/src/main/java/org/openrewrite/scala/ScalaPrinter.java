@@ -434,6 +434,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
 
         if (method.getReturnTypeExpression() != null) {
+            method.getReturnTypeExpression().getMarkers()
+                    .findFirst(org.openrewrite.scala.marker.ReturnTypeColonPrefix.class)
+                    .ifPresent(m -> visitSpace(m.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
             p.append(':');
             visit(method.getReturnTypeExpression(), p);
         }

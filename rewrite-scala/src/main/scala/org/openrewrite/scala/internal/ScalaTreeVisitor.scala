@@ -5415,11 +5415,18 @@ class ScalaTreeVisitor(
 
         // Only use the type if there's a colon BEFORE the equals sign (explicit type annotation)
         if (colonIdx >= 0 && (equalsIdx < 0 || colonIdx < equalsIdx)) {
+          val beforeColon = Space.format(betweenText.substring(0, colonIdx))
           cursor = cursor + colonIdx + 1
-          visitTree(tpt) match {
+          val visited = visitTree(tpt) match {
             case tt: TypeTree => tt
             case id: J.Identifier => id
             case _ => null
+          }
+          if (visited != null && beforeColon != Space.EMPTY) {
+            visited.withMarkers(visited.getMarkers.addIfAbsent(
+              org.openrewrite.scala.marker.ReturnTypeColonPrefix.create(beforeColon))).asInstanceOf[TypeTree]
+          } else {
+            visited
           }
         } else {
           null // Inferred type — not written in source
