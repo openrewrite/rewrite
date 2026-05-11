@@ -69,9 +69,12 @@ public class RewriteRpcProcess extends Thread {
     @Setter
     private @Nullable Path stderrRedirect;
 
+    @Nullable
+    private Thread shutdownHook;
+
     public RewriteRpcProcess(String... command) {
         this.command = command;
-        this.setName("JavaScriptRewriteRpcProcess");
+        this.setName("RewriteRpcProcess");
         this.setDaemon(false);
     }
 
@@ -168,6 +171,16 @@ public class RewriteRpcProcess extends Thread {
             }
         }
 
+        // Hold a reference so shutdown() can deregister the hook; otherwise each
+        // RPC process leaks its full RewriteRpc graph via ApplicationShutdownHooks.
+        shutdownHook = new Thread(() -> {
+            try {
+                shutdown();
+            } catch (Throwable ignored) {
+            }
+        }, "rpc-shutdown");
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
+
         SimpleModule module = new SimpleModule();
         module.addSerializer(Path.class, new PathSerializer());
         module.addDeserializer(Path.class, new PathDeserializer());
@@ -181,6 +194,14 @@ public class RewriteRpcProcess extends Thread {
     }
 
     public void shutdown() {
+        if (shutdownHook != null) {
+            try {
+                Runtime.getRuntime().removeShutdownHook(shutdownHook);
+            } catch (IllegalStateException ignored) {
+                // JVM is already shutting down (e.g. shutdown() invoked from the hook itself).
+            }
+            shutdownHook = null;
+        }
         if (process != null && process.isAlive()) {
             process.destroy();
             try {
@@ -191,7 +212,7 @@ public class RewriteRpcProcess extends Thread {
                 }
                 int exitCode = process.exitValue();
                 if (exitCode != 0 && exitCode != 1 && exitCode != 143) { // 143 = SIGTERM
-                    throw new RuntimeException("JavaScript Rewrite RPC process crashed with exit code: " + exitCode);
+                    throw new RuntimeException("Rewrite RPC process crashed with exit code: " + exitCode);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

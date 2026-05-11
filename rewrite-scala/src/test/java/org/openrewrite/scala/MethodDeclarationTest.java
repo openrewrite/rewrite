@@ -23,6 +23,45 @@ import static org.openrewrite.scala.Assertions.scala;
 class MethodDeclarationTest implements RewriteTest {
 
     @Test
+    void extraSpaceBetweenModifierAndDef() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  private   def hello(): Int = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void extraSpaceBeforeParameterDefaultEquals() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def hello(x: Int   = 1): Int = x
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void noSpaceAroundParameterDefaultEquals() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def hello(x: Int=1): Int = x
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void simpleMethod() {
         rewriteRun(
             scala(
@@ -114,12 +153,86 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void multilineTypeParameters() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f[
+                      A,
+                      B
+                  ](x: A): A = x
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void multilineCurriedParameterList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(a: Int)(
+                      b: Int,
+                      c: Int
+                  ): Int = a + b + c
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void multilineParameterListWithClosingParenOnOwnLine() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def add(
+                      x: Int,
+                      y: Int
+                  ): Int = x + y
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void overrideMethod() {
         rewriteRun(
             scala(
                 """
                 class Child extends Parent {
                   override def toString: String = "Child"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void symbolicNameWithTupleBody() {
+        rewriteRun(
+            scala(
+                """
+                class Foo {
+                  def * = (1, 2, 3)
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void implicitInSecondParamList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def apply(obj: String)(implicit c: Int): String = obj
                 }
                 """
             )

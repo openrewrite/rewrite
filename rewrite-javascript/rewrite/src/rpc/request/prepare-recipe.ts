@@ -17,7 +17,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import {MessageConnection} from "vscode-jsonrpc/node";
 import {Recipe, RecipeDescriptor, ScanningRecipe} from "../../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
-import {Check} from "../../preconditions";
+import {Check, CheckArg, CompositePrecondition, RecipeRef} from "../../preconditions";
 import {RpcRecipe} from "../recipe";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
@@ -109,8 +109,9 @@ export class PrepareRecipe {
         }
 
         if (visitor! instanceof Check) {
-            if (visitor.check instanceof RpcRecipe) {
-                preconditions.push({visitorName: phase === "edit" ? visitor.check.editVisitor : visitor.check.scanVisitor!});
+            const wireEntry = this.conditionWireEntry(visitor.check, phase);
+            if (wireEntry) {
+                preconditions.push(wireEntry);
                 recipe = Object.assign(
                     Object.create(Object.getPrototypeOf(recipe)),
                     recipe,
@@ -133,6 +134,42 @@ export class PrepareRecipe {
             await this.visitorTypePrecondition(preconditions, visitor!);
         }
         return recipe;
+    }
+
+    /**
+     * Translate a precondition condition (operand) to a wire entry.
+     *
+     * Mirrors the Java {@code PrepareRecipeResponse.Precondition} schema:
+     * leaves carry {@code visitorName} (+ optional options); composites
+     * carry {@code op} ({@code "or"}/{@code "and"}/{@code "not"}) and a
+     * nested {@code operands} list. Returns {@code undefined} when the
+     * condition can't be serialized — the caller leaves the wrapper
+     * intact so the gate runs in-process as a fallback.
+     */
+    private static conditionWireEntry(condition: CheckArg, phase: "edit" | "scan"): Precondition | undefined {
+        if (condition instanceof CompositePrecondition) {
+            const operands: Precondition[] = [];
+            for (const operand of condition.operands) {
+                const entry = this.conditionWireEntry(operand, phase);
+                if (entry === undefined) {
+                    return undefined;
+                }
+                operands.push(entry);
+            }
+            return {op: condition.op, operands};
+        }
+        // Common case: helpers like usesMethod / usesType return a lightweight
+        // RecipeRef so the recipe author can declare a precondition without
+        // firing an RPC at editor() time. The Java host's
+        // PreparedRecipeCache.instantiateVisitor constructs the named recipe
+        // via Jackson and uses its visitor.
+        if (condition instanceof RecipeRef) {
+            return {visitorName: condition.recipeName, visitorOptions: {...condition.options}};
+        }
+        if (condition instanceof RpcRecipe) {
+            return {visitorName: phase === "edit" ? condition.editVisitor : condition.scanVisitor!};
+        }
+        return undefined;
     }
 
     private static async visitorTypePrecondition(preconditions: Precondition[], v: TreeVisitor<any, ExecutionContext>): Promise<Precondition[]> {
@@ -183,7 +220,20 @@ export interface PrepareRecipeResponse {
     delegatesTo?: DelegatesTo
 }
 
+/**
+ * Either a leaf (a single visitor identified by {@code visitorName} +
+ * optional {@code visitorOptions}) or a composite of nested preconditions
+ * joined by {@code op} ({@code "or"} / {@code "and"} / {@code "not"}).
+ *
+ * When {@code op} is undefined the entry is a leaf and {@code visitorName}
+ * is required; when {@code op} is set, {@code operands} carries the
+ * children and the visitor fields are ignored. The composite form mirrors
+ * Java's {@code Preconditions.or}/{@code and}/{@code not} so remote
+ * languages can express the same gate shapes the Java side does.
+ */
 export interface Precondition {
-    visitorName: string
+    visitorName?: string
     visitorOptions?: {}
+    op?: "or" | "and" | "not"
+    operands?: Precondition[]
 }

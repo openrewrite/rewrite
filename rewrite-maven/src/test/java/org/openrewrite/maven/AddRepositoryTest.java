@@ -15,8 +15,8 @@
  */
 package org.openrewrite.maven;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
@@ -306,7 +306,8 @@ class AddRepositoryTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
+    @DisabledIfEnvironmentVariable(named = "CI", matches = "true",
+      disabledReason = "Artifactory mirror does not proxy https://repo.spring.io/snapshot")
     void updateToSpringBoot30Snapshot() {
         rewriteRun(
           spec -> spec.recipes(

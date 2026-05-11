@@ -740,12 +740,16 @@ public class PythonRewriteRpc extends RewriteRpc {
             try {
                 Files.createDirectories(pipPackagesPath);
 
+                // Install with the [profiling] extra so pyroscope-io is available when
+                // PYROSCOPE_SERVER_ADDRESS is set in the rpc subprocess environment. The
+                // SDK init in rewrite.rpc.server is a no-op when the env var is unset, so
+                // adding the extra costs nothing for non-profiled deployments.
                 ProcessBuilder pb = new ProcessBuilder(
                         pythonPath.toString(),
                         "-m", "pip", "install",
                         "--upgrade",
                         "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
-                        "openrewrite==" + version
+                        "openrewrite[profiling]==" + version
                 );
                 pb.environment().putAll(environment);
                 pb.redirectErrorStream(true);

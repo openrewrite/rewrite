@@ -205,6 +205,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void onlyAccessRequiredRepositories() throws Exception {
             var ctx = MavenExecutionContextView.view(this.ctx);
+            ctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
             // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
             for (MavenRepository repository : ctx.getRepositories()) {
                 repository.setKnownToExist(true);
@@ -253,6 +254,9 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void mirrorsOverrideRepositoriesInPom() {
             var ctx = MavenExecutionContextView.view(this.ctx);
+            // normalizeRepository probes the mirror over HTTP; the class-level 250ms timeout
+            // is too aggressive under suite load and causes the probe to return null.
+            HttpSenderExecutionContextView.view(this.ctx).setHttpSender(new HttpUrlConnectionSender());
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
@@ -1122,6 +1126,7 @@ class MavenPomDownloaderTest implements RewriteTest {
 
         @Test
         void canResolveDifferentVersionOfProjectPom() {
+            MavenExecutionContextView.view(ctx).setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
             var gav = new GroupArtifactVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0");
 
             Path pomPath = Path.of("pom.xml");
@@ -1586,7 +1591,9 @@ class MavenPomDownloaderTest implements RewriteTest {
 
     @Test
     void resolveDependencies() throws Exception {
-        var doc = (Xml.Document) MavenParser.builder().build().parse("""
+        var ctx = new InMemoryExecutionContext();
+        MavenExecutionContextView.view(ctx).setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
+        var doc = (Xml.Document) MavenParser.builder().build().parse(ctx, """
           <project>
               <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -1606,7 +1613,6 @@ class MavenPomDownloaderTest implements RewriteTest {
               </dependencies>
           </project>
           """).toList().getFirst();
-        var ctx = new InMemoryExecutionContext();
         MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
           .resolveDependencies(new MavenPomDownloader(emptyMap(), ctx, null, null), ctx);
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
@@ -1619,7 +1625,9 @@ class MavenPomDownloaderTest implements RewriteTest {
         // `azure-spring-data-cosmos` brings in `azure-core-http-netty`, which uses property `<boring-ssl-classifier/>`
         // https://repo1.maven.org/maven2/com/azure/azure-spring-data-cosmos/3.45.0/azure-spring-data-cosmos-3.45.0.pom
         // https://repo1.maven.org/maven2/com/azure/azure-core-http-netty/1.16.2/azure-core-http-netty-1.16.2.pom
-        var doc = (Xml.Document) MavenParser.builder().build().parse("""
+        var ctx = new InMemoryExecutionContext();
+        MavenExecutionContextView.view(ctx).setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
+        var doc = (Xml.Document) MavenParser.builder().build().parse(ctx, """
           <project>
               <groupId>com.example</groupId>
               <artifactId>demo</artifactId>
@@ -1636,7 +1644,6 @@ class MavenPomDownloaderTest implements RewriteTest {
               </dependencies>
           </project>
           """).toList().getFirst();
-        var ctx = new InMemoryExecutionContext();
         MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
           .resolveDependencies(new MavenPomDownloader(emptyMap(), ctx, null, null), ctx);
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);

@@ -40,6 +40,24 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void memoizedMethod() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Memoized
+
+              class Foo {
+                  @Memoized
+                  Object bar() {
+                      return null
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void simpleFQN() {
         rewriteRun(
           groovy(

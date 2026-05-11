@@ -23,6 +23,22 @@ import static org.openrewrite.scala.Assertions.scala;
 class MatchTest implements RewriteTest {
 
     @Test
+    void emptyCaseBodyWithGuardPreservesAlignmentBeforeArrow() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def handle(x: Int): Unit = x match {
+                case 1 if x > 0   =>
+                case _ => println(x)
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void simpleMatch() {
         rewriteRun(
           scala(
@@ -207,6 +223,22 @@ class MatchTest implements RewriteTest {
                   println(z)
                 case _ =>
                   println("other")
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchWithExtraWhitespaceBeforeArrow() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def handle(x: Any): String = x match {
+                case "a"   => "1"
+                case _ => "0"
               }
             }
             """

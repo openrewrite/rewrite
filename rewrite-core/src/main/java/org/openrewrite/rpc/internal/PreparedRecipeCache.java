@@ -55,8 +55,18 @@ public class PreparedRecipeCache {
         Map<Object, Object> withJsonType = visitorOptions == null ? new HashMap<>() : new HashMap<>(visitorOptions);
         withJsonType.put("@c", visitorName);
         try {
-            Class<?> visitorType = TypeFactory.defaultInstance().findClass(visitorName);
-            return (TreeVisitor<?, P>) mapper.convertValue(withJsonType, visitorType);
+            Class<?> type = TypeFactory.defaultInstance().findClass(visitorName);
+            // Lazy-prepared precondition: a Recipe class name + options. Construct the
+            // Recipe via Jackson and return its edit visitor. This avoids requiring the
+            // remote (Python) to round-trip a PrepareRecipe RPC just to get an edit:<id>
+            // it can put on the wire — important for in-process recipe authoring (a
+            // Python recipe's editor() can declare uses_method(...) without firing an
+            // RPC at construction time).
+            if (Recipe.class.isAssignableFrom(type)) {
+                Recipe recipe = (Recipe) mapper.convertValue(withJsonType, type);
+                return (TreeVisitor<?, P>) recipe.getVisitor();
+            }
+            return (TreeVisitor<?, P>) mapper.convertValue(withJsonType, type);
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
         }

@@ -21,9 +21,10 @@ import org.openrewrite.Tree
 import org.openrewrite.java.internal.JavaTypeFactory
 import org.openrewrite.java.tree.*
 import org.openrewrite.marker.Markers
+import org.openrewrite.scala.marker.IndentedSyntax
 
 import java.util
-import java.util.{Collections, List as JList}
+import java.util.{Collections, List as JList, UUID}
 
 /**
  * Result of converting a Scala AST to compilation unit components.
@@ -165,18 +166,36 @@ class ScalaASTConverter {
     // This includes "package" keyword + package name
     val packageEndPos = pkgDef.pid.span.end
 
+    // Detect Scala 3 indented package syntax: `package foo.bar:` followed by an indented region.
+    // If the next non-space character after the package name is `:`, consume it and tag the
+    // J.Package with IndentedSyntax so the printer re-emits the colon.
+    val srcText = visitor.getSourceText
+    val srcOffset = visitor.getOffsetAdjustment
+    var scanIdx = packageEndPos - srcOffset
+    while (scanIdx < srcText.length && (srcText.charAt(scanIdx) == ' ' || srcText.charAt(scanIdx) == '\t')) {
+      scanIdx += 1
+    }
+    val hasIndentedColon = scanIdx < srcText.length && srcText.charAt(scanIdx) == ':'
+    val cursorAfter = if (hasIndentedColon) scanIdx + 1 + srcOffset else packageEndPos
+
     // Update the visitor's cursor to after the package declaration
     // This is crucial to prevent the package text from being included
     // in the prefix of subsequent statements
-    visitor.updateCursor(packageEndPos)
+    visitor.updateCursor(cursorAfter)
 
     // Create package expression
     val packageExpr: Expression = TypeTree.build(packageName)
 
+    val markers = if (hasIndentedColon) {
+      Markers.build(Collections.singletonList(new IndentedSyntax(UUID.randomUUID())))
+    } else {
+      Markers.EMPTY
+    }
+
     new J.Package(
       Tree.randomId(),
       prefix,
-      Markers.EMPTY,
+      markers,
       packageExpr.withPrefix(Space.build(" ", Collections.emptyList())),
       Collections.emptyList()
     )

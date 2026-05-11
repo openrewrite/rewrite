@@ -1,8 +1,14 @@
-from dataclasses import replace as dataclass_replace
-from typing import Any, Callable, TypeVar, List, Union, cast
+from dataclasses import fields as _dataclass_fields, is_dataclass as _is_dataclass, replace as dataclass_replace
+from typing import Any, Callable, Dict, TypeVar, List, Tuple, Union, cast
 from uuid import UUID, uuid4
 
 T = TypeVar('T')
+
+# Per-class cache of init-field names. `dataclasses.replace` re-walks
+# `__dataclass_fields__` on every call to fill in missing fields via getattr;
+# we'd rather pay the introspection once per class and then construct directly
+# from `__dict__`. ~16.7M `replace_if_changed` calls per medium sequential run.
+_INIT_FIELDS_CACHE: Dict[type, Tuple[str, ...]] = {}
 
 
 def _is_changed(old, new) -> bool:
@@ -45,15 +51,24 @@ def replace_if_changed(obj: T, **kwargs) -> T:
     if not kwargs:
         return obj
 
+    cls = type(obj)
+    init_fields = _INIT_FIELDS_CACHE.get(cls)
+    if init_fields is None:
+        if not _is_dataclass(cls):
+            # Non-dataclass fallback path — should never hit on the LST hot path,
+            # but preserves the original semantics.
+            return cast(T, dataclass_replace(cast(Any, obj), **kwargs))
+        init_fields = tuple(f.name for f in _dataclass_fields(cls) if f.init)
+        _INIT_FIELDS_CACHE[cls] = init_fields
+
     # Map public property names to private field names and check for changes
-    mapped_kwargs = {}
+    mapped_kwargs: Dict[str, Any] = {}
     changed = False
     for key, value in kwargs.items():
         if not key.startswith('_'):
             # Handle Python keyword conflicts: from_ -> _from
-            base_key = key.rstrip('_')
-            private_key = f'_{base_key}'
-            if hasattr(obj, private_key):
+            private_key = f'_{key.rstrip("_")}'
+            if private_key in init_fields:
                 mapped_kwargs[private_key] = value
                 # Use 'or' for short-circuit evaluation - skips check once changed is True
                 changed = changed or _is_changed(getattr(obj, private_key), value)
@@ -64,8 +79,18 @@ def replace_if_changed(obj: T, **kwargs) -> T:
             mapped_kwargs[key] = value
             changed = changed or _is_changed(getattr(obj, key), value)
 
-    # cast needed because Python lacks a public Dataclass protocol (see cpython#102395)
-    return cast(T, dataclass_replace(cast(Any, obj), **mapped_kwargs)) if changed else obj
+    if not changed:
+        return obj
+
+    # Direct construction from __dict__ + overlay — avoids dataclasses.replace's
+    # per-call walk of __dataclass_fields__. Frozen LST dataclasses still have
+    # __dict__ (no __slots__), so vars() is safe here.
+    obj_dict = obj.__dict__
+    new_kwargs = {
+        name: mapped_kwargs[name] if name in mapped_kwargs else obj_dict[name]
+        for name in init_fields
+    }
+    return cast(T, cls(**new_kwargs))
 
 
 def random_id() -> UUID:

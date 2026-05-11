@@ -121,6 +121,8 @@ func (v *GoVisitor) Visit(t tree.Tree, p any) tree.Tree {
 		return v.self().VisitReturn(n, p)
 	case *tree.If:
 		return v.self().VisitIf(n, p)
+	case *tree.Else:
+		return v.self().VisitElse(n, p)
 	case *tree.Assignment:
 		return v.self().VisitAssignment(n, p)
 	case *tree.MethodDeclaration:
@@ -240,6 +242,7 @@ type VisitorI interface {
 	VisitBlock(block *tree.Block, p any) tree.J
 	VisitReturn(ret *tree.Return, p any) tree.J
 	VisitIf(ifStmt *tree.If, p any) tree.J
+	VisitElse(el *tree.Else, p any) tree.J
 	VisitAssignment(assign *tree.Assignment, p any) tree.J
 	VisitMethodDeclaration(md *tree.MethodDeclaration, p any) tree.J
 	VisitFieldAccess(fa *tree.FieldAccess, p any) tree.J
@@ -378,6 +381,20 @@ func (v *GoVisitor) VisitIf(ifStmt *tree.If, p any) tree.J {
 		ifStmt.ElsePart = &ep
 	}
 	return ifStmt
+}
+
+// VisitElse handles the synthetic *tree.Else wrapper that JavaSender produces
+// for RPC parity with Java's J.If.Else. The node never appears in a parsed
+// Go AST — language-level recipes go through VisitIf instead — so the default
+// implementation simply visits the body so traversal terminates correctly.
+func (v *GoVisitor) VisitElse(el *tree.Else, p any) tree.J {
+	el = el.WithPrefix(v.self().VisitSpace(el.Prefix, p))
+	el = el.WithMarkers(v.visitMarkers(el.Markers, p))
+	body := el.Body
+	body.Element = v.self().Visit(body.Element, p).(tree.Statement)
+	body.After = v.self().VisitSpace(body.After, p)
+	el.Body = body
+	return el
 }
 
 func (v *GoVisitor) VisitAssignment(assign *tree.Assignment, p any) tree.J {

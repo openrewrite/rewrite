@@ -1213,3 +1213,39 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithAnnotations(ListUtils.Map(node.Annotations, ann => Visit(ann, p) as Annotation));
     }
 }
+
+/// <summary>
+/// Adapts a generic <see cref="TreeVisitor{J,P}"/> as a <see cref="JavaVisitor{P}"/>.
+/// Returned by <see cref="TreeVisitor{T,P}.Adapt"/> when a J node is visited by a non-Java
+/// visitor. The wrapper IS-A JavaVisitor (so the language-specific Accept switch runs and
+/// child traversal uses JavaVisitor's defaults), but it forwards <see cref="Visit"/> and
+/// <see cref="TreeVisitor{T,P}.Cursor"/> to the wrapped visitor so that user-defined
+/// PreVisit / PostVisit / DefaultValue / cursor state on the original visitor still drive
+/// the traversal.
+/// </summary>
+internal sealed class TreeVisitorAsJavaVisitor<P> : JavaVisitor<P>
+{
+    private readonly TreeVisitor<J, P> _wrapped;
+
+    public TreeVisitorAsJavaVisitor(TreeVisitor<J, P> wrapped) => _wrapped = wrapped;
+
+    public override Cursor Cursor
+    {
+        get => _wrapped.Cursor;
+        set => _wrapped.Cursor = value;
+    }
+
+    public override J? Visit(Tree? tree, P p) => _wrapped.Visit(tree, p);
+}
+
+internal static class JavaVisitorAdapterInit
+{
+    [System.Runtime.CompilerServices.ModuleInitializer]
+    internal static void Init()
+    {
+        TreeVisitorAdapterRegistry.Register(
+            treeType: typeof(J),
+            openLangVisitorType: typeof(JavaVisitor<>),
+            openAdapterType: typeof(TreeVisitorAsJavaVisitor<>));
+    }
+}

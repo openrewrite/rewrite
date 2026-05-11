@@ -43,6 +43,11 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     }
 
     @Override
+    public J visitExpressionStatement(S.ExpressionStatement expressionStatement, P p) {
+        return super.visitExpressionStatement(expressionStatement, p);
+    }
+
+    @Override
     public Expression visitExpression(Expression expression, P p) {
         return (Expression) super.visitExpression(expression, p);
     }
@@ -201,6 +206,11 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     @Override
     public J.Import visitImport(J.Import _import, P p) {
         return (J.Import) super.visitImport(_import, p);
+    }
+
+    @Override
+    public S.Export visitExport(S.Export export, P p) {
+        return (S.Export) super.visitExport(export, p);
     }
 
     @Override

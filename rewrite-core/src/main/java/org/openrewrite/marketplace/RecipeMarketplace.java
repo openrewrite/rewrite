@@ -87,7 +87,9 @@ public class RecipeMarketplace {
                 if (existingSubCategory != null) {
                     existingSubCategory.merge(subCategory);
                 } else {
-                    categories.add(subCategory);
+                    Category copy = new Category(subCategory.displayName, subCategory.description);
+                    copy.merge(subCategory);
+                    categories.add(copy);
                 }
             }
         }
