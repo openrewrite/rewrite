@@ -15,6 +15,7 @@
  */
 package org.openrewrite.scala.tree;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -237,5 +238,48 @@ class MethodDeclarationTest implements RewriteTest {
                 """
             )
         );
+    }
+
+    @Nested
+    class ExtensionMethods implements RewriteTest {
+
+        @Test
+        void simpleExtensionWithSpaceBeforeParen() {
+            rewriteRun(
+                scala(
+                    """
+                    extension (x: Int) {
+                      def foo = x + 1
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void simpleExtensionNoSpaceBeforeParen() {
+            rewriteRun(
+                scala(
+                    """
+                    extension(x: Int) {
+                      def foo = x + 1
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void extensionWithMultipleSpaces() {
+            rewriteRun(
+                scala(
+                    """
+                    extension   (x: Int) {
+                      def foo = x + 1
+                    }
+                    """
+                )
+            );
+        }
     }
 }
