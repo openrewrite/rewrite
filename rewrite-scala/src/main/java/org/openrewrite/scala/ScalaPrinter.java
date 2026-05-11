@@ -32,7 +32,7 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.scala.marker.BlockArgument;
-import org.openrewrite.scala.marker.IndentedBlock;
+import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TypeProjection;
@@ -198,10 +198,52 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     }
 
     @Override
+    public J visitWhileLoop(J.WhileLoop whileLoop, PrintOutputCapture<P> p) {
+        if (!whileLoop.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
+            return super.visitWhileLoop(whileLoop, p);
+        }
+        // Scala 3 paren-less form: `while cond do body`
+        beforeSyntax(whileLoop, Space.Location.WHILE_PREFIX, p);
+        p.append("while");
+        J.ControlParentheses<Expression> cp = whileLoop.getCondition();
+        visitSpace(cp.getPrefix(), Space.Location.WHILE_CONDITION, p);
+        JRightPadded<Expression> condPadded = cp.getPadding().getTree();
+        visit(condPadded.getElement(), p);
+        visitSpace(condPadded.getAfter(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+        p.append("do");
+        visit(whileLoop.getBody(), p);
+        afterSyntax(whileLoop, p);
+        return whileLoop;
+    }
+
+    @Override
+    public J visitIf(J.If iff, PrintOutputCapture<P> p) {
+        if (!iff.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
+            return super.visitIf(iff, p);
+        }
+        // Scala 3 paren-less form: `if cond then thenp [else elsep]`
+        beforeSyntax(iff, Space.Location.IF_PREFIX, p);
+        p.append("if");
+        J.ControlParentheses<Expression> cp = iff.getIfCondition();
+        visitSpace(cp.getPrefix(), Space.Location.IF_PREFIX, p);
+        JRightPadded<Expression> condPadded = cp.getPadding().getTree();
+        visit(condPadded.getElement(), p);
+        visitSpace(condPadded.getAfter(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+        p.append("then");
+        visit(iff.getThenPart(), p);
+        if (iff.getElsePart() != null) {
+            visit(iff.getElsePart(), p);
+        }
+        afterSyntax(iff, p);
+        return iff;
+    }
+
+    @Override
     public J visitTry(J.Try tryable, PrintOutputCapture<P> p) {
         beforeSyntax(tryable, Space.Location.TRY_PREFIX, p);
         p.append("try");
         visit(tryable.getBody(), p);
+        boolean indentedCatch = tryable.getMarkers().findFirst(IndentedSyntax.class).isPresent();
         if (!tryable.getCatches().isEmpty()) {
             // Print catch block with cases from AST whitespace
             for (int i = 0; i < tryable.getCatches().size(); i++) {
@@ -209,7 +251,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 if (i == 0) {
                     // First catch — prefix is the space before "catch"
                     visitSpace(aCatch.getPrefix(), Space.Location.CATCH_PREFIX, p);
-                    p.append("catch {");
+                    p.append(indentedCatch ? "catch" : "catch {");
                 }
                 // Print case with AST whitespace
                 JRightPadded<J.VariableDeclarations> paramPadded = aCatch.getParameter().getPadding().getTree();
@@ -232,7 +274,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             // Close catch block — use end space from last catch body if available
             J.Try.Catch lastCatch = tryable.getCatches().get(tryable.getCatches().size() - 1);
             visitSpace(lastCatch.getBody().getEnd(), Space.Location.BLOCK_END, p);
-            p.append("}");
+            if (!indentedCatch) {
+                p.append("}");
+            }
         }
         if (tryable.getPadding().getFinally() != null) {
             visitSpace(tryable.getPadding().getFinally().getBefore(), Space.Location.TRY_FINALLY, p);
@@ -247,14 +291,17 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitSwitch(J.Switch switch_, PrintOutputCapture<P> p) {
         beforeSyntax(switch_, Space.Location.SWITCH_PREFIX, p);
         visit(switch_.getSelector().getTree(), p);
-        p.append(" match {");
+        boolean indented = switch_.getMarkers().findFirst(IndentedSyntax.class).isPresent();
+        p.append(indented ? " match" : " match {");
         // Print cases directly (not via visitBlock which adds { })
         J.Block casesBlock = switch_.getCases();
         for (int i = 0; i < casesBlock.getStatements().size(); i++) {
             visit(casesBlock.getStatements().get(i), p);
         }
         visitSpace(casesBlock.getEnd(), Space.Location.BLOCK_END, p);
-        p.append("}");
+        if (!indented) {
+            p.append("}");
+        }
         afterSyntax(switch_, p);
         return switch_;
     }
@@ -583,6 +630,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         beforeSyntax(pkg, Space.Location.PACKAGE_PREFIX, p);
         p.append("package");
         visit(pkg.getExpression(), p);
+        if (pkg.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
+            p.append(':');
+        }
         // Note: No semicolon in Scala package declarations
         afterSyntax(pkg, p);
         return pkg;
@@ -855,7 +905,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return block;
         }
         // Scala 3 braceless (indentation-based) blocks use `:` instead of `{}`
-        if (block.getMarkers().findFirst(IndentedBlock.class).isPresent()) {
+        if (block.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
             beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
             p.append(':');
             visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
@@ -1469,10 +1519,13 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         beforeSyntax(forLoop, Space.Location.LANGUAGE_EXTENSION, p);
         p.append("for");
         char open = forLoop.getOpenBracket();
+        boolean parenless = open == ' ';  // Scala 3 indented form: no '(' or '{'
         char close = open == '(' ? ')' : '}';
         JContainer<S.For.Enumerator> enums = forLoop.getPadding().getEnumerators();
         visitSpace(enums.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
-        p.append(open);
+        if (!parenless) {
+            p.append(open);
+        }
         List<JRightPadded<S.For.Enumerator>> elems = enums.getPadding().getElements();
         for (int i = 0; i < elems.size(); i++) {
             JRightPadded<S.For.Enumerator> rp = elems.get(i);
@@ -1480,14 +1533,17 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visitSpace(rp.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
             // Print ';' separator only if both this and next element are NOT guards.
             // Scala's for-comprehensions don't separate guards with ';'.
-            if (i < elems.size() - 1) {
+            // In paren-less form, enumerators are separated by newlines (whitespace), not ';'.
+            if (i < elems.size() - 1 && !parenless) {
                 S.For.Enumerator next = elems.get(i + 1).getElement();
                 if (next.getKind() != S.For.Enumerator.Kind.Guard) {
                     p.append(';');
                 }
             }
         }
-        p.append(close);
+        if (!parenless) {
+            p.append(close);
+        }
         visitSpace(forLoop.getBeforeBody(), Space.Location.LANGUAGE_EXTENSION, p);
         if (forLoop.isYielding()) {
             p.append("yield");
