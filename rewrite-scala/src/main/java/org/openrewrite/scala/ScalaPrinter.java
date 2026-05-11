@@ -1509,7 +1509,44 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitExtensionMethods(S.ExtensionMethods ext, PrintOutputCapture<P> p) {
         beforeSyntax(ext, Space.Location.LANGUAGE_EXTENSION, p);
         p.append("extension");
-        visitContainer("(", ext.getPadding().getParameters(), JContainer.Location.LANGUAGE_EXTENSION, ",", ")", p);
+        JContainer<Statement> params = ext.getPadding().getParameters();
+        visitSpace(params.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append('(');
+        List<JRightPadded<Statement>> paramList = params.getPadding().getElements();
+        for (int i = 0; i < paramList.size(); i++) {
+            JRightPadded<Statement> param = paramList.get(i);
+            Statement element = param.getElement();
+            if (element instanceof J.VariableDeclarations) {
+                J.VariableDeclarations varDecl = (J.VariableDeclarations) element;
+                visitSpace(varDecl.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+                visit(varDecl.getLeadingAnnotations(), p);
+                visit(varDecl.getModifiers(), p);
+                if (!varDecl.getVariables().isEmpty()) {
+                    visit(varDecl.getVariables().get(0).getName(), p);
+                }
+                if (varDecl.getTypeExpression() != null) {
+                    TypeTree typeExpr = varDecl.getTypeExpression();
+                    if (typeExpr.getPrefix().isEmpty()) {
+                        p.append(": ");
+                    } else {
+                        p.append(":");
+                    }
+                    visit(typeExpr, p);
+                }
+                if (!varDecl.getVariables().isEmpty() &&
+                    varDecl.getVariables().get(0).getPadding().getInitializer() != null) {
+                    JLeftPadded<Expression> init = varDecl.getVariables().get(0).getPadding().getInitializer();
+                    visitLeftPadded("=", init, JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+                }
+            } else {
+                visit(element, p);
+            }
+            visitSpace(param.getAfter(), JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
+            if (i < paramList.size() - 1) {
+                p.append(',');
+            }
+        }
+        p.append(')');
         visit(ext.getBody(), p);
         afterSyntax(ext, p);
         return ext;
