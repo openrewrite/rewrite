@@ -73,6 +73,8 @@ public class PropertyPlaceholderHelper {
     @Nullable
     private final String valueSeparator;
 
+    private final String escapePrefix;
+
     private final ConcurrentMap<String, ParsedTemplate> segmentCache;
 
     public PropertyPlaceholderHelper(String placeholderPrefix, String placeholderSuffix,
@@ -86,6 +88,7 @@ public class PropertyPlaceholderHelper {
             this.simplePrefix = this.placeholderPrefix;
         }
         this.valueSeparator = valueSeparator;
+        this.escapePrefix = "\\" + placeholderPrefix;
         this.segmentCache = SEGMENT_CACHES.computeIfAbsent(
                 placeholderPrefix + '\u0001' + placeholderSuffix, k -> new ConcurrentHashMap<>());
     }
@@ -127,7 +130,6 @@ public class PropertyPlaceholderHelper {
     public String replacePlaceholders(String value, Function<String, @Nullable String> placeholderResolver) {
         // Support escaping: a backslash before the placeholder prefix produces a literal
         // prefix. E.g., for prefix "${", writing "\${" produces literal "${".
-        String escapePrefix = "\\" + placeholderPrefix;
         boolean hasEscaped = value.contains(escapePrefix);
         if (hasEscaped) {
             value = value.replace(escapePrefix, "\u0000\u0001\u0002");
@@ -169,46 +171,78 @@ public class PropertyPlaceholderHelper {
             Placeholder ph = (Placeholder) seg;
             String originalKey = ph.key;
 
+            // Common case: no nested key. Resolve and inspect the value before
+            // touching `visited` — for typical JavaTemplate-style use the
+            // resolved value is a leaf string and we skip the HashSet
+            // allocation entirely.
+            if (!ph.nestedKey) {
+                String propVal = resolveWithDefault(originalKey, placeholderResolver);
+                if (propVal == null) {
+                    out.append(placeholderPrefix).append(originalKey).append(placeholderSuffix);
+                    continue;
+                }
+                if (propVal.indexOf(placeholderPrefix) < 0) {
+                    out.append(propVal);
+                    continue;
+                }
+                // Resolved value re-introduces a placeholder — recurse with
+                // cycle protection.
+                if (visited == null) {
+                    visited = new HashSet<>(4);
+                }
+                if (!visited.add(originalKey)) {
+                    out.append(placeholderPrefix).append(originalKey).append(placeholderSuffix);
+                    continue;
+                }
+                try {
+                    out.append(parseStringValue(propVal, placeholderResolver, visited));
+                } finally {
+                    visited.remove(originalKey);
+                }
+                continue;
+            }
+
+            // Nested key (rare; e.g. `${a${b}c}`). Track `originalKey` across
+            // both the nested-key resolution and the propVal recursion below
+            // to preserve the original cycle-detection scope.
             if (visited == null) {
                 visited = new HashSet<>(4);
             }
             if (!visited.add(originalKey)) {
-                // Circular reference detected — leave this placeholder unresolved.
                 out.append(placeholderPrefix).append(originalKey).append(placeholderSuffix);
                 continue;
             }
             try {
-                // Resolve placeholders contained in the placeholder key itself
-                // (rare; only for inputs like `${a${b}c}`).
-                String resolvedKey = ph.nestedKey ?
-                        parseStringValue(originalKey, placeholderResolver, visited) :
-                        originalKey;
-
-                String propVal = placeholderResolver.apply(resolvedKey);
-                if (propVal == null && valueSeparator != null) {
-                    int separatorIndex = resolvedKey.indexOf(valueSeparator);
-                    if (separatorIndex != -1) {
-                        String actualPlaceholder = resolvedKey.substring(0, separatorIndex);
-                        String defaultValue = resolvedKey.substring(separatorIndex + valueSeparator.length());
-                        propVal = placeholderResolver.apply(actualPlaceholder);
-                        if (propVal == null) {
-                            propVal = defaultValue;
-                        }
-                    }
-                }
-                if (propVal != null) {
-                    if (propVal.indexOf(placeholderPrefix) >= 0) {
-                        propVal = parseStringValue(propVal, placeholderResolver, visited);
-                    }
-                    out.append(propVal);
-                } else {
+                String resolvedKey = parseStringValue(originalKey, placeholderResolver, visited);
+                String propVal = resolveWithDefault(resolvedKey, placeholderResolver);
+                if (propVal == null) {
                     out.append(placeholderPrefix).append(resolvedKey).append(placeholderSuffix);
+                } else if (propVal.indexOf(placeholderPrefix) >= 0) {
+                    out.append(parseStringValue(propVal, placeholderResolver, visited));
+                } else {
+                    out.append(propVal);
                 }
             } finally {
                 visited.remove(originalKey);
             }
         }
         return out.toString();
+    }
+
+    private @Nullable String resolveWithDefault(String key, Function<String, @Nullable String> placeholderResolver) {
+        String propVal = placeholderResolver.apply(key);
+        if (propVal == null && valueSeparator != null) {
+            int separatorIndex = key.indexOf(valueSeparator);
+            if (separatorIndex != -1) {
+                String actualPlaceholder = key.substring(0, separatorIndex);
+                String defaultValue = key.substring(separatorIndex + valueSeparator.length());
+                propVal = placeholderResolver.apply(actualPlaceholder);
+                if (propVal == null) {
+                    propVal = defaultValue;
+                }
+            }
+        }
+        return propVal;
     }
 
     private ParsedTemplate parseTemplate(String value) {
