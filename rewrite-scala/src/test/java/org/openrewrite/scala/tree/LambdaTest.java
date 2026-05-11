@@ -236,4 +236,83 @@ class LambdaTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void partialFunctionLiteralAsArgInInfixCall() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val x = 1
+                  x must beLike {
+                    case y =>
+                      y must_== 1
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void partialFunctionLiteralPreservesExtraWhitespaceBeforeBrace() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  beLike   {
+                    case y => y
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void partialFunctionLiteralPreservesNewlineBeforeBrace() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  beLike
+                  {
+                    case y => y
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void partialFunctionLiteralPreservesBlockCommentBeforeBrace() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  beLike /* comment */ {
+                    case y => y
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void partialFunctionLiteralPreservesBlockCommentBeforeBraceOnSelect() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val list = List(1)
+                  list.collect /* x */ {
+                    case y => y
+                  }
+                }
+                """
+            )
+        );
+    }
 }

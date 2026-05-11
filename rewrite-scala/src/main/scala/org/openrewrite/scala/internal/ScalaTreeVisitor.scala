@@ -732,14 +732,10 @@ class ScalaTreeVisitor(
     // The select is the identifier (e.g., "arr")
     val select = visitIdent(id).asInstanceOf[Expression]
 
-    // Detect block argument syntax: `Seq { 1 }` vs parenthesized `Seq(1)`
+    // Detect block argument syntax: `Seq { 1 }` vs parenthesized `Seq(1)`.
     val isBlockArg = if (app.args.nonEmpty) {
-      val searchEnd = Math.min(cursor + 50, source.length)
-      if (cursor < searchEnd) {
-        val ahead = source.substring(cursor, searchEnd)
-        val firstNonWs = ahead.indexWhere(!_.isWhitespace)
-        firstNonWs >= 0 && ahead.charAt(firstNonWs) == '{'
-      } else false
+      val pos = indexOfNextNonWhitespace(cursor)
+      pos < source.length && source.charAt(pos) == '{'
     } else false
 
     val args = new util.ArrayList[JRightPadded[Expression]]()
@@ -1022,14 +1018,8 @@ class ScalaTreeVisitor(
     // vs a normal parenthesized call:
     //   list.foreach(x => println(x))
     val isBlockArg = if (app.args.nonEmpty) {
-      // Look ahead in source for the next non-whitespace char after the method name
-      val searchStart = cursor
-      val searchEnd = Math.min(cursor + 50, source.length)
-      if (searchStart < searchEnd) {
-        val ahead = source.substring(searchStart, searchEnd)
-        val firstNonWs = ahead.indexWhere(!_.isWhitespace)
-        firstNonWs >= 0 && ahead.charAt(firstNonWs) == '{'
-      } else false
+      val pos = indexOfNextNonWhitespace(cursor)
+      pos < source.length && source.charAt(pos) == '{'
     } else false
 
     val argContainerPrefix = Space.EMPTY
@@ -6801,12 +6791,27 @@ class ScalaTreeVisitor(
   }
   
   /**
-   * Skip whitespace and return the position of the next non-whitespace character.
+   * Skip whitespace and Scala comments (`/* ... */` and `//`) and return the
+   * position of the next significant character. Returns `source.length` if no
+   * such character exists.
    */
   private def indexOfNextNonWhitespace(startFrom: Int = cursor): Int = {
     var i = startFrom
-    while (i < source.length && Character.isWhitespace(source.charAt(i))) {
-      i += 1
+    while (i < source.length) {
+      val c = source.charAt(i)
+      if (Character.isWhitespace(c)) {
+        i += 1
+      } else if (c == '/' && i + 1 < source.length && source.charAt(i + 1) == '*') {
+        val close = source.indexOf("*/", i + 2)
+        if (close < 0) return source.length
+        i = close + 2
+      } else if (c == '/' && i + 1 < source.length && source.charAt(i + 1) == '/') {
+        val nl = source.indexOf('\n', i + 2)
+        if (nl < 0) return source.length
+        i = nl + 1
+      } else {
+        return i
+      }
     }
     i
   }
