@@ -37,6 +37,20 @@ class InfixTest implements RewriteTest {
     }
 
     @Test
+    void postfixChainInsideBlock() {
+        rewriteRun(
+          scala(
+            """
+            import scala.language.postfixOps
+            val r = {
+              x must not beNull
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void namedInfixMax() {
         rewriteRun(
           scala("val x = 1 max 2")
