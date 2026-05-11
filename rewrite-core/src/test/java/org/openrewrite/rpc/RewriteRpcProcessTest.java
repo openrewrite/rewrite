@@ -20,8 +20,14 @@ import org.junit.jupiter.api.Test;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RewriteRpcProcessTest {
@@ -79,6 +85,64 @@ class RewriteRpcProcessTest {
     }
 
     /**
+     * After {@link RewriteRpcProcess#shutdown()} returns, the {@code rpc-stderr-drain}
+     * thread must have completed; otherwise the parent-side handle on the stderr
+     * redirect log file outlives {@code shutdown()}, which on Windows blocks
+     * {@code @TempDir} cleanup and same-path reopens (no FILE_SHARE_DELETE).
+     */
+    @Test
+    void shutdownWaitsForStderrDrainToComplete() throws Exception {
+        int parallel = 16;
+        List<Path> logs = new ArrayList<>();
+        List<RewriteRpcProcess> processes = new ArrayList<>();
+        List<Thread> drainThreads = new ArrayList<>();
+        try {
+            // given: many subprocesses flooding stderr in parallel — competing
+            // for CPU and disk widens the race window between "subprocess exits"
+            // and "drain thread closes its OutputStream"
+            for (int i = 0; i < parallel; i++) {
+                Path log = Files.createTempFile("rpc-stderr-drain-test-" + i, ".log");
+                logs.add(log);
+                RewriteRpcProcess process = new RewriteRpcProcess(
+                        System.getProperty("java.home") + "/bin/java",
+                        "-cp", System.getProperty("java.class.path"),
+                        StderrFlooderEntryPoint.class.getName());
+                process.setStderrRedirect(log);
+                process.start();
+                processes.add(process);
+            }
+            Thread.sleep(500);
+            for (Thread t : Thread.getAllStackTraces().keySet()) {
+                if ("rpc-stderr-drain".equals(t.getName())) {
+                    drainThreads.add(t);
+                }
+            }
+            assertThat(drainThreads)
+                    .as("one drain thread per subprocess should have been started")
+                    .hasSize(parallel);
+
+            // when: each subprocess is shut down in turn
+            for (RewriteRpcProcess process : processes) {
+                process.shutdown();
+            }
+
+            // then: every drain thread must have closed its OutputStream (i.e.
+            // released the log file handle) before its shutdown() returned
+            List<Thread> leaked = drainThreads.stream().filter(Thread::isAlive).collect(toList());
+            assertThat(leaked)
+                    .as("rpc-stderr-drain threads should be joined before shutdown() returns; " +
+                            "otherwise the parent-side log handle outlives shutdown() and breaks " +
+                            "log-file deletion/reuse on Windows. Still-alive drain threads: %s",
+                            leaked)
+                    .isEmpty();
+        } finally {
+            for (Path log : logs) {
+                Files.deleteIfExists(log);
+            }
+        }
+    }
+
+    /**
      * Runs in the forked JVM. Spawns a long-running child via {@link RewriteRpcProcess},
      * prints its PID, and returns from {@code main} so the JVM exits without an explicit
      * {@code shutdown()} call.
@@ -94,6 +158,23 @@ class RewriteRpcProcessTest {
 
             System.out.println("RPC_PID=" + underlying.pid());
             System.out.flush();
+        }
+    }
+
+    /**
+     * Forked entry point that continuously writes to stderr until killed.
+     * The producer outruns any reasonable drain, so the kernel pipe buffer
+     * stays full and the drain thread has guaranteed pending work when the
+     * test calls {@link RewriteRpcProcess#shutdown()}.
+     */
+    public static class StderrFlooderEntryPoint {
+        public static void main(String[] args) throws Exception {
+            byte[] junk = new byte[8192];
+            Arrays.fill(junk, (byte) 'x');
+            while (true) {
+                System.err.write(junk);
+                System.err.flush();
+            }
         }
     }
 }
