@@ -671,26 +671,42 @@ class ScalaTreeVisitor(
         )
         
       case _ =>
-        // Other postfix operators - treat as unary for now
+        // Scala postfix call `obj op` is equivalent to `obj.op` — model it as a
+        // J.MethodInvocation with no arguments and the InfixNotation marker so the
+        // printer emits `<select> <name>` rather than `<select>.<name>()`.
         val prefix = extractPrefix(postfixOp.span)
-        
-        val expr = visitTree(postfixOp.od) match {
+
+        val selectExpr = visitTree(postfixOp.od) match {
           case e: Expression => e
           case j: J => new S.StatementExpression(Tree.randomId(), j)
           case _ => return visitUnknown(postfixOp)
         }
 
-        // For postfix operators, we need to determine the operator type
-        // Currently only handling as PostDecrement (as a placeholder)
-        val operator = J.Unary.Type.PostDecrement // This is a placeholder
-        
-        new J.Unary(
+        val opName = postfixOp.op.name.toString
+        val odEnd = Math.max(0, postfixOp.od.span.end - offsetAdjustment)
+        val opStart = Math.max(0, postfixOp.op.span.start - offsetAdjustment)
+        val namePrefix = if (odEnd < opStart && odEnd >= 0 && opStart <= source.length) {
+          Space.format(source.substring(odEnd, opStart))
+        } else {
+          Space.format(" ")
+        }
+
+        updateCursor(postfixOp.span.end)
+
+        val name = ident(opName, namePrefix, typeFor(postfixOp.op.span))
+
+        val markersList = new util.ArrayList[org.openrewrite.marker.Marker]()
+        markersList.add(InfixNotation.create())
+
+        new J.MethodInvocation(
           Tree.randomId(),
           prefix,
-          Markers.EMPTY,
-          JLeftPadded.build(operator).withBefore(Space.EMPTY),
-          expr,
-          JavaType.Primitive.Boolean
+          Markers.build(markersList),
+          JRightPadded.build(selectExpr),
+          null,
+          name,
+          JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Expression]](), Markers.EMPTY),
+          methodTypeFor(postfixOp.span)
         )
     }
   }
