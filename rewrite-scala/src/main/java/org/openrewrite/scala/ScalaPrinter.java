@@ -33,6 +33,7 @@ import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.IndentedSyntax;
+import org.openrewrite.scala.marker.PackageBraces;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TypeProjection;
@@ -43,6 +44,7 @@ import org.openrewrite.scala.marker.UnderscorePlaceholderLambda;
 import org.openrewrite.scala.tree.S;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * ScalaPrinter is responsible for converting the Scala LST back to source code.
@@ -620,6 +622,14 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visit(statement, p);
         }
 
+        if (scu.getPackageDeclaration() != null) {
+            Optional<PackageBraces> braces = scu.getPackageDeclaration().getMarkers().findFirst(PackageBraces.class);
+            if (braces.isPresent()) {
+                p.append(braces.get().afterBody());
+                p.append('}');
+            }
+        }
+
         visitSpace(scu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
         afterSyntax(scu, p);
         return scu;
@@ -632,6 +642,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visit(pkg.getExpression(), p);
         if (pkg.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
             p.append(':');
+        }
+        Optional<PackageBraces> braces = pkg.getMarkers().findFirst(PackageBraces.class);
+        if (braces.isPresent()) {
+            p.append(braces.get().beforeBrace());
+            p.append('{');
         }
         // Note: No semicolon in Scala package declarations
         afterSyntax(pkg, p);
