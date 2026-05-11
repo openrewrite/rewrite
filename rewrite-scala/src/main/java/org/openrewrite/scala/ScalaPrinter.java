@@ -783,17 +783,53 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visit(classDecl.getName(), p);
             visitTypeParameters(classDecl.getPadding().getTypeParameters(), p);
             
-            // For Scala: print primaryConstructor only if it has elements
-            // The primaryConstructor container includes the parentheses and parameters
+            // Print primaryConstructor with parens and comma separators. Each element is a
+            // J.VariableDeclarations modeled like a Scala parameter (no implicit val/var,
+            // type comes after the name with `:`). We can't fall through to visitVariableDeclarations
+            // because that one is for field/local declarations and always emits a val/var keyword.
             if (classDecl.getPadding().getPrimaryConstructor() != null) {
                 JContainer<Statement> primaryConstructor = classDecl.getPadding().getPrimaryConstructor();
-                if (!primaryConstructor.getElements().isEmpty()) {
-                    // Visit each element in the primary constructor
-                    for (JRightPadded<Statement> statement : primaryConstructor.getPadding().getElements()) {
-                        visit(statement.getElement(), p);
-                        visitSpace(statement.getAfter(), Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
+                visitSpace(primaryConstructor.getBefore(), Space.Location.RECORD_STATE_VECTOR, p);
+                p.append('(');
+                List<JRightPadded<Statement>> ctorElements = primaryConstructor.getPadding().getElements();
+                for (int i = 0; i < ctorElements.size(); i++) {
+                    JRightPadded<Statement> rp = ctorElements.get(i);
+                    Statement element = rp.getElement();
+                    if (element instanceof J.VariableDeclarations) {
+                        J.VariableDeclarations varDecl = (J.VariableDeclarations) element;
+                        visitSpace(varDecl.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+                        visit(varDecl.getLeadingAnnotations(), p);
+                        // Print modifiers as-is: includes `val`/`var`/`private`/etc. when present
+                        // on a class constructor param; absent for plain `(name: T)` form.
+                        for (J.Modifier m : varDecl.getModifiers()) {
+                            visit(m, p);
+                        }
+                        if (!varDecl.getVariables().isEmpty()) {
+                            visit(varDecl.getVariables().get(0).getName(), p);
+                        }
+                        if (varDecl.getTypeExpression() != null) {
+                            TypeTree typeExpr = varDecl.getTypeExpression();
+                            if (typeExpr.getPrefix().isEmpty()) {
+                                p.append(": ");
+                            } else {
+                                p.append(":");
+                            }
+                            visit(typeExpr, p);
+                        }
+                        if (!varDecl.getVariables().isEmpty() &&
+                            varDecl.getVariables().get(0).getPadding().getInitializer() != null) {
+                            JLeftPadded<Expression> init = varDecl.getVariables().get(0).getPadding().getInitializer();
+                            visitLeftPadded("=", init, JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+                        }
+                    } else {
+                        visit(element, p);
+                    }
+                    visitSpace(rp.getAfter(), Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
+                    if (i < ctorElements.size() - 1) {
+                        p.append(',');
                     }
                 }
+                p.append(')');
             }
             
             if (classDecl.getPadding().getExtends() != null) {

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.scala.Assertions.scala;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class ClassDeclarationTest implements RewriteTest {
 
@@ -284,6 +285,58 @@ class ClassDeclarationTest implements RewriteTest {
                 """
                 @Module
                 final class Env
+                """
+            )
+        );
+    }
+
+    @Test
+    void traitWithConstructorParameters() {
+        rewriteRun(
+            scala(
+                """
+                trait Named(val name: String)
+                """
+            )
+        );
+    }
+
+    @Test
+    void classWithParameterDefaultValue() {
+        rewriteRun(
+            scala(
+                """
+                class Greeter(name: String = "world")
+                """
+            )
+        );
+    }
+
+    @Test
+    void classConstructorParametersExposedAsVariableDeclarations() {
+        // Verifies the primary constructor exposes parameters as semantic J.VariableDeclarations
+        // (with names, types, and modifiers) rather than as opaque source text via J.Unknown.
+        rewriteRun(
+            spec -> spec.recipe(toRecipe(() -> new org.openrewrite.scala.ScalaIsoVisitor<>() {
+                @Override
+                public org.openrewrite.java.tree.J.ClassDeclaration visitClassDeclaration(
+                        org.openrewrite.java.tree.J.ClassDeclaration classDecl,
+                        org.openrewrite.ExecutionContext ctx) {
+                    org.openrewrite.java.tree.JContainer<org.openrewrite.java.tree.Statement> ctor =
+                            classDecl.getPadding().getPrimaryConstructor();
+                    if (ctor != null) {
+                        for (org.openrewrite.java.tree.Statement param : ctor.getElements()) {
+                            if (!(param instanceof org.openrewrite.java.tree.J.VariableDeclarations)) {
+                                throw new AssertionError("Expected J.VariableDeclarations for constructor param, got: " + param.getClass());
+                            }
+                        }
+                    }
+                    return super.visitClassDeclaration(classDecl, ctx);
+                }
+            })),
+            scala(
+                """
+                class Person(val name: String, age: Int)
                 """
             )
         );
