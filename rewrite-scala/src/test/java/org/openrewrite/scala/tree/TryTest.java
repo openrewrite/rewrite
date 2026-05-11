@@ -40,6 +40,36 @@ class TryTest implements RewriteTest {
     }
 
     @Test
+    void tryCatchExtraSpaceBeforeBrace() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                try { 1 } catch  {
+                  case _: Exception => 2
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchCommentBeforeBrace() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                try { 1 } catch /* note */ {
+                  case _: Exception => 2
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void tryWithFinally() {
         rewriteRun(
           scala(

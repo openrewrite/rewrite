@@ -37,6 +37,32 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void extraSpaceBeforeReturnTypeColon() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo : Int = 5
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void extraSpaceBeforeReturnTypeColonWithParens() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo()  :  Int = 5
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void extraSpaceBeforeParameterDefaultEquals() {
         rewriteRun(
             scala(
@@ -69,6 +95,46 @@ class MethodDeclarationTest implements RewriteTest {
                 """
                 object Test {
                   def hello(): Unit = println("Hello")
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void methodParameterTypeNoSpaceAfterColon() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo(x:Int) = x
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void methodExtraSpaceBeforeEquals() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo()  = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void methodNewlineBeforeEquals() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo()
+                    = 1
                 }
                 """
             )
@@ -186,6 +252,32 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void curriedMethodExtraSpaceBeforeEquals() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def add(x: Int)(y: Int)  = x + y
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void curriedMethodParameterTypeNoSpaceAfterColon() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def add(x:Int)(y:Int) = x + y
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void multilineParameterListWithClosingParenOnOwnLine() {
         rewriteRun(
             scala(
@@ -276,6 +368,19 @@ class MethodDeclarationTest implements RewriteTest {
                     """
                     extension   (x: Int) {
                       def foo = x + 1
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void extensionParameterTypeNoSpaceAfterColon() {
+            rewriteRun(
+                scala(
+                    """
+                    extension (x:Int) {
+                      def doubled = x * 2
                     }
                     """
                 )
