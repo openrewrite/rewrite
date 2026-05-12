@@ -535,6 +535,29 @@ class UpgradePluginVersionTest implements RewriteTest {
     }
 
     @Test
+    void doesNotNpeWhenNoUpgradeAvailable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "999.x", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  plugins {
+                      String rewriteVersion = '5.40.0'
+                      id 'org.openrewrite.rewrite' version rewriteVersion
+                  }
+              }
+              """
+          ),
+          properties(
+            """
+              rewriteVersion=
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @Test
     void doesNotPinPropertyManagedVersions() {
         rewriteRun(
           spec -> spec

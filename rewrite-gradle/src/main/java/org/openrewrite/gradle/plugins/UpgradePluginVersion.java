@@ -212,6 +212,9 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     String pluginId = acc.versionPropNameToPluginId.get(entry.getKey());
                     if (!StringUtils.isBlank(newVersion)) {
                         String resolvedVersion = acc.pluginIdToNewVersion.get(pluginId);
+                        if (resolvedVersion == null || StringUtils.isBlank(currentVersion)) {
+                            return entry;
+                        }
                         VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
                         if (versionComparator == null) {
                             return entry;
