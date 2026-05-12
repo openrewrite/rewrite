@@ -40,6 +40,18 @@ public class InstallRecipesParseTests
     }
 
     [Fact]
+    public void ExtractsUrlWhenRestoreEmitsToPathBetweenSourceAndContentHash()
+    {
+        // Newer dotnet emits "from <url> to <local-path> with content hash <h>"
+        var output = "         Installed OpenRewrite.CodeQuality 0.1.0 from https://api.nuget.org/v3/index.json to /tmp/scratch/openrewrite.codequality/0.1.0 with content hash JlLi==.";
+
+        var urls = RewriteRpcServer.ParseInstalledFromUrls(output).ToList();
+
+        Assert.Single(urls);
+        Assert.Equal("https://api.nuget.org/v3/index.json", urls[0]);
+    }
+
+    [Fact]
     public void ExtractsInternalArtifactoryFeed()
     {
         var output = "Installed Internal.Pkg 1.0.0 from https://internal.example.com/artifactory/api/nuget/v3/nuget-virtual/index.json with content hash X=.";
