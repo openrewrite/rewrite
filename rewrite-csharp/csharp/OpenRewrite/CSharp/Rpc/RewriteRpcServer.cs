@@ -17,6 +17,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -541,6 +542,7 @@ public class RewriteRpcServer
     {
         var beforeCount = _marketplace.AllRecipes().Count;
         string? version = null;
+        var resolvedRepositories = new HashSet<string>();
 
         if (request.Recipes is string path)
         {
@@ -567,16 +569,31 @@ public class RewriteRpcServer
             }
             else
             {
-                // NuGet package download via dotnet CLI
+                // NuGet package download via dotnet CLI.
                 var csprojPath = EnsureRecipesProject();
                 var args = $"add \"{csprojPath}\" package {packageName}";
                 if (version != null)
                     args += $" --version {version}";
-                RunDotnet(args);
+
+                // Per-install scratch dir for NUGET_PACKAGES so restore actually fetches
+                // (warm caches silently suppress the "Installed ... from ..." lines we parse).
+                var scratchPackages = Path.Combine(Path.GetDirectoryName(csprojPath)!, "nuget-packages");
+                Directory.CreateDirectory(scratchPackages);
+                var dotnetEnv = new Dictionary<string, string> { ["NUGET_PACKAGES"] = scratchPackages };
+
+                RunDotnet(args, env: dotnetEnv);
+
+                // Explicit restore with verbosity normal so NuGet emits per-source install lines.
+                var restoreStdout = RunDotnet(
+                    $"restore \"{csprojPath}\" --verbosity normal", env: dotnetEnv);
+                foreach (var feedUrl in ParseInstalledFromUrls(restoreStdout))
+                {
+                    resolvedRepositories.Add(feedUrl);
+                }
 
                 version = ResolveVersionFromCsproj(csprojPath, packageName);
 
-                var assemblies = PublishAndLoadPlugin(csprojPath, packageName);
+                var assemblies = PublishAndLoadPlugin(csprojPath, packageName, dotnetEnv);
                 foreach (var assembly in assemblies)
                 {
                     CheckVersionCompatibility(assembly);
@@ -593,8 +610,27 @@ public class RewriteRpcServer
         return Task.FromResult(new InstallRecipesResponse
         {
             RecipesInstalled = afterCount - beforeCount,
-            Version = version
+            Version = version,
+            ResolvedRepositories = resolvedRepositories.Count == 0 ? null : resolvedRepositories.ToList()
         });
+    }
+
+    /// <summary>
+    /// Parses the "Installed &lt;id&gt; &lt;version&gt; from &lt;url&gt; with content hash &lt;h&gt;"
+    /// lines that <c>dotnet restore --verbosity normal</c> emits (NuGet 5.9+). Returns the
+    /// unique set of source feed URLs. Lines that don't match are skipped.
+    /// </summary>
+    internal static IEnumerable<string> ParseInstalledFromUrls(string restoreOutput)
+    {
+        // Example line:
+        //   Installed Newtonsoft.Json 13.0.3 from https://api.nuget.org/v3/index.json with content hash ABC=
+        var pattern = new Regex(
+            @"Installed\s+\S+\s+\S+\s+from\s+(?<url>\S+?)\s+with content hash",
+            RegexOptions.CultureInvariant);
+        foreach (Match m in pattern.Matches(restoreOutput))
+        {
+            yield return m.Groups["url"].Value;
+        }
     }
 
     private void ActivateAssembly(Assembly assembly)
@@ -668,7 +704,7 @@ public class RewriteRpcServer
         return csprojPath;
     }
 
-    private static void RunDotnet(string arguments)
+    private static string RunDotnet(string arguments, IDictionary<string, string>? env = null)
     {
         var psi = new ProcessStartInfo("dotnet", arguments)
         {
@@ -677,6 +713,13 @@ public class RewriteRpcServer
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        if (env != null)
+        {
+            foreach (var (k, v) in env)
+            {
+                psi.Environment[k] = v;
+            }
+        }
 
         using var process = System.Diagnostics.Process.Start(psi)
                             ?? throw new InvalidOperationException("Failed to start dotnet process");
@@ -690,6 +733,8 @@ public class RewriteRpcServer
             throw new InvalidOperationException(
                 $"dotnet {arguments} failed (exit code {process.ExitCode}):\n{stderr}\n{stdout}");
         }
+
+        return stdout;
     }
 
     private static string ResolveVersionFromCsproj(string csprojPath, string packageName)
@@ -713,12 +758,13 @@ public class RewriteRpcServer
     /// name, we scan all non-host DLLs in the publish output for <see cref="IRecipeActivator"/>
     /// implementations.
     /// </summary>
-    private List<Assembly> PublishAndLoadPlugin(string csprojPath, string packageName)
+    private List<Assembly> PublishAndLoadPlugin(string csprojPath, string packageName,
+        IDictionary<string, string>? env = null)
     {
         var projectDir = Path.GetDirectoryName(csprojPath)!;
         var publishDir = Path.Combine(projectDir, "publish");
 
-        RunDotnet($"publish \"{csprojPath}\" -c Release -o \"{publishDir}\"");
+        RunDotnet($"publish \"{csprojPath}\" -c Release -o \"{publishDir}\"", env);
 
         // Use the Recipes.deps.json (from the temp project) for the dependency resolver
         var depsJson = Path.Combine(publishDir, "Recipes.deps.json");
@@ -1596,6 +1642,7 @@ public class InstallRecipesResponse
 {
     public int RecipesInstalled { get; set; }
     public string? Version { get; set; }
+    public List<string>? ResolvedRepositories { get; set; }
 }
 
 public class PrepareRecipeRequest

@@ -47,6 +47,6 @@ public class NuGetRecipeBundleResolver implements RecipeBundleResolver {
         if (response.getVersion() != null) {
             bundle.setVersion(response.getVersion());
         }
-        return new NuGetRecipeBundleReader(bundle, rpc);
+        return new NuGetRecipeBundleReader(bundle, rpc, response);
     }
 }

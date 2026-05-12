@@ -20,17 +20,24 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
+import org.openrewrite.csharp.rpc.InstallRecipesResponse;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleReader;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
 
 import java.util.Map;
+import java.util.Set;
 
 @RequiredArgsConstructor
 public class NuGetRecipeBundleReader implements RecipeBundleReader {
     private final @Getter RecipeBundle bundle;
     private final CSharpRewriteRpc rpc;
+    private final InstallRecipesResponse installResponse;
+
+    public NuGetRecipeBundleReader(RecipeBundle bundle, CSharpRewriteRpc rpc) {
+        this(bundle, rpc, new InstallRecipesResponse(0, null, null));
+    }
 
     @Override
     public RecipeMarketplace read() {
@@ -45,5 +52,10 @@ public class NuGetRecipeBundleReader implements RecipeBundleReader {
     @Override
     public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
         return rpc.prepareRecipe(listing.getName(), options);
+    }
+
+    @Override
+    public Set<String> getResolvedFromRepositories() {
+        return installResponse.resolvedFromRepositoriesOrEmpty();
     }
 }

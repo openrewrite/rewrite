@@ -18,8 +18,23 @@ package org.openrewrite.csharp.rpc;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Collections;
+import java.util.Set;
+
 @Value
 public class InstallRecipesResponse {
     int recipesInstalled;
     @Nullable String version;
+    /**
+     * NuGet feed URLs that {@code dotnet restore} pulled packages from while
+     * installing this bundle and its transitive closure. Derived from the
+     * "Installed &lt;id&gt; &lt;version&gt; from &lt;url&gt;" lines that NuGet 5.9+ emits at
+     * {@code --verbosity normal}. URLs are the source feed URLs (e.g. an
+     * {@code index.json}), not the blob URLs of the package files themselves.
+     */
+    @Nullable Set<String> resolvedFromRepositories;
+
+    public Set<String> resolvedFromRepositoriesOrEmpty() {
+        return resolvedFromRepositories == null ? Collections.emptySet() : resolvedFromRepositories;
+    }
 }
