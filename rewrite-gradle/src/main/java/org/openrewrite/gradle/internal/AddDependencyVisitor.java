@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.gradle.GradleParser;
@@ -46,6 +47,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -99,9 +101,10 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                     if (!hasDependenciesBlock(g.getStatements())) {
                         Cursor parent = getCursor();
                         setCursor(new Cursor(parent, g));
-                        J.MethodInvocation dependencies = dependenciesDeclaration(ctx)
-                                .withPrefix(Space.format("\n\n"));
-                        cu = g.withStatements(ListUtils.concat(g.getStatements(), dependencies));
+                        J.MethodInvocation dependencies = dependenciesDeclaration(ctx);
+                        if (dependencies != null) {
+                            cu = g.withStatements(ListUtils.concat(g.getStatements(), dependencies.withPrefix(Space.format("\n\n"))));
+                        }
                         setCursor(parent);
                     }
                 }
@@ -119,9 +122,13 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
             if (!hasDependenciesBlock(b.getStatements())) {
                 Cursor parent = getCursor().dropParentUntil(value -> value instanceof J.MethodInvocation || value == Cursor.ROOT_VALUE);
                 Space prefix = b.getStatements().isEmpty() ? Space.format("\n") : Space.format("\n\n");
+                J.MethodInvocation declaration = dependenciesDeclaration(ctx);
+                if (declaration == null) {
+                    return b;
+                }
                 Statement dependencies = parent.isRoot() ?
-                        dependenciesDeclaration(ctx).withPrefix(prefix) :
-                        autoFormat(dependenciesDeclaration(ctx).withPrefix(prefix), ctx, getCursor());
+                        declaration.withPrefix(prefix) :
+                        autoFormat(declaration.withPrefix(prefix), ctx, getCursor());
                 return b.withStatements(ListUtils.concat(b.getStatements(), dependencies));
             }
         }
@@ -151,6 +158,9 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                     J.Lambda lambda = (J.Lambda) arg;
                     J.Block body = (J.Block) lambda.getBody();
                     J.MethodInvocation addDependencyInvocation = dependencyDeclaration(body, ctx, new Cursor(new Cursor(getCursor(), lambda), body));
+                    if (addDependencyInvocation == null) {
+                        return arg;
+                    }
                     InsertDependencyComparator dependencyComparator = new InsertDependencyComparator(body.getStatements(), addDependencyInvocation);
 
                     List<Statement> statements = new ArrayList<>(body.getStatements());
@@ -332,58 +342,92 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
         return false;
     }
 
-    private J.MethodInvocation dependenciesDeclaration(ExecutionContext ctx) {
+    private J.@Nullable MethodInvocation dependenciesDeclaration(ExecutionContext ctx) {
         String template = templateDependencies();
-        return (J.MethodInvocation) cache(getCursor(), new ContextFreeCacheKey(template, isKotlinDsl, J.MethodInvocation.class), () -> {
+        List<J.MethodInvocation> cached = cache(getCursor(), new ContextFreeCacheKey(template, isKotlinDsl, J.MethodInvocation.class), () -> {
             Boolean requirePrintEqualsInput = ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT);
             try {
-                J.MethodInvocation dependencies;
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
+                ExecutionContext parseCtx = silentParseCtx(ctx);
+                J.MethodInvocation dependencies;
                 if (isKotlinDsl) {
-                    dependencies = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, ctx)
-                            .findFirst()
+                    K.CompilationUnit parsed = GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, parseCtx)
+                            .filter(K.CompilationUnit.class::isInstance)
                             .map(K.CompilationUnit.class::cast)
-                            .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
-                            .getStatements().get(0)).getStatements().get(0);
-                } else {
-                    dependencies = (J.MethodInvocation) GRADLE_PARSER.parse(ctx, template)
                             .findFirst()
+                            .orElse(null);
+                    if (parsed == null) {
+                        return emptyList();
+                    }
+                    dependencies = (J.MethodInvocation) ((J.Block) parsed.getStatements().get(0)).getStatements().get(0);
+                } else {
+                    G.CompilationUnit parsed = GRADLE_PARSER.parse(parseCtx, template)
+                            .filter(G.CompilationUnit.class::isInstance)
                             .map(G.CompilationUnit.class::cast)
-                            .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
-                            .getStatements().get(0);
+                            .findFirst()
+                            .orElse(null);
+                    if (parsed == null) {
+                        return emptyList();
+                    }
+                    dependencies = (J.MethodInvocation) parsed.getStatements().get(0);
                 }
                 return singletonList(dependencies);
             } finally {
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, requirePrintEqualsInput);
             }
-        }).get(0);
+        });
+        return cached.isEmpty() ? null : (J.MethodInvocation) cached.get(0);
     }
 
-    private J.MethodInvocation dependencyDeclaration(J.Block body, ExecutionContext ctx, Cursor cursor) {
+    private J.@Nullable MethodInvocation dependencyDeclaration(J.Block body, ExecutionContext ctx, Cursor cursor) {
         String template = templateDependency(body);
-        return (J.MethodInvocation) autoFormat(cache(cursor, new ContextFreeCacheKey(template, isKotlinDsl, J.MethodInvocation.class), () -> {
+        List<J.MethodInvocation> cached = cache(cursor, new ContextFreeCacheKey(template, isKotlinDsl, J.MethodInvocation.class), () -> {
             Boolean requirePrintEqualsInput = ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT);
             try {
-                J.MethodInvocation dependency;
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
+                ExecutionContext parseCtx = silentParseCtx(ctx);
+                J.MethodInvocation dependency;
                 if (isKotlinDsl) {
-                    dependency = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, ctx)
-                            .findFirst()
+                    K.CompilationUnit parsed = GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, parseCtx)
+                            .filter(K.CompilationUnit.class::isInstance)
                             .map(K.CompilationUnit.class::cast)
-                            .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
-                            .getStatements().get(0)).getStatements().get(0);
-                } else {
-                    dependency = (J.MethodInvocation) GRADLE_PARSER.parse(ctx, template)
                             .findFirst()
+                            .orElse(null);
+                    if (parsed == null) {
+                        return emptyList();
+                    }
+                    dependency = (J.MethodInvocation) ((J.Block) parsed.getStatements().get(0)).getStatements().get(0);
+                } else {
+                    G.CompilationUnit parsed = GRADLE_PARSER.parse(parseCtx, template)
+                            .filter(G.CompilationUnit.class::isInstance)
                             .map(G.CompilationUnit.class::cast)
-                            .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
-                            .getStatements().get(0);
+                            .findFirst()
+                            .orElse(null);
+                    if (parsed == null) {
+                        return emptyList();
+                    }
+                    dependency = (J.MethodInvocation) parsed.getStatements().get(0);
                 }
                 return singletonList(dependency.withPrefix(Space.format("\n")));
             } finally {
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, requirePrintEqualsInput);
             }
-        }).get(0), ctx, cursor);
+        });
+        return cached.isEmpty() ? null : (J.MethodInvocation) autoFormat(cached.get(0), ctx, cursor);
+    }
+
+    private static ExecutionContext silentParseCtx(ExecutionContext ctx) {
+        return new DelegatingExecutionContext(ctx) {
+            @Override
+            public Consumer<Throwable> getOnError() {
+                // The visitor parses its own synthetic build.gradle template. Surfacing a parse
+                // failure here would crash the recipe on the user's source file even though the
+                // failure is internal — instead the calling code treats the empty result as a
+                // signal to skip this insertion.
+                return t -> {
+                };
+            }
+        };
     }
 
     private String templateDependencies() {

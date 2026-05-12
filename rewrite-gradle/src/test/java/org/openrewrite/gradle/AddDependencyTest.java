@@ -2061,6 +2061,58 @@ class AddDependencyTest implements RewriteTest {
     }
 
 
+    @Test
+    void doesNotThrowWhenSyntheticTemplateFailsToParse() {
+        // A double-quote in the groupId produces an unparseable synthetic template,
+        // e.g.: `implementation "g"id:lib"`. The Groovy parser returns a ParseError,
+        // which previously caused a ClassCastException when the visitor blindly cast
+        // the parse result to G.CompilationUnit. The visitor must skip the file instead.
+        var addDep = new AddDependency("g\"id", "lib", null, null, "implementation", null, null, null, null, null);
+        rewriteRun(
+          spec -> spec.recipe(addDep),
+          mavenProject("project",
+            buildGradle(
+              //language=groovy
+              """
+                plugins {
+                    id "java-library"
+                }
+                repositories {
+                    mavenCentral()
+                }
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doesNotThrowWhenSyntheticDependenciesBlockTemplateFailsToParse() {
+        // Same defensive check, but on the path that runs when no `dependencies { }`
+        // block exists yet — `dependenciesDeclaration` builds an entire block from the
+        // template, which also has to tolerate a ParseError.
+        var addDep = new AddDependency("g\"id", "lib", null, null, "implementation", null, null, null, null, null);
+        rewriteRun(
+          spec -> spec.recipe(addDep),
+          mavenProject("project",
+            buildGradle(
+              //language=groovy
+              """
+                plugins {
+                    id "java-library"
+                }
+                repositories {
+                    mavenCentral()
+                }
+                """
+            )
+          )
+        );
+    }
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null);
     }
