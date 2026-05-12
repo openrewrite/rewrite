@@ -138,6 +138,18 @@ class MavenRecipeBundleReaderTest {
     }
 
     @Test
+    void getResolvedFromRepositoriesReportsMavenCentral() {
+        // Metadata resolution (and therefore per-dependency repository attribution)
+        // completes inside resolver.resolve() via MavenParser.parse(); reader.read()
+        // would only trigger JAR downloads and is not needed here.
+        RecipeBundleReader reader = resolver.resolve(REWRITE_CORE_BUNDLE);
+
+        assertThat(reader.getResolvedFromRepositories())
+                .as("rewrite-core resolves through Maven Central, so its URI must appear")
+                .anyMatch(uri -> uri.contains("repo.maven.apache.org") || uri.contains("repo1.maven.org"));
+    }
+
+    @Test
     void canReadRecipesFromDirectory() throws Exception {
         MavenRecipeBundleReader reader = (MavenRecipeBundleReader) resolver.resolve(REWRITE_CORE_BUNDLE);
 

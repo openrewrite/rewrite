@@ -31,9 +31,11 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -126,6 +128,18 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    @Override
+    public Set<String> getResolvedFromRepositories() {
+        Set<String> repos = new LinkedHashSet<>();
+        for (ResolvedDependency d : mrr.getDependencies().get(Scope.Runtime)) {
+            MavenRepository repo = d.getRepository();
+            if (repo != null) {
+                repos.add(repo.getUri());
+            }
+        }
+        return repos;
     }
 
     @Override
