@@ -309,8 +309,15 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
         // Print cases directly (not via visitBlock which adds { })
         J.Block casesBlock = switch_.getCases();
-        for (int i = 0; i < casesBlock.getStatements().size(); i++) {
-            visit(casesBlock.getStatements().get(i), p);
+        List<JRightPadded<Statement>> casePadding = casesBlock.getPadding().getStatements();
+        for (int i = 0; i < casePadding.size(); i++) {
+            JRightPadded<Statement> rp = casePadding.get(i);
+            visit(rp.getElement(), p);
+            visitSpace(rp.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            // Preserve explicit `;` between cases on the same line.
+            if (rp.getMarkers().findFirst(Semicolon.class).isPresent()) {
+                p.append(';');
+            }
         }
         visitSpace(casesBlock.getEnd(), Space.Location.BLOCK_END, p);
         if (!indented) {

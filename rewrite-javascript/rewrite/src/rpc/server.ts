@@ -80,39 +80,37 @@ async function main() {
 
     const options = program.opts() as ProgramOptions;
 
+    let recipeCleanup: (() => Promise<void>) | undefined;
     let recipeInstallDir: string;
     if (!options.recipeInstallDir) {
-        let recipeCleanup: () => Promise<void>;
-
-        async function setupRecipeDir() {
-            const {path, cleanup} = await dir({unsafeCleanup: true});
-            recipeCleanup = cleanup;
-            return path;
-        }
-
-        // Register cleanup on exit
-        process.on('SIGINT', async () => {
-            if (recipeCleanup) {
-                await recipeCleanup();
-            }
-            // Clean up old dependency workspaces (older than 24 hours)
-            DependencyWorkspace.cleanupOldWorkspaces();
-            process.exit(0);
-        });
-
-        process.on('SIGTERM', async () => {
-            if (recipeCleanup) {
-                await recipeCleanup();
-            }
-            // Clean up old dependency workspaces (older than 24 hours)
-            DependencyWorkspace.cleanupOldWorkspaces();
-            process.exit(0);
-        });
-
-        recipeInstallDir = await setupRecipeDir();
+        const {path, cleanup} = await dir({unsafeCleanup: true});
+        recipeCleanup = cleanup;
+        recipeInstallDir = path;
     } else {
         recipeInstallDir = options.recipeInstallDir;
     }
+
+    // Single graceful-shutdown path used by SIGINT, SIGTERM, and connection
+    // close. The connection-close path is what catches parent SIGKILL: when
+    // the host JVM is killed, our stdin closes, vscode-jsonrpc fires onClose,
+    // and we exit. Without it, Pyroscope (or any other ref-holder) can keep
+    // the event loop alive and orphan this process.
+    let shuttingDown = false;
+    const shutdown = async () => {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        try {
+            if (recipeCleanup) {
+                await recipeCleanup();
+            }
+            DependencyWorkspace.cleanupOldWorkspaces();
+        } finally {
+            process.exit(0);
+        }
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
 
     const log = options.logFile ? fs.createWriteStream(options.logFile, {flags: 'a'}) : undefined;
     const logger: rpc.Logger = {
@@ -148,6 +146,7 @@ async function main() {
 
     connection.onClose(() => {
         logger.info(`connection closed`);
+        void shutdown();
     })
 
     connection.onDispose(() => {

@@ -286,6 +286,13 @@ class KotlinTypeMapping(
                 ""
             }
 
+            is ConeTypeVariableType -> {
+                // Inference type variable — use the constructor's debug name (typically
+                // the original type parameter's identifier) rather than the verbose
+                // `TypeVariable(...)` form from `toString()`.
+                type.typeConstructor.name.asString()
+            }
+
             else -> {
                 type.toString()
             }
