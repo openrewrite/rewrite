@@ -280,7 +280,12 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         p.append(delimiter);
 
         visit(stringTemplate.getStrings(), p);
-        p.append(delimiter);
+        // Strip any leading multi-dollar interpolation prefix from the closing delimiter.
+        int dollarCount = 0;
+        while (dollarCount < delimiter.length() && delimiter.charAt(dollarCount) == '$') {
+            dollarCount++;
+        }
+        p.append(delimiter.substring(dollarCount));
 
         afterSyntax(stringTemplate, p);
         return stringTemplate;
@@ -303,10 +308,24 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitStringTemplateExpression(K.StringTemplate.Expression expression, PrintOutputCapture<P> p) {
         beforeSyntax(expression, KSpace.Location.STRING_TEMPLATE_PREFIX, p);
+        // The interpolation marker matches the enclosing string's multi-dollar prefix length (default 1).
+        K.StringTemplate enclosing = getCursor().firstEnclosing(K.StringTemplate.class);
+        int dollarCount = 1;
+        if (enclosing != null) {
+            String enclosingDelimiter = enclosing.getDelimiter();
+            int leading = 0;
+            while (leading < enclosingDelimiter.length() && enclosingDelimiter.charAt(leading) == '$') {
+                leading++;
+            }
+            if (leading > 0) {
+                dollarCount = leading;
+            }
+        }
+        for (int i = 0; i < dollarCount; i++) {
+            p.append('$');
+        }
         if (expression.isEnclosedInBraces()) {
-            p.append("${");
-        } else {
-            p.append("$");
+            p.append('{');
         }
         visit(expression.getTree(), p);
         if (expression.isEnclosedInBraces()) {

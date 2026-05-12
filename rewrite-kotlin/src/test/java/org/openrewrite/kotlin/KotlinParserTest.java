@@ -74,4 +74,68 @@ class KotlinParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multiDollarStringInterpolationWithBlockExpression() {
+        rewriteRun(
+          kotlin(
+            """
+              val name = "World"
+              val x = $$"Hello $${name}!"
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiDollarStringInterpolationWithSimpleName() {
+        rewriteRun(
+          kotlin(
+            """
+              val name = "World"
+              val x = $$"Hello $$name!"
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiDollarStringInterpolationLiteralDollarBeforeInterpolation() {
+        rewriteRun(
+          kotlin(
+            """
+              val name = "World"
+              val x = $$"$$${name}"
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiDollarStringInterpolationTwoBlocksWithLiteralDollarBetween() {
+        // Mirrors the pattern in KotlinTypeSignatureBuilder.kt that originally
+        // triggered the parse failure: a multi-dollar string with two block
+        // interpolations separated by a literal '$' (the JVM-style Outer$Inner FQN).
+        rewriteRun(
+          kotlin(
+            """
+              val outer = "java.lang.Object"
+              val inner = "Entry"
+              val fqn = $$"$${outer}$$${inner}"
+              """
+          )
+        );
+    }
+
+    @Test
+    void tripleDollarStringInterpolation() {
+        rewriteRun(
+          kotlin(
+            """
+              val name = "World"
+              val x = $$$"Hello $$$name!"
+              """
+          )
+        );
+    }
+
 }
