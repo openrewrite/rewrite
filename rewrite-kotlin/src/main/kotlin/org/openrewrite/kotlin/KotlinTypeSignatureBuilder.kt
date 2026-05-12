@@ -29,6 +29,7 @@ import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
 import org.jetbrains.kotlin.fir.resolve.inference.ConeTypeParameterBasedTypeVariable
 import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.resolve.toSymbol
+import org.jetbrains.kotlin.fir.symbols.ConeTypeParameterLookupTag
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
@@ -257,6 +258,19 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 sig.append(boundSigs)
                 sig.append("}")
                 sig.toString()
+            }
+
+            is ConeTypeVariableType -> {
+                // Inference type variable. Surfaces in scenarios like a callable
+                // reference to a generic method whose type argument hasn't been
+                // fixed yet (e.g. `buildList { forEach(::add) }`). Recover the
+                // original type parameter when available; fall back to a wildcard.
+                val original = type.typeConstructor.originalTypeParameter
+                if (original is ConeTypeParameterLookupTag) {
+                    signature(original.typeParameterSymbol.fir)
+                } else {
+                    "Generic{?}"
+                }
             }
 
             else -> throw UnsupportedOperationException("Unsupported ConeTypeProjection ${type.javaClass.name}")

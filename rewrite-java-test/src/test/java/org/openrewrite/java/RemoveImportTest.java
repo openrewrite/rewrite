@@ -965,4 +965,20 @@ class RemoveImportTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://app.moderne.io/recipe-runs/qBYPkMYl0")
+    @Test
+    void doesNotCrashWhenTypeHasNoPackage() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("Foo")),
+          java(
+            """
+              import static java.util.Collections.*;
+
+              class A {
+              }
+              """
+          )
+        );
+    }
 }
