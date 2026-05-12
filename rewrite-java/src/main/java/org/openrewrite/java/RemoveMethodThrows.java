@@ -62,7 +62,12 @@ public class RemoveMethodThrows extends Recipe {
                     @Override
                     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                         J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                        J.ClassDeclaration cd = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
+                        J.ClassDeclaration cd = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                        if (cd == null) {
+                            // Top-level Kotlin functions have no enclosing class; their `@Throws` is an
+                            // annotation, not a throws clause, so there is nothing to remove here.
+                            return m;
+                        }
                         if (methodMatcher.matches(m, cd) && m.getThrows() != null) {
                             return m.withThrows(ListUtils.map(m.getThrows(), nt -> {
                                 if (typeMatcher.matches(nt.getType())) {
