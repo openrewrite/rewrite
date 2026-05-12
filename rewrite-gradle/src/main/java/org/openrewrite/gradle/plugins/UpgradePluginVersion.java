@@ -168,9 +168,11 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                         String versionVariableName = gStringValue.getTree().toString();
                         String resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
                                 .select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
+                        if (resolvedPluginVersion == null) {
+                            return m;
+                        }
 
                         acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
-                        assert resolvedPluginVersion != null;
                         acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
                     } else if (versionArgs.get(0) instanceof J.Identifier) {
                         J.Identifier identifier = (J.Identifier) versionArgs.get(0);
@@ -183,6 +185,9 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                         } else {
                             resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
                                     .select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
+                        }
+                        if (resolvedPluginVersion == null) {
+                            return m;
                         }
 
                         acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
@@ -212,6 +217,9 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     String pluginId = acc.versionPropNameToPluginId.get(entry.getKey());
                     if (!StringUtils.isBlank(newVersion)) {
                         String resolvedVersion = acc.pluginIdToNewVersion.get(pluginId);
+                        if (resolvedVersion == null || StringUtils.isBlank(currentVersion)) {
+                            return entry;
+                        }
                         VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
                         if (versionComparator == null) {
                             return entry;
