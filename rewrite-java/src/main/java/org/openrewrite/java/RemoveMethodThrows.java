@@ -21,13 +21,20 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.DeclaresMethod;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class RemoveMethodThrows extends Recipe {
 
+    private static final String KOTLIN_THROWS_FQN = "kotlin.jvm.Throws";
+    private static final String ANNOTATION_REMOVED_KEY = "kotlinThrowsAnnotationRemoved";
 
     @Option(displayName = "Method pattern",
             description = MethodMatcher.METHOD_PATTERN_INVOCATIONS_DESCRIPTION,
@@ -62,22 +69,63 @@ public class RemoveMethodThrows extends Recipe {
                     @Override
                     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                         J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                        J.ClassDeclaration cd = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                        if (cd == null) {
-                            // Top-level Kotlin functions have no enclosing class; their `@Throws` is an
-                            // annotation, not a throws clause, so there is nothing to remove here.
+                        // Close the gap if the dropped `@Throws` was the only leading annotation.
+                        J.Annotation removedAnnotation = getCursor().pollMessage(ANNOTATION_REMOVED_KEY);
+                        List<J.Annotation> originalAnnotations = method.getLeadingAnnotations();
+                        if (removedAnnotation != null && originalAnnotations.size() == 1 &&
+                                originalAnnotations.get(0) == removedAnnotation) {
+                            m = collapseBlankLineLeftByRemovedAnnotation(m);
+                        }
+                        if (!matchesMethod(m) || m.getThrows() == null) {
                             return m;
                         }
-                        if (methodMatcher.matches(m, cd) && m.getThrows() != null) {
-                            return m.withThrows(ListUtils.map(m.getThrows(), nt -> {
-                                if (typeMatcher.matches(nt.getType())) {
-                                    maybeRemoveImport(nt.getType().toString());
+                        return m.withThrows(ListUtils.map(m.getThrows(), nt -> {
+                            if (typeMatcher.matches(nt.getType())) {
+                                maybeRemoveImport(nt.getType().toString());
+                                return null;
+                            }
+                            return nt;
+                        }));
+                    }
+
+                    @Override
+                    public J.@Nullable Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                        J.Annotation a = super.visitAnnotation(annotation, ctx);
+                        if (!TypeUtils.isOfClassType(a.getType(), KOTLIN_THROWS_FQN) || a.getArguments() == null) {
+                            return a;
+                        }
+                        J.MethodDeclaration enclosing = getCursor().firstEnclosing(J.MethodDeclaration.class);
+                        if (enclosing == null || !matchesMethod(enclosing)) {
+                            return a;
+                        }
+                        List<Expression> originalArgs = a.getArguments();
+                        List<Expression> remaining = ListUtils.map(originalArgs, arg -> {
+                            if (arg instanceof J.MemberReference) {
+                                JavaType referenced = ((J.MemberReference) arg).getContaining().getType();
+                                if (referenced != null && typeMatcher.matches(referenced)) {
+                                    maybeRemoveImport(referenced.toString());
                                     return null;
                                 }
-                                return nt;
-                            }));
+                            }
+                            return arg;
+                        });
+                        if (remaining == null || remaining.isEmpty()) {
+                            // Signal parent method for blank-line cleanup.
+                            getCursor().dropParentUntil(J.MethodDeclaration.class::isInstance)
+                                    .putMessage(ANNOTATION_REMOVED_KEY, annotation);
+                            //noinspection DataFlowIssue
+                            return null;
                         }
-                        return m;
+                        if (remaining.size() == originalArgs.size()) {
+                            return a;
+                        }
+                        // If the first argument was removed, the new first argument carries the prefix
+                        // it had after the comma (e.g. " ") — adopt the original first arg's prefix
+                        // so we don't end up with `( foo`.
+                        if (originalArgs.get(0) != remaining.get(0)) {
+                            remaining.set(0, remaining.get(0).withPrefix(originalArgs.get(0).getPrefix()));
+                        }
+                        return a.withArguments(remaining);
                     }
 
                     @Override
@@ -88,6 +136,44 @@ public class RemoveMethodThrows extends Recipe {
                             return mt.withThrownExceptions(ListUtils.filter(mt.getThrownExceptions(), te -> !typeMatcher.matches(te)));
                         }
                         return jt;
+                    }
+
+                    private boolean matchesMethod(J.MethodDeclaration m) {
+                        // Top-level Kotlin functions have no enclosing class; fall back to matching by
+                        // the method's declaring type from its type attribution.
+                        J.ClassDeclaration cd = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                        return cd != null ? methodMatcher.matches(m, cd) : methodMatcher.matches(m.getMethodType());
+                    }
+
+                    /**
+                     * Mirrors {@link RemoveAnnotationVisitor}'s blank-line cleanup, adapted for Kotlin:
+                     * skip empty-prefix modifiers (the synthetic {@code final} sits at index 0 with no
+                     * whitespace, while {@code fun} sits later with the actual line-leading whitespace),
+                     * and for top-level functions also clear the method's own prefix.
+                     */
+                    private J.MethodDeclaration collapseBlankLineLeftByRemovedAnnotation(J.MethodDeclaration m) {
+                        boolean topLevel = getCursor().firstEnclosing(J.ClassDeclaration.class) == null;
+                        if (!m.getPrefix().getWhitespace().isEmpty()) {
+                            m = m.withPrefix(m.getPrefix().withWhitespace(""));
+                            if (!topLevel) {
+                                return m;
+                            }
+                        }
+                        for (int i = 0; i < m.getModifiers().size(); i++) {
+                            J.Modifier mod = m.getModifiers().get(i);
+                            if (!mod.getPrefix().getWhitespace().isEmpty()) {
+                                List<J.Modifier> mods = new ArrayList<>(m.getModifiers());
+                                mods.set(i, mod.withPrefix(mod.getPrefix().withWhitespace("")));
+                                return m.withModifiers(mods);
+                            }
+                        }
+                        if (m.getReturnTypeExpression() != null && !m.getReturnTypeExpression().getPrefix().getWhitespace().isEmpty()) {
+                            return m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(m.getReturnTypeExpression().getPrefix().withWhitespace("")));
+                        }
+                        if (!m.getName().getPrefix().getWhitespace().isEmpty()) {
+                            return m.withName(m.getName().withPrefix(m.getName().getPrefix().withWhitespace("")));
+                        }
+                        return m;
                     }
                 }
         );

@@ -71,7 +71,7 @@ class RemoveMethodThrowsTest implements RewriteTest {
     }
 
     @Test
-    void classWrappedFunctionWithThrowsAnnotation() {
+    void removeSoleExceptionFromThrowsAnnotation() {
         rewriteRun(
           kotlin(
             """
@@ -79,6 +79,70 @@ class RemoveMethodThrowsTest implements RewriteTest {
 
               class Foo {
                   @Throws(IOException::class)
+                  fun foo() {
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  fun foo() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeOneExceptionFromMultiThrowsAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.io.IOException
+
+              class Foo {
+                  @Throws(IOException::class, RuntimeException::class)
+                  fun foo() {
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  @Throws(RuntimeException::class)
+                  fun foo() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeThrowsAnnotationFromTopLevelFunction() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.io.IOException
+
+              @Throws(IOException::class)
+              fun foo() {
+              }
+              """,
+            """
+              fun foo() {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leaveUnrelatedThrowsAnnotationUntouched() {
+        rewriteRun(
+          kotlin(
+            """
+              class Foo {
+                  @Throws(RuntimeException::class)
                   fun foo() {
                   }
               }
