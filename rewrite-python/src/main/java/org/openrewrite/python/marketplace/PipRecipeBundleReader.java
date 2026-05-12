@@ -28,6 +28,7 @@ import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.request.GetMarketplaceResponse;
 
 import java.util.Map;
+import java.util.Set;
 
 @RequiredArgsConstructor
 public class PipRecipeBundleReader implements RecipeBundleReader {
@@ -56,5 +57,10 @@ public class PipRecipeBundleReader implements RecipeBundleReader {
     @Override
     public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
         return rpc.prepareRecipe(listing.getName(), options);
+    }
+
+    @Override
+    public Set<String> getResolvedFromRepositories() {
+        return installResponse.resolvedFromRepositoriesOrEmpty();
     }
 }

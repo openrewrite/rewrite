@@ -21,6 +21,7 @@ import org.openrewrite.rpc.request.GetMarketplaceResponse;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Response to an {@code InstallRecipes} RPC request.
@@ -40,8 +41,20 @@ public class InstallRecipesResponse {
     int recipesInstalled;
     @Nullable String version;
     @Nullable List<GetMarketplaceResponse.Row> recipes;
+    /**
+     * Index URLs that pip fetched distributions from while installing this bundle and
+     * its transitive closure. Derived from the {@code download_info.url} of each entry
+     * in {@code pip install --report -} output, stripped down to the index base.
+     * URLs are returned as the worker observed them; normalization is the caller's
+     * responsibility.
+     */
+    @Nullable Set<String> resolvedFromRepositories;
 
     public List<GetMarketplaceResponse.Row> recipesOrEmpty() {
         return recipes == null ? Collections.emptyList() : recipes;
+    }
+
+    public Set<String> resolvedFromRepositoriesOrEmpty() {
+        return resolvedFromRepositories == null ? Collections.emptySet() : resolvedFromRepositories;
     }
 }

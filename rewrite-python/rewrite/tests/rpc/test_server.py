@@ -48,6 +48,7 @@ def test_handle_parse_preserves_empty_text(tmp_path, monkeypatch):
 
 
 def test_pip_install_recipe_package_shape(tmp_path, monkeypatch):
+    import json
     import rewrite.rpc.server as server
     import subprocess
 
@@ -61,21 +62,51 @@ def test_pip_install_recipe_package_shape(tmp_path, monkeypatch):
 
     def fake_run(cmd, capture_output=False, text=False):
         captured["cmd"] = cmd
+        # Simulate pip honoring --report by writing a minimal install report.
+        report_path = cmd[cmd.index("--report") + 1]
+        with open(report_path, "w") as f:
+            json.dump({
+                "install": [
+                    {"download_info": {"url": "https://files.pythonhosted.org/packages/aa/bb/foo-1.0-py3-none-any.whl"}},
+                    {"download_info": {"url": "https://internal.example.com/artifactory/api/pypi/pypi/simple/foo/foo-1.0.tar.gz"}},
+                    {"download_info": {"url": "file:///local/wheel.whl"}},
+                ]
+            }, f)
         return FakeCompletedProcess()
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    server._pip_install_recipe_package(
+    repos = server._pip_install_recipe_package(
         "openrewrite-recipes-python", "1.2.3", install_dir
     )
 
     assert install_dir.exists()
-    assert captured["cmd"][1:] == [
-        "-m", "pip", "install",
-        "--target", str(install_dir),
-        "openrewrite-recipes-python==1.2.3",
-    ]
+    assert captured["cmd"][1] == "-m"
+    assert captured["cmd"][2:5] == ["pip", "install", "--target"]
+    assert captured["cmd"][5] == str(install_dir)
+    assert "--report" in captured["cmd"]
+    assert captured["cmd"][-1] == "openrewrite-recipes-python==1.2.3"
     assert str(install_dir.resolve()) in __import__("sys").path
+    # Local file:// download skipped; http(s) downloads reduced to origin.
+    assert repos == {
+        "https://files.pythonhosted.org",
+        "https://internal.example.com",
+    }
+
+
+def test_parse_pip_install_report_handles_missing_or_malformed_file(tmp_path):
+    import rewrite.rpc.server as server
+
+    missing = tmp_path / "does-not-exist.json"
+    assert server._parse_pip_install_report(str(missing)) == set()
+
+    malformed = tmp_path / "malformed.json"
+    malformed.write_text("{not valid json")
+    assert server._parse_pip_install_report(str(malformed)) == set()
+
+    empty_install = tmp_path / "empty.json"
+    empty_install.write_text("{}")
+    assert server._parse_pip_install_report(str(empty_install)) == set()
 
 
 def test_recipe_descriptor_to_dict_emits_all_collection_keys():

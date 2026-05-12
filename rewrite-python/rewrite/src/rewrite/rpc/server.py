@@ -665,24 +665,85 @@ def _is_package_installed(package_name: str, version: Optional[str]) -> bool:
     return version is None or installed == version
 
 
-def _pip_install_recipe_package(package_name: str, version: Optional[str], target_dir: Path) -> None:
+def _pip_install_recipe_package(
+    package_name: str, version: Optional[str], target_dir: Path
+) -> Set[str]:
+    """Install the requested package + closure into target_dir.
+
+    Returns the set of unique origins (scheme://host) that pip downloaded from
+    while installing. Origins are derived from the install report (PEP 658
+    --report flag, pip 22.2+). When the running pip is too old or the report
+    cannot be parsed, an empty set is returned and a warning is logged; the
+    install itself still succeeds.
+    """
     import importlib
     import subprocess
 
     target_dir.mkdir(parents=True, exist_ok=True)
     spec = f"{package_name}=={version}" if version else package_name
-    cmd = [sys.executable, "-m", "pip", "install", "--target", str(target_dir), spec]
-    logger.info(f"pip install: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"pip install failed for {spec} (target={target_dir}):\n{result.stderr}"
-        )
 
-    target_str = str(target_dir.resolve())
-    if target_str not in sys.path:
-        sys.path.insert(0, target_str)
-    importlib.invalidate_caches()
+    with tempfile.NamedTemporaryFile(
+        mode="r", suffix=".json", prefix="pip-report-", delete=False
+    ) as report_handle:
+        report_path = report_handle.name
+
+    try:
+        cmd = [
+            sys.executable, "-m", "pip", "install",
+            "--target", str(target_dir),
+            "--report", report_path,
+            spec,
+        ]
+        logger.info(f"pip install: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"pip install failed for {spec} (target={target_dir}):\n{result.stderr}"
+            )
+
+        target_str = str(target_dir.resolve())
+        if target_str not in sys.path:
+            sys.path.insert(0, target_str)
+        importlib.invalidate_caches()
+
+        return _parse_pip_install_report(report_path)
+    finally:
+        try:
+            os.unlink(report_path)
+        except OSError:
+            pass
+
+
+def _parse_pip_install_report(report_path: str) -> Set[str]:
+    """Read a pip install --report JSON file and return the unique download origins.
+
+    Each entry's download_info.url is reduced to its scheme://host origin. Local
+    file:// URLs and entries without an http(s) download are skipped. This is a
+    deliberate simplification: pip's download URL (e.g. files.pythonhosted.org for
+    PyPI) is often served from a CDN host that differs from the configured index
+    URL (pypi.org/simple), so any finer-grained path matching would be misleading.
+    The saas-side comparator is expected to compare pip URLs by host.
+    """
+    from urllib.parse import urlparse
+
+    try:
+        with open(report_path, "r") as f:
+            report = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        logger.warning(f"Could not parse pip install report at {report_path}: {e}")
+        return set()
+
+    origins: Set[str] = set()
+    for entry in report.get("install", []) or []:
+        download_info = entry.get("download_info") or {}
+        url = download_info.get("url")
+        if not isinstance(url, str):
+            continue
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            continue
+        origins.add(f"{parsed.scheme}://{parsed.netloc}")
+    return origins
 
 
 def handle_install_recipes(params: dict) -> dict:
@@ -717,6 +778,7 @@ def handle_install_recipes(params: dict) -> dict:
     installed_version = None
     package_name: Optional[str] = None
     recipes_added = 0
+    resolved_from_repositories: Set[str] = set()
 
     if isinstance(recipes, str):
         # Local file path - package should already be installed by caller
@@ -741,7 +803,7 @@ def handle_install_recipes(params: dict) -> dict:
             raise ValueError("Package name is required")
 
         if _recipe_install_dir is not None and not _is_package_installed(package_name, version):
-            _pip_install_recipe_package(package_name, version, _recipe_install_dir)
+            resolved_from_repositories = _pip_install_recipe_package(package_name, version, _recipe_install_dir)
 
         logger.info(f"Activating recipes package: {package_name}")
 
@@ -776,6 +838,7 @@ def handle_install_recipes(params: dict) -> dict:
         'recipesInstalled': recipes_added,
         'version': installed_version,
         'recipes': package_rows,
+        'resolvedFromRepositories': sorted(resolved_from_repositories),
     }
 
 
