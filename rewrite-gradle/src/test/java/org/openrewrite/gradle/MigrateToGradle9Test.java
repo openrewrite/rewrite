@@ -39,7 +39,10 @@ class MigrateToGradle9Test implements RewriteTest {
               plugins {
                   id 'java'
                   id 'jacoco'
+                  id 'application'
               }
+
+              mainClassName = "com.example.AppMain"
 
               repositories {
                   mavenCentral()
@@ -61,6 +64,11 @@ class MigrateToGradle9Test implements RewriteTest {
               plugins {
                   id 'java'
                   id 'jacoco'
+                  id 'application'
+              }
+
+              application {
+                  mainClass = "com.example.AppMain"
               }
 
               repositories {
@@ -115,7 +123,10 @@ class MigrateToGradle9Test implements RewriteTest {
             """
               plugins {
                   `java`
+                  `application`
               }
+
+              mainClassName = "com.example.AppMain"
 
               tasks.register<JavaExec>("doSomething") {
                   main = "com.example.AppMain"
@@ -124,6 +135,11 @@ class MigrateToGradle9Test implements RewriteTest {
             """
               plugins {
                   `java`
+                  `application`
+              }
+
+              application {
+                  mainClass = "com.example.AppMain"
               }
 
               tasks.register<JavaExec>("doSomething") {
