@@ -18,7 +18,9 @@ package org.openrewrite.marketplace;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.RecipeDescriptor;
 
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 
 public interface RecipeBundleReader extends AutoCloseable {
     RecipeBundle getBundle();
@@ -28,6 +30,16 @@ public interface RecipeBundleReader extends AutoCloseable {
     RecipeDescriptor describe(RecipeListing listing);
 
     Recipe prepare(RecipeListing listing, Map<String, Object> options);
+
+    /**
+     * Repository URLs the resolver touched while resolving this bundle, including any
+     * transitive dependencies. URLs are returned in the form the underlying tool reported
+     * them; callers that need a canonical form should normalize after receiving. May
+     * return an empty set when the implementation has no remote source to report.
+     */
+    default Set<String> getResolvedFromRepositories() {
+        return Collections.emptySet();
+    }
 
     default void close() throws Exception {
         // no-op
