@@ -17,7 +17,7 @@ import {withDir} from "tmp-promise";
 import * as fs from "fs";
 import * as path from "path";
 import {RecipeMarketplace} from "../../src";
-import {InstallRecipes, InstallRecipesResponse} from "../../src/rpc/request/install-recipes";
+import {collectResolvedFromRepositories, InstallRecipes, InstallRecipesResponse} from "../../src/rpc/request/install-recipes";
 
 describe("InstallRecipes", () => {
 
@@ -148,6 +148,80 @@ describe("InstallRecipes", () => {
                 // then
                 expect(response.recipesInstalled).toBe(3);
                 expect(marketplace.allRecipes().length).toBe(3);
+            }, {unsafeCleanup: true});
+        });
+    });
+
+    describe("collectResolvedFromRepositories", () => {
+
+        test("returns undefined when no package-lock.json is present", async () => {
+            await withDir(async (dir) => {
+                expect(collectResolvedFromRepositories(dir.path)).toBeUndefined();
+            }, {unsafeCleanup: true});
+        });
+
+        test("derives the registry base from npm tarball URLs", async () => {
+            await withDir(async (dir) => {
+                const lockfile = {
+                    packages: {
+                        "": {name: "openrewrite-recipes", version: "1.0.0"},
+                        "node_modules/lodash": {
+                            version: "4.17.21",
+                            resolved: "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz"
+                        },
+                        "node_modules/@openrewrite/recipes-nodejs": {
+                            version: "0.40.0",
+                            resolved: "https://registry.npmjs.org/@openrewrite/recipes-nodejs/-/recipes-nodejs-0.40.0.tgz"
+                        }
+                    }
+                };
+                fs.writeFileSync(path.join(dir.path, "package-lock.json"), JSON.stringify(lockfile));
+
+                const repos = collectResolvedFromRepositories(dir.path);
+                expect(repos).toEqual(["https://registry.npmjs.org"]);
+            }, {unsafeCleanup: true});
+        });
+
+        test("preserves the path of internal registries (Artifactory virtual repos)", async () => {
+            await withDir(async (dir) => {
+                const lockfile = {
+                    packages: {
+                        "node_modules/internal-tool": {
+                            version: "1.0.0",
+                            resolved: "https://internal.example.com/artifactory/api/npm/npm-virtual/internal-tool/-/internal-tool-1.0.0.tgz"
+                        }
+                    }
+                };
+                fs.writeFileSync(path.join(dir.path, "package-lock.json"), JSON.stringify(lockfile));
+
+                const repos = collectResolvedFromRepositories(dir.path);
+                expect(repos).toEqual(["https://internal.example.com/artifactory/api/npm/npm-virtual"]);
+            }, {unsafeCleanup: true});
+        });
+
+        test("skips entries without a resolved URL or with non-tarball shapes", async () => {
+            await withDir(async (dir) => {
+                const lockfile = {
+                    packages: {
+                        "node_modules/local-link": {version: "1.0.0", link: true},
+                        "node_modules/git-dep": {version: "1.0.0", resolved: "git+https://github.com/foo/bar.git#abc"},
+                        "node_modules/file-dep": {version: "1.0.0", resolved: "file:../bar"},
+                        "node_modules/ok": {
+                            version: "1.0.0",
+                            resolved: "https://registry.npmjs.org/ok/-/ok-1.0.0.tgz"
+                        }
+                    }
+                };
+                fs.writeFileSync(path.join(dir.path, "package-lock.json"), JSON.stringify(lockfile));
+
+                expect(collectResolvedFromRepositories(dir.path)).toEqual(["https://registry.npmjs.org"]);
+            }, {unsafeCleanup: true});
+        });
+
+        test("returns an empty array when the lockfile has no resolved URLs", async () => {
+            await withDir(async (dir) => {
+                fs.writeFileSync(path.join(dir.path, "package-lock.json"), JSON.stringify({packages: {"": {}}}));
+                expect(collectResolvedFromRepositories(dir.path)).toEqual([]);
             }, {unsafeCleanup: true});
         });
     });

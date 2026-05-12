@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.javascript.rpc.InstallRecipesResponse;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleReader;
@@ -26,11 +27,17 @@ import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
 
 import java.util.Map;
+import java.util.Set;
 
 @RequiredArgsConstructor
 public class NpmRecipeBundleReader implements RecipeBundleReader {
     private final @Getter RecipeBundle bundle;
     private final JavaScriptRewriteRpc rpc;
+    private final InstallRecipesResponse installResponse;
+
+    public NpmRecipeBundleReader(RecipeBundle bundle, JavaScriptRewriteRpc rpc) {
+        this(bundle, rpc, new InstallRecipesResponse(0, null, null));
+    }
 
     @Override
     public RecipeMarketplace read() {
@@ -45,5 +52,10 @@ public class NpmRecipeBundleReader implements RecipeBundleReader {
     @Override
     public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
         return rpc.prepareRecipe(listing.getName(), options);
+    }
+
+    @Override
+    public Set<String> getResolvedFromRepositories() {
+        return installResponse.resolvedFromRepositoriesOrEmpty();
     }
 }

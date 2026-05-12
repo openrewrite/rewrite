@@ -25,6 +25,51 @@ import {getPlatformCommand} from "../../shell-utils";
 export interface InstallRecipesResponse {
     recipesInstalled: number
     version?: string
+    /**
+     * Registry base URLs that npm fetched packages from while installing the bundle
+     * and its transitive closure. Derived from the `resolved` field of each entry in
+     * the resulting package-lock.json. Empty for local-path installs.
+     */
+    resolvedFromRepositories?: string[]
+}
+
+/**
+ * Read package-lock.json from `installDir` and derive the set of unique registry base
+ * URLs that served the installed packages. Returns undefined if the lockfile is absent
+ * or unreadable; an empty array if it is present but has no `resolved` URLs.
+ */
+export function collectResolvedFromRepositories(installDir: string, logger?: rpc.Logger): string[] | undefined {
+    const lockfilePath = path.join(installDir, "package-lock.json");
+    if (!fs.existsSync(lockfilePath)) {
+        return undefined;
+    }
+    let lock: any;
+    try {
+        lock = JSON.parse(fs.readFileSync(lockfilePath, "utf8"));
+    } catch (e: any) {
+        if (logger) {
+            logger.warn(`Failed to parse ${lockfilePath}: ${e?.message ?? e}`);
+        }
+        return undefined;
+    }
+
+    const bases = new Set<string>();
+    const packages = lock.packages ?? {};
+    for (const [key, value] of Object.entries(packages) as [string, any][]) {
+        if (!value || typeof value.resolved !== "string") continue;
+        const resolved = value.resolved as string;
+        // Only consider tarball URLs; skip git+https, file:, link:, etc.
+        if (!/^https?:\/\//.test(resolved)) continue;
+        const idx = resolved.lastIndexOf("/-/");
+        if (idx < 0) continue; // unrecognized shape, skip
+        const head = resolved.substring(0, idx); // "<base>/<pkgName>"
+        const pkgName = key.replace(/^.*node_modules\//, "");
+        if (!pkgName) continue;
+        if (head.endsWith("/" + pkgName)) {
+            bases.add(head.substring(0, head.length - pkgName.length - 1));
+        }
+    }
+    return Array.from(bases);
 }
 
 /**
@@ -150,9 +195,16 @@ export class InstallRecipes {
                         throw new Error(`${recipesName} does not export an 'activate' function`);
                     }
 
+                    let resolvedFromRepositories: string[] | undefined;
+                    if (typeof request.recipes === "object") {
+                        const absoluteInstallDir = path.isAbsolute(installDir) ? installDir : path.join(process.cwd(), installDir);
+                        resolvedFromRepositories = collectResolvedFromRepositories(absoluteInstallDir, logger);
+                    }
+
                     return {
                         recipesInstalled: marketplace.allRecipes().length - beforeInstall,
-                        version: installedVersion
+                        version: installedVersion,
+                        resolvedFromRepositories
                     };
                 }
             )

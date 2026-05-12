@@ -18,8 +18,23 @@ package org.openrewrite.javascript.rpc;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Collections;
+import java.util.Set;
+
 @Value
 public class InstallRecipesResponse {
     int recipesInstalled;
     @Nullable String version;
+    /**
+     * Registry URLs that {@code npm install} touched while installing this bundle and
+     * its transitive closure. Derived from the {@code resolved} field of each entry in
+     * the resulting {@code package-lock.json}. URLs are returned as the worker observed
+     * them (e.g. {@code https://registry.npmjs.org}); normalization is the caller's
+     * responsibility.
+     */
+    @Nullable Set<String> resolvedFromRepositories;
+
+    public Set<String> resolvedFromRepositoriesOrEmpty() {
+        return resolvedFromRepositories == null ? Collections.emptySet() : resolvedFromRepositories;
+    }
 }

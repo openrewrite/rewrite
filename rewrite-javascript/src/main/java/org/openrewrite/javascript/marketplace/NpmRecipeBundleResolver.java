@@ -47,6 +47,6 @@ public class NpmRecipeBundleResolver implements RecipeBundleResolver {
         if (response.getVersion() != null) {
             bundle.setVersion(response.getVersion());
         }
-        return new NpmRecipeBundleReader(bundle, rpc);
+        return new NpmRecipeBundleReader(bundle, rpc, response);
     }
 }
