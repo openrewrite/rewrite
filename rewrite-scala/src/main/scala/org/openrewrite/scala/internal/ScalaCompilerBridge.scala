@@ -21,7 +21,7 @@ import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Phases
 import dotty.tools.dotc.parsing.Parsers
 import dotty.tools.dotc.util.SourceFile
-import dotty.tools.dotc.reporting.{Diagnostic, Reporter, StoreReporter}
+import dotty.tools.dotc.reporting.{Diagnostic, StoreReporter}
 import dotty.tools.dotc.{CompilationUnit, Run, Compiler, Driver}
 import dotty.tools.dotc.config.ScalaSettings
 
@@ -57,11 +57,15 @@ class ScalaCompilerBridge {
     val driver = new ParsingDriver()
     val baseCtx: Context = driver.getInitialContext
 
+    // Buffer diagnostics in-memory so they don't leak to stderr via Dotty's default ConsoleReporter.
+    val storeReporter = new StoreReporter(null)
+
     // Configure source version, output directory, and classpath.
     given ctx: Context = {
       val fresh = baseCtx.fresh
       // Accept both Scala 2 and Scala 3 syntax (including indentation-based).
       fresh.setSetting(fresh.settings.source, "3.6-migration")
+      fresh.setReporter(storeReporter)
       // Send compiler output to a designated dir so .class files don't pollute cwd.
       if (outputDir != null) {
         fresh.setSetting(fresh.settings.outputDir, dotty.tools.io.AbstractFile.getDirectory(outputDir))
@@ -152,7 +156,36 @@ class ScalaCompilerBridge {
         // Batch compilation failed entirely; all units keep typedTree=None
     }
 
+    // Drain buffered diagnostics into per-source `warnings` lists so callers
+    // can surface them as ParseWarning markers (and optionally log them).
+    val drained = storeReporter.removeBufferedMessages
+    if (drained.nonEmpty) {
+      val byPath = drained.groupBy(diagnosticSourcePath)
+      val rIter = results.entrySet().iterator()
+      while (rIter.hasNext) {
+        val e = rIter.next()
+        byPath.get(e.getKey).foreach { diags =>
+          val ws = e.getValue.warnings
+          diags.foreach(d => ws.add(toScalaWarning(d)))
+        }
+      }
+    }
+
     results
+  }
+
+  private def diagnosticSourcePath(d: Diagnostic): String =
+    if (d.pos.exists && d.pos.source != null) d.pos.source.path else ""
+
+  private def toScalaWarning(d: Diagnostic): ScalaWarning = {
+    val (line, column) =
+      if (d.pos.exists) (d.pos.line + 1, d.pos.column + 1) else (0, 0)
+    val level = d.level match {
+      case 2 => "error"
+      case 1 => "warning"
+      case _ => "info"
+    }
+    ScalaWarning(d.message, line, column, level)
   }
 
   /**
@@ -160,14 +193,15 @@ class ScalaCompilerBridge {
    * Retained for backward compatibility.
    */
   def parse(path: String, content: String): ScalaParseResult = {
-    // Create a custom reporter to collect warnings
-    val warnings = new ListBuffer[ScalaWarning]()
+    // Buffer diagnostics in-memory so they don't leak to stderr via Dotty's default ConsoleReporter.
+    val storeReporter = new StoreReporter(null)
 
     // Create our custom driver and get a proper context with Scala 2 compat
     val driver = new ParsingDriver()
     given Context = {
       val fresh = driver.getInitialContext.fresh
       fresh.setSetting(fresh.settings.source, "3.6-migration")
+      fresh.setReporter(storeReporter)
       fresh
     }
 
@@ -194,9 +228,10 @@ class ScalaCompilerBridge {
       tree
     }
 
-    // Convert warnings to Java list
+    // Drain buffered diagnostics from the reporter so they're surfaced to the caller
+    // instead of being silently dropped (or, with the default reporter, printed to stderr).
     val javaWarnings = new ArrayList[ScalaWarning]()
-    warnings.foreach(javaWarnings.add)
+    storeReporter.removeBufferedMessages.foreach(d => javaWarnings.add(toScalaWarning(d)))
 
     ScalaParseResult(finalTree, None, javaWarnings, needsUnwrap, ctx)
   }

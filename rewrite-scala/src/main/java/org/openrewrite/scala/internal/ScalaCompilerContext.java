@@ -20,7 +20,10 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.ParseWarning;
 import org.openrewrite.Parser;
 import org.openrewrite.Tree;
+import org.openrewrite.scala.ScalaParser;
 import org.openrewrite.scheduling.WorkingDirectoryExecutionContextView;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -31,14 +34,18 @@ import java.util.stream.Collectors;
  * This class delegates to the Scala bridge for compiler interaction.
  */
 public class ScalaCompilerContext {
+    private static final Logger logger = LoggerFactory.getLogger(ScalaParser.class);
+
     private final ScalaCompilerBridge bridge;
     private final ExecutionContext executionContext;
+    private final boolean logCompilationWarningsAndErrors;
     private final List<String> classpathStrings;
 
     public ScalaCompilerContext(@Nullable Collection<Path> classpath,
                                 boolean logCompilationWarningsAndErrors,
                                 ExecutionContext executionContext) {
         this.executionContext = executionContext;
+        this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
         this.bridge = new ScalaCompilerBridge();
 
         // Convert classpath paths to strings for the Scala bridge
@@ -63,8 +70,11 @@ public class ScalaCompilerContext {
         List<ParseWarning> warnings = new ArrayList<>();
         for (int i = 0; i < result.warnings().size(); i++) {
             ScalaWarning w = result.warnings().get(i);
-            warnings.add(new ParseWarning(Tree.randomId(),
-                    input.getPath().toString() + " at line " + w.line() + ":" + w.column() + " " + w.message()));
+            String formatted = input.getPath() + " at line " + w.line() + ":" + w.column() + " " + w.message();
+            warnings.add(new ParseWarning(Tree.randomId(), formatted));
+            if (logCompilationWarningsAndErrors) {
+                logger.warn(formatted);
+            }
         }
 
         return new ParseResult(result, warnings);
@@ -116,8 +126,11 @@ public class ScalaCompilerContext {
                 ScalaWarning w = result.warnings().get(i);
                 Parser.Input input = inputsByPath.get(path);
                 String location = (input != null ? input.getPath().toString() : path);
-                warnings.add(new ParseWarning(Tree.randomId(),
-                        location + " at line " + w.line() + ":" + w.column() + " " + w.message()));
+                String formatted = location + " at line " + w.line() + ":" + w.column() + " " + w.message();
+                warnings.add(new ParseWarning(Tree.randomId(), formatted));
+                if (logCompilationWarningsAndErrors) {
+                    logger.warn(formatted);
+                }
             }
 
             results.put(path, new ParseResult(result, warnings));
