@@ -17,10 +17,8 @@ package org.openrewrite.gradle.gradle9;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.tree.G;
@@ -28,6 +26,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 
 import java.util.Collections;
@@ -51,6 +50,14 @@ public class UseVersionClosure extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile && !(tree instanceof G.CompilationUnit)) {
+                    return (J) tree;
+                }
+                return super.visit(tree, ctx);
+            }
+
             @Override
             public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                 J.Block b = super.visitBlock(block, ctx);
@@ -98,13 +105,10 @@ public class UseVersionClosure extends Recipe {
             return null;
         }
         Expression variable = a.getVariable();
-        String name = null;
-        if (variable instanceof J.Identifier) {
-            name = ((J.Identifier) variable).getSimpleName();
-        } else if (variable instanceof J.FieldAccess) {
-            name = ((J.FieldAccess) variable).getSimpleName();
+        if (!(variable instanceof J.Identifier)) {
+            return null;
         }
-        if (!"version".equals(name)) {
+        if (!"version".equals(((J.Identifier) variable).getSimpleName())) {
             return null;
         }
         Expression value = a.getAssignment();
