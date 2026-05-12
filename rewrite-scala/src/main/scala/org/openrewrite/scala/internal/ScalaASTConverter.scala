@@ -24,7 +24,7 @@ import org.openrewrite.marker.Markers
 import org.openrewrite.scala.marker.{IndentedSyntax, PackageBraces, PackageSemicolon}
 
 import java.util
-import java.util.{Collections, List as JList, UUID}
+import java.util.{Collections, List as JList}
 
 /**
  * Result of converting a Scala AST to compilation unit components.
@@ -215,13 +215,13 @@ class ScalaASTConverter {
 
     val markerList = new util.ArrayList[org.openrewrite.marker.Marker]()
     if (hasIndentedColon) {
-      markerList.add(new IndentedSyntax(UUID.randomUUID()))
+      markerList.add(new IndentedSyntax(Tree.randomId()))
     } else if (hasBraces) {
       val beforeBrace = srcText.substring(scanStart, scanIdx)
-      markerList.add(PackageBraces(UUID.randomUUID(), beforeBrace, ""))
+      markerList.add(PackageBraces(Tree.randomId(), beforeBrace, ""))
     }
     if (hasSemicolon) {
-      markerList.add(PackageSemicolon(UUID.randomUUID()))
+      markerList.add(PackageSemicolon(Tree.randomId()))
     }
     val markers = if (markerList.isEmpty) Markers.EMPTY else Markers.build(markerList)
 

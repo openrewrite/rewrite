@@ -200,6 +200,76 @@ class TryTest implements RewriteTest {
     }
 
     @Test
+    void tryCatchEmptyCaseBody() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def run(): Unit = {
+                  try {
+                    println("risky")
+                  } catch {
+                    case _: Throwable =>
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchLongCommentBeforeCatch() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def run(): Unit = {
+                  try { 1 } /* an absurdly long block comment intended to push the catch keyword past any reasonable fixed-size lookahead window */ catch {
+                    case _: Exception => 2
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryWithLongCommentBeforeFinally() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def run(): Unit = {
+                  try { 1 } catch { case _: Exception => 2 } /* an absurdly long block comment intended to push the finally keyword past any reasonable fixed-size lookahead window */ finally { 3 }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchEmptyCaseBodyWithLineComment() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def run(): Unit = {
+                  try {
+                    println("risky")
+                  } catch {
+                    case _: Throwable => // If traversal fails, maps stay empty; types will be null
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void tryWithTypedPattern() {
         rewriteRun(
           scala(
