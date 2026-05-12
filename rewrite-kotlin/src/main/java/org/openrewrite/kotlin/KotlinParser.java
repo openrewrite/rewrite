@@ -182,7 +182,9 @@ public class KotlinParser implements Parser {
             compilerCus = parse(acceptedInputs, disposable, pctx);
         } catch (Throwable t) {
             disposable.dispose();
-            return acceptedInputs.stream().map(input -> ParseError.build(this, input, relativeTo, ctx, t));
+            return acceptedInputs.stream()
+                    .filter(input -> !dependsOnPaths.contains(input.getRelativePath(relativeTo)))
+                    .map(input -> ParseError.build(this, input, relativeTo, ctx, t));
         }
 
         FirSession firSession = compilerCus.getFirSession();
