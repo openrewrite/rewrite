@@ -69,6 +69,7 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.internal",
             "org.openrewrite.marker",
             "org.openrewrite.scheduling",
+            "org.openrewrite.semver",
             "org.openrewrite.style",
             "org.openrewrite.template",
             "org.openrewrite.trait",
