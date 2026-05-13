@@ -33,6 +33,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -552,13 +553,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         @Override
         public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
-                JavaSourceFile sourceFile = (JavaSourceFile) tree;
+                JavaSourceFile original = (JavaSourceFile) tree;
                 noLongerManaged = null;
                 newlyManaged = null;
-                gradleProject = sourceFile.getMarkers().findFirst(GradleProject.class)
+                gradleProject = original.getMarkers().findFirst(GradleProject.class)
                         .orElse(null);
-                sourceFile = applyPluginProvidedDependencies(sourceFile, ctx);
-                return super.visit(sourceFile, ctx);
+                JavaSourceFile sourceFile = applyPluginProvidedDependencies(original, ctx);
+                JavaSourceFile result = (JavaSourceFile) super.visit(sourceFile, ctx);
+                if (result != original && gradleProject != null) {
+                    JavaSourceSet.markDirty(ctx, gradleProject.getProjectName());
+                }
+                return result;
             }
             return super.visit(tree, ctx);
         }
