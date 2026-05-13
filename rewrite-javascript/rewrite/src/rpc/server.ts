@@ -31,17 +31,20 @@ import "../javascript";
 // Not possible to set the stack size when executing from npx for security reasons
 require('v8').setFlagsFromString('--stack-size=8000');
 
-function initPyroscope(logger: rpc.Logger): void {
-    const server = process.env.PYROSCOPE_SERVER_ADDRESS;
+function initPyroscope(logger: rpc.Logger): any {
+    // Strip trailing slashes: the SDK builds the ingest URL as `${serverAddress}/ingest`,
+    // so a trailing slash produces `//ingest`, which the server normalizes via redirect —
+    // and undici downgrades the redirected POST to a GET, silently dropping all profiles.
+    const server = (process.env.PYROSCOPE_SERVER_ADDRESS || '').replace(/\/+$/, '');
     if (!server) {
-        return;
+        return undefined;
     }
     let Pyroscope: any;
     try {
         Pyroscope = require('@pyroscope/nodejs');
     } catch {
         logger.warn('PYROSCOPE_SERVER_ADDRESS set but @pyroscope/nodejs not installed; profiling disabled');
-        return;
+        return undefined;
     }
     const tags: Record<string, string> = {runtime: 'node'};
     for (const pair of (process.env.PYROSCOPE_TAGS || '').split(',')) {
@@ -56,6 +59,7 @@ function initPyroscope(logger: rpc.Logger): void {
         tags,
     });
     Pyroscope.start();
+    return Pyroscope;
 }
 
 interface ProgramOptions {
@@ -95,11 +99,19 @@ async function main() {
     // the host JVM is killed, our stdin closes, vscode-jsonrpc fires onClose,
     // and we exit. Without it, Pyroscope (or any other ref-holder) can keep
     // the event loop alive and orphan this process.
+    let pyroscope: any;
     let shuttingDown = false;
     const shutdown = async () => {
         if (shuttingDown) return;
         shuttingDown = true;
         try {
+            if (pyroscope) {
+                try {
+                    await pyroscope.stop();
+                } catch (e: any) {
+                    // best-effort flush; nothing to do if it fails during shutdown
+                }
+            }
             if (recipeCleanup) {
                 await recipeCleanup();
             }
@@ -122,7 +134,7 @@ async function main() {
         log: (msg: string) => log && options.traceRpcMessages && log.write(`[js trace] ${msg}\n`)
     };
 
-    initPyroscope(logger);
+    pyroscope = initPyroscope(logger);
 
     // Create the connection with the custom logger
     const connection = rpc.createMessageConnection(
