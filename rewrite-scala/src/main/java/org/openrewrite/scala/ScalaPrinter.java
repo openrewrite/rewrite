@@ -1302,6 +1302,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 visit(method.getName(), p);
             }
 
+            // Type arguments: `intercept[T] { ... }` or `list.foreach[T] { ... }`
+            if (method.getTypeParameters() != null && !method.getTypeParameters().isEmpty()) {
+                visitContainer("[", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", "]", p);
+            }
+
             // Print the block argument — it's typically an S.StatementExpression(J.Block)
             // The J.Block contains the lambda. visitBlock prints the { } braces.
             if (method.getArguments() != null) {
