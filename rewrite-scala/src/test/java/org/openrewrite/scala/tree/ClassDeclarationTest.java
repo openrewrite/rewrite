@@ -363,4 +363,15 @@ class ClassDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void typeParamContextBoundWithSpaceBeforeColon() {
+        rewriteRun(
+            scala(
+                """
+                case class Foo[T : Encoder]()
+                """
+            )
+        );
+    }
 }

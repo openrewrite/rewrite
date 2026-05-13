@@ -7239,6 +7239,13 @@ class ScalaTreeVisitor(
           if (cb.span.exists) updateCursor(cb.span.end)
           if (!boundList.isEmpty) JContainer.build(Space.EMPTY, boundList, Markers.EMPTY) else null
         } else if (cxBoundsList.nonEmpty) {
+          // Capture the space between the type-param name and the first `:` so the printer
+          // can re-emit it. The JContainer.before is the space before `:` (see ScalaPrinter).
+          val cbEnd = if (cb.span.exists) Math.max(0, cb.span.end - offsetAdjustment) else source.length
+          val colonIdx = if (cursor < cbEnd) source.indexOf(':', cursor) else -1
+          val beforeColon: Space = if (colonIdx > cursor && colonIdx < cbEnd) {
+            Space.format(source, cursor, colonIdx)
+          } else Space.EMPTY
           val boundList = new util.ArrayList[JRightPadded[TypeTree]]()
           // For each context bound, extract the bound type name
           cxBoundsList.foreach { cxBound =>
@@ -7260,7 +7267,7 @@ class ScalaTreeVisitor(
             updateCursor(cb.span.end)
           }
           // The JContainer.before space is printed BEFORE the `:` by the printer.
-          JContainer.build(Space.EMPTY, boundList, Markers.EMPTY)
+          JContainer.build(beforeColon, boundList, Markers.EMPTY)
         } else null
 
       case tb: Trees.TypeBoundsTree[?] if !tb.hi.isEmpty || !tb.lo.isEmpty =>
@@ -7361,8 +7368,9 @@ class ScalaTreeVisitor(
               return visitUnknown(typed)
           }
 
-          // Find the colon between expression and type
-          val colonSpace = {
+          // Find the colon between expression and type. Capture the space BEFORE the colon
+          // separately from the space AFTER the colon (which becomes the type tree's prefix).
+          val beforeColon: Space = {
             val tptStart = Math.max(0, typed.tpt.span.start - offsetAdjustment)
             if (tptStart > cursor) {
               val between = source.substring(cursor, tptStart)
@@ -7378,7 +7386,7 @@ class ScalaTreeVisitor(
             }
           }
 
-          // Visit the type tree
+          // Visit the type tree — its natural prefix is the space AFTER the colon.
           val typeTree = visitTree(typed.tpt) match {
             case tt: TypeTree => tt
             case id: J.Identifier => id.asInstanceOf[TypeTree]
@@ -7389,14 +7397,16 @@ class ScalaTreeVisitor(
 
           updateCursor(typed.span.end)
 
-          // The colon space becomes the type tree's prefix
-          val typedTypeTree = if (colonSpace != Space.EMPTY) typeTree.withPrefix(colonSpace) else typeTree
+          val markers = if (beforeColon != Space.EMPTY) {
+            Markers.build(Collections.singletonList(
+              org.openrewrite.scala.marker.TypeAscriptionColonPrefix.create(beforeColon)))
+          } else Markers.EMPTY
           new S.TypeAscription(
             Tree.randomId(),
             prefix,
-            Markers.EMPTY,
+            markers,
             expr,
-            typedTypeTree,
+            typeTree,
             typeFor(typed.span)
           )
         } catch {

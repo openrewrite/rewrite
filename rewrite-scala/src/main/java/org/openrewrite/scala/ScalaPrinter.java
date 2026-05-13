@@ -1041,6 +1041,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitTypeAscription(S.TypeAscription typeAscription, PrintOutputCapture<P> p) {
         beforeSyntax(typeAscription, Space.Location.LANGUAGE_EXTENSION, p);
         visit(typeAscription.getExpression(), p);
+        typeAscription.getMarkers()
+                .findFirst(org.openrewrite.scala.marker.TypeAscriptionColonPrefix.class)
+                .ifPresent(m -> visitSpace(m.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         p.append(':');
         visit(typeAscription.getTypeTree(), p);
         afterSyntax(typeAscription, p);
