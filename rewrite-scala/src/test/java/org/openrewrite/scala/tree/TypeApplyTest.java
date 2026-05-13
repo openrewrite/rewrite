@@ -116,6 +116,21 @@ class TypeApplyTest implements RewriteTest {
     }
 
     @Test
+    void typeApplyWithBlockArgument() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                intercept[IllegalArgumentException] {
+                  foo()
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void typeApplyWithChainedSelect() {
         rewriteRun(
           scala(
