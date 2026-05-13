@@ -826,6 +826,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                         }
                         if (varDecl.getTypeExpression() != null) {
                             TypeTree typeExpr = varDecl.getTypeExpression();
+                            if (varDecl.getVarargs() != null) {
+                                visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
+                            }
                             p.append(":");
                             visit(typeExpr, p);
                         }

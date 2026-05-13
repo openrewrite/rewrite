@@ -5616,11 +5616,13 @@ class ScalaTreeVisitor(
 
     // Type ascription `: Type`
     val paramEnd = Math.max(0, vd.span.end - offsetAdjustment)
+    var beforeColon: Space = Space.EMPTY
     val typeExpr: TypeTree = if (vd.tpt != untpd.EmptyTree && vd.tpt.span.exists) {
       val colonSearchEnd = Math.min(paramEnd, source.length)
       val between = if (cursor < colonSearchEnd) source.substring(cursor, colonSearchEnd) else ""
       val colonIdx = between.indexOf(':')
       if (colonIdx >= 0) {
+        if (colonIdx > 0) beforeColon = Space.format(between.substring(0, colonIdx))
         cursor = cursor + colonIdx + 1
         val res = visitTree(vd.tpt) match {
           case tt: TypeTree => tt
@@ -5669,7 +5671,7 @@ class ScalaTreeVisitor(
       paramAnnotations,
       paramModifiers,
       typeExpr,
-      null,
+      if (beforeColon != Space.EMPTY) beforeColon else null,
       Collections.emptyList(),
       Collections.singletonList(JRightPadded.build(variable))
     )
@@ -5739,10 +5741,14 @@ class ScalaTreeVisitor(
       cursor = Math.max(cursor, paramNameEnd)
     }
 
+    var beforeColon: Space = Space.EMPTY
     val typeExpr: TypeTree = if (hasExplicitType && vd.tpt != untpd.EmptyTree) {
       val colonSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 30, source.length)) else ""
       val colonIdx = colonSearch.indexOf(':')
-      if (colonIdx >= 0) cursor = cursor + colonIdx + 1
+      if (colonIdx >= 0) {
+        if (colonIdx > 0) beforeColon = Space.format(colonSearch.substring(0, colonIdx))
+        cursor = cursor + colonIdx + 1
+      }
 
       val result = if (vd.tpt.isInstanceOf[untpd.Function]) {
         // Function types (Int => Int) — create identifier from source text
@@ -5805,7 +5811,7 @@ class ScalaTreeVisitor(
       paramAnnotations,
       paramModifiers,
       typeExpr,
-      null,
+      if (beforeColon != Space.EMPTY) beforeColon else null,
       Collections.emptyList(),
       Collections.singletonList(JRightPadded.build(variable))
     )

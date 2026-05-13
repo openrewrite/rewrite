@@ -352,4 +352,15 @@ class ClassDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void paramNameEndingInUnderscore() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(tag_ : String)
+                """
+            )
+        );
+    }
 }
