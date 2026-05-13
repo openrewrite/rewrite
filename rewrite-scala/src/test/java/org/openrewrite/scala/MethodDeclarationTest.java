@@ -387,4 +387,30 @@ class MethodDeclarationTest implements RewriteTest {
             );
         }
     }
+
+    @Test
+    void parameterlessDef() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo: Int = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void parameterlessDefInTrait() {
+        rewriteRun(
+            scala(
+                """
+                trait T {
+                  def bar: String
+                }
+                """
+            )
+        );
+    }
 }

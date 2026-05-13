@@ -191,4 +191,18 @@ class VariableDeclarationsTest implements RewriteTest {
           scala("var x: Int = _")
         );
     }
+
+    @Test
+    void tuplePatternWithExtraSpace() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val pair = (1, 2)
+              val (a, b) = pair
+            }
+            """
+          )
+        );
+    }
 }

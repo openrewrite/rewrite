@@ -424,6 +424,7 @@ class ScalaTreeVisitor(
         }
         val select = asExpression(visitTree(app.fun))
         val openIdx = source.indexOf('(', cursor)
+        val argContainerPrefix = if (openIdx > cursor) Space.format(source, cursor, openIdx) else Space.EMPTY
         if (openIdx >= 0) cursor = openIdx + 1
         val args = new util.ArrayList[JRightPadded[Expression]]()
         for (i <- app.args.indices) {
@@ -450,7 +451,7 @@ class ScalaTreeVisitor(
         new J.MethodInvocation(Tree.randomId(), prefix,
           Markers.build(Collections.singletonList(FunctionApplication.create())),
           JRightPadded.build(select), null, nameId,
-          JContainer.build(Space.EMPTY, args, Markers.EMPTY), mt)
+          JContainer.build(argContainerPrefix, args, Markers.EMPTY), mt)
     }
   }
 

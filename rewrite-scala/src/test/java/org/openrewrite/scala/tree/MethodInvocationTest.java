@@ -271,13 +271,23 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
-    void whitespaceBeforeArgumentList() {
+    void extraSpace() {
         rewriteRun(
           scala(
             """
-              val m = Map (
-                "a" -> 1
-              )
+              object Test {
+                def f(a: Int)(b: Int): Int = a + b
+                def fBlock(a: Int)(g: Int => Int): Int = g(a)
+                def fType[T](x: T): T = x
+
+                val m = Map (
+                  "a" -> 1
+                )
+                val lambda = ((x: Int) => x + 1) (5)
+                val blockArg = fBlock(1)  { x => x + 1 }
+                val curried = f(1) (2)
+                val typeApplied = fType[Int] (5)
+              }
               """
           )
         );

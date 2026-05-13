@@ -210,4 +210,20 @@ class NewClassTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void mixinWithExtraSpaceAroundWith() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              trait A
+              trait B
+              trait C
+              val x = new A  with  B  with  C {}
+            }
+            """
+          )
+        );
+    }
 }
