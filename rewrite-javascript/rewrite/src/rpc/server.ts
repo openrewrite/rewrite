@@ -57,6 +57,9 @@ function initPyroscope(logger: rpc.Logger): any {
         appName: process.env.PYROSCOPE_APPLICATION_NAME || 'modcli',
         serverAddress: server,
         tags,
+        wall: {
+            collectCpuTime: true,
+        },
     });
     Pyroscope.start();
     return Pyroscope;
