@@ -467,8 +467,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 boolean procedureSyntax = method.getMarkers().findFirst(
                         org.openrewrite.scala.marker.OmitBraces.class).isPresent();
                 if (!procedureSyntax) {
-                    Space beforeEquals = actualBody instanceof J.Block ?
-                            ((J.Block) actualBody).getPrefix() : Space.SINGLE_SPACE;
+                    final J finalActualBody = actualBody;
+                    Space beforeEquals = method.getMarkers()
+                            .findFirst(org.openrewrite.scala.marker.MethodBodyEqualsPrefix.class)
+                            .map(org.openrewrite.scala.marker.MethodBodyEqualsPrefix::getPrefix)
+                            .orElseGet(() -> finalActualBody instanceof J.Block ?
+                                    ((J.Block) finalActualBody).getPrefix() : Space.SINGLE_SPACE);
                     visitSpace(beforeEquals, Space.Location.BLOCK_PREFIX, p);
                     p.append("=");
                 }
@@ -494,7 +498,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             boolean omitBodyBraces = body.getMarkers().findFirst(
                     org.openrewrite.scala.marker.OmitBraces.class).isPresent();
             if (!procedureSyntax) {
-                visitSpace(body.getPrefix(), Space.Location.BLOCK_PREFIX, p);
+                Space beforeEquals = method.getMarkers()
+                        .findFirst(org.openrewrite.scala.marker.MethodBodyEqualsPrefix.class)
+                        .map(org.openrewrite.scala.marker.MethodBodyEqualsPrefix::getPrefix)
+                        .orElse(body.getPrefix());
+                visitSpace(beforeEquals, Space.Location.BLOCK_PREFIX, p);
                 p.append("=");
             }
             if (omitBodyBraces && body.getStatements().size() == 1) {

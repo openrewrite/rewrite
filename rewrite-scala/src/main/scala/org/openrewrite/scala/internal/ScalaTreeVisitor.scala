@@ -5459,6 +5459,7 @@ class ScalaTreeVisitor(
     }
 
     // Handle method body
+    var beforeEqualsSpace: Space = Space.EMPTY
     val body: J.Block = dd.rhs match {
       case rhs if isProcedureSyntax && rhs.span.isSynthetic =>
         // Procedure syntax: Scala 3 parser replaces body with `_root_.scala.Predef.???`.
@@ -5475,6 +5476,7 @@ class ScalaTreeVisitor(
             cursor = cursor + equalsIdx + 1
           }
         }
+        beforeEqualsSpace = beforeEquals
         visitTree(rhs) match {
             case block: J.Block => block
             case expr: Expression =>
@@ -5542,6 +5544,9 @@ class ScalaTreeVisitor(
     }
     if (isCurried) {
       markerList.add(new Curried(Tree.randomId()))
+    }
+    if (beforeEqualsSpace != Space.EMPTY) {
+      markerList.add(org.openrewrite.scala.marker.MethodBodyEqualsPrefix.create(beforeEqualsSpace))
     }
     val methodMarkers = if (!markerList.isEmpty) Markers.build(markerList) else Markers.EMPTY
 
