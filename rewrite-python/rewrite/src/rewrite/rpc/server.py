@@ -255,20 +255,45 @@ def generate_id() -> str:
     return str(uuid4())
 
 
-def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None) -> dict:
+def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None,
+                      language_level: Optional[str] = None,
+                      project_language_level: Optional[str] = None) -> dict:
     """Parse a Python file and return its LST."""
     with open(path, 'r', encoding='utf-8') as f:
         source = f.read()
-    return parse_python_source(source, path, relative_to, ty_client)
+    return parse_python_source(source, path, relative_to, ty_client,
+                               language_level=language_level,
+                               project_language_level=project_language_level)
 
 
-def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None) -> dict:
+def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None,
+                        language_level: Optional[str] = None,
+                        project_language_level: Optional[str] = None) -> dict:
     """Parse Python source code and return its LST.
 
-    The parser used depends on the REWRITE_PYTHON_VERSION environment variable:
-    - "2" or "2.7": Use parso-based Py2ParserVisitor for Python 2 code
-    - "3" (default): Use ast-based ParserVisitor for Python 3 code
+    The parser used depends on the effective language version, resolved in
+    this order (first non-empty wins):
+
+    1. ``language_level`` — explicit per-parse override (from the RPC request).
+    2. In-source signals: PEP-263-style ``# -*- python: 2 -*-`` magic comment,
+       then ``#!/usr/bin/env python2`` shebang.
+    3. ``project_language_level`` — project metadata (pyproject.toml /
+       setup.cfg classifier or ``requires-python``); resolved once per RPC
+       call by the handler.
+    4. ``REWRITE_PYTHON_VERSION`` environment variable (process-wide default).
+
+    Values starting with "2" select the parso-based Py2ParserVisitor; anything
+    else uses the ast-based Python 3 parser.
     """
+    from rewrite.python._version_detect import detect_from_source
+
+    effective_version = (
+        language_level
+        or detect_from_source(source)
+        or project_language_level
+        or _python_version
+    )
+
     # Compute the source_path that will be stored on the LST
     source_path = Path(path)
     if relative_to is not None:
@@ -280,7 +305,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
     try:
         from rewrite import Markers
 
-        if _python_version.startswith("2"):
+        if effective_version.startswith("2"):
             # Python 2: Try Python 3 ast-based parser first (handles most Python 2 code),
             # fall back to parso-based parser for Python 2-specific syntax
             from rewrite.python._parser_visitor import ParserVisitor
@@ -290,7 +315,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
                 cu = ParserVisitor(source, path, ty_client).visit(tree)
             except SyntaxError:
                 from rewrite.python._py2_parser_visitor import Py2ParserVisitor
-                cu = Py2ParserVisitor(source, path, _python_version).parse()
+                cu = Py2ParserVisitor(source, path, effective_version).parse()
         else:
             # Python 3: Use standard ast-based parser
             from rewrite.python._parser_visitor import ParserVisitor
@@ -396,11 +421,21 @@ def handle_parse(params: dict) -> List[str]:
 
     inputs = params.get('inputs', [])
     relative_to = params.get('relativeTo')
+    # Per-parse options forwarded from the client (e.g. {"languageLevel": "2.7"}).
+    # Absent for older clients; absent or unknown keys are silently ignored.
+    options = params.get('options') or {}
+    language_level = options.get('languageLevel')
     results = []
 
     # If no relativeTo provided, try to infer from absolute input paths
     if not relative_to:
         relative_to = _infer_project_root(inputs)
+
+    # Resolve project-level language version once per request; per-file
+    # detection (shebang / magic comment) can still override this inside
+    # parse_python_source.
+    from rewrite.python._version_detect import detect_from_project
+    project_language_level = detect_from_project(relative_to) if relative_to else None
 
     # Create a ty-types client for this parse batch
     ty_client = None
@@ -421,9 +456,13 @@ def handle_parse(params: dict) -> List[str]:
     try:
         for i, input_item in enumerate(inputs):
             if isinstance(input_item, str):
-                result = parse_python_file(input_item, relative_to, ty_client)
+                result = parse_python_file(input_item, relative_to, ty_client,
+                                           language_level=language_level,
+                                           project_language_level=project_language_level)
             elif 'path' in input_item:
-                result = parse_python_file(input_item['path'], relative_to, ty_client)
+                result = parse_python_file(input_item['path'], relative_to, ty_client,
+                                           language_level=language_level,
+                                           project_language_level=project_language_level)
             elif 'text' in input_item or 'source' in input_item:
                 source = input_item.get('text') if 'text' in input_item else input_item.get('source')
                 path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
@@ -436,9 +475,13 @@ def handle_parse(params: dict) -> List[str]:
                     os.makedirs(os.path.dirname(disk_path), exist_ok=True)
                     with open(disk_path, 'w', encoding='utf-8') as f:
                         f.write(source)
-                    result = parse_python_source(source, disk_path, base_dir, ty_client)
+                    result = parse_python_source(source, disk_path, base_dir, ty_client,
+                                                 language_level=language_level,
+                                                 project_language_level=project_language_level)
                 else:
-                    result = parse_python_source(source, path, relative_to, ty_client)
+                    result = parse_python_source(source, path, relative_to, ty_client,
+                                                 language_level=language_level,
+                                                 project_language_level=project_language_level)
             else:
                 logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
                 continue
@@ -459,6 +502,14 @@ def handle_parse_project(params: dict) -> List[dict]:
     project_path = params.get('projectPath', '.')
     exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne'])
     relative_to = params.get('relativeTo') or project_path
+    # Per-request explicit override (mirror of the Parse RPC options carrier).
+    options = params.get('options') or {}
+    language_level = options.get('languageLevel')
+
+    # Resolve project-level language version once for the whole walk; each
+    # file may still override it via in-source signals inside parse_python_source.
+    from rewrite.python._version_detect import detect_from_project
+    project_language_level = detect_from_project(project_path)
 
     results = []
 
@@ -478,7 +529,9 @@ def handle_parse_project(params: dict) -> List[dict]:
                 if file.endswith('.py'):
                     path = os.path.join(root, file)
                     try:
-                        result = parse_python_file(path, relative_to, ty_client)
+                        result = parse_python_file(path, relative_to, ty_client,
+                                                   language_level=language_level,
+                                                   project_language_level=project_language_level)
                         results.append(result)
                     except Exception as e:
                         logger.error(f"Error parsing {path}: {e}")
