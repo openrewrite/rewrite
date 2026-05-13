@@ -269,4 +269,17 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void whitespaceBeforeArgumentList() {
+        rewriteRun(
+          scala(
+            """
+              val m = Map (
+                "a" -> 1
+              )
+              """
+          )
+        );
+    }
 }

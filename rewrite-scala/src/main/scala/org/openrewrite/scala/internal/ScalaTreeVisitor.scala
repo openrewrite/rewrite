@@ -740,6 +740,7 @@ class ScalaTreeVisitor(
     } else false
 
     val args = new util.ArrayList[JRightPadded[Expression]]()
+    var argContainerPrefix = Space.EMPTY
     val markers = new util.ArrayList[org.openrewrite.marker.Marker]()
     import org.openrewrite.scala.marker.FunctionApplication
     markers.add(FunctionApplication.create())
@@ -762,6 +763,9 @@ class ScalaTreeVisitor(
       // Normal parenthesized arguments: Seq(1, 2)
       val parenPos = positionOfNext("(")
       if (parenPos >= 0) {
+        if (parenPos > cursor) {
+          argContainerPrefix = Space.format(source, cursor, parenPos)
+        }
         cursor = parenPos + 1
       }
 
@@ -805,7 +809,7 @@ class ScalaTreeVisitor(
       JRightPadded.build(select),
       null, // typeParameters
       methodName,
-      JContainer.build(Space.EMPTY, args, Markers.EMPTY),
+      JContainer.build(argContainerPrefix, args, Markers.EMPTY),
       methodTypeOfTree(app)
     )
   }
@@ -1023,7 +1027,7 @@ class ScalaTreeVisitor(
       pos < source.length && source.charAt(pos) == '{'
     } else false
 
-    val argContainerPrefix = Space.EMPTY
+    var argContainerPrefix = Space.EMPTY
     val args = new util.ArrayList[JRightPadded[Expression]]()
 
     if (isBlockArg) {
@@ -1044,6 +1048,9 @@ class ScalaTreeVisitor(
       if (app.args.nonEmpty) {
         val parenPos = positionOfNext("(")
         if (parenPos >= 0) {
+          if (parenPos > cursor) {
+            argContainerPrefix = Space.format(source, cursor, parenPos)
+          }
           cursor = parenPos + 1
         }
       }
