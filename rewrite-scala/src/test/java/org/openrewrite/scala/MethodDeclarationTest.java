@@ -320,6 +320,22 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void functionTypes() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def make1(): Int => Int = x => x + 1
+                  def make2(): () => Int = () => 42
+                  def make3(): (Int, String) => Boolean = (i, s) => s.length == i
+                  def apply(f: Int => Int, x: Int): Int = f(x)
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void implicitInSecondParamList() {
         rewriteRun(
             scala(

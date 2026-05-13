@@ -5429,15 +5429,17 @@ class ScalaTreeVisitor(
         val colonIdx = betweenText.indexOf(':')
         val equalsIdx = betweenText.indexOf('=')
 
-        // Only use the type if there's a colon BEFORE the equals sign (explicit type annotation)
-        if (colonIdx >= 0 && (equalsIdx < 0 || colonIdx < equalsIdx)) {
+        // Only use the type if there's a colon BEFORE the equals sign (explicit type annotation).
+        // For function types like `Int => Int`, the first `=` belongs to the `=>` arrow, not the
+        // body assignment — guard against picking that up as the body separator.
+        val arrowIdx = betweenText.indexOf("=>")
+        val bodyEqualsIdx = if (equalsIdx == arrowIdx && arrowIdx >= 0) {
+          betweenText.indexOf('=', arrowIdx + 2)
+        } else equalsIdx
+        if (colonIdx >= 0 && (bodyEqualsIdx < 0 || colonIdx < bodyEqualsIdx)) {
           val beforeColon = Space.format(betweenText.substring(0, colonIdx))
           cursor = cursor + colonIdx + 1
-          val visited = visitTree(tpt) match {
-            case tt: TypeTree => tt
-            case id: J.Identifier => id
-            case _ => null
-          }
+          val visited = visitTypeTree(tpt)
           if (visited != null && beforeColon != Space.EMPTY) {
             visited.withMarkers(visited.getMarkers.addIfAbsent(
               org.openrewrite.scala.marker.ReturnTypeColonPrefix.create(beforeColon))).asInstanceOf[TypeTree]
@@ -5736,24 +5738,7 @@ class ScalaTreeVisitor(
       val colonIdx = colonSearch.indexOf(':')
       if (colonIdx >= 0) cursor = cursor + colonIdx + 1
 
-      val result = if (vd.tpt.isInstanceOf[untpd.Function]) {
-        // Function types (Int => Int) — create identifier from source text
-        val typeStart = Math.max(0, vd.tpt.span.start - offsetAdjustment)
-        val typeEnd = Math.max(0, vd.tpt.span.end - offsetAdjustment)
-        val typePrefix = if (cursor < typeStart && typeStart <= source.length) {
-          Space.format(source, cursor, typeStart)
-        } else Space.EMPTY
-        val typeText = if (typeStart < typeEnd && typeEnd <= source.length) {
-          source.substring(typeStart, typeEnd)
-        } else "Any"
-        ident(typeText, typePrefix)
-      } else {
-        visitTree(vd.tpt) match {
-          case tt: TypeTree => tt
-          case id: J.Identifier => id
-          case _ => null
-        }
-      }
+      val result = visitTypeTree(vd.tpt)
       if (vd.tpt.span.exists) {
         updateCursor(vd.tpt.span.end)
       }
@@ -6777,6 +6762,132 @@ class ScalaTreeVisitor(
    */
   private def visitSyntheticTypeTree(tt: Trees.TypeTree[?]): J =
     new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY)
+
+  /**
+   * Visit a tree in a type position and return a `TypeTree`. Handles `untpd.Function` in a
+   * type context (e.g. `Int => Int` as a return type or val type ascription) by building an
+   * `S.FunctionType`. For other tree shapes, delegates to `visitTree` and accepts any result
+   * that is already a `TypeTree`.
+   */
+  private def visitTypeTree(tpt: Trees.Tree[?]): TypeTree = tpt match {
+    case f: untpd.Function => visitFunctionType(f)
+    case _ =>
+      visitTree(tpt) match {
+        case tt: TypeTree => tt
+        case id: J.Identifier => id
+        case _ => null
+      }
+  }
+
+  /**
+   * Build an `S.FunctionType` for an `untpd.Function` node used in a type position
+   * (e.g. `Int => Int`, `(Int, String) => Boolean`, `() => Unit`). Each function-type
+   * argument is itself a synthetic `ValDef` whose `tpt` carries the actual parameter
+   * type and source span.
+   */
+  private def visitFunctionType(func: untpd.Function): S.FunctionType = {
+    val funcStart = Math.max(0, func.span.start - offsetAdjustment)
+    val funcEnd = Math.max(0, func.span.end - offsetAdjustment)
+    val prefix = if (cursor < funcStart && funcStart <= source.length) {
+      Space.format(source, cursor, funcStart)
+    } else Space.EMPTY
+    cursor = Math.max(cursor, funcStart)
+
+    val funcSource = if (funcStart < funcEnd && funcEnd <= source.length) {
+      source.substring(funcStart, funcEnd)
+    } else ""
+
+    // Find the arrow within the function-type source.
+    val relArrowIdx = funcSource.indexOf("=>")
+    val arrowAbs = if (relArrowIdx >= 0) funcStart + relArrowIdx else funcEnd
+
+    // Detect whether the parameter list is parenthesized. A single unnamed param like
+    // `Int => Int` is unparenthesized; everything else (`()`, `(Int)`, `(Int, Long)`)
+    // uses parentheses.
+    val headTrimmed = funcSource.dropWhile(Character.isWhitespace)
+    val parenthesized = headTrimmed.startsWith("(")
+
+    val containerBefore = if (parenthesized) {
+      val openParenAbs = funcStart + funcSource.indexOf('(')
+      val before = if (cursor < openParenAbs) Space.format(source, cursor, openParenAbs) else Space.EMPTY
+      cursor = openParenAbs + 1
+      before
+    } else Space.EMPTY
+
+    val paramElements = new util.ArrayList[JRightPadded[TypeTree]]()
+    val params = func.args
+    val closeParenAbs = if (parenthesized) {
+      // Find the matching `)` before the arrow.
+      val rel = funcSource.lastIndexOf(')', if (relArrowIdx >= 0) relArrowIdx - 1 else funcSource.length - 1)
+      if (rel >= 0) funcStart + rel else arrowAbs
+    } else arrowAbs
+
+    for (i <- params.indices) {
+      val param = params(i)
+      // For a function *type*, each arg ValDef carries the type in `tpt`.
+      val paramTpt: Trees.Tree[?] = param match {
+        case vd: Trees.ValDef[?] if vd.tpt != untpd.EmptyTree => vd.tpt
+        case other => other
+      }
+      val paramType = visitTypeTree(paramTpt)
+      val isLast = i == params.size - 1
+      val afterSpace: Space = if (!isLast) {
+        // Find the comma separating this param from the next.
+        val nextStart = Math.max(0, params(i + 1).span.start - offsetAdjustment)
+        if (cursor < nextStart && nextStart <= source.length) {
+          val between = source.substring(cursor, nextStart)
+          val commaIdx = between.indexOf(',')
+          if (commaIdx >= 0) {
+            val space = Space.format(between.substring(0, commaIdx))
+            cursor = cursor + commaIdx + 1
+            space
+          } else Space.EMPTY
+        } else Space.EMPTY
+      } else if (parenthesized) {
+        // Last param in parens: capture space up to `)`.
+        if (cursor < closeParenAbs && closeParenAbs <= source.length) {
+          Space.format(source, cursor, closeParenAbs)
+        } else Space.EMPTY
+      } else {
+        // Unparen single-arg form: param has no separator; the space before `=>`
+        // belongs to the return-type padding, not the param's after-space.
+        Space.EMPTY
+      }
+      paramElements.add(JRightPadded.build(paramType).withAfter(afterSpace))
+    }
+
+    if (parenthesized) {
+      cursor = closeParenAbs + 1
+    }
+
+    val parameters = JContainer.build(containerBefore, paramElements, Markers.EMPTY)
+
+    // Space immediately before `=>`.
+    val beforeArrow = if (cursor < arrowAbs && arrowAbs <= source.length) {
+      Space.format(source, cursor, arrowAbs)
+    } else Space.EMPTY
+
+    // Move past the arrow.
+    if (arrowAbs >= cursor) {
+      cursor = arrowAbs + 2
+    }
+
+    // The return type's own prefix (extracted by visitTree) will carry the space
+    // immediately after `=>`.
+    val returnType = visitTypeTree(func.body)
+
+    if (funcEnd > cursor) cursor = funcEnd
+
+    S.FunctionType.build(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      parenthesized,
+      parameters,
+      new JLeftPadded(beforeArrow, returnType, Markers.EMPTY),
+      typeOfTree(func)
+    )
+  }
 
   /**
    * Returns `true` when the raw-name slice starting at `rawNameStart` (the first non-backtick
