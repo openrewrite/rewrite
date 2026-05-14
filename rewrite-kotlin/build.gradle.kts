@@ -38,6 +38,9 @@ dependencies {
     testImplementation("com.github.ajalt.clikt:clikt:3.5.0")
     testImplementation("com.squareup:javapoet:1.13.0")
     testImplementation("com.google.testing.compile:compile-testing:0.+")
+
+    // For driving kotlinc with the rewrite-kotlin compiler plugin loaded in tests.
+    testImplementation("dev.zacsweers.kctfork:core:0.12.1")
 }
 
 configurations.matching { it.name == "kotlinBouncyCastleConfiguration" }.configureEach {
@@ -58,11 +61,17 @@ java {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_1_8)
+        // Required to override `FirPropertyChecker.check`, whose signature uses
+        // context parameters as of Kotlin 2.2. Scoped to this module because the
+        // recipe DSL compiler plugin in `org.openrewrite.kotlin.recipe.internal`
+        // depends on it.
+        freeCompilerArgs.add("-Xcontext-parameters")
     }
 }
 
 tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileTestKotlin") {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_21)
+        freeCompilerArgs.add("-Xcontext-parameters")
     }
 }
