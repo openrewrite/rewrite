@@ -403,4 +403,40 @@ class MethodDeclarationTest implements RewriteTest {
             );
         }
     }
+
+    @Test
+    void parameterlessDef() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo: Int = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void parameterlessDefInTrait() {
+        rewriteRun(
+            scala(
+                """
+                trait T {
+                  def bar: String
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void spaceBeforeEqualsWithNoSpaceAfter() {
+        rewriteRun(scala("def f(): Unit ={ }"));
+    }
+
+    @Test
+    void spaceBeforeColonOnMethodParameter() {
+        rewriteRun(scala("def f(map : Int): Int = 1"));
+    }
 }

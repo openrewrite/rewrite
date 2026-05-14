@@ -280,12 +280,23 @@ class TryTest implements RewriteTest {
                 } catch {
                   case _: IllegalArgumentException | _: IllegalStateException => 
                     println("illegal argument or state")
-                  case e: Throwable => 
+                  case e: Throwable =>
                     println(s"unexpected error: ${e.getMessage}")
                 }
               }
               """
           )
         );
+    }
+
+    @Test
+    void spaceBeforeColonOnCatchParameter() {
+        rewriteRun(scala(
+            """
+            object T {
+              try { 1 } catch { case e : Exception => 2 }
+            }
+            """
+        ));
     }
 }

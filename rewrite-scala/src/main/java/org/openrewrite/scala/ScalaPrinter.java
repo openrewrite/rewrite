@@ -270,6 +270,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     visit(varDecl.getVariables().get(0).getName(), p);
                 }
                 if (varDecl.getTypeExpression() != null) {
+                    if (varDecl.getVarargs() != null) {
+                        visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
+                    }
                     p.append(":");
                     visit(varDecl.getTypeExpression(), p);
                 }
@@ -403,6 +406,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     // The colon and space between name and type in Scala parameter syntax
                     // Type prefix from parser may or may not include the space
                     TypeTree typeExpr = varDecl.getTypeExpression();
+                    if (varDecl.getVarargs() != null) {
+                        visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
+                    }
                     p.append(":");
                     visit(typeExpr, p);
                 }
@@ -467,8 +473,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 boolean procedureSyntax = method.getMarkers().findFirst(
                         org.openrewrite.scala.marker.OmitBraces.class).isPresent();
                 if (!procedureSyntax) {
-                    Space beforeEquals = actualBody instanceof J.Block ?
-                            ((J.Block) actualBody).getPrefix() : Space.SINGLE_SPACE;
+                    final J finalActualBody = actualBody;
+                    Space beforeEquals = method.getMarkers()
+                            .findFirst(org.openrewrite.scala.marker.MethodBodyEqualsPrefix.class)
+                            .map(org.openrewrite.scala.marker.MethodBodyEqualsPrefix::getPrefix)
+                            .orElseGet(() -> finalActualBody instanceof J.Block ?
+                                    ((J.Block) finalActualBody).getPrefix() : Space.SINGLE_SPACE);
                     visitSpace(beforeEquals, Space.Location.BLOCK_PREFIX, p);
                     p.append("=");
                 }
@@ -494,7 +504,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             boolean omitBodyBraces = body.getMarkers().findFirst(
                     org.openrewrite.scala.marker.OmitBraces.class).isPresent();
             if (!procedureSyntax) {
-                visitSpace(body.getPrefix(), Space.Location.BLOCK_PREFIX, p);
+                Space beforeEquals = method.getMarkers()
+                        .findFirst(org.openrewrite.scala.marker.MethodBodyEqualsPrefix.class)
+                        .map(org.openrewrite.scala.marker.MethodBodyEqualsPrefix::getPrefix)
+                        .orElse(body.getPrefix());
+                visitSpace(beforeEquals, Space.Location.BLOCK_PREFIX, p);
                 p.append("=");
             }
             if (omitBodyBraces && body.getStatements().size() == 1) {
@@ -545,6 +559,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 }
                 if (vd.getTypeExpression() != null) {
                     TypeTree te = vd.getTypeExpression();
+                    if (vd.getVarargs() != null) {
+                        visitSpace(vd.getVarargs(), Space.Location.VARARGS, p);
+                    }
                     p.append(":");
                     visit(te, p);
                 }
@@ -828,6 +845,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                         }
                         if (varDecl.getTypeExpression() != null) {
                             TypeTree typeExpr = varDecl.getTypeExpression();
+                            if (varDecl.getVarargs() != null) {
+                                visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
+                            }
                             p.append(":");
                             visit(typeExpr, p);
                         }
@@ -1040,6 +1060,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitTypeAscription(S.TypeAscription typeAscription, PrintOutputCapture<P> p) {
         beforeSyntax(typeAscription, Space.Location.LANGUAGE_EXTENSION, p);
         visit(typeAscription.getExpression(), p);
+        typeAscription.getMarkers()
+                .findFirst(org.openrewrite.scala.marker.TypeAscriptionColonPrefix.class)
+                .ifPresent(m -> visitSpace(m.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         p.append(':');
         visit(typeAscription.getTypeTree(), p);
         afterSyntax(typeAscription, p);
@@ -1627,6 +1650,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 }
                 if (varDecl.getTypeExpression() != null) {
                     TypeTree typeExpr = varDecl.getTypeExpression();
+                    if (varDecl.getVarargs() != null) {
+                        visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
+                    }
                     p.append(":");
                     visit(typeExpr, p);
                 }

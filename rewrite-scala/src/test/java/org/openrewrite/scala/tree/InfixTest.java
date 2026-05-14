@@ -66,9 +66,18 @@ class InfixTest implements RewriteTest {
     }
 
     @Test
-    void rightAssocWithExtraWhitespace() {
+    void extraSpace() {
         rewriteRun(
-          scala("val xs = 1  ::  Nil")
+          scala(
+            """
+            import scala.language.postfixOps
+            object Test {
+              val rightAssoc = 1  ::  Nil
+              val binary = 1  +  2
+              val postfix = List(1, 2)  reverse
+            }
+            """
+          )
         );
     }
 
@@ -291,5 +300,6 @@ class InfixTest implements RewriteTest {
               )
             );
         }
+
     }
 }

@@ -352,4 +352,26 @@ class ClassDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void paramNameEndingInUnderscore() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(tag_ : String)
+                """
+            )
+        );
+    }
+
+    @Test
+    void typeParamContextBoundWithSpaceBeforeColon() {
+        rewriteRun(
+            scala(
+                """
+                case class Foo[T : Encoder]()
+                """
+            )
+        );
+    }
 }
