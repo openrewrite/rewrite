@@ -64,4 +64,17 @@ class ForYieldTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void significantCharactersInComments() {
+        // buildSFor — `yield` keyword in line comment inside for-comprehension body
+        rewriteRun(
+          scala(
+            """
+              val ys = for { i <- 1 to 3 // yield
+              } yield i
+              """
+          )
+        );
+    }
 }

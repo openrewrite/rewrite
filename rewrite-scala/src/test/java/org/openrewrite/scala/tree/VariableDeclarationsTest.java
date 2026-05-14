@@ -205,4 +205,26 @@ class VariableDeclarationsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitValDef — `(` in line comment between `val` and tuple pattern
+        rewriteRun(
+          scala(
+            """
+            val // (
+            (a, b) = (1, 2)
+            """
+          )
+        );
+        // visitValDef — `_` in line comment between `val` and underscore pattern
+        rewriteRun(
+          scala(
+            """
+            val // _
+            _ = println("x")
+            """
+          )
+        );
+    }
 }

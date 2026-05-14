@@ -501,4 +501,19 @@ class MatchTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void significantCharactersInComments() {
+        // buildCasesBlock — `=>` arrow in case line comment
+        rewriteRun(
+          scala(
+            """
+            val r = 1 match {
+              case x // =>
+              => x
+            }
+            """
+          )
+        );
+    }
 }

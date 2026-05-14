@@ -147,4 +147,18 @@ class TypeApplyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitTypeApply — `)` in line comment closing the value-arg list of a type-applied call
+        rewriteRun(
+          scala(
+            """
+              def f[T](x: T): T = x
+              val r = f[Int](1 // )
+              )
+              """
+          )
+        );
+    }
 }

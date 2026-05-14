@@ -480,4 +480,66 @@ class MethodDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void significantCharactersInComments() {
+        // buildKeywordMethodInvocation — this(...) auxiliary constructor close paren in line comment
+        rewriteRun(
+          scala(
+            """
+              class C(val x: Int) {
+                def this() = this(0 // )
+                )
+              }
+              """
+          )
+        );
+        // reparseProcedureBody — `{` in block comment before procedure body
+        rewriteRun(
+          scala(
+            """
+              class C {
+                def foo() /* { */ {
+                  println("x")
+                }
+              }
+              """
+          )
+        );
+        // visitDefDefImpl — type parameter close bracket in block comment
+        rewriteRun(
+          scala(
+            """
+              def f[T /* ] */](x: T): T = x
+              """
+          )
+        );
+        // visitDefDefImpl — parameter list close paren in line comment
+        rewriteRun(
+          scala(
+            """
+              def f(x: Int // )
+              ): Int = x
+              """
+          )
+        );
+        // visitExtMethods — extension method close paren in block comment
+        rewriteRun(
+          scala(
+            """
+              extension (x: Int /* ) */ ) {
+                def doubled: Int = x * 2
+              }
+              """
+          )
+        );
+        // visitTypeParameter — context bound colon in block comment
+        rewriteRun(
+          scala(
+            """
+              def f[A /* : */ : Ordering](x: A): A = x
+              """
+          )
+        );
+    }
 }

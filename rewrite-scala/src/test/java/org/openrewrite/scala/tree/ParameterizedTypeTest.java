@@ -167,4 +167,16 @@ class ParameterizedTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitAppliedTypeTree — `[` in block comment between type constructor and type args
+        rewriteRun(
+          scala(
+            """
+              val xs: List /* [ */ [Int] = List(1)
+              """
+          )
+        );
+    }
 }
