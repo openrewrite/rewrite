@@ -816,7 +816,7 @@ class ScalaTreeVisitor(
               args.add(JRightPadded.build(expr).withAfter(afterComma))
             } else {
               val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
-              val closePos = source.indexOf(')', Math.max(cursor, argEnd))
+              val closePos = positionOfNext(")", Math.max(cursor, argEnd))
               val beforeClose = if (closePos > argEnd) {
                 Space.format(source, argEnd, closePos)
               } else Space.EMPTY

@@ -292,4 +292,17 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void lineCommentContainingCloseParenInArgList() {
+        rewriteRun(
+          scala(
+            """
+              val xs = Seq(
+                1 // )
+              )
+              """
+          )
+        );
+    }
 }
