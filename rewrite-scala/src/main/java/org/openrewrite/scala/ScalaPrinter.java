@@ -278,13 +278,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 }
                 visitSpace(paramPadded.getAfter(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
                 p.append("=>");
-                for (Statement stmt : aCatch.getBody().getStatements()) {
-                    visit(stmt, p);
-                }
+                // Catch case body is a J.Block with OmitBraces — delegate to visitBlock
+                // so the block prefix, inter-statement padding (incl. Semicolon markers),
+                // and end space are all printed correctly.
+                visit(aCatch.getBody(), p);
             }
-            // Close catch block — use end space from last catch body if available
-            J.Try.Catch lastCatch = tryable.getCatches().get(tryable.getCatches().size() - 1);
-            visitSpace(lastCatch.getBody().getEnd(), Space.Location.BLOCK_END, p);
             if (!indentedCatch) {
                 p.append("}");
             }
