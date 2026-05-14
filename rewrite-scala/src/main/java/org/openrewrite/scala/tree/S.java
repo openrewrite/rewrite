@@ -1565,4 +1565,126 @@ public interface S extends J {
             }
         }
     }
+
+    /**
+     * Represents a Scala function type: {@code Int => Int}, {@code (Int, String) => Boolean},
+     * or {@code () => Unit}. Modeled as a {@link TypeTree} so it is usable anywhere a type is
+     * expected (return type, parameter type, val type ascription).
+     *
+     * <p>The {@code parenthesized} flag distinguishes the single-arg {@code Int => Int}
+     * (unparenthesized) form from {@code (Int) => Int} and from zero-arg or multi-arg forms,
+     * which always require parentheses.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class FunctionType implements S, TypeTree, Expression {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        /**
+         * Whether the parameter list is surrounded by parentheses. {@code false} only for the
+         * single-arg form {@code Int => Int}; always {@code true} for {@code ()}, {@code (Int)},
+         * and {@code (Int, ...)}.
+         */
+        @With @Getter
+        boolean parenthesized;
+
+        /**
+         * The parameter types. The container's before-space is the space before {@code (}
+         * when parenthesized, or {@code Space.EMPTY} otherwise.
+         */
+        JContainer<TypeTree> parameters;
+
+        /**
+         * The return type. The padding's before-space is the whitespace immediately before
+         * {@code =>}; the return TypeTree's own prefix carries the space after {@code =>}.
+         */
+        JLeftPadded<TypeTree> returnType;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public static FunctionType build(UUID id, Space prefix, Markers markers, boolean parenthesized,
+                                         JContainer<TypeTree> parameters, JLeftPadded<TypeTree> returnType,
+                                         @Nullable JavaType type) {
+            return new FunctionType(null, id, prefix, markers, parenthesized, parameters, returnType, type);
+        }
+
+        public List<TypeTree> getParameters() {
+            return parameters.getElements();
+        }
+
+        public FunctionType withParameters(List<TypeTree> parameters) {
+            return getPadding().withParameters(JContainer.withElements(this.parameters, parameters));
+        }
+
+        public TypeTree getReturnType() {
+            return returnType.getElement();
+        }
+
+        public FunctionType withReturnType(TypeTree returnType) {
+            return getPadding().withReturnType(JLeftPadded.withElement(this.returnType, returnType));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitFunctionType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final FunctionType t;
+
+            public JContainer<TypeTree> getParameters() {
+                return t.parameters;
+            }
+
+            public FunctionType withParameters(JContainer<TypeTree> parameters) {
+                return t.parameters == parameters ? t :
+                        new FunctionType(null, t.id, t.prefix, t.markers, t.parenthesized, parameters, t.returnType, t.type);
+            }
+
+            public JLeftPadded<TypeTree> getReturnType() {
+                return t.returnType;
+            }
+
+            public FunctionType withReturnType(JLeftPadded<TypeTree> returnType) {
+                return t.returnType == returnType ? t :
+                        new FunctionType(null, t.id, t.prefix, t.markers, t.parenthesized, t.parameters, returnType, t.type);
+            }
+        }
+    }
 }

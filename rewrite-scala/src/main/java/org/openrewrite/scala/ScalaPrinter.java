@@ -595,6 +595,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitAnnotatedExpression((S.AnnotatedExpression) tree, p);
         } else if (tree instanceof S.RefinedType) {
             return visitRefinedType((S.RefinedType) tree, p);
+        } else if (tree instanceof S.FunctionType) {
+            return visitFunctionType((S.FunctionType) tree, p);
         } else if (tree instanceof S.Macro) {
             return visitMacro((S.Macro) tree, p);
         } else if (tree instanceof S.ExtensionMethods) {
@@ -1544,6 +1546,33 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visit(annotatedExpression.getAnnotation(), p);
         afterSyntax(annotatedExpression, p);
         return annotatedExpression;
+    }
+
+    public J visitFunctionType(S.FunctionType functionType, PrintOutputCapture<P> p) {
+        beforeSyntax(functionType, Space.Location.LANGUAGE_EXTENSION, p);
+        JContainer<TypeTree> params = functionType.getPadding().getParameters();
+        visitSpace(params.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        if (functionType.isParenthesized()) {
+            p.append('(');
+        }
+        List<JRightPadded<TypeTree>> elements = params.getPadding().getElements();
+        for (int i = 0; i < elements.size(); i++) {
+            JRightPadded<TypeTree> element = elements.get(i);
+            visit(element.getElement(), p);
+            visitSpace(element.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            if (i < elements.size() - 1) {
+                p.append(',');
+            }
+        }
+        if (functionType.isParenthesized()) {
+            p.append(')');
+        }
+        JLeftPadded<TypeTree> rt = functionType.getPadding().getReturnType();
+        visitSpace(rt.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append("=>");
+        visit(rt.getElement(), p);
+        afterSyntax(functionType, p);
+        return functionType;
     }
 
     public J visitRefinedType(S.RefinedType refinedType, PrintOutputCapture<P> p) {
