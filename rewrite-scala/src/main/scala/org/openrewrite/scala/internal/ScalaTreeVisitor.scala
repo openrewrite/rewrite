@@ -742,11 +742,15 @@ class ScalaTreeVisitor(
     // The select is the identifier (e.g., "arr")
     val select = visitIdent(id).asInstanceOf[Expression]
 
-    // Detect block argument syntax: `Seq { 1 }` vs parenthesized `Seq(1)`.
-    val isBlockArg = if (app.args.nonEmpty) {
-      val pos = indexOfNextNonWhitespace(cursor)
-      pos < source.length && source.charAt(pos) == '{'
-    } else false
+    // Detect argument delimiter form:
+    //   `{ ... }` — block argument (`Seq { 1 }`)
+    //   `: ...`   — Scala 3 colon-indented argument (`f: x => ...`)
+    //   `( ... )` — normal parenthesized argument list
+    val firstArgNonWs = if (app.args.nonEmpty) indexOfNextNonWhitespace(cursor) else -1
+    val isBlockArg = firstArgNonWs >= 0 && firstArgNonWs < source.length &&
+      source.charAt(firstArgNonWs) == '{'
+    val isColonArg = !isBlockArg && firstArgNonWs >= 0 && firstArgNonWs < source.length &&
+      source.charAt(firstArgNonWs) == ':'
 
     val args = new util.ArrayList[JRightPadded[Expression]]()
     var argContainerPrefix = Space.EMPTY
@@ -765,6 +769,26 @@ class ScalaTreeVisitor(
           case block: J.Block =>
             val blockExpr = new S.StatementExpression(Tree.randomId(), block.withPrefix(argSpace))
             args.add(JRightPadded.build(blockExpr.asInstanceOf[Expression]))
+          case _ =>
+        }
+      }
+    } else if (isColonArg) {
+      // Colon-indented argument: `f: arg` or `f:\n  arg`.
+      markers.add(new IndentedSyntax(Tree.randomId()))
+      if (firstArgNonWs > cursor) {
+        argContainerPrefix = Space.format(source, cursor, firstArgNonWs)
+      }
+      cursor = firstArgNonWs + 1
+      for (arg <- app.args) {
+        visitTree(arg) match {
+          case expr: Expression =>
+            args.add(JRightPadded.build(expr))
+          case block: J.Block =>
+            val blockExpr = new S.StatementExpression(Tree.randomId(), block)
+            args.add(JRightPadded.build(blockExpr.asInstanceOf[Expression]))
+          case stmt: Statement =>
+            val stmtExpr = new S.StatementExpression(Tree.randomId(), stmt)
+            args.add(JRightPadded.build(stmtExpr.asInstanceOf[Expression]))
           case _ =>
         }
       }
@@ -946,7 +970,8 @@ class ScalaTreeVisitor(
         val innerEnd = Math.max(0, innerApp.span.end - offsetAdjustment)
         if (innerEnd > cursor && innerEnd <= source.length) cursor = innerEnd
 
-        // Outer arg list is `{ ... }` when next non-ws is `{`, otherwise `(...)`.
+        // Outer arg list is `{ ... }` when next non-ws is `{`, `: ...` when it's `:`,
+        // otherwise parenthesized `(...)`.
         val firstNonWs = indexOfNextNonWhitespace(cursor)
         val outerArgs = new util.ArrayList[JRightPadded[Expression]]()
 
@@ -957,6 +982,20 @@ class ScalaTreeVisitor(
           val markers = Markers.build(Collections.singletonList(new BlockArgument(Tree.randomId())))
           return S.FunctionCall.build(Tree.randomId(), prefix, markers,
             JRightPadded.build(fn), JContainer.build(Space.EMPTY, outerArgs, Markers.EMPTY), methodType)
+        }
+
+        if (firstNonWs < source.length && source.charAt(firstNonWs) == ':') {
+          // Colon-indented arg list: `foldLeft(0):\n  case ... => ...` — the fn-after space
+          // captures any whitespace between `)` and `:`, then the cursor moves past `:`
+          // so the arg's own prefix carries the newline+indent before its first token.
+          val functionAfterSpace = if (firstNonWs > cursor) Space.format(source, cursor, firstNonWs) else Space.EMPTY
+          cursor = firstNonWs + 1
+          for (arg <- app.args) outerArgs.add(JRightPadded.build(asExpression(visitTree(arg))))
+          finishAtAppEnd()
+          val markers = Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
+          return S.FunctionCall.build(Tree.randomId(), prefix, markers,
+            new JRightPadded(fn, functionAfterSpace, Markers.EMPTY),
+            JContainer.build(Space.EMPTY, outerArgs, Markers.EMPTY), methodType)
         }
 
         val functionAfterSpace = if (firstNonWs > cursor) Space.format(source, cursor, firstNonWs) else Space.EMPTY
@@ -1027,14 +1066,15 @@ class ScalaTreeVisitor(
           JContainer.build(Space.EMPTY, outerArgs, Markers.EMPTY), mt)
     }
 
-    // Determine if this is a block argument call (no parentheses):
-    //   list.foreach { x => println(x) }
-    // vs a normal parenthesized call:
-    //   list.foreach(x => println(x))
-    val isBlockArg = if (app.args.nonEmpty) {
-      val pos = indexOfNextNonWhitespace(cursor)
-      pos < source.length && source.charAt(pos) == '{'
-    } else false
+    // Determine the argument delimiter form:
+    //   `{ ... }` — block argument (`list.foreach { x => ... }`)
+    //   `: ...`   — Scala 3 colon-indented argument (`list.foreach: x => ...`)
+    //   `( ... )` — normal parenthesized argument list
+    val firstArgNonWs = if (app.args.nonEmpty) indexOfNextNonWhitespace(cursor) else -1
+    val isBlockArg = firstArgNonWs >= 0 && firstArgNonWs < source.length &&
+      source.charAt(firstArgNonWs) == '{'
+    val isColonArg = !isBlockArg && firstArgNonWs >= 0 && firstArgNonWs < source.length &&
+      source.charAt(firstArgNonWs) == ':'
 
     var argContainerPrefix = Space.EMPTY
     val args = new util.ArrayList[JRightPadded[Expression]]()
@@ -1049,6 +1089,27 @@ class ScalaTreeVisitor(
             // Keep the block as-is — the printer uses BlockArgument marker to print { }
             val blockExpr = new S.StatementExpression(Tree.randomId(), block)
             args.add(JRightPadded.build(blockExpr.asInstanceOf[Expression]))
+          case _ => cursor = savedCursor; return visitUnknown(app)
+        }
+      }
+    } else if (isColonArg) {
+      // Colon-indented argument: `f: arg` or `obj.method:\n  arg`. The captured
+      // space-before-`:` goes on the JContainer's prefix so it round-trips; the
+      // argument's own prefix carries the newline+indent before its first token.
+      if (firstArgNonWs > cursor) {
+        argContainerPrefix = Space.format(source, cursor, firstArgNonWs)
+      }
+      cursor = firstArgNonWs + 1
+      for (arg <- app.args) {
+        visitTree(arg) match {
+          case expr: Expression =>
+            args.add(JRightPadded.build(expr))
+          case block: J.Block =>
+            val blockExpr = new S.StatementExpression(Tree.randomId(), block)
+            args.add(JRightPadded.build(blockExpr.asInstanceOf[Expression]))
+          case stmt: Statement =>
+            val stmtExpr = new S.StatementExpression(Tree.randomId(), stmt)
+            args.add(JRightPadded.build(stmtExpr.asInstanceOf[Expression]))
           case _ => cursor = savedCursor; return visitUnknown(app)
         }
       }
@@ -1152,6 +1213,8 @@ class ScalaTreeVisitor(
 
     val markers = if (isBlockArg) {
       Markers.build(Collections.singletonList(new BlockArgument(Tree.randomId())))
+    } else if (isColonArg) {
+      Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
     } else {
       Markers.EMPTY
     }
@@ -6141,19 +6204,25 @@ class ScalaTreeVisitor(
   private def visitMatchImpl(matchTree: Trees.Match[?]): J = {
     val prefix = extractPrefix(matchTree.span)
 
-    // Partial-function literal `{ case pat => ... }` has a synthetic selector with NoSpan.
-    // Emit a J.Lambda (no params) whose body is the cases block; printer uses the marker
-    // to emit the `{ case ... => ... }` form.
+    // Partial-function literal: either `{ case pat => ... }` (brace form) or an
+    // indented form following a colon-arg call like `foldLeft(0):\n  case ...`.
+    // Both have a synthetic match selector with NoSpan.
     if (!matchTree.selector.span.exists) {
       val bs = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
-      val bi = bs.indexOf('{'); if (bi >= 0) cursor = cursor + bi + 1
-      val casesBlock = buildCasesBlock(matchTree)
+      val bi = bs.indexOf('{')
+      val ci = bs.indexOf("case")
+      val isBraceForm = bi >= 0 && (ci < 0 || bi < ci)
+      if (isBraceForm) cursor = cursor + bi + 1
+      val casesBlock = buildCasesBlock(matchTree, isBraceForm)
       updateCursor(matchTree.span.end)
       val parameters = new J.Lambda.Parameters(
         Tree.randomId(), Space.EMPTY, Markers.EMPTY, false, Collections.emptyList())
+      val lambdaMarkers = new util.ArrayList[org.openrewrite.marker.Marker]()
+      lambdaMarkers.add(new PartialFunctionLiteral(Tree.randomId()))
+      if (!isBraceForm) lambdaMarkers.add(new IndentedSyntax(Tree.randomId()))
       return new J.Lambda(
         Tree.randomId(), prefix,
-        Markers.build(Collections.singletonList(new PartialFunctionLiteral(Tree.randomId()))),
+        Markers.build(lambdaMarkers),
         parameters, Space.EMPTY, casesBlock, null)
     }
 
