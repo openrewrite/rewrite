@@ -418,4 +418,9 @@ class MethodDeclarationTest implements RewriteTest {
     void spaceBeforeEqualsWithNoSpaceAfter() {
         rewriteRun(scala("def f(): Unit ={ }"));
     }
+
+    @Test
+    void spaceBeforeColonOnMethodParameter() {
+        rewriteRun(scala("def f(map : Int): Int = 1"));
+    }
 }

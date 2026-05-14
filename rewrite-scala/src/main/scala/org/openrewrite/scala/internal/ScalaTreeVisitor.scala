@@ -2436,23 +2436,28 @@ class ScalaTreeVisitor(
     } else {
       // With a type, we need a full variable declaration
       val name = ident(displayName)
-      
+
       // Extract the type
       val sourceText = extractSource(vd.span)
       val colonIdx = sourceText.indexOf(':')
+      val nameLen = displayName.length
+      val nameEnd = sourceText.indexOf(displayName)
+      val beforeColon: Space = if (colonIdx > 0 && nameEnd >= 0 && nameEnd + nameLen <= colonIdx) {
+        Space.format(sourceText.substring(nameEnd + nameLen, colonIdx))
+      } else Space.EMPTY
       val typeSpace = if (colonIdx >= 0 && colonIdx + 1 < sourceText.length) {
         Space.format(sourceText.substring(colonIdx + 1).takeWhile(_.isWhitespace))
       } else {
         Space.SINGLE_SPACE
       }
-      
+
       val typeExpr: TypeTree = visitTree(vd.tpt) match {
         case tt: TypeTree => tt.withPrefix(typeSpace)
         case id: J.Identifier => id.withPrefix(typeSpace)
         case unknown: J.Unknown => unknown.withPrefix(typeSpace)  // Handle J.Unknown types
         case _ => null
       }
-      
+
       // Create the variable
       val variable = new J.VariableDeclarations.NamedVariable(
         Tree.randomId(),
@@ -2463,7 +2468,7 @@ class ScalaTreeVisitor(
         null,
         null
       )
-      
+
       // Create the variable declarations with a marker to indicate it's a lambda parameter
       import org.openrewrite.scala.marker.LambdaParameter
       new J.VariableDeclarations(
@@ -2473,7 +2478,7 @@ class ScalaTreeVisitor(
         Collections.emptyList(), // no annotations
         Collections.emptyList(), // no modifiers
         typeExpr,
-        null,
+        if (beforeColon != Space.EMPTY) beforeColon else null,
         Collections.emptyList(),
         Collections.singletonList(JRightPadded.build(variable))
       )
@@ -5905,6 +5910,17 @@ class ScalaTreeVisitor(
             (patSource, null)
           case _ => ("_", null)
         }
+        // Capture the whitespace between the param name and `:` (e.g. `e : Exception`).
+        val beforeColon: Space = if (paramType != null && caseDef.pat.span.exists) {
+          val patStart = Math.max(0, caseDef.pat.span.start - offsetAdjustment)
+          val patEnd = Math.max(0, caseDef.pat.span.end - offsetAdjustment)
+          val patSrc = if (patStart < patEnd && patEnd <= source.length) source.substring(patStart, patEnd) else ""
+          val colonAt = patSrc.indexOf(':')
+          val nameAt = if (paramName.nonEmpty) patSrc.indexOf(paramName) else -1
+          if (colonAt > 0 && nameAt >= 0 && nameAt + paramName.length <= colonAt) {
+            Space.format(patSrc.substring(nameAt + paramName.length, colonAt))
+          } else Space.EMPTY
+        } else Space.EMPTY
         updateCursor(caseDef.pat.span.end)
         val arrowAbs = source.indexOf("=>", cursor)
         val spaceBeforeArrow = if (arrowAbs >= cursor) Space.format(source, cursor, arrowAbs) else Space.EMPTY
@@ -5913,7 +5929,9 @@ class ScalaTreeVisitor(
         val paramId = ident(paramName, Space.format(" "))
         val namedVar = new J.VariableDeclarations.NamedVariable(Tree.randomId(), Space.EMPTY, Markers.EMPTY, paramId, Collections.emptyList(), null, null)
         val varDecl = new J.VariableDeclarations(Tree.randomId(), casePrefix, Markers.EMPTY,
-          Collections.emptyList(), Collections.emptyList(), paramType, null, Collections.emptyList(),
+          Collections.emptyList(), Collections.emptyList(), paramType,
+          if (beforeColon != Space.EMPTY) beforeColon else null,
+          Collections.emptyList(),
           Collections.singletonList(JRightPadded.build(namedVar)))
         val controlPrefix = if (catches.isEmpty) catchBraceSpace else Space.EMPTY
         val controlParens = new J.ControlParentheses[J.VariableDeclarations](Tree.randomId(), controlPrefix, Markers.EMPTY, JRightPadded.build(varDecl).withAfter(spaceBeforeArrow))
@@ -6037,6 +6055,17 @@ class ScalaTreeVisitor(
             (patSource, null)
           case _ => ("_", null)
         }
+        // Capture the whitespace between the param name and `:` (e.g. `e : Exception`).
+        val beforeColon: Space = if (paramType != null && caseDef.pat.span.exists) {
+          val patStart = Math.max(0, caseDef.pat.span.start - offsetAdjustment)
+          val patEnd = Math.max(0, caseDef.pat.span.end - offsetAdjustment)
+          val patSrc = if (patStart < patEnd && patEnd <= source.length) source.substring(patStart, patEnd) else ""
+          val colonAt = patSrc.indexOf(':')
+          val nameAt = if (paramName.nonEmpty) patSrc.indexOf(paramName) else -1
+          if (colonAt > 0 && nameAt >= 0 && nameAt + paramName.length <= colonAt) {
+            Space.format(patSrc.substring(nameAt + paramName.length, colonAt))
+          } else Space.EMPTY
+        } else Space.EMPTY
         updateCursor(caseDef.pat.span.end)
         val arrowAbs = source.indexOf("=>", cursor)
         val spaceBeforeArrow = if (arrowAbs >= cursor) Space.format(source, cursor, arrowAbs) else Space.EMPTY
@@ -6045,7 +6074,9 @@ class ScalaTreeVisitor(
         val paramId = ident(paramName, Space.format(" "))
         val namedVar = new J.VariableDeclarations.NamedVariable(Tree.randomId(), Space.EMPTY, Markers.EMPTY, paramId, Collections.emptyList(), null, null)
         val varDecl = new J.VariableDeclarations(Tree.randomId(), casePrefix, Markers.EMPTY,
-          Collections.emptyList(), Collections.emptyList(), paramType, null, Collections.emptyList(),
+          Collections.emptyList(), Collections.emptyList(), paramType,
+          if (beforeColon != Space.EMPTY) beforeColon else null,
+          Collections.emptyList(),
           Collections.singletonList(JRightPadded.build(namedVar)))
         val controlPrefix = if (catches.isEmpty) catchBraceSpace else Space.EMPTY
         val controlParens = new J.ControlParentheses[J.VariableDeclarations](Tree.randomId(), controlPrefix, Markers.EMPTY, JRightPadded.build(varDecl).withAfter(spaceBeforeArrow))

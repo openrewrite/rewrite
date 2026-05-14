@@ -270,6 +270,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     visit(varDecl.getVariables().get(0).getName(), p);
                 }
                 if (varDecl.getTypeExpression() != null) {
+                    if (varDecl.getVarargs() != null) {
+                        visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
+                    }
                     p.append(":");
                     visit(varDecl.getTypeExpression(), p);
                 }
@@ -403,6 +406,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     // The colon and space between name and type in Scala parameter syntax
                     // Type prefix from parser may or may not include the space
                     TypeTree typeExpr = varDecl.getTypeExpression();
+                    if (varDecl.getVarargs() != null) {
+                        visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
+                    }
                     p.append(":");
                     visit(typeExpr, p);
                 }
@@ -553,6 +559,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 }
                 if (vd.getTypeExpression() != null) {
                     TypeTree te = vd.getTypeExpression();
+                    if (vd.getVarargs() != null) {
+                        visitSpace(vd.getVarargs(), Space.Location.VARARGS, p);
+                    }
                     p.append(":");
                     visit(te, p);
                 }
@@ -1612,6 +1621,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 }
                 if (varDecl.getTypeExpression() != null) {
                     TypeTree typeExpr = varDecl.getTypeExpression();
+                    if (varDecl.getVarargs() != null) {
+                        visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
+                    }
                     p.append(":");
                     visit(typeExpr, p);
                 }
