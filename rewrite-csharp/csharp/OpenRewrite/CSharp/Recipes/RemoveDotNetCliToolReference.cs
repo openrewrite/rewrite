@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
+using static OpenRewrite.CSharp.Recipes.Categories;
 using OpenRewrite.Xml;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -26,6 +27,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// CLI tools, and have since been replaced by global / local tools and SDK-built-in
 /// commands (e.g. <c>dotnet watch</c>).
 /// </summary>
+[Category, Csproj]
 public class RemoveDotNetCliToolReference : ScanningRecipe<DotNetBuildContext>
 {
     public override string DisplayName => "Remove DotNetCliToolReference";

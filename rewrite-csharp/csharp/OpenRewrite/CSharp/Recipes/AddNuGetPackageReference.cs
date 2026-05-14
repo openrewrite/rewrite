@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
+using static OpenRewrite.CSharp.Recipes.Categories;
 using OpenRewrite.Xml;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -22,6 +23,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// <summary>
 /// Adds a NuGet PackageReference to .csproj files if not already present.
 /// </summary>
+[Category, Csproj]
 public class AddNuGetPackageReference : ScanningRecipe<DotNetBuildContext>
 {
     public override string DisplayName => "Add NuGet package reference";

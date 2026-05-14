@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
+using static OpenRewrite.CSharp.Recipes.Categories;
 using OpenRewrite.Xml;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -23,6 +24,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// Removes a NuGet PackageReference from .csproj files.
 /// Supports glob patterns for the package name.
 /// </summary>
+[Category, Csproj]
 public class RemoveNuGetPackageReference : ScanningRecipe<DotNetBuildContext>
 {
     public override string DisplayName => "Remove NuGet package reference";
