@@ -344,6 +344,28 @@ class TryTest implements RewriteTest {
     }
 
     @Test
+    void catchCaseWithBlockBody() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def foo: Boolean = {
+                  try {
+                    true
+                  } catch {
+                    case e: Exception => {
+                      e.printStackTrace()
+                      false
+                    }
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void spaceBeforeColonOnCatchParameter() {
         rewriteRun(scala(
             """
