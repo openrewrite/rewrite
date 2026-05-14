@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
+using static OpenRewrite.CSharp.Recipes.Categories;
 using OpenRewrite.Xml;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -23,6 +24,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// Changes the target framework in .csproj files.
 /// Handles both single-TFM and multi-TFM elements.
 /// </summary>
+[Category, Csproj]
 public class ChangeDotNetTargetFramework : ScanningRecipe<DotNetBuildContext>
 {
     public override string DisplayName => "Change .NET target framework";

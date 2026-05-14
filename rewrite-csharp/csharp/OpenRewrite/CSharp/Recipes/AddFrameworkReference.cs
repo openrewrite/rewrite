@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
+using static OpenRewrite.CSharp.Recipes.Categories;
 using OpenRewrite.Xml;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -26,6 +27,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// is <c>Microsoft.NET.Sdk.Web</c>, which already imports
 /// <c>Microsoft.AspNetCore.App</c> implicitly.
 /// </summary>
+[Category, Csproj]
 public class AddFrameworkReference : ScanningRecipe<DotNetBuildContext>
 {
     public override string DisplayName => "Add framework reference";

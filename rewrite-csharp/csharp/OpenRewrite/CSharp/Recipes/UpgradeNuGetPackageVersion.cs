@@ -18,6 +18,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using NuGet.Versioning;
 using OpenRewrite.Core;
+using static OpenRewrite.CSharp.Recipes.Categories;
 using OpenRewrite.Xml;
 using Serilog;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -29,6 +30,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// Uses NuGet.Versioning for version parsing and comparison, correctly handling
 /// NuGet version ranges, 4-part versions, and prerelease labels.
 /// </summary>
+[Category, Csproj]
 public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVersion.Accumulator>
 {
     public override string DisplayName => "Upgrade NuGet package version";

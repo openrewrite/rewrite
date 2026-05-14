@@ -13,14 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using OpenRewrite.Core;
+using System.Runtime.CompilerServices;
 
-namespace OpenRewrite.CSharp.Recipes;
-
-public class CsprojRecipeActivator : IRecipeActivator
-{
-    public void Activate(RecipeMarketplace marketplace)
-    {
-        marketplace.InstallAssembly(typeof(CsprojRecipeActivator).Assembly);
-    }
-}
+[assembly: InternalsVisibleTo("OpenRewrite.Tests")]

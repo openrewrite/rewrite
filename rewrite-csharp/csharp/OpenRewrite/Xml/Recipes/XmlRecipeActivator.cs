@@ -19,11 +19,8 @@ namespace OpenRewrite.Xml.Recipes;
 
 public class XmlRecipeActivator : IRecipeActivator
 {
-    private static readonly CategoryDescriptor XmlCategory = new("XML", "XML transformation recipes");
-
     public void Activate(RecipeMarketplace marketplace)
     {
-        marketplace.Install(new ChangeXmlCharData(), XmlCategory);
-        marketplace.Install(new ChangeXmlAttribute(), XmlCategory);
+        marketplace.InstallAssembly(typeof(XmlRecipeActivator).Assembly);
     }
 }

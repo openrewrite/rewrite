@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
+using static OpenRewrite.CSharp.Recipes.Categories;
 using OpenRewrite.Xml;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -24,6 +25,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// <c>PropertyGroup</c> in .csproj files. Useful for stripping legacy properties that
 /// are no longer applicable after upgrading the target framework.
 /// </summary>
+[Category, Csproj]
 public class RemoveMSBuildProperty : ScanningRecipe<DotNetBuildContext>
 {
     public override string DisplayName => "Remove MSBuild property";

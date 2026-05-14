@@ -76,9 +76,12 @@ val csharpBuild by tasks.registering(Exec::class) {
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tests")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(csharpDir.resolve("OpenRewrite/bin"))
+    outputs.dir(csharpDir.resolve("OpenRewrite.Tests/bin"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin"))
 
     doFirst {
@@ -127,6 +130,8 @@ val csharpTest by tasks.registering(Exec::class) {
         rpcTestClasspath.get().outputs.files.singleFile.absolutePath)
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tests")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
