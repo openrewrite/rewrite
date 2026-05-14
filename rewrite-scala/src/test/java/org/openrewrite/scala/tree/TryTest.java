@@ -309,6 +309,41 @@ class TryTest implements RewriteTest {
     }
 
     @Test
+    void catchMultipleCasesWithMultiStatementBodies() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                try {
+                  println("risky")
+                } catch {
+                  case _: NumberFormatException =>
+                    println("nfe a")
+                    println("nfe b")
+                  case _: Exception =>
+                    println("ex a")
+                    println("ex b")
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void catchCaseWithSemicolonSeparatedBody() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                try { 1 } catch { case _: Exception => println("a"); println("b") }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void spaceBeforeColonOnCatchParameter() {
         rewriteRun(scala(
             """
