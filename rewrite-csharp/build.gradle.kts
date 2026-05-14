@@ -139,11 +139,17 @@ val csharpTest by tasks.registering(Exec::class) {
     outputs.cacheIf { true }
 
     doFirst {
-        // Use relative path for JUnit XML to avoid absolute paths in cache key
-        val relativeJunitPath = junitXmlFile.relativeTo(csharpDir).path
+        // Target the OpenRewrite.Tests project explicitly. Running 'dotnet test' at solution
+        // level would also probe OpenRewrite and OpenRewrite.Tool (neither carries the junit
+        // logger after the test split), which fails the run even though all tests pass.
+        // JunitXml.TestLogger resolves a relative LogFilePath against the test project's
+        // TargetDir, so pin the absolute path and pass --results-directory to match.
+        junitXmlFile.parentFile.mkdirs()
         commandLine(
-            findDotnet(), "test", "--no-build", "--verbosity", "normal",
-            "--logger", "junit;LogFilePath=${relativeJunitPath}"
+            findDotnet(), "test", "OpenRewrite.Tests/OpenRewrite.Tests.csproj",
+            "--no-build", "--verbosity", "normal",
+            "--results-directory", junitXmlFile.parentFile.absolutePath,
+            "--logger", "junit;LogFilePath=${junitXmlFile.absolutePath}"
         )
         logger.lifecycle("Running C# tests in ${csharpDir}")
     }
