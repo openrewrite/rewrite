@@ -309,4 +309,95 @@ class CompilationUnitTest implements RewriteTest {
         );
     }
 
+    @Test
+    void curriedMethodWithColonLambda() {
+        rewriteRun(
+          scala(
+            """
+            val x = List(1, 2, 3).foldLeft(0): (acc, n) =>
+              acc + n
+            """
+          )
+        );
+    }
+
+    @Test
+    void chainedMethodWithColonLambda() {
+        rewriteRun(
+          scala(
+            """
+            val x = List(1, 2).map: i =>
+              i + 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void topLevelMethodWithColonLambda() {
+        rewriteRun(
+          scala(
+            """
+            def f(g: Int => Int): Int = g(1)
+            val x = f: i =>
+              i + 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void chainedMethodWithColonPartialFunction() {
+        rewriteRun(
+          scala(
+            """
+            val x = List(1, 2).map:
+              case 1 => "one"
+              case _ => "other"
+            """
+          )
+        );
+    }
+
+    @Test
+    void colonArgWithMultilineBlock() {
+        rewriteRun(
+          scala(
+            """
+            def f(body: => Int): Int = body
+            val x = f:
+              val y = 1
+              y + 2
+            """
+          )
+        );
+    }
+
+    @Test
+    void typeApplyMethodWithColonArg() {
+        rewriteRun(
+          scala(
+            """
+            def f[A](g: A => A): Int = 0
+            val x = f[Int]:
+              n => n + 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void nestedColonArgLambdas() {
+        rewriteRun(
+          scala(
+            """
+            def f(g: Int => Int => Int): Int = 0
+            val x = f: a =>
+              b =>
+                a + b
+            """
+          )
+        );
+    }
+
 }

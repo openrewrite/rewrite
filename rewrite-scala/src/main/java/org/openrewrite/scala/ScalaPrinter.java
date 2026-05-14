@@ -1314,6 +1314,38 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     
     @Override
     public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
+        // Colon-indented argument: `f: arg`, `obj.method: arg`, or `obj.method[T]: arg`.
+        // The arg's prefix carries the indent; we emit `:` in place of `(...)`.
+        if (method.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
+            beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
+
+            if (method.getMarkers().findFirst(org.openrewrite.scala.marker.FunctionApplication.class).isPresent()) {
+                // Function application: `f: arg` — skip the `.apply` name
+                visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
+            } else {
+                if (method.getPadding().getSelect() != null) {
+                    visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, ".", p);
+                }
+                visit(method.getName(), p);
+            }
+
+            if (method.getTypeParameters() != null && !method.getTypeParameters().isEmpty()) {
+                visitContainer("[", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", "]", p);
+            }
+
+            JContainer<Expression> colonArgs = method.getPadding().getArguments();
+            if (colonArgs != null) {
+                visitSpace(colonArgs.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
+                p.append(':');
+                for (Expression arg : method.getArguments()) {
+                    visit(arg, p);
+                }
+            }
+
+            afterSyntax(method, p);
+            return method;
+        }
+
         // Check block argument BEFORE function application — when both are present
         // (e.g. `Seq { 1 }`), the block-arg path should win.
         if (method.getMarkers().findFirst(BlockArgument.class).isPresent()) {
