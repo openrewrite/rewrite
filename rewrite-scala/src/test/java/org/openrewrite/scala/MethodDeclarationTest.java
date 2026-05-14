@@ -168,6 +168,45 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void methodWithVarargsParameter() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo(x: Int, more: String*): Int = x
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void methodWithOnlyVarargsParameter() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo(args: String*): Int = args.size
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void methodWithVarargsParameterizedType() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo(args: Array[String]*): Int = 0
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void methodWithDefaultParameter() {
         rewriteRun(
             scala(

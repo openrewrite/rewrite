@@ -989,6 +989,57 @@ public interface S extends J {
     }
 
     /**
+     * Represents a Scala repeated/vararg type: {@code T*}. Appears in method parameter
+     * positions ({@code def foo(args: String*)}) and in argument ascriptions
+     * ({@code f(xs: _*)}). Modeled as a {@link TypeTree} so it composes with anywhere
+     * a type can appear. {@code beforeStar} preserves whitespace between the element
+     * type and the trailing {@code *} (e.g. {@code String *}).
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class RepeatedType implements S, TypeTree, Expression {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        TypeTree elementType;
+
+        @With @Getter
+        Space beforeStar;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public RepeatedType(UUID id, Space prefix, Markers markers, TypeTree elementType,
+                            Space beforeStar, @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.elementType = elementType;
+            this.beforeStar = beforeStar;
+            this.type = type;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitRepeatedType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
      * Represents a Scala pattern alternative: {@code p1 | p2 | p3}.
      * Used in {@code case 1 | 2 | 3 => "small"} or {@code case _: A | _: B => ...}.
      */
