@@ -278,8 +278,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 }
                 visitSpace(paramPadded.getAfter(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
                 p.append("=>");
-                for (Statement stmt : aCatch.getBody().getStatements()) {
-                    visit(stmt, p);
+                J.Block catchBody = aCatch.getBody();
+                visitSpace(catchBody.getPrefix(), Space.Location.BLOCK_PREFIX, p);
+                for (JRightPadded<Statement> stmtPadded : catchBody.getPadding().getStatements()) {
+                    visit(stmtPadded.getElement(), p);
+                    visitSpace(stmtPadded.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
                 }
             }
             // Close catch block — use end space from last catch body if available

@@ -290,6 +290,25 @@ class TryTest implements RewriteTest {
     }
 
     @Test
+    void catchCaseWithMultipleStatementBody() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                try {
+                  println("risky")
+                } catch {
+                  case _: Exception =>
+                    Thread.sleep(500)
+                    println("recover")
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void spaceBeforeColonOnCatchParameter() {
         rewriteRun(scala(
             """
