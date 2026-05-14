@@ -67,6 +67,7 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
         boolean firstParam = true;
         for (JavaType.GenericTypeVariable tv : typeVariables) {
             if ("?".equals(tv.getName())) {
+                // Wildcards do not appear in declaration position; skip.
                 continue;
             }
             if (!firstParam) {
@@ -74,8 +75,15 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
             }
             firstParam = false;
             params.append(tv.getName());
+            // Note: the Kotlin parser currently maps both Kotlin's `out T` AND Kotlin's `T : Bound`
+            // (invariant-with-bound) to Variance.COVARIANT. We emit bounds for COVARIANT and
+            // CONTRAVARIANT alike so that `<in T : Foo>` round-trips correctly through the template
+            // wrapper. INVARIANT bounded types are still under-served by the current model — that's
+            // a separate fix in the parser-side mapping, not here.
+            JavaType.GenericTypeVariable.Variance variance = tv.getVariance();
             List<JavaType> bounds = tv.getBounds();
-            if (tv.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT && !bounds.isEmpty()) {
+            if ((variance == JavaType.GenericTypeVariable.Variance.COVARIANT ||
+                 variance == JavaType.GenericTypeVariable.Variance.CONTRAVARIANT) && !bounds.isEmpty()) {
                 if (bounds.size() == 1) {
                     params.append(" : ").append(TypeUtils.toString(bounds.get(0)));
                 } else {
