@@ -1076,6 +1076,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             for (Expression arg : fc.getArguments()) {
                 visit(arg, p);
             }
+        } else if (fc.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
+            // Colon-indented arg list: `foo(x):\n  ...`. The arg's prefix carries the indent.
+            p.append(':');
+            for (Expression arg : fc.getArguments()) {
+                visit(arg, p);
+            }
         } else {
             visitContainer("(", fc.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
         }
@@ -1443,16 +1449,22 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return lambda;
         }
 
-        // Partial-function literal `{ case pat => ... }` — the body is a J.Block of J.Case.
+        // Partial-function literal: brace form `{ case pat => ... }` or indented form
+        // (after a colon-arg call) where braces are absent.
         if (lambda.getMarkers().findFirst(PartialFunctionLiteral.class).isPresent() &&
                 lambda.getBody() instanceof J.Block) {
+            boolean indented = lambda.getMarkers().findFirst(IndentedSyntax.class).isPresent();
             J.Block cases = (J.Block) lambda.getBody();
-            p.append('{');
+            if (!indented) {
+                p.append('{');
+            }
             for (Statement caseStmt : cases.getStatements()) {
                 visit(caseStmt, p);
             }
             visitSpace(cases.getEnd(), Space.Location.BLOCK_END, p);
-            p.append('}');
+            if (!indented) {
+                p.append('}');
+            }
             afterSyntax(lambda, p);
             return lambda;
         }

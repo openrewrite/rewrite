@@ -938,7 +938,8 @@ class ScalaTreeVisitor(
         val innerEnd = Math.max(0, innerApp.span.end - offsetAdjustment)
         if (innerEnd > cursor && innerEnd <= source.length) cursor = innerEnd
 
-        // Outer arg list is `{ ... }` when next non-ws is `{`, otherwise `(...)`.
+        // Outer arg list is `{ ... }` when next non-ws is `{`, `: ...` when it's `:`,
+        // otherwise parenthesized `(...)`.
         val firstNonWs = indexOfNextNonWhitespace(cursor)
         val outerArgs = new util.ArrayList[JRightPadded[Expression]]()
 
@@ -949,6 +950,20 @@ class ScalaTreeVisitor(
           val markers = Markers.build(Collections.singletonList(new BlockArgument(Tree.randomId())))
           return S.FunctionCall.build(Tree.randomId(), prefix, markers,
             JRightPadded.build(fn), JContainer.build(Space.EMPTY, outerArgs, Markers.EMPTY), methodType)
+        }
+
+        if (firstNonWs < source.length && source.charAt(firstNonWs) == ':') {
+          // Colon-indented arg list: `foldLeft(0):\n  case ... => ...` — the fn-after space
+          // captures any whitespace between `)` and `:`, then the cursor moves past `:`
+          // so the arg's own prefix carries the newline+indent before its first token.
+          val functionAfterSpace = if (firstNonWs > cursor) Space.format(source, cursor, firstNonWs) else Space.EMPTY
+          cursor = firstNonWs + 1
+          for (arg <- app.args) outerArgs.add(JRightPadded.build(asExpression(visitTree(arg))))
+          finishAtAppEnd()
+          val markers = Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
+          return S.FunctionCall.build(Tree.randomId(), prefix, markers,
+            new JRightPadded(fn, functionAfterSpace, Markers.EMPTY),
+            JContainer.build(Space.EMPTY, outerArgs, Markers.EMPTY), methodType)
         }
 
         val functionAfterSpace = if (firstNonWs > cursor) Space.format(source, cursor, firstNonWs) else Space.EMPTY
@@ -6128,19 +6143,25 @@ class ScalaTreeVisitor(
   private def visitMatchImpl(matchTree: Trees.Match[?]): J = {
     val prefix = extractPrefix(matchTree.span)
 
-    // Partial-function literal `{ case pat => ... }` has a synthetic selector with NoSpan.
-    // Emit a J.Lambda (no params) whose body is the cases block; printer uses the marker
-    // to emit the `{ case ... => ... }` form.
+    // Partial-function literal: either `{ case pat => ... }` (brace form) or an
+    // indented form following a colon-arg call like `foldLeft(0):\n  case ...`.
+    // Both have a synthetic match selector with NoSpan.
     if (!matchTree.selector.span.exists) {
       val bs = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
-      val bi = bs.indexOf('{'); if (bi >= 0) cursor = cursor + bi + 1
-      val casesBlock = buildCasesBlock(matchTree)
+      val bi = bs.indexOf('{')
+      val ci = bs.indexOf("case")
+      val isBraceForm = bi >= 0 && (ci < 0 || bi < ci)
+      if (isBraceForm) cursor = cursor + bi + 1
+      val casesBlock = buildCasesBlock(matchTree, isBraceForm)
       updateCursor(matchTree.span.end)
       val parameters = new J.Lambda.Parameters(
         Tree.randomId(), Space.EMPTY, Markers.EMPTY, false, Collections.emptyList())
+      val lambdaMarkers = new util.ArrayList[org.openrewrite.marker.Marker]()
+      lambdaMarkers.add(new PartialFunctionLiteral(Tree.randomId()))
+      if (!isBraceForm) lambdaMarkers.add(new IndentedSyntax(Tree.randomId()))
       return new J.Lambda(
         Tree.randomId(), prefix,
-        Markers.build(Collections.singletonList(new PartialFunctionLiteral(Tree.randomId()))),
+        Markers.build(lambdaMarkers),
         parameters, Space.EMPTY, casesBlock, null)
     }
 

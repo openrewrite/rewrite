@@ -289,10 +289,24 @@ class CompilationUnitTest implements RewriteTest {
           scala(
             """
             val x = 42
-            
-            
+
+
             """
           )
         );
     }
+
+    @Test
+    void foldLeftWithColonPartialFunction() {
+        rewriteRun(
+          scala(
+            """
+            val x = List(1, 2, 3).foldLeft(0):
+              case (acc, n) if n > 0 => acc + n
+              case (acc, _) => acc
+            """
+          )
+        );
+    }
+
 }
