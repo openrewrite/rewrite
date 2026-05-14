@@ -16,59 +16,72 @@
 @file:JvmName("RecipeDsl")
 package org.openrewrite
 
-import org.openrewrite.kotlin.recipe.internal.RecipeRegistry
-import java.time.Duration
-
-// Author-facing surface for the Kotlin recipe authoring DSL. The trailing block of
-// [recipe] is consumed by the rewrite-kotlin K2 compiler plugin at COMPILE TIME — the
-// plugin reads the metadata setters, the `rewrite ... to ...` clause, and the
-// `scan/edit/generate` clauses, then generates a real `Recipe` subclass per
-// declaration. The block's runtime invocation is intentionally a no-op; the lambdas
-// inside it exist for IDE auto-complete, type-checking, and human readability only.
+// Author-facing surface for the Kotlin recipe authoring DSL.
 //
-// At runtime, [recipe] looks up the generated `Recipe` instance by name and returns
-// it. If the compiler plugin did not run for the enclosing module, [recipe] throws
-// with a clear message pointing at the plugin setup.
+//     val UseUppercase: Recipe = recipe(
+//         displayName = "Use uppercase",
+//         description = "Replace lowercase() with uppercase() (illustrative).",
+//     ) {
+//         rewrite({ s: String -> s.lowercase() }) to { s -> s.uppercase() }
+//     }
+//
+// The rewrite-kotlin K2 compiler plugin
+//   1. walks the [recipe] call's metadata arguments and trailing lambda at
+//      compile time,
+//   2. generates a synthetic `Recipe` subclass per declaration (metadata from
+//      the function arguments, behavior translated from the
+//      rewrite/scan/edit/generate calls inside the block),
+//   3. replaces the [recipe] call's IR with a constructor invocation of the
+//      generated subclass.
+//
+// The lambda body is intentionally never invoked at runtime. Without the
+// plugin loaded, [recipe] throws a setup error — the wrapper exists only as
+// a syntactic anchor that gives the val a `Recipe` type and gives the plugin
+// a well-defined IR call to replace.
 
 /** Marker that pins receiver scopes inside the recipe DSL. */
 @DslMarker
 public annotation class RecipeDslMarker
 
 /**
- * Top-level entry point. The author writes:
+ * Top-level anchor for a recipe declaration. Metadata is carried as named
+ * arguments; behavior is carried in the trailing lambda. The val initializer
+ * wraps the behavior block in this call so that
+ *  - the val's declared type is `Recipe` (Java abstract class from rewrite-core),
+ *  - the K2 compiler plugin has a single well-defined IR call to replace
+ *    with a constructor invocation of the generated `Recipe` subclass.
  *
- *     val UseUppercase = recipe("Use uppercase") {
- *         description = "..."
- *         rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
- *     }
+ * `estimatedEffortPerOccurrence` is an ISO-8601 duration string (e.g. "PT5M");
+ * the plugin parses it at compile time. Empty string means "not specified".
  *
- * The rewrite-kotlin compiler plugin processes the trailing block at compile time
- * and generates a real `Recipe` subclass; this runtime function looks up that
- * subclass by name.
+ * Without the rewrite-kotlin compiler plugin loaded on the consuming module,
+ * this function throws — the DSL requires the plugin.
  */
-public fun recipe(name: String, @Suppress("UNUSED_PARAMETER") block: RecipeBuilder.() -> Unit): Recipe =
-    RecipeRegistry.lookup(name)
-        ?: error(
-            "Recipe DSL: no compiled recipe found for '$name'. The rewrite-kotlin " +
-                "compiler plugin must run on this module — add rewrite-kotlin to " +
-                "`kotlinCompilerPluginClasspath` (plugin id `org.openrewrite.kotlin.recipe`)."
-        )
+public fun recipe(
+    @Suppress("UNUSED_PARAMETER") displayName: String,
+    @Suppress("UNUSED_PARAMETER") description: String,
+    @Suppress("UNUSED_PARAMETER") tags: Set<String> = emptySet(),
+    @Suppress("UNUSED_PARAMETER") estimatedEffortPerOccurrence: String = "",
+    @Suppress("UNUSED_PARAMETER") block: RecipeBuilder.() -> Unit,
+): Recipe =
+    error(
+        "Recipe DSL: the rewrite-kotlin K2 compiler plugin is not loaded. " +
+            "Add rewrite-kotlin to `kotlinCompilerPluginClasspath` " +
+            "(plugin id `org.openrewrite.kotlin.recipe`)."
+    )
 
 /**
- * Receiver scope inside the [recipe] block. None of these methods do real work at
+ * Receiver scope of the recipe lambda. None of these methods do real work at
  * runtime — they exist as type stubs for the compiler plugin to walk.
  */
 @RecipeDslMarker
 public class RecipeBuilder internal constructor() {
-    public var displayName: String = ""
-    public var description: String = ""
-    public var estimatedEffortPerOccurrence: Duration? = null
-    public var tags: Set<String> = emptySet()
 
     // === Pattern mode ===
-    // One `rewrite ... to ...` clause per recipe. Multiple BEFORE lambdas pair with a
-    // single AFTER lambda. The `to` infix returns Unit — chaining a second rewrite is
-    // not a type error here but the compiler plugin rejects it at compile time.
+    // One `rewrite ... to ...` clause per recipe. Multiple BEFORE lambdas pair
+    // with a single AFTER lambda. The `to` infix returns Unit — chaining a
+    // second rewrite is not a type error here but the compiler plugin rejects
+    // it at compile time.
 
     public fun <P, R> rewrite(before: (P) -> R): RewriteAdvice1<P, R> = RewriteAdvice1()
     public fun <P, R> rewrite(first: (P) -> R, vararg rest: (P) -> R): RewriteAdvice1<P, R> = RewriteAdvice1()
@@ -77,9 +90,9 @@ public class RecipeBuilder internal constructor() {
     public fun <P1, P2, R> rewrite(first: (P1, P2) -> R, vararg rest: (P1, P2) -> R): RewriteAdvice2<P1, P2, R> = RewriteAdvice2()
 
     // === Phase mode ===
-    // `scan / edit / generate` map to the standard ScanningRecipe lifecycle. The
-    // compiler plugin rejects mixing phase calls with a `rewrite ... to ...` clause
-    // in the same recipe.
+    // `scan / edit / generate` map to the standard ScanningRecipe lifecycle.
+    // The compiler plugin rejects mixing phase calls with a `rewrite ... to ...`
+    // clause in the same recipe.
 
     public fun <A : Any> scan(initial: A, block: ScanScope<A>.() -> Unit): ScanRef<A> = ScanRef()
     public fun edit(block: EditScope.() -> Unit): Unit = Unit

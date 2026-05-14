@@ -22,24 +22,24 @@ import org.junit.jupiter.api.Test
 
 /**
  * Smoke test that the rewrite-kotlin compiler plugin loads under kotlinc and that a
- * source file declaring a `recipe(...)` block compiles without error.
+ * source file declaring a `recipe(...) { }` val compiles without error.
  *
- * This does NOT yet verify that the plugin generated a real Recipe subclass — that
- * comes once the FirDeclarationGenerationExtension is wired. Until then this only
- * proves the plugin registrar is reachable and the FIR extensions (currently empty)
- * don't reject otherwise-valid source.
+ * Does NOT yet verify that the plugin generated a real Recipe subclass — that comes
+ * once the IrGenerationExtension is wired.
  */
 class RecipePluginSmokeTest {
 
     @Test
-    fun `empty recipe block compiles with the plugin enabled`() {
+    fun `recipe val with empty body compiles with the plugin enabled`() {
         val result = RecipePluginCompileFixture.compile(
             """
+            import org.openrewrite.Recipe
             import org.openrewrite.recipe
 
-            val Empty = recipe("Empty") {
-                description = "Compiles but does nothing yet."
-            }
+            val Empty: Recipe = recipe(
+                displayName = "Empty",
+                description = "Compiles but does nothing yet.",
+            ) { }
             """.trimIndent()
         )
         assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)

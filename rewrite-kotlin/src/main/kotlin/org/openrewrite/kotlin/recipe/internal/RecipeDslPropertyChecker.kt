@@ -34,23 +34,23 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 
 /**
- * FIR-level checker over property declarations that initialize a top-level recipe
- * via `org.openrewrite.recipe(name) { ... }`. Walks the trailing lambda body and
- * validates the recipe-DSL well-formedness rules at compile time.
+ * FIR-level checker over property declarations whose initializer is a call to
+ * `org.openrewrite.recipe(...)`. Walks the trailing lambda body and validates
+ * recipe-DSL well-formedness rules at compile time.
  *
  * Currently implemented rules:
- *  - Pattern mode (`rewrite ... to ...`) and phase mode (`scan/edit/generate`) are
- *    mutually exclusive within one recipe block.
+ *  - Pattern mode (`rewrite ... to ...`) and phase mode (`scan/edit/generate`)
+ *    are mutually exclusive within one recipe block.
  *
  * Rules still to add (tracked in `lane-e-design-2026-05-14` project memory):
  *  - At most one `rewrite ... to ...` per pattern-mode recipe.
  *  - `scan` must precede `edit`/`generate` when phase mode is used.
  *
- * Why route through `FirErrors.OTHER_ERROR_WITH_REASON`: setting up a custom
+ * Why route through `FirErrors.OTHER_ERROR_WITH_REASON`: registering a custom
  * `KtDiagnosticsContainer` in Kotlin 2.3 requires accessing
- * `KtDiagnosticFactoryToRendererMap`'s internal constructor. `OTHER_ERROR_WITH_REASON`
- * is a pre-registered string-arg diagnostic that renders cleanly — adequate while
- * the rule set is small.
+ * `KtDiagnosticFactoryToRendererMap`'s internal constructor.
+ * `OTHER_ERROR_WITH_REASON` is a pre-registered string-arg diagnostic that
+ * renders cleanly — adequate while the rule set is small.
  */
 internal object RecipeDslPropertyChecker : FirPropertyChecker(MppCheckerKind.Common) {
 
@@ -65,16 +65,15 @@ internal object RecipeDslPropertyChecker : FirPropertyChecker(MppCheckerKind.Com
         Name.identifier("generate"),
     )
 
-    context(context: CheckerContext, reporter: DiagnosticReporter)
+    context(@Suppress("unused") context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirProperty) {
         val initializer = declaration.initializer as? FirFunctionCall ?: return
         if (!initializer.callsRecipeBuilder()) return
-
-        val trailingLambda = initializer.findTrailingLambdaBody() ?: return
+        val body = initializer.findTrailingLambdaBody() ?: return
 
         var patternCall: FirFunctionCall? = null
         var phaseCall: FirFunctionCall? = null
-        trailingLambda.accept(object : FirVisitorVoid() {
+        body.accept(object : FirVisitorVoid() {
             override fun visitElement(element: FirElement) {
                 if (element is FirFunctionCall) {
                     val name = element.callableSimpleName()

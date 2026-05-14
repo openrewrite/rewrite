@@ -35,10 +35,13 @@ class RecipeDslCheckerTest {
     fun `mixing pattern and phase modes in one recipe fails compilation`() {
         val result = RecipePluginCompileFixture.compile(
             """
+            import org.openrewrite.Recipe
             import org.openrewrite.recipe
 
-            val Bad = recipe("Bad") {
-                description = "Mixes pattern and phase modes."
+            val Bad: Recipe = recipe(
+                displayName = "Bad",
+                description = "Mixes pattern and phase modes.",
+            ) {
                 rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
                 scan(mutableSetOf<String>()) { }
             }
@@ -55,9 +58,13 @@ class RecipeDslCheckerTest {
     fun `pattern mode alone compiles cleanly`() {
         val result = RecipePluginCompileFixture.compile(
             """
+            import org.openrewrite.Recipe
             import org.openrewrite.recipe
 
-            val PatternOnly = recipe("PatternOnly") {
+            val PatternOnly: Recipe = recipe(
+                displayName = "PatternOnly",
+                description = "Pattern only.",
+            ) {
                 rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
             }
             """.trimIndent()
@@ -69,9 +76,13 @@ class RecipeDslCheckerTest {
     fun `phase mode alone compiles cleanly`() {
         val result = RecipePluginCompileFixture.compile(
             """
+            import org.openrewrite.Recipe
             import org.openrewrite.recipe
 
-            val PhaseOnly = recipe("PhaseOnly") {
+            val PhaseOnly: Recipe = recipe(
+                displayName = "PhaseOnly",
+                description = "Phase only.",
+            ) {
                 scan(mutableSetOf<String>()) { }
                 edit { }
             }
