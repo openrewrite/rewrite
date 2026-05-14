@@ -465,9 +465,12 @@ class ScalaTreeVisitor(
    * {@code this(args)}. The name carries the keyword text so recipes can match on it.
    */
   private def buildKeywordMethodInvocation(app: Trees.Apply[?], keyword: String): J.MethodInvocation = {
-    val prefix = extractPrefix(app.span)
-    // Advance past the keyword token in source
+    // The Apply for `this(args)` in an auxiliary constructor self-call has a
+    // synthetic span covering only the args, not the `this` keyword. Locate
+    // the keyword from the current cursor and derive the prefix from there
+    // rather than trusting `app.span.start`.
     val kwIdx = source.indexOf(keyword, cursor)
+    val prefix = if (kwIdx >= cursor) Space.format(source, cursor, kwIdx) else Space.EMPTY
     if (kwIdx >= 0) cursor = kwIdx + keyword.length
     val nameId = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
       Collections.emptyList(), keyword, null, null)

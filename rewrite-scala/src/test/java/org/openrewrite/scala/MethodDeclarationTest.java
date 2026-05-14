@@ -441,12 +441,40 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void auxiliaryConstructorDelegatingToPrimary() {
+    void auxiliaryConstructors() {
         rewriteRun(
             scala(
                 """
-                class Foo(a: Int) {
+                class DelegatingToPrimary(a: Int) {
                   def this() = this(0)
+                }
+
+                class WithParams(a: Int, b: Int) {
+                  def this(x: Int) = this(x, 0)
+                }
+
+                class Chained(a: Int, b: Int) {
+                  def this(x: Int) = this(x, 0)
+                  def this() = this(0)
+                }
+
+                class WithBlockBody(a: Int) {
+                  def this() = {
+                    this(0)
+                    println("init")
+                  }
+                }
+
+                class WithPrivate(a: Int) {
+                  private def this() = this(0)
+                }
+
+                class WithAnnotation(a: Int) {
+                  @deprecated def this() = this(0)
+                }
+
+                case class CaseClass(a: Int, b: Int) {
+                  def this() = this(0, 0)
                 }
                 """
             )
