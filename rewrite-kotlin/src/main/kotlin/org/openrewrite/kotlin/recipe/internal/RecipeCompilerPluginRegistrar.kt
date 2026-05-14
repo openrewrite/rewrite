@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.recipe.internal
 
+import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.CompilerConfiguration
@@ -24,14 +25,18 @@ import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 // `RecipeDsl.kt`. Registered via `META-INF/services/org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar`.
 // kotlinc loads this class when rewrite-kotlin is on the user's `kotlinCompilerPluginClasspath`.
 //
-// Scope (as of scaffold): the registrar wires up a single FIR extension that scans
-// top-level `recipe(...)` declarations in user source. Actual pattern extraction and
-// Recipe-class generation is implemented in [RecipeFirExtensionRegistrar].
+// Pipeline:
+//   - FIR phase (`RecipeFirExtensionRegistrar`) runs the recipe-DSL well-formedness
+//     checkers (mode mixing, etc.) before any code generation.
+//   - IR phase (`RecipeIrGenerationExtension`) walks property initializers whose
+//     RHS is a call to `org.openrewrite.recipe(...)`, emits a synthetic
+//     `Recipe` subclass per declaration, and rewrites the call site to a
+//     constructor invocation of that subclass.
 //
 // Why a compiler plugin and not KSP: KSP's stable contract exposes declarations and
 // types but not expression bodies (property initializers, lambda contents). The DSL
 // needs to walk the bodies of the user's `rewrite { p -> p.foo() } to { ... }` lambdas,
-// which only the FIR-level extension surface supports. See project memory
+// which only the FIR + IR extension surface supports. See project memory
 // `lane-e-design-2026-05-14`.
 
 @OptIn(ExperimentalCompilerApi::class)
@@ -43,5 +48,11 @@ public class RecipeCompilerPluginRegistrar : CompilerPluginRegistrar() {
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
         FirExtensionRegistrarAdapter.registerExtension(RecipeFirExtensionRegistrar())
+        // `registerExtension` is a member extension function on ExtensionStorage
+        // with `ProjectExtensionDescriptor<T>` as its extension receiver — the
+        // K2-aware registration path. The call form `IrGenerationExtension.registerExtension(...)`
+        // dispatches against ExtensionStorage (= this) and binds the descriptor as
+        // the extension receiver.
+        IrGenerationExtension.registerExtension(RecipeIrGenerationExtension())
     }
 }
