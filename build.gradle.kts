@@ -15,6 +15,16 @@ allprojects {
 }
 
 subprojects {
+    tasks.withType<Test>().configureEach {
+        testLogging {
+            events("failed")
+            showExceptions = true
+            showCauses = true
+            showStackTraces = true
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        }
+    }
+
     tasks.withType<JavaExec>().configureEach {
         if (name == "generateAntlrSources") {
             doLast {
