@@ -397,6 +397,11 @@ class ScalaTreeVisitor(
       case sel: Trees.Select[?] =>
         // Method call with dot notation like "obj.method(args)"
         visitMethodInvocation(app)
+      case id: Trees.Ident[?] if id.name.toString == "<init>" =>
+        // Auxiliary constructor self-call `this(args)`. Dotty parses this as
+        // Apply(fun=Ident("<init>"), args) with a synthetic span on the Ident,
+        // so we must recover the `this` keyword from source.
+        buildKeywordMethodInvocation(app, "this")
       case id: Trees.Ident[?] =>
         // Function application syntax: func(args)
         // This includes array access (arr(0)), function calls, and more
@@ -460,9 +465,12 @@ class ScalaTreeVisitor(
    * {@code this(args)}. The name carries the keyword text so recipes can match on it.
    */
   private def buildKeywordMethodInvocation(app: Trees.Apply[?], keyword: String): J.MethodInvocation = {
-    val prefix = extractPrefix(app.span)
-    // Advance past the keyword token in source
+    // The Apply for `this(args)` in an auxiliary constructor self-call has a
+    // synthetic span covering only the args, not the `this` keyword. Locate
+    // the keyword from the current cursor and derive the prefix from there
+    // rather than trusting `app.span.start`.
     val kwIdx = source.indexOf(keyword, cursor)
+    val prefix = if (kwIdx >= cursor) Space.format(source, cursor, kwIdx) else Space.EMPTY
     if (kwIdx >= 0) cursor = kwIdx + keyword.length
     val nameId = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
       Collections.emptyList(), keyword, null, null)
@@ -5214,12 +5222,17 @@ class ScalaTreeVisitor(
 
     val methodType = try { methodTypeOfTree(dd) } catch { case _: Exception => null }
 
+    // Auxiliary constructors are `def this(...)` in source but have name `<init>`
+    // in the AST. The nameSpan still points at the `this` keyword in source, so
+    // render it as `this` rather than leaking the internal `<init>` name.
+    val rawName = if (dd.name.toString == "<init>") "this" else dd.name.toString
+
     val (nameSpace, displayMethodName, methodNameEndCursor) = if (dd.nameSpan.exists) {
       val rawNameStart = Math.max(0, dd.nameSpan.start - offsetAdjustment)
       val rawNameLen = Math.max(0, dd.nameSpan.end - dd.nameSpan.start)
-      backtickAwareName(defKeywordPos, rawNameStart, rawNameLen, dd.name.toString)
+      backtickAwareName(defKeywordPos, rawNameStart, rawNameLen, rawName)
     } else {
-      (Space.format(" "), dd.name.toString, cursor)
+      (Space.format(" "), rawName, cursor)
     }
 
     val name = ident(displayMethodName, nameSpace)
