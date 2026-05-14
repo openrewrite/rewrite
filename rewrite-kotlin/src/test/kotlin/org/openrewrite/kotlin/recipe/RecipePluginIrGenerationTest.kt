@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import java.time.Duration
 
 /**
  * End-to-end check that the recipe DSL compiler plugin's IR pass produces a real
@@ -72,5 +73,101 @@ class RecipePluginIrGenerationTest {
             generatedClassName.contains("Generated") && generatedClassName.contains("Hello"),
             "Expected generated class name to reference the source val; got $generatedClassName",
         )
+
+        // Default tags + effort: tags stays empty (Recipe's `final Set<String> tags = emptySet()`),
+        // estimatedEffortPerOccurrence falls through to Recipe's 5-minute default.
+        assertEquals(emptySet<String>(), recipe.tags)
+        assertEquals(Duration.ofMinutes(5), recipe.estimatedEffortPerOccurrence)
+    }
+
+    @Test
+    fun `tags argument with literal strings flows to getTags()`() {
+        val recipe = compileAndLoad(
+            propertyName = "Tagged",
+            source = """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val Tagged: Recipe = recipe(
+                displayName = "Tagged",
+                description = "Has tags.",
+                tags = setOf("kotlin", "performance"),
+            ) { }
+            """.trimIndent(),
+        )
+        assertEquals(setOf("kotlin", "performance"), recipe.tags)
+    }
+
+    @Test
+    fun `estimatedEffortPerOccurrence literal flows to a Duration override`() {
+        val recipe = compileAndLoad(
+            propertyName = "Effortful",
+            source = """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val Effortful: Recipe = recipe(
+                displayName = "Effortful",
+                description = "Has effort.",
+                estimatedEffortPerOccurrence = "PT15M",
+            ) { }
+            """.trimIndent(),
+        )
+        assertEquals(Duration.ofMinutes(15), recipe.estimatedEffortPerOccurrence)
+    }
+
+    @Test
+    fun `invalid ISO-8601 effort literal silently inherits Recipe default`() {
+        // We compile-time-validate the literal but don't yet fail the build —
+        // a future FIR checker will turn this into a user-visible error. For
+        // now, an unparseable literal just means "no override", so the runtime
+        // value is Recipe's 5-minute default.
+        val recipe = compileAndLoad(
+            propertyName = "BadEffort",
+            source = """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val BadEffort: Recipe = recipe(
+                displayName = "BadEffort",
+                description = "Has malformed effort.",
+                estimatedEffortPerOccurrence = "not a duration",
+            ) { }
+            """.trimIndent(),
+        )
+        assertEquals(Duration.ofMinutes(5), recipe.estimatedEffortPerOccurrence)
+    }
+
+    @Test
+    fun `explicit empty tags via setOf() still inherits the framework default`() {
+        // Recipe's `final Set<String> tags = emptySet()` field can't be reassigned,
+        // so we want to ensure we don't emit a useless override when the user
+        // wrote `tags = setOf()` (or `emptySet()`) explicitly. The negative test
+        // here is that the recipe compiles + loads without surprise.
+        val recipe = compileAndLoad(
+            propertyName = "Empty",
+            source = """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val Empty: Recipe = recipe(
+                displayName = "Empty",
+                description = "No tags, written explicitly.",
+                tags = setOf(),
+            ) { }
+            """.trimIndent(),
+        )
+        assertEquals(emptySet<String>(), recipe.tags)
+        // Suppress lint: this is also a guard that the generated class loaded at all.
+        assertNotNull(recipe)
+    }
+
+    private fun compileAndLoad(propertyName: String, source: String): Recipe {
+        val result = RecipePluginCompileFixture.compile(source, fileName = "Recipes.kt")
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val getter = facade.getMethod("get$propertyName")
+        val instance = getter.invoke(null)
+        return instance as Recipe
     }
 }

@@ -16,9 +16,9 @@
 package org.openrewrite.kotlin.recipe.internal
 
 import org.jetbrains.kotlin.KtFakeSourceElementKind
+import org.jetbrains.kotlin.KtSourceElement
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporter
 import org.jetbrains.kotlin.diagnostics.reportOn
-import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.analysis.checkers.MppCheckerKind
 import org.jetbrains.kotlin.fir.analysis.checkers.context.CheckerContext
 import org.jetbrains.kotlin.fir.analysis.checkers.declaration.FirPropertyChecker
@@ -27,8 +27,8 @@ import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.expressions.FirAnonymousFunctionExpression
 import org.jetbrains.kotlin.fir.expressions.FirBlock
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
+import org.jetbrains.kotlin.fir.expressions.FirStatement
 import org.jetbrains.kotlin.fir.references.toResolvedCallableSymbol
-import org.jetbrains.kotlin.fir.visitors.FirVisitorVoid
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
@@ -38,16 +38,20 @@ import org.jetbrains.kotlin.name.Name
  * `org.openrewrite.recipe(...)`. Walks the trailing lambda body and validates
  * recipe-DSL well-formedness rules at compile time.
  *
- * Currently implemented rules:
+ * Rules currently enforced:
  *  - Pattern mode (`rewrite ... to ...`) and phase mode (`scan/edit/generate`)
  *    are mutually exclusive within one recipe block.
+ *  - At most one `rewrite ... to ...` clause per pattern-mode recipe.
+ *  - Within a phase-mode recipe, every `scan { … }` precedes every `edit { … }` /
+ *    `generate { … }` call. `edit`-without-scan is allowed (the framework
+ *    treats it as a stateless edit phase).
  *
- * Rules still to add (tracked in `lane-e-design-2026-05-14` project memory):
- *  - At most one `rewrite ... to ...` per pattern-mode recipe.
- *  - `scan` must precede `edit`/`generate` when phase mode is used.
+ * The checker walks only the top-level statements of the recipe block; it
+ * intentionally does NOT recurse into nested lambdas, otherwise user code like
+ * `rewrite { scan -> scan.size }` inside a pattern lambda would false-positive.
  *
- * Why route through `FirErrors.OTHER_ERROR_WITH_REASON`: registering a custom
- * `KtDiagnosticsContainer` in Kotlin 2.3 requires accessing
+ * Why route diagnostics through `FirErrors.OTHER_ERROR_WITH_REASON`: registering
+ * a custom `KtDiagnosticsContainer` in Kotlin 2.3 requires accessing
  * `KtDiagnosticFactoryToRendererMap`'s internal constructor.
  * `OTHER_ERROR_WITH_REASON` is a pre-registered string-arg diagnostic that
  * renders cleanly — adequate while the rule set is small.
@@ -56,14 +60,24 @@ internal object RecipeDslPropertyChecker : FirPropertyChecker(MppCheckerKind.Com
 
     private val RECIPE_FQN = CallableId(FqName("org.openrewrite"), Name.identifier("recipe"))
 
-    // Receiver-scope members of org.openrewrite.RecipeBuilder. We match by simple name
-    // because all of these are unambiguous in the DSL block's receiver-scoped position.
-    private val PATTERN_MODE_NAMES = setOf(Name.identifier("rewrite"), Name.identifier("to"))
-    private val PHASE_MODE_NAMES = setOf(
-        Name.identifier("scan"),
-        Name.identifier("edit"),
-        Name.identifier("generate"),
-    )
+    // Names of the RecipeBuilder / RewriteAdvice members the checker recognises.
+    // Matching is by simple name because all of these are unambiguous in the
+    // DSL block's receiver-scoped position.
+    private val NAME_TO = Name.identifier("to")
+    private val NAME_SCAN = Name.identifier("scan")
+    private val NAME_EDIT = Name.identifier("edit")
+    private val NAME_GENERATE = Name.identifier("generate")
+
+    /**
+     * Classification of a top-level statement inside the recipe block.
+     */
+    private sealed interface StatementKind {
+        object Pattern : StatementKind         // `rewrite(...) to {...}`
+        object Scan : StatementKind            // `scan(...) { ... }`
+        object Edit : StatementKind            // `edit { ... }` or `edit(scanRef) { ... }`
+        object Generate : StatementKind        // `generate(scanRef) { ... }`
+        object Other : StatementKind
+    }
 
     context(@Suppress("unused") context: CheckerContext, reporter: DiagnosticReporter)
     override fun check(declaration: FirProperty) {
@@ -71,28 +85,76 @@ internal object RecipeDslPropertyChecker : FirPropertyChecker(MppCheckerKind.Com
         if (!initializer.callsRecipeBuilder()) return
         val body = initializer.findTrailingLambdaBody() ?: return
 
-        var patternCall: FirFunctionCall? = null
-        var phaseCall: FirFunctionCall? = null
-        body.accept(object : FirVisitorVoid() {
-            override fun visitElement(element: FirElement) {
-                if (element is FirFunctionCall) {
-                    val name = element.callableSimpleName()
-                    if (name in PATTERN_MODE_NAMES && patternCall == null) patternCall = element
-                    if (name in PHASE_MODE_NAMES && phaseCall == null) phaseCall = element
-                }
-                element.acceptChildren(this)
-            }
-        })
+        val classified: List<Pair<FirStatement, StatementKind>> = body.statements.map { it to classify(it) }
 
-        if (patternCall != null && phaseCall != null) {
-            val source = phaseCall!!.source ?: declaration.source ?: return
-            if (source.kind is KtFakeSourceElementKind) return
-            reporter.reportOn(
-                source,
-                FirErrors.OTHER_ERROR_WITH_REASON,
+        val patterns = classified.filter { it.second is StatementKind.Pattern }
+        val scans = classified.filter { it.second is StatementKind.Scan }
+        val edits = classified.filter { it.second is StatementKind.Edit || it.second is StatementKind.Generate }
+
+        val hasPattern = patterns.isNotEmpty()
+        val hasPhase = scans.isNotEmpty() || edits.isNotEmpty()
+
+        // Rule 1 — mode mixing.
+        if (hasPattern && hasPhase) {
+            val phaseAnchor = (scans + edits).first().first
+            reportError(
+                phaseAnchor.source ?: declaration.source ?: return,
                 "Recipe block mixes pattern mode (`rewrite ... to ...`) with phase " +
                     "mode (`scan`/`edit`/`generate`). Split into two recipes.",
             )
+            // Don't pile on further diagnostics once the block is structurally invalid.
+            return
+        }
+
+        // Rule 2 — at most one `rewrite ... to ...` per pattern-mode recipe.
+        if (patterns.size > 1) {
+            val extra = patterns[1].first
+            reportError(
+                extra.source ?: declaration.source ?: return,
+                "Recipe block declares more than one `rewrite ... to ...` clause. " +
+                    "A recipe may carry exactly one pattern; split additional patterns " +
+                    "into separate `recipe(...)` declarations.",
+            )
+        }
+
+        // Rule 3 — within phase mode, every scan must precede every edit/generate.
+        if (scans.isNotEmpty() && edits.isNotEmpty()) {
+            val lastScanIdx = classified.indexOfLast { it.second is StatementKind.Scan }
+            val firstEditIdx = classified.indexOfFirst {
+                it.second is StatementKind.Edit || it.second is StatementKind.Generate
+            }
+            if (firstEditIdx < lastScanIdx) {
+                val offending = classified[firstEditIdx].first
+                reportError(
+                    offending.source ?: declaration.source ?: return,
+                    "Phase-mode recipe places `edit`/`generate` before a `scan` " +
+                        "declared later in the block. Move all `scan { ... }` calls " +
+                        "above any `edit` / `generate` to keep accumulator wiring " +
+                        "lexical.",
+                )
+            }
+        }
+    }
+
+    context(@Suppress("unused") context: CheckerContext, reporter: DiagnosticReporter)
+    private fun reportError(source: KtSourceElement, message: String) {
+        if (source.kind is KtFakeSourceElementKind) return
+        reporter.reportOn(source, FirErrors.OTHER_ERROR_WITH_REASON, message)
+    }
+
+    /**
+     * Classify a top-level statement of the recipe block. Only the outermost call
+     * shape matters — we don't recurse into argument lambdas so user code inside
+     * a pattern lambda can use names like `scan` / `edit` freely.
+     */
+    private fun classify(statement: FirStatement): StatementKind {
+        val call = statement as? FirFunctionCall ?: return StatementKind.Other
+        return when (call.callableSimpleName()) {
+            NAME_TO -> StatementKind.Pattern
+            NAME_SCAN -> StatementKind.Scan
+            NAME_EDIT -> StatementKind.Edit
+            NAME_GENERATE -> StatementKind.Generate
+            else -> StatementKind.Other
         }
     }
 

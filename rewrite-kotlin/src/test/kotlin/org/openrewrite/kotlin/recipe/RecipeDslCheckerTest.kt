@@ -90,4 +90,70 @@ class RecipeDslCheckerTest {
         )
         assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
     }
+
+    @Test
+    fun `two rewrite clauses in one recipe fail compilation`() {
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val TwoPatterns: Recipe = recipe(
+                displayName = "TwoPatterns",
+                description = "Has two rewrite clauses; should be split.",
+            ) {
+                rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
+                rewrite { s: String -> s.trim() } to { s -> s }
+            }
+            """.trimIndent()
+        )
+        assertEquals(KotlinCompilation.ExitCode.COMPILATION_ERROR, result.exitCode, result.messages)
+        assertTrue(
+            result.messages.contains("more than one `rewrite ... to ...`"),
+            "Expected an 'extra rewrite clause' error, got:\n${result.messages}",
+        )
+    }
+
+    @Test
+    fun `edit before scan in phase mode fails compilation`() {
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val OutOfOrder: Recipe = recipe(
+                displayName = "OutOfOrder",
+                description = "Edit appears before scan in phase mode.",
+            ) {
+                edit { }
+                scan(mutableSetOf<String>()) { }
+            }
+            """.trimIndent()
+        )
+        assertEquals(KotlinCompilation.ExitCode.COMPILATION_ERROR, result.exitCode, result.messages)
+        assertTrue(
+            result.messages.contains("before a `scan`"),
+            "Expected a 'scan precedes edit/generate' error, got:\n${result.messages}",
+        )
+    }
+
+    @Test
+    fun `edit without scan in phase mode compiles cleanly`() {
+        // Stateless edit is allowed — the precedence rule only fires when both
+        // scan and edit/generate are present in the same block.
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val EditOnly: Recipe = recipe(
+                displayName = "EditOnly",
+                description = "Stateless edit, no scan.",
+            ) {
+                edit { }
+            }
+            """.trimIndent()
+        )
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+    }
 }

@@ -34,6 +34,7 @@ import org.jetbrains.kotlin.ir.builders.declarations.addConstructor
 import org.jetbrains.kotlin.ir.builders.declarations.addFunction
 import org.jetbrains.kotlin.ir.builders.declarations.buildClass
 import org.jetbrains.kotlin.ir.builders.irBlockBody
+import org.jetbrains.kotlin.ir.builders.irCall
 import org.jetbrains.kotlin.ir.builders.irCallConstructor
 import org.jetbrains.kotlin.ir.builders.irDelegatingConstructorCall
 import org.jetbrains.kotlin.ir.builders.irReturn
@@ -50,15 +51,21 @@ import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
+import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
+import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.util.addChild
 import org.jetbrains.kotlin.ir.util.createThisReceiverParameter
+import org.jetbrains.kotlin.ir.util.deepCopyWithSymbols
 import org.jetbrains.kotlin.ir.util.kotlinFqName
 import org.jetbrains.kotlin.ir.visitors.IrElementTransformerVoid
 import org.jetbrains.kotlin.ir.visitors.transformChildrenVoid
+import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import java.time.Duration as JDuration
+import java.time.format.DateTimeParseException
 
 /**
  * IR-phase code generator for the recipe authoring DSL.
@@ -105,27 +112,64 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val recipeGetDescription = recipeMembers.firstOrNull {
             it.name.asString() == "getDescription" && it.valueParameters.isEmpty()
         } ?: return
+        // getTags / getEstimatedEffortPerOccurrence aren't strictly required: if a
+        // future Recipe revision renames or removes either, we just stop generating
+        // that override rather than failing the whole pass.
+        val recipeGetTags = recipeMembers.firstOrNull {
+            it.name.asString() == "getTags" && it.valueParameters.isEmpty()
+        }
+        val recipeGetEstimatedEffort = recipeMembers.firstOrNull {
+            it.name.asString() == "getEstimatedEffortPerOccurrence" && it.valueParameters.isEmpty()
+        }
+
+        // `Duration.parse(CharSequence)` for materialising the
+        // estimatedEffortPerOccurrence ISO-8601 string into a runtime Duration.
+        val durationClassId = ClassId.topLevel(FqName("java.time.Duration"))
+        val durationClassSymbol: IrClassSymbol? = pluginContext.referenceClass(durationClassId)
+        val durationParseSymbol: IrSimpleFunctionSymbol? = durationClassSymbol
+            ?.owner?.declarations
+            ?.filterIsInstance<IrSimpleFunction>()
+            ?.firstOrNull { fn ->
+                fn.name.asString() == "parse" &&
+                    fn.dispatchReceiverParameter == null &&
+                    fn.valueParameters.size == 1
+            }
+            ?.symbol
+
+        val recipeContext = RecipeIrGenContext(
+            pluginContext = pluginContext,
+            recipeClassSymbol = recipeClassSymbol,
+            recipeNoArgCtorSymbol = recipeNoArgCtor,
+            getDisplayName = recipeGetDisplayName,
+            getDescription = recipeGetDescription,
+            getTags = recipeGetTags,
+            getEstimatedEffort = recipeGetEstimatedEffort,
+            durationClassSymbol = durationClassSymbol,
+            durationParseSymbol = durationParseSymbol,
+        )
 
         for (file in moduleFragment.files) {
-            processFile(
-                file = file,
-                pluginContext = pluginContext,
-                recipeClassSymbol = recipeClassSymbol,
-                recipeNoArgCtorSymbol = recipeNoArgCtor,
-                getDisplayName = recipeGetDisplayName,
-                getDescription = recipeGetDescription,
-            )
+            processFile(file, recipeContext)
         }
     }
 
-    private fun processFile(
-        file: IrFile,
-        pluginContext: IrPluginContext,
-        recipeClassSymbol: IrClassSymbol,
-        recipeNoArgCtorSymbol: IrConstructorSymbol,
-        getDisplayName: IrSimpleFunction,
-        getDescription: IrSimpleFunction,
-    ) {
+    /**
+     * Bundles the IR symbols / function references we look up once at the start
+     * of [generate] so we don't re-resolve them per file or per property.
+     */
+    private class RecipeIrGenContext(
+        val pluginContext: IrPluginContext,
+        val recipeClassSymbol: IrClassSymbol,
+        val recipeNoArgCtorSymbol: IrConstructorSymbol,
+        val getDisplayName: IrSimpleFunction,
+        val getDescription: IrSimpleFunction,
+        val getTags: IrSimpleFunction?,
+        val getEstimatedEffort: IrSimpleFunction?,
+        val durationClassSymbol: IrClassSymbol?,
+        val durationParseSymbol: IrSimpleFunctionSymbol?,
+    )
+
+    private fun processFile(file: IrFile, ctx: RecipeIrGenContext) {
         // First pass: identify recipe properties, emit synthetic classes, and
         // record the call→constructor-call replacement map. We don't mutate
         // the initializer in place because the transform below needs the
@@ -145,18 +189,13 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             // and consumers import it). Compare the full FqName directly instead.
             if (initializerExpr.symbol.owner.kotlinFqName != RECIPE_FQN) continue
 
-            val (displayName, description) = readMetadata(initializerExpr) ?: continue
+            val metadata = readMetadata(initializerExpr) ?: continue
 
             val generatedClass = buildGeneratedRecipeClass(
-                pluginContext = pluginContext,
+                ctx = ctx,
                 parentFile = file,
                 propertyName = declaration.name,
-                displayName = displayName,
-                description = description,
-                recipeClassSymbol = recipeClassSymbol,
-                recipeNoArgCtorSymbol = recipeNoArgCtorSymbol,
-                getDisplayName = getDisplayName,
-                getDescription = getDescription,
+                metadata = metadata,
             )
             file.addChild(generatedClass)
 
@@ -165,7 +204,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 .single().symbol
 
             val builder = DeclarationIrBuilder(
-                generatorContext = pluginContext,
+                generatorContext = ctx.pluginContext,
                 symbol = declaration.symbol,
                 startOffset = initializerExpr.startOffset,
                 endOffset = initializerExpr.endOffset,
@@ -187,44 +226,81 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * Extracts the constant `displayName` and `description` arguments from a
-     * `recipe(...)` call. Returns null if either is missing or non-constant —
-     * the IR pass simply leaves such calls alone, and the runtime stub error
-     * informs the author when it fires.
+     * Holds the metadata extracted from a `recipe(...)` call. `displayName` and
+     * `description` are required; the rest are nullable when the user took the
+     * default (empty set for tags, empty string for effort) — we then skip the
+     * corresponding override and inherit Recipe's default behaviour.
      */
-    private fun readMetadata(call: IrCall): Pair<String, String>? {
+    private class RecipeMetadata(
+        val displayName: String,
+        val description: String,
+        /** The user's `tags` IR expression, only set when it's not the default empty set. */
+        val tagsArg: IrExpression?,
+        /** The ISO-8601 duration literal, only set when it's a non-empty constant. */
+        val estimatedEffortLiteral: String?,
+    )
+
+    /**
+     * Extracts the constant `displayName` and `description` arguments plus the
+     * optional `tags` IR expression and `estimatedEffortPerOccurrence` literal
+     * from a `recipe(...)` call. Returns null if displayName/description are
+     * missing or non-constant — the IR pass simply leaves such calls alone, and
+     * the runtime stub error informs the author when it fires.
+     */
+    private fun readMetadata(call: IrCall): RecipeMetadata? {
         val callee = call.symbol.owner
-        val displayNameIdx = callee.valueParameters.indexOfFirst {
-            it.name == Name.identifier("displayName")
-        }
-        val descriptionIdx = callee.valueParameters.indexOfFirst {
-            it.name == Name.identifier("description")
-        }
+        val params = callee.valueParameters
+        val displayNameIdx = params.indexOfFirst { it.name == Name.identifier("displayName") }
+        val descriptionIdx = params.indexOfFirst { it.name == Name.identifier("description") }
         if (displayNameIdx < 0 || descriptionIdx < 0) return null
         val displayName = (call.arguments[displayNameIdx] as? IrConst)?.value as? String ?: return null
         val description = (call.arguments[descriptionIdx] as? IrConst)?.value as? String ?: return null
-        return displayName to description
+
+        val tagsIdx = params.indexOfFirst { it.name == Name.identifier("tags") }
+        val tagsArg = if (tagsIdx >= 0) substantiveArgOrNull(call.arguments[tagsIdx]) else null
+
+        val effortIdx = params.indexOfFirst { it.name == Name.identifier("estimatedEffortPerOccurrence") }
+        val effortLiteral = if (effortIdx >= 0) {
+            ((call.arguments[effortIdx] as? IrConst)?.value as? String)?.takeIf { it.isNotEmpty() }
+        } else null
+
+        return RecipeMetadata(displayName, description, tagsArg, effortLiteral)
+    }
+
+    /**
+     * Returns the argument expression iff it's something the author specified —
+     * not the default `emptySet()` or `setOf()` fallback. We deep-copy whatever
+     * this returns into the generated override; null means "skip override and
+     * inherit the framework default".
+     */
+    private fun substantiveArgOrNull(arg: IrExpression?): IrExpression? {
+        if (arg == null) return null
+        if (arg is IrCall) {
+            val fqn = arg.symbol.owner.kotlinFqName.asString()
+            if (fqn == "kotlin.collections.emptySet") return null
+            if (fqn == "kotlin.collections.setOf") {
+                // setOf() with no varargs (or an empty vararg) is functionally the default.
+                val singleArg = arg.arguments.singleOrNull() ?: return arg
+                if (singleArg is org.jetbrains.kotlin.ir.expressions.IrVararg && singleArg.elements.isEmpty()) return null
+            }
+        }
+        return arg
     }
 
     private fun buildGeneratedRecipeClass(
-        pluginContext: IrPluginContext,
+        ctx: RecipeIrGenContext,
         parentFile: IrFile,
         propertyName: Name,
-        displayName: String,
-        description: String,
-        recipeClassSymbol: IrClassSymbol,
-        recipeNoArgCtorSymbol: IrConstructorSymbol,
-        getDisplayName: IrSimpleFunction,
-        getDescription: IrSimpleFunction,
+        metadata: RecipeMetadata,
     ): IrClass {
-        val cls = pluginContext.irFactory.buildClass {
+        val cls = ctx.pluginContext.irFactory.buildClass {
             name = Name.identifier("Generated\$${propertyName.asString()}")
             kind = ClassKind.CLASS
             modality = Modality.FINAL
             visibility = DescriptorVisibilities.PUBLIC
         }
         cls.parent = parentFile
-        cls.superTypes = listOf(recipeClassSymbol.defaultType)
+        cls.superTypes = listOf(ctx.recipeClassSymbol.defaultType)
         cls.createThisReceiverParameter()
 
         cls.addConstructor {
@@ -235,14 +311,35 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             returnType = cls.symbol.defaultType
             visibility = DescriptorVisibilities.PUBLIC
         }.apply {
-            body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
-                +irDelegatingConstructorCall(recipeNoArgCtorSymbol.owner)
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                +irDelegatingConstructorCall(ctx.recipeNoArgCtorSymbol.owner)
             }
         }
 
-        addStringOverride(cls, pluginContext, "getDisplayName", displayName, getDisplayName)
-        addStringOverride(cls, pluginContext, "getDescription", description, getDescription)
+        addStringOverride(cls, ctx.pluginContext, "getDisplayName", metadata.displayName, ctx.getDisplayName)
+        addStringOverride(cls, ctx.pluginContext, "getDescription", metadata.description, ctx.getDescription)
+
+        if (metadata.tagsArg != null && ctx.getTags != null) {
+            addTagsOverride(cls, ctx, ctx.getTags, metadata.tagsArg)
+        }
+        if (metadata.estimatedEffortLiteral != null &&
+            ctx.getEstimatedEffort != null &&
+            ctx.durationParseSymbol != null
+        ) {
+            // Validate the ISO-8601 literal at compile time. Bad input falls through
+            // to a no-override (Recipe's default 5min); a future FIR checker will
+            // surface this as a user-visible error before then.
+            if (parsesAsIsoDuration(metadata.estimatedEffortLiteral)) {
+                addEstimatedEffortOverride(cls, ctx, ctx.getEstimatedEffort, metadata.estimatedEffortLiteral)
+            }
+        }
         return cls
+    }
+
+    private fun parsesAsIsoDuration(literal: String): Boolean = try {
+        JDuration.parse(literal); true
+    } catch (_: DateTimeParseException) {
+        false
     }
 
     private fun addStringOverride(
@@ -261,6 +358,55 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             overriddenSymbols = listOf(overrides.symbol)
             body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
                 +irReturn(irString(value))
+            }
+        }
+    }
+
+    private fun addTagsOverride(
+        cls: IrClass,
+        ctx: RecipeIrGenContext,
+        overrides: IrSimpleFunction,
+        tagsArg: IrExpression,
+    ) {
+        val returnType: IrType = overrides.returnType
+        cls.addFunction(
+            name = "getTags",
+            returnType = returnType,
+            modality = Modality.OPEN,
+            visibility = DescriptorVisibilities.PUBLIC,
+        ).apply {
+            overriddenSymbols = listOf(overrides.symbol)
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                // The original arg lives inside the soon-to-be-replaced recipe()
+                // call; deep-copy so the IR node has a fresh identity owned by
+                // the new function. Without this we'd hand the same node to two
+                // owners and break IR tree invariants.
+                +irReturn(tagsArg.deepCopyWithSymbols(initialParent = this@apply))
+            }
+        }
+    }
+
+    private fun addEstimatedEffortOverride(
+        cls: IrClass,
+        ctx: RecipeIrGenContext,
+        overrides: IrSimpleFunction,
+        literal: String,
+    ) {
+        val parseSymbol = ctx.durationParseSymbol ?: return
+        cls.addFunction(
+            name = "getEstimatedEffortPerOccurrence",
+            returnType = overrides.returnType,
+            modality = Modality.OPEN,
+            visibility = DescriptorVisibilities.PUBLIC,
+        ).apply {
+            overriddenSymbols = listOf(overrides.symbol)
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                val parseCall = irCall(
+                    callee = parseSymbol,
+                    type = parseSymbol.owner.returnType,
+                )
+                parseCall.arguments[0] = irString(literal)
+                +irReturn(parseCall)
             }
         }
     }
