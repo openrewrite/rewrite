@@ -22,6 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
@@ -221,6 +222,15 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         a = a.withBeforeColon(visitSpace(a.getBeforeColon(), Space.Location.LANGUAGE_EXTENSION, p));
         a = a.withAnnotation(visitAndCast(a.getAnnotation(), p));
         return a;
+    }
+
+    public J visitFunctionType(S.FunctionType functionType, P p) {
+        S.FunctionType f = functionType;
+        f = f.withPrefix(visitSpace(f.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        f = f.getPadding().withParameters(visitContainer(f.getPadding().getParameters(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        f = f.getPadding().withReturnType(visitLeftPadded(f.getPadding().getReturnType(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        return f;
     }
 
     public J visitRefinedType(S.RefinedType refinedType, P p) {

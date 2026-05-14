@@ -269,4 +269,107 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void extraSpace() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def f(a: Int)(b: Int): Int = a + b
+                def fBlock(a: Int)(g: Int => Int): Int = g(a)
+                def fType[T](x: T): T = x
+
+                val m = Map (
+                  "a" -> 1
+                )
+                val lambda = ((x: Int) => x + 1) (5)
+                val blockArg = fBlock(1)  { x => x + 1 }
+                val curried = f(1) (2)
+                val typeApplied = fType[Int] (5)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitFunctionApplication — last-arg close paren in line comment
+        rewriteRun(
+          scala(
+            """
+              val xs = Seq(
+                1 // )
+              )
+              """
+          )
+        );
+        // visitFunctionApplication — comma between args in block comment
+        rewriteRun(
+          scala(
+            """
+              val xs = Seq(1 /* , */ , 2)
+              """
+          )
+        );
+        // visitApply default branch — close paren in line comment with non-Ident callee
+        rewriteRun(
+          scala(
+            """
+              val f: Int => Int = _ + 1
+              val r = (f)(1 // )
+              )
+              """
+          )
+        );
+        // visitMethodInvocation — close paren of last arg in line comment
+        rewriteRun(
+          scala(
+            """
+              val s = "abc"
+              val i = s.indexOf("b" // )
+              )
+              """
+          )
+        );
+        // visitMethodInvocation — comma between args in line comment
+        rewriteRun(
+          scala(
+            """
+              val s = "abc"
+              val i = s.indexOf("b" // ,
+              , 1)
+              """
+          )
+        );
+        // visitMethodInvocation — open paren in line comment before arg list
+        rewriteRun(
+          scala(
+            """
+              val xs = List(1, 2)
+              val n = xs // (
+              .size
+              """
+          )
+        );
+        // visitMethodInvocation — dot lookup with trailing line comment before dot
+        rewriteRun(
+          scala(
+            """
+              val n = List(1, 2) // .
+              .length
+              """
+          )
+        );
+        // visitMethodInvocationFromTypeApply — dot lookup with trailing line comment before dot
+        rewriteRun(
+          scala(
+            """
+              val xs = List(1, 2) // .
+              .map[Int](_ + 1)
+              """
+          )
+        );
+    }
 }

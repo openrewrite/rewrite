@@ -210,4 +210,43 @@ class NewClassTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void mixinWithExtraSpaceAroundWith() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              trait A
+              trait B
+              trait C
+              val x = new A  with  B  with  C {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitNewClassWithArgs — close paren in line comment
+        rewriteRun(
+          scala(
+            """
+            class Foo(val x: Int)
+            val f = new Foo(1 // )
+            )
+            """
+          )
+        );
+        // visitNew — close paren in block comment within non-empty arg list
+        rewriteRun(
+          scala(
+            """
+            class Foo(a: Int, b: Int)
+            val f = new Foo(1 /* ) */, 2)
+            """
+          )
+        );
+    }
 }

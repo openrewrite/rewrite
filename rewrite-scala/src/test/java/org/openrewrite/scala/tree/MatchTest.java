@@ -461,4 +461,59 @@ class MatchTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void matchCaseWithMultiStatementBody() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def handle(x: Any): String = x match {
+                case s: String =>
+                  println("got string")
+                  s
+                case _ =>
+                  println("other")
+                  "other"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void partialFunctionLiteralWithMultiStatementCaseBody() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val handler: PartialFunction[Any, String] = {
+                case s: String =>
+                  println("got string")
+                  s
+                case _ =>
+                  println("other")
+                  "other"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // buildCasesBlock — `=>` arrow in case line comment
+        rewriteRun(
+          scala(
+            """
+            val r = 1 match {
+              case x // =>
+              => x
+            }
+            """
+          )
+        );
+    }
 }

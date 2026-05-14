@@ -315,4 +315,9 @@ class LambdaTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void spaceBeforeColonOnLambdaParameter() {
+        rewriteRun(scala("val f = (x : Int) => x"));
+    }
 }

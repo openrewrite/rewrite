@@ -320,6 +320,22 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void functionTypes() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def make1(): Int => Int = x => x + 1
+                  def make2(): () => Int = () => 42
+                  def make3(): (Int, String) => Boolean = (i, s) => s.length == i
+                  def apply(f: Int => Int, x: Int): Int = f(x)
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void implicitInSecondParamList() {
         rewriteRun(
             scala(
@@ -386,5 +402,144 @@ class MethodDeclarationTest implements RewriteTest {
                 )
             );
         }
+    }
+
+    @Test
+    void parameterlessDef() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo: Int = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void parameterlessDefInTrait() {
+        rewriteRun(
+            scala(
+                """
+                trait T {
+                  def bar: String
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void spaceBeforeEqualsWithNoSpaceAfter() {
+        rewriteRun(scala("def f(): Unit ={ }"));
+    }
+
+    @Test
+    void spaceBeforeColonOnMethodParameter() {
+        rewriteRun(scala("def f(map : Int): Int = 1"));
+    }
+
+    @Test
+    void auxiliaryConstructors() {
+        rewriteRun(
+            scala(
+                """
+                class DelegatingToPrimary(a: Int) {
+                  def this() = this(0)
+                }
+
+                class WithParams(a: Int, b: Int) {
+                  def this(x: Int) = this(x, 0)
+                }
+
+                class Chained(a: Int, b: Int) {
+                  def this(x: Int) = this(x, 0)
+                  def this() = this(0)
+                }
+
+                class WithBlockBody(a: Int) {
+                  def this() = {
+                    this(0)
+                    println("init")
+                  }
+                }
+
+                class WithPrivate(a: Int) {
+                  private def this() = this(0)
+                }
+
+                class WithAnnotation(a: Int) {
+                  @deprecated def this() = this(0)
+                }
+
+                case class CaseClass(a: Int, b: Int) {
+                  def this() = this(0, 0)
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // buildKeywordMethodInvocation — this(...) auxiliary constructor close paren in line comment
+        rewriteRun(
+          scala(
+            """
+              class C(val x: Int) {
+                def this() = this(0 // )
+                )
+              }
+              """
+          )
+        );
+        // reparseProcedureBody — `{` in block comment before procedure body
+        rewriteRun(
+          scala(
+            """
+              class C {
+                def foo() /* { */ {
+                  println("x")
+                }
+              }
+              """
+          )
+        );
+        // visitDefDefImpl — type parameter close bracket in block comment
+        rewriteRun(
+          scala(
+            """
+              def f[T /* ] */](x: T): T = x
+              """
+          )
+        );
+        // visitDefDefImpl — parameter list close paren in line comment
+        rewriteRun(
+          scala(
+            """
+              def f(x: Int // )
+              ): Int = x
+              """
+          )
+        );
+        // visitExtMethods — extension method close paren in block comment
+        rewriteRun(
+          scala(
+            """
+              extension (x: Int /* ) */ ) {
+                def doubled: Int = x * 2
+              }
+              """
+          )
+        );
+        // visitTypeParameter — context bound colon in block comment
+        rewriteRun(
+          scala(
+            """
+              def f[A /* : */ : Ordering](x: A): A = x
+              """
+          )
+        );
     }
 }

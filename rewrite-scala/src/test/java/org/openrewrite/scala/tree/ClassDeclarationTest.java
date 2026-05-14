@@ -352,4 +352,89 @@ class ClassDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void paramNameEndingInUnderscore() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(tag_ : String)
+                """
+            )
+        );
+    }
+
+    @Test
+    void typeParamContextBoundWithSpaceBeforeColon() {
+        rewriteRun(
+            scala(
+                """
+                case class Foo[T : Encoder]()
+                """
+            )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // buildKeywordMethodInvocation — super(...) close paren in line comment
+        rewriteRun(
+            scala(
+                """
+                class Base(val x: Int)
+                class Derived(x: Int) extends Base(x // )
+                )
+                """
+            )
+        );
+        // visitClassDef — type parameter close bracket in block comment
+        rewriteRun(
+            scala(
+                """
+                class C[A /* ] */, B]
+                """
+            )
+        );
+        // visitClassDef — type parameter comma in block comment
+        rewriteRun(
+            scala(
+                """
+                class C[A /* , */ , B]
+                """
+            )
+        );
+        // visitClassDef — constructor close paren in line comment
+        rewriteRun(
+            scala(
+                """
+                class C(x: Int // )
+                )
+                """
+            )
+        );
+        // visitTypeParameter — `[` in block comment between class name and type params
+        rewriteRun(
+            scala(
+                """
+                class C /* [ */ [A]
+                """
+            )
+        );
+        // visitTypeParameter — `>:` lower bound operator in block comment
+        rewriteRun(
+            scala(
+                """
+                class C[A /* >: */ >: Nothing]
+                """
+            )
+        );
+        // visitTypeParameter — `<:` upper bound operator in block comment
+        rewriteRun(
+            scala(
+                """
+                class C[A /* <: */ <: AnyRef]
+                """
+            )
+        );
+    }
 }
