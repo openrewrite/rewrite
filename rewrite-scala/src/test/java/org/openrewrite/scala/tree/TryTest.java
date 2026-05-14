@@ -375,4 +375,17 @@ class TryTest implements RewriteTest {
             """
         ));
     }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitParsedTry / visitTryImpl — `=>` arrow in catch case line comment
+        rewriteRun(scala(
+            """
+            val r = try { 1 } catch {
+              case e: Exception // =>
+              => 2
+            }
+            """
+        ));
+    }
 }
