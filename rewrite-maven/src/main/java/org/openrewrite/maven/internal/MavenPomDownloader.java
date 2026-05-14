@@ -657,7 +657,6 @@ public class MavenPomDownloader {
                                     new ByteArrayInputStream(pomResponseBody),
                                     Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot
                             );
-                            boolean cacheEmptyResult = true;
                             try (BufferedReader reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(pomResponseBody)))) {
                                 String line;
                                 while ((line = reader.readLine()) != null) {
