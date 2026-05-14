@@ -439,4 +439,17 @@ class MethodDeclarationTest implements RewriteTest {
     void spaceBeforeColonOnMethodParameter() {
         rewriteRun(scala("def f(map : Int): Int = 1"));
     }
+
+    @Test
+    void auxiliaryConstructorDelegatingToPrimary() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(a: Int) {
+                  def this() = this(0)
+                }
+                """
+            )
+        );
+    }
 }
