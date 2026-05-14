@@ -26,11 +26,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
@@ -44,10 +39,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -232,36 +225,6 @@ class RewriteTestTest implements RewriteTest {
                     - org.openrewrite.DoesNotExist
                   """, "org.openrewrite.test.internal.StillValidated")
               ));
-        }
-
-        @Test
-        void doesRetryRepositoryOn401And403() {
-            rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> new PlainTextVisitor<>() {
-                  @Override
-                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                      List<MavenRepository> repositories = singletonList(new MavenRepository("cache-3", "https://artifactory.moderne.ninja/artifactory/moderne-cache-3/", null, null, null, null, null));
-                      GroupArtifact unexisting = new GroupArtifact("org.springframework.integration", "fail");
-                      GroupArtifact existing = new GroupArtifact("org.springframework.integration", "spring-integration-bom");
-                      MavenPomDownloader downloader = new MavenPomDownloader(ctx);
-
-                      //Artifactory virtual anonymous repo returns 401 on unexisting and 404 for authenticated unexisting
-                      assertThrows(MavenDownloadingException.class, () -> downloader.downloadMetadata(unexisting, null, repositories));
-                      assertDoesNotThrow(() -> downloader.downloadMetadata(existing, null, repositories));
-                      //Artifactory virtual anonymous repo returns 401 on unexisting and 404 for authenticated unexisting
-                      assertThrows(MavenDownloadingException.class, () -> downloader.downloadMetadata(new GroupArtifactVersion("com.fasterxml.jackson", "jackson-base", "2.19.3"), null, repositories));
-                      //Artifactory virtual returns 200 anonymous and authenticated existing
-                      assertDoesNotThrow(() -> downloader.downloadMetadata(new GroupArtifactVersion("com.fasterxml.jackson", "jackson-base", "2.19.3-SNAPSHOT"), null, repositories));
-                      //Artifactory virtual anonymous repo returns 401 on unexisting and 404 for authenticated unexisting
-                      assertThrows(MavenDownloadingException.class, () -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.-1"), null, null, repositories));
-                      //Artifactory virtual returns 200 anonymous and authenticated existing
-                      assertDoesNotThrow(() -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.0"), null, null, repositories));
-
-                      return super.visitText(text, ctx);
-                  }
-              })),
-              text("")
-            );
         }
     }
 }

@@ -36,13 +36,15 @@ import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -59,6 +61,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
+import static org.openrewrite.test.SourceSpecs.text;
 
 @SuppressWarnings({"HttpUrlsUsage"})
 class MavenPomDownloaderTest implements RewriteTest {
@@ -1656,5 +1659,35 @@ class MavenPomDownloaderTest implements RewriteTest {
           .doesNotContain("something-else")
           .contains("")
           .anyMatch(c -> !"".equals(c));
+    }
+
+    @Test
+    void doesNotThrowONMissingModuleWhenNot404() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new PlainTextVisitor<>() {
+              @Override
+              public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                  List<MavenRepository> repositories = singletonList(new MavenRepository("cache-3", "https://artifactory.moderne.ninja/artifactory/moderne-cache-3/", null, null, null, null, null));
+                  GroupArtifact unexisting = new GroupArtifact("org.springframework.integration", "fail");
+                  GroupArtifact existing = new GroupArtifact("org.springframework.integration", "spring-integration-bom");
+                  MavenPomDownloader downloader = new MavenPomDownloader(ctx);
+
+                  //Artifactory virtual anonymous repo returns 401 on unexisting and 404 for authenticated unexisting
+                  assertThrows(MavenDownloadingException.class, () -> downloader.downloadMetadata(unexisting, null, repositories));
+                  assertDoesNotThrow(() -> downloader.downloadMetadata(existing, null, repositories));
+                  //Artifactory virtual anonymous repo returns 401 on unexisting and 404 for authenticated unexisting
+                  assertThrows(MavenDownloadingException.class, () -> downloader.downloadMetadata(new GroupArtifactVersion("com.fasterxml.jackson", "jackson-base", "2.19.3"), null, repositories));
+                  //Artifactory virtual returns 200 anonymous and authenticated existing
+                  assertDoesNotThrow(() -> downloader.downloadMetadata(new GroupArtifactVersion("com.fasterxml.jackson", "jackson-base", "2.19.3-SNAPSHOT"), null, repositories));
+                  //Artifactory virtual anonymous repo returns 401 on unexisting and 404 for authenticated unexisting
+                  assertThrows(MavenDownloadingException.class, () -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.-1"), null, null, repositories));
+                  //Artifactory virtual returns 200 anonymous and authenticated existing
+                  assertDoesNotThrow(() -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.0"), null, null, repositories));
+
+                  return super.visitText(text, ctx);
+              }
+          })),
+          text("")
+        );
     }
 }
