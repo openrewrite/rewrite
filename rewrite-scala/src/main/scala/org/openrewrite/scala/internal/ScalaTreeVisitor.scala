@@ -6992,12 +6992,50 @@ class ScalaTreeVisitor(
     case f: untpd.Function => visitFunctionType(f)
     case po: untpd.PostfixOp if po.op != null && po.op.name.toString == "*" =>
       visitRepeatedType(po)
+    case tuple: untpd.Tuple => visitTupleType(tuple)
     case _ =>
       visitTree(tpt) match {
         case tt: TypeTree => tt
         case id: J.Identifier => id
         case _ => null
       }
+  }
+
+  /**
+   * Build an `S.TupleType` for a tuple in a type position (e.g. `(Int, Int)` as a return type
+   * or value type ascription). Scala 3's parser uses `untpd.Tuple` for both value and type
+   * tuples; we dispatch to this builder only when the parent context is a type.
+   */
+  private def visitTupleType(tuple: untpd.Tuple): S.TupleType = {
+    // An empty `Tuple(Nil)` shouldn't appear in a type position: `()` parses as the
+    // unit value, `() => T` parses as `Function`, and `Unit` is the canonical empty
+    // type. Fail loudly if we encounter it so the gap is discovered, not silently
+    // round-tripped to wrong source.
+    if (tuple.trees.isEmpty) {
+      throw new IllegalStateException("Empty tuple in type position is not supported")
+    }
+
+    val prefix = extractPrefix(tuple.span)
+
+    // Space between the prefix and `(`. extractPrefix usually lands the cursor
+    // exactly at `(`, but if the compiler span starts inside the parens we still
+    // want to capture any whitespace here instead of dropping it.
+    val beforeOpenParen = sourceBefore("(")
+
+    val elements = new util.ArrayList[JRightPadded[TypeTree]]()
+    for (i <- tuple.trees.indices) {
+      val elem = visitTypeTree(tuple.trees(i))
+      val after = if (i < tuple.trees.size - 1) sourceBefore(",") else sourceBefore(")")
+      elements.add(JRightPadded.build(elem).withAfter(after))
+    }
+
+    S.TupleType.build(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      JContainer.build(beforeOpenParen, elements, Markers.EMPTY),
+      typeOfTree(tuple)
+    )
   }
 
   /**

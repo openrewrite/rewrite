@@ -614,6 +614,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitRefinedType((S.RefinedType) tree, p);
         } else if (tree instanceof S.FunctionType) {
             return visitFunctionType((S.FunctionType) tree, p);
+        } else if (tree instanceof S.TupleType) {
+            return visitTupleType((S.TupleType) tree, p);
         } else if (tree instanceof S.Macro) {
             return visitMacro((S.Macro) tree, p);
         } else if (tree instanceof S.ExtensionMethods) {
@@ -1649,6 +1651,25 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visit(rt.getElement(), p);
         afterSyntax(functionType, p);
         return functionType;
+    }
+
+    public J visitTupleType(S.TupleType tupleType, PrintOutputCapture<P> p) {
+        beforeSyntax(tupleType, Space.Location.LANGUAGE_EXTENSION, p);
+        JContainer<TypeTree> elements = tupleType.getPadding().getElements();
+        visitSpace(elements.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append('(');
+        List<JRightPadded<TypeTree>> padded = elements.getPadding().getElements();
+        for (int i = 0; i < padded.size(); i++) {
+            JRightPadded<TypeTree> element = padded.get(i);
+            visit(element.getElement(), p);
+            visitSpace(element.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            if (i < padded.size() - 1) {
+                p.append(',');
+            }
+        }
+        p.append(')');
+        afterSyntax(tupleType, p);
+        return tupleType;
     }
 
     public J visitRefinedType(S.RefinedType refinedType, PrintOutputCapture<P> p) {

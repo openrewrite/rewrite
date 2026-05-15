@@ -242,6 +242,14 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return f;
     }
 
+    public J visitTupleType(S.TupleType tupleType, P p) {
+        S.TupleType t = tupleType;
+        t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.getPadding().withElements(visitContainer(t.getPadding().getElements(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return t;
+    }
+
     public J visitRefinedType(S.RefinedType refinedType, P p) {
         S.RefinedType r = refinedType;
         r = r.withPrefix(visitSpace(r.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

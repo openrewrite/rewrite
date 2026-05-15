@@ -393,6 +393,89 @@ public interface S extends J {
     }
 
     /**
+     * Represents a Scala tuple type: {@code (T1, T2, ...)}.
+     * For example, the return type in {@code def f(): (Int, String)} or a value type like
+     * {@code val pair: (Int, Int) = ...}. The element container's {@code before} space is
+     * the whitespace immediately before {@code (}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class TupleType implements S, TypeTree, Expression {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        JContainer<TypeTree> elements;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public static TupleType build(UUID id, Space prefix, Markers markers,
+                                      JContainer<TypeTree> elements, @Nullable JavaType type) {
+            return new TupleType(null, id, prefix, markers, elements, type);
+        }
+
+        public List<TypeTree> getElements() {
+            return elements.getElements();
+        }
+
+        public TupleType withElements(List<TypeTree> elements) {
+            return getPadding().withElements(JContainer.withElements(this.elements, elements));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitTupleType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final TupleType t;
+
+            public JContainer<TypeTree> getElements() {
+                return t.elements;
+            }
+
+            public TupleType withElements(JContainer<TypeTree> elements) {
+                return t.elements == elements ? t :
+                        new TupleType(null, t.id, t.prefix, t.markers, elements, t.type);
+            }
+        }
+    }
+
+    /**
      * Represents a wildcard/underscore placeholder in expressions.
      * Used for partially applied functions (e.g., add(5, _)) and pattern matching.
      * This is NOT for type wildcards (use J.Wildcard) or import wildcards (use * in J.Import).
