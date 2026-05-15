@@ -487,14 +487,25 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * Validated before lambda: the lambda's value parameters (param[0] is the
-     * receiver), the root method call, and a per-arg-position signature for
-     * the root call's args used to set up the after template's substitutions.
+     * Validated before lambda: the lambda's value parameters, the root method
+     * call, a per-arg-position signature for the root call's args used to set
+     * up the after template's substitutions, and the lambda param symbol (if
+     * any) that appears in the root call's receiver position.
+     *
+     * `receiverParamSymbol` is:
+     *  - some `params[i].symbol` when the root call has an IrGetValue
+     *    dispatch/extension receiver bound to that lambda param,
+     *  - null when the root call has no receiver at all (top-level function
+     *    invocation, e.g. `println(s)`).
+     *
+     * External receivers (e.g. `Foo.bar(s)` where the receiver is not a
+     * lambda param) are rejected at validation time.
      */
     private class BeforeLambda(
         val params: List<IrValueParameter>,
         val rootCall: IrCall,
         val argSignatures: List<ArgSig>,
+        val receiverParamSymbol: IrValueSymbol?,
     )
 
     /**
@@ -575,16 +586,19 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * Canonicalised form of a before lambda's argument signature, used to
-     * verify multi-before lambdas all capture in the same shape. Two
-     * signatures are equal iff each position is either the same param index
-     * (0 = receiver, 1 = first non-receiver, ...) or the same literal
-     * `(kind, value)` pair.
+     * Canonicalised form of a before lambda's shape, used to verify
+     * multi-before lambdas all capture in the same way so they can share the
+     * after template + substitution CSV. Two signatures are equal iff
+     *  - the receiver position resolves the same way: same lambda-param index
+     *    or `null` (no receiver) on both sides, and
+     *  - each arg position is either the same param index (0 = first param,
+     *    1 = second param, ...) or the same literal `(kind, value)` pair.
      */
-    private fun BeforeLambda.canonicalSignature(): List<CanonicalArgSig> {
+    private fun BeforeLambda.canonicalSignature(): CanonicalSignature {
         val paramIdxBySymbol: Map<IrValueSymbol, Int> =
             params.withIndex().associate { (idx, p) -> p.symbol to idx }
-        return argSignatures.map { sig ->
+        val receiverIdx = receiverParamSymbol?.let { paramIdxBySymbol[it] }
+        val args = argSignatures.map { sig ->
             when (sig) {
                 is ArgSig.ParamRef -> {
                     val idx = paramIdxBySymbol[sig.symbol] ?: return@map CanonicalArgSig.Unknown
@@ -593,7 +607,13 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 is ArgSig.LiteralConst -> CanonicalArgSig.Literal(sig.kind, sig.value)
             }
         }
+        return CanonicalSignature(receiverIdx, args)
     }
+
+    private data class CanonicalSignature(
+        val receiverParamIdx: Int?,
+        val args: List<CanonicalArgSig>,
+    )
 
     private sealed class CanonicalArgSig {
         data class ParamIdx(val idx: Int) : CanonicalArgSig()
@@ -602,18 +622,25 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * Validates a `{ p0: T0, p1: T1, ... -> p0.someMethod(...args...) }`-shaped
-     * lambda. p0 is the receiver (must appear as the root call's dispatch or
-     * extension receiver). Each remaining root-call arg must be an IrGetValue
-     * of one of p1..pN (named capture) OR an IrConst (literal capture). Any
-     * other shape returns null.
+     * Validates a before lambda whose body is a single method call rooted on
+     * one of the lambda params OR on no receiver (top-level function call).
+     * Each root-call arg must be either an IrGetValue of one of the lambda
+     * params (named capture) or an IrConst (literal capture). Returns null on
+     * any deviation.
+     *
+     * Accepted shapes:
+     *  - `{ p0: T -> p0.foo(...) }`    — param in receiver position.
+     *  - `{ p0: T, p1: U -> p1.foo(p0, ...) }` — any lambda param as receiver.
+     *  - `{ p0: T -> foo(p0) }`        — top-level function call, no receiver.
+     *
+     * Rejected: root calls whose receiver is some external expression (e.g.
+     * `Foo.bar(s)` where Foo is a class reference), since the matcher would
+     * need to know the receiver type at recipe-generation time.
      */
     private fun validateBeforeLambda(fnExpr: IrFunctionExpression): BeforeLambda? {
         val fn = fnExpr.function
         val params = fn.valueParameters
         if (params.isEmpty()) return null
-        val receiverParam = params[0]
-        if (receiverParam.type.classFqName == null) return null
         val body = fn.body as? IrBlockBody ?: return null
         val singleStmt = body.statements.singleOrNull() ?: return null
         val rootCall = when (singleStmt) {
@@ -622,15 +649,23 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             else -> null
         } ?: return null
 
-        // Receiver must be IrGetValue of param[0]. Extension-receiver IrGetValue
+        // Receiver resolution. The dispatch/extension receivers are mutually
+        // exclusive on a single call in K2 IR (extension-receiver IrGetValue
         // has zero-width offsets outside the IrCall's source range; we still
-        // identify it via symbol equality, not source position.
-        val receiverGet = (rootCall.dispatchReceiver as? IrGetValue)
-            ?: (rootCall.extensionReceiver as? IrGetValue)
-            ?: return null
-        if (receiverGet.symbol != receiverParam.symbol) return null
+        // identify it via symbol equality, not source position).
+        val rawReceiver: IrExpression? = rootCall.dispatchReceiver ?: rootCall.extensionReceiver
+        val paramSyms: Set<IrValueSymbol> = params.map { it.symbol }.toSet()
+        val receiverParamSymbol: IrValueSymbol? = when (rawReceiver) {
+            null -> null  // top-level function: no receiver at all.
+            is IrGetValue -> {
+                // The receiver must be one of the lambda's value params; any
+                // other IrGetValue would need a different MethodMatcher spec.
+                if (rawReceiver.symbol !in paramSyms) return null
+                rawReceiver.symbol
+            }
+            else -> return null  // external receiver (class ref, call, etc.) — out of v0 scope.
+        }
 
-        val nonReceiverParamSyms: Set<IrValueSymbol> = params.drop(1).map { it.symbol }.toSet()
         val sigs = mutableListOf<ArgSig>()
         for (i in 0 until rootCall.valueArgumentsCount) {
             // Default-valued args the user didn't write surface as null here in
@@ -639,14 +674,17 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             val arg = rootCall.getValueArgument(i) ?: continue
             when (arg) {
                 is IrGetValue -> {
-                    if (arg.symbol !in nonReceiverParamSyms) return null
+                    // Any lambda param is a valid arg-position capture; the
+                    // after template resolves the source per-param below
+                    // (receiver param → -1, otherwise its arg index).
+                    if (arg.symbol !in paramSyms) return null
                     sigs += ArgSig.ParamRef(arg.symbol)
                 }
                 is IrConst -> sigs += ArgSig.LiteralConst(arg.kind, arg.value)
                 else -> return null
             }
         }
-        return BeforeLambda(params, rootCall, sigs)
+        return BeforeLambda(params, rootCall, sigs, receiverParamSymbol)
     }
 
     /**
@@ -687,18 +725,25 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             else -> return null
         }
 
-        // After's param[i>0] resolves to the before's param[i] by position;
-        // that before-param must appear as some IrGetValue arg of before's
-        // root call to give us a runtime capture slot.
+        // After's param[i] resolves to the before's param[i] by position. The
+        // matched-method source it points to is either:
+        //  - the receiver (-1) iff the before-param is the receiver-param, OR
+        //  - the arg index where the before-param appears in the root call.
+        // If the before pattern doesn't capture that param at all, the after
+        // can't reference it — return null and fall back to no-op visitor.
         val paramSymToSource = HashMap<IrValueSymbol, Int>(afterParams.size)
-        paramSymToSource[afterParams[0].symbol] = -1
-        for (i in 1 until afterParams.size) {
+        for (i in 0 until afterParams.size) {
             val beforeParamSym = before.params[i].symbol
-            val beforeArgIdx = before.argSignatures.indexOfFirst { sig ->
-                sig is ArgSig.ParamRef && sig.symbol == beforeParamSym
+            val source = if (beforeParamSym == before.receiverParamSymbol) {
+                -1
+            } else {
+                val argIdx = before.argSignatures.indexOfFirst { sig ->
+                    sig is ArgSig.ParamRef && sig.symbol == beforeParamSym
+                }
+                if (argIdx < 0) return null
+                argIdx
             }
-            if (beforeArgIdx < 0) return null  // after references a param the before pattern doesn't capture
-            paramSymToSource[afterParams[i].symbol] = beforeArgIdx
+            paramSymToSource[afterParams[i].symbol] = source
         }
 
         // Unconsumed literal arg sigs, keyed by before-arg position. We consume

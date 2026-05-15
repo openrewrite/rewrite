@@ -57,10 +57,10 @@ class RecipePluginRewriteTest : RewriteTest {
             kotlin(
                 """
                 val s: String = "hello".lowercase()
-                """.trimIndent(),
+                """,
                 """
                 val s: String = "hello".uppercase()
-                """.trimIndent(),
+                """,
             ),
         )
     }
@@ -98,10 +98,10 @@ class RecipePluginRewriteTest : RewriteTest {
             kotlin(
                 """
                 fun head(text: String, k: Int): String = text.substring(k)
-                """.trimIndent(),
+                """,
                 """
                 fun head(text: String, k: Int): String = text.take(k)
-                """.trimIndent(),
+                """,
             ),
         )
     }
@@ -146,11 +146,86 @@ class RecipePluginRewriteTest : RewriteTest {
                 """
                 val a: String = "hello".lowercase()
                 val b: String = "  WORLD  ".trim()
-                """.trimIndent(),
+                """,
                 """
                 val a: String = "hello".uppercase()
                 val b: String = "  WORLD  ".uppercase()
-                """.trimIndent(),
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `top-level function recipe rewrites no-receiver calls`() {
+        // The before lambda's root call has no dispatch or extension receiver
+        // (it's a top-level Kotlin function), and the captured param appears
+        // as a regular argument. The plugin lowers to a matcher with no
+        // receiver constraint and an after template that substitutes
+        // `method.getArguments().get(0)` into the captured slot.
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val UseCheckNotNull: Recipe = recipe(
+                displayName = "Use checkNotNull",
+                description = "Replace requireNotNull(x) with checkNotNull(x).",
+            ) {
+                rewrite { x: String? -> requireNotNull(x) } to { x -> checkNotNull(x) }
+            }
+            """.trimIndent(),
+            fileName = "Recipes.kt",
+        )
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val recipe = facade.getMethod("getUseCheckNotNull").invoke(null) as Recipe
+
+        rewriteRun(
+            { spec -> spec.recipe(recipe).validateRecipeSerialization(false) },
+            kotlin(
+                """
+                fun firstOf(s: String?): String = requireNotNull(s)
+                """,
+                """
+                fun firstOf(s: String?): String = checkNotNull(s)
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `receiver can be a non-first lambda param`() {
+        // The receiver position binds to `list` (param[1]), not `x` (param[0]).
+        // Param[0] appears in arg position. The generalized lowering must
+        // resolve `x` -> arg index 0 and `list` -> -1 (receiver) when building
+        // the after template's substitutions.
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val ContainsToIndexOf: Recipe = recipe(
+                displayName = "Use indexOf for contains",
+                description = "Replace list.contains(x) with list.indexOf(x) >= 0.",
+            ) {
+                rewrite { x: String, list: List<String> -> list.contains(x) } to { x, list -> list.indexOf(x) >= 0 }
+            }
+            """.trimIndent(),
+            fileName = "Recipes.kt",
+        )
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val recipe = facade.getMethod("getContainsToIndexOf").invoke(null) as Recipe
+
+        rewriteRun(
+            { spec -> spec.recipe(recipe).validateRecipeSerialization(false) },
+            kotlin(
+                """
+                fun has(strings: List<String>, target: String): Boolean = strings.contains(target)
+                """,
+                """
+                fun has(strings: List<String>, target: String): Boolean = strings.indexOf(target) >= 0
+                """,
             ),
         )
     }
@@ -187,10 +262,10 @@ class RecipePluginRewriteTest : RewriteTest {
             kotlin(
                 """
                 val s: String = "banana".replace("a", "o")
-                """.trimIndent(),
+                """,
                 """
                 val s: String = "banana".replaceFirst("a", "o")
-                """.trimIndent(),
+                """,
             ),
         )
     }
