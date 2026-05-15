@@ -13,7 +13,9 @@ import kotlin.jvm.functions.Function1;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.tree.K;
@@ -88,9 +90,23 @@ public final class GeneratedRecipeSupport {
                             substitutions[i] = method.getArguments().get(src);
                         }
                     }
-                    return KotlinTemplate.builder(afterTemplate).build()
-                            .apply(getCursor(), method.getCoordinates().replace(), substitutions)
-                            .withPrefix(method.getPrefix());
+                    J result = KotlinTemplate.builder(afterTemplate).build()
+                            .apply(getCursor(), method.getCoordinates().replace(), substitutions);
+                    // Preserve the matched call's reified type arguments. The
+                    // after-template's type args (if any) are placeholders the
+                    // author wrote because Kotlin won't let `enumValues<T>()` /
+                    // `enumEntries<T>()` etc. parse without a concrete type
+                    // there. The matched call carries the real type — copy it
+                    // over so the rewrite is type-arg-faithful for reified
+                    // callees. No-op when the result isn't a method invocation
+                    // or the matched call had no type args.
+                    if (result instanceof J.MethodInvocation) {
+                        JContainer<Expression> matchedTypeArgs = method.getPadding().getTypeParameters();
+                        if (matchedTypeArgs != null) {
+                            result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
+                        }
+                    }
+                    return result.withPrefix(method.getPrefix());
                 }
                 return super.visitMethodInvocation(method, ctx);
             }

@@ -86,6 +86,20 @@ public class RecipeBuilder internal constructor() {
     // with a single AFTER lambda. The `to` infix returns Unit — chaining a
     // second rewrite is not a type error here but the compiler plugin rejects
     // it at compile time.
+    //
+    // The after lambda's return type is intentionally decoupled from the
+    // before lambda's (e.g. `enumValues<T>(): Array<T>` vs `enumEntries<T>():
+    // EnumEntries<T>`). The plugin doesn't validate semantic equivalence;
+    // that's on the recipe author.
+
+    /**
+     * Zero-param before/after: typically a reified-generic rename like
+     * `enumValues<E>() -> enumEntries<E>()`. The runtime helper preserves the
+     * matched call's actual type arguments, so the concrete type the author
+     * writes inside `<...>` is just a placeholder for Kotlin's type checker.
+     */
+    public fun <R> rewrite(before: () -> R): RewriteAdvice0<R> = RewriteAdvice0()
+    public fun <R> rewrite(first: () -> R, vararg rest: () -> R): RewriteAdvice0<R> = RewriteAdvice0()
 
     public fun <P, R> rewrite(before: (P) -> R): RewriteAdvice1<P, R> = RewriteAdvice1()
     public fun <P, R> rewrite(first: (P) -> R, vararg rest: (P) -> R): RewriteAdvice1<P, R> = RewriteAdvice1()
@@ -117,12 +131,16 @@ public class RecipeBuilder internal constructor() {
     ): Unit = Unit
 }
 
+@RecipeDslMarker public class RewriteAdvice0<R> internal constructor() {
+    public infix fun <R2> to(after: () -> R2): Unit = Unit
+}
+
 @RecipeDslMarker public class RewriteAdvice1<P, R> internal constructor() {
-    public infix fun to(after: (P) -> R): Unit = Unit
+    public infix fun <R2> to(after: (P) -> R2): Unit = Unit
 }
 
 @RecipeDslMarker public class RewriteAdvice2<P1, P2, R> internal constructor() {
-    public infix fun to(after: (P1, P2) -> R): Unit = Unit
+    public infix fun <R2> to(after: (P1, P2) -> R2): Unit = Unit
 }
 
 /**

@@ -885,11 +885,12 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // an IrReturn when the lambda lowers a single-expression body).
         val firstStmt = statements.singleOrNull() ?: return null
         val toCall = (firstStmt as? IrReturn)?.value as? IrCall ?: firstStmt as? IrCall ?: return null
-        // The `rewrite(before: (P) -> R)` overload returns RewriteAdvice1; the
-        // `rewrite(before: (P1, P2) -> R)` overload returns RewriteAdvice2.
-        // Both expose `to(after)` whose owning class names are RewriteAdviceN.
+        // The `rewrite(before: () -> R)` overload returns RewriteAdvice0; the
+        // 1-param/2-param shapes return RewriteAdvice1/RewriteAdvice2. All three
+        // expose `to(after)` whose owning class names are RewriteAdviceN.
         val toCallFqn = toCall.symbol.owner.kotlinFqName.asString()
-        if (toCallFqn != "org.openrewrite.RewriteAdvice1.to" &&
+        if (toCallFqn != "org.openrewrite.RewriteAdvice0.to" &&
+            toCallFqn != "org.openrewrite.RewriteAdvice1.to" &&
             toCallFqn != "org.openrewrite.RewriteAdvice2.to"
         ) return null
         val rewriteCall = toCall.dispatchReceiver as? IrCall ?: return null
@@ -983,6 +984,11 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
      *  - `{ p0: T -> p0.foo(...) }`    — param in receiver position.
      *  - `{ p0: T, p1: U -> p1.foo(p0, ...) }` — any lambda param as receiver.
      *  - `{ p0: T -> foo(p0) }`        — top-level function call, no receiver.
+     *  - `{ -> foo<T>() }`             — zero-param lambda, top-level call.
+     *                                    Used for reified-generic renames like
+     *                                    `enumValues<E>()` -> `enumEntries<E>()`.
+     *                                    The runtime helper preserves the
+     *                                    matched call's type args.
      *
      * Rejected: root calls whose receiver is some external expression (e.g.
      * `Foo.bar(s)` where Foo is a class reference), since the matcher would
@@ -991,7 +997,6 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     private fun validateBeforeLambda(fnExpr: IrFunctionExpression): BeforeLambda? {
         val fn = fnExpr.function
         val params = fn.valueParameters
-        if (params.isEmpty()) return null
         val body = fn.body as? IrBlockBody ?: return null
         val singleStmt = body.statements.singleOrNull() ?: return null
         val rootCall = when (singleStmt) {
@@ -999,6 +1004,16 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             is IrCall -> singleStmt
             else -> null
         } ?: return null
+
+        // Zero-param case: only valid if the root call has nothing to capture
+        // (no receiver, no value args). The matcher reduces to a pure name +
+        // facade match; downstream constraints (the after lambda must mirror
+        // this shape) are enforced by canonicalSignature equality.
+        if (params.isEmpty()) {
+            if (rootCall.dispatchReceiver != null || rootCall.extensionReceiver != null) return null
+            if (rootCall.valueArgumentsCount > 0) return null
+            return BeforeLambda(params, rootCall, emptyList(), receiverParamSymbol = null)
+        }
 
         // Receiver resolution. The dispatch/extension receivers are mutually
         // exclusive on a single call in K2 IR (extension-receiver IrGetValue

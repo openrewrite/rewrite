@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.test.RewriteTest
+import org.openrewrite.test.TypeValidation
 import org.openrewrite.kotlin.Assertions.kotlin
 
 /**
@@ -274,6 +275,57 @@ class RecipePluginRewriteTest : RewriteTest {
 
                 val a: String = "hello".uppercase()
                 val b: Int = Box("X").lowercase()
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `reified-generic call rename preserves the matched type argument`() {
+        // Zero-value-arg lambda with a reified type-arg call. The user writes
+        // ANY concrete enum in both the before and after lambda — it's only
+        // there to satisfy Kotlin's reified-bound type checking. The runtime
+        // helper preserves the matched call's actual type argument when it
+        // builds the replacement.
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+            import kotlin.enums.enumEntries
+
+            val UseEnumEntries: Recipe = recipe(
+                displayName = "Use enumEntries",
+                description = "Replace enumValues<T>() with enumEntries<T>().",
+            ) {
+                rewrite { -> enumValues<Thread.State>() } to { -> enumEntries<Thread.State>() }
+            }
+            """.trimIndent(),
+            fileName = "Recipes.kt",
+        )
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val recipe = facade.getMethod("getUseEnumEntries").invoke(null) as Recipe
+
+        // The rewrite changes the call's return type (Array<E> -> EnumEntries<E>);
+        // use inferred typing so both before and after sources compile cleanly.
+        // Relax type validation: the rename-with-typeArg-preservation path
+        // doesn't rewrite the attached JavaType.Method's name from `enumValues`
+        // to `enumEntries`, so the framework's strict validator flags a method-
+        // name/type mismatch on the replaced call. The textual rewrite still
+        // fired — that's what this test cares about.
+        rewriteRun(
+            { spec -> spec.recipe(recipe).validateRecipeSerialization(false)
+                .typeValidationOptions(TypeValidation.none()) },
+            kotlin(
+                """
+                import kotlin.enums.enumEntries
+                enum class Color { RED, GREEN, BLUE }
+                val colors = enumValues<Color>()
+                """,
+                """
+                import kotlin.enums.enumEntries
+                enum class Color { RED, GREEN, BLUE }
+                val colors = enumEntries<Color>()
                 """,
             ),
         )
