@@ -75,6 +75,9 @@ public class RewriteRpcProcess extends Thread {
     @Nullable
     private Thread stderrDrainThread;
 
+    @Nullable
+    private IOException startupFailure;
+
     public RewriteRpcProcess(String... command) {
         this.command = command;
         this.setName("RewriteRpcProcess");
@@ -104,7 +107,9 @@ public class RewriteRpcProcess extends Thread {
             process = pb.start();
             stderrDrainThread = drainStderr(process, stderrRedirect);
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            // Record the failure so start() can surface it instead of busy-waiting forever
+            // on `process == null`. Throwing here would just kill this thread silently.
+            this.startupFailure = e;
         }
     }
 
@@ -164,9 +169,18 @@ public class RewriteRpcProcess extends Thread {
     }
 
     @Override
-    public synchronized void start() {
+    public void start() {
         super.start();
         while (this.process == null) {
+            if (!this.isAlive()) {
+                if (startupFailure != null) {
+                    throw new UncheckedIOException(
+                            "Failed to start RPC process: " + String.join(" ", command),
+                            startupFailure);
+                }
+                throw new IllegalStateException(
+                        "RPC startup thread exited without starting process: " + String.join(" ", command));
+            }
             try {
                 //noinspection BusyWait
                 Thread.sleep(100);
