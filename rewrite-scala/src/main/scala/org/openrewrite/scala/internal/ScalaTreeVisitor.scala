@@ -5964,7 +5964,11 @@ class ScalaTreeVisitor(
             // Multi-pattern: `_: A | _: B` — preserve full source as the "name", no separate type
             val patSource = extractSource(caseDef.pat.span)
             (patSource, null)
-          case _ => ("_", null)
+          case _ =>
+            // Any other pattern (e.g. UnApply extractor `NonFatal(e)`, tuple, literal) —
+            // preserve the full source text so the binding/extractor isn't lost on print.
+            val patSource = if (caseDef.pat.span.exists) extractSource(caseDef.pat.span) else ""
+            (if (patSource.nonEmpty) patSource else "_", null)
         }
         // Capture the whitespace between the param name and `:` (e.g. `e : Exception`).
         val beforeColon: Space = if (paramType != null && caseDef.pat.span.exists) {
@@ -6117,7 +6121,11 @@ class ScalaTreeVisitor(
             // Multi-pattern: `_: A | _: B` — preserve full source as the "name", no separate type
             val patSource = extractSource(caseDef.pat.span)
             (patSource, null)
-          case _ => ("_", null)
+          case _ =>
+            // Any other pattern (e.g. UnApply extractor `NonFatal(e)`, tuple, literal) —
+            // preserve the full source text so the binding/extractor isn't lost on print.
+            val patSource = if (caseDef.pat.span.exists) extractSource(caseDef.pat.span) else ""
+            (if (patSource.nonEmpty) patSource else "_", null)
         }
         // Capture the whitespace between the param name and `:` (e.g. `e : Exception`).
         val beforeColon: Space = if (paramType != null && caseDef.pat.span.exists) {
