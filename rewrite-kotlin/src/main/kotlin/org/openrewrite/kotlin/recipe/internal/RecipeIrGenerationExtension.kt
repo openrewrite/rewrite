@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.builders.declarations.addConstructor
 import org.jetbrains.kotlin.ir.builders.declarations.addFunction
+import org.jetbrains.kotlin.ir.builders.declarations.addValueParameter
 import org.jetbrains.kotlin.ir.builders.declarations.buildClass
 import org.jetbrains.kotlin.ir.builders.irBlockBody
 import org.jetbrains.kotlin.ir.builders.irCall
@@ -47,6 +48,7 @@ import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
+import org.jetbrains.kotlin.ir.declarations.IrVariable
 import org.jetbrains.kotlin.ir.expressions.IrBlockBody
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrConst
@@ -55,6 +57,7 @@ import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
 import org.jetbrains.kotlin.ir.expressions.IrReturn
+import org.jetbrains.kotlin.ir.expressions.impl.IrGetValueImpl
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
@@ -62,6 +65,7 @@ import org.jetbrains.kotlin.ir.symbols.IrValueSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.classFqName
 import org.jetbrains.kotlin.ir.types.defaultType
+import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.addChild
 import org.jetbrains.kotlin.ir.util.createThisReceiverParameter
 import org.jetbrains.kotlin.ir.util.deepCopyWithSymbols
@@ -167,6 +171,68 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             }
             ?.symbol
 
+        // `GeneratedRecipeSupport.methodInvocationScanVisitor(Function1<J.MethodInvocation, Unit>)`
+        // is the lowering target for `scan(...) { visitMethodInvocation { ... } }`.
+        // The lambda mutates the accumulator (captured from the enclosing
+        // getScanner(acc)'s parameter); the tree is never transformed.
+        val methodInvocationScanVisitorSymbol: IrSimpleFunctionSymbol? = supportClassSymbol
+            ?.owner?.declarations
+            ?.filterIsInstance<IrSimpleFunction>()
+            ?.firstOrNull { fn ->
+                fn.name.asString() == "methodInvocationScanVisitor" &&
+                    fn.dispatchReceiverParameter == null &&
+                    fn.valueParameters.size == 1
+            }
+            ?.symbol
+
+        // `ScanningRecipe<T>` is the superclass when the recipe body uses
+        // scan/edit phase mode. As with Recipe we need: the class symbol (for
+        // the parameterized supertype), its no-arg constructor (for super-
+        // delegation), and the three abstract / overridable hooks.
+        val scanningRecipeClassId = ClassId.topLevel(FqName("org.openrewrite.ScanningRecipe"))
+        val scanningRecipeClassSymbol: IrClassSymbol? = pluginContext.referenceClass(scanningRecipeClassId)
+        val scanningRecipeNoArgCtor: IrConstructorSymbol? = scanningRecipeClassSymbol?.let {
+            pluginContext.referenceConstructors(scanningRecipeClassId)
+                .singleOrNull { it.owner.valueParameters.isEmpty() }
+        }
+        val scanningRecipeMembers = scanningRecipeClassSymbol?.owner?.declarations
+            ?.filterIsInstance<IrSimpleFunction>().orEmpty()
+        val getInitialValueFn = scanningRecipeMembers.firstOrNull {
+            it.name.asString() == "getInitialValue" && it.valueParameters.size == 1
+        }
+        val getScannerFn = scanningRecipeMembers.firstOrNull {
+            it.name.asString() == "getScanner" && it.valueParameters.size == 1
+        }
+        // `getVisitor(T)` is the one-arg overload distinct from `Recipe.getVisitor()`.
+        // `ScanningRecipe` also `final`s the no-arg getVisitor; we override the T-arg
+        // form.
+        val getVisitorAccFn = scanningRecipeMembers.firstOrNull {
+            it.name.asString() == "getVisitor" && it.valueParameters.size == 1
+        }
+
+        // `ExecutionContext` for the getInitialValue(ctx) parameter type.
+        val executionContextClassId = ClassId.topLevel(FqName("org.openrewrite.ExecutionContext"))
+        val executionContextClassSymbol: IrClassSymbol? = pluginContext.referenceClass(executionContextClassId)
+
+        // ScanScope<A>.acc / EditScopeWithAcc<A>.acc getter symbols — references
+        // to either inside a hoisted lambda body must be rewritten to read the
+        // local visitor method's `acc` parameter instead of the (nonexistent at
+        // runtime) outer receiver-scope object.
+        val scanScopeAccGetterFqn = "org.openrewrite.ScanScope.acc.<get-acc>"
+        val editScopeWithAccAccGetterFqn = "org.openrewrite.EditScopeWithAcc.acc.<get-acc>"
+        val scanScopeClassId = ClassId.topLevel(FqName("org.openrewrite.ScanScope"))
+        val editScopeWithAccClassId = ClassId.topLevel(FqName("org.openrewrite.EditScopeWithAcc"))
+        val scanScopeAccGetterSymbol: IrSimpleFunctionSymbol? = pluginContext
+            .referenceClass(scanScopeClassId)?.owner?.declarations
+            ?.filterIsInstance<IrProperty>()
+            ?.firstOrNull { it.name.asString() == "acc" }
+            ?.getter?.symbol
+        val editScopeWithAccGetterSymbol: IrSimpleFunctionSymbol? = pluginContext
+            .referenceClass(editScopeWithAccClassId)?.owner?.declarations
+            ?.filterIsInstance<IrProperty>()
+            ?.firstOrNull { it.name.asString() == "acc" }
+            ?.getter?.symbol
+
         // `Duration.parse(CharSequence)` for materialising the
         // estimatedEffortPerOccurrence ISO-8601 string into a runtime Duration.
         val durationClassId = ClassId.topLevel(FqName("java.time.Duration"))
@@ -192,6 +258,15 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             getVisitor = recipeGetVisitor,
             methodInvocationRewriteSymbol = methodInvocationRewriteSymbol,
             methodInvocationEditVisitorSymbol = methodInvocationEditVisitorSymbol,
+            methodInvocationScanVisitorSymbol = methodInvocationScanVisitorSymbol,
+            scanningRecipeClassSymbol = scanningRecipeClassSymbol,
+            scanningRecipeNoArgCtorSymbol = scanningRecipeNoArgCtor,
+            getInitialValue = getInitialValueFn,
+            getScanner = getScannerFn,
+            getVisitorAcc = getVisitorAccFn,
+            executionContextClassSymbol = executionContextClassSymbol,
+            scanScopeAccGetterSymbol = scanScopeAccGetterSymbol,
+            editScopeWithAccGetterSymbol = editScopeWithAccGetterSymbol,
             durationClassSymbol = durationClassSymbol,
             durationParseSymbol = durationParseSymbol,
         )
@@ -216,6 +291,15 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val getVisitor: IrSimpleFunction?,
         val methodInvocationRewriteSymbol: IrSimpleFunctionSymbol?,
         val methodInvocationEditVisitorSymbol: IrSimpleFunctionSymbol?,
+        val methodInvocationScanVisitorSymbol: IrSimpleFunctionSymbol?,
+        val scanningRecipeClassSymbol: IrClassSymbol?,
+        val scanningRecipeNoArgCtorSymbol: IrConstructorSymbol?,
+        val getInitialValue: IrSimpleFunction?,
+        val getScanner: IrSimpleFunction?,
+        val getVisitorAcc: IrSimpleFunction?,
+        val executionContextClassSymbol: IrClassSymbol?,
+        val scanScopeAccGetterSymbol: IrSimpleFunctionSymbol?,
+        val editScopeWithAccGetterSymbol: IrSimpleFunctionSymbol?,
         val durationClassSymbol: IrClassSymbol?,
         val durationParseSymbol: IrSimpleFunctionSymbol?,
     )
@@ -261,6 +345,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 extractRewriteTemplates(initializerExpr, sourceText)
             } else null
             val visitorLowering: VisitorLowering? = patternTemplates?.let(VisitorLowering::PatternMode)
+                ?: extractScanEditPhase(initializerExpr)
                 ?: extractStatelessEditLambda(initializerExpr)?.let(VisitorLowering::PhaseStatelessEdit)
 
             val generatedClass = buildGeneratedRecipeClass(
@@ -374,6 +459,22 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
          * Function1, no body introspection needed.
          */
         class PhaseStatelessEdit(val bodyLambda: IrFunctionExpression) : VisitorLowering()
+
+        /**
+         * `scan<A>(initial) { visitMethodInvocation { ... } }` paired with an
+         * optional `edit(scanRef) { visitMethodInvocation { ... } }`. The
+         * generated class extends `ScanningRecipe<A>`. `acc` references inside
+         * the hoisted lambda bodies need rewriting from
+         * `ScanScope<A>.acc` / `EditScopeWithAcc<A>.acc` getter calls into
+         * direct `IrGetValue`s of the respective override-method's `acc`
+         * parameter so the runtime closure captures the right value.
+         */
+        class PhaseScanEdit(
+            val accType: IrType,
+            val initialExpr: IrExpression,
+            val scanInvocationLambda: IrFunctionExpression,
+            val editInvocationLambda: IrFunctionExpression?,
+        ) : VisitorLowering()
     }
 
     private fun buildGeneratedRecipeClass(
@@ -383,6 +484,12 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         metadata: RecipeMetadata,
         visitorLowering: VisitorLowering?,
     ): IrClass {
+        // Two superclass shapes: pattern mode and stateless-edit extend
+        // `Recipe`; scan + acc-threaded edit extends `ScanningRecipe<A>` so the
+        // framework runs the scan phase before the visit phase and threads the
+        // accumulator through. Everything else (metadata overrides, the class
+        // shell itself) is identical, so branch only at the superclass /
+        // delegating-constructor / visitor-override emission steps.
         val cls = ctx.pluginContext.irFactory.buildClass {
             name = Name.identifier("Generated\$${propertyName.asString()}")
             kind = ClassKind.CLASS
@@ -390,8 +497,23 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             visibility = DescriptorVisibilities.PUBLIC
         }
         cls.parent = parentFile
-        cls.superTypes = listOf(ctx.recipeClassSymbol.defaultType)
         cls.createThisReceiverParameter()
+
+        val phaseScanEdit = visitorLowering as? VisitorLowering.PhaseScanEdit
+        val (superType, superCtor) = if (phaseScanEdit != null &&
+            ctx.scanningRecipeClassSymbol != null &&
+            ctx.scanningRecipeNoArgCtorSymbol != null
+        ) {
+            // `ScanningRecipe<A>` — parameterised on the accumulator type the
+            // user wrote on the `scan<A>(initial)` call.
+            ctx.scanningRecipeClassSymbol.typeWith(phaseScanEdit.accType) to ctx.scanningRecipeNoArgCtorSymbol
+        } else {
+            // Plain `Recipe`. Includes the "phaseScanEdit but ScanningRecipe
+            // symbols missing" fallback — we still emit a Recipe shell so the
+            // val resolves, just without scan wiring.
+            ctx.recipeClassSymbol.defaultType to ctx.recipeNoArgCtorSymbol
+        }
+        cls.superTypes = listOf(superType)
 
         cls.addConstructor {
             isPrimary = true
@@ -402,30 +524,12 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             visibility = DescriptorVisibilities.PUBLIC
         }.apply {
             body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
-                +irDelegatingConstructorCall(ctx.recipeNoArgCtorSymbol.owner)
+                +irDelegatingConstructorCall(superCtor.owner)
             }
         }
 
-        addStringOverride(cls, ctx.pluginContext, "getDisplayName", metadata.displayName, ctx.getDisplayName)
-        addStringOverride(cls, ctx.pluginContext, "getDescription", metadata.description, ctx.getDescription)
+        addMetadataOverrides(cls, ctx, metadata)
 
-        if (metadata.tagsArg != null && ctx.getTags != null) {
-            addTagsOverride(cls, ctx, ctx.getTags, metadata.tagsArg)
-        }
-        if (metadata.estimatedEffortLiteral != null &&
-            ctx.getEstimatedEffort != null &&
-            ctx.durationParseSymbol != null
-        ) {
-            // Defense in depth. RecipeDslPropertyChecker rejects invalid
-            // ISO-8601 literals at FIR time so this branch only stays
-            // reachable if the IR pass were ever run without the checker
-            // (both register from the same plugin entry point — not a
-            // configuration users hit today). Skipping the override on bad
-            // input keeps generated bytecode honest in that case.
-            if (parsesAsIsoDuration(metadata.estimatedEffortLiteral)) {
-                addEstimatedEffortOverride(cls, ctx, ctx.getEstimatedEffort, metadata.estimatedEffortLiteral)
-            }
-        }
         when (visitorLowering) {
             is VisitorLowering.PatternMode -> {
                 if (ctx.getVisitor != null && ctx.methodInvocationRewriteSymbol != null) {
@@ -449,9 +553,33 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                     )
                 }
             }
+            is VisitorLowering.PhaseScanEdit -> {
+                addPhaseScanEditOverrides(cls, ctx, visitorLowering)
+            }
             null -> Unit
         }
         return cls
+    }
+
+    private fun addMetadataOverrides(cls: IrClass, ctx: RecipeIrGenContext, metadata: RecipeMetadata) {
+        addStringOverride(cls, ctx.pluginContext, "getDisplayName", metadata.displayName, ctx.getDisplayName)
+        addStringOverride(cls, ctx.pluginContext, "getDescription", metadata.description, ctx.getDescription)
+        if (metadata.tagsArg != null && ctx.getTags != null) {
+            addTagsOverride(cls, ctx, ctx.getTags, metadata.tagsArg)
+        }
+        if (metadata.estimatedEffortLiteral != null &&
+            ctx.getEstimatedEffort != null &&
+            ctx.durationParseSymbol != null
+        ) {
+            // Defense in depth. RecipeDslPropertyChecker rejects invalid ISO-8601
+            // literals at FIR time so this branch only stays reachable if the
+            // IR pass were ever run without the checker (both register from the
+            // same plugin entry point — not a configuration users hit today).
+            // Skipping the override on bad input keeps generated bytecode honest.
+            if (parsesAsIsoDuration(metadata.estimatedEffortLiteral)) {
+                addEstimatedEffortOverride(cls, ctx, ctx.getEstimatedEffort, metadata.estimatedEffortLiteral)
+            }
+        }
     }
 
     private fun parsesAsIsoDuration(literal: String): Boolean = try {
@@ -933,6 +1061,235 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         ) return null
         if (visitCall.valueArgumentsCount != 1) return null
         return visitCall.getValueArgument(0) as? IrFunctionExpression
+    }
+
+    /**
+     * Tries to lower the recipe body to scan + acc-threaded edit phase mode.
+     * The shape we accept here is exactly the resume-brief minimum-viable demo:
+     *
+     *     val seen = scan<A>(initial = ...) { visitMethodInvocation { call -> /* uses acc */ } }
+     *     edit(seen) { visitMethodInvocation { call -> /* uses acc */ } }
+     *
+     * — two top-level statements, the first an `IrVariable` whose initializer
+     * is a `scan(...) { ... }` call, the second an `edit(scanRef) { ... }`
+     * call. The block lambdas must each contain exactly one
+     * `visitMethodInvocation { ... }` call. Anything else returns null and
+     * the lowering falls through (recipe still compiles, inherits the no-op
+     * visitor).
+     */
+    private fun extractScanEditPhase(recipeCall: IrCall): VisitorLowering.PhaseScanEdit? {
+        val callee = recipeCall.symbol.owner
+        val blockIdx = callee.valueParameters.indexOfFirst { it.name == Name.identifier("block") }
+        if (blockIdx < 0) return null
+        val blockArg = recipeCall.arguments[blockIdx] as? IrFunctionExpression ?: return null
+        val recipeStmts = (blockArg.function.body as? IrBlockBody)?.statements ?: return null
+        // Two-statement form: val seen = scan(...) { ... } ; edit(seen) { ... }.
+        if (recipeStmts.size != 2) return null
+
+        val scanVar = recipeStmts[0] as? IrVariable ?: return null
+        val scanCall = scanVar.initializer as? IrCall ?: return null
+        if (scanCall.symbol.owner.kotlinFqName.asString() != "org.openrewrite.RecipeBuilder.scan") return null
+        // `scan<A>(initial, block)` — two value args, one type arg (A).
+        val initialExpr = scanCall.getValueArgument(0) ?: return null
+        val scanBlock = scanCall.getValueArgument(1) as? IrFunctionExpression ?: return null
+        val accType: IrType = scanCall.typeArguments.firstOrNull() ?: return null
+        val scanInvocationLambda = singleVisitMethodInvocationLambdaIn(
+            scanBlock, expectedScopeFqn = "org.openrewrite.ScanScope.visitMethodInvocation",
+        ) ?: return null
+
+        val editStmt = recipeStmts[1]
+        val editCall = (editStmt as? IrReturn)?.value as? IrCall
+            ?: editStmt as? IrCall
+            ?: return null
+        if (editCall.symbol.owner.kotlinFqName.asString() != "org.openrewrite.RecipeBuilder.edit") return null
+        // `edit(scanRef, block)` — the two-arg form. The single-arg form is
+        // handled by extractStatelessEditLambda and doesn't pair with scan.
+        if (editCall.valueArgumentsCount != 2) return null
+        val scanRefArg = editCall.getValueArgument(0) as? IrGetValue ?: return null
+        if (scanRefArg.symbol != scanVar.symbol) return null
+        val editBlock = editCall.getValueArgument(1) as? IrFunctionExpression ?: return null
+        val editInvocationLambda = singleVisitMethodInvocationLambdaIn(
+            editBlock, expectedScopeFqn = "org.openrewrite.EditScopeWithAcc.visitMethodInvocation",
+        ) ?: return null
+
+        return VisitorLowering.PhaseScanEdit(
+            accType = accType,
+            initialExpr = initialExpr,
+            scanInvocationLambda = scanInvocationLambda,
+            editInvocationLambda = editInvocationLambda,
+        )
+    }
+
+    /**
+     * Asserts a scan/edit block lambda's body is exactly
+     * `visitMethodInvocation { call -> ... }` (single top-level statement, the
+     * expected scope's overload). Returns the inner lambda, or null if the
+     * shape doesn't match.
+     */
+    private fun singleVisitMethodInvocationLambdaIn(
+        blockArg: IrFunctionExpression,
+        expectedScopeFqn: String,
+    ): IrFunctionExpression? {
+        val stmts = (blockArg.function.body as? IrBlockBody)?.statements ?: return null
+        val onlyStmt = stmts.singleOrNull() ?: return null
+        val call = (onlyStmt as? IrReturn)?.value as? IrCall
+            ?: onlyStmt as? IrCall
+            ?: return null
+        if (call.symbol.owner.kotlinFqName.asString() != expectedScopeFqn) return null
+        if (call.valueArgumentsCount != 1) return null
+        return call.getValueArgument(0) as? IrFunctionExpression
+    }
+
+    /**
+     * Emits the three ScanningRecipe overrides for a phase-mode recipe:
+     * `getInitialValue(ctx): A`, `getScanner(acc): TreeVisitor<*,
+     * ExecutionContext>`, and `getVisitor(acc): TreeVisitor<*,
+     * ExecutionContext>`. The scanner and visitor bodies wrap the user's
+     * (deep-copied) inner lambda in the appropriate runtime helper; before
+     * passing the lambda to the helper, references to the outer
+     * `ScanScope<A>.acc` / `EditScopeWithAcc<A>.acc` getter inside the body
+     * are rewritten to read the local method's `acc` parameter (which the
+     * Kotlin compiler then captures as a closure when lowering the lambda
+     * to a Function class).
+     */
+    private fun addPhaseScanEditOverrides(
+        cls: IrClass,
+        ctx: RecipeIrGenContext,
+        lowering: VisitorLowering.PhaseScanEdit,
+    ) {
+        val getInitialValueFn = ctx.getInitialValue
+        val getScannerFn = ctx.getScanner
+        val getVisitorAccFn = ctx.getVisitorAcc
+        val ecCls = ctx.executionContextClassSymbol
+        val scanHelper = ctx.methodInvocationScanVisitorSymbol
+        val editHelper = ctx.methodInvocationEditVisitorSymbol
+        // ScanningRecipe must be fully resolved for the lowering to be valid.
+        // The class shell still got built (extending Recipe in fallback) so
+        // skipping overrides keeps the recipe loadable; it just won't transform.
+        if (getInitialValueFn == null || getScannerFn == null || getVisitorAccFn == null) return
+        if (ecCls == null || scanHelper == null || editHelper == null) return
+
+        addGetInitialValueOverride(cls, ctx, getInitialValueFn, ecCls, lowering)
+        addPhaseVisitorOverride(
+            cls = cls,
+            ctx = ctx,
+            overrides = getScannerFn,
+            helperSymbol = scanHelper,
+            lowering = lowering,
+            bodyLambda = lowering.scanInvocationLambda,
+            accGetterToRewrite = ctx.scanScopeAccGetterSymbol,
+            jvmName = "getScanner",
+        )
+        // No edit phase = leave the framework's default getVisitor(acc) which
+        // is `TreeVisitor.noop()`. PhaseScanEdit currently always carries an
+        // edit lambda; the null branch is there for the future scan-only path.
+        val editLambda = lowering.editInvocationLambda
+        if (editLambda != null) {
+            addPhaseVisitorOverride(
+                cls = cls,
+                ctx = ctx,
+                overrides = getVisitorAccFn,
+                helperSymbol = editHelper,
+                lowering = lowering,
+                bodyLambda = editLambda,
+                accGetterToRewrite = ctx.editScopeWithAccGetterSymbol,
+                jvmName = "getVisitor",
+            )
+        }
+    }
+
+    private fun addGetInitialValueOverride(
+        cls: IrClass,
+        ctx: RecipeIrGenContext,
+        overrides: IrSimpleFunction,
+        executionContextClass: IrClassSymbol,
+        lowering: VisitorLowering.PhaseScanEdit,
+    ) {
+        cls.addFunction(
+            name = "getInitialValue",
+            returnType = lowering.accType,
+            modality = Modality.OPEN,
+            visibility = DescriptorVisibilities.PUBLIC,
+        ).apply {
+            overriddenSymbols = listOf(overrides.symbol)
+            addValueParameter("ctx", executionContextClass.defaultType)
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                +irReturn(lowering.initialExpr.deepCopyWithSymbols(initialParent = this@apply))
+            }
+        }
+    }
+
+    /**
+     * Shared shape for getScanner(acc) and getVisitor(acc). Differs only in
+     * the helper to call and which acc-getter symbol to rewrite — but the
+     * structure is identical: take the inner lambda, deep-copy it, rewrite
+     * acc references against the new `acc` parameter, then return the helper
+     * call.
+     */
+    private fun addPhaseVisitorOverride(
+        cls: IrClass,
+        ctx: RecipeIrGenContext,
+        overrides: IrSimpleFunction,
+        helperSymbol: IrSimpleFunctionSymbol,
+        lowering: VisitorLowering.PhaseScanEdit,
+        bodyLambda: IrFunctionExpression,
+        accGetterToRewrite: IrSimpleFunctionSymbol?,
+        jvmName: String,
+    ) {
+        // The override's return type is `TreeVisitor<?, ExecutionContext>` —
+        // the helper's return type already matches that shape, so we reuse it
+        // instead of substituting T → accType in the parent's signature.
+        cls.addFunction(
+            name = jvmName,
+            returnType = helperSymbol.owner.returnType,
+            modality = Modality.OPEN,
+            visibility = DescriptorVisibilities.PUBLIC,
+        ).apply {
+            overriddenSymbols = listOf(overrides.symbol)
+            val accParam = addValueParameter("acc", lowering.accType)
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                val rewrittenLambda = bodyLambda.deepCopyWithSymbols(initialParent = this@apply)
+                rewriteAccReferences(rewrittenLambda, accParam, accGetterToRewrite)
+                val factoryCall = irCall(
+                    callee = helperSymbol,
+                    type = helperSymbol.owner.returnType,
+                )
+                factoryCall.arguments[0] = rewrittenLambda
+                +irReturn(factoryCall)
+            }
+        }
+    }
+
+    /**
+     * Rewrites every `IrCall` to the given acc-getter inside [lambda]'s body
+     * into an `IrGetValue` of the supplied `acc` parameter. The transform
+     * leaves all other IR nodes untouched.
+     *
+     * The user's lambda body sees `acc` as a property on the outer scan/edit
+     * receiver scope. Once we hoist the lambda into a generated method whose
+     * own `acc` parameter is the live accumulator, those getter calls must
+     * route to the parameter instead — otherwise they'd dereference a
+     * scope-instance that doesn't exist at runtime.
+     */
+    private fun rewriteAccReferences(
+        lambda: IrFunctionExpression,
+        accParam: IrValueParameter,
+        accGetterToRewrite: IrSimpleFunctionSymbol?,
+    ) {
+        if (accGetterToRewrite == null) return
+        lambda.function.body?.transformChildrenVoid(object : IrElementTransformerVoid() {
+            override fun visitCall(expression: IrCall): IrExpression {
+                if (expression.symbol == accGetterToRewrite) {
+                    return IrGetValueImpl(
+                        startOffset = expression.startOffset,
+                        endOffset = expression.endOffset,
+                        type = accParam.type,
+                        symbol = accParam.symbol,
+                    )
+                }
+                return super.visitCall(expression)
+            }
+        })
     }
 
     /**

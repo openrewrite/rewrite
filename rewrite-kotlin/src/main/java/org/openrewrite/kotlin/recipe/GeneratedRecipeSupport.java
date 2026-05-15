@@ -107,6 +107,12 @@ public final class GeneratedRecipeSupport {
      * for every method invocation in the tree, and the author has full
      * imperative control over what (if anything) to change. This is the entry
      * point for phase-mode recipes; pattern-mode is the declarative shortcut.
+     *
+     * <p>Also the lowering target for {@code edit(scanRef) { visitMethodInvocation
+     * { call -> ... } }}: the IR pass rewrites {@code acc} references inside the
+     * body so they read from the enclosing {@code getVisitor(acc)} method's
+     * parameter, which the Kotlin lambda captures as a closure variable. From
+     * this helper's POV the lambda is identical to the stateless case.
      */
     public static TreeVisitor<?, ExecutionContext> methodInvocationEditVisitor(
             Function1<J.MethodInvocation, J.MethodInvocation> body) {
@@ -115,6 +121,25 @@ public final class GeneratedRecipeSupport {
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation transformed = body.invoke(method);
                 return super.visitMethodInvocation(transformed, ctx);
+            }
+        };
+    }
+
+    /**
+     * Visitor for a phase-mode recipe's scan phase. The Kotlin lambda receives
+     * each method invocation in turn and is expected to mutate the recipe's
+     * accumulator (captured from the enclosing {@code getScanner(acc)} method's
+     * parameter). The tree is never transformed during scanning — the framework
+     * discards any structural changes a scanner visitor produces — so the lambda
+     * returns {@code Unit} and the helper always defers to {@code super}.
+     */
+    public static TreeVisitor<?, ExecutionContext> methodInvocationScanVisitor(
+            Function1<J.MethodInvocation, kotlin.Unit> body) {
+        return new KotlinVisitor<ExecutionContext>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                body.invoke(method);
+                return super.visitMethodInvocation(method, ctx);
             }
         };
     }
