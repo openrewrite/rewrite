@@ -699,7 +699,7 @@ class ScalaTreeVisitor(
         val opName = postfixOp.op.name.toString
         val odEnd = Math.max(0, postfixOp.od.span.end - offsetAdjustment)
         val opStart = Math.max(0, postfixOp.op.span.start - offsetAdjustment)
-        val namePrefix = if (odEnd < opStart && odEnd >= 0 && opStart <= source.length) {
+        val namePrefix = if (odEnd <= opStart && odEnd >= 0 && opStart <= source.length) {
           Space.format(source, odEnd, opStart)
         } else {
           Space.format(" ")
@@ -1576,11 +1576,11 @@ class ScalaTreeVisitor(
       var operatorSpace = Space.EMPTY
       var valueSpace = Space.EMPTY
       
-      if (leftEnd < opStart && leftEnd >= cursor && opStart <= source.length) {
+      if (leftEnd <= opStart && leftEnd >= cursor && opStart <= source.length) {
         operatorSpace = Space.format(source, leftEnd, opStart)
       }
-      
-      if (opEnd < rightStart && opEnd >= cursor && rightStart <= source.length) {
+
+      if (opEnd <= rightStart && opEnd >= cursor && rightStart <= source.length) {
         valueSpace = Space.format(source, opEnd, rightStart)
       }
       
@@ -1634,12 +1634,12 @@ class ScalaTreeVisitor(
     
     var operatorSpace = Space.format(" ")
     var rightSpace = Space.format(" ")
-    
-    if (leftEnd < opStart && leftEnd >= cursor && opStart <= source.length) {
+
+    if (leftEnd <= opStart && leftEnd >= cursor && opStart <= source.length) {
       operatorSpace = Space.format(source, leftEnd, opStart)
     }
-    
-    if (opEnd < rightStart && opEnd >= cursor && rightStart <= source.length) {
+
+    if (opEnd <= rightStart && opEnd >= cursor && rightStart <= source.length) {
       rightSpace = Space.format(source, opEnd, rightStart)
     }
     
@@ -1682,7 +1682,7 @@ class ScalaTreeVisitor(
     // Extract space before the method name
     val leftEnd = Math.max(0, infixOp.left.span.end - offsetAdjustment)
     val opStart = Math.max(0, infixOp.op.span.start - offsetAdjustment)
-    val methodNameSpace = if (leftEnd < opStart && leftEnd >= cursor && opStart <= source.length) {
+    val methodNameSpace = if (leftEnd <= opStart && leftEnd >= cursor && opStart <= source.length) {
       cursor = opStart
       Space.format(source, leftEnd, opStart)
     } else {
@@ -1695,7 +1695,7 @@ class ScalaTreeVisitor(
     // Extract space between the operator and the right-hand-side expression
     val opEnd = Math.max(0, infixOp.op.span.end - offsetAdjustment)
     val rightStart = Math.max(0, infixOp.right.span.start - offsetAdjustment)
-    val rhsSpace = if (opEnd < rightStart && opEnd >= cursor && rightStart <= source.length) {
+    val rhsSpace = if (opEnd <= rightStart && opEnd >= cursor && rightStart <= source.length) {
       cursor = rightStart
       Space.format(source, opEnd, rightStart)
     } else {

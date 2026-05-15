@@ -140,6 +140,22 @@ class InfixTest implements RewriteTest {
         );
     }
 
+    @Test
+    void noSpaceOnTheLeft() {
+        rewriteRun(
+          scala(
+            """
+            val arrowLeft = Map(key-> "true")
+            val plusNone = 1+2
+            val plusLeft = 1+ 2
+            val plusRight = 1 +2
+            val eqNone = 1==2
+            val arrowBoth = Map(1->2)
+            """
+          )
+        );
+    }
+
     @Nested
     class Postfix implements RewriteTest {
 
