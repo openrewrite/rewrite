@@ -2470,6 +2470,9 @@ class ScalaTreeVisitor(
   }
   
   private def visitLambdaParameter(vd: Trees.ValDef[?]): J = {
+    import dotty.tools.dotc.core.Flags
+    import org.openrewrite.scala.marker.LambdaParameter
+
     val prefix = extractPrefix(vd.span)
 
     // Check if the type was explicitly written in source or inferred
@@ -2492,12 +2495,77 @@ class ScalaTreeVisitor(
       } else rawName
     }
 
-    // If there's no explicit type in source, just return an identifier
+    // Detect `implicit` modifier on the lambda parameter. The Scala 3 parser
+    // exposes it on `vd.mods` but it sits in the source *before* `vd.span.start`
+    // (the span covers only the name and optional type). The whitespace before
+    // "implicit" is already captured in the enclosing `J.Lambda` prefix, so the
+    // modifier itself carries `Space.EMPTY` as its prefix; the space between
+    // "implicit" and the parameter name is folded into the name's prefix.
+    val nameStartAbs = if (vd.nameSpan.exists)
+      Math.max(0, vd.nameSpan.start - offsetAdjustment)
+    else
+      Math.max(0, vd.span.start - offsetAdjustment)
+    val implicitModifier: J.Modifier =
+      if (vd.mods != null && vd.mods.is(Flags.Implicit) &&
+          nameStartAbs > 0 && nameStartAbs <= source.length) {
+        // Walk left over whitespace, then check for the "implicit" keyword.
+        var p = nameStartAbs - 1
+        while (p >= 0 && Character.isWhitespace(source.charAt(p))) p -= 1
+        val kw = "implicit"
+        val kwEnd = p + 1
+        val kwStart = kwEnd - kw.length
+        val boundaryOk = kwStart >= 0 &&
+          source.substring(kwStart, kwEnd) == kw &&
+          (kwStart == 0 || !Character.isJavaIdentifierPart(source.charAt(kwStart - 1)))
+        if (boundaryOk)
+          new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+            kw, J.Modifier.Type.LanguageExtension, Collections.emptyList())
+        else null
+      } else null
+
+    // Space between "implicit" and the parameter name (when modifier is present).
+    // `p+1` is the position immediately after the keyword's last character.
+    val namePrefix: Space =
+      if (implicitModifier != null) {
+        var p = nameStartAbs - 1
+        while (p >= 0 && Character.isWhitespace(source.charAt(p))) p -= 1
+        val gapStart = p + 1
+        if (gapStart < nameStartAbs) Space.format(source.substring(gapStart, nameStartAbs))
+        else Space.EMPTY
+      } else Space.EMPTY
+
+    // If there's no explicit type in source, return either a plain identifier
+    // or — when an `implicit` modifier is present — a J.VariableDeclarations
+    // that can carry it.
     if (!hasExplicitType || vd.tpt == untpd.EmptyTree) {
-      ident(displayName, prefix)
+      if (implicitModifier == null) {
+        ident(displayName, prefix)
+      } else {
+        val name = ident(displayName, namePrefix)
+        val variable = new J.VariableDeclarations.NamedVariable(
+          Tree.randomId(),
+          Space.EMPTY,
+          Markers.EMPTY,
+          name,
+          Collections.emptyList(),
+          null,
+          null
+        )
+        new J.VariableDeclarations(
+          Tree.randomId(),
+          prefix,
+          Markers.build(Collections.singletonList(new LambdaParameter())),
+          Collections.emptyList(),
+          Collections.singletonList(implicitModifier),
+          null,
+          null,
+          Collections.emptyList(),
+          Collections.singletonList(JRightPadded.build(variable))
+        )
+      }
     } else {
       // With a type, we need a full variable declaration
-      val name = ident(displayName)
+      val name = ident(displayName, namePrefix)
 
       // Extract the type
       val sourceText = extractSource(vd.span)
@@ -2531,14 +2599,17 @@ class ScalaTreeVisitor(
         null
       )
 
+      val modifiers: java.util.List[J.Modifier] =
+        if (implicitModifier != null) Collections.singletonList(implicitModifier)
+        else Collections.emptyList()
+
       // Create the variable declarations with a marker to indicate it's a lambda parameter
-      import org.openrewrite.scala.marker.LambdaParameter
       new J.VariableDeclarations(
         Tree.randomId(),
         prefix,
         Markers.build(Collections.singletonList(new LambdaParameter())),
         Collections.emptyList(), // no annotations
-        Collections.emptyList(), // no modifiers
+        modifiers,
         typeExpr,
         if (beforeColon != Space.EMPTY) beforeColon else null,
         Collections.emptyList(),
@@ -7791,7 +7862,7 @@ class ScalaTreeVisitor(
     }
     
     val prefix = extractPrefix(func.span)
-    
+
     // Build lambda parameters
     val parameters = new J.Lambda.Parameters(
       Tree.randomId(),

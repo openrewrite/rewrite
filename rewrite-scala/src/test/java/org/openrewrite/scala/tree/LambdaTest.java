@@ -320,4 +320,19 @@ class LambdaTest implements RewriteTest {
     void spaceBeforeColonOnLambdaParameter() {
         rewriteRun(scala("val f = (x : Int) => x"));
     }
+
+    @Test
+    void blockArgumentWithImplicitParam() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  List(1).foreach { implicit session =>
+                    println(session)
+                  }
+                }
+                """
+            )
+        );
+    }
 }
