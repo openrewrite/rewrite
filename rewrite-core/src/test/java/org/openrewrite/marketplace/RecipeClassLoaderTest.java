@@ -17,6 +17,7 @@ package org.openrewrite.marketplace;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.objectweb.asm.ClassWriter;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.ClasspathScanningLoader;
 import org.openrewrite.config.Environment;
@@ -34,6 +35,9 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
+
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.V1_8;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -142,6 +146,56 @@ class RecipeClassLoaderTest {
                 assertThat(resources.hasMoreElements()).isFalse();
             }
         }
+    }
+
+    @Test
+    void kotlinClassesShouldDelegateToParent(@TempDir Path tempDir) throws Exception {
+        // Reproduces moderneinc/customer-requests#2372: when both the parent and the
+        // recipe classloader can define a kotlin.* class (e.g., kotlin.jvm.functions.Function1),
+        // the JVM raises LinkageError on loader-constraint violations once Jackson, loaded
+        // from the parent, interacts with jackson-module-kotlin from the recipe jar.
+        // The fix is to delegate kotlin.* classes to the parent, mirroring slf4j/jackson.
+        Path parentLib = tempDir.resolve("parent");
+        Files.createDirectories(parentLib.resolve("kotlin/jvm/functions"));
+        Files.write(parentLib.resolve("kotlin/jvm/functions/Function1.class"),
+          stubClass("kotlin/jvm/functions/Function1"));
+
+        Path childLib = tempDir.resolve("child");
+        Files.createDirectories(childLib.resolve("kotlin/jvm/functions"));
+        Files.write(childLib.resolve("kotlin/jvm/functions/Function1.class"),
+          stubClass("kotlin/jvm/functions/Function1"));
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{parentLib.toUri().toURL()}, null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{childLib.toUri().toURL()}, parent)) {
+            Class<?> loaded = classLoader.loadClass("kotlin.jvm.functions.Function1");
+            assertThat(loaded.getClassLoader())
+              .as("kotlin.* classes must come from the parent to avoid LinkageError")
+              .isSameAs(parent);
+        }
+    }
+
+    @Test
+    void kotlinClassesFallBackToChildWhenParentLacksThem(@TempDir Path tempDir) throws Exception {
+        // The parent-first delegation must still fall back to the child if the parent
+        // does not provide the kotlin class, so recipes can ship their own kotlin runtime
+        // when the host application has none.
+        Path childLib = tempDir.resolve("child");
+        Files.createDirectories(childLib.resolve("kotlin"));
+        Files.write(childLib.resolve("kotlin/Standalone.class"),
+          stubClass("kotlin/Standalone"));
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[0], null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{childLib.toUri().toURL()}, parent)) {
+            Class<?> loaded = classLoader.loadClass("kotlin.Standalone");
+            assertThat(loaded.getClassLoader()).isSameAs(classLoader);
+        }
+    }
+
+    private static byte[] stubClass(String internalName) {
+        ClassWriter cw = new ClassWriter(0);
+        cw.visit(V1_8, ACC_PUBLIC, internalName, null, "java/lang/Object", null);
+        cw.visitEnd();
+        return cw.toByteArray();
     }
 
     @Test
