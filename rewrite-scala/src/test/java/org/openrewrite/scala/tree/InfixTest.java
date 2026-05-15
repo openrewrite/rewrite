@@ -140,6 +140,57 @@ class InfixTest implements RewriteTest {
         );
     }
 
+    @Test
+    void noSpaceOnTheRight() {
+        rewriteRun(
+          scala(
+            """
+            val plus = 1 +2
+            val minus = 5 -3
+            val mul = 2 *3
+            val div = 10 /2
+            val mod = 10 %3
+            val eq = 1 ==2
+            val neq = 1 !=2
+            val lt = 1 <2
+            val gt = 2 >1
+            val lte = 1 <=2
+            val gte = 2 >=1
+            val and = true &&false
+            val or = true ||false
+            val bitAnd = 1 &2
+            val bitOr = 1 |2
+            val xor = 1 ^2
+            val shl = 1 <<2
+            val shr = 8 >>2
+            val arrow = Map(1 ->2)
+            val cons = 1 ::Nil
+            object T {
+              var x = 10
+              x +=5
+              x -=5
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void noSpaceOnTheLeft() {
+        rewriteRun(
+          scala(
+            """
+            val arrowLeft = Map(key-> "true")
+            val plusNone = 1+2
+            val plusLeft = 1+ 2
+            val plusRight = 1 +2
+            val eqNone = 1==2
+            val arrowBoth = Map(1->2)
+            """
+          )
+        );
+    }
+
     @Nested
     class Postfix implements RewriteTest {
 
