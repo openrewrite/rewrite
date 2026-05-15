@@ -58,6 +58,7 @@ import org.jetbrains.kotlin.ir.expressions.IrReturn
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
+import org.jetbrains.kotlin.ir.symbols.IrValueSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.classFqName
 import org.jetbrains.kotlin.ir.types.defaultType
@@ -88,9 +89,9 @@ import java.time.format.DateTimeParseException
  *  2. Emits a synthetic top-level class `Generated$<PropertyName>` that
  *     extends `org.openrewrite.Recipe` and overrides the metadata accessors.
  *  3. For pattern-mode recipes whose body is the v0-supported shape
- *     `rewrite { p: T -> p.foo() } to { p -> p.bar() }`, emits a
- *     `getVisitor()` override that returns
- *     `GeneratedRecipeSupport.methodInvocationReceiverRewrite(matcherSpec, afterTemplate)`.
+ *     `rewrite { p0: T, p1: U, ... -> p0.foo(...) } to { p0, p1, ... -> ... }`,
+ *     emits a `getVisitor()` override that returns
+ *     `GeneratedRecipeSupport.methodInvocationRewrite(matcherSpec, afterTemplate, substitutionSourcesCsv)`.
  *     Wider lambda shapes leave the framework's default no-op visitor in
  *     place (so the recipe compiles but doesn't transform code).
  *  4. Rewrites the original `recipe(...)` call expression in the property
@@ -134,20 +135,20 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             it.name.asString() == "getVisitor" && it.valueParameters.isEmpty()
         }
 
-        // `GeneratedRecipeSupport.methodInvocationReceiverRewrite(beforeTemplate, afterTemplate)`
-        // is the v0 lowering target for `rewrite { p -> p.foo() } to { p -> p.bar() }`.
+        // `GeneratedRecipeSupport.methodInvocationRewrite(matcherSpec, afterTemplate, substitutionSourcesCsv)`
+        // is the lowering target for `rewrite { p -> p.foo(...) } to { p -> p.bar(...) }`.
         // If we can't find it (e.g. when running against an older rewrite-kotlin),
         // we silently skip getVisitor() generation — recipes still compile, they
         // just don't transform code.
         val supportClassId = ClassId.topLevel(FqName("org.openrewrite.kotlin.recipe.GeneratedRecipeSupport"))
         val supportClassSymbol = pluginContext.referenceClass(supportClassId)
-        val methodInvocationReceiverRewriteSymbol: IrSimpleFunctionSymbol? = supportClassSymbol
+        val methodInvocationRewriteSymbol: IrSimpleFunctionSymbol? = supportClassSymbol
             ?.owner?.declarations
             ?.filterIsInstance<IrSimpleFunction>()
             ?.firstOrNull { fn ->
-                fn.name.asString() == "methodInvocationReceiverRewrite" &&
+                fn.name.asString() == "methodInvocationRewrite" &&
                     fn.dispatchReceiverParameter == null &&
-                    fn.valueParameters.size == 2
+                    fn.valueParameters.size == 3
             }
             ?.symbol
 
@@ -174,7 +175,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             getTags = recipeGetTags,
             getEstimatedEffort = recipeGetEstimatedEffort,
             getVisitor = recipeGetVisitor,
-            methodInvocationReceiverRewriteSymbol = methodInvocationReceiverRewriteSymbol,
+            methodInvocationRewriteSymbol = methodInvocationRewriteSymbol,
             durationClassSymbol = durationClassSymbol,
             durationParseSymbol = durationParseSymbol,
         )
@@ -197,7 +198,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val getTags: IrSimpleFunction?,
         val getEstimatedEffort: IrSimpleFunction?,
         val getVisitor: IrSimpleFunction?,
-        val methodInvocationReceiverRewriteSymbol: IrSimpleFunctionSymbol?,
+        val methodInvocationRewriteSymbol: IrSimpleFunctionSymbol?,
         val durationClassSymbol: IrClassSymbol?,
         val durationParseSymbol: IrSimpleFunctionSymbol?,
     )
@@ -233,7 +234,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
             val metadata = readMetadata(initializerExpr) ?: continue
             val visitorTemplates = if (sourceText != null) {
-                extractReceiverRewriteTemplates(initializerExpr, sourceText)
+                extractRewriteTemplates(initializerExpr, sourceText)
             } else null
 
             val generatedClass = buildGeneratedRecipeClass(
@@ -338,7 +339,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         parentFile: IrFile,
         propertyName: Name,
         metadata: RecipeMetadata,
-        visitorTemplates: ReceiverRewriteTemplates?,
+        visitorTemplates: RewriteTemplates?,
     ): IrClass {
         val cls = ctx.pluginContext.irFactory.buildClass {
             name = Name.identifier("Generated\$${propertyName.asString()}")
@@ -382,13 +383,13 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         }
         if (visitorTemplates != null &&
             ctx.getVisitor != null &&
-            ctx.methodInvocationReceiverRewriteSymbol != null
+            ctx.methodInvocationRewriteSymbol != null
         ) {
             addGetVisitorOverride(
                 cls = cls,
                 ctx = ctx,
                 overrides = ctx.getVisitor,
-                factorySymbol = ctx.methodInvocationReceiverRewriteSymbol,
+                factorySymbol = ctx.methodInvocationRewriteSymbol,
                 templates = visitorTemplates,
             )
         }
@@ -446,33 +447,63 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * Lowering output for a single-rewrite pattern-mode recipe whose before
-     * and after lambdas are zero-arg method calls rooted at the lambda
-     * parameter. The runtime helper builds a {@link org.openrewrite.java.MethodMatcher}
-     * from [matcherSpec] and applies [afterTemplate] (a `#{any()}.method(...)`
-     * KotlinTemplate string) with `method.getSelect()` as the substitution.
+     * Lowering output for a pattern-mode recipe whose before lambda body is a
+     * method call rooted at the receiver param. The runtime helper builds a
+     * {@link org.openrewrite.java.MethodMatcher} from [matcherSpec] and applies
+     * [afterTemplate] (a KotlinTemplate string with one `#{any()}` per slot)
+     * with substitutions sourced as described by [substitutionSourcesCsv]:
+     * left-to-right by placeholder position, each entry is `-1` for the
+     * matched method's receiver (`method.getSelect()`) or `N >= 0` for the
+     * Nth argument (`method.getArguments().get(N)`).
      *
      * Why MethodMatcher rather than KotlinTemplate-based matching: KotlinTemplate's
      * `matches("#{any()}.method()", cursor)` does not currently bind a receiver
      * placeholder against a concrete invocation (verified by probe).
      */
-    private class ReceiverRewriteTemplates(
+    private class RewriteTemplates(
         val matcherSpec: String,
         val afterTemplate: String,
+        val substitutionSourcesCsv: String,
     )
 
     /**
-     * Tries to lower the recipe body to a `(beforeTemplate, afterTemplate)` pair
-     * for the v0 shape this commit supports: exactly one `rewrite(before) to after`
-     * clause in the body, where both lambdas have one parameter and a single-
-     * statement body of the form `<param>.someMethodCall(...)`. Returns null on
-     * any deviation — the generated recipe then still compiles but inherits the
-     * Recipe default no-op visitor.
+     * A single root-call arg position is either:
+     *  - a reference to a lambda value parameter (a "named capture"), or
+     *  - an IR const literal (matched wildly against the runtime call, but
+     *    re-emitted in the after template where the same `(kind, value)`
+     *    appears in source order).
+     * Any other kind of arg (compound expression, named-fn ref, etc.) means
+     * "out of v0 scope" — we fall back to no-op visitor by returning null.
      */
-    private fun extractReceiverRewriteTemplates(
+    private sealed class ArgSig {
+        class ParamRef(val symbol: IrValueSymbol) : ArgSig()
+        class LiteralConst(val kind: org.jetbrains.kotlin.ir.expressions.IrConstKind, val value: Any?) : ArgSig()
+    }
+
+    /**
+     * Validated before lambda: the lambda's value parameters (param[0] is the
+     * receiver), the root method call, and a per-arg-position signature for
+     * the root call's args used to set up the after template's substitutions.
+     */
+    private class BeforeLambda(
+        val params: List<IrValueParameter>,
+        val rootCall: IrCall,
+        val argSignatures: List<ArgSig>,
+    )
+
+    /**
+     * Tries to lower the recipe body to a `(matcherSpec, afterTemplate, substitutionSourcesCsv)`
+     * triple for the v0 shape this commit supports: exactly one
+     * `rewrite(before) to after` clause in the body, where the before lambda
+     * has param[0] in receiver position of a method call and remaining args
+     * are param refs or literal constants. Returns null on any deviation —
+     * the generated recipe then still compiles but inherits the Recipe
+     * default no-op visitor.
+     */
+    private fun extractRewriteTemplates(
         recipeCall: IrCall,
         sourceText: String,
-    ): ReceiverRewriteTemplates? {
+    ): RewriteTemplates? {
         val callee = recipeCall.symbol.owner
         val blockIdx = callee.valueParameters.indexOfFirst { it.name == Name.identifier("block") }
         if (blockIdx < 0) return null
@@ -483,36 +514,41 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // an IrReturn when the lambda lowers a single-expression body).
         val firstStmt = statements.singleOrNull() ?: return null
         val toCall = (firstStmt as? IrReturn)?.value as? IrCall ?: firstStmt as? IrCall ?: return null
-        if (toCall.symbol.owner.kotlinFqName.asString() != "org.openrewrite.RewriteAdvice1.to") return null
+        // The `rewrite(before: (P) -> R)` overload returns RewriteAdvice1; the
+        // `rewrite(before: (P1, P2) -> R)` overload returns RewriteAdvice2.
+        // Both expose `to(after)` whose owning class names are RewriteAdviceN.
+        val toCallFqn = toCall.symbol.owner.kotlinFqName.asString()
+        if (toCallFqn != "org.openrewrite.RewriteAdvice1.to" &&
+            toCallFqn != "org.openrewrite.RewriteAdvice2.to"
+        ) return null
         val rewriteCall = toCall.dispatchReceiver as? IrCall ?: return null
         if (rewriteCall.symbol.owner.kotlinFqName.asString() != "org.openrewrite.RecipeBuilder.rewrite") return null
         // Single-before form: `rewrite(before: (P) -> R)`. valueArgumentsCount == 1.
         if (rewriteCall.valueArgumentsCount != 1) return null
         val beforeArg = rewriteCall.getValueArgument(0) as? IrFunctionExpression ?: return null
         val afterArg = toCall.getValueArgument(0) as? IrFunctionExpression ?: return null
-        val matcherSpec = lambdaBodyAsMatcherSpec(beforeArg) ?: return null
-        val afterTemplate = lambdaBodyAsAfterTemplate(afterArg, sourceText) ?: return null
-        return ReceiverRewriteTemplates(matcherSpec, afterTemplate)
+        val beforeLambda = validateBeforeLambda(beforeArg) ?: return null
+        val afterTemplateAndSources = buildAfterTemplate(afterArg, sourceText, beforeLambda) ?: return null
+        return RewriteTemplates(
+            matcherSpec = "* ${beforeLambda.rootCall.symbol.owner.name.asString()}(..)",
+            afterTemplate = afterTemplateAndSources.first,
+            substitutionSourcesCsv = afterTemplateAndSources.second,
+        )
     }
 
     /**
-     * Validates a `{ p: T -> p.someMethod(...) }`-shaped lambda and returns
-     * the data the lowering needs: the root method call (for method name and
-     * offset slicing) and the lambda's value parameter. Returns null on any
-     * deviation from the v0 supported shape: single param, single statement,
-     * zero-arg method call rooted at the param, and exactly one param
-     * reference in the body.
+     * Validates a `{ p0: T0, p1: T1, ... -> p0.someMethod(...args...) }`-shaped
+     * lambda. p0 is the receiver (must appear as the root call's dispatch or
+     * extension receiver). Each remaining root-call arg must be an IrGetValue
+     * of one of p1..pN (named capture) OR an IrConst (literal capture). Any
+     * other shape returns null.
      */
-    private class ReceiverLambda(
-        val param: IrValueParameter,
-        val rootCall: IrCall,
-    )
-
-    private fun validateReceiverLambda(fnExpr: IrFunctionExpression): ReceiverLambda? {
+    private fun validateBeforeLambda(fnExpr: IrFunctionExpression): BeforeLambda? {
         val fn = fnExpr.function
-        if (fn.valueParameters.size != 1) return null
-        val param = fn.valueParameters[0]
-        if (param.type.classFqName == null) return null
+        val params = fn.valueParameters
+        if (params.isEmpty()) return null
+        val receiverParam = params[0]
+        if (receiverParam.type.classFqName == null) return null
         val body = fn.body as? IrBlockBody ?: return null
         val singleStmt = body.statements.singleOrNull() ?: return null
         val rootCall = when (singleStmt) {
@@ -521,70 +557,173 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             else -> null
         } ?: return null
 
-        // The param must be the call's receiver — dispatch for member functions,
-        // extension for extension functions. IR quirk worth knowing: extension
-        // receivers have zero-width offsets sitting OUTSIDE the IrCall's source
-        // range (the IrCall covers just `methodName()`).
+        // Receiver must be IrGetValue of param[0]. Extension-receiver IrGetValue
+        // has zero-width offsets outside the IrCall's source range; we still
+        // identify it via symbol equality, not source position.
         val receiverGet = (rootCall.dispatchReceiver as? IrGetValue)
             ?: (rootCall.extensionReceiver as? IrGetValue)
             ?: return null
-        if (receiverGet.symbol != param.symbol) return null
+        if (receiverGet.symbol != receiverParam.symbol) return null
 
-        // v0: zero-arg only. Multi-arg cases require argument templating.
-        if (rootCall.valueArgumentsCount != 0) return null
-
-        // Reject bodies with more than one param reference — out of v0 scope.
-        var paramRefCount = 0
-        body.acceptChildrenVoid(object : IrVisitorVoid() {
-            override fun visitElement(element: IrElement) { element.acceptChildrenVoid(this) }
-            override fun visitGetValue(expression: IrGetValue) {
-                if (expression.symbol == param.symbol) paramRefCount++
+        val nonReceiverParamSyms: Set<IrValueSymbol> = params.drop(1).map { it.symbol }.toSet()
+        val sigs = mutableListOf<ArgSig>()
+        for (i in 0 until rootCall.valueArgumentsCount) {
+            // Default-valued args the user didn't write surface as null here in
+            // K2 IR. Skip them: the runtime MethodMatcher wildcards args, and
+            // the after template never references unwritten positions.
+            val arg = rootCall.getValueArgument(i) ?: continue
+            when (arg) {
+                is IrGetValue -> {
+                    if (arg.symbol !in nonReceiverParamSyms) return null
+                    sigs += ArgSig.ParamRef(arg.symbol)
+                }
+                is IrConst -> sigs += ArgSig.LiteralConst(arg.kind, arg.value)
+                else -> return null
             }
-        })
-        if (paramRefCount != 1) return null
-        return ReceiverLambda(param, rootCall)
+        }
+        return BeforeLambda(params, rootCall, sigs)
     }
 
     /**
-     * Builds a MethodMatcher spec for the before lambda. For zero-arg calls
-     * this is `"* <methodName>(..)"`. The declaring type is wildcarded because
-     * extension functions at JVM level live on a `<PackageName>Kt` facade
-     * (e.g. `kotlin.text.StringsKt` for `String.lowercase()`), not on the
-     * receiver type itself, AND the receiver is lifted to the first argument
-     * (so the JVM parameter list is `[receiverType]` rather than empty).
-     * The receiver-type constraint already comes from the Kotlin compile-time
-     * check on the recipe author's lambda; the runtime matcher just needs to
-     * find the right method name.
+     * Builds the KotlinTemplate string + substitution-sources CSV for the
+     * after lambda body. Strategy:
+     *
+     *  1. Compute the body's source span by walking the IR and taking the
+     *     union of all elements' (non-zero-width) offsets. This subsumes
+     *     both single-call bodies and nested calls like `s.foo(...).bar()`.
+     *  2. Walk the body's IR for substitution spots: IrGetValue of a lambda
+     *     value param (mapped by position to the before's params), or
+     *     IrConst whose `(kind, value)` matches an unconsumed before-arg
+     *     literal in source order.
+     *  3. Spots whose offsets are inside the slice are substituted in place.
+     *     Spots with zero-width offsets outside the slice (the extension-
+     *     receiver case for the lambda receiver param) are emitted as a
+     *     `#{any()}.` prepend to the template.
+     *  4. The substitution-sources CSV lists slot indices in template
+     *     left-to-right order: `-1` for receiver, `N >= 0` for arg N.
+     *
+     * Returns null if the after references a non-receiver param that the
+     * before pattern doesn't capture, if any non-receiver spot falls outside
+     * the slice, or if more than one prepend spot is needed.
      */
-    private fun lambdaBodyAsMatcherSpec(fnExpr: IrFunctionExpression): String? {
-        val parsed = validateReceiverLambda(fnExpr) ?: return null
-        return "* ${parsed.rootCall.symbol.owner.name.asString()}(..)"
-    }
-
-    /**
-     * Builds the KotlinTemplate string for the after lambda — `#{any()}.<methodCall>`.
-     * Same shape constraints as the before lambda. Placeholder is untyped for
-     * v0 (the typed `any(<type>)` spelling for Kotlin types is still a probe).
-     */
-    private fun lambdaBodyAsAfterTemplate(
+    private fun buildAfterTemplate(
         fnExpr: IrFunctionExpression,
         sourceText: String,
-    ): String? {
-        val parsed = validateReceiverLambda(fnExpr) ?: return null
-        val rootCall = parsed.rootCall
-        val rootStart = rootCall.startOffset
-        val rootEnd = rootCall.endOffset
-        if (rootStart < 0 || rootEnd < 0 || rootEnd > sourceText.length || rootStart >= rootEnd) return null
-        val callSlice = sourceText.substring(rootStart, rootEnd)
-        val paramName = parsed.param.name.asString()
-        val placeholder = "#{any()}"
-        return if (callSlice.startsWith("$paramName.")) {
-            // Member-call case: slice already includes `param.` prefix.
-            placeholder + "." + callSlice.removePrefix("$paramName.")
-        } else {
-            // Extension-call case: receiver is outside the slice.
-            "$placeholder.$callSlice"
+        before: BeforeLambda,
+    ): Pair<String, String>? {
+        val fn = fnExpr.function
+        val afterParams = fn.valueParameters
+        if (afterParams.size != before.params.size) return null
+        val body = fn.body as? IrBlockBody ?: return null
+        val singleStmt = body.statements.singleOrNull() ?: return null
+        val expr: IrExpression = when (singleStmt) {
+            is IrReturn -> singleStmt.value
+            is IrExpression -> singleStmt
+            else -> return null
         }
+
+        // After's param[i>0] resolves to the before's param[i] by position;
+        // that before-param must appear as some IrGetValue arg of before's
+        // root call to give us a runtime capture slot.
+        val paramSymToSource = HashMap<IrValueSymbol, Int>(afterParams.size)
+        paramSymToSource[afterParams[0].symbol] = -1
+        for (i in 1 until afterParams.size) {
+            val beforeParamSym = before.params[i].symbol
+            val beforeArgIdx = before.argSignatures.indexOfFirst { sig ->
+                sig is ArgSig.ParamRef && sig.symbol == beforeParamSym
+            }
+            if (beforeArgIdx < 0) return null  // after references a param the before pattern doesn't capture
+            paramSymToSource[afterParams[i].symbol] = beforeArgIdx
+        }
+
+        // Unconsumed literal arg sigs, keyed by before-arg position. We consume
+        // each at most once when matching IrConst nodes during the walk so
+        // duplicate literal values pair positionally.
+        data class LiteralSlot(val argPos: Int, val sig: ArgSig.LiteralConst, var consumed: Boolean = false)
+        val literalSlots = before.argSignatures.mapIndexedNotNull { idx, sig ->
+            if (sig is ArgSig.LiteralConst) LiteralSlot(idx, sig) else null
+        }
+
+        // Span computation: walk IR for min(start)/max(end) over valid offsets.
+        var minStart = Int.MAX_VALUE
+        var maxEnd = Int.MIN_VALUE
+        expr.acceptChildrenVoid(object : IrVisitorVoid() {
+            override fun visitElement(element: IrElement) {
+                val so = element.startOffset
+                val eo = element.endOffset
+                if (so >= 0 && eo > so) {
+                    if (so < minStart) minStart = so
+                    if (eo > maxEnd) maxEnd = eo
+                }
+                element.acceptChildrenVoid(this)
+            }
+        })
+        run {
+            val so = expr.startOffset
+            val eo = expr.endOffset
+            if (so >= 0 && eo > so) {
+                if (so < minStart) minStart = so
+                if (eo > maxEnd) maxEnd = eo
+            }
+        }
+        if (minStart == Int.MAX_VALUE || maxEnd > sourceText.length) return null
+        val sliceStart = minStart
+        val sliceEnd = maxEnd
+        val slice = sourceText.substring(sliceStart, sliceEnd)
+
+        data class Spot(val startOffset: Int, val endOffset: Int, val sourceIndex: Int)
+        val spots = mutableListOf<Spot>()
+
+        expr.acceptChildrenVoid(object : IrVisitorVoid() {
+            override fun visitElement(element: IrElement) { element.acceptChildrenVoid(this) }
+
+            override fun visitGetValue(expression: IrGetValue) {
+                val src = paramSymToSource[expression.symbol] ?: return
+                spots += Spot(expression.startOffset, expression.endOffset, src)
+            }
+
+            override fun visitConst(expression: IrConst) {
+                val slot = literalSlots.firstOrNull { !it.consumed && it.sig.kind == expression.kind && it.sig.value == expression.value }
+                    ?: return
+                slot.consumed = true
+                spots += Spot(expression.startOffset, expression.endOffset, slot.argPos)
+            }
+        })
+
+        // Partition into in-slice (normal in-place substitution) and prepend
+        // (zero-width-outside receiver). Reject other out-of-slice spots.
+        val inSliceSpots = mutableListOf<Spot>()
+        val prependSpots = mutableListOf<Spot>()
+        for (spot in spots) {
+            val inSlice = spot.startOffset in sliceStart until sliceEnd &&
+                spot.endOffset in (spot.startOffset + 1)..sliceEnd
+            if (inSlice) {
+                inSliceSpots += spot
+            } else if (spot.sourceIndex == -1) {
+                prependSpots += spot
+            } else {
+                return null
+            }
+        }
+        if (prependSpots.size > 1) return null
+
+        // Right-to-left source-text substitution; left-to-right CSV ordering.
+        val templateBuilder = StringBuilder(slice)
+        for (spot in inSliceSpots.sortedByDescending { it.startOffset }) {
+            templateBuilder.replace(spot.startOffset - sliceStart, spot.endOffset - sliceStart, "#{any()}")
+        }
+        val template = if (prependSpots.isEmpty()) {
+            templateBuilder.toString()
+        } else {
+            "#{any()}.$templateBuilder"
+        }
+
+        val orderedSources = mutableListOf<Int>()
+        if (prependSpots.isNotEmpty()) orderedSources += prependSpots.single().sourceIndex
+        orderedSources += inSliceSpots.sortedBy { it.startOffset }.map { it.sourceIndex }
+        val csv = orderedSources.joinToString(",")
+
+        return template to csv
     }
 
     private fun addGetVisitorOverride(
@@ -592,7 +731,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         ctx: RecipeIrGenContext,
         overrides: IrSimpleFunction,
         factorySymbol: IrSimpleFunctionSymbol,
-        templates: ReceiverRewriteTemplates,
+        templates: RewriteTemplates,
     ) {
         cls.addFunction(
             name = "getVisitor",
@@ -608,6 +747,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 )
                 factoryCall.arguments[0] = irString(templates.matcherSpec)
                 factoryCall.arguments[1] = irString(templates.afterTemplate)
+                factoryCall.arguments[2] = irString(templates.substitutionSourcesCsv)
                 +irReturn(factoryCall)
             }
         }

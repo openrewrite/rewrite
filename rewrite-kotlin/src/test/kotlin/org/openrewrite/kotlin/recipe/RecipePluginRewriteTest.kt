@@ -64,4 +64,85 @@ class RecipePluginRewriteTest : RewriteTest {
             ),
         )
     }
+
+    @Test
+    fun `named-capture multi-arg recipe substitutes both receiver and arg`() {
+        // Two-param lambda: param[0]=s is the receiver, param[1]=n is a named
+        // capture appearing as the single arg of s.substring(n). After body
+        // re-uses both params; placeholders bind receiver -> method.getSelect()
+        // and n -> method.getArguments().get(0).
+        //
+        // Chose `substring(n)` → `take(n)` (not `l.get(i)` → `l[i]`) because the
+        // matcher `* substring(..)` doesn't fire on `take(..)`, so the recipe
+        // stops after one pass instead of looping.
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val SubstringToTake: Recipe = recipe(
+                displayName = "Use take for substring(n)",
+                description = "Replace s.substring(n) with s.take(n).",
+            ) {
+                rewrite { s: String, n: Int -> s.substring(n) } to { s, n -> s.take(n) }
+            }
+            """.trimIndent(),
+            fileName = "Recipes.kt",
+        )
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val recipe = facade.getMethod("getSubstringToTake").invoke(null) as Recipe
+
+        rewriteRun(
+            { spec -> spec.recipe(recipe).validateRecipeSerialization(false) },
+            kotlin(
+                """
+                fun head(text: String, k: Int): String = text.substring(k)
+                """.trimIndent(),
+                """
+                fun head(text: String, k: Int): String = text.take(k)
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `literal-capture multi-arg recipe re-emits matched args at literal positions`() {
+        // Single-param lambda whose before's root call has two literal string args.
+        // The after body references the same literals at the same source-order
+        // positions; the plugin pairs them positionally and emits placeholders
+        // bound to method.getArguments().get(0) and .get(1) respectively.
+        //
+        // Chose `replace("a", "b")` → `replaceFirst("a", "b")` so the matcher
+        // `* replace(..)` doesn't match the after's call.
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val ReplaceFirstOnly: Recipe = recipe(
+                displayName = "Replace only first occurrence",
+                description = "Replace s.replace(\"a\", \"b\") with s.replaceFirst(\"a\", \"b\").",
+            ) {
+                rewrite { s: String -> s.replace("a", "b") } to { s -> s.replaceFirst("a", "b") }
+            }
+            """.trimIndent(),
+            fileName = "Recipes.kt",
+        )
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val recipe = facade.getMethod("getReplaceFirstOnly").invoke(null) as Recipe
+
+        rewriteRun(
+            { spec -> spec.recipe(recipe).validateRecipeSerialization(false) },
+            kotlin(
+                """
+                val s: String = "banana".replace("a", "o")
+                """.trimIndent(),
+                """
+                val s: String = "banana".replaceFirst("a", "o")
+                """.trimIndent(),
+            ),
+        )
+    }
 }
