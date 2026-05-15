@@ -134,6 +134,153 @@ class RecipePluginPhaseModeTest : RewriteTest {
     }
 
     @Test
+    fun `stateless edit hoists aux val and the visit lambda captures it via closure`() {
+        // The `edit { }` block contains TWO statements: an aux `val gate` and
+        // the `visitMethodInvocation { call -> ... }` call. The visit body
+        // references `gate` — this proves the IR pass:
+        //   1. accepts a multi-statement edit block,
+        //   2. hoists the aux declaration into the generated `getVisitor()`
+        //      body ahead of the helper call,
+        //   3. preserves symbol cross-references after deep-copy so the visit
+        //      lambda's IrGetValue(gate) still resolves.
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+            import org.openrewrite.java.tree.J
+
+            val GatedRename: Recipe = recipe(
+                displayName = "Gated rename",
+                description = "Rename `gate` -> uppercase only.",
+            ) {
+                edit {
+                    val gate = "lowercase"
+                    visitMethodInvocation { call: J.MethodInvocation ->
+                        if (call.simpleName == gate)
+                            call.withName(call.name.withSimpleName("uppercase"))
+                        else call
+                    }
+                }
+            }
+            """.trimIndent(),
+            fileName = "Recipes.kt",
+        )
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val recipe = facade.getMethod("getGatedRename").invoke(null) as Recipe
+
+        rewriteRun(
+            { spec -> spec.recipe(recipe).validateRecipeSerialization(false) },
+            kotlin(
+                """
+                val a: String = "x".lowercase()
+                val b: String = "y".uppercase()
+                """,
+                """
+                val a: String = "x".uppercase()
+                val b: String = "y".uppercase()
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `scan block hoists aux val and the visit lambda captures it`() {
+        // Scan block has `val prefix = "marker_"` alongside the visit call.
+        // The visit body writes `prefix + call.simpleName` into the
+        // accumulator. The edit gate then checks for the marker-prefixed
+        // simpleName, proving the aux survived hoisting and capture.
+        val src = """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+            import org.openrewrite.java.tree.J
+
+            val MarkerScan: Recipe = recipe(
+                displayName = "Marker scan",
+                description = "Scan with a marker prefix; edit when marker_trim was seen.",
+            ) {
+                val seen = scan<MutableSet<String>>(initial = mutableSetOf()) {
+                    val prefix = "marker_"
+                    visitMethodInvocation { call: J.MethodInvocation -> acc.add(prefix + call.simpleName) }
+                }
+                edit(seen) {
+                    visitMethodInvocation { call: J.MethodInvocation ->
+                        if (call.simpleName == "lowercase" && acc.contains("marker_trim"))
+                            call.withName(call.name.withSimpleName("uppercase"))
+                        else call
+                    }
+                }
+            }
+        """.trimIndent()
+        val result = RecipePluginCompileFixture.compile(src, fileName = "Recipes.kt")
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val recipe = facade.getMethod("getMarkerScan").invoke(null) as Recipe
+
+        rewriteRun(
+            { spec -> spec.recipe(recipe).validateRecipeSerialization(false) },
+            kotlin(
+                """
+                val a: String = "x".lowercase()
+                val b: String = "  y  ".trim()
+                """,
+                """
+                val a: String = "x".uppercase()
+                val b: String = "  y  ".trim()
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `edit-with-acc block hoists aux val and reads both aux and acc`() {
+        // Edit block has `val targetName = "lowercase"` alongside the visit
+        // call. The visit body checks `call.simpleName == targetName` (aux
+        // capture) AND `acc.contains("trim")` (acc reference). Aux statements
+        // must survive deep-copy AND coexist with acc-rewriting.
+        val src = """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+            import org.openrewrite.java.tree.J
+
+            val MixedGate: Recipe = recipe(
+                displayName = "Mixed gate",
+                description = "Aux val + acc gate inside edit.",
+            ) {
+                val seen = scan<MutableSet<String>>(initial = mutableSetOf()) {
+                    visitMethodInvocation { call: J.MethodInvocation -> acc.add(call.simpleName) }
+                }
+                edit(seen) {
+                    val targetName = "lowercase"
+                    visitMethodInvocation { call: J.MethodInvocation ->
+                        if (call.simpleName == targetName && acc.contains("trim"))
+                            call.withName(call.name.withSimpleName("uppercase"))
+                        else call
+                    }
+                }
+            }
+        """.trimIndent()
+        val result = RecipePluginCompileFixture.compile(src, fileName = "Recipes.kt")
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val recipe = facade.getMethod("getMixedGate").invoke(null) as Recipe
+
+        rewriteRun(
+            { spec -> spec.recipe(recipe).validateRecipeSerialization(false) },
+            kotlin(
+                """
+                val a: String = "x".lowercase()
+                val b: String = "  y  ".trim()
+                """,
+                """
+                val a: String = "x".uppercase()
+                val b: String = "  y  ".trim()
+                """,
+            ),
+        )
+    }
+
+    @Test
     fun `stateless edit lambda transforms method invocation via direct withers`() {
         // The lambda mutates the LST directly: when the method name is
         // `lowercase`, replace it with `uppercase`. No templates, no matcher —
