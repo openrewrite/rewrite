@@ -9,6 +9,7 @@
  */
 package org.openrewrite.kotlin.recipe;
 
+import kotlin.jvm.functions.Function1;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -91,6 +92,29 @@ public final class GeneratedRecipeSupport {
                             .withPrefix(method.getPrefix());
                 }
                 return super.visitMethodInvocation(method, ctx);
+            }
+        };
+    }
+
+    /**
+     * Visitor for a stateless phase-mode recipe whose body is
+     * {@code edit { visitMethodInvocation { call -> ... } }}. The Kotlin lambda
+     * receives each method invocation in turn and returns a possibly-transformed
+     * {@code J.MethodInvocation}; returning the same instance is a no-op.
+     *
+     * <p>Unlike {@link #methodInvocationRewrite}, there's no MethodMatcher gate
+     * and no KotlinTemplate substitution — the user's lambda body runs as Kotlin
+     * for every method invocation in the tree, and the author has full
+     * imperative control over what (if anything) to change. This is the entry
+     * point for phase-mode recipes; pattern-mode is the declarative shortcut.
+     */
+    public static TreeVisitor<?, ExecutionContext> methodInvocationEditVisitor(
+            Function1<J.MethodInvocation, J.MethodInvocation> body) {
+        return new KotlinVisitor<ExecutionContext>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation transformed = body.invoke(method);
+                return super.visitMethodInvocation(transformed, ctx);
             }
         };
     }

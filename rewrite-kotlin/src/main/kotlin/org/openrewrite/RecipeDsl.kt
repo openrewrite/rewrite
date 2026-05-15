@@ -116,12 +116,25 @@ public class ScanRef<A> internal constructor()
 
 @RecipeDslMarker public class ScanScope<A> internal constructor() {
     public val acc: A get() = error("Stub — the compiler plugin processes the body; runtime is never invoked.")
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitMethodInvocation(action: (org.openrewrite.java.tree.J.MethodInvocation) -> Unit): Unit = Unit
 }
 
-@RecipeDslMarker public class EditScope internal constructor()
+@RecipeDslMarker public class EditScope internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitMethodInvocation(
+        action: (org.openrewrite.java.tree.J.MethodInvocation) -> org.openrewrite.java.tree.J.MethodInvocation,
+    ): Unit = Unit
+}
 
 @RecipeDslMarker public class EditScopeWithAcc<A> internal constructor() {
     public val acc: A get() = error("Stub — the compiler plugin processes the body; runtime is never invoked.")
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitMethodInvocation(
+        action: (org.openrewrite.java.tree.J.MethodInvocation) -> org.openrewrite.java.tree.J.MethodInvocation,
+    ): Unit = Unit
 }
 
 @RecipeDslMarker public class GenerateScope<A> internal constructor() {

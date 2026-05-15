@@ -152,6 +152,21 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             }
             ?.symbol
 
+        // `GeneratedRecipeSupport.methodInvocationEditVisitor(Function1<J.MethodInvocation, J.MethodInvocation>)`
+        // is the lowering target for stateless phase-mode bodies of the shape
+        // `edit { visitMethodInvocation { call -> ... } }`. Same fall-through
+        // contract: if missing, recipes still compile but inherit the default
+        // no-op visitor.
+        val methodInvocationEditVisitorSymbol: IrSimpleFunctionSymbol? = supportClassSymbol
+            ?.owner?.declarations
+            ?.filterIsInstance<IrSimpleFunction>()
+            ?.firstOrNull { fn ->
+                fn.name.asString() == "methodInvocationEditVisitor" &&
+                    fn.dispatchReceiverParameter == null &&
+                    fn.valueParameters.size == 1
+            }
+            ?.symbol
+
         // `Duration.parse(CharSequence)` for materialising the
         // estimatedEffortPerOccurrence ISO-8601 string into a runtime Duration.
         val durationClassId = ClassId.topLevel(FqName("java.time.Duration"))
@@ -176,6 +191,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             getEstimatedEffort = recipeGetEstimatedEffort,
             getVisitor = recipeGetVisitor,
             methodInvocationRewriteSymbol = methodInvocationRewriteSymbol,
+            methodInvocationEditVisitorSymbol = methodInvocationEditVisitorSymbol,
             durationClassSymbol = durationClassSymbol,
             durationParseSymbol = durationParseSymbol,
         )
@@ -199,6 +215,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val getEstimatedEffort: IrSimpleFunction?,
         val getVisitor: IrSimpleFunction?,
         val methodInvocationRewriteSymbol: IrSimpleFunctionSymbol?,
+        val methodInvocationEditVisitorSymbol: IrSimpleFunctionSymbol?,
         val durationClassSymbol: IrClassSymbol?,
         val durationParseSymbol: IrSimpleFunctionSymbol?,
     )
@@ -233,16 +250,25 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             if (initializerExpr.symbol.owner.kotlinFqName != RECIPE_FQN) continue
 
             val metadata = readMetadata(initializerExpr) ?: continue
-            val visitorTemplates = if (sourceText != null) {
+            // Two lowering shapes today, mutually exclusive by FIR-checker
+            // construction (mode-mixing is rejected at compile time): pattern
+            // mode (`rewrite ... to ...`) becomes string-args to a Java helper;
+            // phase mode (`edit { visitMethodInvocation { ... } }` for the
+            // stateless v0 slice) becomes a lambda passed straight through.
+            // Try pattern mode first because it has the stricter shape match;
+            // fall through to phase mode if no pattern clause is recognised.
+            val patternTemplates = if (sourceText != null) {
                 extractRewriteTemplates(initializerExpr, sourceText)
             } else null
+            val visitorLowering: VisitorLowering? = patternTemplates?.let(VisitorLowering::PatternMode)
+                ?: extractStatelessEditLambda(initializerExpr)?.let(VisitorLowering::PhaseStatelessEdit)
 
             val generatedClass = buildGeneratedRecipeClass(
                 ctx = ctx,
                 parentFile = file,
                 propertyName = declaration.name,
                 metadata = metadata,
-                visitorTemplates = visitorTemplates,
+                visitorLowering = visitorLowering,
             )
             file.addChild(generatedClass)
 
@@ -334,12 +360,28 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         return arg
     }
 
+    /**
+     * The recipe body's intended visitor lowering. Mutually exclusive by the
+     * FIR checker — at most one of these survives extraction.
+     */
+    private sealed class VisitorLowering {
+        /** `rewrite { p -> p.foo() } to { p -> p.bar() }` — string-template path. */
+        class PatternMode(val templates: RewriteTemplates) : VisitorLowering()
+
+        /**
+         * `edit { visitMethodInvocation { call -> ... } }` with no scan — the
+         * inner lambda is passed straight to the runtime helper as a
+         * Function1, no body introspection needed.
+         */
+        class PhaseStatelessEdit(val bodyLambda: IrFunctionExpression) : VisitorLowering()
+    }
+
     private fun buildGeneratedRecipeClass(
         ctx: RecipeIrGenContext,
         parentFile: IrFile,
         propertyName: Name,
         metadata: RecipeMetadata,
-        visitorTemplates: RewriteTemplates?,
+        visitorLowering: VisitorLowering?,
     ): IrClass {
         val cls = ctx.pluginContext.irFactory.buildClass {
             name = Name.identifier("Generated\$${propertyName.asString()}")
@@ -384,17 +426,30 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 addEstimatedEffortOverride(cls, ctx, ctx.getEstimatedEffort, metadata.estimatedEffortLiteral)
             }
         }
-        if (visitorTemplates != null &&
-            ctx.getVisitor != null &&
-            ctx.methodInvocationRewriteSymbol != null
-        ) {
-            addGetVisitorOverride(
-                cls = cls,
-                ctx = ctx,
-                overrides = ctx.getVisitor,
-                factorySymbol = ctx.methodInvocationRewriteSymbol,
-                templates = visitorTemplates,
-            )
+        when (visitorLowering) {
+            is VisitorLowering.PatternMode -> {
+                if (ctx.getVisitor != null && ctx.methodInvocationRewriteSymbol != null) {
+                    addGetVisitorOverride(
+                        cls = cls,
+                        ctx = ctx,
+                        overrides = ctx.getVisitor,
+                        factorySymbol = ctx.methodInvocationRewriteSymbol,
+                        templates = visitorLowering.templates,
+                    )
+                }
+            }
+            is VisitorLowering.PhaseStatelessEdit -> {
+                if (ctx.getVisitor != null && ctx.methodInvocationEditVisitorSymbol != null) {
+                    addPhaseEditGetVisitorOverride(
+                        cls = cls,
+                        ctx = ctx,
+                        overrides = ctx.getVisitor,
+                        factorySymbol = ctx.methodInvocationEditVisitorSymbol,
+                        bodyLambda = visitorLowering.bodyLambda,
+                    )
+                }
+            }
+            null -> Unit
         }
         return cls
     }
@@ -837,6 +892,84 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val csv = orderedSources.joinToString(",")
 
         return template to csv
+    }
+
+    /**
+     * Tries to lower the recipe body to a stateless phase-mode edit: exactly
+     * one top-level `edit { visitMethodInvocation { call -> ... } }` clause and
+     * nothing else. The lambda body is whatever the user wrote — we don't
+     * introspect it; the Kotlin compiler's lambda lowering emits it as a
+     * regular `Function1<J.MethodInvocation, J.MethodInvocation>` instance,
+     * and the runtime helper invokes it per method-invocation visit.
+     *
+     * The two-arg `edit(scanRef, block)` overload is intentionally rejected
+     * here — it's the scan-bound variant whose lowering needs ScanningRecipe
+     * (a separate, larger commit). Same for any `scan` / `generate` siblings.
+     */
+    private fun extractStatelessEditLambda(recipeCall: IrCall): IrFunctionExpression? {
+        val callee = recipeCall.symbol.owner
+        val blockIdx = callee.valueParameters.indexOfFirst { it.name == Name.identifier("block") }
+        if (blockIdx < 0) return null
+        val blockArg = recipeCall.arguments[blockIdx] as? IrFunctionExpression ?: return null
+        val recipeStmts = (blockArg.function.body as? IrBlockBody)?.statements ?: return null
+        // Exactly one top-level call — same shape constraint as pattern mode.
+        // Mixing rules are enforced earlier by the FIR checker; this is just
+        // the lowering's structural gate for what it can currently emit.
+        val firstRecipeStmt = recipeStmts.singleOrNull() ?: return null
+        val editCall = (firstRecipeStmt as? IrReturn)?.value as? IrCall
+            ?: firstRecipeStmt as? IrCall
+            ?: return null
+        // The single-arg `edit(block: EditScope.() -> Unit)` overload only.
+        if (editCall.symbol.owner.kotlinFqName.asString() != "org.openrewrite.RecipeBuilder.edit") return null
+        if (editCall.valueArgumentsCount != 1) return null
+        val editBlockArg = editCall.getValueArgument(0) as? IrFunctionExpression ?: return null
+        val editStmts = (editBlockArg.function.body as? IrBlockBody)?.statements ?: return null
+        val firstEditStmt = editStmts.singleOrNull() ?: return null
+        val visitCall = (firstEditStmt as? IrReturn)?.value as? IrCall
+            ?: firstEditStmt as? IrCall
+            ?: return null
+        if (visitCall.symbol.owner.kotlinFqName.asString() !=
+            "org.openrewrite.EditScope.visitMethodInvocation"
+        ) return null
+        if (visitCall.valueArgumentsCount != 1) return null
+        return visitCall.getValueArgument(0) as? IrFunctionExpression
+    }
+
+    /**
+     * Lowering for stateless phase-mode edit. The generated `getVisitor()`
+     * returns `GeneratedRecipeSupport.methodInvocationEditVisitor(lambda)`,
+     * where `lambda` is the user's `(J.MethodInvocation) -> J.MethodInvocation`
+     * function expression deep-copied so its parent points at the new
+     * getVisitor() body rather than the soon-to-be-replaced `edit { }` call.
+     */
+    private fun addPhaseEditGetVisitorOverride(
+        cls: IrClass,
+        ctx: RecipeIrGenContext,
+        overrides: IrSimpleFunction,
+        factorySymbol: IrSimpleFunctionSymbol,
+        bodyLambda: IrFunctionExpression,
+    ) {
+        cls.addFunction(
+            name = "getVisitor",
+            returnType = overrides.returnType,
+            modality = Modality.OPEN,
+            visibility = DescriptorVisibilities.PUBLIC,
+        ).apply {
+            overriddenSymbols = listOf(overrides.symbol)
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                val factoryCall = irCall(
+                    callee = factorySymbol,
+                    type = factorySymbol.owner.returnType,
+                )
+                // Deep-copy so the lambda's IR identity is fresh inside the new
+                // owner. Without this, the same node would be parented under
+                // both the original `edit(...)` call (about to be replaced
+                // wholesale) and the new getVisitor body, breaking IR tree
+                // invariants.
+                factoryCall.arguments[0] = bodyLambda.deepCopyWithSymbols(initialParent = this@apply)
+                +irReturn(factoryCall)
+            }
+        }
     }
 
     private fun addGetVisitorOverride(
