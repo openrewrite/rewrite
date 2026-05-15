@@ -107,6 +107,55 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `multi-before recipe matches every before lambda and rewrites to a shared after`() {
+        // Two before lambdas share a canonical capture shape (only the receiver
+        // is captured) and pair with a single after lambda. The plugin lowers
+        // them to two MethodMatcher specs joined into the helper as a
+        // newline-delimited list; at runtime, any matching spec triggers the
+        // substitution.
+        //
+        // `lowercase()` and `trim()` are both zero-arg String members and
+        // neither is deprecated. Semantics aren't meaningful — the test only
+        // verifies that both names route through the same after template.
+        // After the rewrite the call becomes `uppercase()` which matches
+        // neither matcher, so the recipe terminates after one pass.
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val ToUpper: Recipe = recipe(
+                displayName = "Use uppercase",
+                description = "Replace lowercase()/trim() with uppercase() (illustrative).",
+            ) {
+                rewrite(
+                    { s: String -> s.lowercase() },
+                    { s: String -> s.trim() },
+                ) to { s -> s.uppercase() }
+            }
+            """.trimIndent(),
+            fileName = "Recipes.kt",
+        )
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val recipe = facade.getMethod("getToUpper").invoke(null) as Recipe
+
+        rewriteRun(
+            { spec -> spec.recipe(recipe).validateRecipeSerialization(false) },
+            kotlin(
+                """
+                val a: String = "hello".lowercase()
+                val b: String = "  WORLD  ".trim()
+                """.trimIndent(),
+                """
+                val a: String = "hello".uppercase()
+                val b: String = "  WORLD  ".uppercase()
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
     fun `literal-capture multi-arg recipe re-emits matched args at literal positions`() {
         // Single-param lambda whose before's root call has two literal string args.
         // The after body references the same literals at the same source-order

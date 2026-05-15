@@ -34,10 +34,18 @@ public final class GeneratedRecipeSupport {
      * {@link MethodMatcher}; the after template is a {@link KotlinTemplate}
      * string with one {@code #{any()}} placeholder per substitution slot.
      *
+     * {@code matcherSpecsLines} is a {@code \n}-delimited list of
+     * MethodMatcher specs — multi-before recipes
+     * ({@code rewrite(b1, b2, ...) to a}) lower to one spec per before lambda
+     * and we accept a method invocation when any spec matches.
+     *
      * The {@code substitutionSourcesCsv} encodes, in template-left-to-right
      * order, how to fill each placeholder from the matched method invocation:
      * {@code -1} for {@code method.getSelect()} (the receiver), {@code N >= 0}
-     * for {@code method.getArguments().get(N)}.
+     * for {@code method.getArguments().get(N)}. The CSV is shared across all
+     * matchers because the IR pass requires every before lambda to agree on
+     * the captured argument shape (same param-index references and same
+     * literal {@code (kind, value)} at each position).
      *
      * Switching from {@code KotlinTemplate.matches} to {@link MethodMatcher} is
      * intentional for v0: {@code KotlinTemplate.matches("#{any()}.foo()", cursor)}
@@ -45,13 +53,24 @@ public final class GeneratedRecipeSupport {
      * concrete invocation — verified by a standalone probe test 2026-05-14.
      */
     public static TreeVisitor<?, ExecutionContext> methodInvocationRewrite(
-            String matcherSpec, String afterTemplate, String substitutionSourcesCsv) {
-        MethodMatcher matcher = new MethodMatcher(matcherSpec);
+            String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv) {
+        String[] specs = matcherSpecsLines.isEmpty() ? new String[0] : matcherSpecsLines.split("\n");
+        MethodMatcher[] matchers = new MethodMatcher[specs.length];
+        for (int i = 0; i < specs.length; i++) {
+            matchers[i] = new MethodMatcher(specs[i]);
+        }
         int[] substitutionSources = parseCsv(substitutionSourcesCsv);
         return new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                if (matcher.matches(method)) {
+                boolean matched = false;
+                for (MethodMatcher matcher : matchers) {
+                    if (matcher.matches(method)) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if (matched) {
                     Object[] substitutions = new Object[substitutionSources.length];
                     for (int i = 0; i < substitutionSources.length; i++) {
                         int src = substitutionSources[i];

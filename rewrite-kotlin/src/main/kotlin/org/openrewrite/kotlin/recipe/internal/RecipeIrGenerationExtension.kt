@@ -448,20 +448,26 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
     /**
      * Lowering output for a pattern-mode recipe whose before lambda body is a
-     * method call rooted at the receiver param. The runtime helper builds a
-     * {@link org.openrewrite.java.MethodMatcher} from [matcherSpec] and applies
+     * method call rooted at the receiver param. The runtime helper builds one
+     * {@link org.openrewrite.java.MethodMatcher} per entry in [matcherSpecs]
+     * and accepts a method invocation when any of them matches; it then applies
      * [afterTemplate] (a KotlinTemplate string with one `#{any()}` per slot)
      * with substitutions sourced as described by [substitutionSourcesCsv]:
      * left-to-right by placeholder position, each entry is `-1` for the
      * matched method's receiver (`method.getSelect()`) or `N >= 0` for the
      * Nth argument (`method.getArguments().get(N)`).
      *
+     * For multi-before recipes (`rewrite(b1, b2, ...) to a`), every before
+     * lambda lowers to its own spec but they share a single after template +
+     * CSV — the IR pass refuses to lower unless every before lambda agrees on
+     * the captured argument shape, so the same source positions apply.
+     *
      * Why MethodMatcher rather than KotlinTemplate-based matching: KotlinTemplate's
      * `matches("#{any()}.method()", cursor)` does not currently bind a receiver
      * placeholder against a concrete invocation (verified by probe).
      */
     private class RewriteTemplates(
-        val matcherSpec: String,
+        val matcherSpecs: List<String>,
         val afterTemplate: String,
         val substitutionSourcesCsv: String,
     )
@@ -492,11 +498,14 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     )
 
     /**
-     * Tries to lower the recipe body to a `(matcherSpec, afterTemplate, substitutionSourcesCsv)`
+     * Tries to lower the recipe body to a `(matcherSpecs, afterTemplate, substitutionSourcesCsv)`
      * triple for the v0 shape this commit supports: exactly one
-     * `rewrite(before) to after` clause in the body, where the before lambda
-     * has param[0] in receiver position of a method call and remaining args
-     * are param refs or literal constants. Returns null on any deviation —
+     * `rewrite(before, ...) to after` clause in the body. Each before lambda
+     * must have param[0] in receiver position of a method call and remaining
+     * root-call args must be param refs or literal constants. Multi-before
+     * (`rewrite(b1, b2, ...) to a`) is accepted only when every before lambda
+     * has the same canonical argument signature so they can share a single
+     * after template + substitution CSV. Returns null on any deviation —
      * the generated recipe then still compiles but inherits the Recipe
      * default no-op visitor.
      */
@@ -523,17 +532,73 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         ) return null
         val rewriteCall = toCall.dispatchReceiver as? IrCall ?: return null
         if (rewriteCall.symbol.owner.kotlinFqName.asString() != "org.openrewrite.RecipeBuilder.rewrite") return null
-        // Single-before form: `rewrite(before: (P) -> R)`. valueArgumentsCount == 1.
-        if (rewriteCall.valueArgumentsCount != 1) return null
-        val beforeArg = rewriteCall.getValueArgument(0) as? IrFunctionExpression ?: return null
+
+        // Two accepted shapes:
+        //  1) `rewrite(before)`               — valueArgumentsCount == 1.
+        //  2) `rewrite(first, vararg rest)`   — valueArgumentsCount == 2 with
+        //                                       arg 1 an `IrVararg` of lambdas.
+        val beforeExprs: List<IrFunctionExpression> = when (rewriteCall.valueArgumentsCount) {
+            1 -> {
+                val only = rewriteCall.getValueArgument(0) as? IrFunctionExpression ?: return null
+                listOf(only)
+            }
+            2 -> {
+                val first = rewriteCall.getValueArgument(0) as? IrFunctionExpression ?: return null
+                val rest = rewriteCall.getValueArgument(1) as? org.jetbrains.kotlin.ir.expressions.IrVararg ?: return null
+                val restLambdas = rest.elements.map { it as? IrFunctionExpression ?: return null }
+                listOf(first) + restLambdas
+            }
+            else -> return null
+        }
         val afterArg = toCall.getValueArgument(0) as? IrFunctionExpression ?: return null
-        val beforeLambda = validateBeforeLambda(beforeArg) ?: return null
-        val afterTemplateAndSources = buildAfterTemplate(afterArg, sourceText, beforeLambda) ?: return null
+
+        val beforeLambdas = beforeExprs.map { validateBeforeLambda(it) ?: return null }
+        // Multi-before requires a shared after template; enforce that every
+        // before lambda canonicalises to the same argument signature. We use
+        // the first lambda as the source-truth for the after template, and
+        // reject on shape mismatch so we never silently emit a wrong CSV.
+        val canonical = beforeLambdas[0].canonicalSignature()
+        for (i in 1 until beforeLambdas.size) {
+            if (beforeLambdas[i].canonicalSignature() != canonical) return null
+            // Same number of lambda params is implied by the DSL surface (all
+            // overloads of `rewrite` share a single `(P) -> R` arity), but
+            // belt-and-braces verify in case the call resolves unexpectedly.
+            if (beforeLambdas[i].params.size != beforeLambdas[0].params.size) return null
+        }
+        val afterTemplateAndSources = buildAfterTemplate(afterArg, sourceText, beforeLambdas[0]) ?: return null
+        val matcherSpecs = beforeLambdas.map { "* ${it.rootCall.symbol.owner.name.asString()}(..)" }
         return RewriteTemplates(
-            matcherSpec = "* ${beforeLambda.rootCall.symbol.owner.name.asString()}(..)",
+            matcherSpecs = matcherSpecs,
             afterTemplate = afterTemplateAndSources.first,
             substitutionSourcesCsv = afterTemplateAndSources.second,
         )
+    }
+
+    /**
+     * Canonicalised form of a before lambda's argument signature, used to
+     * verify multi-before lambdas all capture in the same shape. Two
+     * signatures are equal iff each position is either the same param index
+     * (0 = receiver, 1 = first non-receiver, ...) or the same literal
+     * `(kind, value)` pair.
+     */
+    private fun BeforeLambda.canonicalSignature(): List<CanonicalArgSig> {
+        val paramIdxBySymbol: Map<IrValueSymbol, Int> =
+            params.withIndex().associate { (idx, p) -> p.symbol to idx }
+        return argSignatures.map { sig ->
+            when (sig) {
+                is ArgSig.ParamRef -> {
+                    val idx = paramIdxBySymbol[sig.symbol] ?: return@map CanonicalArgSig.Unknown
+                    CanonicalArgSig.ParamIdx(idx)
+                }
+                is ArgSig.LiteralConst -> CanonicalArgSig.Literal(sig.kind, sig.value)
+            }
+        }
+    }
+
+    private sealed class CanonicalArgSig {
+        data class ParamIdx(val idx: Int) : CanonicalArgSig()
+        data class Literal(val kind: org.jetbrains.kotlin.ir.expressions.IrConstKind, val value: Any?) : CanonicalArgSig()
+        object Unknown : CanonicalArgSig()
     }
 
     /**
@@ -745,7 +810,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                     callee = factorySymbol,
                     type = factorySymbol.owner.returnType,
                 )
-                factoryCall.arguments[0] = irString(templates.matcherSpec)
+                factoryCall.arguments[0] = irString(templates.matcherSpecs.joinToString("\n"))
                 factoryCall.arguments[1] = irString(templates.afterTemplate)
                 factoryCall.arguments[2] = irString(templates.substitutionSourcesCsv)
                 +irReturn(factoryCall)
