@@ -582,7 +582,8 @@ class ScalaTreeVisitor(
           }
           updateCursor(arg.span.end)
           expr
-        }
+        },
+        ")"
       )
     }
     
@@ -1281,7 +1282,7 @@ class ScalaTreeVisitor(
       val initPrefix = sourceBefore("(")
       import scala.jdk.CollectionConverters.*
       buildArgumentContainer[Expression, Expression](
-        elements.asScala.toSeq, identity, initPrefix, Markers.EMPTY, ")")
+        elements.asScala.toSeq, identity, ")", initPrefix, Markers.EMPTY)
     }
 
     // Update cursor to end of expression
@@ -1348,7 +1349,7 @@ class ScalaTreeVisitor(
       val initPrefix = sourceBefore("(")
       import scala.jdk.CollectionConverters.*
       buildArgumentContainer[Expression, Expression](
-        elements.asScala.toSeq, identity, initPrefix, Markers.EMPTY, ")")
+        elements.asScala.toSeq, identity, ")", initPrefix, Markers.EMPTY)
     }
     
     // Update cursor to end of expression
@@ -5001,9 +5002,8 @@ class ScalaTreeVisitor(
         case j: J => new S.StatementExpression(Tree.randomId(), j)
         case _ => visitUnknown(arg)
       },
-      beforeBracket,
-      Markers.EMPTY,
-      "]"
+      "]",
+      beforeBracket
     )
   }
   
@@ -7254,15 +7254,15 @@ class ScalaTreeVisitor(
    * `items`, the caller's `convert` function is applied (advancing the cursor
    * over that element's source text). Between consecutive elements this
    * helper consumes the comma via `sourceBefore(",")`. After the last element
-   * it consumes `sourceBefore(endDelim)` if an `endDelim` is provided (e.g.
-   * `")"` or `"]"`), otherwise the last element's trailing space is empty.
+   * it consumes `sourceBefore(endDelim)` (e.g. `")"` or `"]"`), so the trailing
+   * whitespace before the closing delimiter is captured on the last element.
    */
   private def buildArgumentContainer[A, T <: J](
     items: Seq[A],
     convert: A => T,
+    endDelim: String,
     prefix: Space = Space.EMPTY,
-    markers: Markers = Markers.EMPTY,
-    endDelim: String = null
+    markers: Markers = Markers.EMPTY
   ): JContainer[T] = {
     val padded = new util.ArrayList[JRightPadded[T]](items.size)
     val last = items.size - 1
@@ -7271,8 +7271,7 @@ class ScalaTreeVisitor(
       val elem = convert(items(i))
       val after =
         if (i < last) sourceBefore(",")
-        else if (endDelim != null) sourceBefore(endDelim)
-        else Space.EMPTY
+        else sourceBefore(endDelim)
       padded.add(JRightPadded.build(elem).withAfter(after))
       i += 1
     }
