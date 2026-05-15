@@ -644,6 +644,47 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     private fun renderPlaceholder(typeFqn: String?): String =
         if (typeFqn != null) "#{any($typeFqn)}" else "#{any()}"
 
+    /**
+     * Builds a [MethodMatcher][org.openrewrite.java.MethodMatcher] spec from a
+     * before-lambda's root call. The declaring-type segment is tightened
+     * from the previous `* method(..)` wildcard to the actual declaring
+     * type's Kotlin FQN — but **only** for member calls. Kotlin extension
+     * functions lower to static methods on a synthetic JVM facade class
+     * (e.g. `kotlin.text.StringsKt` for `kotlin.text` package extensions);
+     * the J.MethodInvocation's `declaringType` reflects that facade, NOT
+     * the source-level receiver type. Matching against the receiver type
+     * directly silently misses every extension call, so we keep the
+     * wildcard for those until proper facade resolution lands.
+     *
+     *  - Member calls (`dispatchReceiverParameter != null`,
+     *    `extensionReceiverParameter == null`): tighten to
+     *    `<receiverFqn> method(..)`.
+     *  - Extension calls (`extensionReceiverParameter != null`): keep
+     *    `* method(..)` — JVM facade FQN computation needs a compiler
+     *    helper (`JvmFileClassUtil` or equivalent) that respects
+     *    `@file:JvmName` overrides; that's a separate runway item.
+     *  - Top-level non-extension functions (no receiver of either kind):
+     *    keep `* method(..)`.
+     *
+     * If the receiver type can't be reduced to a class FQN (function types,
+     * intersection types, etc.), fall back to wildcard so the matcher still
+     * fires rather than silently dropping the recipe.
+     */
+    private fun computeMatcherSpec(rootCall: IrCall): String {
+        val owner = rootCall.symbol.owner
+        val methodName = owner.name.asString()
+        // Extensions go on the JVM facade — receiver type doesn't match LST.
+        if (owner.extensionReceiverParameter != null) {
+            return "* $methodName(..)"
+        }
+        val receiverFqn = owner.dispatchReceiverParameter?.type?.classFqName?.asString()
+        return if (receiverFqn != null) {
+            "$receiverFqn $methodName(..)"
+        } else {
+            "* $methodName(..)"
+        }
+    }
+
     private fun parsesAsIsoDuration(literal: String): Boolean = try {
         JDuration.parse(literal); true
     } catch (_: DateTimeParseException) {
@@ -825,7 +866,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             if (beforeLambdas[i].params.size != beforeLambdas[0].params.size) return null
         }
         val afterTemplateAndSources = buildAfterTemplate(afterArg, sourceText, beforeLambdas[0]) ?: return null
-        val matcherSpecs = beforeLambdas.map { "* ${it.rootCall.symbol.owner.name.asString()}(..)" }
+        val matcherSpecs = beforeLambdas.map { computeMatcherSpec(it.rootCall) }
         return RewriteTemplates(
             matcherSpecs = matcherSpecs,
             afterTemplate = afterTemplateAndSources.first,
