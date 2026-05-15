@@ -625,6 +625,25 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         }
     }
 
+    /**
+     * Renders an [IrType] as the Kotlin FQN string used inside a
+     * `#{any(...)}` placeholder (e.g., `kotlin.String`, `java.lang.StringBuilder`).
+     * Returns null when the type can't be reduced to a class FQN — function
+     * types, intersection types, generic parameters etc. — in which case the
+     * placeholder emits as untyped `#{any()}` instead of breaking the
+     * template parse.
+     *
+     * Nullability is not encoded here: Kotlin's nullable `String?` shares its
+     * `classFqName` with `String`, and KotlinTemplate placeholders accept the
+     * non-null spelling for either form.
+     */
+    private fun renderPlaceholderType(type: IrType): String? =
+        type.classFqName?.asString()
+
+    /** `#{any(fqn)}` when [typeFqn] is non-null, otherwise `#{any()}`. */
+    private fun renderPlaceholder(typeFqn: String?): String =
+        if (typeFqn != null) "#{any($typeFqn)}" else "#{any()}"
+
     private fun parsesAsIsoDuration(literal: String): Boolean = try {
         JDuration.parse(literal); true
     } catch (_: DateTimeParseException) {
@@ -1010,7 +1029,15 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val sliceEnd = maxEnd
         val slice = sourceText.substring(sliceStart, sliceEnd)
 
-        data class Spot(val startOffset: Int, val endOffset: Int, val sourceIndex: Int)
+        data class Spot(
+            val startOffset: Int,
+            val endOffset: Int,
+            val sourceIndex: Int,
+            // Kotlin FQN to use in the placeholder (e.g. "kotlin.String"), or
+            // null when the type isn't representable; null degrades gracefully
+            // to an untyped `#{any()}` so the template still parses.
+            val typeFqn: String?,
+        )
         val spots = mutableListOf<Spot>()
 
         expr.acceptChildrenVoid(object : IrVisitorVoid() {
@@ -1018,14 +1045,24 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
             override fun visitGetValue(expression: IrGetValue) {
                 val src = paramSymToSource[expression.symbol] ?: return
-                spots += Spot(expression.startOffset, expression.endOffset, src)
+                spots += Spot(
+                    startOffset = expression.startOffset,
+                    endOffset = expression.endOffset,
+                    sourceIndex = src,
+                    typeFqn = renderPlaceholderType(expression.symbol.owner.type),
+                )
             }
 
             override fun visitConst(expression: IrConst) {
                 val slot = literalSlots.firstOrNull { !it.consumed && it.sig.kind == expression.kind && it.sig.value == expression.value }
                     ?: return
                 slot.consumed = true
-                spots += Spot(expression.startOffset, expression.endOffset, slot.argPos)
+                spots += Spot(
+                    startOffset = expression.startOffset,
+                    endOffset = expression.endOffset,
+                    sourceIndex = slot.argPos,
+                    typeFqn = renderPlaceholderType(expression.type),
+                )
             }
         })
 
@@ -1047,14 +1084,22 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         if (prependSpots.size > 1) return null
 
         // Right-to-left source-text substitution; left-to-right CSV ordering.
+        // Each placeholder carries the slot's Kotlin type when we could render
+        // one — narrower than `#{any()}` so KotlinTemplate validates that the
+        // matched-value's type matches the source-level shape the recipe
+        // author wrote.
         val templateBuilder = StringBuilder(slice)
         for (spot in inSliceSpots.sortedByDescending { it.startOffset }) {
-            templateBuilder.replace(spot.startOffset - sliceStart, spot.endOffset - sliceStart, "#{any()}")
+            templateBuilder.replace(
+                spot.startOffset - sliceStart,
+                spot.endOffset - sliceStart,
+                renderPlaceholder(spot.typeFqn),
+            )
         }
         val template = if (prependSpots.isEmpty()) {
             templateBuilder.toString()
         } else {
-            "#{any()}.$templateBuilder"
+            "${renderPlaceholder(prependSpots.single().typeFqn)}.$templateBuilder"
         }
 
         val orderedSources = mutableListOf<Int>()
