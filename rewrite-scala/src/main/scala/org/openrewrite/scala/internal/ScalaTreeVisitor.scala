@@ -4399,8 +4399,8 @@ class ScalaTreeVisitor(
       if (i < source.length && source.charAt(i) == '(') i else -1
     }
 
-    val primaryConstructor: JContainer[Statement] = if (ctorParenPos >= 0 && firstValueParamList.isDefined) {
-      val params = firstValueParamList.get
+    val primaryConstructor: JContainer[Statement] = if (ctorParenPos >= 0) {
+      val params = firstValueParamList.getOrElse(Nil)
       val parenSpace = Space.format(source, cursor, ctorParenPos)
       cursor = ctorParenPos + 1
 
@@ -4440,7 +4440,12 @@ class ScalaTreeVisitor(
       }
 
       JContainer.build(parenSpace, jParams, Markers.EMPTY)
-    } else null
+    } else {
+      // No `(` in source — non-constructor class definition. Emit an empty container
+      // marked with OmitParentheses so the printer skips emitting `(...)`.
+      JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
+        Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId()))))
+    }
     
     // Extract extends/implements from Template
     var extendings: JLeftPadded[TypeTree] = null

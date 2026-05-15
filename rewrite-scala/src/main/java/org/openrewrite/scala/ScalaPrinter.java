@@ -763,9 +763,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             needsScalaHandling = true;
         }
         
-        // Or if we have a primary constructor with actual parameters
-        if (classDecl.getPadding().getPrimaryConstructor() != null && 
-            !classDecl.getPadding().getPrimaryConstructor().getElements().isEmpty()) {
+        // Or if we have a primary constructor at all — Scala distinguishes
+        // `class Foo`, `class Foo()`, and `class Foo(x)` via container presence,
+        // emptiness, and an OmitParentheses marker on the container.
+        if (classDecl.getPadding().getPrimaryConstructor() != null) {
             needsScalaHandling = true;
         }
         
@@ -825,7 +826,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             // J.VariableDeclarations modeled like a Scala parameter (no implicit val/var,
             // type comes after the name with `:`). We can't fall through to visitVariableDeclarations
             // because that one is for field/local declarations and always emits a val/var keyword.
-            if (classDecl.getPadding().getPrimaryConstructor() != null) {
+            if (classDecl.getPadding().getPrimaryConstructor() != null &&
+                !classDecl.getPadding().getPrimaryConstructor().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
                 JContainer<Statement> primaryConstructor = classDecl.getPadding().getPrimaryConstructor();
                 visitSpace(primaryConstructor.getBefore(), Space.Location.RECORD_STATE_VECTOR, p);
                 p.append('(');
@@ -918,49 +920,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             afterSyntax(classDecl, p);
             return classDecl;
         } else {
-            // For classes without Scala features, use Java printing but skip empty primary constructors
-            // The Java printer would print empty parentheses for primary constructors
-            if (classDecl.getPadding().getPrimaryConstructor() != null && 
-                classDecl.getPadding().getPrimaryConstructor().getElements().isEmpty()) {
-                // We have an empty primary constructor that shouldn't be printed
-                // Use the default Java printer logic but without the primary constructor
-                beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
-                visit(classDecl.getLeadingAnnotations(), p);
-                for (J.Modifier m : classDecl.getModifiers()) {
-                    visit(m, p);
-                }
-                visit(classDecl.getPadding().getKind().getAnnotations(), p);
-                visitSpace(classDecl.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
-                // For Scala, print "trait" for Interface kind
-                String classKind = classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface ? 
-                    "trait" : classDecl.getKind().name().toLowerCase();
-                p.append(classKind);
-                visit(classDecl.getName(), p);
-                // Use our custom type parameter printing for Scala
-                visitTypeParameters(classDecl.getPadding().getTypeParameters(), p);
-                // Skip the empty primary constructor
-                
-                if (classDecl.getPadding().getExtends() != null) {
-                    visitSpace(classDecl.getPadding().getExtends().getBefore(), Space.Location.EXTENDS, p);
-                    p.append("extends");
-                    visit(classDecl.getPadding().getExtends().getElement(), p);
-                }
-
-                if (classDecl.getPadding().getImplements() != null) {
-                    visitContainer(" implements", classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", "", p);
-                }
-
-                if (classDecl.getPadding().getPermits() != null) {
-                    visitContainer(" permits", classDecl.getPadding().getPermits(), JContainer.Location.PERMITS, ",", "", p);
-                }
-
-                visit(classDecl.getBody(), p);
-                afterSyntax(classDecl, p);
-                return classDecl;
-            } else {
-                // Use the default Java printing
-                return super.visitClassDeclaration(classDecl, p);
-            }
+            // No Scala-specific structure (no primary constructor, no object/trait/with/type-params).
+            // Fall through to default Java printing.
+            return super.visitClassDeclaration(classDecl, p);
         }
     }
     
