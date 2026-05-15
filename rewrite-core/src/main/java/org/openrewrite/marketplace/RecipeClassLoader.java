@@ -180,8 +180,15 @@ public class RecipeClassLoader extends URLClassLoader {
             }
         }
 
-        // SLF4J and Jackson should always be from parent
-        if (className.startsWith("org.slf4j") || className.startsWith("com.fasterxml.jackson")) {
+        // SLF4J, Jackson, and the Kotlin runtime should always come from the parent.
+        // Why kotlin: if both the parent and a recipe jar ship kotlin-stdlib, types like
+        // kotlin.jvm.functions.Function1 get defined by both loaders. When Jackson (loaded
+        // from parent) interacts with jackson-module-kotlin (typically bundled in the recipe
+        // jar), the JVM raises a LinkageError on loader-constraint violations.
+        // See moderneinc/customer-requests#2372.
+        if (className.startsWith("org.slf4j") ||
+            className.startsWith("com.fasterxml.jackson") ||
+            className.startsWith("kotlin.")) {
             return true;
         }
 
