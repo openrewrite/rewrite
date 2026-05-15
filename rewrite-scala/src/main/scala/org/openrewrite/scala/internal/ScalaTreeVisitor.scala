@@ -6911,12 +6911,37 @@ class ScalaTreeVisitor(
    */
   private def visitTypeTree(tpt: Trees.Tree[?]): TypeTree = tpt match {
     case f: untpd.Function => visitFunctionType(f)
+    case po: untpd.PostfixOp if po.op != null && po.op.name.toString == "*" =>
+      visitRepeatedType(po)
     case _ =>
       visitTree(tpt) match {
         case tt: TypeTree => tt
         case id: J.Identifier => id
         case _ => null
       }
+  }
+
+  /**
+   * Build an `S.RepeatedType` for a repeated/vararg type position (e.g. `String*`).
+   * Scala 3's parser represents `T*` as `PostfixOp(T, Ident("*"))`.
+   */
+  private def visitRepeatedType(po: untpd.PostfixOp): S.RepeatedType = {
+    val prefix = extractPrefix(po.span)
+    val elementType = visitTypeTree(po.od)
+    val innerEnd = if (po.od.span.exists) Math.max(0, po.od.span.end - offsetAdjustment) else cursor
+    val starStart = if (po.op.span.exists) Math.max(0, po.op.span.start - offsetAdjustment) else innerEnd
+    val beforeStar = if (cursor < starStart && starStart <= source.length) {
+      Space.format(source, cursor, starStart)
+    } else Space.EMPTY
+    if (po.span.exists) updateCursor(po.span.end)
+    new S.RepeatedType(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      elementType,
+      beforeStar,
+      typeOfTree(po)
+    )
   }
 
   /**

@@ -193,6 +193,15 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return s;
     }
 
+    public J visitRepeatedType(S.RepeatedType repeatedType, P p) {
+        S.RepeatedType r = repeatedType;
+        r = r.withPrefix(visitSpace(r.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withElementType(visitAndCast(r.getElementType(), p));
+        r = r.withBeforeStar(visitSpace(r.getBeforeStar(), Space.Location.LANGUAGE_EXTENSION, p));
+        return r;
+    }
+
     public J visitAlternative(S.Alternative alternative, P p) {
         S.Alternative a = alternative;
         a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

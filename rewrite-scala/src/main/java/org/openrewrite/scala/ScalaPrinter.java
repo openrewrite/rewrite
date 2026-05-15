@@ -602,6 +602,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitFunctionCall((S.FunctionCall) tree, p);
         } else if (tree instanceof S.SingletonType) {
             return visitSingletonType((S.SingletonType) tree, p);
+        } else if (tree instanceof S.RepeatedType) {
+            return visitRepeatedType((S.RepeatedType) tree, p);
         } else if (tree instanceof S.Alternative) {
             return visitAlternative((S.Alternative) tree, p);
         } else if (tree instanceof S.QualifiedSuper) {
@@ -1185,14 +1187,14 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             }
             p.append(":");
             visit(parent.getTypeExpression(), p);
-            
+
             // If there's an initializer, use visitLeftPadded to handle it properly
             visitLeftPadded("=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
         } else {
             // No type annotation, handle initializer normally
             visitLeftPadded("=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
         }
-        
+
         afterSyntax(variable, p);
         return variable;
     }
@@ -1578,6 +1580,15 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         p.append(".type");
         afterSyntax(singletonType, p);
         return singletonType;
+    }
+
+    public J visitRepeatedType(S.RepeatedType repeatedType, PrintOutputCapture<P> p) {
+        beforeSyntax(repeatedType, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(repeatedType.getElementType(), p);
+        visitSpace(repeatedType.getBeforeStar(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append('*');
+        afterSyntax(repeatedType, p);
+        return repeatedType;
     }
 
     public J visitAlternative(S.Alternative alternative, PrintOutputCapture<P> p) {
