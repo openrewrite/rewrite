@@ -377,6 +377,21 @@ class TryTest implements RewriteTest {
     }
 
     @Test
+    void catchExtractorPatternWithBinding() {
+        rewriteRun(scala(
+            """
+            object Test {
+              try {
+                println("risky")
+              } catch {
+                case NonFatal(e) => println(e)
+              }
+            }
+            """
+        ));
+    }
+
+    @Test
     void significantCharactersInComments() {
         // visitParsedTry / visitTryImpl — `=>` arrow in catch case line comment
         rewriteRun(scala(
