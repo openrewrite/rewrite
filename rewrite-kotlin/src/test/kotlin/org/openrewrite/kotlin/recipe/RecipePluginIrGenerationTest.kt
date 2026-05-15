@@ -99,17 +99,18 @@ class RecipePluginIrGenerationTest {
     }
 
     @Test
-    fun `estimatedEffortPerOccurrence literal flows to a Duration override`() {
+    fun `estimatedEffortPerOccurrence Duration expression flows to override`() {
         val recipe = compileAndLoad(
             propertyName = "Effortful",
             source = """
             import org.openrewrite.Recipe
             import org.openrewrite.recipe
+            import java.time.Duration
 
             val Effortful: Recipe = recipe(
                 displayName = "Effortful",
                 description = "Has effort.",
-                estimatedEffortPerOccurrence = "PT15M",
+                estimatedEffortPerOccurrence = Duration.ofMinutes(15),
             ) { }
             """.trimIndent(),
         )

@@ -16,6 +16,8 @@
 @file:JvmName("RecipeDsl")
 package org.openrewrite
 
+import java.time.Duration
+
 // Author-facing surface for the Kotlin recipe authoring DSL.
 //
 //     val UseUppercase: Recipe = recipe(
@@ -51,8 +53,10 @@ public annotation class RecipeDslMarker
  *  - the K2 compiler plugin has a single well-defined IR call to replace
  *    with a constructor invocation of the generated `Recipe` subclass.
  *
- * `estimatedEffortPerOccurrence` is an ISO-8601 duration string (e.g. "PT5M");
- * the plugin parses it at compile time. Empty string means "not specified".
+ * `estimatedEffortPerOccurrence` is a [java.time.Duration]; the plugin
+ * deep-copies the supplied expression into the generated Recipe's
+ * `getEstimatedEffortPerOccurrence()` override. `null` (the default) leaves
+ * the framework's Recipe-level default in place.
  *
  * Without the rewrite-kotlin compiler plugin loaded on the consuming module,
  * this function throws — the DSL requires the plugin.
@@ -61,7 +65,7 @@ public fun recipe(
     @Suppress("UNUSED_PARAMETER") displayName: String,
     @Suppress("UNUSED_PARAMETER") description: String,
     @Suppress("UNUSED_PARAMETER") tags: Set<String> = emptySet(),
-    @Suppress("UNUSED_PARAMETER") estimatedEffortPerOccurrence: String = "",
+    @Suppress("UNUSED_PARAMETER") estimatedEffortPerOccurrence: Duration? = null,
     @Suppress("UNUSED_PARAMETER") block: RecipeBuilder.() -> Unit,
 ): Recipe =
     error(

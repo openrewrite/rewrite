@@ -26,19 +26,12 @@ import org.jetbrains.kotlin.fir.analysis.diagnostics.FirErrors
 import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.expressions.FirAnonymousFunctionExpression
 import org.jetbrains.kotlin.fir.expressions.FirBlock
-import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
-import org.jetbrains.kotlin.fir.expressions.FirLiteralExpression
-import org.jetbrains.kotlin.fir.expressions.FirNamedArgumentExpression
 import org.jetbrains.kotlin.fir.expressions.FirStatement
-import org.jetbrains.kotlin.fir.expressions.impl.FirResolvedArgumentList
 import org.jetbrains.kotlin.fir.references.toResolvedCallableSymbol
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.types.ConstantValueKind
-import java.time.Duration
-import java.time.format.DateTimeParseException
 
 /**
  * FIR-level checker over property declarations whose initializer is a call to
@@ -52,10 +45,6 @@ import java.time.format.DateTimeParseException
  *  - Within a phase-mode recipe, every `scan { … }` precedes every `edit { … }` /
  *    `generate { … }` call. `edit`-without-scan is allowed (the framework
  *    treats it as a stateless edit phase).
- *  - `estimatedEffortPerOccurrence`, when supplied as a string literal, must
- *    parse as an ISO-8601 duration. The IR pass silently falls back to the
- *    Recipe-default 5min on bad input — this checker promotes that to an
- *    error so the author finds out at compile time, not runtime.
  *
  * The checker walks only the top-level statements of the recipe block; it
  * intentionally does NOT recurse into nested lambdas, otherwise user code like
@@ -96,8 +85,6 @@ internal object RecipeDslPropertyChecker : FirPropertyChecker(MppCheckerKind.Com
     override fun check(declaration: FirProperty) {
         val initializer = declaration.initializer as? FirFunctionCall ?: return
         if (!initializer.callsRecipeBuilder()) return
-
-        validateEffortLiteral(initializer, declaration)
 
         val body = initializer.findTrailingLambdaBody() ?: return
 
@@ -171,65 +158,6 @@ internal object RecipeDslPropertyChecker : FirPropertyChecker(MppCheckerKind.Com
     private fun reportError(source: KtSourceElement, message: String) {
         if (source.kind is KtFakeSourceElementKind) return
         reporter.reportOn(source, FirErrors.OTHER_ERROR_WITH_REASON, message)
-    }
-
-    /**
-     * Validates the `estimatedEffortPerOccurrence` arg's string-literal value
-     * against ISO-8601 duration parsing. Only fires when the value is a string
-     * literal — variable references, expression args, and the default empty
-     * string are out of scope (the IR pass treats empty as "not specified").
-     */
-    context(@Suppress("unused") context: CheckerContext, reporter: DiagnosticReporter)
-    private fun validateEffortLiteral(call: FirFunctionCall, declaration: FirProperty) {
-        val literal = call.findStringLiteralArg("estimatedEffortPerOccurrence") ?: return
-        val value = literal.value as? String ?: return
-        if (value.isEmpty()) return
-        try {
-            Duration.parse(value)
-        } catch (_: DateTimeParseException) {
-            reportError(
-                literal.source ?: declaration.source ?: return,
-                "`estimatedEffortPerOccurrence` must be an ISO-8601 duration " +
-                    "(e.g. \"PT5M\", \"PT30S\"); got \"$value\".",
-            )
-        }
-    }
-
-    /**
-     * Looks up the named argument [paramName] on a resolved recipe call and
-     * returns its FirLiteralExpression if the user supplied a string literal.
-     * Returns null for variable references, function calls, missing args,
-     * non-string literals, or any other expression shape — those aren't
-     * statically checkable.
-     *
-     * Handles both pre-resolution shapes (FirNamedArgumentExpression wrappers
-     * still present) and post-resolution shapes (mapping in
-     * FirResolvedArgumentList, args reordered to parameter order).
-     */
-    private fun FirFunctionCall.findStringLiteralArg(paramName: String): FirLiteralExpression? {
-        val resolved = argumentList as? FirResolvedArgumentList
-        if (resolved != null) {
-            for ((argExpr, param) in resolved.mapping) {
-                if (param.name.asString() != paramName) continue
-                return argExpr.unwrapNamed().asStringLiteralOrNull()
-            }
-            return null
-        }
-        // Fallback for the unresolved shape — find a wrapper by source-side name.
-        for (arg in argumentList.arguments) {
-            if (arg is FirNamedArgumentExpression && arg.name.asString() == paramName) {
-                return arg.expression.asStringLiteralOrNull()
-            }
-        }
-        return null
-    }
-
-    private fun FirExpression.unwrapNamed(): FirExpression =
-        if (this is FirNamedArgumentExpression) expression else this
-
-    private fun FirExpression.asStringLiteralOrNull(): FirLiteralExpression? {
-        val lit = this as? FirLiteralExpression ?: return null
-        return if (lit.kind == ConstantValueKind.String) lit else null
     }
 
     /**

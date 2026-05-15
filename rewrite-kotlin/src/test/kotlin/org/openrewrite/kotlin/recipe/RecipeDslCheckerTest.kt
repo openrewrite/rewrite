@@ -138,37 +138,19 @@ class RecipeDslCheckerTest {
     }
 
     @Test
-    fun `invalid ISO-8601 effort literal fails compilation`() {
+    fun `Duration object for estimatedEffortPerOccurrence compiles cleanly`() {
+        // The parameter is `Duration? = null`; type checking happens at the
+        // Kotlin compiler level. There's no dedicated FIR diagnostic.
         val result = RecipePluginCompileFixture.compile(
             """
             import org.openrewrite.Recipe
             import org.openrewrite.recipe
-
-            val BadEffort: Recipe = recipe(
-                displayName = "BadEffort",
-                description = "Has malformed effort.",
-                estimatedEffortPerOccurrence = "not a duration",
-            ) { }
-            """.trimIndent()
-        )
-        assertEquals(KotlinCompilation.ExitCode.COMPILATION_ERROR, result.exitCode, result.messages)
-        assertTrue(
-            result.messages.contains("must be an ISO-8601 duration"),
-            "Expected an ISO-8601 effort error, got:\n${result.messages}",
-        )
-    }
-
-    @Test
-    fun `valid ISO-8601 effort literal compiles cleanly`() {
-        val result = RecipePluginCompileFixture.compile(
-            """
-            import org.openrewrite.Recipe
-            import org.openrewrite.recipe
+            import java.time.Duration
 
             val GoodEffort: Recipe = recipe(
                 displayName = "GoodEffort",
                 description = "Well-formed effort.",
-                estimatedEffortPerOccurrence = "PT15M",
+                estimatedEffortPerOccurrence = Duration.ofMinutes(15),
             ) { }
             """.trimIndent()
         )

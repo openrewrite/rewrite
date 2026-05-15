@@ -80,8 +80,6 @@ import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import java.time.Duration as JDuration
-import java.time.format.DateTimeParseException
 
 /**
  * IR-phase code generator for the recipe authoring DSL.
@@ -283,20 +281,6 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             ?.firstOrNull { it.name.asString() == "ctx" }
             ?.getter?.symbol
 
-        // `Duration.parse(CharSequence)` for materialising the
-        // estimatedEffortPerOccurrence ISO-8601 string into a runtime Duration.
-        val durationClassId = ClassId.topLevel(FqName("java.time.Duration"))
-        val durationClassSymbol: IrClassSymbol? = pluginContext.referenceClass(durationClassId)
-        val durationParseSymbol: IrSimpleFunctionSymbol? = durationClassSymbol
-            ?.owner?.declarations
-            ?.filterIsInstance<IrSimpleFunction>()
-            ?.firstOrNull { fn ->
-                fn.name.asString() == "parse" &&
-                    fn.dispatchReceiverParameter == null &&
-                    fn.valueParameters.size == 1
-            }
-            ?.symbol
-
         val recipeContext = RecipeIrGenContext(
             pluginContext = pluginContext,
             recipeClassSymbol = recipeClassSymbol,
@@ -320,8 +304,6 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             generateScopeAccGetterSymbol = generateScopeAccGetterSymbol,
             generateScopeCtxGetterSymbol = generateScopeCtxGetterSymbol,
             generate = generateFn,
-            durationClassSymbol = durationClassSymbol,
-            durationParseSymbol = durationParseSymbol,
         )
 
         for (file in moduleFragment.files) {
@@ -371,8 +353,6 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val generateScopeCtxGetterSymbol: IrSimpleFunctionSymbol?,
         /** `ScanningRecipe.generate(A, ExecutionContext): Collection<? extends SourceFile>`. */
         val generate: IrSimpleFunction?,
-        val durationClassSymbol: IrClassSymbol?,
-        val durationParseSymbol: IrSimpleFunctionSymbol?,
     )
 
     private fun processFile(file: IrFile, ctx: RecipeIrGenContext) {
@@ -465,16 +445,16 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val description: String,
         /** The user's `tags` IR expression, only set when it's not the default empty set. */
         val tagsArg: IrExpression?,
-        /** The ISO-8601 duration literal, only set when it's a non-empty constant. */
-        val estimatedEffortLiteral: String?,
+        /** The user's `estimatedEffortPerOccurrence` Duration expression, only set when the author supplied a non-null value. */
+        val estimatedEffortArg: IrExpression?,
     )
 
     /**
      * Extracts the constant `displayName` and `description` arguments plus the
-     * optional `tags` IR expression and `estimatedEffortPerOccurrence` literal
-     * from a `recipe(...)` call. Returns null if displayName/description are
-     * missing or non-constant — the IR pass simply leaves such calls alone, and
-     * the runtime stub error informs the author when it fires.
+     * optional `tags` IR expression and `estimatedEffortPerOccurrence` Duration
+     * expression from a `recipe(...)` call. Returns null if displayName/description
+     * are missing or non-constant — the IR pass simply leaves such calls alone,
+     * and the runtime stub error informs the author when it fires.
      */
     private fun readMetadata(call: IrCall): RecipeMetadata? {
         val callee = call.symbol.owner
@@ -489,11 +469,21 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val tagsArg = if (tagsIdx >= 0) substantiveArgOrNull(call.arguments[tagsIdx]) else null
 
         val effortIdx = params.indexOfFirst { it.name == Name.identifier("estimatedEffortPerOccurrence") }
-        val effortLiteral = if (effortIdx >= 0) {
-            ((call.arguments[effortIdx] as? IrConst)?.value as? String)?.takeIf { it.isNotEmpty() }
-        } else null
+        val effortArg = if (effortIdx >= 0) nonNullArgOrNull(call.arguments[effortIdx]) else null
 
-        return RecipeMetadata(displayName, description, tagsArg, effortLiteral)
+        return RecipeMetadata(displayName, description, tagsArg, effortArg)
+    }
+
+    /**
+     * Returns the argument expression iff the author supplied a non-null value.
+     * The default at the DSL surface is `null`; both the elided-argument case
+     * (slot is null in the IR call) and the explicit `null` literal collapse
+     * to "skip override and inherit the framework default".
+     */
+    private fun nonNullArgOrNull(arg: IrExpression?): IrExpression? {
+        if (arg == null) return null
+        if (arg is IrConst && arg.value == null) return null
+        return arg
     }
 
     /**
@@ -652,18 +642,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         if (metadata.tagsArg != null && ctx.getTags != null) {
             addTagsOverride(cls, ctx, ctx.getTags, metadata.tagsArg)
         }
-        if (metadata.estimatedEffortLiteral != null &&
-            ctx.getEstimatedEffort != null &&
-            ctx.durationParseSymbol != null
-        ) {
-            // Defense in depth. RecipeDslPropertyChecker rejects invalid ISO-8601
-            // literals at FIR time so this branch only stays reachable if the
-            // IR pass were ever run without the checker (both register from the
-            // same plugin entry point — not a configuration users hit today).
-            // Skipping the override on bad input keeps generated bytecode honest.
-            if (parsesAsIsoDuration(metadata.estimatedEffortLiteral)) {
-                addEstimatedEffortOverride(cls, ctx, ctx.getEstimatedEffort, metadata.estimatedEffortLiteral)
-            }
+        if (metadata.estimatedEffortArg != null && ctx.getEstimatedEffort != null) {
+            addEstimatedEffortOverride(cls, ctx, ctx.getEstimatedEffort, metadata.estimatedEffortArg)
         }
     }
 
@@ -725,12 +705,6 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         } else {
             "* $methodName(..)"
         }
-    }
-
-    private fun parsesAsIsoDuration(literal: String): Boolean = try {
-        JDuration.parse(literal); true
-    } catch (_: DateTimeParseException) {
-        false
     }
 
     private fun addStringOverride(
@@ -1784,9 +1758,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         cls: IrClass,
         ctx: RecipeIrGenContext,
         overrides: IrSimpleFunction,
-        literal: String,
+        effortArg: IrExpression,
     ) {
-        val parseSymbol = ctx.durationParseSymbol ?: return
         cls.addFunction(
             name = "getEstimatedEffortPerOccurrence",
             returnType = overrides.returnType,
@@ -1795,12 +1768,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         ).apply {
             overriddenSymbols = listOf(overrides.symbol)
             body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
-                val parseCall = irCall(
-                    callee = parseSymbol,
-                    type = parseSymbol.owner.returnType,
-                )
-                parseCall.arguments[0] = irString(literal)
-                +irReturn(parseCall)
+                // Deep-copy because the original lives inside the soon-to-be-replaced
+                // recipe() call; handing the same node to two owners breaks IR invariants.
+                +irReturn(effortArg.deepCopyWithSymbols(initialParent = this@apply))
             }
         }
     }
