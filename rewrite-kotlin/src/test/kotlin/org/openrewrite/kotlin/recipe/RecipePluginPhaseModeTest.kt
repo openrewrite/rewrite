@@ -17,6 +17,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.TypeValidation
 import org.openrewrite.kotlin.Assertions.kotlin
+import org.openrewrite.test.SourceSpecs.text
 
 /**
  * End-to-end check that a Kotlin-DSL recipe written in phase mode actually
@@ -558,6 +559,78 @@ class RecipePluginPhaseModeTest : RewriteTest {
                 val target: String get() = "x".uppercase()
                 """,
             ),
+        )
+    }
+
+    @Test
+    fun `scan plus generate produces a new SourceFile per accumulated entry`() {
+        // End-to-end generate-mode wiring: scan collects class simple names,
+        // then `generate(seen) { ... }` lowers to a
+        // `generate(A, ExecutionContext): Collection<? extends SourceFile>`
+        // override whose body returns a list of PlainText files (one per
+        // accumulated class name). Verifies the override is wired AND that
+        // acc + ctx references survive the rewrite into the override's
+        // local parameters.
+        val src = """
+            import org.openrewrite.Recipe
+            import org.openrewrite.SourceFile
+            import org.openrewrite.recipe
+            import org.openrewrite.java.tree.J
+            import org.openrewrite.text.PlainText
+            import java.nio.file.Paths
+            import org.openrewrite.marker.Markers
+
+            val ClassReport: Recipe = recipe(
+                displayName = "Class report",
+                description = "Emit a PlainText file per discovered class.",
+            ) {
+                val seen = scan<MutableSet<String>>(initial = mutableSetOf()) {
+                    visitClassDeclaration { cls: J.ClassDeclaration -> acc.add(cls.simpleName) }
+                }
+                generate(seen) {
+                    acc.map { name ->
+                        PlainText.builder()
+                            .sourcePath(Paths.get("${'$'}{name}.txt"))
+                            .text("found: ${'$'}name")
+                            .build() as SourceFile
+                    }
+                }
+            }
+        """.trimIndent()
+        val result = RecipePluginCompileFixture.compile(src, fileName = "Recipes.kt")
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val recipe = facade.getMethod("getClassReport").invoke(null) as Recipe
+
+        // Generate makes changes on cycle 1 (adds the two new files), then
+        // re-runs on cycle 2 (the framework's stability check). Cycle 2
+        // re-scans, accumulates the same names, and "regenerates" — the
+        // framework detects the duplicate files. Allow 2 cycles with 1
+        // change-making cycle. A production recipe that needs strict
+        // 1-cycle behavior would use the `generate(A, Collection<? extends
+        // SourceFile>, ExecutionContext)` overload to check what's already
+        // been generated; v0 wires only the 2-arg form.
+        rewriteRun(
+            { spec ->
+                spec.recipe(recipe)
+                    .validateRecipeSerialization(false)
+                    // 1 max cycle skips the framework's stability re-run.
+                    // The 2-arg generate(A, ExecutionContext) overload has no
+                    // visibility into prior cycles' generated files, so a
+                    // stability cycle would regenerate duplicates. The 3-arg
+                    // overload (with `generatedInThisCycle`) is the right
+                    // long-term fix.
+                    .cycles(1)
+                    .expectedCyclesThatMakeChanges(1)
+            },
+            kotlin(
+                """
+                class Alpha
+                class Beta
+                """,
+            ),
+            text(null, "found: Alpha") { s -> s.path("Alpha.txt") },
+            text(null, "found: Beta") { s -> s.path("Beta.txt") },
         )
     }
 

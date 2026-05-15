@@ -97,7 +97,20 @@ public class RecipeBuilder internal constructor() {
     public fun <A : Any> scan(initial: A, block: ScanScope<A>.() -> Unit): ScanRef<A> = ScanRef()
     public fun edit(block: EditScope.() -> Unit): Unit = Unit
     public fun <A : Any> edit(scan: ScanRef<A>, block: EditScopeWithAcc<A>.() -> Unit): Unit = Unit
-    public fun <A : Any> generate(scan: ScanRef<A>, block: GenerateScope<A>.() -> Unit): Unit = Unit
+
+    /**
+     * Phase-mode file generation. The block runs once after scanning is
+     * complete and returns the new source files to add to the working
+     * source set. Inside the lambda, `acc` exposes the scan accumulator and
+     * `ctx` the active [ExecutionContext][org.openrewrite.ExecutionContext].
+     *
+     * Returning an empty collection is a no-op — the recipe still passes
+     * through the framework's generate phase, just adding nothing.
+     */
+    public fun <A : Any> generate(
+        scan: ScanRef<A>,
+        block: GenerateScope<A>.() -> kotlin.collections.Collection<org.openrewrite.SourceFile>,
+    ): Unit = Unit
 }
 
 @RecipeDslMarker public class RewriteAdvice1<P, R> internal constructor() {
@@ -204,4 +217,6 @@ public class ScanRef<A> internal constructor()
 
 @RecipeDslMarker public class GenerateScope<A> internal constructor() {
     public val acc: A get() = error("Stub — the compiler plugin processes the body; runtime is never invoked.")
+    public val ctx: org.openrewrite.ExecutionContext
+        get() = error("Stub — the compiler plugin processes the body; runtime is never invoked.")
 }

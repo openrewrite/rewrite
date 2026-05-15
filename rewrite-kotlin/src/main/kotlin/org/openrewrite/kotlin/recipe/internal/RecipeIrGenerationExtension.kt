@@ -237,6 +237,13 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val getVisitorAccFn = scanningRecipeMembers.firstOrNull {
             it.name.asString() == "getVisitor" && it.valueParameters.size == 1
         }
+        // `generate(A acc, ExecutionContext ctx): Collection<? extends SourceFile>`
+        // — the two-arg overload. ScanningRecipe also has a three-arg variant
+        // (with the per-cycle generated set); we override the simpler form for
+        // v0 since recipes that need cross-cycle awareness can compose later.
+        val generateFn = scanningRecipeMembers.firstOrNull {
+            it.name.asString() == "generate" && it.valueParameters.size == 2
+        }
 
         // `ExecutionContext` for the getInitialValue(ctx) parameter type.
         val executionContextClassId = ClassId.topLevel(FqName("org.openrewrite.ExecutionContext"))
@@ -259,6 +266,21 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             .referenceClass(editScopeWithAccClassId)?.owner?.declarations
             ?.filterIsInstance<IrProperty>()
             ?.firstOrNull { it.name.asString() == "acc" }
+            ?.getter?.symbol
+        // GenerateScope<A> exposes `acc` AND `ctx` — both getters need
+        // rewriting against the override method's local parameters when the
+        // lambda body is hoisted.
+        val generateScopeClassId = ClassId.topLevel(FqName("org.openrewrite.GenerateScope"))
+        val generateScopeClass = pluginContext.referenceClass(generateScopeClassId)
+        val generateScopeAccGetterSymbol: IrSimpleFunctionSymbol? = generateScopeClass
+            ?.owner?.declarations
+            ?.filterIsInstance<IrProperty>()
+            ?.firstOrNull { it.name.asString() == "acc" }
+            ?.getter?.symbol
+        val generateScopeCtxGetterSymbol: IrSimpleFunctionSymbol? = generateScopeClass
+            ?.owner?.declarations
+            ?.filterIsInstance<IrProperty>()
+            ?.firstOrNull { it.name.asString() == "ctx" }
             ?.getter?.symbol
 
         // `Duration.parse(CharSequence)` for materialising the
@@ -295,6 +317,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             executionContextClassSymbol = executionContextClassSymbol,
             scanScopeAccGetterSymbol = scanScopeAccGetterSymbol,
             editScopeWithAccGetterSymbol = editScopeWithAccGetterSymbol,
+            generateScopeAccGetterSymbol = generateScopeAccGetterSymbol,
+            generateScopeCtxGetterSymbol = generateScopeCtxGetterSymbol,
+            generate = generateFn,
             durationClassSymbol = durationClassSymbol,
             durationParseSymbol = durationParseSymbol,
         )
@@ -337,6 +362,15 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val executionContextClassSymbol: IrClassSymbol?,
         val scanScopeAccGetterSymbol: IrSimpleFunctionSymbol?,
         val editScopeWithAccGetterSymbol: IrSimpleFunctionSymbol?,
+        /**
+         * GenerateScope<A>.acc / .ctx getter symbols — references to either
+         * inside a hoisted generate lambda body get rewritten to read the
+         * override method's `acc` / `ctx` parameters.
+         */
+        val generateScopeAccGetterSymbol: IrSimpleFunctionSymbol?,
+        val generateScopeCtxGetterSymbol: IrSimpleFunctionSymbol?,
+        /** `ScanningRecipe.generate(A, ExecutionContext): Collection<? extends SourceFile>`. */
+        val generate: IrSimpleFunction?,
         val durationClassSymbol: IrClassSymbol?,
         val durationParseSymbol: IrSimpleFunctionSymbol?,
     )
@@ -519,6 +553,13 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             val initialExpr: IrExpression,
             val scanBlock: IrFunctionExpression,
             val editBlock: IrFunctionExpression?,
+            /**
+             * `generate(scanRef) { ... }` lambda — when present, generates a
+             * `generate(A, ExecutionContext): Collection<? extends SourceFile>`
+             * override whose body is the lambda inlined with acc + ctx refs
+             * rewritten to the override parameters.
+             */
+            val generateBlock: IrFunctionExpression?,
         ) : VisitorLowering()
     }
 
@@ -1281,8 +1322,12 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         if (blockIdx < 0) return null
         val blockArg = recipeCall.arguments[blockIdx] as? IrFunctionExpression ?: return null
         val recipeStmts = (blockArg.function.body as? IrBlockBody)?.statements ?: return null
-        // Two-statement form: val seen = scan(...) { ... } ; edit(seen) { ... }.
-        if (recipeStmts.size != 2) return null
+        // Recognised shapes:
+        //   2 stmts: `val seen = scan(...) { ... }` then either
+        //            `edit(seen) { ... }` OR `generate(seen) { ... }`.
+        //   3 stmts: `val seen = scan(...) { ... }`, `edit(seen) { ... }`,
+        //            `generate(seen) { ... }` (edit must precede generate).
+        if (recipeStmts.size !in 2..3) return null
 
         val scanVar = recipeStmts[0] as? IrVariable ?: return null
         val scanCall = scanVar.initializer as? IrCall ?: return null
@@ -1296,27 +1341,56 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             scopePrefix = SCAN_SCOPE_PREFIX,
         ) ?: return null
 
-        val editStmt = recipeStmts[1]
-        val editCall = (editStmt as? IrReturn)?.value as? IrCall
-            ?: editStmt as? IrCall
-            ?: return null
-        if (editCall.symbol.owner.kotlinFqName.asString() != "org.openrewrite.RecipeBuilder.edit") return null
-        // `edit(scanRef, block)` — the two-arg form. The single-arg form is
-        // handled by extractStatelessEditLambda and doesn't pair with scan.
-        if (editCall.valueArgumentsCount != 2) return null
-        val scanRefArg = editCall.getValueArgument(0) as? IrGetValue ?: return null
-        if (scanRefArg.symbol != scanVar.symbol) return null
-        val editBlock = editCall.getValueArgument(1) as? IrFunctionExpression ?: return null
-        validateBlockHasExactlyOneVisitCall(
-            block = editBlock,
-            scopePrefix = EDIT_SCOPE_WITH_ACC_PREFIX,
-        ) ?: return null
+        // Walk the trailing statements collecting edit and/or generate blocks.
+        // Each call type appears at most once; order matters only for the
+        // 3-stmt shape (edit before generate).
+        var editBlock: IrFunctionExpression? = null
+        var generateBlock: IrFunctionExpression? = null
+        for (i in 1 until recipeStmts.size) {
+            val stmt = recipeStmts[i]
+            val call = (stmt as? IrReturn)?.value as? IrCall
+                ?: stmt as? IrCall
+                ?: return null
+            val fqn = call.symbol.owner.kotlinFqName.asString()
+            when (fqn) {
+                "org.openrewrite.RecipeBuilder.edit" -> {
+                    if (editBlock != null) return null
+                    if (call.valueArgumentsCount != 2) return null
+                    val scanRefArg = call.getValueArgument(0) as? IrGetValue ?: return null
+                    if (scanRefArg.symbol != scanVar.symbol) return null
+                    val block = call.getValueArgument(1) as? IrFunctionExpression ?: return null
+                    validateBlockHasExactlyOneVisitCall(
+                        block = block,
+                        scopePrefix = EDIT_SCOPE_WITH_ACC_PREFIX,
+                    ) ?: return null
+                    editBlock = block
+                }
+                "org.openrewrite.RecipeBuilder.generate" -> {
+                    if (generateBlock != null) return null
+                    if (call.valueArgumentsCount != 2) return null
+                    val scanRefArg = call.getValueArgument(0) as? IrGetValue ?: return null
+                    if (scanRefArg.symbol != scanVar.symbol) return null
+                    // The generate block has no required `visit*` shape — its
+                    // body is plain Kotlin returning Collection<SourceFile>, so
+                    // we accept any well-formed function expression and let
+                    // the override emission do parent/symbol fix-up via the
+                    // same deep-copy machinery as scan/edit.
+                    generateBlock = call.getValueArgument(1) as? IrFunctionExpression ?: return null
+                }
+                else -> return null
+            }
+        }
+        // Phase mode requires at least one consumer of the scan handle —
+        // otherwise the accumulator is computed and discarded. A future
+        // bare-scan mode (with DataTable side effects) would relax this.
+        if (editBlock == null && generateBlock == null) return null
 
         return VisitorLowering.PhaseScanEdit(
             accType = accType,
             initialExpr = initialExpr,
             scanBlock = scanBlock,
             editBlock = editBlock,
+            generateBlock = generateBlock,
         )
     }
 
@@ -1360,8 +1434,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             jvmName = "getScanner",
         )
         // No edit phase = leave the framework's default getVisitor(acc) which
-        // is `TreeVisitor.noop()`. PhaseScanEdit currently always carries an
-        // edit block; the null branch is there for the future scan-only path.
+        // is `TreeVisitor.noop()`. PhaseScanEdit carries at least one consumer
+        // (edit and/or generate) by construction — the extractor returns null
+        // when both are absent.
         val editBlock = lowering.editBlock
         if (editBlock != null) {
             addPhaseVisitorOverride(
@@ -1374,6 +1449,21 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 scopePrefix = EDIT_SCOPE_WITH_ACC_PREFIX,
                 accGetterToRewrite = ctx.editScopeWithAccGetterSymbol,
                 jvmName = "getVisitor",
+            )
+        }
+        // generate phase: synthesize a
+        // `generate(A, ExecutionContext): Collection<? extends SourceFile>`
+        // override whose body is the user's lambda inlined, with acc + ctx
+        // references rewritten to the override parameters.
+        val generateBlock = lowering.generateBlock
+        val generateFn = ctx.generate
+        if (generateBlock != null && generateFn != null) {
+            addGenerateOverride(
+                cls = cls,
+                ctx = ctx,
+                overrides = generateFn,
+                lowering = lowering,
+                block = generateBlock,
             )
         }
     }
@@ -1458,6 +1548,76 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 )
                 factoryCall.arguments[0] = expansion.visitLambda
                 +irReturn(factoryCall)
+            }
+        }
+    }
+
+    /**
+     * Emits the `generate(A acc, ExecutionContext ctx): Collection<? extends SourceFile>`
+     * override. The user's lambda is the whole body — deep-copy it, splice its
+     * statements into the new function (its trailing expression becomes the
+     * `return`, mirroring how Kotlin lowers a single-expression lambda body),
+     * and rewrite `GenerateScope.acc` / `GenerateScope.ctx` getter calls
+     * against the override's local parameters.
+     *
+     * Unlike scan/edit, there is no runtime helper to wrap the lambda — the
+     * override body IS the lambda body. ScanningRecipe's generate(...) is
+     * abstract-but-with-default; overriding it lets the recipe contribute
+     * new source files.
+     */
+    private fun addGenerateOverride(
+        cls: IrClass,
+        ctx: RecipeIrGenContext,
+        overrides: IrSimpleFunction,
+        lowering: VisitorLowering.PhaseScanEdit,
+        block: IrFunctionExpression,
+    ) {
+        val ecCls = ctx.executionContextClassSymbol ?: return
+        cls.addFunction(
+            name = "generate",
+            returnType = overrides.returnType,
+            modality = Modality.OPEN,
+            visibility = DescriptorVisibilities.PUBLIC,
+        ).apply {
+            overriddenSymbols = listOf(overrides.symbol)
+            val accParam = addValueParameter("acc", lowering.accType)
+            val ctxParam = addValueParameter("ctx", ecCls.defaultType)
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                val copiedBlock = block.deepCopyWithSymbols(initialParent = this@apply)
+                val stmts = (copiedBlock.function.body as IrBlockBody).statements
+                // Rewrite GenerateScope.acc / .ctx getter calls and reparent
+                // declarations onto the override before we splice in the
+                // hoisted statements. The lambda's trailing expression
+                // becomes the return — Kotlin compiles a Collection-returning
+                // lambda's body so the final stmt is either an IrReturn or a
+                // bare IrExpression.
+                rewriteAccReferencesIn(copiedBlock, accParam, ctx.generateScopeAccGetterSymbol)
+                rewriteAccReferencesIn(copiedBlock, ctxParam, ctx.generateScopeCtxGetterSymbol)
+                for (stmt in stmts) {
+                    if (stmt is IrVariable) stmt.parent = this@apply
+                }
+                val n = stmts.size
+                if (n == 0) {
+                    // Empty body — emit a return of `emptyList()`. Without
+                    // some return path the JVM verifier rejects the method,
+                    // so we'd need a runtime emptyList symbol. For v0,
+                    // require at least one return-bearing statement; if
+                    // somehow we got here, fall back to the parent default
+                    // by skipping the override entirely.
+                    return@irBlockBody
+                }
+                // All but the last statement are aux. The last is the
+                // expression yielding the Collection<SourceFile>; wrap it
+                // (or unwrap+rewrap if it's already an IrReturn) so the
+                // override body returns it.
+                for (i in 0 until n - 1) +stmts[i]
+                val tail = stmts[n - 1]
+                val tailExpr: IrExpression = when (tail) {
+                    is IrReturn -> tail.value
+                    is IrExpression -> tail
+                    else -> return@irBlockBody
+                }
+                +irReturn(tailExpr)
             }
         }
     }
