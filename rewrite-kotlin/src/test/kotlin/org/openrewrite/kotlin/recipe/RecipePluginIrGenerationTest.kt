@@ -117,28 +117,6 @@ class RecipePluginIrGenerationTest {
     }
 
     @Test
-    fun `invalid ISO-8601 effort literal silently inherits Recipe default`() {
-        // We compile-time-validate the literal but don't yet fail the build —
-        // a future FIR checker will turn this into a user-visible error. For
-        // now, an unparseable literal just means "no override", so the runtime
-        // value is Recipe's 5-minute default.
-        val recipe = compileAndLoad(
-            propertyName = "BadEffort",
-            source = """
-            import org.openrewrite.Recipe
-            import org.openrewrite.recipe
-
-            val BadEffort: Recipe = recipe(
-                displayName = "BadEffort",
-                description = "Has malformed effort.",
-                estimatedEffortPerOccurrence = "not a duration",
-            ) { }
-            """.trimIndent(),
-        )
-        assertEquals(Duration.ofMinutes(5), recipe.estimatedEffortPerOccurrence)
-    }
-
-    @Test
     fun `explicit empty tags via setOf() still inherits the framework default`() {
         // Recipe's `final Set<String> tags = emptySet()` field can't be reassigned,
         // so we want to ensure we don't emit a useless override when the user

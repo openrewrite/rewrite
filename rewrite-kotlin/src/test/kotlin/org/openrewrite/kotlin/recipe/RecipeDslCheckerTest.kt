@@ -138,6 +138,44 @@ class RecipeDslCheckerTest {
     }
 
     @Test
+    fun `invalid ISO-8601 effort literal fails compilation`() {
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val BadEffort: Recipe = recipe(
+                displayName = "BadEffort",
+                description = "Has malformed effort.",
+                estimatedEffortPerOccurrence = "not a duration",
+            ) { }
+            """.trimIndent()
+        )
+        assertEquals(KotlinCompilation.ExitCode.COMPILATION_ERROR, result.exitCode, result.messages)
+        assertTrue(
+            result.messages.contains("must be an ISO-8601 duration"),
+            "Expected an ISO-8601 effort error, got:\n${result.messages}",
+        )
+    }
+
+    @Test
+    fun `valid ISO-8601 effort literal compiles cleanly`() {
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val GoodEffort: Recipe = recipe(
+                displayName = "GoodEffort",
+                description = "Well-formed effort.",
+                estimatedEffortPerOccurrence = "PT15M",
+            ) { }
+            """.trimIndent()
+        )
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+    }
+
+    @Test
     fun `edit without scan in phase mode compiles cleanly`() {
         // Stateless edit is allowed — the precedence rule only fires when both
         // scan and edit/generate are present in the same block.
