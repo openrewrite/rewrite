@@ -111,6 +111,22 @@ public class AnnotationTest implements RewriteTest {
     }
     
     @Test
+    void annotationWithArrayArgumentMultiline() {
+        rewriteRun(
+            scala(
+                """
+                @SuppressWarnings(
+                  Array(
+                    "a", "b"
+                  )
+                )
+                val x = 1
+                """
+            )
+        );
+    }
+
+    @Test
     void annotationOnParameter() {
         rewriteRun(
             scala(

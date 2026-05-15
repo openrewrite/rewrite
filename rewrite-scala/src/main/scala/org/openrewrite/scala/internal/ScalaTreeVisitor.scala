@@ -582,7 +582,10 @@ class ScalaTreeVisitor(
           }
           updateCursor(arg.span.end)
           expr
-        }
+        },
+        Space.EMPTY,
+        Markers.EMPTY,
+        ")"
       )
     }
     
