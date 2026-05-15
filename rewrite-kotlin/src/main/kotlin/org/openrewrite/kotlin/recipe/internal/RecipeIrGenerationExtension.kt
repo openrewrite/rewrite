@@ -111,7 +111,40 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
     private companion object {
         val RECIPE_FQN: FqName = FqName("org.openrewrite.recipe")
+
+        /**
+         * Per-scope FQN prefixes used to recognise `visitX { ... }` calls
+         * inside scan/edit blocks. The visit-method's simple name is recovered
+         * by stripping the prefix and matched against [VISIT_NAMES].
+         */
+        const val SCAN_SCOPE_PREFIX = "org.openrewrite.ScanScope."
+        const val EDIT_SCOPE_PREFIX = "org.openrewrite.EditScope."
+        const val EDIT_SCOPE_WITH_ACC_PREFIX = "org.openrewrite.EditScopeWithAcc."
+
+        /**
+         * Each entry maps a DSL visit method name to the two runtime helpers
+         * (edit phase and scan phase) in [GeneratedRecipeSupport] that wrap a
+         * user lambda into a TreeVisitor for that node kind. Adding a new
+         * primitive is one row here + four declarations (DSL stubs on the
+         * three scopes + helper functions in Java) and the IR pass picks it
+         * up automatically.
+         */
+        val VISIT_PRIMITIVES: List<VisitPrimitive> = listOf(
+            VisitPrimitive("visitMethodInvocation", "methodInvocationEditVisitor", "methodInvocationScanVisitor"),
+            VisitPrimitive("visitClassDeclaration", "classDeclarationEditVisitor", "classDeclarationScanVisitor"),
+            VisitPrimitive("visitMethodDeclaration", "methodDeclarationEditVisitor", "methodDeclarationScanVisitor"),
+            VisitPrimitive("visitVariableDeclarations", "variableDeclarationsEditVisitor", "variableDeclarationsScanVisitor"),
+            VisitPrimitive("visitImport", "importEditVisitor", "importScanVisitor"),
+        )
+
+        val VISIT_NAMES: Set<String> = VISIT_PRIMITIVES.map { it.visitMethodName }.toSet()
     }
+
+    private data class VisitPrimitive(
+        val visitMethodName: String,
+        val editHelperName: String,
+        val scanHelperName: String,
+    )
 
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
         val recipeClassId = ClassId.topLevel(FqName("org.openrewrite.Recipe"))
@@ -157,34 +190,27 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             }
             ?.symbol
 
-        // `GeneratedRecipeSupport.methodInvocationEditVisitor(Function1<J.MethodInvocation, J.MethodInvocation>)`
-        // is the lowering target for stateless phase-mode bodies of the shape
-        // `edit { visitMethodInvocation { call -> ... } }`. Same fall-through
-        // contract: if missing, recipes still compile but inherit the default
-        // no-op visitor.
-        val methodInvocationEditVisitorSymbol: IrSimpleFunctionSymbol? = supportClassSymbol
+        // For each visit primitive (visitMethodInvocation, visitClassDeclaration,
+        // ...), look up the runtime helper symbols in GeneratedRecipeSupport for
+        // both phases. Maps are keyed by visit-method-name (e.g.
+        // "visitMethodInvocation") so the IR pass can route a recognised
+        // `visit*` call straight to its helper. Same fall-through contract as
+        // before: missing symbols just leave the recipe with a no-op visitor.
+        val supportFns = supportClassSymbol
             ?.owner?.declarations
             ?.filterIsInstance<IrSimpleFunction>()
-            ?.firstOrNull { fn ->
-                fn.name.asString() == "methodInvocationEditVisitor" &&
-                    fn.dispatchReceiverParameter == null &&
-                    fn.valueParameters.size == 1
-            }
-            ?.symbol
-
-        // `GeneratedRecipeSupport.methodInvocationScanVisitor(Function1<J.MethodInvocation, Unit>)`
-        // is the lowering target for `scan(...) { visitMethodInvocation { ... } }`.
-        // The lambda mutates the accumulator (captured from the enclosing
-        // getScanner(acc)'s parameter); the tree is never transformed.
-        val methodInvocationScanVisitorSymbol: IrSimpleFunctionSymbol? = supportClassSymbol
-            ?.owner?.declarations
-            ?.filterIsInstance<IrSimpleFunction>()
-            ?.firstOrNull { fn ->
-                fn.name.asString() == "methodInvocationScanVisitor" &&
-                    fn.dispatchReceiverParameter == null &&
-                    fn.valueParameters.size == 1
-            }
-            ?.symbol
+            ?.filter { it.dispatchReceiverParameter == null && it.valueParameters.size == 1 }
+            .orEmpty()
+        val editVisitorHelpers: Map<String, IrSimpleFunctionSymbol> = VISIT_PRIMITIVES
+            .mapNotNull { p ->
+                supportFns.firstOrNull { it.name.asString() == p.editHelperName }
+                    ?.symbol?.let { p.visitMethodName to it }
+            }.toMap()
+        val scanVisitorHelpers: Map<String, IrSimpleFunctionSymbol> = VISIT_PRIMITIVES
+            .mapNotNull { p ->
+                supportFns.firstOrNull { it.name.asString() == p.scanHelperName }
+                    ?.symbol?.let { p.visitMethodName to it }
+            }.toMap()
 
         // `ScanningRecipe<T>` is the superclass when the recipe body uses
         // scan/edit phase mode. As with Recipe we need: the class symbol (for
@@ -258,8 +284,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             getEstimatedEffort = recipeGetEstimatedEffort,
             getVisitor = recipeGetVisitor,
             methodInvocationRewriteSymbol = methodInvocationRewriteSymbol,
-            methodInvocationEditVisitorSymbol = methodInvocationEditVisitorSymbol,
-            methodInvocationScanVisitorSymbol = methodInvocationScanVisitorSymbol,
+            editVisitorHelpers = editVisitorHelpers,
+            scanVisitorHelpers = scanVisitorHelpers,
             scanningRecipeClassSymbol = scanningRecipeClassSymbol,
             scanningRecipeNoArgCtorSymbol = scanningRecipeNoArgCtor,
             getInitialValue = getInitialValueFn,
@@ -291,8 +317,17 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val getEstimatedEffort: IrSimpleFunction?,
         val getVisitor: IrSimpleFunction?,
         val methodInvocationRewriteSymbol: IrSimpleFunctionSymbol?,
-        val methodInvocationEditVisitorSymbol: IrSimpleFunctionSymbol?,
-        val methodInvocationScanVisitorSymbol: IrSimpleFunctionSymbol?,
+        /**
+         * Visit-method-name (e.g. "visitMethodInvocation") → runtime helper
+         * symbol in `GeneratedRecipeSupport` for the edit phase. Used by both
+         * `EditScope` (stateless) and `EditScopeWithAcc` (acc-threaded), which
+         * share the same per-kind helper because the lambda's signature is
+         * identical and acc capture happens via Kotlin closure lowering, not
+         * via the helper.
+         */
+        val editVisitorHelpers: Map<String, IrSimpleFunctionSymbol>,
+        /** Same idea, for the scan phase (lambda returns Unit). */
+        val scanVisitorHelpers: Map<String, IrSimpleFunctionSymbol>,
         val scanningRecipeClassSymbol: IrClassSymbol?,
         val scanningRecipeNoArgCtorSymbol: IrConstructorSymbol?,
         val getInitialValue: IrSimpleFunction?,
@@ -552,12 +587,11 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 }
             }
             is VisitorLowering.PhaseStatelessEdit -> {
-                if (ctx.getVisitor != null && ctx.methodInvocationEditVisitorSymbol != null) {
+                if (ctx.getVisitor != null) {
                     addPhaseEditGetVisitorOverride(
                         cls = cls,
                         ctx = ctx,
                         overrides = ctx.getVisitor,
-                        factorySymbol = ctx.methodInvocationEditVisitorSymbol,
                         editBlock = visitorLowering.editBlock,
                     )
                 }
@@ -1068,49 +1102,57 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // copy + re-partition at emit time relies on this gate having passed.
         validateBlockHasExactlyOneVisitCall(
             block = editBlockArg,
-            expectedVisitFqn = "org.openrewrite.EditScope.visitMethodInvocation",
+            scopePrefix = EDIT_SCOPE_PREFIX,
         ) ?: return null
         return VisitorLowering.PhaseStatelessEdit(editBlock = editBlockArg)
     }
 
     /**
      * Splits a scan/edit block body into (auxiliary statements, the single
-     * `visit*` call's lambda argument). The block must contain exactly one
-     * call matching [expectedVisitFqn]; everything else is treated as aux and
-     * gets hoisted into the generated override body so the visit lambda
-     * captures it via closure.
+     * `visit*` call's lambda argument, the matched visit method's simple
+     * name). The block must contain exactly one call whose FQN starts with
+     * [scopePrefix] and whose simple-name suffix is in [VISIT_NAMES];
+     * non-visit statements are aux and get hoisted into the override body so
+     * the visit lambda captures them via closure.
      *
      * Returns null if zero or multiple recognised visit calls are present.
-     * Multi-primitive support (e.g. mixing `visitMethodInvocation` with a
-     * future `visitClassDeclaration`) is a separate runway item — that path
-     * needs a richer runtime helper signature, so for now we keep the
-     * structural gate at "single visit anchor".
+     * Multi-primitive support (mixing two different `visit*` calls in one
+     * block) is a separate runway item — that path needs a richer runtime
+     * helper signature, so for now we keep the structural gate at "single
+     * visit anchor".
      */
     private class BlockPartition(
         val auxStatements: List<IrStatement>,
         val visitLambda: IrFunctionExpression,
+        val visitMethodName: String,
     )
 
     private fun partitionVisitCall(
         stmts: List<IrStatement>,
-        expectedVisitFqn: String,
+        scopePrefix: String,
     ): BlockPartition? {
         var visitIdx = -1
         var visitLambda: IrFunctionExpression? = null
+        var visitName: String? = null
         for ((i, stmt) in stmts.withIndex()) {
             val call = (stmt as? IrReturn)?.value as? IrCall
                 ?: stmt as? IrCall
                 ?: continue
-            if (call.symbol.owner.kotlinFqName.asString() != expectedVisitFqn) continue
+            val fqn = call.symbol.owner.kotlinFqName.asString()
+            if (!fqn.startsWith(scopePrefix)) continue
+            val name = fqn.removePrefix(scopePrefix)
+            if (name !in VISIT_NAMES) continue
             if (visitIdx >= 0) return null // more than one visit anchor
             if (call.valueArgumentsCount != 1) return null
             val lambda = call.getValueArgument(0) as? IrFunctionExpression ?: return null
             visitIdx = i
             visitLambda = lambda
+            visitName = name
         }
         val lambda = visitLambda ?: return null
+        val name = visitName ?: return null
         val aux = stmts.filterIndexed { i, _ -> i != visitIdx }
-        return BlockPartition(auxStatements = aux, visitLambda = lambda)
+        return BlockPartition(auxStatements = aux, visitLambda = lambda, visitMethodName = name)
     }
 
     /**
@@ -1122,10 +1164,10 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
      */
     private fun validateBlockHasExactlyOneVisitCall(
         block: IrFunctionExpression,
-        expectedVisitFqn: String,
+        scopePrefix: String,
     ): Unit? {
         val stmts = (block.function.body as? IrBlockBody)?.statements ?: return null
-        partitionVisitCall(stmts, expectedVisitFqn) ?: return null
+        partitionVisitCall(stmts, scopePrefix) ?: return null
         return Unit
     }
 
@@ -1164,7 +1206,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val accType: IrType = scanCall.typeArguments.firstOrNull() ?: return null
         validateBlockHasExactlyOneVisitCall(
             block = scanBlock,
-            expectedVisitFqn = "org.openrewrite.ScanScope.visitMethodInvocation",
+            scopePrefix = SCAN_SCOPE_PREFIX,
         ) ?: return null
 
         val editStmt = recipeStmts[1]
@@ -1180,7 +1222,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val editBlock = editCall.getValueArgument(1) as? IrFunctionExpression ?: return null
         validateBlockHasExactlyOneVisitCall(
             block = editBlock,
-            expectedVisitFqn = "org.openrewrite.EditScopeWithAcc.visitMethodInvocation",
+            scopePrefix = EDIT_SCOPE_WITH_ACC_PREFIX,
         ) ?: return null
 
         return VisitorLowering.PhaseScanEdit(
@@ -1212,23 +1254,21 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val getScannerFn = ctx.getScanner
         val getVisitorAccFn = ctx.getVisitorAcc
         val ecCls = ctx.executionContextClassSymbol
-        val scanHelper = ctx.methodInvocationScanVisitorSymbol
-        val editHelper = ctx.methodInvocationEditVisitorSymbol
         // ScanningRecipe must be fully resolved for the lowering to be valid.
         // The class shell still got built (extending Recipe in fallback) so
         // skipping overrides keeps the recipe loadable; it just won't transform.
         if (getInitialValueFn == null || getScannerFn == null || getVisitorAccFn == null) return
-        if (ecCls == null || scanHelper == null || editHelper == null) return
+        if (ecCls == null) return
 
         addGetInitialValueOverride(cls, ctx, getInitialValueFn, ecCls, lowering)
         addPhaseVisitorOverride(
             cls = cls,
             ctx = ctx,
             overrides = getScannerFn,
-            helperSymbol = scanHelper,
+            helpersByVisitName = ctx.scanVisitorHelpers,
             lowering = lowering,
             block = lowering.scanBlock,
-            expectedVisitFqn = "org.openrewrite.ScanScope.visitMethodInvocation",
+            scopePrefix = SCAN_SCOPE_PREFIX,
             accGetterToRewrite = ctx.scanScopeAccGetterSymbol,
             jvmName = "getScanner",
         )
@@ -1241,10 +1281,10 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 cls = cls,
                 ctx = ctx,
                 overrides = getVisitorAccFn,
-                helperSymbol = editHelper,
+                helpersByVisitName = ctx.editVisitorHelpers,
                 lowering = lowering,
                 block = editBlock,
-                expectedVisitFqn = "org.openrewrite.EditScopeWithAcc.visitMethodInvocation",
+                scopePrefix = EDIT_SCOPE_WITH_ACC_PREFIX,
                 accGetterToRewrite = ctx.editScopeWithAccGetterSymbol,
                 jvmName = "getVisitor",
             )
@@ -1284,19 +1324,26 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         cls: IrClass,
         ctx: RecipeIrGenContext,
         overrides: IrSimpleFunction,
-        helperSymbol: IrSimpleFunctionSymbol,
+        helpersByVisitName: Map<String, IrSimpleFunctionSymbol>,
         lowering: VisitorLowering.PhaseScanEdit,
         block: IrFunctionExpression,
-        expectedVisitFqn: String,
+        scopePrefix: String,
         accGetterToRewrite: IrSimpleFunctionSymbol?,
         jvmName: String,
     ) {
-        // The override's return type is `TreeVisitor<?, ExecutionContext>` —
-        // the helper's return type already matches that shape, so we reuse it
-        // instead of substituting T → accType in the parent's signature.
+        // Override return type follows the helper's return type
+        // (`TreeVisitor<?, ExecutionContext>`). We need to expand the block
+        // before we can pick the helper (its visit-method-name comes from
+        // the partition), so build the override body and look up the helper
+        // inside; if no matching helper resolves, abort and leave the parent
+        // class's default override.
+        // Pick any helper to determine the return type — they all return
+        // `TreeVisitor<?, ExecutionContext>`. If the map is empty there's
+        // nothing we can do anyway.
+        val sampleHelper = helpersByVisitName.values.firstOrNull() ?: return
         cls.addFunction(
             name = jvmName,
-            returnType = helperSymbol.owner.returnType,
+            returnType = sampleHelper.owner.returnType,
             modality = Modality.OPEN,
             visibility = DescriptorVisibilities.PUBLIC,
         ).apply {
@@ -1305,9 +1352,11 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
                 val expansion = expandBlockIntoOverride(
                     block = block,
-                    expectedVisitFqn = expectedVisitFqn,
+                    scopePrefix = scopePrefix,
                     overrideFunction = this@apply,
                 )
+                val helperSymbol = helpersByVisitName[expansion.visitMethodName]
+                    ?: return@irBlockBody
                 // Acc rewriting covers both aux statements and the visit
                 // lambda — aux may reference the scope's `acc` (e.g.
                 // `val n = acc.size`) just as freely as the visit body.
@@ -1375,7 +1424,6 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         cls: IrClass,
         ctx: RecipeIrGenContext,
         overrides: IrSimpleFunction,
-        factorySymbol: IrSimpleFunctionSymbol,
         editBlock: IrFunctionExpression,
     ) {
         cls.addFunction(
@@ -1388,9 +1436,16 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
                 val expansion = expandBlockIntoOverride(
                     block = editBlock,
-                    expectedVisitFqn = "org.openrewrite.EditScope.visitMethodInvocation",
+                    scopePrefix = EDIT_SCOPE_PREFIX,
                     overrideFunction = this@apply,
                 )
+                // Helper symbol is selected by the visit-method-name recovered
+                // from the partition. If a `visit*` primitive's helper isn't
+                // resolvable (older GeneratedRecipeSupport on the classpath
+                // missing the helper), fall through to the no-op visitor by
+                // skipping the override entirely.
+                val factorySymbol = ctx.editVisitorHelpers[expansion.visitMethodName]
+                    ?: return@irBlockBody
                 for (aux in expansion.auxStatements) +aux
                 val factoryCall = irCall(
                     callee = factorySymbol,
@@ -1405,19 +1460,22 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     /**
      * Result of deep-copying a scan/edit block and repartitioning the copy:
      * the auxiliary statements (with their `parent` updated to the override
-     * method) and the single visit-call's inner lambda (with its
-     * `function.parent` updated to the override method). Both halves come
-     * from the same deep copy so any cross-references — e.g., an aux `val`
-     * referenced from inside the visit lambda — stay symbol-coherent.
+     * method), the single visit-call's inner lambda (with its
+     * `function.parent` updated to the override method), and the visit
+     * method's simple name (used by the caller to pick the right runtime
+     * helper). All three pieces come from the same deep copy so any
+     * cross-references — e.g., an aux `val` referenced from inside the visit
+     * lambda — stay symbol-coherent.
      */
     private class BlockExpansion(
         val auxStatements: List<IrStatement>,
         val visitLambda: IrFunctionExpression,
+        val visitMethodName: String,
     )
 
     private fun expandBlockIntoOverride(
         block: IrFunctionExpression,
-        expectedVisitFqn: String,
+        scopePrefix: String,
         overrideFunction: IrSimpleFunction,
     ): BlockExpansion {
         // Deep-copy the whole block as one unit. The initialParent only
@@ -1429,8 +1487,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // Guaranteed to succeed: the extractor already validated the shape.
         // If a later refactor breaks that invariant, fail loudly here rather
         // than silently emit a malformed override.
-        val partition = partitionVisitCall(stmts, expectedVisitFqn)
-            ?: error("Expected exactly one $expectedVisitFqn call in deep-copied block; extractor invariant violated.")
+        val partition = partitionVisitCall(stmts, scopePrefix)
+            ?: error("Expected exactly one $scopePrefix visit call in deep-copied block; extractor invariant violated.")
         val visitLambda = partition.visitLambda
         // Reparent aux declarations from the inner block function up to the
         // override function so they read as locals of the override body
@@ -1444,6 +1502,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         return BlockExpansion(
             auxStatements = partition.auxStatements,
             visitLambda = visitLambda,
+            visitMethodName = partition.visitMethodName,
         )
     }
 

@@ -119,12 +119,44 @@ public class ScanRef<A> internal constructor()
 
     @Suppress("UNUSED_PARAMETER")
     public fun visitMethodInvocation(action: (org.openrewrite.java.tree.J.MethodInvocation) -> Unit): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitClassDeclaration(action: (org.openrewrite.java.tree.J.ClassDeclaration) -> Unit): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitMethodDeclaration(action: (org.openrewrite.java.tree.J.MethodDeclaration) -> Unit): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitVariableDeclarations(action: (org.openrewrite.java.tree.J.VariableDeclarations) -> Unit): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitImport(action: (org.openrewrite.java.tree.J.Import) -> Unit): Unit = Unit
 }
 
 @RecipeDslMarker public class EditScope internal constructor() {
     @Suppress("UNUSED_PARAMETER")
     public fun visitMethodInvocation(
         action: (org.openrewrite.java.tree.J.MethodInvocation) -> org.openrewrite.java.tree.J.MethodInvocation,
+    ): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitClassDeclaration(
+        action: (org.openrewrite.java.tree.J.ClassDeclaration) -> org.openrewrite.java.tree.J.ClassDeclaration,
+    ): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitMethodDeclaration(
+        action: (org.openrewrite.java.tree.J.MethodDeclaration) -> org.openrewrite.java.tree.J.MethodDeclaration,
+    ): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitVariableDeclarations(
+        action: (org.openrewrite.java.tree.J.VariableDeclarations) -> org.openrewrite.java.tree.J.VariableDeclarations,
+    ): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitImport(
+        action: (org.openrewrite.java.tree.J.Import) -> org.openrewrite.java.tree.J.Import,
     ): Unit = Unit
 }
 
@@ -134,6 +166,26 @@ public class ScanRef<A> internal constructor()
     @Suppress("UNUSED_PARAMETER")
     public fun visitMethodInvocation(
         action: (org.openrewrite.java.tree.J.MethodInvocation) -> org.openrewrite.java.tree.J.MethodInvocation,
+    ): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitClassDeclaration(
+        action: (org.openrewrite.java.tree.J.ClassDeclaration) -> org.openrewrite.java.tree.J.ClassDeclaration,
+    ): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitMethodDeclaration(
+        action: (org.openrewrite.java.tree.J.MethodDeclaration) -> org.openrewrite.java.tree.J.MethodDeclaration,
+    ): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitVariableDeclarations(
+        action: (org.openrewrite.java.tree.J.VariableDeclarations) -> org.openrewrite.java.tree.J.VariableDeclarations,
+    ): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitImport(
+        action: (org.openrewrite.java.tree.J.Import) -> org.openrewrite.java.tree.J.Import,
     ): Unit = Unit
 }
 
