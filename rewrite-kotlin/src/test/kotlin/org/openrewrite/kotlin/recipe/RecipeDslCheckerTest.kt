@@ -176,6 +176,83 @@ class RecipeDslCheckerTest {
     }
 
     @Test
+    fun `val-bound scan mixed with pattern fails compilation`() {
+        // Regression test: `val seen = scan(...)` is a FirProperty, not a
+        // bare FirFunctionCall. An earlier classify() only matched bare
+        // calls, so a val-bound scan slipped past the mode-mixing rule.
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val Bad: Recipe = recipe(
+                displayName = "Bad",
+                description = "Mixes pattern with a val-bound scan.",
+            ) {
+                rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
+                val seen = scan(mutableSetOf<String>()) { }
+            }
+            """.trimIndent()
+        )
+        assertEquals(KotlinCompilation.ExitCode.COMPILATION_ERROR, result.exitCode, result.messages)
+        assertTrue(
+            result.messages.contains("mixes pattern mode"),
+            "Expected a 'mixes pattern mode' error, got:\n${result.messages}",
+        )
+    }
+
+    @Test
+    fun `val-bound scan with edit-before-scan ordering fails compilation`() {
+        // Same regression: classify() needs to see the FirProperty's
+        // initializer to enforce scan-precedes-edit on val-bound scans too.
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val BadOrder: Recipe = recipe(
+                displayName = "BadOrder",
+                description = "Edit precedes a val-bound scan.",
+            ) {
+                edit { }
+                val seen = scan(mutableSetOf<String>()) { }
+            }
+            """.trimIndent()
+        )
+        assertEquals(KotlinCompilation.ExitCode.COMPILATION_ERROR, result.exitCode, result.messages)
+        assertTrue(
+            result.messages.contains("before a `scan`"),
+            "Expected an edit-before-scan error, got:\n${result.messages}",
+        )
+    }
+
+    @Test
+    fun `rewrite without to fails compilation`() {
+        // The DSL surface makes `to` a separate infix call returning Unit,
+        // so a recipe body of just `rewrite { ... }` type-checks (the unused
+        // RewriteAdvice value is discarded) and silently does nothing at
+        // runtime. The checker flags this as the footgun it is.
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val OrphanRewrite: Recipe = recipe(
+                displayName = "OrphanRewrite",
+                description = "Has a rewrite with no to clause.",
+            ) {
+                rewrite { s: String -> s.lowercase() }
+            }
+            """.trimIndent()
+        )
+        assertEquals(KotlinCompilation.ExitCode.COMPILATION_ERROR, result.exitCode, result.messages)
+        assertTrue(
+            result.messages.contains("without a trailing `to"),
+            "Expected an orphan-rewrite error, got:\n${result.messages}",
+        )
+    }
+
+    @Test
     fun `edit without scan in phase mode compiles cleanly`() {
         // Stateless edit is allowed — the precedence rule only fires when both
         // scan and edit/generate are present in the same block.

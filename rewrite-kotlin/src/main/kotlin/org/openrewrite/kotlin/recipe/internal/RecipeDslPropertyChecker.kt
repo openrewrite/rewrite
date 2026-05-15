@@ -78,12 +78,14 @@ internal object RecipeDslPropertyChecker : FirPropertyChecker(MppCheckerKind.Com
     private val NAME_SCAN = Name.identifier("scan")
     private val NAME_EDIT = Name.identifier("edit")
     private val NAME_GENERATE = Name.identifier("generate")
+    private val NAME_REWRITE = Name.identifier("rewrite")
 
     /**
      * Classification of a top-level statement inside the recipe block.
      */
     private sealed interface StatementKind {
         object Pattern : StatementKind         // `rewrite(...) to {...}`
+        object OrphanRewrite : StatementKind   // `rewrite(...)` with no trailing `to {...}` — silently no-ops today; we error.
         object Scan : StatementKind            // `scan(...) { ... }`
         object Edit : StatementKind            // `edit { ... }` or `edit(scanRef) { ... }`
         object Generate : StatementKind        // `generate(scanRef) { ... }`
@@ -102,8 +104,23 @@ internal object RecipeDslPropertyChecker : FirPropertyChecker(MppCheckerKind.Com
         val classified: List<Pair<FirStatement, StatementKind>> = body.statements.map { it to classify(it) }
 
         val patterns = classified.filter { it.second is StatementKind.Pattern }
+        val orphanRewrites = classified.filter { it.second is StatementKind.OrphanRewrite }
         val scans = classified.filter { it.second is StatementKind.Scan }
         val edits = classified.filter { it.second is StatementKind.Edit || it.second is StatementKind.Generate }
+
+        // Rule 0 — orphan `rewrite(...)` with no `to`. The DSL surface makes
+        // `to` a separate infix call, so a recipe body of just
+        // `rewrite { ... }` type-checks (the unused `RewriteAdvice` value is
+        // discarded) and silently does nothing at runtime. Catch it here
+        // before other rules so the author fixes the orphan first.
+        for ((orphan, _) in orphanRewrites) {
+            reportError(
+                orphan.source ?: declaration.source ?: return,
+                "`rewrite(...)` without a trailing `to { ... }` produces no " +
+                    "transformation. Add `to { /* after */ }` or remove the call.",
+            )
+        }
+        if (orphanRewrites.isNotEmpty()) return
 
         val hasPattern = patterns.isNotEmpty()
         val hasPhase = scans.isNotEmpty() || edits.isNotEmpty()
@@ -221,9 +238,18 @@ internal object RecipeDslPropertyChecker : FirPropertyChecker(MppCheckerKind.Com
      * a pattern lambda can use names like `scan` / `edit` freely.
      */
     private fun classify(statement: FirStatement): StatementKind {
-        val call = statement as? FirFunctionCall ?: return StatementKind.Other
+        // Recipe-body statements are either bare DSL calls (`edit { ... }`)
+        // or property declarations binding a scan handle
+        // (`val seen = scan(...) { ... }`). Both shapes need classification —
+        // missing the FirProperty case let `val seen = scan(...)` register
+        // as Other, which let the mode-mixing rules skip seeing the scan
+        // and was a latent footgun.
+        val call = statement as? FirFunctionCall
+            ?: (statement as? FirProperty)?.initializer as? FirFunctionCall
+            ?: return StatementKind.Other
         return when (call.callableSimpleName()) {
             NAME_TO -> StatementKind.Pattern
+            NAME_REWRITE -> StatementKind.OrphanRewrite
             NAME_SCAN -> StatementKind.Scan
             NAME_EDIT -> StatementKind.Edit
             NAME_GENERATE -> StatementKind.Generate
