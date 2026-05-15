@@ -369,6 +369,54 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    /**
+     * The shared {@code guavaVersion} variable is used by the targeted artifact ({@code guava}) and
+     * by a neighbor ({@code guava-testlib}) that the recipe matcher does not match.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "def guavaVersion = 'VERSION'",
+      "ext { guavaVersion = 'VERSION' }"
+    })
+    void sharedVersionVariableWithUntargetedNeighbour(String variableDeclarationTemplate) {
+        String beforeDeclaration = variableDeclarationTemplate.replace("VERSION", "29.0-jre");
+        String afterDeclaration = variableDeclarationTemplate.replace("VERSION", "30.1.1-jre");
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              %s
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation "com.google.guava:guava:$guavaVersion"
+                implementation "com.google.guava:guava-testlib:$guavaVersion"
+              }
+              """.formatted(beforeDeclaration),
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              %s
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation "com.google.guava:guava:$guavaVersion"
+                implementation "com.google.guava:guava-testlib:$guavaVersion"
+              }
+              """.formatted(afterDeclaration)
+          )
+        );
+    }
+
     @Test
     void updateVersionInVariableToRelease() {
         rewriteRun(
