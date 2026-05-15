@@ -9,15 +9,23 @@
  */
 package org.openrewrite.kotlin.recipe;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import kotlin.jvm.functions.Function1;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
+import org.openrewrite.kotlin.marker.TrailingLambdaArgument;
 import org.openrewrite.kotlin.tree.K;
 
 /**
@@ -105,6 +113,7 @@ public final class GeneratedRecipeSupport {
                         if (matchedTypeArgs != null) {
                             result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
                         }
+                        result = preserveTrailingLambdaShape((J.MethodInvocation) result);
                     }
                     return result.withPrefix(method.getPrefix());
                 }
@@ -295,5 +304,50 @@ public final class GeneratedRecipeSupport {
             result[i] = Integer.parseInt(parts[i]);
         }
         return result;
+    }
+
+    /**
+     * Restore Kotlin trailing-lambda call shape on a template-substituted result.
+     *
+     * <p>The substitution sources come straight off the matched invocation's
+     * argument list. When the matched call site used trailing-lambda syntax
+     * ({@code xs.foo { ... }}), the captured {@link J.Lambda} carries a
+     * {@link TrailingLambdaArgument} marker — that marker tells
+     * {@code KotlinPrinter#visitArgumentsContainer} to emit {@code )} <em>before</em>
+     * the lambda. After the substitution lands inside a parenthesised template
+     * call ({@code xs.bar(#{any()})}), the marker still fires but the template's
+     * container has no {@link OmitParentheses} marker, so the printer emits
+     * {@code xs.bar(){ ... }} (an empty pair of parens followed by the lambda).
+     *
+     * <p>Re-attach {@link OmitParentheses} to the args container when the last
+     * arg is a {@code TrailingLambdaArgument}-marked lambda. The output is the
+     * idiomatic {@code xs.bar { ... }}.
+     */
+    private static J.MethodInvocation preserveTrailingLambdaShape(J.MethodInvocation method) {
+        JContainer<Expression> args = method.getPadding().getArguments();
+        List<JRightPadded<Expression>> padded = args.getPadding().getElements();
+        if (padded.isEmpty()) {
+            return method;
+        }
+        JRightPadded<Expression> lastPadded = padded.get(padded.size() - 1);
+        Expression last = lastPadded.getElement();
+        if (!(last instanceof J.Lambda) ||
+            !last.getMarkers().findFirst(TrailingLambdaArgument.class).isPresent() ||
+            args.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+            return method;
+        }
+        // The template parsed without trailing-lambda syntax, so the lambda's
+        // own prefix is "" (it sat flush against the placeholder). Once the
+        // parens are gone, Kotlin convention is one space between the method
+        // name and `{`.
+        Expression spaced = last.getPrefix().getWhitespace().isEmpty()
+                ? last.withPrefix(Space.SINGLE_SPACE)
+                : last;
+        List<JRightPadded<Expression>> rebuilt = new ArrayList<>(padded);
+        rebuilt.set(rebuilt.size() - 1, lastPadded.withElement(spaced));
+        JContainer<Expression> reshaped = args.getPadding()
+                .withElements(rebuilt)
+                .withMarkers(args.getMarkers().addIfAbsent(new OmitParentheses(Tree.randomId())));
+        return method.getPadding().withArguments(reshaped);
     }
 }

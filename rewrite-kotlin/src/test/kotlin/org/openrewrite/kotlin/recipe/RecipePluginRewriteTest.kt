@@ -370,4 +370,61 @@ class RecipePluginRewriteTest : RewriteTest {
             ),
         )
     }
+
+    @Test
+    fun `lambda-typed arg flows through as untyped placeholder and preserves trailing-lambda shape`() {
+        // The before's selector arg `sel: (Int) -> Int` is an IrGetValue of a
+        // lambda value param — same shape as any non-function-typed param, so
+        // the validation path accepts it. The placeholder renders untyped
+        // (`#{any()}`) because `renderPlaceholderType` returns null for
+        // function types (no `classFqName`).
+        //
+        // Two call shapes share one recipe: an explicit `(f)` arg site and a
+        // trailing-lambda `{ it * 2 }` site. The matched lambda carries
+        // `TrailingLambdaArgument`; the runtime helper detects this and
+        // re-attaches `OmitParentheses` to the after's args container so the
+        // rewrite emits idiomatic `sumOf { ... }` rather than `sumOf(){...}`.
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val UseSumOf: Recipe = recipe(
+                displayName = "Use sumOf",
+                description = "Replace list.sumBy(selector) with list.sumOf(selector).",
+            ) {
+                rewrite { xs: List<Int>, sel: (Int) -> Int -> xs.sumBy(sel) } to { xs, sel -> xs.sumOf(sel) }
+            }
+            """.trimIndent(),
+            fileName = "Recipes.kt",
+        )
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val recipe = facade.getMethod("getUseSumOf").invoke(null) as Recipe
+
+        rewriteRun(
+            { spec -> spec.recipe(recipe).validateRecipeSerialization(false)
+                .typeValidationOptions(TypeValidation.none()) },
+            kotlin(
+                """
+                @Suppress("DEPRECATION")
+                fun total(xs: List<Int>, f: (Int) -> Int): Int = xs.sumBy(f)
+                """,
+                """
+                @Suppress("DEPRECATION")
+                fun total(xs: List<Int>, f: (Int) -> Int): Int = xs.sumOf(f)
+                """,
+            ),
+            kotlin(
+                """
+                @Suppress("DEPRECATION")
+                fun totalTrailing(xs: List<Int>): Int = xs.sumBy { it * 2 }
+                """,
+                """
+                @Suppress("DEPRECATION")
+                fun totalTrailing(xs: List<Int>): Int = xs.sumOf { it * 2 }
+                """,
+            ),
+        )
+    }
 }
