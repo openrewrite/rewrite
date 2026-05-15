@@ -214,6 +214,19 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void abstractClassWithEmptyParensAndAbstractDef() {
+        rewriteRun(
+            scala(
+                """
+                abstract class Foo() {
+                  def x: Boolean
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void classExtendingAnother() {
         rewriteRun(
             scala(
