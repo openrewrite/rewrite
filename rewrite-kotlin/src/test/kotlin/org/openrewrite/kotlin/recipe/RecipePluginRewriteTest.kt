@@ -231,6 +231,55 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `extension matcher tightens to the JVM facade and skips same-named user extensions`() {
+        // `s.lowercase()` lowers to a static call on `kotlin.text.StringsKt`.
+        // After the facade-resolution tightening, the matcher emits
+        // `kotlin.text.StringsKt lowercase(..)` instead of the wildcard
+        // `* lowercase(..)`. A same-module user extension named `lowercase`
+        // on a different type must NOT be touched.
+        val result = RecipePluginCompileFixture.compile(
+            """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+
+            val UseUpper: Recipe = recipe(
+                displayName = "Use uppercase for String",
+                description = "Only String.lowercase() should match.",
+            ) {
+                rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
+            }
+            """.trimIndent(),
+            fileName = "Recipes.kt",
+        )
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val recipe = facade.getMethod("getUseUpper").invoke(null) as Recipe
+
+        // The test source mixes a String extension call (should rewrite)
+        // and a user-defined extension named `lowercase` on a custom class
+        // (must NOT rewrite — its facade is `<test-file>Kt`, not StringsKt).
+        rewriteRun(
+            { spec -> spec.recipe(recipe).validateRecipeSerialization(false) },
+            kotlin(
+                """
+                class Box(val raw: String)
+                fun Box.lowercase(): Int = raw.length
+
+                val a: String = "hello".lowercase()
+                val b: Int = Box("X").lowercase()
+                """,
+                """
+                class Box(val raw: String)
+                fun Box.lowercase(): Int = raw.length
+
+                val a: String = "hello".uppercase()
+                val b: Int = Box("X").lowercase()
+                """,
+            ),
+        )
+    }
+
+    @Test
     fun `literal-capture multi-arg recipe re-emits matched args at literal positions`() {
         // Single-param lambda whose before's root call has two literal string args.
         // The after body references the same literals at the same source-order

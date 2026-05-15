@@ -43,6 +43,7 @@ import org.jetbrains.kotlin.ir.builders.irString
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrConstructor
 import org.jetbrains.kotlin.ir.declarations.IrFile
+import org.jetbrains.kotlin.ir.declarations.IrMemberWithContainerSource
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
@@ -50,6 +51,7 @@ import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.declarations.IrVariable
+import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.ir.expressions.IrBlockBody
 import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrConst
@@ -668,43 +670,87 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
     /**
      * Builds a [MethodMatcher][org.openrewrite.java.MethodMatcher] spec from a
-     * before-lambda's root call. The declaring-type segment is tightened
-     * from the previous `* method(..)` wildcard to the actual declaring
-     * type's Kotlin FQN — but **only** for member calls. Kotlin extension
-     * functions lower to static methods on a synthetic JVM facade class
-     * (e.g. `kotlin.text.StringsKt` for `kotlin.text` package extensions);
-     * the J.MethodInvocation's `declaringType` reflects that facade, NOT
-     * the source-level receiver type. Matching against the receiver type
-     * directly silently misses every extension call, so we keep the
-     * wildcard for those until proper facade resolution lands.
+     * before-lambda's root call. The declaring-type segment is tightened from
+     * the previous `* method(..)` wildcard to the parsed call's actual
+     * declaring type.
      *
      *  - Member calls (`dispatchReceiverParameter != null`,
      *    `extensionReceiverParameter == null`): tighten to
      *    `<receiverFqn> method(..)`.
-     *  - Extension calls (`extensionReceiverParameter != null`): keep
-     *    `* method(..)` — JVM facade FQN computation needs a compiler
-     *    helper (`JvmFileClassUtil` or equivalent) that respects
-     *    `@file:JvmName` overrides; that's a separate runway item.
-     *  - Top-level non-extension functions (no receiver of either kind):
-     *    keep `* method(..)`.
+     *  - Extension calls (`extensionReceiverParameter != null`) and top-level
+     *    non-extension functions (no receiver): both lower to static methods
+     *    on a JVM facade class. Tighten to `<facadeFqn> method(..)` where
+     *    `facadeFqn` is computed from the function's [JvmPackagePartSource]
+     *    (deserialized library code) or its parent [IrFile] (same-module
+     *    code) using the same rule [KotlinTypeMapping] uses when it sets
+     *    `JavaType.Method.declaringType` for the parsed LST.
      *
-     * If the receiver type can't be reduced to a class FQN (function types,
-     * intersection types, etc.), fall back to wildcard so the matcher still
-     * fires rather than silently dropping the recipe.
+     * If the declaring type can't be reduced to a class FQN (function types,
+     * intersection types, files with no JVM-facade representation, etc.),
+     * fall back to wildcard so the matcher still fires rather than silently
+     * dropping the recipe.
      */
     private fun computeMatcherSpec(rootCall: IrCall): String {
         val owner = rootCall.symbol.owner
         val methodName = owner.name.asString()
-        // Extensions go on the JVM facade — receiver type doesn't match LST.
-        if (owner.extensionReceiverParameter != null) {
-            return "* $methodName(..)"
+
+        // Member calls bind on the dispatch receiver's class FQN.
+        val dispatchFqn = owner.dispatchReceiverParameter?.type?.classFqName?.asString()
+        if (dispatchFqn != null) {
+            return "$dispatchFqn $methodName(..)"
         }
-        val receiverFqn = owner.dispatchReceiverParameter?.type?.classFqName?.asString()
-        return if (receiverFqn != null) {
-            "$receiverFqn $methodName(..)"
+
+        // Extensions and top-level non-extensions live on a JVM facade.
+        val facadeFqn = computeJvmFacadeFqn(owner)
+        return if (facadeFqn != null) {
+            "$facadeFqn $methodName(..)"
         } else {
             "* $methodName(..)"
         }
+    }
+
+    /**
+     * Computes the JVM facade FQN that the parsed LST will attach to calls
+     * on [fn] as their `JavaType.Method.declaringType`. Mirrors the rule used
+     * by [org.openrewrite.kotlin.KotlinTypeMapping.methodInvocationType]:
+     *
+     *  1. Library-deserialized declarations carry their source-info as a
+     *     [JvmPackagePartSource]; the facade is `facadeClassName ?: className`,
+     *     which already accounts for `@JvmMultifileClass` aggregation.
+     *  2. Same-module declarations live in an [IrFile]; the facade is
+     *     `<package>.<FileBaseName>Kt` with the first character of the base
+     *     name capitalized. `@file:JvmName("Foo")` replaces the base with
+     *     `Foo` (no `Kt` suffix added).
+     *
+     * Returns null if the facade can't be determined — the matcher then
+     * falls back to its `* method(..)` wildcard form.
+     */
+    private fun computeJvmFacadeFqn(fn: IrSimpleFunction): String? {
+        val containerSource = (fn as? IrMemberWithContainerSource)?.containerSource
+        if (containerSource is JvmPackagePartSource) {
+            val jvmName = containerSource.facadeClassName ?: containerSource.className
+            return jvmName.fqNameForTopLevelClassMaybeWithDollars.asString()
+        }
+        val file = fn.parent as? IrFile ?: return null
+        val pkgFqn = file.packageFqName.asString()
+        val jvmNameOverride = file.annotations
+            .firstOrNull { it.type.classFqName?.asString() == "kotlin.jvm.JvmName" }
+            ?.let { ann -> (ann.arguments.firstOrNull() as? IrConst)?.value as? String }
+        val baseName = jvmNameOverride ?: defaultFacadeBaseName(file.fileEntry.name) ?: return null
+        return if (pkgFqn.isEmpty()) baseName else "$pkgFqn.$baseName"
+    }
+
+    /**
+     * `Foo.kt` -> `FooKt`, `foo.kt` -> `FooKt`. Returns null if the path has
+     * no recognizable `.kt` filename — e.g. a synthetic IrFile from another
+     * generator pass — so we don't synthesize a junk facade name.
+     */
+    private fun defaultFacadeBaseName(filePath: String): String? {
+        val nameOnly = filePath.substringAfterLast('/').substringAfterLast('\\')
+        if (!nameOnly.endsWith(".kt")) return null
+        val stem = nameOnly.removeSuffix(".kt")
+        if (stem.isEmpty()) return null
+        return stem.replaceFirstChar { it.uppercaseChar() } + "Kt"
     }
 
     private fun addStringOverride(
