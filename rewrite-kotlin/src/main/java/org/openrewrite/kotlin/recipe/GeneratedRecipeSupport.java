@@ -16,6 +16,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
+import org.openrewrite.kotlin.tree.K;
 
 /**
  * Runtime support for the recipe authoring DSL's K2 compiler plugin
@@ -242,6 +243,28 @@ public final class GeneratedRecipeSupport {
             public J visitImport(J.Import _import, ExecutionContext ctx) {
                 body.invoke(_import);
                 return super.visitImport(_import, ctx);
+            }
+        };
+    }
+
+    public static TreeVisitor<?, ExecutionContext> propertyEditVisitor(
+            Function1<K.Property, K.Property> body) {
+        return new KotlinVisitor<ExecutionContext>() {
+            @Override
+            public J visitProperty(K.Property property, ExecutionContext ctx) {
+                K.Property transformed = body.invoke(property);
+                return super.visitProperty(transformed, ctx);
+            }
+        };
+    }
+
+    public static TreeVisitor<?, ExecutionContext> propertyScanVisitor(
+            Function1<K.Property, kotlin.Unit> body) {
+        return new KotlinVisitor<ExecutionContext>() {
+            @Override
+            public J visitProperty(K.Property property, ExecutionContext ctx) {
+                body.invoke(property);
+                return super.visitProperty(property, ctx);
             }
         };
     }

@@ -135,6 +135,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             VisitPrimitive("visitMethodDeclaration", "methodDeclarationEditVisitor", "methodDeclarationScanVisitor"),
             VisitPrimitive("visitVariableDeclarations", "variableDeclarationsEditVisitor", "variableDeclarationsScanVisitor"),
             VisitPrimitive("visitImport", "importEditVisitor", "importScanVisitor"),
+            VisitPrimitive("visitProperty", "propertyEditVisitor", "propertyScanVisitor"),
         )
 
         val VISIT_NAMES: Set<String> = VISIT_PRIMITIVES.map { it.visitMethodName }.toSet()

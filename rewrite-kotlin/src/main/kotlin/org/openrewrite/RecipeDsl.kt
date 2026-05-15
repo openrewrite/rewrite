@@ -131,6 +131,9 @@ public class ScanRef<A> internal constructor()
 
     @Suppress("UNUSED_PARAMETER")
     public fun visitImport(action: (org.openrewrite.java.tree.J.Import) -> Unit): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitProperty(action: (org.openrewrite.kotlin.tree.K.Property) -> Unit): Unit = Unit
 }
 
 @RecipeDslMarker public class EditScope internal constructor() {
@@ -157,6 +160,11 @@ public class ScanRef<A> internal constructor()
     @Suppress("UNUSED_PARAMETER")
     public fun visitImport(
         action: (org.openrewrite.java.tree.J.Import) -> org.openrewrite.java.tree.J.Import,
+    ): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitProperty(
+        action: (org.openrewrite.kotlin.tree.K.Property) -> org.openrewrite.kotlin.tree.K.Property,
     ): Unit = Unit
 }
 
@@ -186,6 +194,11 @@ public class ScanRef<A> internal constructor()
     @Suppress("UNUSED_PARAMETER")
     public fun visitImport(
         action: (org.openrewrite.java.tree.J.Import) -> org.openrewrite.java.tree.J.Import,
+    ): Unit = Unit
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun visitProperty(
+        action: (org.openrewrite.kotlin.tree.K.Property) -> org.openrewrite.kotlin.tree.K.Property,
     ): Unit = Unit
 }
 

@@ -512,6 +512,56 @@ class RecipePluginPhaseModeTest : RewriteTest {
     }
 
     @Test
+    fun `scan visitProperty populates acc and gates edit`() {
+        // K.Property is the Kotlin-LST shape for `val/var` declarations
+        // (distinct from J.VariableDeclarations which covers function
+        // parameters and catch clauses). Verifies the registry picks up
+        // visitProperty / K.Property correctly.
+        val src = """
+            import org.openrewrite.Recipe
+            import org.openrewrite.recipe
+            import org.openrewrite.java.tree.J
+            import org.openrewrite.kotlin.tree.K
+
+            val GatedByProperty: Recipe = recipe(
+                displayName = "Gate by val seen",
+                description = "Rewrites lowercase()->uppercase() only when any property declaration was seen.",
+            ) {
+                val seen = scan<MutableSet<String>>(initial = mutableSetOf()) {
+                    visitProperty { prop: K.Property -> acc.add("seen") }
+                }
+                edit(seen) {
+                    visitMethodInvocation { call: J.MethodInvocation ->
+                        if (call.simpleName == "lowercase" && acc.isNotEmpty())
+                            call.withName(call.name.withSimpleName("uppercase"))
+                        else call
+                    }
+                }
+            }
+        """.trimIndent()
+        val result = RecipePluginCompileFixture.compile(src, fileName = "Recipes.kt")
+        assertEquals(KotlinCompilation.ExitCode.OK, result.exitCode, result.messages)
+        val facade = result.classLoader.loadClass("RecipesKt")
+        val recipe = facade.getMethod("getGatedByProperty").invoke(null) as Recipe
+
+        // `K.Property` only emits when the property has custom accessors,
+        // an extension receiver, or type constraints — the plain
+        // `val x: T = ...` shape is `J.VariableDeclarations` instead.
+        // Custom getter is the lightest source that triggers K.Property.
+        rewriteRun(
+            { spec -> spec.recipe(recipe).validateRecipeSerialization(false) },
+            kotlin(
+                """
+                val target: String get() = "x".lowercase()
+                """,
+                """
+                val target: String get() = "x".uppercase()
+                """,
+            ),
+        )
+    }
+
+    @Test
     fun `stateless edit visitImport renames an import`() {
         // J.Import is recognised by the registry. The user's lambda swaps a
         // specific import's package name. KotlinTreeParser emits J.Import for
