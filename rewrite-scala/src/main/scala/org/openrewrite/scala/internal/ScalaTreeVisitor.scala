@@ -2488,7 +2488,10 @@ class ScalaTreeVisitor(
       val rawName = vd.name.toString
       if (vd.nameSpan.exists) {
         val nsStart = Math.max(0, vd.nameSpan.start - offsetAdjustment)
-        if (isBacktickQuotedNameAt(nsStart, rawName.length)) "`" + rawName + "`"
+        // dotty names an explicit `_ => expr` parameter `_$N`. The source still reads
+        // `_`, so render the wildcard as written.
+        if (rawName.startsWith("_$") && nsStart < source.length && source.charAt(nsStart) == '_') "_"
+        else if (isBacktickQuotedNameAt(nsStart, rawName.length)) "`" + rawName + "`"
         else if (nsStart < source.length && source.charAt(nsStart) == '`' &&
             nsStart + rawName.length + 1 < source.length &&
             source.charAt(nsStart + rawName.length + 1) == '`') "`" + rawName + "`"
@@ -5783,11 +5786,7 @@ class ScalaTreeVisitor(
       if (colonIdx >= 0) {
         if (colonIdx > 0) beforeColon = Space.format(between.substring(0, colonIdx))
         cursor = cursor + colonIdx + 1
-        val res = visitTree(vd.tpt) match {
-          case tt: TypeTree => tt
-          case id: J.Identifier => id
-          case _ => null
-        }
+        val res = visitTypeTree(vd.tpt)
         if (vd.tpt.span.exists) updateCursor(vd.tpt.span.end)
         res
       } else null
@@ -7826,8 +7825,13 @@ class ScalaTreeVisitor(
       val savedCursor = cursor
       val funcSource = extractSource(func.span)
       cursor = savedCursor
-      val hasUnderscorePlaceholder = funcSource.contains("_")
-      
+      // An explicit `_ => expr` lambda contains `=>` in source. dotty also names its
+      // parameter `_$N`, but the `_` is the parameter, not a placeholder reference, so
+      // the placeholder-rewrite path below (which assumes the body absorbs the `_`)
+      // would mis-attribute the `_ => ` text to the body's prefix. Defer to the regular
+      // lambda path in that case.
+      val hasUnderscorePlaceholder = funcSource.contains("_") && !funcSource.contains("=>")
+
       // If we have synthetic params and underscore in source, it's likely a placeholder lambda
       // These should be treated as regular lambdas but we skip the synthetic param
       if (hasUnderscorePlaceholder) {

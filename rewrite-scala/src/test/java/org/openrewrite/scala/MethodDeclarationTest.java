@@ -355,6 +355,17 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void functionTypeAsDefaultParameter() {
+        rewriteRun(
+            scala(
+                """
+                case class C(f: Int => Boolean = _ => false)
+                """
+            )
+        );
+    }
+
+    @Test
     void implicitInSecondParamList() {
         rewriteRun(
             scala(
