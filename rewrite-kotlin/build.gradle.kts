@@ -147,3 +147,13 @@ sourceSets.named("main") {
 tasks.named("compileKotlin") {
     dependsOn(generateLanguageScopes)
 }
+
+// `kotlinSourcesJar` (and any other task that reads the main source set's
+// srcDirs) needs to know it must run after the codegen — otherwise Gradle 9
+// flags the implicit dependency and fails the build. `configureEach` covers
+// `sourcesJar` and `kotlinSourcesJar` both.
+tasks.matching {
+    it.name.endsWith("sourcesJar", ignoreCase = true)
+}.configureEach {
+    dependsOn(generateLanguageScopes)
+}
