@@ -24,10 +24,7 @@ import org.openrewrite.TreeVisitor;
 
 import java.lang.reflect.*;
 import java.util.IdentityHashMap;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.ServiceConfigurationError;
-import java.util.ServiceLoader;
 
 public class TreeVisitorAdapter {
     private static final Integer classCreationLock = 1;
@@ -48,7 +45,7 @@ public class TreeVisitorAdapter {
                     "TreeVisitorAdapter currently supports at most one mixin per adapt() call; got " + mixins.length + ".");
         }
 
-        TreeVisitor<?, ?> mixin = mixins.length == 1 ? mixins[0] : discoverMixinViaSpi(delegate, adaptTo);
+        TreeVisitor<?, ?> mixin = mixins.length == 1 ? mixins[0] : discoverRegisteredMixin(delegate, adaptTo);
         if (mixin != null && !adaptTo.isAssignableFrom(mixin.getClass())) {
             throw new IllegalArgumentException(
                     "Mixin " + mixin.getClass().getName() + " is not assignable to " + adaptTo.getName() +
@@ -327,20 +324,20 @@ public class TreeVisitorAdapter {
         }
     }
 
-    private static @org.jspecify.annotations.Nullable TreeVisitor<?, ?> discoverMixinViaSpi(TreeVisitor<?, ?> delegate, Class<?> adaptTo) {
-        // Each language module ships per-base-visitor SPI files at
-        //   META-INF/services/<base-visitor-fqn>
-        // listing mixin classes that should compose with that base. We parse
-        // these files directly rather than using {@link ServiceLoader} because
-        // ServiceLoader requires the registered class to be a subtype of the
-        // service class — but a mixin extends the language module's iso-visitor
-        // (e.g., KotlinIsoVisitor), not the base visitor it composes with
-        // (e.g., RemoveAnnotationVisitor). They share the visitor role
-        // structurally, not via inheritance.
+    private static @org.jspecify.annotations.Nullable TreeVisitor<?, ?> discoverRegisteredMixin(TreeVisitor<?, ?> delegate, Class<?> adaptTo) {
+        // Each language module ships per-base-visitor registry files at
+        //   META-INF/rewrite/mixins/<base-visitor-fqn>
+        // listing mixin classes that should compose with that base. Same
+        // namespace already used by rewrite-YAML resources, not the JDK
+        // ServiceLoader namespace — we don't use {@link ServiceLoader} because
+        // its subtype check rejects mixins (a mixin extends the language
+        // module's iso-visitor, e.g. KotlinIsoVisitor, not the base visitor
+        // it composes with, e.g. RemoveAnnotationVisitor). The visitor role
+        // is shared structurally, not by inheritance.
         //
         // Anchor resource lookup to adaptTo's classloader so the language
-        // module's own SPI files (shipped in the language module's JAR) are
-        // visible.
+        // module's own registry files (shipped in the language module's JAR)
+        // are visible.
         ClassLoader cl = adaptTo.getClassLoader();
         if (cl == null) {
             cl = Thread.currentThread().getContextClassLoader();
@@ -348,7 +345,7 @@ public class TreeVisitorAdapter {
         if (cl == null) {
             return null;
         }
-        String resource = "META-INF/services/" + delegate.getClass().getName();
+        String resource = "META-INF/rewrite/mixins/" + delegate.getClass().getName();
         try {
             java.util.Enumeration<java.net.URL> urls = cl.getResources(resource);
             while (urls.hasMoreElements()) {
@@ -369,18 +366,18 @@ public class TreeVisitorAdapter {
                             Class<?> mixinClass = Class.forName(line, false, cl);
                             if (!TreeVisitor.class.isAssignableFrom(mixinClass)) {
                                 throw new IllegalStateException(
-                                        "SPI-registered mixin " + line + " is not a TreeVisitor (registered at " + url + ").");
+                                        "Registered mixin " + line + " is not a TreeVisitor (registered at " + url + ").");
                             }
                             return (TreeVisitor<?, ?>) mixinClass.getDeclaredConstructor().newInstance();
                         } catch (ReflectiveOperationException e) {
                             throw new IllegalStateException(
-                                    "Failed to instantiate SPI-registered mixin " + line + " (from " + url + ").", e);
+                                    "Failed to instantiate registered mixin " + line + " (from " + url + ").", e);
                         }
                     }
                 }
             }
         } catch (java.io.IOException e) {
-            // Couldn't enumerate SPI resources; treat as no registration.
+            // Couldn't enumerate mixin registry resources; treat as no registration.
         }
         return null;
     }
