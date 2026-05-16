@@ -7716,7 +7716,43 @@ class ScalaTreeVisitor(
   }
   
   private def visitTyped(typed: Trees.Typed[?]): J = {
-    
+
+    // Scala 3 vararg splat `f(xs*)` and Scala 2 form `f(xs: _*)` both parse to
+    // `Typed(expr, Ident("_*"))`. Distinguish by checking whether the source
+    // between the expression and the trailing `*` contains a `:`.
+    typed.tpt match {
+      case id: Trees.Ident[?] if id.name.toString == "_*" =>
+        val exprEnd = if (typed.expr.span.exists) Math.max(0, typed.expr.span.end - offsetAdjustment) else cursor
+        val typedEnd = if (typed.span.exists) Math.max(0, typed.span.end - offsetAdjustment) else exprEnd
+        val between = if (exprEnd >= 0 && typedEnd <= source.length && exprEnd <= typedEnd) {
+          source.substring(exprEnd, typedEnd)
+        } else ""
+        if (!between.contains(":")) {
+          // Scala 3 form: `xs*`. Build S.RepeatedType directly with the expression as element.
+          val prefix = extractPrefix(typed.span)
+          val element = visitTree(typed.expr) match {
+            case tt: TypeTree => tt
+            case other => throw new IllegalStateException(
+              s"Scala 3 vararg splat element must be a TypeTree-compatible expression, got: ${if (other == null) "null" else other.getClass.getName}")
+          }
+          val starPos = source.indexOf('*', cursor)
+          val beforeStar = if (starPos >= cursor && starPos < typedEnd) {
+            Space.format(source, cursor, starPos)
+          } else Space.EMPTY
+          updateCursor(typed.span.end)
+          return new S.RepeatedType(
+            Tree.randomId(),
+            prefix,
+            Markers.EMPTY,
+            element,
+            beforeStar,
+            typeOfTree(typed)
+          )
+        }
+        // Fall through to general type-ascription handling for the Scala 2 form.
+      case _ =>
+    }
+
     // Check if this is a member reference pattern (expr _)
     typed.tpt match {
       case id: Trees.Ident[?] if id.name.toString == "_" =>
