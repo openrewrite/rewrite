@@ -22,7 +22,6 @@ import org.openrewrite.java.search.UsesMethod
 import org.openrewrite.java.search.UsesType
 import org.openrewrite.kotlin.recipe.GeneratedRecipeSupport
 import java.time.Duration
-import java.util.concurrent.atomic.AtomicReference
 
 // Author-facing surface for the Kotlin recipe-authoring DSL.
 //
@@ -98,8 +97,15 @@ public class RecipeBuilder internal constructor() {
      * chained consumer would compute and discard the accumulator — Phase 3's FIR
      * checker rejects that shape at compile time; at runtime the scan still runs
      * but contributes no visitor.
+     *
+     * The accumulator [A] is passed as a lambda parameter to scan / edit /
+     * generate blocks — `scan<A>(initial) { acc -> … }.edit { acc -> … }`. The
+     * DSL is agnostic to mutability: authors picking a mutable container type
+     * (e.g. `MutableList<String>`) mutate `acc` in place; authors picking a
+     * value type wrap in `AtomicReference<A>` themselves. Matches the Java
+     * [ScanningRecipe<A>] convention — `A` is whatever fits the recipe.
      */
-    public fun <A : Any> scan(initial: A, block: ScanScope<A>.() -> Unit): Scan<A> {
+    public fun <A : Any> scan(initial: A, block: ScanScope.(A) -> Unit): Scan<A> {
         require(scanBuilder == null) { "recipe { } already declares a scan block (single-scan v1)" }
         require(editBlock == null && generateBlock == null) {
             "place scan { } before edit { } / generate { } (chain with scan { }.edit { })"
@@ -151,7 +157,6 @@ public class RecipeBuilder internal constructor() {
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
     private fun <A : Any> buildScanningRecipe(
         scan: ScanBuilder<A>,
         displayName: String,
@@ -159,34 +164,35 @@ public class RecipeBuilder internal constructor() {
         recipeTags: Set<String>,
         effort: Duration?,
     ): Recipe {
-        return object : ScanningRecipe<AtomicReference<A>>() {
+        return object : ScanningRecipe<A>() {
             override fun getDisplayName(): String = displayName
             override fun getDescription(): String = description
             override fun getTags(): Set<String> = recipeTags
             override fun getEstimatedEffortPerOccurrence(): Duration? = effort
 
-            override fun getInitialValue(ctx: ExecutionContext): AtomicReference<A> =
-                AtomicReference(scan.initial)
+            override fun getInitialValue(ctx: ExecutionContext): A = scan.initial
 
-            override fun getScanner(acc: AtomicReference<A>): TreeVisitor<*, ExecutionContext> {
-                val scope = ScanScope(acc).apply(scan.scanBlock)
+            override fun getScanner(acc: A): TreeVisitor<*, ExecutionContext> {
+                val scope = ScanScope()
+                scan.scanBlock(scope, acc)
                 return scope.buildVisitor()
             }
 
-            override fun getVisitor(acc: AtomicReference<A>): TreeVisitor<*, ExecutionContext> {
+            override fun getVisitor(acc: A): TreeVisitor<*, ExecutionContext> {
                 val editBlock = scan.editBlock ?: return TreeVisitor.noop<Tree, ExecutionContext>()
-                val scope = EditScopeWithAcc(acc.get()).apply(editBlock)
+                val scope = EditScope()
+                editBlock(scope, acc)
                 return scope.buildVisitor()
             }
 
             override fun generate(
-                acc: AtomicReference<A>,
+                acc: A,
                 generatedInThisCycle: MutableCollection<SourceFile>,
                 ctx: ExecutionContext,
             ): MutableCollection<SourceFile> {
                 val genBlock = scan.generateBlock ?: return mutableListOf()
-                val scope = GenerateScopeWithAcc(acc.get(), ctx)
-                val produced = scope.genBlock().toMutableList()
+                val scope = GenerateScope(ctx)
+                val produced = genBlock(scope, acc).toMutableList()
                 // 3-arg form: filter against already-generated files for cycle-2 stability.
                 val alreadyByPath = generatedInThisCycle.mapNotNull { it.sourcePath?.toString() }.toSet()
                 produced.removeAll { (it.sourcePath?.toString() ?: "") in alreadyByPath }
@@ -227,16 +233,16 @@ public class RecipeBuilder internal constructor() {
 /** Internal carrier for a scan phase's captured blocks. */
 internal class ScanBuilder<A : Any>(
     val initial: A,
-    val scanBlock: ScanScope<A>.() -> Unit,
+    val scanBlock: ScanScope.(A) -> Unit,
 ) {
-    var editBlock: (EditScopeWithAcc<A>.() -> Unit)? = null
-    var generateBlock: (GenerateScopeWithAcc<A>.() -> Collection<SourceFile>)? = null
+    var editBlock: (EditScope.(A) -> Unit)? = null
+    var generateBlock: (GenerateScope.(A) -> Collection<SourceFile>)? = null
 }
 
 /** Chain builder returned by [RecipeBuilder.scan]. */
 public class Scan<A : Any> internal constructor(internal val builder: ScanBuilder<A>) {
     /** Consume the scan accumulator with an edit phase. */
-    public fun edit(block: EditScopeWithAcc<A>.() -> Unit) {
+    public fun edit(block: EditScope.(A) -> Unit) {
         require(builder.editBlock == null) { "scan { }.edit { } already declared" }
         builder.editBlock = block
     }
@@ -245,7 +251,7 @@ public class Scan<A : Any> internal constructor(internal val builder: ScanBuilde
      * Consume the scan accumulator with a generate phase. Returns this same
      * [Scan] so a trailing `.edit { }` can follow.
      */
-    public fun generate(block: GenerateScopeWithAcc<A>.() -> Collection<SourceFile>): Scan<A> {
+    public fun generate(block: GenerateScope.(A) -> Collection<SourceFile>): Scan<A> {
         require(builder.generateBlock == null) { "scan { }.generate { } already declared" }
         builder.generateBlock = block
         return this
@@ -441,33 +447,18 @@ public open class EditScope internal constructor() : LanguageHost() {
     )
 }
 
-/** Edit-phase receiver with access to the scan accumulator. */
-public class EditScopeWithAcc<A> internal constructor(public val acc: A) : EditScope()
-
 /**
  * Receiver for the `scan { }` phase block. Same language-scope surface as
  * [EditScope] but no preconditions / no rewrite{}to{} — scanners only observe.
- * The mutable `acc` field is shared with the rest of the scan lifecycle via
- * an [AtomicReference]: closures inside language scopes that assign `acc = ...`
- * write through to the framework's accumulator.
+ * The accumulator is passed to the block as a lambda parameter, not exposed
+ * on the receiver.
  */
 @RecipeDsl
-public open class ScanScope<A : Any> internal constructor(private val accRef: AtomicReference<A>) : LanguageHost() {
-    public var acc: A
-        get() = accRef.get()
-        set(value) { accRef.set(value) }
-}
+public open class ScanScope internal constructor() : LanguageHost()
 
-/** Receiver for the bare `generate { }` block; access [ctx] only. */
+/** Receiver for the `generate { }` block; access [ctx] only. */
 @RecipeDsl
 public open class GenerateScope internal constructor(public val ctx: ExecutionContext)
-
-/** Generate-phase receiver with access to the scan accumulator. */
-@RecipeDsl
-public class GenerateScopeWithAcc<A> internal constructor(
-    public val acc: A,
-    ctx: ExecutionContext,
-) : GenerateScope(ctx)
 
 // ---------------------------------------------------------------------------
 // rewrite { } to { } type stubs — populated at IR time by the K2 plugin.

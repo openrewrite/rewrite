@@ -17,11 +17,11 @@ package org.openrewrite.kotlin.recipe.internal
 
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
 
-// Bundles all FIR-level extensions that the recipe DSL plugin contributes.
-// Phase 3 of the DSL rewrite re-populates this with `RecipeFirDslCheckers` —
-// currently empty so the plugin is well-formed but contributes no FIR checks.
+// Bundles all FIR-level extensions that the recipe DSL plugin contributes:
+//   - `RecipeDslAdditionalCheckers` runs `RecipeFirDslCheckers` on each user
+//     property declaration whose initializer is `org.openrewrite.recipe(...)`.
 internal class RecipeFirExtensionRegistrar : FirExtensionRegistrar() {
     override fun ExtensionRegistrarContext.configurePlugin() {
-        // intentionally empty until RecipeFirDslCheckers lands in Phase 3
+        +::RecipeDslAdditionalCheckers
     }
 }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.recipe.internal
 
+import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.CompilerConfiguration
@@ -24,9 +25,19 @@ import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 // `RecipeDsl.kt`. Registered via `META-INF/services/org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar`.
 // kotlinc loads this class when rewrite-kotlin is on the user's `kotlinCompilerPluginClasspath`.
 //
-// Phase 3 of the DSL rewrite will register both a FIR checkers extension and a
-// rewritten IR generation extension. After tear-down only the FIR registrar is
-// wired (currently a no-op shell) so the plugin loads cleanly without v0 code.
+// Two extensions register here:
+//   - `RecipeFirExtensionRegistrar` — FIR shape checks (count limits,
+//     orphan-rewrite, orphan-scan). Catches ill-formed DSL at compile time.
+//   - `RecipeIrGenerationExtension` — IR pass for `rewrite { } to { }` recipes.
+//     Replaces each pattern recipe's `recipe(...)` initializer with a synthetic
+//     `Generated$<Name>` constructor call; the synthetic class extends Recipe
+//     and `getVisitor()` delegates to GeneratedRecipeSupport.
+//
+// Recipes with purely imperative shapes (`edit { lang { visitX { } } }` and
+// `scan<A>(initial) { … }.edit { … }`) compile + run pure-JVM WITHOUT this
+// plugin — the runtime DSL builder in RecipeDsl.kt covers them. The plugin is
+// REQUIRED only for `rewrite { } to { }` (whose runtime stub is an `error(...)`)
+// and for compile-time FIR validation.
 //
 // Why a compiler plugin and not KSP: KSP's stable contract exposes declarations and
 // types but not expression bodies (property initializers, lambda contents). The DSL
@@ -43,5 +54,6 @@ public class RecipeCompilerPluginRegistrar : CompilerPluginRegistrar() {
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
         FirExtensionRegistrarAdapter.registerExtension(RecipeFirExtensionRegistrar())
+        IrGenerationExtension.registerExtension(RecipeIrGenerationExtension())
     }
 }

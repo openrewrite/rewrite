@@ -18,6 +18,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.Expression;
@@ -37,10 +39,13 @@ import org.openrewrite.kotlin.marker.TrailingLambdaArgument;
  * keeping the IR codegen small and the matching/replacing logic
  * Java-readable.
  *
- * <p>Phase 3 of the DSL rewrite will add a {@code methodInvocationRewriteJava}
- * parallel of the Kotlin path and {@code composeSequential(vararg visitors)}
- * for multi-statement edit/scan/generate bodies. Until then this class carries
- * only the canonical KotlinVisitor-rooted {@code rewrite { } to { }} helper.
+ * <p>{@code methodInvocationRewrite} (Kotlin) and {@code methodInvocationRewriteJava}
+ * are parallel paths selected by the LST-structural classifier in the IR
+ * extension: the default is {@code methodInvocationRewriteJava} (a
+ * {@link JavaVisitor} walks both Java AND Kotlin sources via
+ * {@link org.openrewrite.kotlin.TreeVisitorAdapter}); the Kotlin variant kicks
+ * in only when the before/after templates structurally reference a {@code K.*}
+ * LST node — see {@code RecipeIrLanguageDescriptors.isKotlinSpecificTreeNode}.
  */
 public final class GeneratedRecipeSupport {
 
@@ -116,6 +121,68 @@ public final class GeneratedRecipeSupport {
                             result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
                         }
                         result = preserveTrailingLambdaShape((J.MethodInvocation) result);
+                    }
+                    return result.withPrefix(method.getPrefix());
+                }
+                return super.visitMethodInvocation(method, ctx);
+            }
+        };
+    }
+
+    /**
+     * Java-rooted parallel of {@link #methodInvocationRewrite}. Used when the
+     * LST-structural classifier defaults a {@code rewrite { } to { }} clause
+     * to a {@link JavaVisitor}: the visitor walks both Java and Kotlin sources
+     * via {@link org.openrewrite.kotlin.TreeVisitorAdapter}, but the template
+     * is parsed via {@link JavaTemplate}.
+     *
+     * <p>Matching, substitution-source semantics, and the multi-spec {@code \n}
+     * delimiter are identical to the Kotlin variant — only the visitor type
+     * and the template engine differ. There is no trailing-lambda fix-up:
+     * Java has no trailing-lambda syntax, so the {@link OmitParentheses}
+     * dance is Kotlin-specific.
+     */
+    public static TreeVisitor<?, ExecutionContext> methodInvocationRewriteJava(
+            String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv) {
+        String[] specs = matcherSpecsLines.isEmpty() ? new String[0] : matcherSpecsLines.split("\n");
+        MethodMatcher[] matchers = new MethodMatcher[specs.length];
+        for (int i = 0; i < specs.length; i++) {
+            matchers[i] = new MethodMatcher(specs[i]);
+        }
+        int[] substitutionSources = parseCsv(substitutionSourcesCsv);
+        return new JavaVisitor<ExecutionContext>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                boolean matched = false;
+                for (MethodMatcher matcher : matchers) {
+                    if (matcher.matches(method)) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if (matched) {
+                    Object[] substitutions = new Object[substitutionSources.length];
+                    for (int i = 0; i < substitutionSources.length; i++) {
+                        int src = substitutionSources[i];
+                        if (src < 0) {
+                            if (method.getSelect() == null) {
+                                return super.visitMethodInvocation(method, ctx);
+                            }
+                            substitutions[i] = method.getSelect();
+                        } else {
+                            if (src >= method.getArguments().size()) {
+                                return super.visitMethodInvocation(method, ctx);
+                            }
+                            substitutions[i] = method.getArguments().get(src);
+                        }
+                    }
+                    J result = JavaTemplate.builder(afterTemplate).build()
+                            .apply(getCursor(), method.getCoordinates().replace(), substitutions);
+                    if (result instanceof J.MethodInvocation) {
+                        JContainer<Expression> matchedTypeArgs = method.getPadding().getTypeParameters();
+                        if (matchedTypeArgs != null) {
+                            result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
+                        }
                     }
                     return result.withPrefix(method.getPrefix());
                 }

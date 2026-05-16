@@ -19,7 +19,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.time.Duration
-import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Smoke tests for the runtime DSL surface — `recipe(...)`, `edit { }`,
@@ -62,9 +61,9 @@ class RecipeDslSurfaceTest {
     @Test
     fun `recipe with scan returns a ScanningRecipe`() {
         val r = recipe("Foo", "bar") {
-            scan<String>("initial") {
+            scan<String>("initial") { _ ->
                 java { /* no-op */ }
-            }.edit { java { /* no-op */ } }
+            }.edit { _ -> java { /* no-op */ } }
         }
         assertThat(r).isInstanceOf(ScanningRecipe::class.java)
     }
@@ -93,8 +92,8 @@ class RecipeDslSurfaceTest {
     fun `declaring scan twice fails fast`() {
         assertThatThrownBy {
             recipe("Foo", "bar") {
-                scan<String>("a") { java { } }.edit { java { } }
-                scan<String>("b") { java { } }.edit { java { } }
+                scan<String>("a") { _ -> java { } }.edit { _ -> java { } }
+                scan<String>("b") { _ -> java { } }.edit { _ -> java { } }
             }
         }.isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("already declares a scan block")
@@ -116,23 +115,22 @@ class RecipeDslSurfaceTest {
     }
 
     @Test
-    fun `scan-bound edit wraps the accumulator in an AtomicReference`() {
+    fun `scan-bound edit threads the accumulator through directly`() {
+        // The accumulator is a lambda parameter, not a receiver property.
+        // The DSL is agnostic to mutability — authors pick `MutableList`,
+        // `AtomicReference<String>`, or anything that fits.
         val r = recipe("Foo", "bar") {
-            // @DslMarker on the language scopes obscures outer-receiver access
-            // (plan §11); capture `this` so the nested java { } closure can
-            // address the ScanScope's `acc`.
-            scan<MutableList<String>>(mutableListOf()) {
-                val s = this
+            scan<MutableList<String>>(mutableListOf()) { acc ->
                 java {
                     visitMethodInvocation { mi ->
-                        s.acc.add(mi.simpleName)
+                        acc.add(mi.simpleName)
                         mi
                     }
                 }
-            }.edit { java { /* no-op edit */ } }
+            }.edit { _ -> java { /* no-op edit */ } }
         }
         val sr = r as ScanningRecipe<*>
-        val initial = sr.getInitialValue(InMemoryExecutionContext()) as AtomicReference<*>
-        assertThat(initial.get()).isInstanceOf(MutableList::class.java)
+        val initial = sr.getInitialValue(InMemoryExecutionContext())
+        assertThat(initial).isInstanceOf(MutableList::class.java)
     }
 }
