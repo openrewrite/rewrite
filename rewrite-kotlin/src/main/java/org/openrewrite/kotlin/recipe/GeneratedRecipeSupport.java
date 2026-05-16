@@ -41,10 +41,11 @@ public final class GeneratedRecipeSupport {
     private GeneratedRecipeSupport() {}
 
     /**
-     * Visitor for a pattern-mode recipe whose before lambda body is a method
-     * invocation rooted at the receiver param. Matching is delegated to
-     * {@link MethodMatcher}; the after template is a {@link KotlinTemplate}
-     * string with one {@code #{any()}} placeholder per substitution slot.
+     * Visitor for a {@code rewrite { ... } to { ... }} recipe whose before
+     * lambda body is a method invocation rooted at the receiver param. Matching
+     * is delegated to {@link MethodMatcher}; the after template is a
+     * {@link KotlinTemplate} string with one {@code #{any()}} placeholder per
+     * substitution slot.
      *
      * {@code matcherSpecsLines} is a {@code \n}-delimited list of
      * MethodMatcher specs — multi-before recipes
@@ -123,16 +124,17 @@ public final class GeneratedRecipeSupport {
     }
 
     /**
-     * Visitor for a stateless phase-mode recipe whose body is
-     * {@code edit { visitMethodInvocation { call -> ... } }}. The Kotlin lambda
-     * receives each method invocation in turn and returns a possibly-transformed
-     * {@code J.MethodInvocation}; returning the same instance is a no-op.
+     * Visitor for a stateless {@code edit { visitMethodInvocation { call -> ... } }}
+     * recipe. The Kotlin lambda receives each method invocation in turn and
+     * returns a possibly-transformed {@code J.MethodInvocation}; returning the
+     * same instance is a no-op.
      *
      * <p>Unlike {@link #methodInvocationRewrite}, there's no MethodMatcher gate
      * and no KotlinTemplate substitution — the user's lambda body runs as Kotlin
      * for every method invocation in the tree, and the author has full
      * imperative control over what (if anything) to change. This is the entry
-     * point for phase-mode recipes; pattern-mode is the declarative shortcut.
+     * point for imperative-edit recipes; {@code rewrite ... to ...} is the
+     * declarative shortcut.
      *
      * <p>Also the lowering target for {@code edit(scanRef) { visitMethodInvocation
      * { call -> ... } }}: the IR pass rewrites {@code acc} references inside the
@@ -152,12 +154,14 @@ public final class GeneratedRecipeSupport {
     }
 
     /**
-     * Visitor for a phase-mode recipe's scan phase. The Kotlin lambda receives
-     * each method invocation in turn and is expected to mutate the recipe's
-     * accumulator (captured from the enclosing {@code getScanner(acc)} method's
-     * parameter). The tree is never transformed during scanning — the framework
-     * discards any structural changes a scanner visitor produces — so the lambda
-     * returns {@code Unit} and the helper always defers to {@code super}.
+     * Visitor for the scan phase of a {@code scan + edit} / {@code scan + generate}
+     * recipe (i.e. a recipe lowered to a {@link org.openrewrite.ScanningRecipe}).
+     * The Kotlin lambda receives each method invocation in turn and is expected
+     * to mutate the recipe's accumulator (captured from the enclosing
+     * {@code getScanner(acc)} method's parameter). The tree is never transformed
+     * during scanning — the framework discards any structural changes a scanner
+     * visitor produces — so the lambda returns {@code Unit} and the helper always
+     * defers to {@code super}.
      */
     public static TreeVisitor<?, ExecutionContext> methodInvocationScanVisitor(
             Function1<J.MethodInvocation, kotlin.Unit> body) {

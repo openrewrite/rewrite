@@ -21,7 +21,8 @@ import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
 //
 // Currently wired:
 //   - [RecipeDslAdditionalCheckers] — validates recipe declarations (mutual exclusion
-//     between pattern mode and phase mode today; more rules to come).
+//     between the `rewrite ... to ...` pattern shape and the imperative
+//     `edit` / `scan` / `generate` blocks today; more rules to come).
 //
 // Future:
 //   - A `FirDeclarationGenerationExtension` that emits a synthetic `Recipe` subclass

@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test
 class RecipeDslCheckerTest {
 
     @Test
-    fun `mixing pattern and phase modes in one recipe fails compilation`() {
+    fun `mixing the pattern shape with imperative edit blocks fails compilation`() {
         val result = RecipePluginCompileFixture.compile(
             """
             import org.openrewrite.Recipe
@@ -40,7 +40,7 @@ class RecipeDslCheckerTest {
 
             val Bad: Recipe = recipe(
                 displayName = "Bad",
-                description = "Mixes pattern and phase modes.",
+                description = "Mixes a rewrite pattern with imperative edit blocks.",
             ) {
                 rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
                 scan(mutableSetOf<String>()) { }
@@ -49,13 +49,13 @@ class RecipeDslCheckerTest {
         )
         assertEquals(KotlinCompilation.ExitCode.COMPILATION_ERROR, result.exitCode, result.messages)
         assertTrue(
-            result.messages.contains("mixes pattern mode"),
-            "Expected a 'mixes pattern mode' error, got:\n${result.messages}",
+            result.messages.contains("mixes the `rewrite ... to ...` pattern"),
+            "Expected a 'mixes pattern shape' error, got:\n${result.messages}",
         )
     }
 
     @Test
-    fun `pattern mode alone compiles cleanly`() {
+    fun `pattern shape alone compiles cleanly`() {
         val result = RecipePluginCompileFixture.compile(
             """
             import org.openrewrite.Recipe
@@ -73,15 +73,15 @@ class RecipeDslCheckerTest {
     }
 
     @Test
-    fun `phase mode alone compiles cleanly`() {
+    fun `scan plus edit alone compiles cleanly`() {
         val result = RecipePluginCompileFixture.compile(
             """
             import org.openrewrite.Recipe
             import org.openrewrite.recipe
 
-            val PhaseOnly: Recipe = recipe(
-                displayName = "PhaseOnly",
-                description = "Phase only.",
+            val ScanEdit: Recipe = recipe(
+                displayName = "ScanEdit",
+                description = "Scan + edit, no pattern shape.",
             ) {
                 scan(mutableSetOf<String>()) { }
                 edit { }
@@ -115,7 +115,7 @@ class RecipeDslCheckerTest {
     }
 
     @Test
-    fun `edit before scan in phase mode fails compilation`() {
+    fun `edit before scan fails compilation`() {
         val result = RecipePluginCompileFixture.compile(
             """
             import org.openrewrite.Recipe
@@ -123,7 +123,7 @@ class RecipeDslCheckerTest {
 
             val OutOfOrder: Recipe = recipe(
                 displayName = "OutOfOrder",
-                description = "Edit appears before scan in phase mode.",
+                description = "Edit appears before scan.",
             ) {
                 edit { }
                 scan(mutableSetOf<String>()) { }
@@ -161,7 +161,7 @@ class RecipeDslCheckerTest {
     fun `val-bound scan mixed with pattern fails compilation`() {
         // Regression test: `val seen = scan(...)` is a FirProperty, not a
         // bare FirFunctionCall. An earlier classify() only matched bare
-        // calls, so a val-bound scan slipped past the mode-mixing rule.
+        // calls, so a val-bound scan slipped past the shape-mixing rule.
         val result = RecipePluginCompileFixture.compile(
             """
             import org.openrewrite.Recipe
@@ -178,8 +178,8 @@ class RecipeDslCheckerTest {
         )
         assertEquals(KotlinCompilation.ExitCode.COMPILATION_ERROR, result.exitCode, result.messages)
         assertTrue(
-            result.messages.contains("mixes pattern mode"),
-            "Expected a 'mixes pattern mode' error, got:\n${result.messages}",
+            result.messages.contains("mixes the `rewrite ... to ...` pattern"),
+            "Expected a 'mixes pattern shape' error, got:\n${result.messages}",
         )
     }
 
@@ -235,7 +235,7 @@ class RecipeDslCheckerTest {
     }
 
     @Test
-    fun `edit without scan in phase mode compiles cleanly`() {
+    fun `stateless edit (no scan) compiles cleanly`() {
         // Stateless edit is allowed — the precedence rule only fires when both
         // scan and edit/generate are present in the same block.
         val result = RecipePluginCompileFixture.compile(

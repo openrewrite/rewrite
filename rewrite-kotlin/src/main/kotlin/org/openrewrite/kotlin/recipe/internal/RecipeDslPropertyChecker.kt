@@ -39,12 +39,13 @@ import org.jetbrains.kotlin.name.Name
  * recipe-DSL well-formedness rules at compile time.
  *
  * Rules currently enforced:
- *  - Pattern mode (`rewrite ... to ...`) and phase mode (`scan/edit/generate`)
- *    are mutually exclusive within one recipe block.
- *  - At most one `rewrite ... to ...` clause per pattern-mode recipe.
- *  - Within a phase-mode recipe, every `scan { … }` precedes every `edit { … }` /
- *    `generate { … }` call. `edit`-without-scan is allowed (the framework
- *    treats it as a stateless edit phase).
+ *  - The declarative `rewrite ... to ...` shape and the imperative
+ *    `scan` / `edit` / `generate` blocks are mutually exclusive within one
+ *    recipe block.
+ *  - At most one `rewrite ... to ...` clause per recipe.
+ *  - In a scan + edit / scan + generate recipe, every `scan { … }` precedes
+ *    every `edit { … }` / `generate { … }` call. `edit`-without-scan is allowed
+ *    (the recipe lowers to a plain Recipe with a stateless visitor).
  *
  * The checker walks only the top-level statements of the recipe block; it
  * intentionally does NOT recurse into nested lambdas, otherwise user code like
@@ -110,21 +111,21 @@ internal object RecipeDslPropertyChecker : FirPropertyChecker(MppCheckerKind.Com
         if (orphanRewrites.isNotEmpty()) return
 
         val hasPattern = patterns.isNotEmpty()
-        val hasPhase = scans.isNotEmpty() || edits.isNotEmpty()
+        val hasImperative = scans.isNotEmpty() || edits.isNotEmpty()
 
-        // Rule 1 — mode mixing.
-        if (hasPattern && hasPhase) {
-            val phaseAnchor = (scans + edits).first().first
+        // Rule 1 — mixing the declarative pattern shape with the imperative blocks.
+        if (hasPattern && hasImperative) {
+            val imperativeAnchor = (scans + edits).first().first
             reportError(
-                phaseAnchor.source ?: declaration.source ?: return,
-                "Recipe block mixes pattern mode (`rewrite ... to ...`) with phase " +
-                    "mode (`scan`/`edit`/`generate`). Split into two recipes.",
+                imperativeAnchor.source ?: declaration.source ?: return,
+                "Recipe block mixes the `rewrite ... to ...` pattern shape with " +
+                    "imperative `scan` / `edit` / `generate` blocks. Split into two recipes.",
             )
             // Don't pile on further diagnostics once the block is structurally invalid.
             return
         }
 
-        // Rule 2 — at most one `rewrite ... to ...` per pattern-mode recipe.
+        // Rule 2 — at most one `rewrite ... to ...` per pattern recipe.
         if (patterns.size > 1) {
             val extra = patterns[1].first
             reportError(
@@ -135,7 +136,7 @@ internal object RecipeDslPropertyChecker : FirPropertyChecker(MppCheckerKind.Com
             )
         }
 
-        // Rule 3 — within phase mode, every scan must precede every edit/generate.
+        // Rule 3 — every `scan` must precede every `edit` / `generate`.
         if (scans.isNotEmpty() && edits.isNotEmpty()) {
             val lastScanIdx = classified.indexOfLast { it.second is StatementKind.Scan }
             val firstEditIdx = classified.indexOfFirst {
@@ -145,10 +146,9 @@ internal object RecipeDslPropertyChecker : FirPropertyChecker(MppCheckerKind.Com
                 val offending = classified[firstEditIdx].first
                 reportError(
                     offending.source ?: declaration.source ?: return,
-                    "Phase-mode recipe places `edit`/`generate` before a `scan` " +
-                        "declared later in the block. Move all `scan { ... }` calls " +
-                        "above any `edit` / `generate` to keep accumulator wiring " +
-                        "lexical.",
+                    "Recipe places `edit` / `generate` before a `scan` declared " +
+                        "later in the block. Move all `scan { ... }` calls above any " +
+                        "`edit` / `generate` to keep accumulator wiring lexical.",
                 )
             }
         }

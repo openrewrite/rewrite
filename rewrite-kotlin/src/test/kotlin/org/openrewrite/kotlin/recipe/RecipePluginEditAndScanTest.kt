@@ -20,22 +20,24 @@ import org.openrewrite.kotlin.Assertions.kotlin
 import org.openrewrite.test.SourceSpecs.text
 
 /**
- * End-to-end check that a Kotlin-DSL recipe written in phase mode actually
- * transforms code via the generated `getVisitor()` override.
+ * End-to-end check that a Kotlin-DSL recipe written with the imperative
+ * `edit { ... }` / `scan { ... } + edit(scanRef) { ... }` blocks actually
+ * transforms code via the generated visitor / ScanningRecipe overrides.
  *
- * Phase mode is the imperative companion to pattern mode: the user writes
- * real Kotlin code inside a `visitMethodInvocation { call -> ... }` lambda
- * that operates on `J.MethodInvocation` directly, instead of declaring
- * before/after structural shapes.
+ * These are the imperative companion to the declarative `rewrite ... to ...`
+ * shape: the user writes real Kotlin code inside a
+ * `visitMethodInvocation { call -> ... }` lambda that operates on
+ * `J.MethodInvocation` directly, instead of declaring before/after structural
+ * shapes.
  *
- * The v0 slice exercised here is the smallest possible: a single
+ * The simplest slice exercised here is a single
  * `edit { visitMethodInvocation { ... } }` block, no `scan`, no `acc`. The
  * IR pass passes the user's lambda straight through to
  * `GeneratedRecipeSupport.methodInvocationEditVisitor` as a `Function1`.
  * Body introspection is not used; the body runs as ordinary Kotlin at recipe
  * execution time.
  */
-class RecipePluginPhaseModeTest : RewriteTest {
+class RecipePluginEditAndScanTest : RewriteTest {
 
     @Test
     fun `scan plus acc-threaded edit transforms only when scan saw the gating method`() {
@@ -43,7 +45,7 @@ class RecipePluginPhaseModeTest : RewriteTest {
         // simpleNames into a MutableSet<String>; the edit phase reads the
         // accumulator and rewrites `lowercase()` -> `uppercase()` only when
         // `trim` was also seen elsewhere in the tree. This proves both
-        // halves of phase mode in one go: getInitialValue's expression is
+        // halves of the lowering in one go: getInitialValue's expression is
         // returned by the generated class, getScanner sees every method
         // invocation and mutates `acc`, and getVisitor(acc) reads back the
         // accumulator via the IR-rewritten `acc` reference inside the user's
