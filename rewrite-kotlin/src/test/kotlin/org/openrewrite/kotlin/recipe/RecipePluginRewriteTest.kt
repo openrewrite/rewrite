@@ -21,11 +21,12 @@ import org.openrewrite.kotlin.Assertions.kotlin
 /**
  * End-to-end check that a Kotlin-DSL recipe with a `rewrite { p -> p.foo() } to
  * { p -> p.bar() }` clause actually transforms code via the generated
- * `getVisitor()` override. The compiler plugin's IR pass lowers the lambdas to
- * KotlinTemplate strings and emits a `getVisitor()` that returns a
- * `KotlinVisitor` from `GeneratedRecipeSupport.methodInvocationReceiverRewrite`.
+ * `getVisitor()` override. The compiler plugin's IR pass extracts the before /
+ * after lambdas as KotlinTemplate strings and emits a `getVisitor()` that
+ * returns a `KotlinVisitor` from
+ * `GeneratedRecipeSupport.methodInvocationReceiverRewrite`.
  *
- * If the lowering is missing, the generated recipe still instantiates but the
+ * If that emission is missing, the generated recipe still instantiates but the
  * visitor is the framework's no-op and the test fails on the unchanged source.
  */
 class RecipePluginRewriteTest : RewriteTest {
@@ -110,10 +111,9 @@ class RecipePluginRewriteTest : RewriteTest {
     @Test
     fun `multi-before recipe matches every before lambda and rewrites to a shared after`() {
         // Two before lambdas share a canonical capture shape (only the receiver
-        // is captured) and pair with a single after lambda. The plugin lowers
-        // them to two MethodMatcher specs joined into the helper as a
-        // newline-delimited list; at runtime, any matching spec triggers the
-        // substitution.
+        // is captured) and pair with a single after lambda. The plugin emits
+        // two MethodMatcher specs joined into the helper as a newline-delimited
+        // list; at runtime, any matching spec triggers the substitution.
         //
         // `lowercase()` and `trim()` are both zero-arg String members and
         // neither is deprecated. Semantics aren't meaningful — the test only
@@ -160,7 +160,7 @@ class RecipePluginRewriteTest : RewriteTest {
     fun `top-level function recipe rewrites no-receiver calls`() {
         // The before lambda's root call has no dispatch or extension receiver
         // (it's a top-level Kotlin function), and the captured param appears
-        // as a regular argument. The plugin lowers to a matcher with no
+        // as a regular argument. The plugin emits a matcher with no
         // receiver constraint and an after template that substitutes
         // `method.getArguments().get(0)` into the captured slot.
         val result = RecipePluginCompileFixture.compile(
@@ -197,9 +197,9 @@ class RecipePluginRewriteTest : RewriteTest {
     @Test
     fun `receiver can be a non-first lambda param`() {
         // The receiver position binds to `list` (param[1]), not `x` (param[0]).
-        // Param[0] appears in arg position. The generalized lowering must
-        // resolve `x` -> arg index 0 and `list` -> -1 (receiver) when building
-        // the after template's substitutions.
+        // Param[0] appears in arg position. The generalized substitution
+        // logic must resolve `x` -> arg index 0 and `list` -> -1 (receiver)
+        // when building the after template's substitutions.
         val result = RecipePluginCompileFixture.compile(
             """
             import org.openrewrite.Recipe
@@ -233,7 +233,7 @@ class RecipePluginRewriteTest : RewriteTest {
 
     @Test
     fun `extension matcher tightens to the JVM facade and skips same-named user extensions`() {
-        // `s.lowercase()` lowers to a static call on `kotlin.text.StringsKt`.
+        // `s.lowercase()` compiles to a static call on `kotlin.text.StringsKt`.
         // After the facade-resolution tightening, the matcher emits
         // `kotlin.text.StringsKt lowercase(..)` instead of the wildcard
         // `* lowercase(..)`. A same-module user extension named `lowercase`

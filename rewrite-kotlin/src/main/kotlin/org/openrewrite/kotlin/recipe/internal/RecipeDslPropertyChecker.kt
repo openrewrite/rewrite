@@ -45,7 +45,7 @@ import org.jetbrains.kotlin.name.Name
  *  - At most one `rewrite ... to ...` clause per recipe.
  *  - In a scan + edit / scan + generate recipe, every `scan { … }` precedes
  *    every `edit { … }` / `generate { … }` call. `edit`-without-scan is allowed
- *    (the recipe lowers to a plain Recipe with a stateless visitor).
+ *    (the recipe becomes a plain Recipe with a stateless visitor).
  *
  * The checker walks only the top-level statements of the recipe block; it
  * intentionally does NOT recurse into nested lambdas, otherwise user code like

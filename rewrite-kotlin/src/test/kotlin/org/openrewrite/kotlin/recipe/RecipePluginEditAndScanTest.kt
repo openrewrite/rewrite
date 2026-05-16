@@ -45,7 +45,7 @@ class RecipePluginEditAndScanTest : RewriteTest {
         // simpleNames into a MutableSet<String>; the edit phase reads the
         // accumulator and rewrites `lowercase()` -> `uppercase()` only when
         // `trim` was also seen elsewhere in the tree. This proves both
-        // halves of the lowering in one go: getInitialValue's expression is
+        // halves of the generated ScanningRecipe in one go: getInitialValue's expression is
         // returned by the generated class, getScanner sees every method
         // invocation and mutates `acc`, and getVisitor(acc) reads back the
         // accumulator via the IR-rewritten `acc` reference inside the user's
@@ -566,8 +566,8 @@ class RecipePluginEditAndScanTest : RewriteTest {
 
     @Test
     fun `scan plus generate produces a new SourceFile per accumulated entry`() {
-        // End-to-end generate-mode wiring: scan collects class simple names,
-        // then `generate(seen) { ... }` lowers to a
+        // End-to-end scan + generate wiring: scan collects class simple names,
+        // then `generate(seen) { ... }` becomes a
         // `generate(A, ExecutionContext): Collection<? extends SourceFile>`
         // override whose body returns a list of PlainText files (one per
         // accumulated class name). Verifies the override is wired AND that

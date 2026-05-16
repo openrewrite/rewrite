@@ -175,7 +175,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         }
 
         // `GeneratedRecipeSupport.methodInvocationRewrite(matcherSpec, afterTemplate, substitutionSourcesCsv)`
-        // is the lowering target for `rewrite { p -> p.foo(...) } to { p -> p.bar(...) }`.
+        // is what `rewrite { p -> p.foo(...) } to { p -> p.bar(...) }` compiles into.
         // If we can't find it (e.g. when running against an older rewrite-kotlin),
         // we silently skip getVisitor() generation — recipes still compile, they
         // just don't transform code.
@@ -332,8 +332,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
          * symbol in `GeneratedRecipeSupport` for the edit phase. Used by both
          * `EditScope` (stateless) and `EditScopeWithAcc` (acc-threaded), which
          * share the same per-kind helper because the lambda's signature is
-         * identical and acc capture happens via Kotlin closure lowering, not
-         * via the helper.
+         * identical and acc capture happens via Kotlin's normal closure
+         * conversion (the compiler boxes captured values into the lambda's
+         * synthetic field), not via the helper.
          */
         val editVisitorHelpers: Map<String, IrSimpleFunctionSymbol>,
         /** Same idea, for the scan phase (lambda returns Unit). */
@@ -387,18 +388,18 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             if (initializerExpr.symbol.owner.kotlinFqName != RECIPE_FQN) continue
 
             val metadata = readMetadata(initializerExpr) ?: continue
-            // Two lowering shapes today, mutually exclusive by FIR-checker
+            // Two recipe shapes today, mutually exclusive by FIR-checker
             // construction (mixing them is rejected at compile time): the
             // declarative pattern shape (`rewrite ... to ...`) becomes
             // string-args to a Java helper; the imperative shape
             // (`edit { visitMethodInvocation { ... } }` for the stateless v0
             // slice) becomes a lambda passed straight through. Try the pattern
-            // shape first because it has the stricter shape match; fall through
+            // shape first because it has the stricter match; fall through
             // to the imperative path if no pattern clause is recognised.
             val patternTemplates = if (sourceText != null) {
                 extractRewriteTemplates(initializerExpr, sourceText)
             } else null
-            val visitorLowering: VisitorLowering? = patternTemplates?.let(VisitorLowering::Pattern)
+            val recipeShape: RecipeShape? = patternTemplates?.let(RecipeShape::Pattern)
                 ?: extractScanEdit(initializerExpr)
                 ?: extractStatelessEditLambda(initializerExpr)
 
@@ -407,7 +408,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 parentFile = file,
                 propertyName = declaration.name,
                 metadata = metadata,
-                visitorLowering = visitorLowering,
+                recipeShape = recipeShape,
             )
             file.addChild(generatedClass)
 
@@ -510,12 +511,13 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * The recipe body's intended visitor lowering. Mutually exclusive by the
-     * FIR checker — at most one of these survives extraction.
+     * Classification of the recipe body, used to decide which generated-class
+     * shape to emit. Mutually exclusive by the FIR checker — at most one of
+     * these survives extraction.
      */
-    private sealed class VisitorLowering {
+    private sealed class RecipeShape {
         /** `rewrite { p -> p.foo() } to { p -> p.bar() }` — string-template path. */
-        class Pattern(val templates: RewriteTemplates) : VisitorLowering()
+        class Pattern(val templates: RewriteTemplates) : RecipeShape()
 
         /**
          * `edit { [aux*]; visitMethodInvocation { call -> ... } }` with no
@@ -527,7 +529,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
          * `getVisitor()` body ahead of the runtime helper call, so the visit
          * lambda closes over them.
          */
-        class StatelessEdit(val editBlock: IrFunctionExpression) : VisitorLowering()
+        class StatelessEdit(val editBlock: IrFunctionExpression) : RecipeShape()
 
         /**
          * `scan<A>(initial) { [aux*]; visitMethodInvocation { ... } }` paired
@@ -553,7 +555,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
              * rewritten to the override parameters.
              */
             val generateBlock: IrFunctionExpression?,
-        ) : VisitorLowering()
+        ) : RecipeShape()
     }
 
     private fun buildGeneratedRecipeClass(
@@ -561,7 +563,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         parentFile: IrFile,
         propertyName: Name,
         metadata: RecipeMetadata,
-        visitorLowering: VisitorLowering?,
+        recipeShape: RecipeShape?,
     ): IrClass {
         // Two superclass shapes: the declarative `rewrite ... to ...` shape
         // and the stateless `edit { ... }` shape both extend `Recipe`;
@@ -579,7 +581,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         cls.parent = parentFile
         cls.createThisReceiverParameter()
 
-        val scanEdit = visitorLowering as? VisitorLowering.ScanEdit
+        val scanEdit = recipeShape as? RecipeShape.ScanEdit
         val (superType, superCtor) = if (scanEdit != null &&
             ctx.scanningRecipeClassSymbol != null &&
             ctx.scanningRecipeNoArgCtorSymbol != null
@@ -610,30 +612,30 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
         addMetadataOverrides(cls, ctx, metadata)
 
-        when (visitorLowering) {
-            is VisitorLowering.Pattern -> {
+        when (recipeShape) {
+            is RecipeShape.Pattern -> {
                 if (ctx.getVisitor != null && ctx.methodInvocationRewriteSymbol != null) {
                     addGetVisitorOverride(
                         cls = cls,
                         ctx = ctx,
                         overrides = ctx.getVisitor,
                         factorySymbol = ctx.methodInvocationRewriteSymbol,
-                        templates = visitorLowering.templates,
+                        templates = recipeShape.templates,
                     )
                 }
             }
-            is VisitorLowering.StatelessEdit -> {
+            is RecipeShape.StatelessEdit -> {
                 if (ctx.getVisitor != null) {
                     addStatelessEditGetVisitorOverride(
                         cls = cls,
                         ctx = ctx,
                         overrides = ctx.getVisitor,
-                        editBlock = visitorLowering.editBlock,
+                        editBlock = recipeShape.editBlock,
                     )
                 }
             }
-            is VisitorLowering.ScanEdit -> {
-                addScanEditOverrides(cls, ctx, visitorLowering)
+            is RecipeShape.ScanEdit -> {
+                addScanEditOverrides(cls, ctx, recipeShape)
             }
             null -> Unit
         }
@@ -680,7 +682,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
      *    `extensionReceiverParameter == null`): tighten to
      *    `<receiverFqn> method(..)`.
      *  - Extension calls (`extensionReceiverParameter != null`) and top-level
-     *    non-extension functions (no receiver): both lower to static methods
+     *    non-extension functions (no receiver): both compile to static methods
      *    on a JVM facade class. Tighten to `<facadeFqn> method(..)` where
      *    `facadeFqn` is computed from the function's [JvmPackagePartSource]
      *    (deserialized library code) or its parent [IrFile] (same-module
@@ -800,7 +802,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * Lowering output for a `rewrite { ... } to { ... }` recipe whose before
+     * Generator inputs for a `rewrite { ... } to { ... }` recipe whose before
      * lambda body is a method call rooted at the receiver param. The runtime
      * helper builds one {@link org.openrewrite.java.MethodMatcher} per entry in [matcherSpecs]
      * and accepts a method invocation when any of them matches; it then applies
@@ -811,8 +813,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
      * Nth argument (`method.getArguments().get(N)`).
      *
      * For multi-before recipes (`rewrite(b1, b2, ...) to a`), every before
-     * lambda lowers to its own spec but they share a single after template +
-     * CSV — the IR pass refuses to lower unless every before lambda agrees on
+     * lambda gets its own spec but they share a single after template +
+     * CSV — the IR pass refuses to emit unless every before lambda agrees on
      * the captured argument shape, so the same source positions apply.
      *
      * Why MethodMatcher rather than KotlinTemplate-based matching: KotlinTemplate's
@@ -862,7 +864,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     )
 
     /**
-     * Tries to lower the recipe body to a `(matcherSpecs, afterTemplate, substitutionSourcesCsv)`
+     * Tries to extract the recipe body as a `(matcherSpecs, afterTemplate, substitutionSourcesCsv)`
      * triple for the v0 shape this commit supports: exactly one
      * `rewrite(before, ...) to after` clause in the body. Each before lambda
      * must have param[0] in receiver position of a method call and remaining
@@ -884,7 +886,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val statements = (blockArg.function.body as? IrBlockBody)?.statements ?: return null
         // Single-rewrite v0: exactly one top-level statement. `to` returns Unit,
         // so the wrapper appears as a bare expression statement (or wrapped in
-        // an IrReturn when the lambda lowers a single-expression body).
+        // an IrReturn when the lambda is a single-expression body, which the
+        // Kotlin compiler emits as `return <expr>` in IR).
         val firstStmt = statements.singleOrNull() ?: return null
         val toCall = (firstStmt as? IrReturn)?.value as? IrCall ?: firstStmt as? IrCall ?: return null
         // The `rewrite(before: () -> R)` overload returns RewriteAdvice0; the
@@ -1231,18 +1234,18 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * Tries to lower the recipe body to a stateless edit: exactly one
+     * Tries to match the recipe body as a stateless edit: exactly one
      * top-level `edit { visitMethodInvocation { call -> ... } }` clause and
      * nothing else. The lambda body is whatever the user wrote — we don't
-     * introspect it; the Kotlin compiler's lambda lowering emits it as a
-     * regular `Function1<J.MethodInvocation, J.MethodInvocation>` instance,
-     * and the runtime helper invokes it per method-invocation visit.
+     * introspect it; the Kotlin compiler emits it as a regular
+     * `Function1<J.MethodInvocation, J.MethodInvocation>` instance, and the
+     * runtime helper invokes it per method-invocation visit.
      *
      * The two-arg `edit(scanRef, block)` overload is intentionally rejected
-     * here — it's the scan-bound variant whose lowering needs ScanningRecipe
+     * here — it's the scan-bound variant that compiles to a ScanningRecipe
      * (a separate, larger commit). Same for any `scan` / `generate` siblings.
      */
-    private fun extractStatelessEditLambda(recipeCall: IrCall): VisitorLowering.StatelessEdit? {
+    private fun extractStatelessEditLambda(recipeCall: IrCall): RecipeShape.StatelessEdit? {
         val callee = recipeCall.symbol.owner
         val blockIdx = callee.valueParameters.indexOfFirst { it.name == Name.identifier("block") }
         if (blockIdx < 0) return null
@@ -1250,7 +1253,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val recipeStmts = (blockArg.function.body as? IrBlockBody)?.statements ?: return null
         // Exactly one top-level call — same shape constraint as `rewrite ... to ...`.
         // Mixing rules are enforced earlier by the FIR checker; this is just
-        // the lowering's structural gate for what it can currently emit.
+        // the structural gate for what the IR pass can currently emit.
         // Allowing aux statements at the recipe-body level is a separate
         // relaxation (would require hoisting to class fields or constructor);
         // not in scope here.
@@ -1269,7 +1272,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             block = editBlockArg,
             scopePrefix = EDIT_SCOPE_PREFIX,
         ) ?: return null
-        return VisitorLowering.StatelessEdit(editBlock = editBlockArg)
+        return RecipeShape.StatelessEdit(editBlock = editBlockArg)
     }
 
     /**
@@ -1337,8 +1340,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * Tries to lower the recipe body to a scan + acc-threaded edit shape
-     * (i.e. a `ScanningRecipe<A>`).
+     * Tries to match the recipe body as a scan + acc-threaded edit
+     * (compiles to a `ScanningRecipe<A>`).
      * The shape we accept here is exactly the resume-brief minimum-viable demo:
      *
      *     val seen = scan<A>(initial = ...) { visitMethodInvocation { call -> /* uses acc */ } }
@@ -1351,10 +1354,10 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
      * statements get hoisted into the generated override body so the visit
      * lambda captures them via closure; their `acc` references are rewritten
      * just like the visit lambda's. Anything that fails the shape match
-     * returns null and the lowering falls through (recipe still compiles,
+     * returns null and the IR pass falls through (recipe still compiles,
      * inherits the no-op visitor).
      */
-    private fun extractScanEdit(recipeCall: IrCall): VisitorLowering.ScanEdit? {
+    private fun extractScanEdit(recipeCall: IrCall): RecipeShape.ScanEdit? {
         val callee = recipeCall.symbol.owner
         val blockIdx = callee.valueParameters.indexOfFirst { it.name == Name.identifier("block") }
         if (blockIdx < 0) return null
@@ -1423,7 +1426,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // (with DataTable side effects) would relax this.
         if (editBlock == null && generateBlock == null) return null
 
-        return VisitorLowering.ScanEdit(
+        return RecipeShape.ScanEdit(
             accType = accType,
             initialExpr = initialExpr,
             scanBlock = scanBlock,
@@ -1441,32 +1444,32 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
      * passing the lambda to the helper, references to the outer
      * `ScanScope<A>.acc` / `EditScopeWithAcc<A>.acc` getter inside the body
      * are rewritten to read the local method's `acc` parameter (which the
-     * Kotlin compiler then captures as a closure when lowering the lambda
-     * to a Function class).
+     * Kotlin compiler then captures via the lambda's normal closure
+     * conversion to a Function class).
      */
     private fun addScanEditOverrides(
         cls: IrClass,
         ctx: RecipeIrGenContext,
-        lowering: VisitorLowering.ScanEdit,
+        shape: RecipeShape.ScanEdit,
     ) {
         val getInitialValueFn = ctx.getInitialValue
         val getScannerFn = ctx.getScanner
         val getVisitorAccFn = ctx.getVisitorAcc
         val ecCls = ctx.executionContextClassSymbol
-        // ScanningRecipe must be fully resolved for the lowering to be valid.
+        // ScanningRecipe must be fully resolved for the generated code to be valid.
         // The class shell still got built (extending Recipe in fallback) so
         // skipping overrides keeps the recipe loadable; it just won't transform.
         if (getInitialValueFn == null || getScannerFn == null || getVisitorAccFn == null) return
         if (ecCls == null) return
 
-        addGetInitialValueOverride(cls, ctx, getInitialValueFn, ecCls, lowering)
+        addGetInitialValueOverride(cls, ctx, getInitialValueFn, ecCls, shape)
         addScanOrEditVisitorOverride(
             cls = cls,
             ctx = ctx,
             overrides = getScannerFn,
             helpersByVisitName = ctx.scanVisitorHelpers,
-            lowering = lowering,
-            block = lowering.scanBlock,
+            shape = shape,
+            block = shape.scanBlock,
             scopePrefix = SCAN_SCOPE_PREFIX,
             accGetterToRewrite = ctx.scanScopeAccGetterSymbol,
             jvmName = "getScanner",
@@ -1475,14 +1478,14 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // is `TreeVisitor.noop()`. ScanEdit carries at least one consumer
         // (edit and/or generate) by construction — the extractor returns null
         // when both are absent.
-        val editBlock = lowering.editBlock
+        val editBlock = shape.editBlock
         if (editBlock != null) {
             addScanOrEditVisitorOverride(
                 cls = cls,
                 ctx = ctx,
                 overrides = getVisitorAccFn,
                 helpersByVisitName = ctx.editVisitorHelpers,
-                lowering = lowering,
+                shape = shape,
                 block = editBlock,
                 scopePrefix = EDIT_SCOPE_WITH_ACC_PREFIX,
                 accGetterToRewrite = ctx.editScopeWithAccGetterSymbol,
@@ -1493,14 +1496,14 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // `generate(A, ExecutionContext): Collection<? extends SourceFile>`
         // override whose body is the user's lambda inlined, with acc + ctx
         // references rewritten to the override parameters.
-        val generateBlock = lowering.generateBlock
+        val generateBlock = shape.generateBlock
         val generateFn = ctx.generate
         if (generateBlock != null && generateFn != null) {
             addGenerateOverride(
                 cls = cls,
                 ctx = ctx,
                 overrides = generateFn,
-                lowering = lowering,
+                shape = shape,
                 block = generateBlock,
             )
         }
@@ -1511,18 +1514,18 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         ctx: RecipeIrGenContext,
         overrides: IrSimpleFunction,
         executionContextClass: IrClassSymbol,
-        lowering: VisitorLowering.ScanEdit,
+        shape: RecipeShape.ScanEdit,
     ) {
         cls.addFunction(
             name = "getInitialValue",
-            returnType = lowering.accType,
+            returnType = shape.accType,
             modality = Modality.OPEN,
             visibility = DescriptorVisibilities.PUBLIC,
         ).apply {
             overriddenSymbols = listOf(overrides.symbol)
             addValueParameter("ctx", executionContextClass.defaultType)
             body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
-                +irReturn(lowering.initialExpr.deepCopyWithSymbols(initialParent = this@apply))
+                +irReturn(shape.initialExpr.deepCopyWithSymbols(initialParent = this@apply))
             }
         }
     }
@@ -1540,7 +1543,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         ctx: RecipeIrGenContext,
         overrides: IrSimpleFunction,
         helpersByVisitName: Map<String, IrSimpleFunctionSymbol>,
-        lowering: VisitorLowering.ScanEdit,
+        shape: RecipeShape.ScanEdit,
         block: IrFunctionExpression,
         scopePrefix: String,
         accGetterToRewrite: IrSimpleFunctionSymbol?,
@@ -1563,7 +1566,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             visibility = DescriptorVisibilities.PUBLIC,
         ).apply {
             overriddenSymbols = listOf(overrides.symbol)
-            val accParam = addValueParameter("acc", lowering.accType)
+            val accParam = addValueParameter("acc", shape.accType)
             body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
                 val expansion = expandBlockIntoOverride(
                     block = block,
@@ -1594,7 +1597,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
      * Emits the `generate(A acc, ExecutionContext ctx): Collection<? extends SourceFile>`
      * override. The user's lambda is the whole body — deep-copy it, splice its
      * statements into the new function (its trailing expression becomes the
-     * `return`, mirroring how Kotlin lowers a single-expression lambda body),
+     * `return`, mirroring how Kotlin emits a single-expression lambda body),
      * and rewrite `GenerateScope.acc` / `GenerateScope.ctx` getter calls
      * against the override's local parameters.
      *
@@ -1607,7 +1610,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         cls: IrClass,
         ctx: RecipeIrGenContext,
         overrides: IrSimpleFunction,
-        lowering: VisitorLowering.ScanEdit,
+        shape: RecipeShape.ScanEdit,
         block: IrFunctionExpression,
     ) {
         val ecCls = ctx.executionContextClassSymbol ?: return
@@ -1618,7 +1621,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             visibility = DescriptorVisibilities.PUBLIC,
         ).apply {
             overriddenSymbols = listOf(overrides.symbol)
-            val accParam = addValueParameter("acc", lowering.accType)
+            val accParam = addValueParameter("acc", shape.accType)
             val ctxParam = addValueParameter("ctx", ecCls.defaultType)
             body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
                 val copiedBlock = block.deepCopyWithSymbols(initialParent = this@apply)
@@ -1695,13 +1698,13 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * Lowering for a stateless `edit { ... }` recipe. The generated `getVisitor()`
-     * deep-copies the whole `edit { }` block once so all internal symbol
-     * cross-references stay coherent, then re-partitions the copy into
-     * (aux statements, the inner visit lambda). Aux statements are emitted
-     * as locals of `getVisitor()`; the visit lambda is the argument to
+     * Code generation for a stateless `edit { ... }` recipe. The generated
+     * `getVisitor()` deep-copies the whole `edit { }` block once so all
+     * internal symbol cross-references stay coherent, then re-partitions the
+     * copy into (aux statements, the inner visit lambda). Aux statements are
+     * emitted as locals of `getVisitor()`; the visit lambda is the argument to
      * `GeneratedRecipeSupport.methodInvocationEditVisitor`. Because the
-     * Kotlin compiler lowers the visit lambda into a Function1 class that
+     * Kotlin compiler emits the visit lambda as a Function1 class that
      * captures its enclosing locals, the aux declarations are visible to
      * the lambda at runtime via standard closure capture.
      */

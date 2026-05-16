@@ -49,7 +49,7 @@ public final class GeneratedRecipeSupport {
      *
      * {@code matcherSpecsLines} is a {@code \n}-delimited list of
      * MethodMatcher specs — multi-before recipes
-     * ({@code rewrite(b1, b2, ...) to a}) lower to one spec per before lambda
+     * ({@code rewrite(b1, b2, ...) to a}) yield one spec per before lambda
      * and we accept a method invocation when any spec matches.
      *
      * The {@code substitutionSourcesCsv} encodes, in template-left-to-right
@@ -136,7 +136,7 @@ public final class GeneratedRecipeSupport {
      * point for imperative-edit recipes; {@code rewrite ... to ...} is the
      * declarative shortcut.
      *
-     * <p>Also the lowering target for {@code edit(scanRef) { visitMethodInvocation
+     * <p>Also the entry point for {@code edit(scanRef) { visitMethodInvocation
      * { call -> ... } }}: the IR pass rewrites {@code acc} references inside the
      * body so they read from the enclosing {@code getVisitor(acc)} method's
      * parameter, which the Kotlin lambda captures as a closure variable. From
@@ -155,7 +155,7 @@ public final class GeneratedRecipeSupport {
 
     /**
      * Visitor for the scan phase of a {@code scan + edit} / {@code scan + generate}
-     * recipe (i.e. a recipe lowered to a {@link org.openrewrite.ScanningRecipe}).
+     * recipe (i.e. one that compiles to a {@link org.openrewrite.ScanningRecipe}).
      * The Kotlin lambda receives each method invocation in turn and is expected
      * to mutate the recipe's accumulator (captured from the enclosing
      * {@code getScanner(acc)} method's parameter). The tree is never transformed
