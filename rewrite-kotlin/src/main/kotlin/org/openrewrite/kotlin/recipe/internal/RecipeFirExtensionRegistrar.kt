@@ -18,19 +18,10 @@ package org.openrewrite.kotlin.recipe.internal
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar
 
 // Bundles all FIR-level extensions that the recipe DSL plugin contributes.
-//
-// Currently wired:
-//   - [RecipeDslAdditionalCheckers] — validates recipe declarations (mutual exclusion
-//     between the `rewrite ... to ...` pattern shape and the imperative
-//     `edit` / `scan` / `generate` blocks today; more rules to come).
-//
-// Future:
-//   - A `FirDeclarationGenerationExtension` that emits a synthetic `Recipe` subclass
-//     per top-level `recipe(name) { ... }` val, with metadata + KotlinTemplate
-//     strings extracted from the user's lambda bodies.
-
+// Phase 3 of the DSL rewrite re-populates this with `RecipeFirDslCheckers` —
+// currently empty so the plugin is well-formed but contributes no FIR checks.
 internal class RecipeFirExtensionRegistrar : FirExtensionRegistrar() {
     override fun ExtensionRegistrarContext.configurePlugin() {
-        +::RecipeDslAdditionalCheckers
+        // intentionally empty until RecipeFirDslCheckers lands in Phase 3
     }
 }

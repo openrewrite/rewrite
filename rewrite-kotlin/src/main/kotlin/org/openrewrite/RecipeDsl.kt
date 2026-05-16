@@ -13,232 +13,483 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:JvmName("RecipeDsl")
 package org.openrewrite
 
+import org.openrewrite.dsl.scopes.LanguageScope
+import org.openrewrite.java.search.UsesField
+import org.openrewrite.java.search.UsesJavaVersion
+import org.openrewrite.java.search.UsesMethod
+import org.openrewrite.java.search.UsesType
+import org.openrewrite.kotlin.recipe.GeneratedRecipeSupport
 import java.time.Duration
+import java.util.concurrent.atomic.AtomicReference
 
-// Author-facing surface for the Kotlin recipe authoring DSL.
+// Author-facing surface for the Kotlin recipe-authoring DSL.
 //
-//     val UseUppercase: Recipe = recipe(
-//         displayName = "Use uppercase",
-//         description = "Replace lowercase() with uppercase() (illustrative).",
-//     ) {
-//         rewrite({ s: String -> s.lowercase() }) to { s -> s.uppercase() }
-//     }
+// Three layers (see plan `you-should-read-the-compressed-crayon.md`):
+//   1. recipe(displayName, description, recipeTags, effort) { ... }  — metadata + scope
+//   2. edit { } / generate { } / scan<A>(initial) { }.edit { }.generate { }
+//   3. kotlin { } / java { } / yaml { } / ... { visitX { node -> ... } } — per-language visitor builders
 //
-// The rewrite-kotlin K2 compiler plugin
-//   1. walks the [recipe] call's metadata arguments and trailing lambda at
-//      compile time,
-//   2. generates a synthetic `Recipe` subclass per declaration (metadata from
-//      the function arguments, behavior translated from the
-//      rewrite/scan/edit/generate calls inside the block),
-//   3. replaces the [recipe] call's IR with a constructor invocation of the
-//      generated subclass.
-//
-// The lambda body is intentionally never invoked at runtime. Without the
-// plugin loaded, [recipe] throws a setup error — the wrapper exists only as
-// a syntactic anchor that gives the val a `Recipe` type and gives the plugin
-// a well-defined IR call to replace.
+// The imperative path (`edit { kotlin { visitX { ... } } }`) compiles and runs
+// pure-JVM without the rewrite-kotlin K2 compiler plugin. The `rewrite { } to { }`
+// declarative path REQUIRES the plugin: the MethodMatcher spec is synthesized at
+// FIR time from the resolved before-lambda symbol. Without the plugin, `rewrite`
+// is an `error(...)` stub.
 
 /** Marker that pins receiver scopes inside the recipe DSL. */
 @DslMarker
-public annotation class RecipeDslMarker
+public annotation class RecipeDsl
 
 /**
- * Top-level anchor for a recipe declaration. Metadata is carried as named
- * arguments; behavior is carried in the trailing lambda. The val initializer
- * wraps the behavior block in this call so that
- *  - the val's declared type is `Recipe` (Java abstract class from rewrite-core),
- *  - the K2 compiler plugin has a single well-defined IR call to replace
- *    with a constructor invocation of the generated `Recipe` subclass.
+ * Top-level entry point for a recipe declaration. The trailing lambda runs once
+ * at recipe-construction time, populating a [RecipeBuilder] with the captured
+ * phase blocks (`edit`/`scan`/`generate`). The returned [Recipe] re-evaluates
+ * those blocks on each lifecycle call (`getVisitor()`, `getScanner(acc)`, etc.)
+ * to produce fresh visitors per cycle — matching the framework's expectation
+ * that visitors carry per-run state via cursor.
  *
- * `estimatedEffortPerOccurrence` is a [java.time.Duration]; the plugin
- * deep-copies the supplied expression into the generated Recipe's
- * `getEstimatedEffortPerOccurrence()` override. `null` (the default) leaves
- * the framework's Recipe-level default in place.
- *
- * Without the rewrite-kotlin compiler plugin loaded on the consuming module,
- * this function throws — the DSL requires the plugin.
+ * `estimatedEffortPerOccurrence` is a [java.time.Duration]; `null` (the default)
+ * leaves the framework's Recipe-level default in place.
  */
 public fun recipe(
-    @Suppress("UNUSED_PARAMETER") displayName: String,
-    @Suppress("UNUSED_PARAMETER") description: String,
-    @Suppress("UNUSED_PARAMETER") tags: Set<String> = emptySet(),
-    @Suppress("UNUSED_PARAMETER") estimatedEffortPerOccurrence: Duration? = null,
-    @Suppress("UNUSED_PARAMETER") block: RecipeBuilder.() -> Unit,
-): Recipe =
-    error(
-        "Recipe DSL: the rewrite-kotlin K2 compiler plugin is not loaded. " +
-            "Add rewrite-kotlin to `kotlinCompilerPluginClasspath` " +
-            "(plugin id `org.openrewrite.kotlin.recipe`)."
-    )
+    displayName: String,
+    description: String,
+    tags: Set<String> = emptySet(),
+    estimatedEffortPerOccurrence: Duration? = null,
+    block: RecipeBuilder.() -> Unit,
+): Recipe {
+    val builder = RecipeBuilder().apply(block)
+    return builder.build(displayName, description, tags, estimatedEffortPerOccurrence)
+}
 
 /**
- * Receiver scope of the recipe lambda. None of these methods do real work at
- * runtime — they exist as type stubs for the compiler plugin to walk.
+ * Receiver scope of the [recipe] lambda. Carries the captured phase blocks
+ * (`edit`/`scan`/`generate`) and produces a [Recipe] or [ScanningRecipe] from
+ * them on [build].
  */
-@RecipeDslMarker
+@RecipeDsl
 public class RecipeBuilder internal constructor() {
 
-    // === Pattern mode ===
-    // One `rewrite ... to ...` clause per recipe. Multiple BEFORE lambdas pair
-    // with a single AFTER lambda. The `to` infix returns Unit — chaining a
-    // second rewrite is not a type error here but the compiler plugin rejects
-    // it at compile time.
+    private var editBlock: (EditScope.() -> Unit)? = null
+    private var generateBlock: (GenerateScope.() -> Collection<SourceFile>)? = null
+    private var scanBuilder: ScanBuilder<*>? = null
+
+    /** Bare edit phase, no accumulator. */
+    public fun edit(block: EditScope.() -> Unit) {
+        require(editBlock == null) { "recipe { } already declares an edit block" }
+        require(scanBuilder == null) { "use scan<A>(initial) { }.edit { } when a scan accumulator is in play" }
+        editBlock = block
+    }
+
+    /**
+     * Bare generate phase, no accumulator. Rare — generation without scan.
+     * The block's last expression is a `Collection<SourceFile>` to emit.
+     */
+    public fun generate(block: GenerateScope.() -> Collection<SourceFile>) {
+        require(generateBlock == null) { "recipe { } already declares a generate block" }
+        require(scanBuilder == null) { "use scan<A>(initial) { }.generate { } when a scan accumulator is in play" }
+        generateBlock = block
+    }
+
+    /**
+     * Scan phase that produces an accumulator of type [A]. Chain with `.edit { }`
+     * and/or `.generate { }` to consume the accumulator. A bare `scan` with no
+     * chained consumer would compute and discard the accumulator — Phase 3's FIR
+     * checker rejects that shape at compile time; at runtime the scan still runs
+     * but contributes no visitor.
+     */
+    public fun <A : Any> scan(initial: A, block: ScanScope<A>.() -> Unit): Scan<A> {
+        require(scanBuilder == null) { "recipe { } already declares a scan block (single-scan v1)" }
+        require(editBlock == null && generateBlock == null) {
+            "place scan { } before edit { } / generate { } (chain with scan { }.edit { })"
+        }
+        val sb = ScanBuilder(initial, block)
+        scanBuilder = sb
+        return Scan(sb)
+    }
+
+    internal fun build(
+        displayName: String,
+        description: String,
+        recipeTags: Set<String>,
+        effort: Duration?,
+    ): Recipe {
+        val scan = scanBuilder
+        if (scan != null) {
+            return buildScanningRecipe(scan, displayName, description, recipeTags, effort)
+        }
+        return buildSimpleRecipe(displayName, description, recipeTags, effort)
+    }
+
+    private fun buildSimpleRecipe(
+        displayName: String,
+        description: String,
+        recipeTags: Set<String>,
+        effort: Duration?,
+    ): Recipe {
+        val capturedEdit = editBlock
+        val capturedGen = generateBlock
+        // A bare generate { } without scan is a SourceFile generator that runs
+        // outside the scan accumulator lifecycle. Without scan the framework
+        // has no natural lifecycle hook for generation; we synthesize a
+        // ScanningRecipe<Unit> whose getInitialValue returns Unit and whose
+        // generate runs the captured block.
+        if (capturedGen != null && capturedEdit == null) {
+            return buildBareGenerateRecipe(displayName, description, recipeTags, effort, capturedGen)
+        }
+        return object : Recipe() {
+            override fun getDisplayName(): String = displayName
+            override fun getDescription(): String = description
+            override fun getTags(): Set<String> = recipeTags
+            override fun getEstimatedEffortPerOccurrence(): Duration? = effort
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                val edit = capturedEdit ?: return TreeVisitor.noop<Tree, ExecutionContext>()
+                val scope = EditScope().apply(edit)
+                return scope.buildVisitor()
+            }
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <A : Any> buildScanningRecipe(
+        scan: ScanBuilder<A>,
+        displayName: String,
+        description: String,
+        recipeTags: Set<String>,
+        effort: Duration?,
+    ): Recipe {
+        return object : ScanningRecipe<AtomicReference<A>>() {
+            override fun getDisplayName(): String = displayName
+            override fun getDescription(): String = description
+            override fun getTags(): Set<String> = recipeTags
+            override fun getEstimatedEffortPerOccurrence(): Duration? = effort
+
+            override fun getInitialValue(ctx: ExecutionContext): AtomicReference<A> =
+                AtomicReference(scan.initial)
+
+            override fun getScanner(acc: AtomicReference<A>): TreeVisitor<*, ExecutionContext> {
+                val scope = ScanScope(acc).apply(scan.scanBlock)
+                return scope.buildVisitor()
+            }
+
+            override fun getVisitor(acc: AtomicReference<A>): TreeVisitor<*, ExecutionContext> {
+                val editBlock = scan.editBlock ?: return TreeVisitor.noop<Tree, ExecutionContext>()
+                val scope = EditScopeWithAcc(acc.get()).apply(editBlock)
+                return scope.buildVisitor()
+            }
+
+            override fun generate(
+                acc: AtomicReference<A>,
+                generatedInThisCycle: MutableCollection<SourceFile>,
+                ctx: ExecutionContext,
+            ): MutableCollection<SourceFile> {
+                val genBlock = scan.generateBlock ?: return mutableListOf()
+                val scope = GenerateScopeWithAcc(acc.get(), ctx)
+                val produced = scope.genBlock().toMutableList()
+                // 3-arg form: filter against already-generated files for cycle-2 stability.
+                val alreadyByPath = generatedInThisCycle.mapNotNull { it.sourcePath?.toString() }.toSet()
+                produced.removeAll { (it.sourcePath?.toString() ?: "") in alreadyByPath }
+                return produced
+            }
+        }
+    }
+
+    private fun buildBareGenerateRecipe(
+        displayName: String,
+        description: String,
+        recipeTags: Set<String>,
+        effort: Duration?,
+        genBlock: GenerateScope.() -> Collection<SourceFile>,
+    ): Recipe {
+        return object : ScanningRecipe<Unit>() {
+            override fun getDisplayName(): String = displayName
+            override fun getDescription(): String = description
+            override fun getTags(): Set<String> = recipeTags
+            override fun getEstimatedEffortPerOccurrence(): Duration? = effort
+            override fun getInitialValue(ctx: ExecutionContext) = Unit
+            override fun getScanner(acc: Unit): TreeVisitor<*, ExecutionContext> = TreeVisitor.noop<Tree, ExecutionContext>()
+            override fun generate(
+                acc: Unit,
+                generatedInThisCycle: MutableCollection<SourceFile>,
+                ctx: ExecutionContext,
+            ): MutableCollection<SourceFile> {
+                val scope = GenerateScope(ctx)
+                val produced = scope.genBlock().toMutableList()
+                val alreadyByPath = generatedInThisCycle.mapNotNull { it.sourcePath?.toString() }.toSet()
+                produced.removeAll { (it.sourcePath?.toString() ?: "") in alreadyByPath }
+                return produced
+            }
+        }
+    }
+}
+
+/** Internal carrier for a scan phase's captured blocks. */
+internal class ScanBuilder<A : Any>(
+    val initial: A,
+    val scanBlock: ScanScope<A>.() -> Unit,
+) {
+    var editBlock: (EditScopeWithAcc<A>.() -> Unit)? = null
+    var generateBlock: (GenerateScopeWithAcc<A>.() -> Collection<SourceFile>)? = null
+}
+
+/** Chain builder returned by [RecipeBuilder.scan]. */
+public class Scan<A : Any> internal constructor(internal val builder: ScanBuilder<A>) {
+    /** Consume the scan accumulator with an edit phase. */
+    public fun edit(block: EditScopeWithAcc<A>.() -> Unit) {
+        require(builder.editBlock == null) { "scan { }.edit { } already declared" }
+        builder.editBlock = block
+    }
+
+    /**
+     * Consume the scan accumulator with a generate phase. Returns this same
+     * [Scan] so a trailing `.edit { }` can follow.
+     */
+    public fun generate(block: GenerateScopeWithAcc<A>.() -> Collection<SourceFile>): Scan<A> {
+        require(builder.generateBlock == null) { "scan { }.generate { } already declared" }
+        builder.generateBlock = block
+        return this
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Scope receivers
+// ---------------------------------------------------------------------------
+
+/**
+ * Shared base for [EditScope] and [ScanScope]: holds the registered visitors
+ * and exposes one language-scope factory per supported language. The 15 factory
+ * methods (`kotlin`, `java`, `yaml`, ...) auto-register their built visitor
+ * with the enclosing scope AND return it, so authors can also pass them to
+ * [check] / [and] / [or] / [not] as ordinary visitor expressions.
+ */
+@RecipeDsl
+public abstract class LanguageHost internal constructor() {
+
+    internal val visitors: MutableList<TreeVisitor<*, ExecutionContext>> = mutableListOf()
+
+    /**
+     * Build the composed visitor for this scope. Single-visitor scopes return
+     * that visitor directly; multi-visitor scopes wrap via
+     * [GeneratedRecipeSupport.composeSequential].
+     */
+    internal fun buildVisitor(): TreeVisitor<*, ExecutionContext> = when (visitors.size) {
+        0 -> TreeVisitor.noop<Tree, ExecutionContext>()
+        1 -> visitors[0]
+        else -> GeneratedRecipeSupport.composeSequential(visitors.toTypedArray())
+    }
+
+    internal fun register(visitor: TreeVisitor<*, ExecutionContext>): TreeVisitor<*, ExecutionContext> {
+        visitors.add(visitor)
+        return visitor
+    }
+
+    /**
+     * Take a visitor that was just auto-registered by a sibling factory call
+     * and remove it from the visitor list. Used by precondition wrappers
+     * ([check]) to "claim" the inner visitor before wrapping it, so the
+     * inner visitor doesn't run twice.
+     */
+    internal fun unregister(visitor: TreeVisitor<*, ExecutionContext>): TreeVisitor<*, ExecutionContext> {
+        visitors.remove(visitor)
+        return visitor
+    }
+
+    // === Language scope factories ===
     //
-    // The after lambda's return type is intentionally decoupled from the
-    // before lambda's (e.g. `enumValues<T>(): Array<T>` vs `enumEntries<T>():
-    // EnumEntries<T>`). The plugin doesn't validate semantic equivalence;
-    // that's on the recipe author.
+    // Each one builds a fresh `<Lang>Scope`, runs the user's block on it, then
+    // emits the resulting language visitor. The visitor is auto-registered with
+    // this enclosing scope (so it contributes to the recipe's visitor pipeline)
+    // AND returned (so authors can compose it with [check]).
+    //
+    // Missing-language dep behavior: when a language module is not on the
+    // runtime classpath, the JVM raises `NoClassDefFoundError` when first
+    // resolving `<Lang>Visitor` here. Phase 2 accepts that native error; a
+    // friendlier pre-flight check is an open implementation note (plan §Phase 2).
 
-    /**
-     * Zero-param before/after: typically a reified-generic rename like
-     * `enumValues<E>() -> enumEntries<E>()`. The runtime helper preserves the
-     * matched call's actual type arguments, so the concrete type the author
-     * writes inside `<...>` is just a placeholder for Kotlin's type checker.
-     */
-    public fun <R> rewrite(before: () -> R): RewriteAdvice0<R> = RewriteAdvice0()
-    public fun <R> rewrite(first: () -> R, vararg rest: () -> R): RewriteAdvice0<R> = RewriteAdvice0()
+    public fun kotlin(block: org.openrewrite.dsl.scopes.KotlinScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.KotlinScope().apply(block).build())
 
-    public fun <P, R> rewrite(before: (P) -> R): RewriteAdvice1<P, R> = RewriteAdvice1()
-    public fun <P, R> rewrite(first: (P) -> R, vararg rest: (P) -> R): RewriteAdvice1<P, R> = RewriteAdvice1()
+    public fun java(block: org.openrewrite.dsl.scopes.JavaScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.JavaScope().apply(block).build())
 
-    public fun <P1, P2, R> rewrite(before: (P1, P2) -> R): RewriteAdvice2<P1, P2, R> = RewriteAdvice2()
-    public fun <P1, P2, R> rewrite(first: (P1, P2) -> R, vararg rest: (P1, P2) -> R): RewriteAdvice2<P1, P2, R> = RewriteAdvice2()
+    public fun yaml(block: org.openrewrite.dsl.scopes.YamlScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.YamlScope().apply(block).build())
 
-    // === Phase mode ===
-    // `scan / edit / generate` map to the standard ScanningRecipe lifecycle.
-    // The compiler plugin rejects mixing phase calls with a `rewrite ... to ...`
-    // clause in the same recipe.
+    public fun xml(block: org.openrewrite.dsl.scopes.XmlScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.XmlScope().apply(block).build())
 
-    public fun <A : Any> scan(initial: A, block: ScanScope<A>.() -> Unit): ScanRef<A> = ScanRef()
-    public fun edit(block: EditScope.() -> Unit): Unit = Unit
-    public fun <A : Any> edit(scan: ScanRef<A>, block: EditScopeWithAcc<A>.() -> Unit): Unit = Unit
+    public fun maven(block: org.openrewrite.dsl.scopes.MavenScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.MavenScope().apply(block).build())
 
-    /**
-     * Phase-mode file generation. The block runs once after scanning is
-     * complete and returns the new source files to add to the working
-     * source set. Inside the lambda, `acc` exposes the scan accumulator and
-     * `ctx` the active [ExecutionContext][org.openrewrite.ExecutionContext].
-     *
-     * Returning an empty collection is a no-op — the recipe still passes
-     * through the framework's generate phase, just adding nothing.
-     */
-    public fun <A : Any> generate(
-        scan: ScanRef<A>,
-        block: GenerateScope<A>.() -> kotlin.collections.Collection<org.openrewrite.SourceFile>,
-    ): Unit = Unit
-}
+    public fun json(block: org.openrewrite.dsl.scopes.JsonScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.JsonScope().apply(block).build())
 
-@RecipeDslMarker public class RewriteAdvice0<R> internal constructor() {
-    public infix fun <R2> to(after: () -> R2): Unit = Unit
-}
+    public fun properties(block: org.openrewrite.dsl.scopes.PropertiesScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.PropertiesScope().apply(block).build())
 
-@RecipeDslMarker public class RewriteAdvice1<P, R> internal constructor() {
-    public infix fun <R2> to(after: (P) -> R2): Unit = Unit
-}
+    public fun toml(block: org.openrewrite.dsl.scopes.TomlScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.TomlScope().apply(block).build())
 
-@RecipeDslMarker public class RewriteAdvice2<P1, P2, R> internal constructor() {
-    public infix fun <R2> to(after: (P1, P2) -> R2): Unit = Unit
+    public fun hcl(block: org.openrewrite.dsl.scopes.HclScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.HclScope().apply(block).build())
+
+    // `gradle { … }` is intentionally omitted: rewrite-gradle depends on
+    // rewrite-kotlin (Gradle .kts scripts are parsed via the Kotlin LST), so
+    // adding rewrite-gradle as a compileOnly dep here would create a project
+    // cycle. Authors targeting Gradle DSL use `groovy { … }` for .gradle and
+    // `kotlin { … }` for .gradle.kts; a dedicated GradleScope can land once
+    // rewrite-gradle is split into a leaf module.
+
+    public fun groovy(block: org.openrewrite.dsl.scopes.GroovyScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.GroovyScope().apply(block).build())
+
+    public fun python(block: org.openrewrite.dsl.scopes.PythonScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.PythonScope().apply(block).build())
+
+    public fun csharp(block: org.openrewrite.dsl.scopes.CSharpScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.CSharpScope().apply(block).build())
+
+    public fun scala(block: org.openrewrite.dsl.scopes.ScalaScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.ScalaScope().apply(block).build())
+
+    public fun javascript(block: org.openrewrite.dsl.scopes.JavaScriptScope.() -> Unit): TreeVisitor<*, ExecutionContext> =
+        register(org.openrewrite.dsl.scopes.JavaScriptScope().apply(block).build())
 }
 
 /**
- * Reference to the accumulator created by a [RecipeBuilder.scan] call, used to bind
- * `edit`/`generate` to the same accumulator.
+ * Receiver for the `edit { }` phase block. Hosts language scopes, precondition
+ * wrappers, the phase-level `uses<T>() / usesMethod / usesField / usesJavaVersion`
+ * helpers, and the declarative `rewrite { } to { }` surface.
  */
-public class ScanRef<A> internal constructor()
+@RecipeDsl
+public open class EditScope internal constructor() : LanguageHost() {
 
-@RecipeDslMarker public class ScanScope<A> internal constructor() {
-    public val acc: A get() = error("Stub — the compiler plugin processes the body; runtime is never invoked.")
+    // === Precondition wrappers ===
+    //
+    // `check(condition, visitor)` "claims" the visitor from the auto-registered
+    // list, wraps it with the precondition, and registers the wrapper instead.
+    // This lets authors write `check(uses<T>(), kotlin { ... })` without the
+    // inner kotlin visitor running twice.
+
+    public fun check(condition: TreeVisitor<*, ExecutionContext>?, visitor: TreeVisitor<*, ExecutionContext>): TreeVisitor<*, ExecutionContext> {
+        unregister(visitor)
+        return register(Preconditions.check(condition, visitor))
+    }
+
+    public fun check(condition: Recipe, visitor: TreeVisitor<*, ExecutionContext>): TreeVisitor<*, ExecutionContext> {
+        unregister(visitor)
+        return register(Preconditions.check(condition, visitor))
+    }
+
+    public fun check(condition: Boolean, visitor: TreeVisitor<*, ExecutionContext>): TreeVisitor<*, ExecutionContext> {
+        unregister(visitor)
+        return register(Preconditions.check(condition, visitor))
+    }
+
+    public fun and(vararg vs: TreeVisitor<*, ExecutionContext>): TreeVisitor<*, ExecutionContext> =
+        Preconditions.and(*vs)
+
+    public fun or(vararg vs: TreeVisitor<*, ExecutionContext>): TreeVisitor<*, ExecutionContext> =
+        Preconditions.or(*vs)
+
+    public fun not(v: TreeVisitor<*, ExecutionContext>): TreeVisitor<*, ExecutionContext> =
+        Preconditions.not(v)
+
+    // === Phase-level usage probes ===
+    //
+    // These return visitors NOT auto-registered with the enclosing scope —
+    // they're meant to be consumed by `check(...)` as the precondition arg.
+
+    public inline fun <reified T : Any> uses(): TreeVisitor<*, ExecutionContext> =
+        UsesType<ExecutionContext>(T::class.java.name, false)
+
+    public fun usesMethod(spec: String): TreeVisitor<*, ExecutionContext> =
+        UsesMethod<ExecutionContext>(spec)
+
+    public fun usesField(owner: String, field: String): TreeVisitor<*, ExecutionContext> =
+        UsesField<ExecutionContext>(owner, field)
+
+    public fun usesJavaVersion(min: Int, max: Int = Int.MAX_VALUE): TreeVisitor<*, ExecutionContext> =
+        UsesJavaVersion<ExecutionContext>(min, max)
+
+    // === Declarative pattern shape ===
+    //
+    // `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin: the
+    // MethodMatcher spec is synthesized at FIR time from the resolved before-
+    // lambda symbol. Without the plugin, the surface compiles (it's just a
+    // function call) but throws at runtime.
 
     @Suppress("UNUSED_PARAMETER")
-    public fun visitMethodInvocation(action: (org.openrewrite.java.tree.J.MethodInvocation) -> Unit): Unit = Unit
+    public fun <R> rewrite(before: () -> R): RewriteAdvice0<R> = pluginRequired()
+    @Suppress("UNUSED_PARAMETER")
+    public fun <R> rewrite(first: () -> R, vararg rest: () -> R): RewriteAdvice0<R> = pluginRequired()
 
     @Suppress("UNUSED_PARAMETER")
-    public fun visitClassDeclaration(action: (org.openrewrite.java.tree.J.ClassDeclaration) -> Unit): Unit = Unit
+    public fun <P, R> rewrite(before: (P) -> R): RewriteAdvice1<P, R> = pluginRequired()
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P, R> rewrite(first: (P) -> R, vararg rest: (P) -> R): RewriteAdvice1<P, R> = pluginRequired()
 
     @Suppress("UNUSED_PARAMETER")
-    public fun visitMethodDeclaration(action: (org.openrewrite.java.tree.J.MethodDeclaration) -> Unit): Unit = Unit
-
+    public fun <P1, P2, R> rewrite(before: (P1, P2) -> R): RewriteAdvice2<P1, P2, R> = pluginRequired()
     @Suppress("UNUSED_PARAMETER")
-    public fun visitVariableDeclarations(action: (org.openrewrite.java.tree.J.VariableDeclarations) -> Unit): Unit = Unit
+    public fun <P1, P2, R> rewrite(first: (P1, P2) -> R, vararg rest: (P1, P2) -> R): RewriteAdvice2<P1, P2, R> = pluginRequired()
 
-    @Suppress("UNUSED_PARAMETER")
-    public fun visitImport(action: (org.openrewrite.java.tree.J.Import) -> Unit): Unit = Unit
-
-    @Suppress("UNUSED_PARAMETER")
-    public fun visitProperty(action: (org.openrewrite.kotlin.tree.K.Property) -> Unit): Unit = Unit
+    private fun <T> pluginRequired(): T = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin. " +
+            "Add rewrite-kotlin to `kotlinCompilerPluginClasspath` (plugin id `org.openrewrite.kotlin.recipe`)."
+    )
 }
 
-@RecipeDslMarker public class EditScope internal constructor() {
-    @Suppress("UNUSED_PARAMETER")
-    public fun visitMethodInvocation(
-        action: (org.openrewrite.java.tree.J.MethodInvocation) -> org.openrewrite.java.tree.J.MethodInvocation,
-    ): Unit = Unit
+/** Edit-phase receiver with access to the scan accumulator. */
+public class EditScopeWithAcc<A> internal constructor(public val acc: A) : EditScope()
 
-    @Suppress("UNUSED_PARAMETER")
-    public fun visitClassDeclaration(
-        action: (org.openrewrite.java.tree.J.ClassDeclaration) -> org.openrewrite.java.tree.J.ClassDeclaration,
-    ): Unit = Unit
-
-    @Suppress("UNUSED_PARAMETER")
-    public fun visitMethodDeclaration(
-        action: (org.openrewrite.java.tree.J.MethodDeclaration) -> org.openrewrite.java.tree.J.MethodDeclaration,
-    ): Unit = Unit
-
-    @Suppress("UNUSED_PARAMETER")
-    public fun visitVariableDeclarations(
-        action: (org.openrewrite.java.tree.J.VariableDeclarations) -> org.openrewrite.java.tree.J.VariableDeclarations,
-    ): Unit = Unit
-
-    @Suppress("UNUSED_PARAMETER")
-    public fun visitImport(
-        action: (org.openrewrite.java.tree.J.Import) -> org.openrewrite.java.tree.J.Import,
-    ): Unit = Unit
-
-    @Suppress("UNUSED_PARAMETER")
-    public fun visitProperty(
-        action: (org.openrewrite.kotlin.tree.K.Property) -> org.openrewrite.kotlin.tree.K.Property,
-    ): Unit = Unit
+/**
+ * Receiver for the `scan { }` phase block. Same language-scope surface as
+ * [EditScope] but no preconditions / no rewrite{}to{} — scanners only observe.
+ * The mutable `acc` field is shared with the rest of the scan lifecycle via
+ * an [AtomicReference]: closures inside language scopes that assign `acc = ...`
+ * write through to the framework's accumulator.
+ */
+@RecipeDsl
+public open class ScanScope<A : Any> internal constructor(private val accRef: AtomicReference<A>) : LanguageHost() {
+    public var acc: A
+        get() = accRef.get()
+        set(value) { accRef.set(value) }
 }
 
-@RecipeDslMarker public class EditScopeWithAcc<A> internal constructor() {
-    public val acc: A get() = error("Stub — the compiler plugin processes the body; runtime is never invoked.")
+/** Receiver for the bare `generate { }` block; access [ctx] only. */
+@RecipeDsl
+public open class GenerateScope internal constructor(public val ctx: ExecutionContext)
 
-    @Suppress("UNUSED_PARAMETER")
-    public fun visitMethodInvocation(
-        action: (org.openrewrite.java.tree.J.MethodInvocation) -> org.openrewrite.java.tree.J.MethodInvocation,
-    ): Unit = Unit
+/** Generate-phase receiver with access to the scan accumulator. */
+@RecipeDsl
+public class GenerateScopeWithAcc<A> internal constructor(
+    public val acc: A,
+    ctx: ExecutionContext,
+) : GenerateScope(ctx)
 
-    @Suppress("UNUSED_PARAMETER")
-    public fun visitClassDeclaration(
-        action: (org.openrewrite.java.tree.J.ClassDeclaration) -> org.openrewrite.java.tree.J.ClassDeclaration,
-    ): Unit = Unit
+// ---------------------------------------------------------------------------
+// rewrite { } to { } type stubs — populated at IR time by the K2 plugin.
+// ---------------------------------------------------------------------------
 
+@RecipeDsl public class RewriteAdvice0<R> internal constructor() {
     @Suppress("UNUSED_PARAMETER")
-    public fun visitMethodDeclaration(
-        action: (org.openrewrite.java.tree.J.MethodDeclaration) -> org.openrewrite.java.tree.J.MethodDeclaration,
-    ): Unit = Unit
-
-    @Suppress("UNUSED_PARAMETER")
-    public fun visitVariableDeclarations(
-        action: (org.openrewrite.java.tree.J.VariableDeclarations) -> org.openrewrite.java.tree.J.VariableDeclarations,
-    ): Unit = Unit
-
-    @Suppress("UNUSED_PARAMETER")
-    public fun visitImport(
-        action: (org.openrewrite.java.tree.J.Import) -> org.openrewrite.java.tree.J.Import,
-    ): Unit = Unit
-
-    @Suppress("UNUSED_PARAMETER")
-    public fun visitProperty(
-        action: (org.openrewrite.kotlin.tree.K.Property) -> org.openrewrite.kotlin.tree.K.Property,
-    ): Unit = Unit
+    public infix fun <R2> to(after: () -> R2): Unit = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
 }
 
-@RecipeDslMarker public class GenerateScope<A> internal constructor() {
-    public val acc: A get() = error("Stub — the compiler plugin processes the body; runtime is never invoked.")
-    public val ctx: org.openrewrite.ExecutionContext
-        get() = error("Stub — the compiler plugin processes the body; runtime is never invoked.")
+@RecipeDsl public class RewriteAdvice1<P, R> internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public infix fun <R2> to(after: (P) -> R2): Unit = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
+}
+
+@RecipeDsl public class RewriteAdvice2<P1, P2, R> internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public infix fun <R2> to(after: (P1, P2) -> R2): Unit = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
 }

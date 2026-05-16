@@ -12,8 +12,10 @@ package org.openrewrite.kotlin.recipe;
 import java.util.ArrayList;
 import java.util.List;
 
-import kotlin.jvm.functions.Function1;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -26,7 +28,6 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.TrailingLambdaArgument;
-import org.openrewrite.kotlin.tree.K;
 
 /**
  * Runtime support for the recipe authoring DSL's K2 compiler plugin
@@ -35,6 +36,11 @@ import org.openrewrite.kotlin.tree.K;
  * {@code getVisitor()} body is a single call into one of these factories,
  * keeping the IR codegen small and the matching/replacing logic
  * Java-readable.
+ *
+ * <p>Phase 3 of the DSL rewrite will add a {@code methodInvocationRewriteJava}
+ * parallel of the Kotlin path and {@code composeSequential(vararg visitors)}
+ * for multi-statement edit/scan/generate bodies. Until then this class carries
+ * only the canonical KotlinVisitor-rooted {@code rewrite { } to { }} helper.
  */
 public final class GeneratedRecipeSupport {
 
@@ -59,11 +65,6 @@ public final class GeneratedRecipeSupport {
      * matchers because the IR pass requires every before lambda to agree on
      * the captured argument shape (same param-index references and same
      * literal {@code (kind, value)} at each position).
-     *
-     * Switching from {@code KotlinTemplate.matches} to {@link MethodMatcher} is
-     * intentional for v0: {@code KotlinTemplate.matches("#{any()}.foo()", cursor)}
-     * does not currently match receiver-placeholder patterns against a
-     * concrete invocation — verified by a standalone probe test 2026-05-14.
      */
     public static TreeVisitor<?, ExecutionContext> methodInvocationRewrite(
             String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv) {
@@ -124,176 +125,54 @@ public final class GeneratedRecipeSupport {
     }
 
     /**
-     * Visitor for a stateless {@code edit { visitMethodInvocation { call -> ... } }}
-     * recipe. The Kotlin lambda receives each method invocation in turn and
-     * returns a possibly-transformed {@code J.MethodInvocation}; returning the
-     * same instance is a no-op.
+     * Compose visitors sequentially: each runs in declaration order on the
+     * result of the previous one. Backs multi-statement {@code edit/scan/generate}
+     * bodies in {@code org.openrewrite.RecipeDsl}.
      *
-     * <p>Unlike {@link #methodInvocationRewrite}, there's no MethodMatcher gate
-     * and no KotlinTemplate substitution — the user's lambda body runs as Kotlin
-     * for every method invocation in the tree, and the author has full
-     * imperative control over what (if anything) to change. This is the entry
-     * point for imperative-edit recipes; {@code rewrite ... to ...} is the
-     * declarative shortcut.
-     *
-     * <p>Also the entry point for {@code edit(scanRef) { visitMethodInvocation
-     * { call -> ... } }}: the IR pass rewrites {@code acc} references inside the
-     * body so they read from the enclosing {@code getVisitor(acc)} method's
-     * parameter, which the Kotlin lambda captures as a closure variable. From
-     * this helper's POV the lambda is identical to the stateless case.
+     * <p>Semantics (per plan §7):
+     * <ul>
+     *   <li>{@code isAcceptable(SourceFile, ctx)} returns true iff ANY inner
+     *       visitor accepts the source. Non-accepting inner visitors are skipped
+     *       for that source.</li>
+     *   <li>{@code visit(tree, ctx)} threads {@code tree} through each visitor in
+     *       declaration order, restarting cursor state between visitors. Cursor
+     *       messages set by one inner visitor are NOT visible to the next.
+     *       Returning the same instance does NOT short-circuit — the next visitor
+     *       still runs.</li>
+     *   <li>Exceptions propagate; there's no partial-state recovery.</li>
+     * </ul>
      */
-    public static TreeVisitor<?, ExecutionContext> methodInvocationEditVisitor(
-            Function1<J.MethodInvocation, J.MethodInvocation> body) {
-        return new KotlinVisitor<ExecutionContext>() {
+    public static TreeVisitor<?, ExecutionContext> composeSequential(TreeVisitor<?, ExecutionContext>[] visitors) {
+        if (visitors.length == 0) {
+            return TreeVisitor.noop();
+        }
+        if (visitors.length == 1) {
+            return visitors[0];
+        }
+        return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation transformed = body.invoke(method);
-                return super.visitMethodInvocation(transformed, ctx);
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                for (TreeVisitor<?, ExecutionContext> v : visitors) {
+                    if (v.isAcceptable(sourceFile, ctx)) {
+                        return true;
+                    }
+                }
+                return false;
             }
-        };
-    }
 
-    /**
-     * Visitor for the scan phase of a {@code scan + edit} / {@code scan + generate}
-     * recipe (i.e. one that compiles to a {@link org.openrewrite.ScanningRecipe}).
-     * The Kotlin lambda receives each method invocation in turn and is expected
-     * to mutate the recipe's accumulator (captured from the enclosing
-     * {@code getScanner(acc)} method's parameter). The tree is never transformed
-     * during scanning — the framework discards any structural changes a scanner
-     * visitor produces — so the lambda returns {@code Unit} and the helper always
-     * defers to {@code super}.
-     */
-    public static TreeVisitor<?, ExecutionContext> methodInvocationScanVisitor(
-            Function1<J.MethodInvocation, kotlin.Unit> body) {
-        return new KotlinVisitor<ExecutionContext>() {
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                body.invoke(method);
-                return super.visitMethodInvocation(method, ctx);
-            }
-        };
-    }
-
-    /*
-     * The remaining helpers below cover the other recognised visitor primitives.
-     * Each pair (edit, scan) follows the same shape as methodInvocation*:
-     *  - edit: invoke the user's lambda on the node, hand the (possibly new)
-     *    node to super so children get visited.
-     *  - scan: invoke the lambda for its side effect on the accumulator, leave
-     *    the tree unchanged.
-     *
-     * They're spelled out one at a time rather than factored via reflection so
-     * the generated bytecode stays type-stable: KotlinVisitor's `visitX` methods
-     * are virtually dispatched, and reflective overrides would lose the
-     * compiler's ability to see them as concrete entry points.
-     */
-
-    public static TreeVisitor<?, ExecutionContext> classDeclarationEditVisitor(
-            Function1<J.ClassDeclaration, J.ClassDeclaration> body) {
-        return new KotlinVisitor<ExecutionContext>() {
-            @Override
-            public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                J.ClassDeclaration transformed = body.invoke(classDecl);
-                return super.visitClassDeclaration(transformed, ctx);
-            }
-        };
-    }
-
-    public static TreeVisitor<?, ExecutionContext> classDeclarationScanVisitor(
-            Function1<J.ClassDeclaration, kotlin.Unit> body) {
-        return new KotlinVisitor<ExecutionContext>() {
-            @Override
-            public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                body.invoke(classDecl);
-                return super.visitClassDeclaration(classDecl, ctx);
-            }
-        };
-    }
-
-    public static TreeVisitor<?, ExecutionContext> methodDeclarationEditVisitor(
-            Function1<J.MethodDeclaration, J.MethodDeclaration> body) {
-        return new KotlinVisitor<ExecutionContext>() {
-            @Override
-            public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                J.MethodDeclaration transformed = body.invoke(method);
-                return super.visitMethodDeclaration(transformed, ctx);
-            }
-        };
-    }
-
-    public static TreeVisitor<?, ExecutionContext> methodDeclarationScanVisitor(
-            Function1<J.MethodDeclaration, kotlin.Unit> body) {
-        return new KotlinVisitor<ExecutionContext>() {
-            @Override
-            public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                body.invoke(method);
-                return super.visitMethodDeclaration(method, ctx);
-            }
-        };
-    }
-
-    public static TreeVisitor<?, ExecutionContext> variableDeclarationsEditVisitor(
-            Function1<J.VariableDeclarations, J.VariableDeclarations> body) {
-        return new KotlinVisitor<ExecutionContext>() {
-            @Override
-            public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                J.VariableDeclarations transformed = body.invoke(multiVariable);
-                return super.visitVariableDeclarations(transformed, ctx);
-            }
-        };
-    }
-
-    public static TreeVisitor<?, ExecutionContext> variableDeclarationsScanVisitor(
-            Function1<J.VariableDeclarations, kotlin.Unit> body) {
-        return new KotlinVisitor<ExecutionContext>() {
-            @Override
-            public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                body.invoke(multiVariable);
-                return super.visitVariableDeclarations(multiVariable, ctx);
-            }
-        };
-    }
-
-    public static TreeVisitor<?, ExecutionContext> importEditVisitor(
-            Function1<J.Import, J.Import> body) {
-        return new KotlinVisitor<ExecutionContext>() {
-            @Override
-            public J visitImport(J.Import _import, ExecutionContext ctx) {
-                J.Import transformed = body.invoke(_import);
-                return super.visitImport(transformed, ctx);
-            }
-        };
-    }
-
-    public static TreeVisitor<?, ExecutionContext> importScanVisitor(
-            Function1<J.Import, kotlin.Unit> body) {
-        return new KotlinVisitor<ExecutionContext>() {
-            @Override
-            public J visitImport(J.Import _import, ExecutionContext ctx) {
-                body.invoke(_import);
-                return super.visitImport(_import, ctx);
-            }
-        };
-    }
-
-    public static TreeVisitor<?, ExecutionContext> propertyEditVisitor(
-            Function1<K.Property, K.Property> body) {
-        return new KotlinVisitor<ExecutionContext>() {
-            @Override
-            public J visitProperty(K.Property property, ExecutionContext ctx) {
-                K.Property transformed = body.invoke(property);
-                return super.visitProperty(transformed, ctx);
-            }
-        };
-    }
-
-    public static TreeVisitor<?, ExecutionContext> propertyScanVisitor(
-            Function1<K.Property, kotlin.Unit> body) {
-        return new KotlinVisitor<ExecutionContext>() {
-            @Override
-            public J visitProperty(K.Property property, ExecutionContext ctx) {
-                body.invoke(property);
-                return super.visitProperty(property, ctx);
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                Tree current = tree;
+                for (TreeVisitor<?, ExecutionContext> v : visitors) {
+                    if (current instanceof SourceFile && !v.isAcceptable((SourceFile) current, ctx)) {
+                        continue;
+                    }
+                    Tree next = v.visit(current, ctx, new Cursor(null, Cursor.ROOT_VALUE));
+                    if (next != null) {
+                        current = next;
+                    }
+                }
+                return current;
             }
         };
     }

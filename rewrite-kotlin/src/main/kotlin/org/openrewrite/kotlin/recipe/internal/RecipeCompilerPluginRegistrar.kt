@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.recipe.internal
 
-import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import org.jetbrains.kotlin.config.CompilerConfiguration
@@ -25,13 +24,9 @@ import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 // `RecipeDsl.kt`. Registered via `META-INF/services/org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar`.
 // kotlinc loads this class when rewrite-kotlin is on the user's `kotlinCompilerPluginClasspath`.
 //
-// Pipeline:
-//   - FIR phase (`RecipeFirExtensionRegistrar`) runs the recipe-DSL well-formedness
-//     checkers (mode mixing, etc.) before any code generation.
-//   - IR phase (`RecipeIrGenerationExtension`) walks property initializers whose
-//     RHS is a call to `org.openrewrite.recipe(...)`, emits a synthetic
-//     `Recipe` subclass per declaration, and rewrites the call site to a
-//     constructor invocation of that subclass.
+// Phase 3 of the DSL rewrite will register both a FIR checkers extension and a
+// rewritten IR generation extension. After tear-down only the FIR registrar is
+// wired (currently a no-op shell) so the plugin loads cleanly without v0 code.
 //
 // Why a compiler plugin and not KSP: KSP's stable contract exposes declarations and
 // types but not expression bodies (property initializers, lambda contents). The DSL
@@ -48,11 +43,5 @@ public class RecipeCompilerPluginRegistrar : CompilerPluginRegistrar() {
 
     override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
         FirExtensionRegistrarAdapter.registerExtension(RecipeFirExtensionRegistrar())
-        // `registerExtension` is a member extension function on ExtensionStorage
-        // with `ProjectExtensionDescriptor<T>` as its extension receiver — the
-        // K2-aware registration path. The call form `IrGenerationExtension.registerExtension(...)`
-        // dispatches against ExtensionStorage (= this) and binds the descriptor as
-        // the extension receiver.
-        IrGenerationExtension.registerExtension(RecipeIrGenerationExtension())
     }
 }
