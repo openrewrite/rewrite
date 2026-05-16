@@ -345,14 +345,25 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     private fun pickHelperSymbol(
         templates: RewriteTemplates,
         ctx: RecipeIrGenContext,
-    ): IrSimpleFunctionSymbol? = if (templates.usesKotlinTreeNode) {
-        ctx.methodInvocationRewriteKotlinSymbol
-    } else {
-        // Default JavaVisitor path. Fall back to the Kotlin helper if the
-        // Java helper isn't available (e.g. older GeneratedRecipeSupport on
-        // the classpath); both paths produce a working visitor, the Java path
-        // is just the broader source-language coverage.
-        ctx.methodInvocationRewriteJavaSymbol ?: ctx.methodInvocationRewriteKotlinSymbol
+    ): IrSimpleFunctionSymbol? {
+        // v1: always dispatch to the Kotlin helper. Plan §Design.4 reasoned
+        // about which SOURCES the visitor walks (JavaVisitor walks both .java
+        // and .kt via TreeVisitorAdapter), but the TEMPLATE engine must match
+        // the recipe author's source language. Recipes authored in Kotlin
+        // carry Kotlin syntax in their before/after templates — trailing
+        // lambdas, `<Type>` arg lists, extension calls, `..<` — none of which
+        // JavaTemplate can parse. Always-Kotlin works because recipes
+        // authored under this DSL are by definition in .kt source.
+        //
+        // `methodInvocationRewriteJava` exists for a future cross-language
+        // path (`java { rewrite { } to { } }` explicit shape) and for recipes
+        // authored in Java someday; v1 has no way to reach it from the DSL.
+        // The LST-structural classifier still computes [usesKotlinTreeNode]
+        // — it's plumbing for the eventual third helper (JavaVisitor +
+        // KotlinTemplate) the plan deferred.
+        @Suppress("UNUSED_VARIABLE")
+        val classifierResult = templates.usesKotlinTreeNode
+        return ctx.methodInvocationRewriteKotlinSymbol
     }
 
     /**

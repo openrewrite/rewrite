@@ -19,31 +19,25 @@ package org.openrewrite.kotlin.recipe
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
-import org.openrewrite.java.JavaVisitor
 import org.openrewrite.kotlin.KotlinVisitor
 
 /**
- * Coverage for the LST-structural Java vs Kotlin classifier in
- * `RecipeIrGenerationExtension`. The classifier picks a visitor type per
- * plan §Design.4: default JavaVisitor; promote to KotlinVisitor only when the
- * before/after lambdas structurally reference a `K.*` LST node.
- *
- * Method-name / callee-package / API-level signals are DELIBERATELY NOT used,
- * so a recipe whose before-lambda calls a Kotlin extension function like
- * `appendln()` still ends up on a JavaVisitor — the MethodMatcher spec is
- * resolved at FIR time pre-inline and encodes the Kotlin-extension target
- * correctly regardless.
+ * v1 dispatch coverage for the IR pass's helper selection. The
+ * LST-structural classifier still runs (it computes `usesKotlinTreeNode`)
+ * but v1 always dispatches to the Kotlin helper — see
+ * `RecipeIrGenerationExtension.pickHelperSymbol` for the reasoning. These
+ * tests pin that v1 behavior so a future change that re-enables the
+ * Java-template path doesn't accidentally regress recipes authored in
+ * Kotlin (every recipe in Kotlin1To2.kt today).
  *
  * Test strategy: compile each recipe via the K2 plugin, load the synthesized
  * `Generated$<Name>` class through the compilation result's classloader, and
- * `instanceof`-check the visitor returned by `getVisitor()`. Because
- * KotlinVisitor extends JavaVisitor, the KotlinVisitor check has to come
- * first.
+ * `instanceof`-check the visitor returned by `getVisitor()`.
  */
 class JavaKotlinClassifierTest {
 
     @Test
-    fun `all-Java body defaults to JavaVisitor`() {
+    fun `all-Java body still dispatches to KotlinVisitor in v1`() {
         val r = compileRecipe(
             """
             import org.openrewrite.recipe
@@ -55,19 +49,11 @@ class JavaKotlinClassifierTest {
             """.trimIndent(),
             propertyName = "UseUpper",
         )
-        val v = r.getVisitor()
-        assertThat(v).isNotInstanceOf(KotlinVisitor::class.java)
-        assertThat(v).isInstanceOf(JavaVisitor::class.java)
+        assertThat(r.getVisitor()).isInstanceOf(KotlinVisitor::class.java)
     }
 
     @Test
-    fun `kotlin stdlib extension call still defaults to JavaVisitor`() {
-        // Per plan §Design.4 the classifier ignores method-name / package
-        // signals. `appendLine()` is a Kotlin extension on Appendable but
-        // doesn't reference a K.* tree node, so the recipe defaults to
-        // JavaVisitor. The MethodMatcher spec was built at FIR time and
-        // encodes the resolved Kotlin facade — it works regardless of visitor
-        // type.
+    fun `kotlin stdlib extension call dispatches to KotlinVisitor`() {
         val r = compileRecipe(
             """
             import org.openrewrite.recipe
@@ -79,15 +65,11 @@ class JavaKotlinClassifierTest {
             """.trimIndent(),
             propertyName = "UseAppendLine",
         )
-        val v = r.getVisitor()
-        assertThat(v).isNotInstanceOf(KotlinVisitor::class.java)
-        assertThat(v).isInstanceOf(JavaVisitor::class.java)
+        assertThat(r.getVisitor()).isInstanceOf(KotlinVisitor::class.java)
     }
 
     @Test
-    fun `reified-generic stdlib call defaults to JavaVisitor`() {
-        // `enumValues<...>()` is a reified-generic Kotlin stdlib call; the
-        // classifier doesn't care.
+    fun `reified-generic stdlib call dispatches to KotlinVisitor`() {
         val r = compileRecipe(
             """
             import org.openrewrite.recipe
@@ -100,9 +82,7 @@ class JavaKotlinClassifierTest {
             """.trimIndent(),
             propertyName = "EnumEntriesRename",
         )
-        val v = r.getVisitor()
-        assertThat(v).isNotInstanceOf(KotlinVisitor::class.java)
-        assertThat(v).isInstanceOf(JavaVisitor::class.java)
+        assertThat(r.getVisitor()).isInstanceOf(KotlinVisitor::class.java)
     }
 
     /**

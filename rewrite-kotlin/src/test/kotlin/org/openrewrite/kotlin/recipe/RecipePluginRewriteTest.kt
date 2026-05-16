@@ -21,7 +21,6 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
-import org.openrewrite.test.TypeValidation
 import org.openrewrite.kotlin.Assertions.kotlin
 
 /**
@@ -62,14 +61,6 @@ class RecipePluginRewriteTest : RewriteTest {
         // class-id deserializer can't resolve it. The recipe still executes
         // correctly via direct invocation; the round-trip is what fails.
         spec.validateRecipeSerialization(false)
-        // The default helper is JavaVisitor + JavaTemplate. JavaTemplate's
-        // substituted method-invocation doesn't carry the same type info that
-        // KotlinTemplate's does (a known shortcoming on the Java path when the
-        // matched call has Kotlin extension semantics). The rewrite still
-        // produces correct source; only LST type validation fails.
-        // Phase 4 recipe migration will exercise this end-to-end on real
-        // Kotlin1To2 recipes; for now skip type validation in this smoke test.
-        spec.typeValidationOptions(TypeValidation.none())
     }
 
     @Test
