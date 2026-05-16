@@ -140,20 +140,12 @@ val generateLanguageScopes by tasks.registering(GenerateLanguageScopesTask::clas
     ))
 }
 
+// Register the generator task PROVIDER on the source set (not the raw output
+// directory). Gradle then infers the implicit dependency for every task that
+// consumes the source set — `compileKotlin`, `kotlinSourcesJar`,
+// `licenseMain`, and any other downstream task. Passing the path string
+// (`generatedScopesDir`) instead would force us to wire each consumer
+// manually, which Gradle 9's strict validation rejects on CI.
 sourceSets.named("main") {
-    java.srcDir(generatedScopesDir)
-}
-
-tasks.named("compileKotlin") {
-    dependsOn(generateLanguageScopes)
-}
-
-// `kotlinSourcesJar` (and any other task that reads the main source set's
-// srcDirs) needs to know it must run after the codegen — otherwise Gradle 9
-// flags the implicit dependency and fails the build. `configureEach` covers
-// `sourcesJar` and `kotlinSourcesJar` both.
-tasks.matching {
-    it.name.endsWith("sourcesJar", ignoreCase = true)
-}.configureEach {
-    dependsOn(generateLanguageScopes)
+    java.srcDir(generateLanguageScopes)
 }
