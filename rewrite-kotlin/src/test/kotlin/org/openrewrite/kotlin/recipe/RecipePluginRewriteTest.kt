@@ -201,6 +201,42 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `chain with Java-static inner segment — Optional_of_x_get to x`() {
+        // The chain validator must accept an inner segment that is a Java
+        // static call (`Optional.of(x)`). The inner has no dispatch receiver
+        // (statics carry the class via the symbol's parent IrClass) but does
+        // bind the lambda param to its value arg.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                import java.util.Optional
+                val UseValueForOptionalOfGet = recipe(
+                    displayName = "Optional.of(x).get() -> x",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { x: String -> Optional.of(x).get() } to { x -> x }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseValueForOptionalOfGet",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                import java.util.Optional
+                fun example(): String = Optional.of("hi").get()
+                """.trimIndent(),
+                """
+                import java.util.Optional
+                fun example(): String = "hi"
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
     fun `multi-before mixed shapes — receiver in one, arg in the other`() {
         // Two before lambdas with the same param count but different
         // canonical signatures: `s.toInt()` binds `s` to the (extension)
