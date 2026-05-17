@@ -571,22 +571,36 @@ public final class GeneratedRecipeSupport {
         JRightPadded<Expression> lastPadded = padded.get(padded.size() - 1);
         Expression last = lastPadded.getElement();
         if (!(last instanceof J.Lambda) ||
-            !last.getMarkers().findFirst(TrailingLambdaArgument.class).isPresent() ||
-            args.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+            !last.getMarkers().findFirst(TrailingLambdaArgument.class).isPresent()) {
+            return method;
+        }
+        // Two cases:
+        //   (1) single lambda arg → `obj.foo { ... }` (no parens anywhere). Add
+        //       OmitParentheses to the args container so the printer drops the
+        //       call's parens entirely.
+        //   (2) multi-arg with trailing lambda → `obj.foo(a, b) { ... }`. The
+        //       printer already handles this when OmitParentheses is absent and
+        //       the trailing lambda carries TrailingLambdaArgument: it emits
+        //       `(` ... `)` around the non-lambda args, then the lambda. We
+        //       must NOT add OmitParentheses here — doing so would drop the
+        //       call's parens and produce `obj.fooab { ... }`.
+        boolean singleArg = padded.size() == 1;
+        if (singleArg && args.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
             return method;
         }
         // The template parsed without trailing-lambda syntax, so the lambda's
         // own prefix is "" (it sat flush against the placeholder). Once the
-        // parens are gone, Kotlin convention is one space between the method
-        // name and `{`.
+        // lambda moves outside the call's args, Kotlin convention is one space
+        // between the closing position and `{`.
         Expression spaced = last.getPrefix().getWhitespace().isEmpty()
                 ? last.withPrefix(Space.SINGLE_SPACE)
                 : last;
         List<JRightPadded<Expression>> rebuilt = new ArrayList<>(padded);
         rebuilt.set(rebuilt.size() - 1, lastPadded.withElement(spaced));
-        JContainer<Expression> reshaped = args.getPadding()
-                .withElements(rebuilt)
-                .withMarkers(args.getMarkers().addIfAbsent(new OmitParentheses(Tree.randomId())));
+        JContainer<Expression> withElements = args.getPadding().withElements(rebuilt);
+        JContainer<Expression> reshaped = singleArg
+                ? withElements.withMarkers(args.getMarkers().addIfAbsent(new OmitParentheses(Tree.randomId())))
+                : withElements;
         return method.getPadding().withArguments(reshaped);
     }
 }
