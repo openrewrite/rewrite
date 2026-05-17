@@ -18,6 +18,7 @@ package org.openrewrite.config;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.AbstractRecipe;
 import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.MetricsHelper;
@@ -481,7 +482,8 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     Class<?> cls = classLoader.loadClass(name);
                     if (!cls.getName().equals(DeclarativeRecipe.class.getName()) &&
                             (cls.getModifiers() & Modifier.PUBLIC) != 0 &&
-                            (cls.getModifiers() & Modifier.ABSTRACT) == 0) {
+                            (cls.getModifiers() & Modifier.ABSTRACT) == 0 &&
+                            !cls.isAnnotationPresent(AbstractRecipe.class)) {
                         configureRecipe(cls, configured);
                     }
                 } catch (ClassNotFoundException | LinkageError ignored) {
