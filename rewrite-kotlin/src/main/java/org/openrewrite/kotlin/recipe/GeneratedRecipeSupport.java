@@ -74,6 +74,13 @@ public final class GeneratedRecipeSupport {
      */
     public static TreeVisitor<?, ExecutionContext> methodInvocationRewrite(
             String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv) {
+        // Chain mode: a single matcher spec line containing a tab encodes a
+        // two-segment chain <outerSpec>\t<innerSpec>. Substitution-source CSV
+        // is segment-tagged ("o:N" / "i:N"). v1 supports single-before chains
+        // only; multi-before chains are rejected at IR-pass time.
+        if (matcherSpecsLines.indexOf('\t') >= 0) {
+            return chainMethodInvocationRewrite(matcherSpecsLines, afterTemplate, substitutionSourcesCsv);
+        }
         String[] specs = matcherSpecsLines.isEmpty() ? new String[0] : matcherSpecsLines.split("\n");
         MethodMatcher[] matchers = new MethodMatcher[specs.length];
         for (int i = 0; i < specs.length; i++) {
@@ -129,6 +136,93 @@ public final class GeneratedRecipeSupport {
                 return super.visitMethodInvocation(method, ctx);
             }
         };
+    }
+
+    /**
+     * Chain-mode body for {@link #methodInvocationRewrite}. The before lambda
+     * was a two-segment chained call (e.g. {@code xs.filter(p).first()}); the
+     * matcher spec is {@code <outerSpec>\t<innerSpec>} and the substitution-
+     * source CSV uses segment-tagged entries ({@code o:N} for outer-call args
+     * with {@code o:-1} for the outer receiver, {@code i:N} / {@code i:-1} for
+     * the inner segment).
+     *
+     * <p>Walks {@link J.MethodInvocation}; matches the outer spec, then
+     * checks that {@code method.getSelect()} is itself a {@link J.MethodInvocation}
+     * matching the inner spec. If both match, extracts substitutions per the
+     * tagged CSV and applies the after template.
+     */
+    private static TreeVisitor<?, ExecutionContext> chainMethodInvocationRewrite(
+            String matcherSpecsLine, String afterTemplate, String substitutionSourcesCsv) {
+        int tabIdx = matcherSpecsLine.indexOf('\t');
+        MethodMatcher outerMatcher = new MethodMatcher(matcherSpecsLine.substring(0, tabIdx));
+        MethodMatcher innerMatcher = new MethodMatcher(matcherSpecsLine.substring(tabIdx + 1));
+        ChainSourceRef[] sources = parseChainCsv(substitutionSourcesCsv);
+        return new KotlinVisitor<ExecutionContext>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                if (!outerMatcher.matches(method)) {
+                    return super.visitMethodInvocation(method, ctx);
+                }
+                if (!(method.getSelect() instanceof J.MethodInvocation)) {
+                    return super.visitMethodInvocation(method, ctx);
+                }
+                J.MethodInvocation inner = (J.MethodInvocation) method.getSelect();
+                if (!innerMatcher.matches(inner)) {
+                    return super.visitMethodInvocation(method, ctx);
+                }
+                Object[] substitutions = new Object[sources.length];
+                for (int i = 0; i < sources.length; i++) {
+                    ChainSourceRef ref = sources[i];
+                    J.MethodInvocation target = ref.outer ? method : inner;
+                    if (ref.pos < 0) {
+                        if (target.getSelect() == null) {
+                            return super.visitMethodInvocation(method, ctx);
+                        }
+                        substitutions[i] = target.getSelect();
+                    } else {
+                        if (ref.pos >= target.getArguments().size()) {
+                            return super.visitMethodInvocation(method, ctx);
+                        }
+                        substitutions[i] = target.getArguments().get(ref.pos);
+                    }
+                }
+                J result = KotlinTemplate.builder(afterTemplate).build()
+                        .apply(getCursor(), method.getCoordinates().replace(), substitutions);
+                if (result instanceof J.MethodInvocation) {
+                    JContainer<Expression> matchedTypeArgs = method.getPadding().getTypeParameters();
+                    if (matchedTypeArgs != null) {
+                        result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
+                    }
+                    result = preserveTrailingLambdaShape((J.MethodInvocation) result);
+                }
+                return result.withPrefix(method.getPrefix());
+            }
+        };
+    }
+
+    private static class ChainSourceRef {
+        final boolean outer;
+        final int pos;
+        ChainSourceRef(boolean outer, int pos) { this.outer = outer; this.pos = pos; }
+    }
+
+    private static ChainSourceRef[] parseChainCsv(String csv) {
+        if (csv.isEmpty()) {
+            return new ChainSourceRef[0];
+        }
+        String[] parts = csv.split(",");
+        ChainSourceRef[] result = new ChainSourceRef[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            String p = parts[i];
+            int colonIdx = p.indexOf(':');
+            if (colonIdx < 0) {
+                throw new IllegalStateException("Chain CSV entry missing segment tag: " + p);
+            }
+            char tag = p.charAt(0);
+            int pos = Integer.parseInt(p.substring(colonIdx + 1));
+            result[i] = new ChainSourceRef(tag == 'o', pos);
+        }
+        return result;
     }
 
     /**
