@@ -586,8 +586,20 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             if (nextTemplate.first != firstTemplate.first) return null
             csvs += nextTemplate.second
         }
-        val matcherSpecs = beforeLambdas.map {
-            it.inlinedConstantMatcherSpec ?: computeMatcherSpec(it.rootCall!!, it.propertyAccess)
+        // Reject multi-before chains in v1 (mixing chain shapes with single-call
+        // would require per-before matcher dispatch in the runtime helper; the
+        // 5 starter chain recipes are all single-before).
+        if (beforeLambdas.any { it.inner != null } && beforeLambdas.size > 1) return null
+        val matcherSpecs = beforeLambdas.map { bl ->
+            bl.inlinedConstantMatcherSpec ?: run {
+                val outerSpec = computeMatcherSpec(bl.rootCall!!, bl.propertyAccess)
+                val innerSpec = bl.inner?.let { computeMatcherSpec(it.rootCall!!, propertyAccess = false) }
+                // Chain encoding: <outerSpec>\t<innerSpec>. The tab separator
+                // distinguishes a single chained spec from the \n-separated
+                // multi-before shape. Runtime helpers detect the tab and
+                // switch to chain-matching mode.
+                if (innerSpec != null) "$outerSpec\t$innerSpec" else outerSpec
+            }
         }
         // Single-before recipes pass the CSV through as a plain string for
         // backward compatibility with the original helper signature. Multi-
@@ -699,6 +711,18 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
          * [computeMatcherSpec].
          */
         val inlinedConstantMatcherSpec: String? = null,
+        /**
+         * Set when the before lambda is a two-segment chained call
+         * (e.g. `{ xs, p -> xs.filter(p).first() }`). [rootCall] holds the
+         * OUTER call (`first()`); [inner] describes the inner call (`filter(p)`)
+         * with its own arg signatures and receiver-param binding. v1 supports
+         * depth-2 chains only; deeper chains return null from
+         * [validateBeforeLambda].
+         *
+         * Chain BeforeLambdas may NOT also be wrappedInNotNull or propertyAccess
+         * — those routes use different visitor entries.
+         */
+        val inner: BeforeLambda? = null,
     )
 
     private fun validateBeforeLambda(
@@ -766,6 +790,64 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
         val rawReceiver: IrExpression? = rootCall.dispatchReceiver ?: rootCall.extensionReceiver
         val paramSyms: Set<IrValueSymbol> = params.map { it.symbol }.toSet()
+
+        // Chain detection (v1: depth-2 only). When the root call's receiver is
+        // itself an IrCall, treat the root as the OUTER segment and recurse one
+        // level to extract the inner segment. The inner segment binds lambda
+        // params via its receiver and value args; the outer segment in v1 must
+        // bind no lambda params (the outer's args may be literal constants but
+        // not param refs — keeps the substitution-source encoding simple).
+        if (rawReceiver is IrCall && !wrappedInNotNull && !propertyAccess) {
+            val outerSigs = mutableListOf<ArgSig>()
+            for (i in 0 until rootCall.valueArgumentsCount) {
+                val arg = rootCall.getValueArgument(i) ?: continue
+                when (arg) {
+                    is IrConst -> outerSigs += ArgSig.LiteralConst(arg.kind, arg.value)
+                    else -> return null  // outer args binding lambda params not yet supported
+                }
+            }
+            val innerCall = rawReceiver
+            val innerRawRecv: IrExpression? = innerCall.dispatchReceiver ?: innerCall.extensionReceiver
+            // Reject depth-3+ chains: inner.receiver must not be another IrCall.
+            val innerReceiverSym: IrValueSymbol? = when (innerRawRecv) {
+                null -> null
+                is IrGetValue -> {
+                    if (innerRawRecv.symbol !in paramSyms) return null
+                    innerRawRecv.symbol
+                }
+                else -> return null
+            }
+            val innerSigs = mutableListOf<ArgSig>()
+            for (i in 0 until innerCall.valueArgumentsCount) {
+                val arg = innerCall.getValueArgument(i) ?: continue
+                when (arg) {
+                    is IrGetValue -> {
+                        if (arg.symbol !in paramSyms) return null
+                        innerSigs += ArgSig.ParamRef(arg.symbol)
+                    }
+                    is IrConst -> innerSigs += ArgSig.LiteralConst(arg.kind, arg.value)
+                    else -> return null
+                }
+            }
+            val inner = BeforeLambda(
+                params = params,
+                rootCall = innerCall,
+                argSignatures = innerSigs,
+                receiverParamSymbol = innerReceiverSym,
+                wrappedInNotNull = false,
+                propertyAccess = false,
+            )
+            return BeforeLambda(
+                params = params,
+                rootCall = rootCall,
+                argSignatures = outerSigs,
+                receiverParamSymbol = null,
+                wrappedInNotNull = false,
+                propertyAccess = false,
+                inner = inner,
+            )
+        }
+
         val receiverParamSymbol: IrValueSymbol? = when (rawReceiver) {
             null -> null
             is IrGetValue -> {
@@ -1024,24 +1106,55 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             else -> return null
         }
 
-        val paramSymToSource = HashMap<IrValueSymbol, Int>(afterParams.size)
+        // Substitution source encoding:
+        //   * Single-segment recipes use plain integer strings ("-1", "0", "N")
+        //     for backward compatibility with the runtime helper's existing
+        //     parser. -1 means root-call receiver; N >= 0 means root-call arg N.
+        //   * Chain (two-segment) recipes prefix each source with a segment
+        //     tag: "o:" for outer, "i:" for inner. v1 outer args are all
+        //     literal constants and chain BeforeLambdas always set
+        //     receiverParamSymbol = null on the outer, so every param-derived
+        //     source for a chain recipe carries the "i:" prefix in practice.
+        //     The CSV parser at runtime branches on the presence of ':'.
+        val isChain = before.inner != null
+        fun outerSrc(pos: Int): String = if (isChain) "o:$pos" else pos.toString()
+        fun innerSrc(pos: Int): String = "i:$pos"
+
+        val paramSymToSource = HashMap<IrValueSymbol, String>(afterParams.size)
         for (i in 0 until afterParams.size) {
             val beforeParamSym = before.params[i].symbol
-            val source = if (beforeParamSym == before.receiverParamSymbol) {
-                -1
-            } else {
-                val argIdx = before.argSignatures.indexOfFirst { sig ->
-                    sig is ArgSig.ParamRef && sig.symbol == beforeParamSym
+            val source: String = when {
+                beforeParamSym == before.receiverParamSymbol -> outerSrc(-1)
+                else -> {
+                    val outerArgIdx = before.argSignatures.indexOfFirst { sig ->
+                        sig is ArgSig.ParamRef && sig.symbol == beforeParamSym
+                    }
+                    if (outerArgIdx >= 0) outerSrc(outerArgIdx)
+                    else if (isChain) {
+                        val inner = before.inner!!
+                        if (beforeParamSym == inner.receiverParamSymbol) innerSrc(-1)
+                        else {
+                            val innerArgIdx = inner.argSignatures.indexOfFirst { sig ->
+                                sig is ArgSig.ParamRef && sig.symbol == beforeParamSym
+                            }
+                            if (innerArgIdx < 0) return null
+                            innerSrc(innerArgIdx)
+                        }
+                    } else return null
                 }
-                if (argIdx < 0) return null
-                argIdx
             }
             paramSymToSource[afterParams[i].symbol] = source
         }
 
-        data class LiteralSlot(val argPos: Int, val sig: ArgSig.LiteralConst, var consumed: Boolean = false)
-        val literalSlots = before.argSignatures.mapIndexedNotNull { idx, sig ->
-            if (sig is ArgSig.LiteralConst) LiteralSlot(idx, sig) else null
+        data class LiteralSlot(val src: String, val sig: ArgSig.LiteralConst, var consumed: Boolean = false)
+        val literalSlots = mutableListOf<LiteralSlot>()
+        before.argSignatures.forEachIndexed { idx, sig ->
+            if (sig is ArgSig.LiteralConst) literalSlots += LiteralSlot(outerSrc(idx), sig)
+        }
+        if (isChain) {
+            before.inner!!.argSignatures.forEachIndexed { idx, sig ->
+                if (sig is ArgSig.LiteralConst) literalSlots += LiteralSlot(innerSrc(idx), sig)
+            }
         }
 
         // Span computation: walk IR for min(start)/max(end) over valid offsets.
@@ -1082,7 +1195,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         data class Spot(
             val startOffset: Int,
             val endOffset: Int,
-            val sourceIndex: Int,
+            val source: String,
             val typeFqn: String?,
         )
         val spots = mutableListOf<Spot>()
@@ -1095,7 +1208,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 spots += Spot(
                     startOffset = expression.startOffset,
                     endOffset = expression.endOffset,
-                    sourceIndex = src,
+                    source = src,
                     typeFqn = renderPlaceholderType(expression.symbol.owner.type),
                 )
             }
@@ -1107,7 +1220,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 spots += Spot(
                     startOffset = expression.startOffset,
                     endOffset = expression.endOffset,
-                    sourceIndex = slot.argPos,
+                    source = slot.src,
                     typeFqn = renderPlaceholderType(expression.type),
                 )
             }
@@ -1115,12 +1228,18 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
         val inSliceSpots = mutableListOf<Spot>()
         val prependSpots = mutableListOf<Spot>()
+        // "Prepend" handling — a receiver-source spot that the IR placed
+        // outside the source slice (the package qualifier on a static call,
+        // typically) needs to attach to the front of the rendered template
+        // as `#{any()}.<slice>`. For single-segment recipes that means
+        // source == "-1"; for chains the prepend slot would be "i:-1".
+        val receiverSourceTags = if (isChain) setOf("i:-1", "o:-1") else setOf("-1")
         for (spot in spots) {
             val inSlice = spot.startOffset in sliceStart until sliceEnd &&
                 spot.endOffset in (spot.startOffset + 1)..sliceEnd
             if (inSlice) {
                 inSliceSpots += spot
-            } else if (spot.sourceIndex == -1) {
+            } else if (spot.source in receiverSourceTags) {
                 prependSpots += spot
             } else {
                 return null
@@ -1142,9 +1261,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             "${renderPlaceholder(prependSpots.single().typeFqn)}.$templateBuilder"
         }
 
-        val orderedSources = mutableListOf<Int>()
-        if (prependSpots.isNotEmpty()) orderedSources += prependSpots.single().sourceIndex
-        orderedSources += inSliceSpots.sortedBy { it.startOffset }.map { it.sourceIndex }
+        val orderedSources = mutableListOf<String>()
+        if (prependSpots.isNotEmpty()) orderedSources += prependSpots.single().source
+        orderedSources += inSliceSpots.sortedBy { it.startOffset }.map { it.source }
         val csv = orderedSources.joinToString(",")
 
         return template to csv
