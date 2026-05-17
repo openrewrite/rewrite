@@ -24,7 +24,7 @@ import org.openrewrite.TreeVisitor
 //
 // Each `<Lang>Scope` class:
 //   - Inherits this base and is `@RecipeDsl`-marked.
-//   - Auto-generates one `visitX(action: (Node) -> Node)` function per public
+//   - Auto-generates one `visitX(action: <Visitor>.(Node) -> Node)` function per public
 //     `visitX(Node, P)` declared on `<Lang>Visitor` (and its visitor ancestors,
 //     up to but not including `TreeVisitor`).
 //   - Each registered action is stored in [actions] keyed by the visitor

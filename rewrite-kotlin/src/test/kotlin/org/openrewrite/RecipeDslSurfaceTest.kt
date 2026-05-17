@@ -135,6 +135,33 @@ class RecipeDslSurfaceTest {
     }
 
     @Test
+    fun `visit lambda exposes the running visitor as 'this' (cursor in scope)`() {
+        // Receiver-style action signature: visitX { node -> ... } runs with
+        // `this: <Lang>Visitor<ExecutionContext>`, so `cursor` resolves to the
+        // visitor's live cursor — without that, gated/scoped recipes (e.g.
+        // "only in loops") would need a separate JavaVisitor subclass.
+        val depths = mutableListOf<Int>()
+        val r = recipe("Foo", "bar") {
+            edit {
+                java {
+                    visitMethodInvocation { mi ->
+                        // `this` is the JavaVisitor; `cursor` is its current cursor.
+                        depths.add(cursor.pathAsStream.count().toInt())
+                        mi
+                    }
+                }
+            }
+        }
+        // Drive the visitor against a tiny Java source so the cursor is non-null.
+        val cu = org.openrewrite.java.JavaParser.fromJavaVersion().build()
+            .parse("class A { void m() { System.out.println(\"hi\"); } }")
+            .iterator().next() as org.openrewrite.java.tree.J.CompilationUnit
+        r.visitor.visit(cu, InMemoryExecutionContext())
+        assertThat(depths).isNotEmpty
+        assertThat(depths.first()).isGreaterThan(0)
+    }
+
+    @Test
     fun `recipes composite exposes its children via getRecipeList`() {
         val a = recipe("A", "a") { edit { java { /* no-op */ } } }
         val b = recipe("B", "b") { edit { java { /* no-op */ } } }
