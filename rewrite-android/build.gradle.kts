@@ -1,5 +1,6 @@
 plugins {
     id("org.openrewrite.build.language-library")
+    id("org.openrewrite.build.moderne-source-available-license")
 }
 
 dependencies {
