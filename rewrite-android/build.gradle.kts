@@ -34,7 +34,4 @@ tasks.withType<Javadoc>().configureEach {
         "**/AndroidVariant**",
         "**/AndroidSourceSet**"
     )
-    // Phase 1 ships only marker types, all excluded above; javadoc would otherwise fail
-    // with "No public or protected classes found to document". Phases C/D add real classes.
-    isFailOnError = false
 }
