@@ -31,7 +31,7 @@ import org.openrewrite.kotlin.Assertions.kotlin
  *     }
  *
  * Each test compiles a recipe via the K2 plugin, instantiates the synthesized
- * `Generated$<Name>` class, then runs it through `RewriteTest` against a
+ * `<Name>$KtRecipe` class, then runs it through `RewriteTest` against a
  * Kotlin source fixture. This proves the full IR-pass pipeline — metadata
  * extraction, MethodMatcher spec computation, after-template synthesis,
  * Java-vs-Kotlin classifier, helper dispatch — works against real recipes.
@@ -56,7 +56,7 @@ class RecipePluginRewriteTest : RewriteTest {
             """.trimIndent(),
             propertyName = "UseUppercase",
         ))
-        // The synthesized `Generated$<Name>` class lives in the
+        // The synthesized `<Name>$KtRecipe` class lives in the
         // kotlin-compile-testing classloader, not the test's. Jackson's
         // class-id deserializer can't resolve it. The recipe still executes
         // correctly via direct invocation; the round-trip is what fails.
@@ -315,7 +315,7 @@ class RecipePluginRewriteTest : RewriteTest {
     fun `imperative recipe — edit kotlin visitClassDeclaration rewrites class shape`() {
         // Exercises the imperative-shape fallback: the K2 plugin can't extract
         // an `edit { rewrite { } to { } }` template, so it instead synthesizes
-        // `Generated$<Name>` whose `getVisitor()` body delegates back to
+        // `<Name>$KtRecipe` whose `getVisitor()` body delegates back to
         // `buildImperativeVisitor(<original recipe block>)`. The generated
         // class is field-less — see `imperative recipe — generated class is
         // serializable (no instance fields)` for the Jackson-roundtrip proof.
@@ -357,7 +357,7 @@ class RecipePluginRewriteTest : RewriteTest {
         // fields beyond declared `@Option` ones (the runtime DSL's anonymous
         // Recipe captures the `block` lambda as a synthetic field — that's
         // what breaks serialization). The plugin's imperative-recipe path
-        // produces a top-level `Generated$<Name>` whose state is reconstructed
+        // produces a top-level `<Name>$KtRecipe` whose state is reconstructed
         // fresh on each `getVisitor()` call, so the class itself has zero
         // fields. Verify by reflection.
         val r = loadCompiledRecipe(
@@ -372,8 +372,33 @@ class RecipePluginRewriteTest : RewriteTest {
             """.trimIndent(),
             propertyName = "Noop",
         )
-        assertThat(r::class.java.simpleName).isEqualTo("Generated\$Noop")
+        assertThat(r::class.java.simpleName).isEqualTo("Noop\$KtRecipe")
         assertThat(r::class.java.declaredFields).isEmpty()
+    }
+
+    @Test
+    fun `recipes composite — generated class exposes children`() {
+        // The K2 plugin synthesizes a `<Name>$KtRecipe` class for `recipes(...)`
+        // properties too, so composites are discoverable by classpath scanning
+        // (and end up in `recipes.csv`). The synthesized class extends Recipe
+        // directly and overrides getRecipeList() to return `listOf(<children>)`.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                import org.openrewrite.recipes
+                val A = recipe("A", "first") { edit { kotlin { visitClassDeclaration { it } } } }
+                val B = recipe("B", "second") { edit { kotlin { visitClassDeclaration { it } } } }
+                val Combo = recipes("Combo", "A then B", A, B)
+            """.trimIndent(),
+            propertyName = "Combo",
+        )
+        assertThat(r::class.java.simpleName).isEqualTo("Combo\$KtRecipe")
+        assertThat(r::class.java.declaredFields).isEmpty()
+        assertThat(r.displayName).isEqualTo("Combo")
+        assertThat(r.description).isEqualTo("A then B")
+        assertThat(r.recipeList).hasSize(2)
+        assertThat(r.recipeList.map { it::class.java.simpleName })
+            .containsExactly("A\$KtRecipe", "B\$KtRecipe")
     }
 
     @Test

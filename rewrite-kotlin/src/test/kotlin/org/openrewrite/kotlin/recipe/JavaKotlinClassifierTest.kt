@@ -31,7 +31,7 @@ import org.openrewrite.kotlin.KotlinVisitor
  * Kotlin (every recipe in Kotlin1To2.kt today).
  *
  * Test strategy: compile each recipe via the K2 plugin, load the synthesized
- * `Generated$<Name>` class through the compilation result's classloader, and
+ * `<Name>$KtRecipe` class through the compilation result's classloader, and
  * `instanceof`-check the visitor returned by `getVisitor()`.
  */
 class JavaKotlinClassifierTest {
@@ -89,7 +89,7 @@ class JavaKotlinClassifierTest {
      * Compile the snippet, load the named property from the synthesized
      * top-level file, and cast its value to Recipe.
      *
-     * The synthesized class lives at `<file-package>.Generated$<propertyName>`;
+     * The synthesized class lives at `<file-package>.<propertyName>$KtRecipe`;
      * the property's getter returns an instance of it.
      */
     private fun compileRecipe(source: String, propertyName: String): Recipe {

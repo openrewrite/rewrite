@@ -93,7 +93,12 @@ public fun recipes(
  * because [org.openrewrite.internal.RecipeLoader] validates instantiability by
  * calling the constructor with empty arguments; the public [recipes] entry
  * point always passes real, non-null values.
+ *
+ * Marked [AbstractRecipe] so the classpath scanner doesn't enumerate it as a
+ * self-standing recipe — its only meaningful uses are concrete deserialized
+ * instances and (eventually) compiler-synthesized `<Name>$KtRecipe` subclasses.
  */
+@AbstractRecipe
 public class KotlinCompositeRecipe @JsonCreator constructor(
     @JsonProperty("displayName") private val displayName: String?,
     @JsonProperty("description") private val description: String?,
@@ -536,7 +541,7 @@ public open class GenerateScope internal constructor(public val ctx: ExecutionCo
  * `recipe(...) { edit { lang { visitX { ... } } } }` recipe on each call.
  *
  * The K2 plugin replaces the original `recipe(...)` call site with a
- * synthetic `Generated$<Name>()` constructor; the generated class is a
+ * synthetic `<Name>$KtRecipe()` constructor; the generated class is a
  * field-less top-level `Recipe` whose `getVisitor()` body calls this
  * helper, threading the user's original trailing lambda back through a
  * fresh [RecipeBuilder]. Because the generated class has no instance
