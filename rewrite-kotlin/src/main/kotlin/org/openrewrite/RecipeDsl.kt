@@ -104,7 +104,7 @@ public class KotlinCompositeRecipe @JsonCreator constructor(
     @JsonProperty("description") private val description: String?,
     @JsonProperty("recipeList") private val recipeList: List<Recipe>?,
 ) : Recipe() {
-    override fun getDisplayName(): String = displayName ?: name
+    override fun getDisplayName(): String = displayName ?: "Composite recipe"
     override fun getDescription(): String = description ?: "A composite recipe."
     override fun getRecipeList(): List<Recipe> = recipeList ?: emptyList()
 }
