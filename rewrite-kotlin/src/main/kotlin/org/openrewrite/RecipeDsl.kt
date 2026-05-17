@@ -112,6 +112,11 @@ public class KotlinCompositeRecipe @JsonCreator constructor(
         // the scanner's own classloader) can't see it. Throwing here trips the
         // scanner's catch-Throwable in `configureRecipe`, so the class is silently
         // skipped rather than enumerated as a phantom empty composite.
+        //
+        // FIXME: remove this `require` once 8.83.0+ (which parent-delegates
+        //  `org.openrewrite.AbstractRecipe` in `RecipeClassLoader`) is the
+        //  minimum supported version of build-plugin/CLI scanners in the wild.
+        //  At that point the annotation alone is sufficient.
         require(displayName != null) { "KotlinCompositeRecipe requires a non-null displayName" }
     }
 

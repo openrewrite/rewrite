@@ -38,6 +38,7 @@ public class RecipeClassLoader extends URLClassLoader {
 
     // Core OpenRewrite types that must be loaded from parent (from Moderne's RecipeClassLoader)
     private static final List<String> PARENT_DELEGATED_PREFIXES = Arrays.asList(
+            "org.openrewrite.AbstractRecipe",
             "org.openrewrite.Column",
             "org.openrewrite.Cursor",
             "org.openrewrite.DelegatingExecutionContext",
