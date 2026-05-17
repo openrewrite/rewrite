@@ -82,6 +82,71 @@ class RecipePluginRewriteTest : RewriteTest {
     )
 
     @Test
+    fun `not-null-asserted before pattern rewrites the whole expression`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseReadln = recipe(
+                    displayName = "Use readln() instead of readLine()!!",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { -> readLine()!! } to { -> readln() }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseReadln",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                fun first(): String = readLine()!!
+                """.trimIndent(),
+                """
+                fun first(): String = readln()
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `after-template preserves source-level FQN qualifier`() {
+        // `Math.abs(x: Double)` -> `kotlin.math.abs(x)`. K2 IR resolves
+        // `kotlin.math.abs(x)` to a single `IrCall(abs)` whose offsets cover
+        // only `abs(x)`; the package qualifier has no IR node. The IR pass
+        // extends the source slice backward through any `id(.id)*` chain so
+        // the synthesized template emits the same FQN the recipe author wrote,
+        // keeping the rewrite single-cycle stable without needing an
+        // import-add post-visit.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseKotlinMathAbs = recipe(
+                    displayName = "Use kotlin.math.abs",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { x: Double -> Math.abs(x) } to { x -> kotlin.math.abs(x) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseKotlinMathAbs",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                fun a(x: Double): Double = Math.abs(x)
+                """.trimIndent(),
+                """
+                fun a(x: Double): Double = kotlin.math.abs(x)
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
     fun `metadata accessors populate correctly on generated recipe`() {
         val r = loadCompiledRecipe(
             source = """

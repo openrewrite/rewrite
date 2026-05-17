@@ -128,6 +128,14 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
         const val EDIT_SCOPE_REWRITE_FQN = "org.openrewrite.EditScope.rewrite"
         const val RECIPE_BUILDER_EDIT_FQN = "org.openrewrite.RecipeBuilder.edit"
+
+        /**
+         * K2 FIR2IR represents `expr!!` as a call to this synthetic intrinsic,
+         * taking the asserted expression as the (only) value argument. See
+         * `org.jetbrains.kotlin.ir.expressions.IrConstantValueImpl` and
+         * `FirNotNullableTransformer` in the Kotlin compiler.
+         */
+        const val CHECK_NOT_NULL_FQN = "kotlin.internal.ir.CHECK_NOT_NULL"
     }
 
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
@@ -153,6 +161,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val getVisitor: IrSimpleFunction?,
         val methodInvocationRewriteKotlinSymbol: IrSimpleFunctionSymbol?,
         val methodInvocationRewriteJavaSymbol: IrSimpleFunctionSymbol?,
+        val methodInvocationRewriteKotlinNotNullSymbol: IrSimpleFunctionSymbol?,
     )
 
     private fun buildIrGenContext(pluginContext: IrPluginContext): RecipeIrGenContext? {
@@ -187,6 +196,9 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             .orEmpty()
         val kotlinHelper = supportFns.firstOrNull { it.name.asString() == "methodInvocationRewrite" }?.symbol
         val javaHelper = supportFns.firstOrNull { it.name.asString() == "methodInvocationRewriteJava" }?.symbol
+        val kotlinNotNullHelper = supportFns.firstOrNull {
+            it.name.asString() == "methodInvocationRewriteKotlinNotNull"
+        }?.symbol
 
         return RecipeIrGenContext(
             pluginContext = pluginContext,
@@ -199,6 +211,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             getVisitor = getVisitor,
             methodInvocationRewriteKotlinSymbol = kotlinHelper,
             methodInvocationRewriteJavaSymbol = javaHelper,
+            methodInvocationRewriteKotlinNotNullSymbol = kotlinNotNullHelper,
         )
     }
 
@@ -340,6 +353,12 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val afterTemplate: String,
         val substitutionSourcesCsv: String,
         val usesKotlinTreeNode: Boolean,
+        /**
+         * True when every before lambda was a `someCall()!!` pattern. The
+         * helper selection routes to a `K.Unary(NotNull)`-walking visitor so
+         * the rewrite replaces the entire not-null-asserted expression.
+         */
+        val wrappedInNotNull: Boolean,
     )
 
     private fun pickHelperSymbol(
@@ -363,7 +382,11 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // KotlinTemplate) the plan deferred.
         @Suppress("UNUSED_VARIABLE")
         val classifierResult = templates.usesKotlinTreeNode
-        return ctx.methodInvocationRewriteKotlinSymbol
+        return if (templates.wrappedInNotNull) {
+            ctx.methodInvocationRewriteKotlinNotNullSymbol
+        } else {
+            ctx.methodInvocationRewriteKotlinSymbol
+        }
     }
 
     /**
@@ -427,9 +450,15 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
         val beforeLambdas = beforeExprs.map { validateBeforeLambda(it) ?: return null }
         val canonical = beforeLambdas[0].canonicalSignature()
+        val notNullForAll = beforeLambdas[0].wrappedInNotNull
         for (i in 1 until beforeLambdas.size) {
             if (beforeLambdas[i].canonicalSignature() != canonical) return null
             if (beforeLambdas[i].params.size != beforeLambdas[0].params.size) return null
+            // Multi-before recipes must agree on the not-null-assertion shape.
+            // Mixing `someCall()` and `someCall()!!` befores would require two
+            // different visitor entry points; reject and let the runtime DSL
+            // builder surface the limitation.
+            if (beforeLambdas[i].wrappedInNotNull != notNullForAll) return null
         }
         val afterTemplateAndSources = buildAfterTemplate(afterArg, sourceText, beforeLambdas[0]) ?: return null
         val matcherSpecs = beforeLambdas.map { computeMatcherSpec(it.rootCall) }
@@ -440,6 +469,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             afterTemplate = afterTemplateAndSources.first,
             substitutionSourcesCsv = afterTemplateAndSources.second,
             usesKotlinTreeNode = usesKotlinTreeNode,
+            wrappedInNotNull = notNullForAll,
         )
     }
 
@@ -503,6 +533,15 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val rootCall: IrCall,
         val argSignatures: List<ArgSig>,
         val receiverParamSymbol: IrValueSymbol?,
+        /**
+         * True when the lambda body returns `someCall()!!` rather than bare
+         * `someCall()`. K2 FIR2IR represents `expr!!` as an `IrCall` to the
+         * `kotlin.internal.ir.CHECK_NOT_NULL` intrinsic; the matcher targets
+         * the inner call but the helper selection routes to a visitor that
+         * walks `K.Unary(NotNull)` so the rewrite replaces the entire
+         * not-null-asserted expression rather than just the inner invocation.
+         */
+        val wrappedInNotNull: Boolean,
     )
 
     private fun validateBeforeLambda(fnExpr: IrFunctionExpression): BeforeLambda? {
@@ -510,16 +549,30 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val params = fn.valueParameters
         val body = fn.body as? IrBlockBody ?: return null
         val singleStmt = body.statements.singleOrNull() ?: return null
-        val rootCall = when (singleStmt) {
-            is IrReturn -> singleStmt.value as? IrCall
+        val rawExpr = when (singleStmt) {
+            is IrReturn -> singleStmt.value
             is IrCall -> singleStmt
             else -> null
         } ?: return null
+        // Unwrap an outer `!!` — K2 FIR2IR represents `someCall()!!` as an
+        // `IrCall` to the `kotlin.internal.ir.CHECK_NOT_NULL` intrinsic with
+        // the asserted expression as its (single) value argument. The matcher
+        // should target the inner call; the not-null-assertion shape is then
+        // remembered so the helper-selection routes to a visitor that walks
+        // `K.Unary(NotNull)` and rewrites the whole not-null expression.
+        var wrappedInNotNull = false
+        var current: IrCall = rawExpr as? IrCall ?: return null
+        while (current.symbol.owner.kotlinFqName.asString() == CHECK_NOT_NULL_FQN) {
+            wrappedInNotNull = true
+            val inner = current.getValueArgument(0) as? IrCall ?: return null
+            current = inner
+        }
+        val rootCall = current
 
         if (params.isEmpty()) {
             if (rootCall.dispatchReceiver != null || rootCall.extensionReceiver != null) return null
             if (rootCall.valueArgumentsCount > 0) return null
-            return BeforeLambda(params, rootCall, emptyList(), receiverParamSymbol = null)
+            return BeforeLambda(params, rootCall, emptyList(), receiverParamSymbol = null, wrappedInNotNull = wrappedInNotNull)
         }
 
         val rawReceiver: IrExpression? = rootCall.dispatchReceiver ?: rootCall.extensionReceiver
@@ -545,7 +598,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 else -> return null
             }
         }
-        return BeforeLambda(params, rootCall, sigs, receiverParamSymbol)
+        return BeforeLambda(params, rootCall, sigs, receiverParamSymbol, wrappedInNotNull)
     }
 
     private fun BeforeLambda.canonicalSignature(): CanonicalSignature {
@@ -590,6 +643,17 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             return "$dispatchFqn $methodName(..)"
         }
 
+        // Java static methods (and `@JvmStatic` companions): the IrSimpleFunction's
+        // parent is the declaring IrClass even when the dispatch-receiver param is
+        // null. Pin the matcher to that class so `Math.abs(x)` doesn't accidentally
+        // match `kotlin.math.abs(x)` after the rewrite. Without this, the matcher
+        // falls through to `* abs(..)` and the recipe keeps firing every cycle,
+        // tripping the test framework's single-cycle stability check.
+        val parent = owner.parent
+        if (parent is IrClass) {
+            return "${parent.kotlinFqName.asString()} $methodName(..)"
+        }
+
         val facadeFqn = computeJvmFacadeFqn(owner)
         return if (facadeFqn != null) {
             "$facadeFqn $methodName(..)"
@@ -619,6 +683,33 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val stem = nameOnly.removeSuffix(".kt")
         if (stem.isEmpty()) return null
         return stem.replaceFirstChar { it.uppercaseChar() } + "Kt"
+    }
+
+    /**
+     * Walk backward from [start] through any `identifier(.identifier)*` chain
+     * in [sourceText] and return the new (earlier) start offset. Used to grow
+     * the IR-derived source slice over a syntactic FQN qualifier preceding a
+     * top-level call — K2 IR doesn't emit a child node for the qualifier so
+     * the IR walk's `minStart` lands at the simple call name. Stops at any
+     * non-identifier-or-dot char (whitespace, paren, operator, brace), so a
+     * non-qualified call slice is unchanged.
+     */
+    private fun extendBackwardForQualifierChain(sourceText: String, start: Int): Int {
+        var i = start
+        while (i > 0) {
+            val dotIdx = i - 1
+            if (sourceText[dotIdx] != '.') break
+            // Walk back through identifier chars preceding the '.'.
+            var j = dotIdx - 1
+            while (j >= 0 && (sourceText[j].isLetterOrDigit() || sourceText[j] == '_')) j--
+            val identStart = j + 1
+            // Identifier must be at least one char and start with a non-digit.
+            if (identStart >= dotIdx) break
+            val first = sourceText[identStart]
+            if (!(first.isLetter() || first == '_')) break
+            i = identStart
+        }
+        return i
     }
 
     // ------------------------------------------------------------------
@@ -684,7 +775,15 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             }
         }
         if (minStart == Int.MAX_VALUE || maxEnd > sourceText.length) return null
-        val sliceStart = minStart
+        // Source-text-slice gives the IR-visible span, which excludes any
+        // syntactic FQN qualifier preceding a top-level call (K2 IR resolves
+        // `kotlin.math.abs(x)` to a single `IrCall(abs)` whose offsets cover
+        // only `abs(x)`; the `kotlin.math.` package qualifier has no IR node).
+        // Walk backward through any `identifier(.identifier)*` chain so the
+        // template includes whatever qualifier the recipe author wrote — the
+        // rewrite is then output-identical to the source spelling and remains
+        // single-cycle stable (no separate import-add pass needed).
+        val sliceStart = extendBackwardForQualifierChain(sourceText, minStart)
         val sliceEnd = maxEnd
         val slice = sourceText.substring(sliceStart, sliceEnd)
 

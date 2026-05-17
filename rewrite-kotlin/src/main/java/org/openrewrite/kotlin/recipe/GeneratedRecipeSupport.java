@@ -30,6 +30,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.TrailingLambdaArgument;
+import org.openrewrite.kotlin.tree.K;
 
 /**
  * Runtime support for the recipe authoring DSL's K2 compiler plugin
@@ -125,6 +126,78 @@ public final class GeneratedRecipeSupport {
                     return result.withPrefix(method.getPrefix());
                 }
                 return super.visitMethodInvocation(method, ctx);
+            }
+        };
+    }
+
+    /**
+     * Variant of {@link #methodInvocationRewrite} for recipes whose before
+     * lambda body is {@code someCall()!!} (a method invocation immediately
+     * not-null-asserted). In the rewrite-kotlin LST that pattern parses as
+     * {@code K.Unary(NotNull, J.MethodInvocation)} — visiting only
+     * {@code J.MethodInvocation} would replace just the call and leave a
+     * stranded {@code !!} on the rewritten template, so this visitor walks
+     * {@link K.Unary} instead and swaps the whole not-null expression for the
+     * after template.
+     *
+     * <p>Matcher specs, substitution-source CSV, and trailing-lambda fix-up
+     * semantics are identical to the bare variant — only the entry point and
+     * the replacement coordinate (the K.Unary, not its inner J.MethodInvocation)
+     * change.
+     */
+    public static TreeVisitor<?, ExecutionContext> methodInvocationRewriteKotlinNotNull(
+            String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv) {
+        String[] specs = matcherSpecsLines.isEmpty() ? new String[0] : matcherSpecsLines.split("\n");
+        MethodMatcher[] matchers = new MethodMatcher[specs.length];
+        for (int i = 0; i < specs.length; i++) {
+            matchers[i] = new MethodMatcher(specs[i]);
+        }
+        int[] substitutionSources = parseCsv(substitutionSourcesCsv);
+        return new KotlinVisitor<ExecutionContext>() {
+            @Override
+            public J visitUnary(K.Unary unary, ExecutionContext ctx) {
+                if (unary.getOperator() != K.Unary.Type.NotNull) {
+                    return super.visitUnary(unary, ctx);
+                }
+                if (!(unary.getExpression() instanceof J.MethodInvocation)) {
+                    return super.visitUnary(unary, ctx);
+                }
+                J.MethodInvocation method = (J.MethodInvocation) unary.getExpression();
+                boolean matched = false;
+                for (MethodMatcher matcher : matchers) {
+                    if (matcher.matches(method)) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    return super.visitUnary(unary, ctx);
+                }
+                Object[] substitutions = new Object[substitutionSources.length];
+                for (int i = 0; i < substitutionSources.length; i++) {
+                    int src = substitutionSources[i];
+                    if (src < 0) {
+                        if (method.getSelect() == null) {
+                            return super.visitUnary(unary, ctx);
+                        }
+                        substitutions[i] = method.getSelect();
+                    } else {
+                        if (src >= method.getArguments().size()) {
+                            return super.visitUnary(unary, ctx);
+                        }
+                        substitutions[i] = method.getArguments().get(src);
+                    }
+                }
+                J result = KotlinTemplate.builder(afterTemplate).build()
+                        .apply(getCursor(), unary.getCoordinates().replace(), substitutions);
+                if (result instanceof J.MethodInvocation) {
+                    JContainer<Expression> matchedTypeArgs = method.getPadding().getTypeParameters();
+                    if (matchedTypeArgs != null) {
+                        result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
+                    }
+                    result = preserveTrailingLambdaShape((J.MethodInvocation) result);
+                }
+                return result.withPrefix(unary.getPrefix());
             }
         };
     }
@@ -256,7 +329,7 @@ public final class GeneratedRecipeSupport {
         return result;
     }
 
-    /**
+/**
      * Restore Kotlin trailing-lambda call shape on a template-substituted result.
      *
      * <p>The substitution sources come straight off the matched invocation's
