@@ -484,3 +484,33 @@ public open class GenerateScope internal constructor(public val ctx: ExecutionCo
         "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
     )
 }
+
+// ---------------------------------------------------------------------------
+// Runtime support for the K2 plugin's imperative-recipe synthesis.
+// ---------------------------------------------------------------------------
+
+/**
+ * Rebuild the visitor pipeline for an imperative
+ * `recipe(...) { edit { lang { visitX { ... } } } }` recipe on each call.
+ *
+ * The K2 plugin replaces the original `recipe(...)` call site with a
+ * synthetic `Generated$<Name>()` constructor; the generated class is a
+ * field-less top-level `Recipe` whose `getVisitor()` body calls this
+ * helper, threading the user's original trailing lambda back through a
+ * fresh [RecipeBuilder]. Because the generated class has no instance
+ * state, Jackson roundtrip (`RecipeSerializer.read(write(r))`) succeeds —
+ * the workaround `validateRecipeSerialization(false)` is no longer needed
+ * for imperative recipes that route through this path.
+ *
+ * The temporary [Recipe] built here exists only long enough to extract
+ * its visitor; metadata (displayName, description, tags, effort) is the
+ * generated class's responsibility (it overrides the corresponding Recipe
+ * methods with constants), so passing empty placeholders is intentional.
+ */
+public fun buildImperativeVisitor(
+    block: RecipeBuilder.() -> Unit,
+): TreeVisitor<*, ExecutionContext> {
+    val builder = RecipeBuilder()
+    builder.block()
+    return builder.build("", "", emptySet(), null).getVisitor()
+}

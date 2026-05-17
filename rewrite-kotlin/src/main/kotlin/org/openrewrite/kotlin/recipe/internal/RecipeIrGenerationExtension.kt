@@ -162,6 +162,17 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val methodInvocationRewriteKotlinSymbol: IrSimpleFunctionSymbol?,
         val methodInvocationRewriteJavaSymbol: IrSimpleFunctionSymbol?,
         val methodInvocationRewriteKotlinNotNullSymbol: IrSimpleFunctionSymbol?,
+        val propertyAccessRewriteKotlinSymbol: IrSimpleFunctionSymbol?,
+        /**
+         * Top-level `org.openrewrite.buildImperativeVisitor` Kotlin helper.
+         * The IR pass routes imperative-shape recipes to this helper so the
+         * generated class can stay field-less (Jackson-roundtrippable) while
+         * still constructing the visitor pipeline fresh on each `getVisitor()`
+         * call. Null when the helper isn't on the classpath (older
+         * `rewrite-kotlin`) — imperative recipes fall back to the runtime
+         * DSL's anonymous-Recipe path.
+         */
+        val buildImperativeVisitorSymbol: IrSimpleFunctionSymbol?,
     )
 
     private fun buildIrGenContext(pluginContext: IrPluginContext): RecipeIrGenContext? {
@@ -199,6 +210,19 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val kotlinNotNullHelper = supportFns.firstOrNull {
             it.name.asString() == "methodInvocationRewriteKotlinNotNull"
         }?.symbol
+        val propertyAccessHelper = supportFns.firstOrNull {
+            it.name.asString() == "propertyAccessRewrite"
+        }?.symbol
+
+        // Top-level helper in `org.openrewrite.RecipeDslKt`. Resolved via
+        // `referenceFunctions` against the FqName of the standalone declaration.
+        val buildImperativeVisitorFqn = FqName("org.openrewrite.buildImperativeVisitor")
+        val buildImperativeVisitorSymbol = pluginContext
+            .referenceFunctions(org.jetbrains.kotlin.name.CallableId(
+                packageName = buildImperativeVisitorFqn.parent(),
+                callableName = buildImperativeVisitorFqn.shortName(),
+            ))
+            .singleOrNull { it.owner.valueParameters.size == 1 }
 
         return RecipeIrGenContext(
             pluginContext = pluginContext,
@@ -212,6 +236,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             methodInvocationRewriteKotlinSymbol = kotlinHelper,
             methodInvocationRewriteJavaSymbol = javaHelper,
             methodInvocationRewriteKotlinNotNullSymbol = kotlinNotNullHelper,
+            propertyAccessRewriteKotlinSymbol = propertyAccessHelper,
+            buildImperativeVisitorSymbol = buildImperativeVisitorSymbol,
         )
     }
 
@@ -244,20 +270,39 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             if (initializerExpr.symbol.owner.kotlinFqName != RECIPE_FQN) continue
 
             val metadata = readMetadata(initializerExpr) ?: continue
-            val templates = extractRewriteTemplates(initializerExpr, sourceText) ?: continue
-            // Classify Java vs Kotlin per the LST-structural rule. The helper
-            // resolution may have failed (e.g. older GeneratedRecipeSupport on
-            // classpath); skip the recipe if the picked helper is unavailable.
-            val helperSymbol = pickHelperSymbol(templates, ctx) ?: continue
-
-            val generatedClass = buildGeneratedRecipeClass(
-                ctx = ctx,
-                parentFile = file,
-                propertyName = declaration.name,
-                metadata = metadata,
-                templates = templates,
-                helperSymbol = helperSymbol,
-            )
+            // Two paths share the rest of the loop:
+            //   - declarative: `edit { rewrite { } to { } }` — synthesizes a
+            //     visitor whose body is the IR-derived template helper call.
+            //   - imperative:  `edit { lang { visitX { } } }` (or anything
+            //     else not matching the declarative shape) — synthesizes a
+            //     visitor whose body delegates back to the runtime DSL via
+            //     `buildImperativeVisitor`, threading the original recipe
+            //     trailing lambda through a fresh [RecipeBuilder] per call.
+            // Both produce a field-less top-level class so Jackson roundtrip
+            // succeeds (no `validateRecipeSerialization(false)` workaround).
+            val templates = extractRewriteTemplates(initializerExpr, sourceText, ctx)
+            val generatedClass: IrClass = if (templates != null) {
+                val helperSymbol = pickHelperSymbol(templates, ctx) ?: continue
+                buildGeneratedRecipeClass(
+                    ctx = ctx,
+                    parentFile = file,
+                    propertyName = declaration.name,
+                    metadata = metadata,
+                    templates = templates,
+                    helperSymbol = helperSymbol,
+                )
+            } else {
+                val imperativeBlock = findTrailingLambda(initializerExpr) ?: continue
+                val helperSymbol = ctx.buildImperativeVisitorSymbol ?: continue
+                buildImperativeRecipeClass(
+                    ctx = ctx,
+                    parentFile = file,
+                    propertyName = declaration.name,
+                    metadata = metadata,
+                    recipeBlock = imperativeBlock,
+                    helperSymbol = helperSymbol,
+                )
+            }
             file.addChild(generatedClass)
 
             val generatedCtor = generatedClass.declarations
@@ -359,6 +404,12 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
          * the rewrite replaces the entire not-null-asserted expression.
          */
         val wrappedInNotNull: Boolean,
+        /**
+         * True when every before lambda was a property-access pattern
+         * (`{ d: Duration -> d.inHours }`) rather than a method invocation.
+         * Routes the helper selection to a `J.FieldAccess`-walking visitor.
+         */
+        val propertyAccess: Boolean,
     )
 
     private fun pickHelperSymbol(
@@ -382,10 +433,10 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // KotlinTemplate) the plan deferred.
         @Suppress("UNUSED_VARIABLE")
         val classifierResult = templates.usesKotlinTreeNode
-        return if (templates.wrappedInNotNull) {
-            ctx.methodInvocationRewriteKotlinNotNullSymbol
-        } else {
-            ctx.methodInvocationRewriteKotlinSymbol
+        return when {
+            templates.propertyAccess -> ctx.propertyAccessRewriteKotlinSymbol
+            templates.wrappedInNotNull -> ctx.methodInvocationRewriteKotlinNotNullSymbol
+            else -> ctx.methodInvocationRewriteKotlinSymbol
         }
     }
 
@@ -405,6 +456,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     private fun extractRewriteTemplates(
         recipeCall: IrCall,
         sourceText: String,
+        ctx: RecipeIrGenContext,
     ): RewriteTemplates? {
         val recipeBlock = findTrailingLambda(recipeCall) ?: return null
         val recipeStmts = (recipeBlock.function.body as? IrBlockBody)?.statements ?: return null
@@ -448,28 +500,55 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         }
         val afterArg = toCall.getValueArgument(0) as? IrFunctionExpression ?: return null
 
-        val beforeLambdas = beforeExprs.map { validateBeforeLambda(it) ?: return null }
-        val canonical = beforeLambdas[0].canonicalSignature()
+        val beforeLambdas = beforeExprs.map { validateBeforeLambda(it, sourceText, ctx) ?: return null }
         val notNullForAll = beforeLambdas[0].wrappedInNotNull
+        val propertyAccessForAll = beforeLambdas[0].propertyAccess
         for (i in 1 until beforeLambdas.size) {
-            if (beforeLambdas[i].canonicalSignature() != canonical) return null
+            // Same param count is still required: the after lambda has a
+            // fixed param list and each before must supply the same set of
+            // bindings. Canonical signatures, however, may differ — they
+            // just produce per-before substitution-source CSVs (see below).
             if (beforeLambdas[i].params.size != beforeLambdas[0].params.size) return null
             // Multi-before recipes must agree on the not-null-assertion shape.
             // Mixing `someCall()` and `someCall()!!` befores would require two
             // different visitor entry points; reject and let the runtime DSL
             // builder surface the limitation.
             if (beforeLambdas[i].wrappedInNotNull != notNullForAll) return null
+            // Same restriction for property-access vs method-invocation shape:
+            // the two routes use different LST visitors, so a multi-before
+            // recipe must pick one or the other.
+            if (beforeLambdas[i].propertyAccess != propertyAccessForAll) return null
         }
-        val afterTemplateAndSources = buildAfterTemplate(afterArg, sourceText, beforeLambdas[0]) ?: return null
-        val matcherSpecs = beforeLambdas.map { computeMatcherSpec(it.rootCall) }
+        // Mixed-shape multi-before: each before gets its own
+        // substitution-source CSV (since the after-lambda params bind to
+        // different positions in each before — receiver in one, arg-N in
+        // another). The after TEMPLATE is required to be identical across
+        // all befores; if it isn't, the after lambda's IR was somehow
+        // different per-before, which the runtime helper can't dispatch on.
+        val firstTemplate = buildAfterTemplate(afterArg, sourceText, beforeLambdas[0]) ?: return null
+        val csvs = mutableListOf(firstTemplate.second)
+        for (i in 1 until beforeLambdas.size) {
+            val nextTemplate = buildAfterTemplate(afterArg, sourceText, beforeLambdas[i]) ?: return null
+            if (nextTemplate.first != firstTemplate.first) return null
+            csvs += nextTemplate.second
+        }
+        val matcherSpecs = beforeLambdas.map {
+            it.inlinedConstantMatcherSpec ?: computeMatcherSpec(it.rootCall!!, it.propertyAccess)
+        }
+        // Single-before recipes pass the CSV through as a plain string for
+        // backward compatibility with the original helper signature. Multi-
+        // before recipes pack per-matcher CSVs `\n`-delimited; helpers detect
+        // the delimiter and dispatch per-matcher.
+        val csvField = if (csvs.size == 1) csvs[0] else csvs.joinToString("\n")
 
         val usesKotlinTreeNode = classifyKotlinPromotion(beforeExprs + afterArg)
         return RewriteTemplates(
             matcherSpecs = matcherSpecs,
-            afterTemplate = afterTemplateAndSources.first,
-            substitutionSourcesCsv = afterTemplateAndSources.second,
+            afterTemplate = firstTemplate.first,
+            substitutionSourcesCsv = csvField,
             usesKotlinTreeNode = usesKotlinTreeNode,
             wrappedInNotNull = notNullForAll,
+            propertyAccess = propertyAccessForAll,
         )
     }
 
@@ -530,7 +609,15 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
     private class BeforeLambda(
         val params: List<IrValueParameter>,
-        val rootCall: IrCall,
+        /**
+         * Null when the lambda body is an inlined static constant
+         * (e.g. `{ -> Math.PI }`). K2 FIR2IR compile-time-folds primitive
+         * `const val` accesses to a bare `IrConst`, dropping the qualifier
+         * symbol entirely; there's no `IrCall` to anchor a method-matcher
+         * spec on. The matcher spec is recovered by parsing the recipe
+         * source slice instead — see [inlinedConstantMatcherSpec].
+         */
+        val rootCall: IrCall?,
         val argSignatures: List<ArgSig>,
         val receiverParamSymbol: IrValueSymbol?,
         /**
@@ -542,9 +629,29 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
          * not-null-asserted expression rather than just the inner invocation.
          */
         val wrappedInNotNull: Boolean,
+        /**
+         * True when the rootCall is a property getter invoked at the source
+         * level via property-access syntax (`d.inHours`) rather than a method
+         * call (`d.inHours()`), OR when the body is an inlined static
+         * constant. Both shapes are matched as `J.FieldAccess` by the
+         * `propertyAccessRewrite` helper — same matcher-spec format
+         * (`<owner-fqn>#<name>`), same visitor entry point.
+         */
+        val propertyAccess: Boolean,
+        /**
+         * For inlined static-constant befores (e.g. `{ -> Math.PI }`): the
+         * matcher spec computed by parsing the recipe source slice. Null
+         * otherwise — the spec is computed downstream from [rootCall] via
+         * [computeMatcherSpec].
+         */
+        val inlinedConstantMatcherSpec: String? = null,
     )
 
-    private fun validateBeforeLambda(fnExpr: IrFunctionExpression): BeforeLambda? {
+    private fun validateBeforeLambda(
+        fnExpr: IrFunctionExpression,
+        sourceText: String,
+        ctx: RecipeIrGenContext,
+    ): BeforeLambda? {
         val fn = fnExpr.function
         val params = fn.valueParameters
         val body = fn.body as? IrBlockBody ?: return null
@@ -552,14 +659,18 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val rawExpr = when (singleStmt) {
             is IrReturn -> singleStmt.value
             is IrCall -> singleStmt
+            is IrConst -> singleStmt
             else -> null
         } ?: return null
-        // Unwrap an outer `!!` — K2 FIR2IR represents `someCall()!!` as an
-        // `IrCall` to the `kotlin.internal.ir.CHECK_NOT_NULL` intrinsic with
-        // the asserted expression as its (single) value argument. The matcher
-        // should target the inner call; the not-null-assertion shape is then
-        // remembered so the helper-selection routes to a visitor that walks
-        // `K.Unary(NotNull)` and rewrites the whole not-null expression.
+        // Inlined-constant before pattern: `{ -> Math.PI }`. K2 FIR2IR
+        // compile-time-folds primitive `const val` reads to a bare IrConst,
+        // erasing both the `Math` qualifier and the `<get-PI>` accessor
+        // symbol. Fall back to parsing the recipe source slice to recover
+        // the `Class.NAME` shape; route to the property-access helper
+        // (matches `J.FieldAccess` in user code by `<owner-fqn>#<name>`).
+        if (rawExpr is IrConst && params.isEmpty()) {
+            return validateInlinedConstantBeforeLambda(rawExpr, params, sourceText, ctx)
+        }
         var wrappedInNotNull = false
         var current: IrCall = rawExpr as? IrCall ?: return null
         while (current.symbol.owner.kotlinFqName.asString() == CHECK_NOT_NULL_FQN) {
@@ -569,10 +680,34 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         }
         val rootCall = current
 
+        // Source-level property access vs method invocation: K2 lowers
+        // `d.inHours` (property) and `d.inHours()` (would-be method) both to
+        // `IrCall(<get-inHours>)` with identical IR offsets covering the LHS
+        // plus the accessor name only — `()` (if present) is NOT inside the
+        // IrCall's offsets. We therefore disambiguate by looking at the
+        // character immediately following the IrCall's endOffset in source.
+        // If it's `(`, the author wrote method-call syntax. Otherwise
+        // (newline, whitespace, EOF, operator, `}`), it's property access.
+        val propertyAccess = run {
+            if (rootCall.symbol.owner.correspondingPropertySymbol == null) return@run false
+            val eo = rootCall.endOffset
+            if (eo < 0 || eo > sourceText.length) return@run false
+            // Skip horizontal whitespace; a literal '(' on the same expression
+            // line means the author wrote a method-style call.
+            var i = eo
+            while (i < sourceText.length) {
+                val c = sourceText[i]
+                if (c == ' ' || c == '\t') { i++; continue }
+                return@run c != '('
+            }
+            true
+        }
+
         if (params.isEmpty()) {
             if (rootCall.dispatchReceiver != null || rootCall.extensionReceiver != null) return null
             if (rootCall.valueArgumentsCount > 0) return null
-            return BeforeLambda(params, rootCall, emptyList(), receiverParamSymbol = null, wrappedInNotNull = wrappedInNotNull)
+            return BeforeLambda(params, rootCall, emptyList(), receiverParamSymbol = null,
+                wrappedInNotNull = wrappedInNotNull, propertyAccess = propertyAccess)
         }
 
         val rawReceiver: IrExpression? = rootCall.dispatchReceiver ?: rootCall.extensionReceiver
@@ -598,7 +733,94 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 else -> return null
             }
         }
-        return BeforeLambda(params, rootCall, sigs, receiverParamSymbol, wrappedInNotNull)
+        // Property accessors take 0 value args; a non-empty arg signature here
+        // means the IR is method-style despite a getter-shaped symbol.
+        val finalPropertyAccess = propertyAccess && sigs.isEmpty()
+        return BeforeLambda(params, rootCall, sigs, receiverParamSymbol, wrappedInNotNull, finalPropertyAccess)
+    }
+
+    /**
+     * Recover a matcher spec for a before-lambda whose body K2 compile-time-
+     * folded into an [IrConst]. Primitive Java `public static final` fields
+     * (`Math.PI`, `Math.E`, `Integer.MAX_VALUE`) and Kotlin `const val`
+     * companions get inlined at FIR2IR, leaving no symbol to anchor the spec
+     * on — we re-derive the `Class.NAME` shape by parsing the lambda source.
+     *
+     * Returns null when the slice doesn't have a `Qualifier.NAME` shape or
+     * when the qualifier can't be resolved to a class on the compiler
+     * classpath. Imports are erased by the time IR runs, so resolution
+     * probes a fixed candidate list (the slice as-FQN, `java.lang.X`,
+     * `kotlin.X`) — covers the common JVM/Kotlin primitive-const cases.
+     */
+    private fun validateInlinedConstantBeforeLambda(
+        constExpr: IrConst,
+        params: List<IrValueParameter>,
+        sourceText: String,
+        ctx: RecipeIrGenContext,
+    ): BeforeLambda? {
+        val so = constExpr.startOffset
+        val eo = constExpr.endOffset
+        if (so < 0 || eo <= so || eo > sourceText.length) return null
+        // The IR-emitted offsets may cover just `PI` (the package qualifier
+        // has no IR node); reuse the FQN-extension walk so the parsed slice
+        // is the recipe author's full `Foo.BAR` spelling.
+        val sliceStart = extendBackwardForQualifierChain(sourceText, so)
+        val rawSlice = sourceText.substring(sliceStart, eo).trim()
+        val dotIdx = rawSlice.lastIndexOf('.')
+        if (dotIdx <= 0 || dotIdx == rawSlice.length - 1) return null
+        val qualifier = rawSlice.substring(0, dotIdx)
+        val name = rawSlice.substring(dotIdx + 1)
+        if (!isValidJavaIdentifier(qualifier.replace(".", "")) || !isValidJavaIdentifier(name)) return null
+        val resolvedFqn = resolveQualifierAsClass(ctx.pluginContext, qualifier) ?: return null
+        return BeforeLambda(
+            params = params,
+            rootCall = null,
+            argSignatures = emptyList(),
+            receiverParamSymbol = null,
+            wrappedInNotNull = false,
+            propertyAccess = true,
+            inlinedConstantMatcherSpec = "$resolvedFqn#$name",
+        )
+    }
+
+    private fun isValidJavaIdentifier(s: String): Boolean {
+        if (s.isEmpty()) return false
+        if (!Character.isJavaIdentifierStart(s[0])) return false
+        for (i in 1 until s.length) {
+            if (!Character.isJavaIdentifierPart(s[i])) return false
+        }
+        return true
+    }
+
+    /**
+     * Try to resolve the qualifier slice (everything left of the final dot
+     * in a `Qualifier.NAME` constant reference) to a class FQN. Probes:
+     *   1. The qualifier as-is (already a FQN, e.g. `java.lang.Math`).
+     *   2. `java.lang.<qualifier>` (the auto-imported root in Kotlin source).
+     *   3. `kotlin.<qualifier>` (for `Int`, `Long`, `Double` etc. — the
+     *      stdlib types that house Kotlin's primitive constants).
+     *
+     * Returns the first FQN whose class resolves on the compiler classpath,
+     * or null. Imports are erased by IR time so we can't query the recipe
+     * file's own import list; the candidate set is intentionally narrow to
+     * avoid false positives.
+     */
+    private fun resolveQualifierAsClass(
+        pluginContext: IrPluginContext,
+        qualifier: String,
+    ): String? {
+        val candidates = mutableListOf<String>()
+        if (qualifier.contains('.')) {
+            candidates += qualifier
+        }
+        candidates += "java.lang.$qualifier"
+        candidates += "kotlin.$qualifier"
+        for (cand in candidates) {
+            val fq = FqName(cand)
+            if (fq.isRoot) continue
+            if (pluginContext.referenceClass(ClassId.topLevel(fq)) != null) return cand
+        }
+        return null
     }
 
     private fun BeforeLambda.canonicalSignature(): CanonicalSignature {
@@ -633,9 +855,25 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
      * resolved before-lambda's root call. Member calls bind to the dispatch
      * receiver's class FQN; extension calls and top-level non-extensions to
      * the JVM facade class. Mirrors [org.openrewrite.kotlin.KotlinTypeMapping].
+     *
+     * When [propertyAccess] is true, the spec uses the `<owner-fqn>#<property-name>`
+     * format consumed by `GeneratedRecipeSupport.propertyAccessRewrite`, which
+     * walks `J.FieldAccess` rather than `J.MethodInvocation`. The property
+     * name comes from the `IrSimpleFunction`'s `correspondingPropertySymbol`
+     * — the function's own `name` is the synthetic `<get-foo>` accessor name,
+     * which doesn't match the source-level identifier.
      */
-    private fun computeMatcherSpec(rootCall: IrCall): String {
+    private fun computeMatcherSpec(rootCall: IrCall, propertyAccess: Boolean): String {
         val owner = rootCall.symbol.owner
+        if (propertyAccess) {
+            val propName = owner.correspondingPropertySymbol?.owner?.name?.asString()
+                ?: owner.name.asString().removePrefix("<get-").removeSuffix(">")
+            val ownerFqn = owner.dispatchReceiverParameter?.type?.classFqName?.asString()
+                ?: (owner.parent as? IrClass)?.kotlinFqName?.asString()
+                ?: computeJvmFacadeFqn(owner)
+                ?: "*"
+            return "$ownerFqn#$propName"
+        }
         val methodName = owner.name.asString()
 
         val dispatchFqn = owner.dispatchReceiverParameter?.type?.classFqName?.asString()
@@ -989,6 +1227,88 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 factoryCall.arguments[0] = irString(templates.matcherSpecs.joinToString("\n"))
                 factoryCall.arguments[1] = irString(templates.afterTemplate)
                 factoryCall.arguments[2] = irString(templates.substitutionSourcesCsv)
+                +irReturn(factoryCall)
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Imperative-shape class synthesis.
+    // ------------------------------------------------------------------
+
+    /**
+     * Synthesize a `Generated$<Name>` class for an imperative recipe
+     * (`recipe(...) { edit { lang { visitX { … } } } }`). The class is
+     * structurally identical to the declarative one — same metadata
+     * overrides, same field-less shape — but its `getVisitor()` body
+     * delegates to `buildImperativeVisitor(<recipe trailing lambda>)`
+     * instead of a template-driven factory.
+     *
+     * The recipe trailing lambda is deep-copied so it survives the
+     * subsequent `recipe(...) → Generated$<Name>()` replacement (the
+     * original call's IR is discarded by the transformer).
+     */
+    private fun buildImperativeRecipeClass(
+        ctx: RecipeIrGenContext,
+        parentFile: IrFile,
+        propertyName: Name,
+        metadata: RecipeMetadata,
+        recipeBlock: IrFunctionExpression,
+        helperSymbol: IrSimpleFunctionSymbol,
+    ): IrClass {
+        val cls = ctx.pluginContext.irFactory.buildClass {
+            name = Name.identifier("Generated\$${propertyName.asString()}")
+            kind = ClassKind.CLASS
+            modality = Modality.FINAL
+            visibility = DescriptorVisibilities.PUBLIC
+        }
+        cls.parent = parentFile
+        cls.createThisReceiverParameter()
+        cls.superTypes = listOf(ctx.recipeClassSymbol.defaultType)
+
+        cls.addConstructor {
+            isPrimary = true
+            returnType = cls.symbol.defaultType
+            visibility = DescriptorVisibilities.PUBLIC
+        }.apply {
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                +irDelegatingConstructorCall(ctx.recipeNoArgCtorSymbol.owner)
+            }
+        }
+
+        addMetadataOverrides(cls, ctx, metadata)
+        if (ctx.getVisitor != null) {
+            addImperativeGetVisitorOverride(
+                cls = cls,
+                ctx = ctx,
+                overrides = ctx.getVisitor,
+                helperSymbol = helperSymbol,
+                recipeBlock = recipeBlock,
+            )
+        }
+        return cls
+    }
+
+    private fun addImperativeGetVisitorOverride(
+        cls: IrClass,
+        ctx: RecipeIrGenContext,
+        overrides: IrSimpleFunction,
+        helperSymbol: IrSimpleFunctionSymbol,
+        recipeBlock: IrFunctionExpression,
+    ) {
+        cls.addFunction(
+            name = "getVisitor",
+            returnType = overrides.returnType,
+            modality = Modality.OPEN,
+            visibility = DescriptorVisibilities.PUBLIC,
+        ).apply {
+            overriddenSymbols = listOf(overrides.symbol)
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                val factoryCall = irCall(
+                    callee = helperSymbol,
+                    type = helperSymbol.owner.returnType,
+                )
+                factoryCall.arguments[0] = recipeBlock.deepCopyWithSymbols(initialParent = this@apply)
                 +irReturn(factoryCall)
             }
         }

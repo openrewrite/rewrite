@@ -79,18 +79,19 @@ public final class GeneratedRecipeSupport {
         for (int i = 0; i < specs.length; i++) {
             matchers[i] = new MethodMatcher(specs[i]);
         }
-        int[] substitutionSources = parseCsv(substitutionSourcesCsv);
+        int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
         return new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                boolean matched = false;
-                for (MethodMatcher matcher : matchers) {
-                    if (matcher.matches(method)) {
-                        matched = true;
+                int matchedIdx = -1;
+                for (int i = 0; i < matchers.length; i++) {
+                    if (matchers[i].matches(method)) {
+                        matchedIdx = i;
                         break;
                     }
                 }
-                if (matched) {
+                if (matchedIdx >= 0) {
+                    int[] substitutionSources = substitutionSourcesByMatcher[matchedIdx];
                     Object[] substitutions = new Object[substitutionSources.length];
                     for (int i = 0; i < substitutionSources.length; i++) {
                         int src = substitutionSources[i];
@@ -152,7 +153,7 @@ public final class GeneratedRecipeSupport {
         for (int i = 0; i < specs.length; i++) {
             matchers[i] = new MethodMatcher(specs[i]);
         }
-        int[] substitutionSources = parseCsv(substitutionSourcesCsv);
+        int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
         return new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitUnary(K.Unary unary, ExecutionContext ctx) {
@@ -163,16 +164,17 @@ public final class GeneratedRecipeSupport {
                     return super.visitUnary(unary, ctx);
                 }
                 J.MethodInvocation method = (J.MethodInvocation) unary.getExpression();
-                boolean matched = false;
-                for (MethodMatcher matcher : matchers) {
-                    if (matcher.matches(method)) {
-                        matched = true;
+                int matchedIdx = -1;
+                for (int i = 0; i < matchers.length; i++) {
+                    if (matchers[i].matches(method)) {
+                        matchedIdx = i;
                         break;
                     }
                 }
-                if (!matched) {
+                if (matchedIdx < 0) {
                     return super.visitUnary(unary, ctx);
                 }
+                int[] substitutionSources = substitutionSourcesByMatcher[matchedIdx];
                 Object[] substitutions = new Object[substitutionSources.length];
                 for (int i = 0; i < substitutionSources.length; i++) {
                     int src = substitutionSources[i];
@@ -203,6 +205,87 @@ public final class GeneratedRecipeSupport {
     }
 
     /**
+     * Visitor for a {@code rewrite { d: Duration -> d.inHours } to { d -> d.inWholeHours }}
+     * recipe whose before lambda body is a property access (rather than a
+     * method invocation). The Kotlin parser models {@code obj.prop} as a
+     * {@link J.FieldAccess} — so this visitor walks {@link J.FieldAccess}
+     * instead of {@link J.MethodInvocation}.
+     *
+     * <p>Matcher specs use the {@code <owner-fqn>#<property-name>} format
+     * (rather than the {@link MethodMatcher} spelling), since property access
+     * has no parenthesised parameter list. Each line of
+     * {@code matcherSpecsLines} is one such spec; the visitor accepts a
+     * field access iff its target type FQN and selector name match any spec.
+     *
+     * <p>Property accessors have no value arguments, so the substitution
+     * source CSV always references the receiver via {@code -1} — the IR pass
+     * still emits the receiver placeholder uniformly with the method-invocation
+     * path, which keeps the after-template synthesis logic shared.
+     */
+    public static TreeVisitor<?, ExecutionContext> propertyAccessRewrite(
+            String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv) {
+        String[] specs = matcherSpecsLines.isEmpty() ? new String[0] : matcherSpecsLines.split("\n");
+        String[] specOwners = new String[specs.length];
+        String[] specNames = new String[specs.length];
+        for (int i = 0; i < specs.length; i++) {
+            int hash = specs[i].indexOf('#');
+            if (hash < 0) {
+                specOwners[i] = "*";
+                specNames[i] = specs[i];
+            } else {
+                specOwners[i] = specs[i].substring(0, hash);
+                specNames[i] = specs[i].substring(hash + 1);
+            }
+        }
+        int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
+        return new KotlinVisitor<ExecutionContext>() {
+            @Override
+            public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                String name = fieldAccess.getName().getSimpleName();
+                String targetTypeFqn = fullyQualifiedNameOf(fieldAccess.getTarget().getType());
+                int matchedIdx = -1;
+                for (int i = 0; i < specs.length; i++) {
+                    if (!specNames[i].equals(name)) {
+                        continue;
+                    }
+                    if (!"*".equals(specOwners[i]) && !specOwners[i].equals(targetTypeFqn)) {
+                        continue;
+                    }
+                    matchedIdx = i;
+                    break;
+                }
+                if (matchedIdx < 0) {
+                    return super.visitFieldAccess(fieldAccess, ctx);
+                }
+                int[] substitutionSources = substitutionSourcesByMatcher[matchedIdx];
+                Object[] substitutions = new Object[substitutionSources.length];
+                for (int i = 0; i < substitutionSources.length; i++) {
+                    int src = substitutionSources[i];
+                    if (src < 0) {
+                        substitutions[i] = fieldAccess.getTarget();
+                    } else {
+                        // Property accessors have no positional args — the IR
+                        // pass should never have emitted a non-negative source
+                        // for this path. Bail out rather than substituting a
+                        // placeholder we can't satisfy.
+                        return super.visitFieldAccess(fieldAccess, ctx);
+                    }
+                }
+                J result = KotlinTemplate.builder(afterTemplate).build()
+                        .apply(getCursor(), fieldAccess.getCoordinates().replace(), substitutions);
+                return result.withPrefix(fieldAccess.getPrefix());
+            }
+        };
+    }
+
+    private static @Nullable String fullyQualifiedNameOf(org.openrewrite.java.tree.@Nullable JavaType type) {
+        if (type instanceof org.openrewrite.java.tree.JavaType.FullyQualified) {
+            return ((org.openrewrite.java.tree.JavaType.FullyQualified) type).getFullyQualifiedName();
+        }
+        return null;
+    }
+
+    /**
      * Java-rooted parallel of {@link #methodInvocationRewrite}. Used when the
      * LST-structural classifier defaults a {@code rewrite { } to { }} clause
      * to a {@link JavaVisitor}: the visitor walks both Java and Kotlin sources
@@ -222,18 +305,19 @@ public final class GeneratedRecipeSupport {
         for (int i = 0; i < specs.length; i++) {
             matchers[i] = new MethodMatcher(specs[i]);
         }
-        int[] substitutionSources = parseCsv(substitutionSourcesCsv);
+        int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                boolean matched = false;
-                for (MethodMatcher matcher : matchers) {
-                    if (matcher.matches(method)) {
-                        matched = true;
+                int matchedIdx = -1;
+                for (int i = 0; i < matchers.length; i++) {
+                    if (matchers[i].matches(method)) {
+                        matchedIdx = i;
                         break;
                     }
                 }
-                if (matched) {
+                if (matchedIdx >= 0) {
+                    int[] substitutionSources = substitutionSourcesByMatcher[matchedIdx];
                     Object[] substitutions = new Object[substitutionSources.length];
                     for (int i = 0; i < substitutionSources.length; i++) {
                         int src = substitutionSources[i];
@@ -325,6 +409,44 @@ public final class GeneratedRecipeSupport {
         int[] result = new int[parts.length];
         for (int i = 0; i < parts.length; i++) {
             result[i] = Integer.parseInt(parts[i]);
+        }
+        return result;
+    }
+
+    /**
+     * Parse a substitution-source CSV that may be a single shared list (no
+     * {@code \n}) or one CSV per matcher ({@code \n}-delimited, one entry per
+     * matcher spec). Returns an {@code int[][]} of length {@code matcherCount}
+     * — the same array repeated for the shared case, or a per-matcher array
+     * for the mixed-shape multi-before case.
+     *
+     * <p>Mixed-shape multi-before: a recipe like
+     * {@code rewrite({ s: String -> s.foo() }, { s: String -> bar(s) }) to { s -> s.qux() }}
+     * binds {@code s} to the receiver in the first matcher and to arg 0 in
+     * the second. The after template's placeholder ORDER is shared (since
+     * the template is derived from the same after lambda), but the substitution
+     * sources differ per-matcher.
+     */
+    private static int[][] parseCsvPerMatcher(String csv, int matcherCount) {
+        if (matcherCount == 0) {
+            return new int[0][];
+        }
+        if (csv.indexOf('\n') < 0) {
+            int[] shared = parseCsv(csv);
+            int[][] result = new int[matcherCount][];
+            for (int i = 0; i < matcherCount; i++) {
+                result[i] = shared;
+            }
+            return result;
+        }
+        String[] lines = csv.split("\n", -1);
+        if (lines.length != matcherCount) {
+            throw new IllegalStateException(
+                    "expected " + matcherCount + " per-matcher CSVs but got " + lines.length);
+        }
+        int[][] result = new int[matcherCount][];
+        for (int i = 0; i < matcherCount; i++) {
+            result[i] = parseCsv(lines[i]);
         }
         return result;
     }
