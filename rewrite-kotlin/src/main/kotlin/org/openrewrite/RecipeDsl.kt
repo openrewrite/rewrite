@@ -15,6 +15,8 @@
  */
 package org.openrewrite
 
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
 import org.openrewrite.dsl.scopes.LanguageScope
 import org.openrewrite.java.search.UsesField
 import org.openrewrite.java.search.UsesJavaVersion
@@ -60,6 +62,46 @@ public fun recipe(
 ): Recipe {
     val builder = RecipeBuilder().apply(block)
     return builder.build(displayName, description, tags, estimatedEffortPerOccurrence)
+}
+
+/**
+ * Group a fixed list of recipes under a single named composite. The returned
+ * [Recipe] has no edit phase of its own — its only effect is to run each
+ * element of [recipes] in order via [Recipe.getRecipeList]. Useful for
+ * assembling several fine-grained recipes into a higher-level migration
+ * target.
+ *
+ * Unlike [recipe], this builder requires no K2 compiler-plugin support — the
+ * returned [Recipe] is a plain JVM class ([KotlinCompositeRecipe]) and
+ * round-trips cleanly through the standard recipe serializer.
+ */
+public fun recipes(
+    displayName: String,
+    description: String,
+    vararg recipes: Recipe,
+): Recipe = KotlinCompositeRecipe(displayName, description, recipes.toList())
+
+/**
+ * Backing class for [recipes]. Holds a fixed display name, description, and
+ * recipe list, exposing them through the [Recipe] API. Public so Jackson can
+ * round-trip it via the standard recipe serializer (`@c` polymorphic type tag
+ * + property-based constructor detection).
+ *
+ * The constructor uses `@JsonCreator` + `@JsonProperty` directly so the class
+ * deserializes without the optional `jackson-module-kotlin` runtime — only the
+ * always-present `ParameterNamesModule` is required. Parameters are nullable
+ * because [org.openrewrite.internal.RecipeLoader] validates instantiability by
+ * calling the constructor with empty arguments; the public [recipes] entry
+ * point always passes real, non-null values.
+ */
+public class KotlinCompositeRecipe @JsonCreator constructor(
+    @JsonProperty("displayName") private val displayName: String?,
+    @JsonProperty("description") private val description: String?,
+    @JsonProperty("recipeList") private val recipeList: List<Recipe>?,
+) : Recipe() {
+    override fun getDisplayName(): String = displayName ?: name
+    override fun getDescription(): String = description ?: "A composite recipe."
+    override fun getRecipeList(): List<Recipe> = recipeList ?: emptyList()
 }
 
 /**
