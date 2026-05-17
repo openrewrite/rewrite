@@ -91,7 +91,7 @@ import java.io.File
  *
  * For these recipes the runtime DSL's `rewrite { } to { }` is an `error(...)`
  * stub that throws on `getVisitor()`. This pass replaces the entire
- * `recipe(...)` call with a synthetic `Generated$<Name>` constructor call;
+ * `recipe(...)` call with a synthetic `<Name>$KtRecipe` constructor call;
  * the synthetic class extends `Recipe` and overrides `getVisitor()` to delegate
  * to `GeneratedRecipeSupport.methodInvocationRewrite[Java](spec, template, csv)`.
  *
@@ -119,6 +119,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
     private companion object {
         val RECIPE_FQN: FqName = FqName("org.openrewrite.recipe")
+        val RECIPES_FQN: FqName = FqName("org.openrewrite.recipes")
 
         const val REWRITE_ADVICE_0_TO = "org.openrewrite.RewriteAdvice0.to"
         const val REWRITE_ADVICE_1_TO = "org.openrewrite.RewriteAdvice1.to"
@@ -159,6 +160,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val getTags: IrSimpleFunction?,
         val getEstimatedEffort: IrSimpleFunction?,
         val getVisitor: IrSimpleFunction?,
+        val getRecipeList: IrSimpleFunction?,
+        val listOfVarargSymbol: IrSimpleFunctionSymbol?,
         val methodInvocationRewriteKotlinSymbol: IrSimpleFunctionSymbol?,
         val methodInvocationRewriteJavaSymbol: IrSimpleFunctionSymbol?,
         val methodInvocationRewriteKotlinNotNullSymbol: IrSimpleFunctionSymbol?,
@@ -197,6 +200,22 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val getVisitor = recipeMembers.firstOrNull {
             it.name.asString() == "getVisitor" && it.valueParameters.isEmpty()
         }
+        val getRecipeList = recipeMembers.firstOrNull {
+            it.name.asString() == "getRecipeList" && it.valueParameters.isEmpty()
+        }
+
+        // Resolve the vararg overload of `kotlin.collections.listOf` so the
+        // composite `<Name>$KtRecipe.getRecipeList()` body can wrap the original
+        // `recipes(...)` vararg in a `List<Recipe>`.
+        val listOfFqn = FqName("kotlin.collections.listOf")
+        val listOfVarargSymbol = pluginContext
+            .referenceFunctions(org.jetbrains.kotlin.name.CallableId(
+                packageName = listOfFqn.parent(),
+                callableName = listOfFqn.shortName(),
+            ))
+            .firstOrNull { fn ->
+                fn.owner.valueParameters.size == 1 && fn.owner.valueParameters[0].varargElementType != null
+            }
 
         val supportClassId = ClassId.topLevel(FqName("org.openrewrite.kotlin.recipe.GeneratedRecipeSupport"))
         val supportClassSymbol = pluginContext.referenceClass(supportClassId)
@@ -233,6 +252,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             getTags = getTags,
             getEstimatedEffort = getEstimatedEffort,
             getVisitor = getVisitor,
+            getRecipeList = getRecipeList,
+            listOfVarargSymbol = listOfVarargSymbol,
             methodInvocationRewriteKotlinSymbol = kotlinHelper,
             methodInvocationRewriteJavaSymbol = javaHelper,
             methodInvocationRewriteKotlinNotNullSymbol = kotlinNotNullHelper,
@@ -267,41 +288,55 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             // `IrUtilsKt.hasTopLevelEqualFqName` returns false for callees whose
             // parent is an `IrExternalPackageFragmentImpl` (functions resolved
             // out of a dependency jar — exactly our case). Compare FqName.
-            if (initializerExpr.symbol.owner.kotlinFqName != RECIPE_FQN) continue
-
-            val metadata = readMetadata(initializerExpr) ?: continue
-            // Two paths share the rest of the loop:
-            //   - declarative: `edit { rewrite { } to { } }` — synthesizes a
-            //     visitor whose body is the IR-derived template helper call.
-            //   - imperative:  `edit { lang { visitX { } } }` (or anything
-            //     else not matching the declarative shape) — synthesizes a
-            //     visitor whose body delegates back to the runtime DSL via
-            //     `buildImperativeVisitor`, threading the original recipe
-            //     trailing lambda through a fresh [RecipeBuilder] per call.
-            // Both produce a field-less top-level class so Jackson roundtrip
-            // succeeds (no `validateRecipeSerialization(false)` workaround).
-            val templates = extractRewriteTemplates(initializerExpr, sourceText, ctx)
-            val generatedClass: IrClass = if (templates != null) {
-                val helperSymbol = pickHelperSymbol(templates, ctx) ?: continue
-                buildGeneratedRecipeClass(
-                    ctx = ctx,
-                    parentFile = file,
-                    propertyName = declaration.name,
-                    metadata = metadata,
-                    templates = templates,
-                    helperSymbol = helperSymbol,
-                )
-            } else {
-                val imperativeBlock = findTrailingLambda(initializerExpr) ?: continue
-                val helperSymbol = ctx.buildImperativeVisitorSymbol ?: continue
-                buildImperativeRecipeClass(
-                    ctx = ctx,
-                    parentFile = file,
-                    propertyName = declaration.name,
-                    metadata = metadata,
-                    recipeBlock = imperativeBlock,
-                    helperSymbol = helperSymbol,
-                )
+            val callFqn = initializerExpr.symbol.owner.kotlinFqName
+            val generatedClass: IrClass = when (callFqn) {
+                RECIPE_FQN -> {
+                    val metadata = readMetadata(initializerExpr) ?: continue
+                    // Two paths share the rest of the loop:
+                    //   - declarative: `edit { rewrite { } to { } }` — synthesizes a
+                    //     visitor whose body is the IR-derived template helper call.
+                    //   - imperative:  `edit { lang { visitX { } } }` (or anything
+                    //     else not matching the declarative shape) — synthesizes a
+                    //     visitor whose body delegates back to the runtime DSL via
+                    //     `buildImperativeVisitor`, threading the original recipe
+                    //     trailing lambda through a fresh [RecipeBuilder] per call.
+                    // Both produce a field-less top-level class so Jackson roundtrip
+                    // succeeds (no `validateRecipeSerialization(false)` workaround).
+                    val templates = extractRewriteTemplates(initializerExpr, sourceText, ctx)
+                    if (templates != null) {
+                        val helperSymbol = pickHelperSymbol(templates, ctx) ?: continue
+                        buildGeneratedRecipeClass(
+                            ctx = ctx,
+                            parentFile = file,
+                            propertyName = declaration.name,
+                            metadata = metadata,
+                            templates = templates,
+                            helperSymbol = helperSymbol,
+                        )
+                    } else {
+                        val imperativeBlock = findTrailingLambda(initializerExpr) ?: continue
+                        val helperSymbol = ctx.buildImperativeVisitorSymbol ?: continue
+                        buildImperativeRecipeClass(
+                            ctx = ctx,
+                            parentFile = file,
+                            propertyName = declaration.name,
+                            metadata = metadata,
+                            recipeBlock = imperativeBlock,
+                            helperSymbol = helperSymbol,
+                        )
+                    }
+                }
+                RECIPES_FQN -> {
+                    val compositeMetadata = readCompositeMetadata(initializerExpr) ?: continue
+                    if (ctx.getRecipeList == null || ctx.listOfVarargSymbol == null) continue
+                    buildCompositeRecipeClass(
+                        ctx = ctx,
+                        parentFile = file,
+                        propertyName = declaration.name,
+                        metadata = compositeMetadata,
+                    )
+                }
+                else -> continue
             }
             file.addChild(generatedClass)
 
@@ -358,6 +393,25 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val effortArg = if (effortIdx >= 0) nonNullArgOrNull(call.arguments[effortIdx]) else null
 
         return RecipeMetadata(displayName, description, tagsArg, effortArg)
+    }
+
+    private class CompositeRecipeMetadata(
+        val displayName: String,
+        val description: String,
+        val recipesVararg: org.jetbrains.kotlin.ir.expressions.IrVararg,
+    )
+
+    private fun readCompositeMetadata(call: IrCall): CompositeRecipeMetadata? {
+        val callee = call.symbol.owner
+        val params = callee.valueParameters
+        val displayNameIdx = params.indexOfFirst { it.name == Name.identifier("displayName") }
+        val descriptionIdx = params.indexOfFirst { it.name == Name.identifier("description") }
+        val recipesIdx = params.indexOfFirst { it.name == Name.identifier("recipes") }
+        if (displayNameIdx < 0 || descriptionIdx < 0 || recipesIdx < 0) return null
+        val displayName = (call.arguments[displayNameIdx] as? IrConst)?.value as? String ?: return null
+        val description = (call.arguments[descriptionIdx] as? IrConst)?.value as? String ?: return null
+        val recipesVararg = call.arguments[recipesIdx] as? org.jetbrains.kotlin.ir.expressions.IrVararg ?: return null
+        return CompositeRecipeMetadata(displayName, description, recipesVararg)
     }
 
     private fun nonNullArgOrNull(arg: IrExpression?): IrExpression? {
@@ -1115,7 +1169,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         helperSymbol: IrSimpleFunctionSymbol,
     ): IrClass {
         val cls = ctx.pluginContext.irFactory.buildClass {
-            name = Name.identifier("Generated\$${propertyName.asString()}")
+            name = Name.identifier("${propertyName.asString()}\$KtRecipe")
             kind = ClassKind.CLASS
             modality = Modality.FINAL
             visibility = DescriptorVisibilities.PUBLIC
@@ -1237,7 +1291,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     // ------------------------------------------------------------------
 
     /**
-     * Synthesize a `Generated$<Name>` class for an imperative recipe
+     * Synthesize a `<Name>$KtRecipe` class for an imperative recipe
      * (`recipe(...) { edit { lang { visitX { … } } } }`). The class is
      * structurally identical to the declarative one — same metadata
      * overrides, same field-less shape — but its `getVisitor()` body
@@ -1245,7 +1299,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
      * instead of a template-driven factory.
      *
      * The recipe trailing lambda is deep-copied so it survives the
-     * subsequent `recipe(...) → Generated$<Name>()` replacement (the
+     * subsequent `recipe(...) → <Name>$KtRecipe()` replacement (the
      * original call's IR is discarded by the transformer).
      */
     private fun buildImperativeRecipeClass(
@@ -1257,7 +1311,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         helperSymbol: IrSimpleFunctionSymbol,
     ): IrClass {
         val cls = ctx.pluginContext.irFactory.buildClass {
-            name = Name.identifier("Generated\$${propertyName.asString()}")
+            name = Name.identifier("${propertyName.asString()}\$KtRecipe")
             kind = ClassKind.CLASS
             modality = Modality.FINAL
             visibility = DescriptorVisibilities.PUBLIC
@@ -1310,6 +1364,85 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 )
                 factoryCall.arguments[0] = recipeBlock.deepCopyWithSymbols(initialParent = this@apply)
                 +irReturn(factoryCall)
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Composite-shape class synthesis (for `recipes(...)` properties).
+    // ------------------------------------------------------------------
+
+    /**
+     * Synthesize a `<Name>$KtRecipe` class for a `recipes(displayName, description,
+     * vararg recipes: Recipe)` call site. The class extends `Recipe` and
+     * overrides:
+     *  - `getDisplayName()` returns the captured displayName constant
+     *  - `getDescription()` returns the captured description constant
+     *  - `getRecipeList()` returns `listOf(<vararg elements>)`
+     *
+     * Like the recipe(...) path, the synthesized class is field-less so Jackson
+     * roundtrip is clean — the child recipe references live in the file's
+     * top-level property getters, which the synthesized class invokes fresh on
+     * each `getRecipeList()` call.
+     */
+    private fun buildCompositeRecipeClass(
+        ctx: RecipeIrGenContext,
+        parentFile: IrFile,
+        propertyName: Name,
+        metadata: CompositeRecipeMetadata,
+    ): IrClass {
+        val cls = ctx.pluginContext.irFactory.buildClass {
+            name = Name.identifier("${propertyName.asString()}\$KtRecipe")
+            kind = ClassKind.CLASS
+            modality = Modality.FINAL
+            visibility = DescriptorVisibilities.PUBLIC
+        }
+        cls.parent = parentFile
+        cls.createThisReceiverParameter()
+        cls.superTypes = listOf(ctx.recipeClassSymbol.defaultType)
+
+        cls.addConstructor {
+            isPrimary = true
+            returnType = cls.symbol.defaultType
+            visibility = DescriptorVisibilities.PUBLIC
+        }.apply {
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                +irDelegatingConstructorCall(ctx.recipeNoArgCtorSymbol.owner)
+            }
+        }
+
+        addStringOverride(cls, ctx.pluginContext, "getDisplayName", metadata.displayName, ctx.getDisplayName)
+        addStringOverride(cls, ctx.pluginContext, "getDescription", metadata.description, ctx.getDescription)
+        addGetRecipeListOverride(cls, ctx, ctx.getRecipeList!!, ctx.listOfVarargSymbol!!, metadata.recipesVararg)
+        return cls
+    }
+
+    private fun addGetRecipeListOverride(
+        cls: IrClass,
+        ctx: RecipeIrGenContext,
+        overrides: IrSimpleFunction,
+        listOfVarargSymbol: IrSimpleFunctionSymbol,
+        recipesVararg: org.jetbrains.kotlin.ir.expressions.IrVararg,
+    ) {
+        cls.addFunction(
+            name = "getRecipeList",
+            returnType = overrides.returnType,
+            modality = Modality.OPEN,
+            visibility = DescriptorVisibilities.PUBLIC,
+        ).apply {
+            overriddenSymbols = listOf(overrides.symbol)
+            body = DeclarationIrBuilder(ctx.pluginContext, symbol).irBlockBody {
+                val listOfCall = irCall(
+                    callee = listOfVarargSymbol,
+                    type = overrides.returnType,
+                )
+                // listOf<T>(vararg elements: T): T is the single type parameter.
+                listOfCall.typeArguments[0] = ctx.recipeClassSymbol.defaultType
+                // Deep-copy because the original IrVararg lives inside the
+                // soon-to-be-replaced `recipes(...)` call; sharing the node
+                // with two owners breaks IR invariants.
+                listOfCall.arguments[0] = recipesVararg.deepCopyWithSymbols(initialParent = this@apply)
+                +irReturn(listOfCall)
             }
         }
     }

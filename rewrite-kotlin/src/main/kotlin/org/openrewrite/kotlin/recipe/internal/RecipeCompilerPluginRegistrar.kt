@@ -30,7 +30,7 @@ import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 //     orphan-rewrite, orphan-scan). Catches ill-formed DSL at compile time.
 //   - `RecipeIrGenerationExtension` — IR pass for `rewrite { } to { }` recipes.
 //     Replaces each pattern recipe's `recipe(...)` initializer with a synthetic
-//     `Generated$<Name>` constructor call; the synthetic class extends Recipe
+//     `<Name>$KtRecipe` constructor call; the synthetic class extends Recipe
 //     and `getVisitor()` delegates to GeneratedRecipeSupport.
 //
 // Recipes with purely imperative shapes (`edit { lang { visitX { } } }` and
