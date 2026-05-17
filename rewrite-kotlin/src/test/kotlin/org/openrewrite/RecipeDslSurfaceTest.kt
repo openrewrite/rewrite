@@ -133,4 +133,28 @@ class RecipeDslSurfaceTest {
         val initial = sr.getInitialValue(InMemoryExecutionContext())
         assertThat(initial).isInstanceOf(MutableList::class.java)
     }
+
+    @Test
+    fun `recipes composite exposes its children via getRecipeList`() {
+        val a = recipe("A", "a") { edit { java { /* no-op */ } } }
+        val b = recipe("B", "b") { edit { java { /* no-op */ } } }
+        val r = recipes("Combo", "a + b", a, b)
+        assertThat(r.displayName).isEqualTo("Combo")
+        assertThat(r.description).isEqualTo("a + b")
+        assertThat(r.recipeList).containsExactly(a, b)
+    }
+
+    @Test
+    fun `recipes composite round-trips through RecipeSerializer`() {
+        // The K2 compiler plugin is not applied to this module's own test
+        // sources, so children built through `recipe { }` here would be
+        // anonymous and break serialization. Use `Recipe.noop()` — a named
+        // singleton class — to exercise the round-trip independent of K2.
+        val r = recipes("Combo", "noop only", Recipe.noop())
+        val ser = RecipeSerializer()
+        val restored = ser.read(ser.write(r))
+        assertThat(restored.displayName).isEqualTo("Combo")
+        assertThat(restored.description).isEqualTo("noop only")
+        assertThat(restored.recipeList).hasSize(1)
+    }
 }
