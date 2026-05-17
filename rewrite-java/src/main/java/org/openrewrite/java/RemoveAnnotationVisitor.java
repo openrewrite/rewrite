@@ -52,6 +52,15 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                     c = c.withLeadingAnnotations(newLeadingAnnotations);
                 }
             }
+            // The manual prefix surgery above writes to whatever modifier or
+            // kind happens to be first in the list — on languages like Kotlin,
+            // the parser inserts synthetic modifiers that print to nothing,
+            // so the cleanup lands on an invisible slot and stranded leading
+            // whitespace remains. Run the language's BlankLines pass on the
+            // touched declaration to absorb such cases without paying for
+            // full auto-format (which would also touch braces, annotation
+            // wrapping, etc. and change unrelated formatting).
+            c = maybeRemoveBlankLines(classDecl, c, ctx);
         }
         return c;
     }
@@ -79,6 +88,7 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                     m = m.withLeadingAnnotations(newLeadingAnnotations);
                 }
             }
+            m = maybeRemoveBlankLines(method, m, ctx);
         }
         return m;
     }
@@ -102,6 +112,7 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                     v = v.withLeadingAnnotations(newLeadingAnnotations);
                 }
             }
+            v = maybeRemoveBlankLines(multiVariable, v, ctx);
         }
 
         return v;
