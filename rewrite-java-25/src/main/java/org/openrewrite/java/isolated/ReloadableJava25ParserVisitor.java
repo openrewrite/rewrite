@@ -136,12 +136,10 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             List<JRightPadded<Expression>> expressions;
             if (node.getArguments().size() == 1) {
                 ExpressionTree arg = node.getArguments().get(0);
-                if (arg instanceof JCAssign) {
-                    if (endPos(arg) < 0) {
-                        expressions = singletonList(convert(((JCAssign) arg).rhs, t -> sourceBefore(")")));
-                    } else {
-                        expressions = singletonList(convert(arg, t -> sourceBefore(")")));
-                    }
+                if (arg instanceof JCAssign && isSyntheticValueAssignment((JCAssign) arg)) {
+                    // Single-element annotation shorthand like `@Ann("foo")`. javac
+                    // synthesizes a `value=` JCAssign that doesn't appear in source.
+                    expressions = singletonList(convert(((JCAssign) arg).rhs, t -> sourceBefore(")")));
                 } else {
                     expressions = singletonList(convert(arg, t -> sourceBefore(")")));
                 }
@@ -1276,8 +1274,11 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             whitespaceBeforeNew = sourceBefore("new");
         }
 
-        // for enum definitions with anonymous class initializers, endPos of node identifier will be -1
-        TypeTree clazz = endPos(node.getIdentifier()) >= 0 ? convert(node.getIdentifier()) : null;
+        // For enum constants, the identifier is synthesized: on JDK ≤ 25 with endPos < 0,
+        // on JDK 26+ as a zero-width node at the enum-constant's own name position.
+        // In both cases we want `clazz = null` so the cursor isn't advanced past the args.
+        JCTree ident = (JCTree) node.getIdentifier();
+        TypeTree clazz = endPos(ident) > ident.getStartPosition() ? convert(node.getIdentifier()) : null;
 
         JContainer<Expression> args;
         if (positionOfNext("(", '{') > -1) {
@@ -1748,6 +1749,14 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         return hasFlag(node.getModifiers(), Flags.ENUM) ?
                 visitEnumVariable(node, fmt) :
                 visitVariables(singletonList(node), fmt); // method arguments cannot be multi-declarations
+    }
+
+    private boolean isSyntheticValueAssignment(JCAssign arg) {
+        // Single-element annotation shorthand `@Ann("foo")` is reported by javac as a
+        // JCAssign whose lhs is a synthesized `value=` identifier. On JDK ≤ 25 the
+        // synthesized assignment had NOPOS as its end position; on JDK 26+ it carries
+        // a zero-width range at the rhs's start position. Either way, `endPos <= startPos`.
+        return endPos(arg) <= arg.getStartPosition();
     }
 
     private boolean isImplicitLambdaParameterType(JCVariableDecl node, JCExpression vartype) {
