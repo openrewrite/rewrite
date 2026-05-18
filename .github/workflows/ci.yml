@@ -26,6 +26,7 @@ jobs:
       - uses: openrewrite/gh-automation/.github/actions/setup@main
         with:
           java_version: |
+            26
             25
             21
           develocity_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
