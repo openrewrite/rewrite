@@ -5011,13 +5011,21 @@ class ScalaTreeVisitor(
   }
   
   private def visitAppliedTypeTree(at: Trees.AppliedTypeTree[?]): J = {
+    // Dotty's parser desugars `A with B` (and `&` intersections introduced via
+    // `makeAndType`) into an AppliedTypeTree whose `tpt` is a synthetic, zero-
+    // span reference to `scala.&`. Detect that shape and emit J.IntersectionType
+    // instead of falling through to the parameterized-type path.
+    if (isWithIntersectionType(at)) {
+      return visitWithIntersectionType(at)
+    }
+
     // AppliedTypeTree represents a parameterized type like List[String]
     val savedCursor = cursor
     val prefix = extractPrefix(at.span)
 
     // Save original cursor position
     val originalCursor = cursor
-    
+
     // Visit the base type (e.g., List, Map, Option)
     val clazz = visitTree(at.tpt) match {
       case nt: NameTree => nt
@@ -5134,6 +5142,69 @@ class ScalaTreeVisitor(
       clazz,
       typeParameters,
       paramType
+    )
+  }
+
+  /**
+   * True when `at` is the desugared form of an `A with B` intersection type:
+   * a synthetic (zero-span) `tpt` reference to `scala.&` and exactly two args,
+   * with the literal keyword `with` appearing in source between the two args.
+   *
+   * `A & B` syntax is parsed as an `untpd.InfixOp` (not via `makeAndType`), so
+   * it doesn't match here.
+   */
+  private def isWithIntersectionType(at: Trees.AppliedTypeTree[?]): Boolean = {
+    if (at.args.size != 2) return false
+    val tpt = at.tpt
+    // Synthetic tpt: either no span at all, or a zero-length span.
+    if (tpt.span.exists && tpt.span.start != tpt.span.end) return false
+    val left = at.args.head
+    val right = at.args(1)
+    if (!left.span.exists || !right.span.exists) return false
+    val leftEnd = Math.max(0, left.span.end - offsetAdjustment)
+    val rightStart = Math.max(0, right.span.start - offsetAdjustment)
+    if (leftEnd >= rightStart || rightStart > source.length) return false
+    // Match `with` as a whole keyword (avoid e.g. an identifier containing "with").
+    val between = source.substring(leftEnd, rightStart)
+    "(?s).*\\bwith\\b.*".r.matches(between)
+  }
+
+  /**
+   * Flatten a right-associative `A with B with C` (parsed as
+   * `AppliedTypeTree(&, [A, AppliedTypeTree(&, [B, C])])`) into the list of
+   * leaf type trees `[A, B, C]`.
+   */
+  private def flattenWithIntersection(at: Trees.AppliedTypeTree[?]): List[Trees.Tree[?]] = {
+    val tail = at.args(1) match {
+      case inner: Trees.AppliedTypeTree[?] if isWithIntersectionType(inner) =>
+        flattenWithIntersection(inner)
+      case other =>
+        List(other)
+    }
+    at.args.head :: tail
+  }
+
+  private def visitWithIntersectionType(at: Trees.AppliedTypeTree[?]): J = {
+    val prefix = extractPrefix(at.span)
+    val parts = flattenWithIntersection(at)
+
+    val elements = new util.ArrayList[JRightPadded[TypeTree]](parts.size)
+    for (i <- parts.indices) {
+      // Don't clobber the cursor here: visitTypeTree → extractPrefix relies on
+      // the gap between `cursor` and the part's span.start to capture the
+      // whitespace after the previous `with` keyword.
+      val tt = visitTypeTree(parts(i))
+      if (tt == null) return visitUnknown(parts(i))
+      val isLast = i == parts.size - 1
+      val afterSpace = if (isLast) Space.EMPTY else sourceBefore("with")
+      elements.add(new JRightPadded[TypeTree](tt, afterSpace, Markers.EMPTY))
+    }
+    updateCursor(at.span.end)
+    new J.IntersectionType(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      JContainer.build(Space.EMPTY, elements, Markers.EMPTY)
     )
   }
 
