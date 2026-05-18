@@ -24,11 +24,13 @@ import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.TreeVisitorAdapter;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.text.PlainTextVisitor;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 class TreeVisitorAdapterTest {
 
@@ -88,6 +90,36 @@ class TreeVisitorAdapterTest {
             n.incrementAndGet();
             return tree;
         }
+    }
+
+    /**
+     * A single base visitor can have language-specific mixins registered from
+     * multiple language modules (one extends KotlinIsoVisitor, another extends
+     * GroovyVisitor, etc.). When adapting the base to {@code adaptTo} for one
+     * language, registered mixins for other languages must be skipped — not
+     * cause {@code adapt(...)} to throw — so dispatch for the current language
+     * falls through to the base visitor.
+     *
+     * <p>Regression for: adapting {@code RemoveAnnotationVisitor} to
+     * {@code GroovyVisitor} threw because {@code RemoveAnnotationKotlinMixin}
+     * (registered for that base) extends {@code KotlinIsoVisitor}.
+     */
+    @Test
+    void crossLanguageRegisteredMixinSkipped() {
+        // META-INF/rewrite/mixins/org.openrewrite.java.TreeVisitorAdapterTest$RegistryAdaptable
+        // registers JavaOnlyMixin (extends JavaIsoVisitor). Adapting to
+        // PlainTextVisitor — which the Java mixin is not assignable to —
+        // must silently skip the mixin rather than throw.
+        assertThatCode(() ->
+          //noinspection unchecked
+          TreeVisitorAdapter.adapt(new RegistryAdaptable(), PlainTextVisitor.class)
+        ).doesNotThrowAnyException();
+    }
+
+    public static class RegistryAdaptable extends TreeVisitor<Tree, Integer> {
+    }
+
+    public static class JavaOnlyMixin extends JavaIsoVisitor<Integer> {
     }
 
     @Test

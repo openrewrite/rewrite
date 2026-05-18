@@ -368,6 +368,15 @@ public class TreeVisitorAdapter {
                                 throw new IllegalStateException(
                                         "Registered mixin " + line + " is not a TreeVisitor (registered at " + url + ").");
                             }
+                            // A single base visitor (e.g. RemoveAnnotationVisitor) may have
+                            // mixins registered from multiple language modules — Kotlin's
+                            // mixin extends KotlinIsoVisitor, a (hypothetical) Groovy mixin
+                            // would extend GroovyVisitor, etc. Only one can compose with
+                            // the current adaptTo target; skip mixins that aren't a subtype
+                            // so dispatch for other languages falls through to the base.
+                            if (!adaptTo.isAssignableFrom(mixinClass)) {
+                                continue;
+                            }
                             return (TreeVisitor<?, ?>) mixinClass.getDeclaredConstructor().newInstance();
                         } catch (ReflectiveOperationException e) {
                             throw new IllegalStateException(
