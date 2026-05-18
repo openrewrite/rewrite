@@ -322,6 +322,20 @@ class LambdaTest implements RewriteTest {
     }
 
     @Test
+    void underscorePlaceholderLambdaWithNestedLambdaInBody() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val xs: List[List[Int]] = Nil
+                  xs.map(_.filter(f => f > 0))
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void blockArgumentWithImplicitParam() {
         rewriteRun(
             scala(
