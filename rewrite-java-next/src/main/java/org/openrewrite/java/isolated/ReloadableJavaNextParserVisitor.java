@@ -213,7 +213,17 @@ public class ReloadableJavaNextParserVisitor extends TreePathScanner<J, Space> {
             cursor(wrapped.getStartPosition());
             return scan(wrapped, fmt);
         }
-        String erroneousNode = source.substring(((JCTree) node).getStartPosition(), ((JCTree) node).getEndPosition(endPosTable));
+        // TEMP DIAGNOSTIC: encode JCErroneous shape so CI failure surfaces it.
+        JCTree jt = (JCTree) node;
+        String src = source.substring(jt.getStartPosition(), jt.getEndPosition(endPosTable));
+        StringBuilder children = new StringBuilder();
+        for (Tree e : errs) {
+            children.append("|").append(e == null ? "null" : e.getClass().getSimpleName());
+            if (e instanceof JCTree jce) {
+                children.append("@").append(jce.getStartPosition()).append("..").append(jce.getEndPosition(endPosTable));
+            }
+        }
+        String erroneousNode = "[ERR errs=" + errs.size() + children + " src=" + src + "]";
         return new J.Erroneous(
                 randomId(),
                 fmt,
