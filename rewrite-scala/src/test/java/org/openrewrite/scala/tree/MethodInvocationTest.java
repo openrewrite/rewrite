@@ -421,5 +421,20 @@ class MethodInvocationTest implements RewriteTest {
               )
             );
         }
+
+        @Test
+        void scala3SplatOfMethodCall() {
+            rewriteRun(
+              scala(
+                """
+                object Test {
+                  def f(x: Int*): Unit = ()
+                  def g(): Seq[Int] = Seq(1, 2)
+                  f(g()*)
+                }
+                """
+              )
+            );
+        }
     }
 }

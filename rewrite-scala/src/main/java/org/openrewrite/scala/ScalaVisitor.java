@@ -202,6 +202,21 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return r;
     }
 
+    public J visitSplatExpression(S.SplatExpression splatExpression, P p) {
+        S.SplatExpression s = splatExpression;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withExpression(visitAndCast(s.getExpression(), p));
+        if (s.getBeforeColon() != null) {
+            s = s.withBeforeColon(visitSpace(s.getBeforeColon(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (s.getAfterColon() != null) {
+            s = s.withAfterColon(visitSpace(s.getAfterColon(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        s = s.withBeforeStar(visitSpace(s.getBeforeStar(), Space.Location.LANGUAGE_EXTENSION, p));
+        return s;
+    }
+
     public J visitAlternative(S.Alternative alternative, P p) {
         S.Alternative a = alternative;
         a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

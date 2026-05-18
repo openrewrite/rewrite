@@ -604,6 +604,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitSingletonType((S.SingletonType) tree, p);
         } else if (tree instanceof S.RepeatedType) {
             return visitRepeatedType((S.RepeatedType) tree, p);
+        } else if (tree instanceof S.SplatExpression) {
+            return visitSplatExpression((S.SplatExpression) tree, p);
         } else if (tree instanceof S.Alternative) {
             return visitAlternative((S.Alternative) tree, p);
         } else if (tree instanceof S.QualifiedSuper) {
@@ -1553,6 +1555,21 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         p.append('*');
         afterSyntax(repeatedType, p);
         return repeatedType;
+    }
+
+    public J visitSplatExpression(S.SplatExpression splatExpression, PrintOutputCapture<P> p) {
+        beforeSyntax(splatExpression, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(splatExpression.getExpression(), p);
+        if (splatExpression.getBeforeColon() != null) {
+            visitSpace(splatExpression.getBeforeColon(), Space.Location.LANGUAGE_EXTENSION, p);
+            p.append(':');
+            visitSpace(splatExpression.getAfterColon(), Space.Location.LANGUAGE_EXTENSION, p);
+            p.append('_');
+        }
+        visitSpace(splatExpression.getBeforeStar(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append('*');
+        afterSyntax(splatExpression, p);
+        return splatExpression;
     }
 
     public J visitAlternative(S.Alternative alternative, PrintOutputCapture<P> p) {
