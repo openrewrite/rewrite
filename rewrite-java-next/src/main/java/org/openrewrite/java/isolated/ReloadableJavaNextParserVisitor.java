@@ -203,6 +203,16 @@ public class ReloadableJavaNextParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitErroneous(ErroneousTree node, Space fmt) {
+        // On JDK 26, javac sometimes wraps annotation argument expressions in JCErroneous
+        // for record-component annotations (the wrapper has no semantic meaning — its
+        // single child is the real expression). Delegate to the wrapped expression's
+        // own visitor so the resulting LST doesn't carry a spurious J.Erroneous node.
+        java.util.List<? extends Tree> errs = node.getErrorTrees();
+        if (errs.size() == 1 && errs.get(0) instanceof JCExpression) {
+            JCTree wrapped = (JCTree) errs.get(0);
+            cursor(wrapped.getStartPosition());
+            return scan(wrapped, fmt);
+        }
         String erroneousNode = source.substring(((JCTree) node).getStartPosition(), ((JCTree) node).getEndPosition(endPosTable));
         return new J.Erroneous(
                 randomId(),
@@ -449,19 +459,7 @@ public class ReloadableJavaNextParserVisitor extends TreePathScanner<J, Space> {
                 if (member instanceof JCMethodDecl md) {
                     if (hasFlag(md.getModifiers(), Flags.RECORD) && "<init>".equals(md.getName().toString())) {
                         for (JCVariableDecl var : md.getParameters()) {
-                            // Canonical constructor parameter annotations are synthesized
-                            // copies of the record-component annotations. On JDK ≤ 25 they
-                            // carried `NOPOS` (-1) so they coexisted with the originals;
-                            // on JDK 26+ they carry real source positions identical to the
-                            // originals and would overwrite them. The originals from
-                            // `rc.getOriginalAnnos()` are authoritative, so only add the
-                            // canonical-constructor copies for positions we don't already
-                            // have.
-                            Map<Integer, JCAnnotation> existing = recordAnnotationPosTable.computeIfAbsent(var.getName(), k -> new HashMap<>());
-                            for (AnnotationTree annotationNode : var.getModifiers().getAnnotations()) {
-                                JCAnnotation annotation = (JCAnnotation) annotationNode;
-                                existing.putIfAbsent(annotation.pos, annotation);
-                            }
+                            mapAnnotations(var.getModifiers().getAnnotations(), recordAnnotationPosTable.computeIfAbsent(var.getName(), k -> new HashMap<>()));
                         }
                     }
                 }
