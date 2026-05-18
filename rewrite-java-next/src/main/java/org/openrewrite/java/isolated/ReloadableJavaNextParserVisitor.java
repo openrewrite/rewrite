@@ -449,7 +449,19 @@ public class ReloadableJavaNextParserVisitor extends TreePathScanner<J, Space> {
                 if (member instanceof JCMethodDecl md) {
                     if (hasFlag(md.getModifiers(), Flags.RECORD) && "<init>".equals(md.getName().toString())) {
                         for (JCVariableDecl var : md.getParameters()) {
-                            mapAnnotations(var.getModifiers().getAnnotations(), recordAnnotationPosTable.computeIfAbsent(var.getName(), k -> new HashMap<>()));
+                            // Canonical constructor parameter annotations are synthesized
+                            // copies of the record-component annotations. On JDK ≤ 25 they
+                            // carried `NOPOS` (-1) so they coexisted with the originals;
+                            // on JDK 26+ they carry real source positions identical to the
+                            // originals and would overwrite them. The originals from
+                            // `rc.getOriginalAnnos()` are authoritative, so only add the
+                            // canonical-constructor copies for positions we don't already
+                            // have.
+                            Map<Integer, JCAnnotation> existing = recordAnnotationPosTable.computeIfAbsent(var.getName(), k -> new HashMap<>());
+                            for (AnnotationTree annotationNode : var.getModifiers().getAnnotations()) {
+                                JCAnnotation annotation = (JCAnnotation) annotationNode;
+                                existing.putIfAbsent(annotation.pos, annotation);
+                            }
                         }
                     }
                 }
