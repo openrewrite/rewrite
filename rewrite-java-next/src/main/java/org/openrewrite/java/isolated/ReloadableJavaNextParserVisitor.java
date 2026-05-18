@@ -1753,20 +1753,27 @@ public class ReloadableJavaNextParserVisitor extends TreePathScanner<J, Space> {
 
     private boolean isSyntheticValueAssignment(JCAssign arg) {
         // Single-element annotation shorthand `@Ann("foo")` is reported by javac as a
-        // JCAssign whose lhs is a synthesized `value=` identifier. On JDK ≤ 25 the
-        // synthesized assignment had NOPOS as its end position; on JDK 26+ it carries
-        // a zero-width range at the rhs's start position. Either way, `endPos <= startPos`.
-        return endPos(arg) <= arg.getStartPosition();
+        // JCAssign whose lhs is a synthesized `value=` identifier that doesn't appear
+        // in source. Detect via the lhs's range rather than the JCAssign's own range:
+        // the lhs is always synthesized, while the JCAssign on JDK 26 sometimes spans
+        // the rhs (e.g. for annotations on record components). The synthesized lhs has
+        // either NOPOS (JDK ≤ 25) or a zero-width range (JDK 26+) — in both cases
+        // endPos <= startPos.
+        JCExpression lhs = arg.lhs;
+        return endPos(lhs) <= lhs.getStartPosition();
     }
 
     private boolean isImplicitLambdaParameterType(JCVariableDecl node, JCExpression vartype) {
         if ((node.sym.flags() & Flags.PARAMETER) == 0) {
             return false;
         }
-        int end = endPos(vartype);
-        // JDK ≤ 25: synthesized vartype has NOPOS, so end == -1.
-        // JDK 26+: synthesized vartype is a zero-width JCErroneous at the parameter name's position.
-        return end <= vartype.getStartPosition();
+        return isSynthesizedVarType(vartype);
+    }
+
+    private boolean isSynthesizedVarType(JCExpression vartype) {
+        // JDK ≤ 25: synthesized vartype has NOPOS, so endPos == -1.
+        // JDK 26+: synthesized vartype is a zero-width node at the variable name's position.
+        return endPos(vartype) <= vartype.getStartPosition();
     }
 
     private J.VariableDeclarations visitVariables(List<VariableTree> nodes, Space fmt) {
@@ -1783,9 +1790,12 @@ public class ReloadableJavaNextParserVisitor extends TreePathScanner<J, Space> {
         TypeTree typeExpr;
         if (vartype == null || isImplicitLambdaParameterType(node, vartype)) {
             // Lambda parameter with an inferred type. The synthesized vartype has either
-            // NOPOS (JDK ≤ 25) or is a zero-width JCErroneous at the parameter name (JDK 26+).
+            // NOPOS (JDK ≤ 25) or is a zero-width node at the parameter name (JDK 26+).
             typeExpr = null;
-        } else if (endPos(vartype) < 0) {
+        } else if (isSynthesizedVarType(vartype)) {
+            // `var` / `val` local declaration (and any non-parameter context where javac
+            // synthesizes the vartype, e.g. record patterns, try-with-resources, unnamed
+            // variables). Same dual-shape detection as the lambda-parameter case.
             Space space = whitespace();
             boolean lombokVal = source.startsWith("val", cursor);
             cursor += 3; // skip `val` or `var`
