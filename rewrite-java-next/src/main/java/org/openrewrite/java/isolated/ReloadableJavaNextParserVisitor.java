@@ -203,27 +203,7 @@ public class ReloadableJavaNextParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitErroneous(ErroneousTree node, Space fmt) {
-        // On JDK 26, javac sometimes wraps annotation argument expressions in JCErroneous
-        // for record-component annotations (the wrapper has no semantic meaning — its
-        // single child is the real expression). Delegate to the wrapped expression's
-        // own visitor so the resulting LST doesn't carry a spurious J.Erroneous node.
-        java.util.List<? extends Tree> errs = node.getErrorTrees();
-        if (errs.size() == 1 && errs.get(0) instanceof JCExpression) {
-            JCTree wrapped = (JCTree) errs.get(0);
-            cursor(wrapped.getStartPosition());
-            return scan(wrapped, fmt);
-        }
-        // TEMP DIAGNOSTIC: encode JCErroneous shape so CI failure surfaces it.
-        JCTree jt = (JCTree) node;
-        String src = source.substring(jt.getStartPosition(), jt.getEndPosition(endPosTable));
-        StringBuilder children = new StringBuilder();
-        for (Tree e : errs) {
-            children.append("|").append(e == null ? "null" : e.getClass().getSimpleName());
-            if (e instanceof JCTree jce) {
-                children.append("@").append(jce.getStartPosition()).append("..").append(jce.getEndPosition(endPosTable));
-            }
-        }
-        String erroneousNode = "[ERR errs=" + errs.size() + children + " src=" + src + "]";
+        String erroneousNode = source.substring(((JCTree) node).getStartPosition(), ((JCTree) node).getEndPosition(endPosTable));
         return new J.Erroneous(
                 randomId(),
                 fmt,
@@ -989,7 +969,12 @@ public class ReloadableJavaNextParserVisitor extends TreePathScanner<J, Space> {
         int endPos = endPos(node);
         Object value = node.getValue();
 
-        if (endPos == Position.NOPOS) {
+        // JDK ≤ 25: synthesized literals (e.g. propagated annotation arguments)
+        // had NOPOS as their end position, so endPos < 0.
+        // JDK 26+: synthesized literals carry a zero-width range at the start position,
+        // so endPos <= startPos.
+        int startPos = ((JCLiteral) node).getStartPosition();
+        if (endPos == Position.NOPOS || endPos <= startPos) {
             if (typeMapping.primitive(((JCLiteral) node).typetag) == JavaType.Primitive.String) {
                 int quote = source.startsWith("\"\"\"", cursor) ? 3 : 1;
                 int elementLength = quote == 3 ? source.indexOf("\"\"\"", cursor + quote) - cursor - quote : value.toString().length();
@@ -999,10 +984,11 @@ public class ReloadableJavaNextParserVisitor extends TreePathScanner<J, Space> {
                         ch -> Character.isWhitespace(ch) || ",;)]}+-*/%=!<>&|^?:.".indexOf(ch) != -1
                 );
             }
+            startPos = cursor;
         }
 
         cursor(endPos);
-        String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos);
+        String valueSource = source.substring(startPos, endPos);
         JavaType.Primitive type = typeMapping.primitive(((JCLiteral) node).typetag);
 
         if (value instanceof Character) {
