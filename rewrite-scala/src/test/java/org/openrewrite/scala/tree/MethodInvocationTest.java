@@ -15,6 +15,7 @@
  */
 package org.openrewrite.scala.tree;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -371,5 +372,54 @@ class MethodInvocationTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Nested
+    class VarargSplat implements RewriteTest {
+
+        @Test
+        void scala3Splat() {
+            rewriteRun(
+              scala(
+                """
+                object Test {
+                  val xs = Seq(1, 2)
+                  def f(x: Int*): Unit = ()
+                  f(xs*)
+                }
+                """
+              )
+            );
+        }
+
+        @Test
+        void scala2Splat() {
+            rewriteRun(
+              scala(
+                """
+                object Test {
+                  val xs = Seq(1, 2)
+                  def f(x: Int*): Unit = ()
+                  f(xs: _*)
+                }
+                """
+              )
+            );
+        }
+
+        @Test
+        void scala3SplatWithSpaceBeforeStar() {
+            rewriteRun(
+              scala(
+                """
+                object Test {
+                  val xs = Seq(1, 2)
+                  def f(x: Int*): Unit = ()
+                  f(xs *)
+                }
+                """
+              )
+            );
+        }
     }
 }
