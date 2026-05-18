@@ -93,6 +93,17 @@ testing {
                         testClassesDirs += javaTckClasses
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)
+                        // Surface TCK failures in the CI log — this module is the only one
+                        // that exercises the TCK on the latest non-LTS JDK, so individual
+                        // failures need to be visible without the HTML report.
+                        testLogging {
+                            events("failed")
+                            showStandardStreams = true
+                            showExceptions = true
+                            showCauses = true
+                            showStackTraces = true
+                            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+                        }
                     }
                 }
             }
