@@ -1,0 +1,120 @@
+@file:Suppress("UnstableApiUsage")
+
+plugins {
+    id("org.openrewrite.build.language-library")
+    id("jvm-test-suite")
+}
+
+val javaTck = configurations.create("javaTck") {
+    isTransitive = false
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
+val javaTckClasses = javaTck.incoming.artifactView {
+    attributes {
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))
+    }
+}.files
+
+dependencies {
+    api(project(":rewrite-core"))
+    api(project(":rewrite-java"))
+    implementation(project(":rewrite-java-lombok"))
+
+    compileOnly("org.slf4j:slf4j-api:1.7.+")
+
+    implementation("io.micrometer:micrometer-core:1.9.+")
+    implementation("io.github.classgraph:classgraph:latest.release")
+    implementation("org.ow2.asm:asm:latest.release")
+
+    testImplementation(project(":rewrite-test"))
+    testImplementation("org.antlr:antlr4-runtime:4.13.2")
+    "javaTck"(project(":rewrite-java-tck"))
+}
+
+// rewrite-java-next tracks the latest non-LTS JDK release. It currently targets
+// JDK 26, and will advance to 27/28 as those ship, before being renamed to
+// `rewrite-java-29` once 29 (the next LTS after 25) is released.
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(26))
+    }
+}
+
+tasks.named("licenseFormat") { enabled = false }
+
+tasks.withType<JavaCompile>().configureEach {
+    sourceCompatibility = JavaVersion.VERSION_26.toString()
+    targetCompatibility = JavaVersion.VERSION_26.toString()
+
+    options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
+    options.compilerArgs.addAll(
+        listOf(
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED"
+        )
+    )
+}
+
+//Javadoc compiler will complain about the use of the internal types.
+tasks.withType<Javadoc>().configureEach {
+    exclude(
+        "**/ReloadableJavaNextJavadocVisitor**",
+        "**/ReloadableJavaNextParser**",
+        "**/ReloadableJavaNextParserVisitor**",
+        "**/ReloadableJavaNextTypeMapping**",
+        "**/ReloadableJavaNextTypeSignatureBuilder**"
+    )
+}
+
+testing {
+    suites {
+        val test by getting(JvmTestSuite::class)
+
+        register("compatibilityTest", JvmTestSuite::class) {
+            dependencies {
+                implementation(project())
+                implementation(project(":rewrite-test"))
+                implementation(project(":rewrite-java-tck"))
+                implementation(project(":rewrite-java-test"))
+                implementation("org.assertj:assertj-core:latest.release")
+            }
+
+            targets {
+                all {
+                    testTask.configure {
+                        useJUnitPlatform()
+                        testClassesDirs += javaTckClasses
+                        jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
+                        shouldRunAfter(test)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Keep the Test tasks' @Classpath fingerprint stable across CI runs. In this module the
+// only consumers of runtimeClasspath are :test and :compatibilityTest (compileJava uses
+// compileClasspath / ABI-only normalization and is unaffected). The convention plugin's
+// info-broker writes build-varying entries (Build-Date, Change, Build-Number, ...) into
+// MANIFEST.MF and META-INF/<project>.properties of every consumed JAR; none of META-INF
+// is a real input for the TCK's parser tests, so drop the whole directory from the
+// fingerprint and let the build cache hit when only those metadata bytes have changed.
+normalization {
+    runtimeClasspath {
+        metaInf {
+            ignoreCompletely()
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn(testing.suites.named("compatibilityTest"))
+}
