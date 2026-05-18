@@ -1882,4 +1882,49 @@ public interface S extends J {
             }
         }
     }
+
+    /**
+     * A Scala XML literal expression such as {@code <message>Hello</message>}.
+     * Stored opaquely as raw source text — the Scala compiler desugars XML into
+     * {@code scala.xml.Elem}/{@code Group}/{@code NodeBuffer} constructor calls,
+     * but the original syntax is preserved here for round-trip fidelity.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class XmlLiteral implements S, Expression, Statement, TypedTree {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        String source;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public XmlLiteral(UUID id, Space prefix, Markers markers, String source, @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.source = source;
+            this.type = type;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitXmlLiteral(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
 }

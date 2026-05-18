@@ -211,6 +211,7 @@ class ScalaTreeVisitor(
       case ifTree: Trees.If[?] => visitIf(ifTree)
       case whileTree: Trees.WhileDo[?] => visitWhileDo(whileTree)
       case forTree: untpd.ForDo => visitForDo(forTree)
+      case xmlb: untpd.XMLBlock => visitXmlLiteral(xmlb)
       case block: Trees.Block[?] => visitBlock(block)
       case td: Trees.TypeDef[?] if td.isClassDef => visitClassDef(td)
       case td: Trees.TypeDef[?] => visitTypeAlias(td)
@@ -2965,8 +2966,8 @@ class ScalaTreeVisitor(
         }
       }
     } else if (vd.rhs != null && !vd.rhs.isEmpty && vd.rhs.span.exists) {
-      val rhsStart = Math.max(0, vd.rhs.span.start - offsetAdjustment)
-      
+      val rhsStart = effectiveStart(vd.rhs)
+
       // Look for equals sign
       if (cursor < rhsStart && rhsStart <= source.length) {
         val beforeRhs = source.substring(cursor, rhsStart)
@@ -3408,7 +3409,7 @@ class ScalaTreeVisitor(
 
     // Find the position of the equals sign
     val lhsEnd = Math.max(cursor, Math.max(0, asg.lhs.span.end - offsetAdjustment))
-    val rhsStart = Math.max(0, asg.rhs.span.start - offsetAdjustment)
+    val rhsStart = effectiveStart(asg.rhs)
     var equalsSpace = Space.EMPTY
     var valueSpace = Space.EMPTY
     var isCompoundAssignment = false
@@ -5694,7 +5695,7 @@ class ScalaTreeVisitor(
         // The actual body exists in source. Re-parse to get AST nodes.
         reparseProcedureBody(dd)
       case rhs if rhs != untpd.EmptyTree && rhs.span.exists =>
-        val rhsStart = Math.max(0, rhs.span.start - offsetAdjustment)
+        val rhsStart = effectiveStart(rhs)
         var beforeEquals = Space.EMPTY
         if (!isProcedureSyntax && cursor < rhsStart && rhsStart <= source.length) {
           val beforeBody = source.substring(cursor, rhsStart)
@@ -5866,7 +5867,7 @@ class ScalaTreeVisitor(
     // Default value `= expr`
     var initBefore: Space = Space.EMPTY
     val initializer: Expression = if (vd.rhs != untpd.EmptyTree && vd.rhs.span.exists) {
-      val rhsStart = Math.max(0, vd.rhs.span.start - offsetAdjustment)
+      val rhsStart = effectiveStart(vd.rhs)
       if (cursor < rhsStart) {
         val before = source.substring(cursor, rhsStart)
         val eqIdx = positionOfNextIn(before, "=", 0)
@@ -5989,7 +5990,7 @@ class ScalaTreeVisitor(
     // Handle default value
     var initBefore: Space = Space.EMPTY
     val initializer: Expression = if (vd.rhs != untpd.EmptyTree && vd.rhs.span.exists) {
-      val rhsStart = Math.max(0, vd.rhs.span.start - offsetAdjustment)
+      val rhsStart = effectiveStart(vd.rhs)
       if (cursor < rhsStart) {
         val before = source.substring(cursor, rhsStart)
         val eqIdx = positionOfNextIn(before, "=", 0)
@@ -6539,6 +6540,56 @@ class ScalaTreeVisitor(
     updateCursor(superTree.span.end)
     new S.QualifiedSuper(Tree.randomId(), prefix, Markers.EMPTY,
       qualifierIdent, mixIdent, typeFor(superTree.span))
+  }
+
+  /**
+   * Dotty's `untpd.XMLBlock` span starts one character past the leading `<`. Parent visitors
+   * (ValDef, Assign, DefDef, ...) compute `rhs.span.start - offsetAdjustment` to advance the
+   * cursor to the rhs, which for XML would leave the `<` behind as a stray non-whitespace
+   * character in the parent's "before-rhs" Space. Use this helper instead of the raw
+   * `tree.span.start - offsetAdjustment` computation so the cursor lands on the `<`.
+   */
+  private def effectiveStart(tree: Trees.Tree[?]): Int = {
+    val adjStart = Math.max(0, tree.span.start - offsetAdjustment)
+    tree match {
+      case _: untpd.XMLBlock
+          if adjStart > 0 && adjStart <= source.length && source.charAt(adjStart - 1) == '<' =>
+        adjStart - 1
+      case _ => adjStart
+    }
+  }
+
+  private def visitXmlLiteral(xmlb: untpd.XMLBlock): S.XmlLiteral = {
+    // Scala XML literals are parsed into untpd.XMLBlock, whose span covers the original
+    // XML source — *except* it starts one char past the leading `<`. Back up to include
+    // it. The desugared scala.xml.Elem/NodeBuffer subtree is ignored on purpose: walking
+    // it would collide with the actual XML syntax in source.
+    val adjustedStart = Math.max(0, xmlb.span.start - offsetAdjustment)
+    val adjustedEnd = Math.max(0, xmlb.span.end - offsetAdjustment)
+    val realStart =
+      if (adjustedStart > 0 && adjustedStart <= source.length && source.charAt(adjustedStart - 1) == '<') adjustedStart - 1
+      else adjustedStart
+
+    val prefixStart = cursor
+    val prefix = if (realStart > cursor && realStart <= source.length) {
+      cursor = realStart
+      Space.format(source, prefixStart, realStart)
+    } else Space.EMPTY
+
+    val sourceText =
+      if (realStart >= 0 && adjustedEnd <= source.length && adjustedEnd > realStart) {
+        val s = source.substring(realStart, adjustedEnd)
+        cursor = adjustedEnd
+        s
+      } else ""
+
+    new S.XmlLiteral(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      sourceText,
+      typeOfTree(xmlb)
+    )
   }
 
   private def visitInterpolatedString(interp: untpd.InterpolatedString): J.Identifier = {
