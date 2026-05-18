@@ -369,12 +369,6 @@ public class TreeVisitorAdapter {
                                         "Registered mixin " + line + " is not a TreeVisitor (registered at " + url + ").");
                             }
                             if (!adaptTo.isAssignableFrom(mixinClass)) {
-                                // The registry is keyed by base-visitor FQN and shared across
-                                // language modules. When multiple language modules are on the
-                                // classpath (e.g. rewrite-groovy + rewrite-kotlin in
-                                // rewrite-gradle), a registry entry that targets another
-                                // language's visitor will surface here. Skip it — the proxy
-                                // must be able to extend the mixin's class.
                                 continue;
                             }
                             return (TreeVisitor<?, ?>) mixinClass.getDeclaredConstructor().newInstance();
