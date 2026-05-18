@@ -104,7 +104,7 @@ sourceSets.named("main") {
     resources.srcDir(goRpcSourceStaging)
 }
 
-listOf("processResources", "sourcesJar").forEach {
+listOf("processResources", "sourcesJar", "licenseMain", "assemble").forEach {
     tasks.named(it) {
         dependsOn(prepareGoRpcSources)
     }
@@ -120,6 +120,10 @@ val goBuild = tasks.register<Exec>("goBuild") {
         include("go.mod")
         include("go.sum")
         exclude("build/**")
+        // vendor/ is reproducible from go.mod/go.sum (already inputs) and is
+        // declared as goModVendor's output; excluding it avoids a spurious
+        // implicit-dependency validation error from Gradle.
+        exclude("vendor/**")
     }).withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.file(layout.buildDirectory.file("rewrite-go-rpc"))
 }
@@ -203,6 +207,7 @@ val goTest = tasks.register<Exec>("goTest") {
         include("go.mod")
         include("go.sum")
         exclude("build/**")
+        exclude("vendor/**")
     }).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(file("test-classpath.txt"))
     outputs.file(junitXmlFile)
