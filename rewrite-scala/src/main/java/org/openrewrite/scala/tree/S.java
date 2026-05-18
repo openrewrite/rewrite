@@ -1072,11 +1072,12 @@ public interface S extends J {
     }
 
     /**
-     * Represents a Scala repeated/vararg type: {@code T*}. Appears in method parameter
-     * positions ({@code def foo(args: String*)}) and in argument ascriptions
-     * ({@code f(xs: _*)}). Modeled as a {@link TypeTree} so it composes with anywhere
-     * a type can appear. {@code beforeStar} preserves whitespace between the element
-     * type and the trailing {@code *} (e.g. {@code String *}).
+     * Represents a Scala repeated/vararg type at a type position: {@code T*}, as in
+     * {@code def foo(args: String*)}. {@code beforeStar} preserves whitespace between
+     * the element type and the trailing {@code *} (e.g. {@code String *}).
+     *
+     * <p>Call-site varargs splats ({@code f(xs*)} or {@code f(xs: _*)}) are modeled by
+     * {@link SplatExpression}, not this class.
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1114,6 +1115,66 @@ public interface S extends J {
         @Override
         public <P> J acceptScala(ScalaVisitor<P> v, P p) {
             return v.visitRepeatedType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * Represents a call-site varargs splat. Scala 3 form: {@code f(xs*)}.
+     * Scala 2 form: {@code f(xs: _*)} — for the Scala 2 form, {@link #beforeColon}
+     * and {@link #afterColon} are non-null; for the Scala 3 form they are null.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class SplatExpression implements S, Expression, TypedTree {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        Expression expression;
+
+        @With @Getter
+        @Nullable
+        Space beforeColon;
+
+        @With @Getter
+        @Nullable
+        Space afterColon;
+
+        @With @Getter
+        Space beforeStar;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public SplatExpression(UUID id, Space prefix, Markers markers, Expression expression,
+                               @Nullable Space beforeColon, @Nullable Space afterColon,
+                               Space beforeStar, @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.expression = expression;
+            this.beforeColon = beforeColon;
+            this.afterColon = afterColon;
+            this.beforeStar = beforeStar;
+            this.type = type;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitSplatExpression(this, p);
         }
 
         @Override
