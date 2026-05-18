@@ -18,7 +18,10 @@ package org.openrewrite.kotlin.recipe
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Preconditions
 import org.openrewrite.Recipe
+import org.openrewrite.java.search.UsesField
+import org.openrewrite.java.search.UsesMethod
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.kotlin.Assertions.kotlin
@@ -435,6 +438,68 @@ class RecipePluginRewriteTest : RewriteTest {
         assertThat(r.recipeList).hasSize(2)
         assertThat(r.recipeList.map { it::class.java.simpleName })
             .containsExactly("A\$KtRecipe", "B\$KtRecipe")
+    }
+
+    @Test
+    fun `generated visitor is wrapped with UsesMethod precondition`() {
+        // Mirrors what Refaster does in its generated Java recipes: the
+        // synthesized `getVisitor()` returns a Preconditions.Check whose
+        // inner `check` visitor is a UsesMethod for the recipe's matcher
+        // spec. The framework uses this to skip files that don't reference
+        // the targeted member at all.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseUppercase = recipe("d", "desc") {
+                    edit {
+                        rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseUppercase",
+        )
+        val visitor = r.getVisitor()
+        assertThat(visitor).isInstanceOf(Preconditions.Check::class.java)
+        val check = (visitor as Preconditions.Check).check
+        assertThat(check).isInstanceOf(UsesMethod::class.java)
+        assertThat((check as UsesMethod<*>).methodMatcher.toString())
+            .contains("lowercase")
+    }
+
+    @Test
+    fun `property-access recipe is wrapped with UsesField precondition`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseKotlinMathPi = recipe("d", "desc") {
+                    edit {
+                        rewrite { -> Math.PI } to { -> kotlin.math.PI }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseKotlinMathPi",
+        )
+        val visitor = r.getVisitor()
+        assertThat(visitor).isInstanceOf(Preconditions.Check::class.java)
+        assertThat((visitor as Preconditions.Check).check).isInstanceOf(UsesField::class.java)
+    }
+
+    @Test
+    fun `precondition skips files that don't use the targeted method`() {
+        // A source that doesn't call `lowercase()` anywhere must be left
+        // untouched even though the walker, if invoked, would visit every
+        // method invocation in the file. RewriteTest's single-arg `kotlin(...)`
+        // form asserts no change.
+        rewriteRun(
+            kotlin(
+                """
+                fun unrelated() {
+                    val n = 1 + 2
+                    println(n)
+                }
+                """,
+            ),
+        )
     }
 
     @Test
