@@ -173,6 +173,41 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/291")
+    @Test
+    void nestedAnnotationsInListLiteralWithConstantReferenceUnderCompileStatic() {
+        rewriteRun(
+          groovy(
+            """
+              import java.lang.annotation.*
+              import groovy.transform.CompileStatic
+
+              interface TestConstants {
+                  public static final String PROVIDER = "Provider1"
+                  public static final String CATEGORY = "Category1"
+              }
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.TYPE)
+              @interface Tag {
+                  String id()
+                  String category()
+                  String provider()
+              }
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.TYPE)
+              @interface Tags { Tag[] value() }
+
+              @CompileStatic
+              @Tags(value = [@Tag(id="tag1", category= TestConstants.CATEGORY, provider = "prov1"),
+                             @Tag(id="tag2", category="cat2", provider = "prov2")])
+              class Main {}
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4254")
     @Test
     void groovyTransformAnnotation() {
