@@ -1754,13 +1754,18 @@ public class ReloadableJavaNextParserVisitor extends TreePathScanner<J, Space> {
     private boolean isSyntheticValueAssignment(JCAssign arg) {
         // Single-element annotation shorthand `@Ann("foo")` is reported by javac as a
         // JCAssign whose lhs is a synthesized `value=` identifier that doesn't appear
-        // in source. Detect via the lhs's range rather than the JCAssign's own range:
-        // the lhs is always synthesized, while the JCAssign on JDK 26 sometimes spans
-        // the rhs (e.g. for annotations on record components). The synthesized lhs has
-        // either NOPOS (JDK ≤ 25) or a zero-width range (JDK 26+) — in both cases
-        // endPos <= startPos.
-        JCExpression lhs = arg.lhs;
-        return endPos(lhs) <= lhs.getStartPosition();
+        // in source. Position-based detection is fragile because JDK 26's encoding of
+        // synthesized nodes varies by context (zero-width on classes, but apparently
+        // overlapping with the rhs on record-component annotations). Instead detect
+        // via the source itself: if there's no `=` between the cursor (just past `(`)
+        // and the rhs's start position, the assignment was synthesized.
+        int rhsStart = ((JCTree) arg.rhs).getStartPosition();
+        if (rhsStart < cursor || rhsStart > source.length()) {
+            // Positions unusable — fall back to the position-based check so we don't
+            // misclassify a real assignment whose rhs starts before the current cursor.
+            return endPos(arg) <= arg.getStartPosition();
+        }
+        return source.substring(cursor, rhsStart).indexOf('=') < 0;
     }
 
     private boolean isImplicitLambdaParameterType(JCVariableDecl node, JCExpression vartype) {
