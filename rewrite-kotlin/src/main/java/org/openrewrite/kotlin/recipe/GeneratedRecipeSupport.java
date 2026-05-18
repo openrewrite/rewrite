@@ -15,6 +15,7 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
@@ -22,6 +23,8 @@ import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.search.UsesField;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
@@ -87,7 +90,7 @@ public final class GeneratedRecipeSupport {
             matchers[i] = new MethodMatcher(specs[i]);
         }
         int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
-        return new KotlinVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 int matchedIdx = -1;
@@ -136,6 +139,7 @@ public final class GeneratedRecipeSupport {
                 return super.visitMethodInvocation(method, ctx);
             }
         };
+        return wrapWithPrecondition(matcherSpecsLines, walker);
     }
 
     /**
@@ -157,7 +161,7 @@ public final class GeneratedRecipeSupport {
         MethodMatcher outerMatcher = new MethodMatcher(matcherSpecsLine.substring(0, tabIdx));
         MethodMatcher innerMatcher = new MethodMatcher(matcherSpecsLine.substring(tabIdx + 1));
         ChainSourceRef[] sources = parseChainCsv(substitutionSourcesCsv);
-        return new KotlinVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (!outerMatcher.matches(method)) {
@@ -198,6 +202,7 @@ public final class GeneratedRecipeSupport {
                 return result.withPrefix(method.getPrefix());
             }
         };
+        return wrapWithPrecondition(matcherSpecsLine, walker);
     }
 
     private static class ChainSourceRef {
@@ -248,7 +253,7 @@ public final class GeneratedRecipeSupport {
             matchers[i] = new MethodMatcher(specs[i]);
         }
         int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
-        return new KotlinVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitUnary(K.Unary unary, ExecutionContext ctx) {
                 if (unary.getOperator() != K.Unary.Type.NotNull) {
@@ -296,6 +301,7 @@ public final class GeneratedRecipeSupport {
                 return result.withPrefix(unary.getPrefix());
             }
         };
+        return wrapWithPrecondition(matcherSpecsLines, walker);
     }
 
     /**
@@ -332,7 +338,7 @@ public final class GeneratedRecipeSupport {
             }
         }
         int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
-        return new KotlinVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 String name = fieldAccess.getName().getSimpleName();
@@ -370,6 +376,7 @@ public final class GeneratedRecipeSupport {
                 return result.withPrefix(fieldAccess.getPrefix());
             }
         };
+        return wrapWithPrecondition(matcherSpecsLines, walker);
     }
 
     private static @Nullable String fullyQualifiedNameOf(org.openrewrite.java.tree.@Nullable JavaType type) {
@@ -400,7 +407,7 @@ public final class GeneratedRecipeSupport {
             matchers[i] = new MethodMatcher(specs[i]);
         }
         int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
-        return new JavaVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> walker = new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 int matchedIdx = -1;
@@ -440,6 +447,7 @@ public final class GeneratedRecipeSupport {
                 return super.visitMethodInvocation(method, ctx);
             }
         };
+        return wrapWithPrecondition(matcherSpecsLines, walker);
     }
 
     /**
@@ -493,6 +501,77 @@ public final class GeneratedRecipeSupport {
                 return current;
             }
         };
+    }
+
+    /**
+     * Wrap a generated walker in {@link Preconditions#check(TreeVisitor, TreeVisitor)}
+     * using {@link UsesMethod} / {@link UsesField} derived from the recipe's
+     * matcher spec(s). Same idea as the {@code Preconditions.check(Preconditions.and(
+     * new UsesType<>(...), new UsesMethod<>(...)), visitor)} pattern that Refaster
+     * emits for its generated Java recipes — the walker only runs against a source
+     * file that actually uses the relevant member, letting the framework
+     * short-circuit unrelated files before they're walked.
+     *
+     * <p>We deliberately skip the {@link UsesType} prefilter that Refaster pairs
+     * with {@link UsesMethod}: for Kotlin extension functions and properties
+     * the matcher's owner is the synthetic JVM facade class (e.g.
+     * {@code kotlin.text.StringsKt} for {@code String.lowercase()}), which the
+     * source never references directly and which {@link UsesType} therefore
+     * always reports as absent. {@link UsesMethod} and {@link UsesField} each
+     * already constrain on the owner via the methods-/fields-in-use cache, so
+     * dropping {@link UsesType} loses no real filtering power.
+     *
+     * <p>Spec shapes (set by
+     * {@link org.openrewrite.kotlin.recipe.internal.RecipeIrGenerationExtension}):
+     * <ul>
+     *   <li>{@code "<owner-fqn> <name>(<args>)"} — method invocation. Yields
+     *       {@code UsesMethod(spec)}.</li>
+     *   <li>{@code "<owner-fqn>#<name>"} — property/field access (also the
+     *       inlined-constant fallback for {@code Math.PI} etc.). Yields
+     *       {@code UsesField(owner, name)}.</li>
+     *   <li>{@code "<outer>\t<inner>"} — two-segment chain. Yields the
+     *       AND of both segments' per-spec preconditions.</li>
+     * </ul>
+     * Multiple specs ({@code \n}-delimited, from {@code rewrite(b1, b2) to a})
+     * compose as {@link Preconditions#or}: the walker runs when ANY before
+     * pattern's member appears in the source.
+     *
+     * <p>Empty {@code specsLines} falls through to the bare walker without
+     * a precondition.
+     */
+    @SuppressWarnings("unchecked")
+    private static TreeVisitor<?, ExecutionContext> wrapWithPrecondition(
+            String specsLines, TreeVisitor<?, ExecutionContext> walker) {
+        if (specsLines == null || specsLines.isEmpty()) {
+            return walker;
+        }
+        String[] specs = specsLines.split("\n");
+        TreeVisitor<?, ExecutionContext>[] perSpec = new TreeVisitor[specs.length];
+        for (int i = 0; i < specs.length; i++) {
+            perSpec[i] = preconditionForSpec(specs[i]);
+        }
+        TreeVisitor<?, ExecutionContext> combined = perSpec.length == 1
+                ? perSpec[0]
+                : Preconditions.or(perSpec);
+        return Preconditions.check(combined, walker);
+    }
+
+    private static TreeVisitor<?, ExecutionContext> preconditionForSpec(String spec) {
+        int tabIdx = spec.indexOf('\t');
+        if (tabIdx >= 0) {
+            // Chain: BOTH segments must be present in the source file for the
+            // chained pattern to ever match.
+            return Preconditions.and(
+                    preconditionForSpec(spec.substring(0, tabIdx)),
+                    preconditionForSpec(spec.substring(tabIdx + 1)));
+        }
+        int hashIdx = spec.indexOf('#');
+        if (hashIdx >= 0) {
+            String owner = spec.substring(0, hashIdx);
+            String field = spec.substring(hashIdx + 1);
+            return new UsesField<>(owner, field);
+        }
+        return new UsesMethod<>(spec);
     }
 
     private static int[] parseCsv(String csv) {

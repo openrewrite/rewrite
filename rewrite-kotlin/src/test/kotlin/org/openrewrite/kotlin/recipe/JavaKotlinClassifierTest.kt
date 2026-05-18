@@ -18,7 +18,9 @@ package org.openrewrite.kotlin.recipe
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Preconditions
 import org.openrewrite.Recipe
+import org.openrewrite.TreeVisitor
 import org.openrewrite.kotlin.KotlinVisitor
 
 /**
@@ -49,7 +51,7 @@ class JavaKotlinClassifierTest {
             """.trimIndent(),
             propertyName = "UseUpper",
         )
-        assertThat(r.getVisitor()).isInstanceOf(KotlinVisitor::class.java)
+        assertThat(unwrap(r.getVisitor())).isInstanceOf(KotlinVisitor::class.java)
     }
 
     @Test
@@ -65,7 +67,7 @@ class JavaKotlinClassifierTest {
             """.trimIndent(),
             propertyName = "UseAppendLine",
         )
-        assertThat(r.getVisitor()).isInstanceOf(KotlinVisitor::class.java)
+        assertThat(unwrap(r.getVisitor())).isInstanceOf(KotlinVisitor::class.java)
     }
 
     @Test
@@ -82,7 +84,7 @@ class JavaKotlinClassifierTest {
             """.trimIndent(),
             propertyName = "EnumEntriesRename",
         )
-        assertThat(r.getVisitor()).isInstanceOf(KotlinVisitor::class.java)
+        assertThat(unwrap(r.getVisitor())).isInstanceOf(KotlinVisitor::class.java)
     }
 
     /**
@@ -92,6 +94,21 @@ class JavaKotlinClassifierTest {
      * The synthesized class lives at `<file-package>.<propertyName>$KtRecipe`;
      * the property's getter returns an instance of it.
      */
+    /**
+     * Peel off the [Preconditions.Check] wrapper added by
+     * [org.openrewrite.kotlin.recipe.GeneratedRecipeSupport] so the
+     * classifier dispatch assertion sees the inner walker. The wrapper is
+     * present for every rewrite/to recipe (UsesMethod / UsesField gating)
+     * but isn't what the classifier picks — `KotlinVisitor` vs `JavaVisitor`
+     * lives inside.
+     */
+    private fun unwrap(v: TreeVisitor<*, *>): TreeVisitor<*, *> =
+        if (v is Preconditions.Check) {
+            val field = Preconditions.Check::class.java.getDeclaredField("v")
+            field.isAccessible = true
+            field.get(v) as TreeVisitor<*, *>
+        } else v
+
     private fun compileRecipe(source: String, propertyName: String): Recipe {
         val result = RecipePluginCompileFixture.compile(source)
         check(result.exitOk()) { "compile failed:\n${result.messages}" }
