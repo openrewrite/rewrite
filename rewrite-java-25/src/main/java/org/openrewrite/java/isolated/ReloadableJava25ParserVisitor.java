@@ -1750,6 +1750,16 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 visitVariables(singletonList(node), fmt); // method arguments cannot be multi-declarations
     }
 
+    private boolean isImplicitLambdaParameterType(JCVariableDecl node, JCExpression vartype) {
+        if ((node.sym.flags() & Flags.PARAMETER) == 0) {
+            return false;
+        }
+        int end = endPos(vartype);
+        // JDK ≤ 25: synthesized vartype has NOPOS, so end == -1.
+        // JDK 26+: synthesized vartype is a zero-width JCErroneous at the parameter name's position.
+        return end <= vartype.getStartPosition();
+    }
+
     private J.VariableDeclarations visitVariables(List<VariableTree> nodes, Space fmt) {
         JCVariableDecl node = (JCVariableDecl) nodes.get(0);
 
@@ -1762,24 +1772,21 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
         TypeTree typeExpr;
-        if (vartype == null) {
+        if (vartype == null || isImplicitLambdaParameterType(node, vartype)) {
+            // Lambda parameter with an inferred type. The synthesized vartype has either
+            // NOPOS (JDK ≤ 25) or is a zero-width JCErroneous at the parameter name (JDK 26+).
             typeExpr = null;
         } else if (endPos(vartype) < 0) {
-            if ((node.sym.flags() & Flags.PARAMETER) > 0) {
-                // this is a lambda parameter with an inferred type expression
-                typeExpr = null;
-            } else {
-                Space space = whitespace();
-                boolean lombokVal = source.startsWith("val", cursor);
-                cursor += 3; // skip `val` or `var`
-                typeExpr = new J.Identifier(randomId(),
-                        space,
-                        Markers.build(singletonList(JavaVarKeyword.build())),
-                        emptyList(),
-                        lombokVal ? "val" : "var",
-                        typeMapping.type(vartype),
-                        null);
-            }
+            Space space = whitespace();
+            boolean lombokVal = source.startsWith("val", cursor);
+            cursor += 3; // skip `val` or `var`
+            typeExpr = new J.Identifier(randomId(),
+                    space,
+                    Markers.build(singletonList(JavaVarKeyword.build())),
+                    emptyList(),
+                    lombokVal ? "val" : "var",
+                    typeMapping.type(vartype),
+                    null);
         } else if (vartype instanceof JCArrayTypeTree) {
             JCExpression elementType = vartype;
             while (elementType instanceof JCArrayTypeTree || elementType instanceof JCAnnotatedType) {
