@@ -7932,12 +7932,17 @@ class ScalaTreeVisitor(
       val savedCursor = cursor
       val funcSource = extractSource(func.span)
       cursor = savedCursor
-      // An explicit `_ => expr` lambda contains `=>` in source. dotty also names its
-      // parameter `_$N`, but the `_` is the parameter, not a placeholder reference, so
-      // the placeholder-rewrite path below (which assumes the body absorbs the `_`)
-      // would mis-attribute the `_ => ` text to the body's prefix. Defer to the regular
-      // lambda path in that case.
-      val hasUnderscorePlaceholder = funcSource.contains("_") && !funcSource.contains("=>")
+      // An explicit `_ => expr` lambda has `=>` between the parameter and the body.
+      // For a placeholder lambda like `_.filter(f => f > 0)`, the body starts at the
+      // `_` itself, so any `=>` is inside the body, not before it. Only treat the
+      // function as an explicit underscore lambda when `=>` appears before the body.
+      val isExplicitUnderscoreLambda = if (func.body.span.exists) {
+        val funcStart = Math.max(0, func.span.start - offsetAdjustment)
+        val bodyStart = Math.max(0, func.body.span.start - offsetAdjustment)
+        bodyStart > funcStart && bodyStart <= source.length &&
+          source.substring(funcStart, bodyStart).contains("=>")
+      } else false
+      val hasUnderscorePlaceholder = funcSource.contains("_") && !isExplicitUnderscoreLambda
 
       // If we have synthetic params and underscore in source, it's likely a placeholder lambda
       // These should be treated as regular lambdas but we skip the synthetic param
