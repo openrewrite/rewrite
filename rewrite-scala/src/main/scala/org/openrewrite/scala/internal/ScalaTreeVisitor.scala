@@ -5396,10 +5396,27 @@ class ScalaTreeVisitor(
     // correctly (otherwise the alpha-only name scan stops at the first char and
     // mistakes the body's opening `(` for a parameter list).
     var hasParensInSource = true
+    // For `given foo[T]: Bar = ...` (named) or `given [T]: Bar = ...` (anonymous),
+    // we must skip past `[type-params]` before deciding. Both cases land here when
+    // the underlying DefDef has Given flag set.
+    val isGivenDefDef = dd.mods != null && dd.mods.is(Flags.Given)
     if (dd.nameSpan.exists) {
       val nameEnd = Math.max(0, dd.nameSpan.end - offsetAdjustment)
       var i = nameEnd
       while (i < source.length && source.charAt(i).isWhitespace) i += 1
+      // Skip a `[...]` type parameter list (only relevant for given aliases — for
+      // ordinary defs, `def foo[T]` always has either `()` or `:` after `]`).
+      if (isGivenDefDef && i < source.length && source.charAt(i) == '[') {
+        var depth = 1
+        i += 1
+        while (i < source.length && depth > 0) {
+          val c = source.charAt(i)
+          if (c == '[') depth += 1
+          else if (c == ']') depth -= 1
+          i += 1
+        }
+        while (i < source.length && source.charAt(i).isWhitespace) i += 1
+      }
       if (i < source.length) {
         val nextCh = source.charAt(i)
         if (nextCh == ':' || nextCh == '=') {
@@ -5408,15 +5425,29 @@ class ScalaTreeVisitor(
       }
     } else if (adjustedStart < adjustedEnd && adjustedEnd <= source.length) {
       val defSource = source.substring(adjustedStart, adjustedEnd)
-      val defIdx = positionOfNextIn(defSource, "def ", 0)
-      if (defIdx >= 0) {
-        val afterDef = defSource.substring(defIdx + 4)
-        val nameEnd = afterDef.indexWhere(c => !c.isLetterOrDigit && c != '_')
-        if (nameEnd >= 0) {
-          val afterName = afterDef.substring(nameEnd).trim()
-          if (afterName.startsWith(":") || afterName.startsWith("=")) {
-            hasParensInSource = false
+      val keyword = if (isGivenDefDef) "given" else "def"
+      val kwIdx = positionOfNextIn(defSource, keyword + " ", 0)
+      if (kwIdx >= 0) {
+        var rest = defSource.substring(kwIdx + keyword.length + 1).stripLeading
+        // Anonymous given: keyword is immediately followed by `[T]` (type params)
+        // or just `:`/`=`.
+        if (rest.startsWith("[")) {
+          var depth = 1
+          var j = 1
+          while (j < rest.length && depth > 0) {
+            val c = rest.charAt(j)
+            if (c == '[') depth += 1
+            else if (c == ']') depth -= 1
+            j += 1
           }
+          rest = rest.substring(j).stripLeading
+        } else {
+          // Named def: skip the name itself.
+          val nameEnd = rest.indexWhere(c => !c.isLetterOrDigit && c != '_')
+          if (nameEnd >= 0) rest = rest.substring(nameEnd).stripLeading
+        }
+        if (rest.startsWith(":") || rest.startsWith("=")) {
+          hasParensInSource = false
         }
       }
     }
@@ -5917,8 +5948,9 @@ class ScalaTreeVisitor(
       var i = curriedParamLists.size - 1
       while (i >= 0) {
         val lambdaParams = curriedParamLists.get(i)
-        // Intermediate lambdas (not the last) get Curried marker
-        val lambdaMarkers = if (i > 0) {
+        // The printer descends through curried lambdas while the OUTER lambda carries a
+        // Curried marker. So every wrapper except the innermost needs the marker.
+        val lambdaMarkers = if (i < curriedParamLists.size - 1) {
           Markers.build(Collections.singletonList(new Curried(Tree.randomId())))
         } else Markers.EMPTY
         innerBody = new J.Lambda(Tree.randomId(), Space.EMPTY, lambdaMarkers,

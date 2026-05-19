@@ -284,6 +284,19 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void tripleCurriedParamList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(a: Int)(b: Int)(c: Int): Int = a + b + c
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void curriedMethodParameterTypeNoSpaceAfterColon() {
         rewriteRun(
             scala(
@@ -378,44 +391,78 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
-    void usingInSecondParamList() {
-        rewriteRun(
-            scala(
-                """
-                object Test {
-                  def apply(obj: String)(using c: Int): String = obj
-                }
-                """
-            )
-        );
-    }
+    @Nested
+    class Using implements RewriteTest {
 
-    @Test
-    void usingInFirstParamList() {
-        rewriteRun(
-            scala(
-                """
-                object Test {
-                  def apply(using c: Int): String = c.toString
-                }
-                """
-            )
-        );
-    }
+        @Test
+        void inSecondParamList() {
+            rewriteRun(
+                scala(
+                    """
+                    object Test {
+                      def apply(obj: String)(using c: Int): String = obj
+                    }
+                    """
+                )
+            );
+        }
 
-    @Test
-    void usingAnonymousParameter() {
-        rewriteRun(
-            scala(
-                """
-                trait Ord[T]
-                object Test {
-                  def sort[T](xs: List[T])(using Ord[T]): List[T] = xs
-                }
-                """
-            )
-        );
+        @Test
+        void inFirstParamList() {
+            rewriteRun(
+                scala(
+                    """
+                    object Test {
+                      def apply(using c: Int): String = c.toString
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void inThirdParamListSingleLine() {
+            rewriteRun(
+                scala(
+                    """
+                    trait BSONHandler[T]
+                    object Test {
+                      def valueMapHandler[K, V](mapping: Map[K, V])(toKey: V => K)(using keyHandler: BSONHandler[K]): BSONHandler[V] = new BSONHandler[V] {}
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void inThirdParamListMultiline() {
+            rewriteRun(
+                scala(
+                    """
+                    trait BSONHandler[T]
+                    object Test {
+                      def valueMapHandler[K, V](mapping: Map[K, V])(toKey: V => K)(using
+                          keyHandler: BSONHandler[K]
+                      ): BSONHandler[V] = new BSONHandler[V] {}
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void anonymousParameter() {
+            rewriteRun(
+                scala(
+                    """
+                    trait Ord[T]
+                    object Test {
+                      def sort[T](xs: List[T])(using Ord[T]): List[T] = xs
+                    }
+                    """
+                )
+            );
+        }
     }
 
     @Nested

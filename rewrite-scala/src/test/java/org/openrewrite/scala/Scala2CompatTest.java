@@ -974,6 +974,34 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
+    void givenMethodShapeNoValueParams() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  given mapHandler[V: BSONHandler]: BSONHandler[V] = new BSONHandler[V] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenAnonymousTypeParamsOnly() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  given [T: BSONHandler]: BSONHandler[List[T]] = new BSONHandler[List[T]] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void givenAliasMethodShape() {
         rewriteRun(
             scala(
