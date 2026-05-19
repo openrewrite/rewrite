@@ -432,6 +432,19 @@ class MethodDeclarationTest implements RewriteTest {
                 )
             );
         }
+
+        @Test
+        void extensionBracelessIndentedBody() {
+            rewriteRun(
+                scala(
+                    """
+                    extension (s: String)
+                      def shout: String = s.toUpperCase
+                      def whisper: String = s.toLowerCase
+                    """
+                )
+            );
+        }
     }
 
     @Test

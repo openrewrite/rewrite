@@ -66,6 +66,47 @@ class ForYieldTest implements RewriteTest {
     }
 
     @Test
+    void scala3ParenlessForDoIndented() {
+        rewriteRun(
+          scala(
+            """
+              object Test:
+                def f(): Unit =
+                  for i <- 0 to 10 do
+                    println(i)
+              """
+          )
+        );
+    }
+
+    @Test
+    void scala3ParenlessForYieldIndented() {
+        rewriteRun(
+          scala(
+            """
+              object Test:
+                def f(): Seq[Int] =
+                  for i <- 0 to 10
+                  yield i * 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void scala3ParenlessForDoSingleLine() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                for i <- 0 to 10 do println(i)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void significantCharactersInComments() {
         // buildSFor — `yield` keyword in line comment inside for-comprehension body
         rewriteRun(
