@@ -217,6 +217,13 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return s;
     }
 
+    public J visitXmlLiteral(S.XmlLiteral xmlLiteral, P p) {
+        S.XmlLiteral x = xmlLiteral;
+        x = x.withPrefix(visitSpace(x.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        x = x.withMarkers(visitMarkers(x.getMarkers(), p));
+        return x;
+    }
+
     public J visitAlternative(S.Alternative alternative, P p) {
         S.Alternative a = alternative;
         a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
