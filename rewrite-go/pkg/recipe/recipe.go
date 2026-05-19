@@ -130,6 +130,12 @@ type OptionDescriptor struct {
 
 	// Value is the current value, if set.
 	Value any
+
+	// Secret indicates the value is sensitive (an API token, password, etc.).
+	// Consumers persisting or displaying option values are expected to redact
+	// secret values at persistence boundaries; the runtime value here stays raw
+	// so the recipe can still execute with it.
+	Secret bool
 }
 
 // Option creates a required OptionDescriptor with the given name, display name, and description.
@@ -153,6 +159,10 @@ func (o OptionDescriptor) WithValid(v ...string) OptionDescriptor { o.Valid = v;
 
 // AsOptional marks the option as not required.
 func (o OptionDescriptor) AsOptional() OptionDescriptor { o.Required = false; return o }
+
+// AsSecret marks the option's value as sensitive. Consumers persisting or displaying
+// the value (CLI traces, marketplace JSON, SaaS event log) are expected to redact it.
+func (o OptionDescriptor) AsSecret() OptionDescriptor { o.Secret = true; return o }
 
 // TypeName returns a Java-style type name derived from the option's Value.
 // Used to populate the marketplace option `type` wire field.

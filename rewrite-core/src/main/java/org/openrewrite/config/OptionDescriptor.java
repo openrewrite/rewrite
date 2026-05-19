@@ -46,7 +46,19 @@ public class OptionDescriptor {
 
     boolean required;
 
+    boolean secret;
+
     @Nullable
     @EqualsAndHashCode.Include
     Object value;
+
+    /**
+     * If this option is marked {@link #secret}, returns a copy with {@link #value} nulled.
+     * Otherwise returns this instance unchanged. Use at persistence and external-transport
+     * boundaries to ensure secret values are not written to durable storage.
+     */
+    public OptionDescriptor withRedactedSecretValue() {
+        return secret ? new OptionDescriptor(name, type, displayName, description,
+                example, valid, required, true, null) : this;
+    }
 }

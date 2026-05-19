@@ -154,6 +154,13 @@ export interface OptionDescriptor {
     readonly required?: boolean
     readonly example?: string
     readonly valid?: string[]
+    /**
+     * If true, the option's value is sensitive (an API token, password, etc.).
+     * Recipe authors must not log or persist a secret value from within the recipe.
+     * The value is still made available to the recipe at runtime; redaction is the
+     * responsibility of consumers at persistence boundaries.
+     */
+    readonly secret?: boolean
 }
 
 export abstract class ScanningRecipe<P> extends Recipe {

@@ -29,5 +29,15 @@ public record OptionDescriptor(
     string? Example,
     IReadOnlyList<string>? Valid,
     bool Required,
+    bool Secret,
     object? Value
-);
+)
+{
+    /// <summary>
+    /// If this option is marked <see cref="Secret"/>, returns a copy with <see cref="Value"/>
+    /// nulled. Otherwise returns this instance unchanged. Use at persistence and external-
+    /// transport boundaries to ensure secret values are not written to durable storage.
+    /// </summary>
+    public OptionDescriptor WithRedactedSecretValue() =>
+        Secret ? this with { Value = null } : this;
+}
