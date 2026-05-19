@@ -284,6 +284,22 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void qualifiedContextBound() {
+        rewriteRun(
+            scala(
+                """
+                object pkg {
+                  trait Zero[A]
+                }
+                object Test {
+                  def f[A: pkg.Zero](x: A): A = x
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void tripleCurriedParamList() {
         rewriteRun(
             scala(

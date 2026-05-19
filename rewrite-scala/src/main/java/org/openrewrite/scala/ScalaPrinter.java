@@ -890,8 +890,13 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     }
                 }
                 p.append(')');
+                // Re-emit any additional curried constructor param lists captured verbatim
+                // from source (e.g. `(using Executor)`).
+                primaryConstructor.getMarkers()
+                    .findFirst(org.openrewrite.scala.marker.ExtraConstructorParamLists.class)
+                    .ifPresent(m -> p.append(m.text()));
             }
-            
+
             if (classDecl.getPadding().getExtends() != null) {
                 visitSpace(classDecl.getPadding().getExtends().getBefore(), Space.Location.EXTENDS, p);
                 p.append("extends");
@@ -1576,6 +1581,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         for (J.Modifier m : g.getModifiers()) {
             visit(m, p);
         }
+        // Whitespace between the last modifier (or annotations) and `given`. Captured by
+        // the visitor when a modifier precedes the keyword.
+        g.getMarkers().findFirst(ValVarKeyword.class)
+                .ifPresent(m -> p.append(m.beforeKeyword()));
         p.append("given");
         visit(g.getType(), p);
         JLeftPadded<Expression> init = g.getInitializer();

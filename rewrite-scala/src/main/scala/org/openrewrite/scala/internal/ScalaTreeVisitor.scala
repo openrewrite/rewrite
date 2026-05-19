@@ -3093,18 +3093,11 @@ class ScalaTreeVisitor(
    * Dotty into a synthesized ClassDef/ModuleDef. The synthesized definitions don't
    * map cleanly to J.ClassDeclaration with the current modeling. Until form 3 has
    * proper structured handling, we preserve the original source text via
-   * S.PatternDefinition. Detection: Flags.Given is set on the mods AND the source
-   * span starts with `given`.
+   * S.PatternDefinition. A `ModuleDef`/`ClassDef` with the `Given` flag is always a
+   * synthesized given-with-body — no other construct produces that combination.
    */
   private def isGivenWithBody(t: Trees.Tree[?], mods: untpd.Modifiers): Boolean = {
-    if (mods == null || !mods.is(Flags.Given)) return false
-    if (!t.span.exists) return false
-    val s = Math.max(0, t.span.start - offsetAdjustment)
-    val e = Math.max(0, t.span.end - offsetAdjustment)
-    if (s < 0 || e > source.length || s >= e) return false
-    val snippet = source.substring(s, e)
-    // Skip leading whitespace and modifiers; we just need `given` to appear.
-    snippet.trim.startsWith("given")
+    mods != null && mods.is(Flags.Given) && t.span.exists
   }
 
   private def preserveGivenWithBodyAsText(span: dotty.tools.dotc.util.Spans.Span): S.PatternDefinition = {
@@ -3178,19 +3171,27 @@ class ScalaTreeVisitor(
     }
     updateCursor(vd.span.end)
 
-    // Carry whitespace before the `given` keyword on the AnonymousGiven prefix when there
-    // are no leading annotations/modifiers — the printer emits `given` immediately.
-    val effectivePrefix =
+    // Whitespace handling around the `given` keyword:
+    // - No leading annotations/modifiers: `beforeKeyword` (gap between cursor and `given`)
+    //   collapses with the declaration prefix.
+    // - Otherwise: declaration prefix is unchanged, and `beforeKeyword` (the gap between
+    //   the last modifier and `given`) is preserved via a ValVarKeyword marker so the
+    //   printer can emit it before the keyword.
+    val (effectivePrefix, gMarkers) =
       if (leadingAnnotations.isEmpty && modifiers.isEmpty) {
-        // prefix is the whitespace before the whole declaration; beforeKeyword is the gap
-        // between modifiers and the keyword. With no modifiers/annos these collapse.
-        if (beforeKeyword.getWhitespace.nonEmpty) beforeKeyword else prefix
-      } else prefix
+        val effPrefix = if (beforeKeyword.getWhitespace.nonEmpty) beforeKeyword else prefix
+        (effPrefix, Markers.EMPTY)
+      } else if (beforeKeyword.getWhitespace.nonEmpty) {
+        (prefix, Markers.build(Collections.singletonList(
+          ValVarKeyword(Tree.randomId(), beforeKeyword.getWhitespace))))
+      } else {
+        (prefix, Markers.EMPTY)
+      }
 
     new S.AnonymousGiven(
       Tree.randomId(),
       effectivePrefix,
-      Markers.EMPTY,
+      gMarkers,
       leadingAnnotations,
       modifiers,
       typeExpr,
@@ -4609,7 +4610,42 @@ class ScalaTreeVisitor(
         if (closeParen >= 0) cursor = cursor + closeParen + 1
       }
 
-      JContainer.build(parenSpace, jParams, Markers.EMPTY)
+      // Scala 3 allows curried constructor param lists: `class C(a: Int)(using Executor)`.
+      // J.ClassDeclaration only models the first list; collect the rest verbatim from source
+      // so the printer can re-emit them. Stops at the first non-`(` non-whitespace char.
+      val extraListsBuf = new StringBuilder
+      var scanCursor = cursor
+      var keepScanning = true
+      while (keepScanning) {
+        var probe = scanCursor
+        while (probe < source.length && source.charAt(probe).isWhitespace) probe += 1
+        if (probe < source.length && source.charAt(probe) == '(') {
+          var depth = 1
+          var i = probe + 1
+          while (i < source.length && depth > 0) {
+            val c = source.charAt(i)
+            if (c == '(') depth += 1
+            else if (c == ')') depth -= 1
+            i += 1
+          }
+          if (depth == 0) {
+            extraListsBuf.append(source.substring(scanCursor, i))
+            scanCursor = i
+          } else {
+            keepScanning = false
+          }
+        } else {
+          keepScanning = false
+        }
+      }
+      val containerMarkers: Markers = if (extraListsBuf.nonEmpty) {
+        cursor = scanCursor
+        Markers.build(Collections.singletonList(
+          org.openrewrite.scala.marker.ExtraConstructorParamLists(
+            Tree.randomId(), extraListsBuf.toString)))
+      } else Markers.EMPTY
+
+      JContainer.build(parenSpace, jParams, containerMarkers)
     } else {
       // No `(` in source — non-constructor class definition. Emit an empty container
       // marked with OmitParentheses so the printer skips emitting `(...)`.
@@ -8024,15 +8060,17 @@ class ScalaTreeVisitor(
             Space.format(source, cursor, colonIdx)
           } else Space.EMPTY
           val boundList = new util.ArrayList[JRightPadded[TypeTree]]()
-          // For each context bound, extract the bound type name
+          // For each context bound, extract the bound type name. Qualified names
+          // (`pkg.Zero`) are reconstructed from the Select chain — `sel.name.toString`
+          // alone drops the qualifier.
+          def selectToName(t: Trees.Tree[?]): String = t match {
+            case id: Trees.Ident[?] => id.name.toString
+            case sel: Trees.Select[?] => selectToName(sel.qualifier) + "." + sel.name.toString
+            case _ => t.toString
+          }
           cxBoundsList.foreach { cxBound =>
             val boundName = cxBound match {
-              case cbt: untpd.ContextBoundTypeTree =>
-                cbt.tycon match {
-                  case id: Trees.Ident[?] => id.name.toString
-                  case sel: Trees.Select[?] => sel.name.toString
-                  case _ => cxBound.toString
-                }
+              case cbt: untpd.ContextBoundTypeTree => selectToName(cbt.tycon)
               case _ => cxBound.toString
             }
             val boundId: TypeTree = ident(boundName, Space.format(" "))

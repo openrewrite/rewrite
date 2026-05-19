@@ -902,6 +902,49 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
+    void classConstructorWithUsingClause() {
+        rewriteRun(
+            scala(
+                """
+                trait Executor
+                class C(val coll: String, helper: Int)(using Executor):
+                  def foo = 1
+                """
+            )
+        );
+    }
+
+    @Test
+    void anonymousGivenWithModifier() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  private given BSONHandler[Int] = new BSONHandler[Int] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void namedGivenWithBodyAndScopedModifier() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  private[Test] given intHandler: BSONHandler[Int] with {
+                    def write(i: Int) = ???
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void namedGivenWithBody() {
         rewriteRun(
             scala(
