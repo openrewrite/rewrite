@@ -1038,10 +1038,11 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             return "$ownerFqn#$propName"
         }
         val methodName = owner.name.asString()
+        val argsPattern = computeArgsPattern(owner)
 
         val dispatchFqn = owner.dispatchReceiverParameter?.type?.classFqName?.asString()
         if (dispatchFqn != null) {
-            return "$dispatchFqn $methodName(..)"
+            return "$dispatchFqn $methodName($argsPattern)"
         }
 
         // Java static methods (and `@JvmStatic` companions): the IrSimpleFunction's
@@ -1052,15 +1053,42 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // tripping the test framework's single-cycle stability check.
         val parent = owner.parent
         if (parent is IrClass) {
-            return "${parent.kotlinFqName.asString()} $methodName(..)"
+            return "${parent.kotlinFqName.asString()} $methodName($argsPattern)"
         }
 
         val facadeFqn = computeJvmFacadeFqn(owner)
         return if (facadeFqn != null) {
-            "$facadeFqn $methodName(..)"
+            "$facadeFqn $methodName($argsPattern)"
         } else {
-            "* $methodName(..)"
+            "* $methodName($argsPattern)"
         }
+    }
+
+    /**
+     * Emit a precise MethodMatcher arg pattern (e.g. `*,*` for two args, empty for
+     * zero) instead of the `..` wildcard. Tightening the arg count is what
+     * distinguishes overloaded methods on the same name: `Iterable<T>.any()` (no
+     * predicate) versus `Iterable<T>.any(predicate: (T) -> Boolean)`. A recipe
+     * authored as `xs.filter(p).any()` would otherwise also match
+     * `xs.filter(p1).any { p2 }` via `(..)` and silently drop the `p2` predicate.
+     *
+     * Arg count is computed against the JVM-resolved signature, which differs by
+     * call shape:
+     * <ul>
+     *   <li>Member call (dispatch receiver, e.g. {@code String.lowercase()}): the
+     *       receiver is dispatched, so the JVM arg list is just the source-level
+     *       value args.</li>
+     *   <li>Extension or top-level facade call (e.g. {@code Iterable<T>.any(p)}):
+     *       the receiver is lifted to the first arg of the static facade method,
+     *       so the JVM arg list is the (extension) receiver plus value args.</li>
+     * </ul>
+     */
+    private fun computeArgsPattern(owner: IrSimpleFunction): String {
+        val isDispatched = owner.dispatchReceiverParameter != null
+        val extReceiverArg = if (!isDispatched && owner.extensionReceiverParameter != null) 1 else 0
+        val jvmArgCount = owner.valueParameters.size + extReceiverArg
+        if (jvmArgCount == 0) return ""
+        return List(jvmArgCount) { "*" }.joinToString(",")
     }
 
     private fun computeJvmFacadeFqn(fn: IrSimpleFunction): String? {
