@@ -132,6 +132,7 @@ public final class GeneratedRecipeSupport {
                         if (matchedTypeArgs != null) {
                             result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
                         }
+                        result = preserveSelectAfter((J.MethodInvocation) result, method);
                         result = preserveTrailingLambdaShape((J.MethodInvocation) result);
                     }
                     return result.withPrefix(method.getPrefix());
@@ -197,12 +198,42 @@ public final class GeneratedRecipeSupport {
                     if (matchedTypeArgs != null) {
                         result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
                     }
+                    result = preserveSelectAfter((J.MethodInvocation) result, method);
                     result = preserveTrailingLambdaShape((J.MethodInvocation) result);
                 }
                 return result.withPrefix(method.getPrefix());
             }
         };
         return wrapWithPrecondition(matcherSpecsLine, walker);
+    }
+
+    /**
+     * When a chain-collapse rewrite replaces a multi-line chain like
+     * <pre>{@code xs
+     *     .filter(p)
+     *     .firstOrNull()}</pre>
+     * with a single fused call ({@code xs.firstOrNull(p)}), the synthesized result's
+     * outer call has an empty {@link J.MethodInvocation.Padding#getSelect() select.after}
+     * — the whitespace that used to sit between the inner's text end and the outer's
+     * {@code .}. The author's intent (and Kotlin convention for long chains) was to
+     * keep the trailing call on its own indented line. We carry the original outer's
+     * select.after onto the result so the dot-on-its-own-line layout survives the
+     * rewrite.
+     *
+     * <p>No-op when the original outer had no select.after (already single-line)
+     * or when the result has no select (e.g. the template produced a non-method
+     * shape).
+     */
+    private static J.MethodInvocation preserveSelectAfter(J.MethodInvocation result, J.MethodInvocation matched) {
+        JRightPadded<Expression> resultSelect = result.getPadding().getSelect();
+        JRightPadded<Expression> matchedSelect = matched.getPadding().getSelect();
+        if (resultSelect == null || matchedSelect == null) {
+            return result;
+        }
+        if (matchedSelect.getAfter().getWhitespace().isEmpty()) {
+            return result;
+        }
+        return result.getPadding().withSelect(resultSelect.withAfter(matchedSelect.getAfter()));
     }
 
     private static class ChainSourceRef {
@@ -296,6 +327,7 @@ public final class GeneratedRecipeSupport {
                     if (matchedTypeArgs != null) {
                         result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
                     }
+                    result = preserveSelectAfter((J.MethodInvocation) result, method);
                     result = preserveTrailingLambdaShape((J.MethodInvocation) result);
                 }
                 return result.withPrefix(unary.getPrefix());
@@ -441,6 +473,7 @@ public final class GeneratedRecipeSupport {
                         if (matchedTypeArgs != null) {
                             result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
                         }
+                        result = preserveSelectAfter((J.MethodInvocation) result, method);
                     }
                     return result.withPrefix(method.getPrefix());
                 }
