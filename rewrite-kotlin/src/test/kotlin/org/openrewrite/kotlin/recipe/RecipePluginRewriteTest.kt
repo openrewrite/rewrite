@@ -240,6 +240,173 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `chain collapse preserves dot-on-its-own-line layout`() {
+        // Real-world Kotlin chains are formatted with each `.member(...)` on its
+        // own indented line. The chain-collapse rewrite synthesizes a single
+        // fused call (`xs.firstOrNull(p)`), whose select.after defaults to ""
+        // — jamming the trailing `.firstOrNull` onto the previous line and
+        // clobbering the author's formatting. `preserveSelectAfter` copies the
+        // matched outer call's select.after onto the result so the new outer
+        // sits on its own dot-prefixed line, matching where the matched outer
+        // originally was.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseFirstOrNullWithPredicate = recipe(
+                    displayName = "Use firstOrNull(p) instead of filter(p).firstOrNull()",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, p: (Any) -> Boolean -> xs.filter(p).firstOrNull() } to { xs, p -> xs.firstOrNull(p) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseFirstOrNullWithPredicate",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                // The synthesized `firstOrNull(p)` outer call doesn't get a
+                // resolved JavaType.Method on the template-substituted MethodInvocation;
+                // the formatting check is what this test is about, not type
+                // attribution.
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                """
+                fun first(xs: List<Int>): Int? = xs
+                    .filter { it > 0 }
+                    .firstOrNull()
+                """,
+                """
+                fun first(xs: List<Int>): Int? = xs
+                    .firstOrNull { it > 0 }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `chain collapse — single-line input stays single-line (no false-positive newline)`() {
+        // Negative case for `preserveSelectAfter`: if the matched outer call's
+        // select.after has no whitespace (the chain was on one line), we must
+        // NOT add any newline to the result. The helper's empty-whitespace
+        // guard short-circuits, leaving the result's select.after at the
+        // template-substituted default (also empty).
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseFirstOrNullWithPredicate = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, p: (Any) -> Boolean -> xs.filter(p).firstOrNull() } to { xs, p -> xs.firstOrNull(p) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseFirstOrNullWithPredicate",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                """
+                fun first(xs: List<Int>): Int? = xs.filter { it > 0 }.firstOrNull()
+                """,
+                """
+                fun first(xs: List<Int>): Int? = xs.firstOrNull { it > 0 }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `chain collapse — alternate shape (map then filterNotNull) also preserves layout`() {
+        // Second chain-shape variant to prove the fix isn't specific to
+        // filter/firstOrNull. The `map { f }.filterNotNull()` collapse is the
+        // pattern that surfaced the formatting bug in moderneinc/recipes-kotlin
+        // corpus runs.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseMapNotNull = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, f: (Any) -> Int? -> xs.map(f).filterNotNull() } to { xs, f -> xs.mapNotNull(f) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseMapNotNull",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                """
+                fun nonNull(xs: List<Int>): List<Int> = xs
+                    .map { it.takeIf { v -> v > 0 } }
+                    .filterNotNull()
+                """,
+                """
+                fun nonNull(xs: List<Int>): List<Int> = xs
+                    .mapNotNull { it.takeIf { v -> v > 0 } }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `bare single-call rewrite preserves dot-on-its-own-line layout`() {
+        // Same fix, different rewrite path: `methodInvocationRewrite` (the
+        // non-chain bare path) also runs the template through
+        // `KotlinTemplate.builder(...).apply(...)`, which loses the matched
+        // outer's `select.after`. The fix is the same shared helper, but the
+        // wiring is per-path — exercise the bare path explicitly so we don't
+        // regress one branch while fixing another. The recipe pair here
+        // (`lowercase` → `uppercase`) is semantically nonsensical; the test
+        // is about formatting only. `toUpperCase`-style stdlib deprecations
+        // are `@Deprecated(level=ERROR)` in modern Kotlin and won't compile
+        // inside `RecipePluginCompileFixture`.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseUppercase = recipe(
+                    displayName = "Use uppercase()",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseUppercase",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                """
+                fun upper(s: String): String = s
+                    .lowercase()
+                """,
+                """
+                fun upper(s: String): String = s
+                    .uppercase()
+                """,
+            ),
+        )
+    }
+
+    @Test
     fun `multi-before mixed shapes — receiver in one, arg in the other`() {
         // Two before lambdas with the same param count but different
         // canonical signatures: `s.toInt()` binds `s` to the (extension)
