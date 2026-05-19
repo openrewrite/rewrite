@@ -459,6 +459,12 @@ public class RewriteRpc {
 
     public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo,
                                     Parser parser, String sourceFileType, ExecutionContext ctx) {
+        return parse(inputs, relativeTo, parser, sourceFileType, ctx, null);
+    }
+
+    public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo,
+                                    Parser parser, String sourceFileType, ExecutionContext ctx,
+                                    @Nullable Map<String, String> options) {
         List<Parser.Input> inputList = new ArrayList<>();
         List<Parse.Input> mappedInputs = new ArrayList<>();
         for (Parser.Input input : inputs) {
@@ -486,7 +492,7 @@ public class RewriteRpc {
                 if (ids == null) {
                     // FIXME handle `TimeoutException` gracefully
                     ids = RewriteRpcExecutionContextView.view(ctx).withInFlightSlot(() ->
-                            send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class));
+                            send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null, options), ParseResponse.class));
                     assert ids.size() == inputList.size();
                 }
 
