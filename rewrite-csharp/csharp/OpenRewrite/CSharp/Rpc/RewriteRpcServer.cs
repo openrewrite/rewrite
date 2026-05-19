@@ -17,7 +17,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
-using System.Xml.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
@@ -574,7 +573,11 @@ public class RewriteRpcServer
                     args += $" --version {version}";
                 RunDotnet(args);
 
-                version = ResolveVersionFromCsproj(csprojPath, packageName);
+                // dotnet add package preserves the user-supplied version constraint
+                // verbatim in the csproj's PackageReference, so wildcards like "*" survive
+                // there. The resolved concrete version lives in obj/project.assets.json.
+                version = MSBuildProjectHelper.GetResolvedPackageVersion(
+                    Path.GetDirectoryName(csprojPath)!, packageName);
 
                 var assemblies = PublishAndLoadPlugin(csprojPath, packageName);
                 foreach (var assembly in assemblies)
@@ -690,20 +693,6 @@ public class RewriteRpcServer
             throw new InvalidOperationException(
                 $"dotnet {arguments} failed (exit code {process.ExitCode}):\n{stderr}\n{stdout}");
         }
-    }
-
-    private static string ResolveVersionFromCsproj(string csprojPath, string packageName)
-    {
-        var doc = XDocument.Load(csprojPath);
-        var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
-
-        var packageRef = doc.Descendants(ns + "PackageReference")
-            .FirstOrDefault(e => string.Equals(
-                e.Attribute("Include")?.Value, packageName, StringComparison.OrdinalIgnoreCase));
-
-        return packageRef?.Attribute("Version")?.Value
-               ?? throw new InvalidOperationException(
-                   $"Could not find resolved version for {packageName} in {csprojPath}");
     }
 
     /// <summary>
