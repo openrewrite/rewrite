@@ -216,6 +216,17 @@ public class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void annotationOnSameLineBeforeObject() {
+        rewriteRun(
+            scala(
+                """
+                @deprecated object Marker
+                """
+            )
+        );
+    }
+
+    @Test
     void annotationOnOwnLineBeforeCaseObject() {
         rewriteRun(
             scala(

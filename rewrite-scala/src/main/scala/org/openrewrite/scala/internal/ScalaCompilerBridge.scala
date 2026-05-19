@@ -290,9 +290,14 @@ class ScalaCompilerBridge {
     val declarationPattern = """^\s*(package|import|class|object|trait|def|val|var|type|private|protected|public|final|lazy|implicit|case\s+class|case\s+object)\s""".r
     val startsWithDeclaration = declarationPattern.findFirstIn(trimmed).isDefined
 
+    // A leading `@Ann` (optionally `@Ann(...)`) is a declaration annotation, not an
+    // expression — wrapping it as `val result = @Ann object Foo` produces garbage.
+    val startsWithAnnotation = trimmed.startsWith("@")
+
     !hasMultipleLines &&
     !hasPostfixOperator &&
     !startsWithDeclaration &&
+    !startsWithAnnotation &&
     !trimmed.startsWith("//") &&
     !trimmed.startsWith("/*") &&
     trimmed.nonEmpty
