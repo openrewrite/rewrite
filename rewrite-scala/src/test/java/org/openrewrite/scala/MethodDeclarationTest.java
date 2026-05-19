@@ -378,6 +378,46 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void usingInSecondParamList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def apply(obj: String)(using c: Int): String = obj
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void usingInFirstParamList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def apply(using c: Int): String = c.toString
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void usingAnonymousParameter() {
+        rewriteRun(
+            scala(
+                """
+                trait Ord[T]
+                object Test {
+                  def sort[T](xs: List[T])(using Ord[T]): List[T] = xs
+                }
+                """
+            )
+        );
+    }
+
     @Nested
     class ExtensionMethods implements RewriteTest {
 

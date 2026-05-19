@@ -20,6 +20,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JLeftPadded;
@@ -173,6 +174,24 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         pd = pd.withPrefix(visitSpace(pd.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         pd = pd.withMarkers(visitMarkers(pd.getMarkers(), p));
         return pd;
+    }
+
+    public J visitAnonymousGiven(S.AnonymousGiven anonymousGiven, P p) {
+        S.AnonymousGiven g = anonymousGiven;
+        g = g.withPrefix(visitSpace(g.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        g = g.withMarkers(visitMarkers(g.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(g, p);
+        if (!(temp instanceof S.AnonymousGiven)) {
+            return temp;
+        }
+        g = (S.AnonymousGiven) temp;
+        g = g.withLeadingAnnotations(ListUtils.map(g.getLeadingAnnotations(), a -> visitAndCast(a, p)));
+        g = g.withModifiers(ListUtils.map(g.getModifiers(), m -> visitAndCast(m, p)));
+        g = g.withType(visitAndCast(g.getType(), p));
+        if (g.getInitializer() != null) {
+            g = g.withInitializer(visitLeftPadded(g.getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p));
+        }
+        return g;
     }
 
     public J visitFunctionCall(S.FunctionCall functionCall, P p) {
