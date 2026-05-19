@@ -40,6 +40,7 @@ import org.openrewrite.scala.marker.TypeProjection;
 import org.openrewrite.scala.marker.ScalaForLoop;
 import org.openrewrite.scala.marker.TypeAscription;
 import org.openrewrite.scala.marker.PartialFunctionLiteral;
+import org.openrewrite.scala.marker.ContextFunctionArrow;
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda;
 import org.openrewrite.scala.marker.ValVarKeyword;
 import org.openrewrite.scala.marker.PackageSemicolon;
@@ -1487,11 +1488,15 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         
         // Print arrow with spacing
         visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
-        p.append("=>");
-        
+        if (lambda.getMarkers().findFirst(ContextFunctionArrow.class).isPresent()) {
+            p.append("?=>");
+        } else {
+            p.append("=>");
+        }
+
         // Print lambda body
         visit(lambda.getBody(), p);
-        
+
         afterSyntax(lambda, p);
         return lambda;
     }

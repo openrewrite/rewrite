@@ -39,6 +39,7 @@ import org.openrewrite.scala.marker.FunctionApplication
 import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.marker.PartialFunctionLiteral
+import org.openrewrite.scala.marker.ContextFunctionArrow
 import org.openrewrite.scala.marker.Curried
 import org.openrewrite.scala.marker.InfixNotation
 import org.openrewrite.scala.marker.RightAssociative
@@ -8161,29 +8162,41 @@ class ScalaTreeVisitor(
       params
     )
     
-    // Extract arrow and spacing (arrowIndex already computed above)
+    // Extract arrow and spacing (arrowIndex already computed above).
+    // Scala 3 context-function arrow `?=>` puts a `?` immediately before `=>`;
+    // treat the `?` as part of the arrow so that whitespace before it is captured
+    // as the arrow prefix.
     var arrowPrefix = Space.EMPTY
+    var isContextArrow = false
     if (arrowIndex >= 0) {
-      // Find the space before =>
-      var spaceStart = arrowIndex - 1
+      val arrowTokenStart = if (arrowIndex > 0 && funcSource.charAt(arrowIndex - 1) == '?') {
+        isContextArrow = true
+        arrowIndex - 1
+      } else arrowIndex
+      // Find the space before the arrow token
+      var spaceStart = arrowTokenStart - 1
       while (spaceStart >= 0 && Character.isWhitespace(funcSource.charAt(spaceStart))) {
         spaceStart -= 1
       }
-      if (spaceStart < arrowIndex - 1) {
-        arrowPrefix = Space.format(funcSource.substring(spaceStart + 1, arrowIndex))
+      if (spaceStart < arrowTokenStart - 1) {
+        arrowPrefix = Space.format(funcSource.substring(spaceStart + 1, arrowTokenStart))
       }
       // Move cursor to right after the arrow (past =>)
       val arrowEndPos = func.span.start + arrowIndex + 2 - offsetAdjustment
       cursor = arrowEndPos
     }
-    
+
     // Visit the lambda body - it will extract its own prefix including space after =>
     val body = visitTree(func.body)
-    
+
+    val lambdaMarkers = if (isContextArrow) {
+      Markers.build(Collections.singletonList(new ContextFunctionArrow(java.util.UUID.randomUUID())))
+    } else Markers.EMPTY
+
     new J.Lambda(
       Tree.randomId(),
       prefix,
-      Markers.EMPTY,
+      lambdaMarkers,
       updatedParams,
       arrowPrefix,
       body,
