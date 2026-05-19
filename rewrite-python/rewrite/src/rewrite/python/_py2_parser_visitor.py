@@ -14,7 +14,7 @@ Key differences from the Python 3 ParserVisitor:
 """
 
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from uuid import UUID
 
 import parso
@@ -22,13 +22,14 @@ from parso.python import tree as parso_tree
 
 from rewrite import random_id, Markers
 from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, JavaType
+from rewrite.java.support_types import TextComment
 from rewrite.java import tree as j
 from rewrite.python import tree as py
 from rewrite.python.markers import (
     PrintSyntax, ExecSyntax, Quoted, KeywordArguments,
     TupleExceptClause, LegacyNotEqual, RaiseTuple,
 )
-from rewrite.java.markers import OmitParentheses, TrailingComma
+from rewrite.java.markers import OmitParentheses, Semicolon, TrailingComma
 
 
 class Py2ParserVisitor:
@@ -76,7 +77,13 @@ class Py2ParserVisitor:
             A Py.CompilationUnit representing the parsed source code.
         """
         # Convert parso tree to LST statements
-        statements = self._convert_module(self._tree)
+        statements, end_ws = self._convert_module(self._tree)
+
+        # Combine block end-whitespace (from trailing ``;`` lines) with
+        # the file's terminal whitespace recovered from the endmarker.
+        trailing = self._trailing_whitespace()
+        if end_ws is not Space.EMPTY:
+            trailing = Space([], end_ws.whitespace + trailing.whitespace)
 
         # Build CompilationUnit
         cu = py.CompilationUnit(
@@ -88,40 +95,41 @@ class Py2ParserVisitor:
             None,  # charset_name
             self._bom_marked,
             None,  # checksum
-            [],    # imports (TODO: extract from statements)
+            [],    # imports — Python imports live in `statements`, like the Py3 parser
             statements,
-            self._trailing_whitespace()
+            trailing,
         )
 
         return cu
 
-    def _convert_module(self, module: parso_tree.Module) -> List[JRightPadded]:
+    def _convert_module(self, module: parso_tree.Module) -> Tuple[List[JRightPadded], Space]:
         """Convert a parso Module to a list of LST statements, preserving
         newlines so the printer can round-trip the source.
 
         parso emits newline leaves between top-level statements. We thread
         each one onto the *trailing* :class:`JRightPadded.after` of the
-        statement that owns it (which is how the printer expects to find them).
+        statement that owns it (which is how the printer expects to find
+        them). Returns the statement list plus any leftover end-whitespace
+        that must be appended to ``cu.eof`` (e.g. the ``\\n`` after a
+        trailing ``;`` line).
         """
-        statements = self._convert_stmt_block_children(module.children)
+        statements, end_ws = self._convert_stmt_block_children(module.children)
         if not statements:
             statements.append(JRightPadded(
                 j.Empty(random_id(), Space.EMPTY, Markers.EMPTY),
                 Space.EMPTY,
                 Markers.EMPTY
             ))
-        return statements
+        return statements, end_ws
 
-    def _convert_stmt_block_children(self, children) -> list:
-        """Walk a list of parso suite/module children into JRightPadded
-        statement entries with correct newline placement.
+    def _convert_stmt_block_children(self, children) -> Tuple[list, Space]:
+        """Walk parso suite/module children into ``JRightPadded`` statements.
 
-        - Leading-newline leaves accumulate onto the *prefix* of the next
-          statement (so the printer's per-statement prefix emits ``\\n<indent>``
-          before each line).
-        - A simple_stmt's trailing newline is captured as the resulting
-          statement's :attr:`JRightPadded.after` so the printer terminates
-          each line correctly.
+        Newlines between statements live on the next statement's prefix.
+        When a line ends with a trailing ``;``, the trailing newline can't
+        live in ``JRightPadded.after`` (the printer renders ``.after``
+        *before* markers); the helper returns it so the surrounding
+        ``cu.eof`` or ``block.end`` slot absorbs it instead.
         """
         statements = []
         pending_prefix = ''
@@ -132,43 +140,52 @@ class Py2ParserVisitor:
                     pending_prefix += getattr(child, 'value', '')
                     continue
                 if ctype == 'endmarker':
-                    # endmarker.prefix is captured by _trailing_whitespace;
-                    # nothing to add to the statement list.
+                    # endmarker.prefix is captured by _trailing_whitespace.
                     continue
+            if ctype == 'simple_stmt':
+                padded, trail = self._convert_simple_stmt_padded(child)
+                if padded and pending_prefix:
+                    padded[0] = padded[0].replace(
+                        element=self._prepend_prefix(padded[0].element, pending_prefix),
+                    )
+                    pending_prefix = ''
+                statements.extend(padded)
+                pending_prefix += trail
+                continue
             stmt = self._convert_node(child)
             if stmt is None:
                 continue
             if pending_prefix:
                 stmt = self._prepend_prefix(stmt, pending_prefix)
                 pending_prefix = ''
-            after = Space.EMPTY
-            if ctype == 'simple_stmt' and child.children:
-                last = child.children[-1]
-                if (isinstance(last, parso_tree.PythonLeaf)
-                        and getattr(last, 'type', None) == 'newline'):
-                    # parso stores trailing comments on the newline leaf's
-                    # ``prefix`` (e.g. ``"  # comment"``) while the newline
-                    # character itself is the leaf's ``value``. Concatenate
-                    # both so the printer reproduces the trailing comment.
-                    after = Space([], last.prefix + last.value)
-            statements.append(JRightPadded(stmt, after, Markers.EMPTY))
-        # Any leftover newline gets attached as trailing-after on the last
-        # statement, so the file's terminal `\n` round-trips.
-        if pending_prefix and statements:
+            statements.append(self._pad_statement(stmt))
+
+        if not pending_prefix:
+            return statements, Space.EMPTY
+        if statements:
             last = statements[-1]
-            combined = (last.after.whitespace if last.after else '') + pending_prefix
-            statements[-1] = JRightPadded(last.element, Space([], combined), last.markers)
-        return statements
+            if last.markers.find_first(Semicolon) is None:
+                # Last statement has no trailing ``;``: append the
+                # leftover whitespace to its ``.after`` (the existing
+                # convention — this is how the file's terminal ``\n``
+                # normally round-trips).
+                statements[-1] = last.replace(
+                    after=Space([], last.after.whitespace + pending_prefix),
+                )
+                return statements, Space.EMPTY
+        return statements, Space([], pending_prefix)
 
     @staticmethod
     def _prepend_prefix(stmt, leading: str):
-        """Prepend a whitespace string to a node's prefix, when possible."""
+        """Prepend a whitespace string to a node's prefix, preserving
+        any comments already attached.
+        """
         if not hasattr(stmt, 'prefix'):
             return stmt
-        existing = stmt.prefix.whitespace if stmt.prefix is not None else ''
-        new_prefix = Space([], leading + existing)
+        existing = stmt.prefix if stmt.prefix is not None else Space.EMPTY
+        new_prefix = Space(existing.comments, leading + existing.whitespace)
         try:
-            return stmt.replace(_prefix=new_prefix)
+            return stmt.replace(prefix=new_prefix)
         except (TypeError, AttributeError):
             return stmt
 
@@ -190,7 +207,10 @@ class Py2ParserVisitor:
 
         converters = {
             'file_input': lambda n: None,  # Handled by _convert_module
-            'simple_stmt': self._convert_simple_stmt,
+            # 'simple_stmt' is intentionally absent: it must be routed
+            # through ``_convert_simple_stmt_padded`` by the block walker
+            # so semicolon-separated small_stmts each surface as their
+            # own LST statement.
             'expr_stmt': self._convert_expr_stmt,
             'print_stmt': self._convert_print_stmt,
             'exec_stmt': self._convert_exec_stmt,
@@ -466,15 +486,55 @@ class Py2ParserVisitor:
     # --- Stub implementations for other node types ---
     # These will be implemented incrementally
 
-    def _convert_simple_stmt(self, node) -> Optional[j.J]:
-        """Convert a simple_stmt node."""
-        # simple_stmt: small_stmt (';' small_stmt)* [';'] NEWLINE
+    def _convert_simple_stmt_padded(self, node) -> Tuple[List[JRightPadded], str]:
+        """Convert a ``simple_stmt`` to one padded LST statement per
+        semicolon-separated ``small_stmt``.
+
+        Grammar (parso): ``simple_stmt: small_stmt (';' small_stmt)* [';'] NEWLINE``.
+
+        Each ``;`` attaches a :class:`Semicolon` marker to the preceding
+        statement; the whitespace before the ``;`` lives in that
+        statement's :attr:`JRightPadded.after`. The trailing newline goes
+        on the last small_stmt's ``.after`` — *unless* the line ends with
+        a trailing ``;``, in which case the printer's ``element →
+        after → markers`` order would put the newline before the ``;``.
+        For that case the newline is returned as the second tuple element
+        so the caller can route it to ``cu.eof`` / ``block.end``.
+        """
+        result: List[JRightPadded] = []
+        trailing_after_marker = ''
         for child in node.children:
-            if hasattr(child, 'type') and child.type != 'NEWLINE' and child.type != 'SEMI':
-                result = self._convert_node(child)
+            ctype = getattr(child, 'type', None)
+            cval = getattr(child, 'value', None)
+            if ctype == 'newline':
+                # parso stores any trailing comment in this leaf's
+                # ``prefix`` (e.g. ``"  # comment"``), with the bare
+                # ``\n`` as its ``value``. When there's a small_stmt to
+                # absorb it the trailing whitespace/comment becomes its
+                # ``.after``; otherwise (trailing ``;``) we return it.
+                if result and result[-1].markers.find_first(Semicolon) is None:
+                    last = result[-1]
+                    trailing_space = self._parse_space(child.prefix + cval)
+                    if last.after.whitespace:
+                        trailing_space = Space(
+                            trailing_space.comments,
+                            last.after.whitespace + trailing_space.whitespace,
+                        )
+                    result[-1] = last.replace(after=trailing_space)
+                else:
+                    trailing_after_marker = child.prefix + cval
+                continue
+            if cval == ';':
                 if result:
-                    return result
-        return None
+                    result[-1] = result[-1].replace(
+                        after=self._parse_space(child.prefix),
+                        markers=Markers.build(random_id(), [Semicolon(random_id())]),
+                    )
+                continue
+            stmt = self._convert_node(child)
+            if stmt is not None:
+                result.append(self._pad_statement(stmt))
+        return result, trailing_after_marker
 
     def _convert_expr_stmt(self, node) -> Optional[j.J]:
         """Convert an expression statement.
@@ -1311,16 +1371,19 @@ class Py2ParserVisitor:
     def _convert_suite_to_block(self, suite_node, block_prefix) -> j.Block:
         """Convert a parso ``suite`` to a :class:`j.Block`, threading
         newlines onto statement prefixes / trailing-padding so the printer
-        can faithfully reproduce the original line layout.
+        can faithfully reproduce the original line layout. Any leftover
+        whitespace that must follow a trailing-``;`` marker is routed to
+        :attr:`j.Block.end` (the printer renders ``.after`` before
+        markers, so it can't live in the last statement's ``.after``).
         """
-        statements = self._convert_stmt_block_children(suite_node.children)
+        statements, end_ws = self._convert_stmt_block_children(suite_node.children)
         return j.Block(
             random_id(),
             block_prefix,
             Markers.EMPTY,
             JRightPadded(False, Space.EMPTY, Markers.EMPTY),  # not static
             statements,
-            Space.EMPTY,
+            end_ws,
         )
 
     def _convert_try_stmt(self, node) -> Optional[j.J]:
@@ -2906,16 +2969,41 @@ class Py2ParserVisitor:
     # --- Helper methods ---
 
     def _parse_space(self, text: str) -> Space:
-        """Convert whitespace/comment string to Space object.
+        """Convert a parso prefix string into a :class:`Space`.
 
-        Parso includes whitespace and comments in the 'prefix' attribute of nodes.
+        parso embeds whitespace and ``# ...`` comments together in a
+        single ``prefix`` string. We tokenize them so recipes can query
+        :attr:`Space.comments` instead of grovelling through the raw
+        whitespace; the printer's render order (whitespace, then each
+        comment with its trailing ``suffix``) keeps round-trip output
+        byte-identical.
         """
         if not text:
             return Space.EMPTY
+        if '#' not in text:
+            return Space([], text)
 
-        # TODO: Parse comments from the whitespace
-        # For now, just return the whitespace
-        return Space([], text)
+        comments: List[TextComment] = []
+        prefix = ''
+        i = 0
+        n = len(text)
+        while i < n:
+            hash_idx = text.find('#', i)
+            if hash_idx < 0:
+                tail = text[i:]
+                if comments and tail:
+                    comments[-1] = comments[-1].replace(suffix=tail)
+                break
+            inter = text[i:hash_idx]
+            if not comments:
+                prefix = inter
+            elif inter:
+                comments[-1] = comments[-1].replace(suffix=inter)
+            nl = text.find('\n', hash_idx + 1)
+            end = n if nl < 0 else nl
+            comments.append(TextComment(False, text[hash_idx + 1:end], '', Markers.EMPTY))
+            i = end
+        return Space(comments, prefix)
 
     def _pad_statement(self, stmt: j.J) -> JRightPadded:
         """Wrap a statement in JRightPadded."""
@@ -2986,7 +3074,13 @@ class Py2ParserVisitor:
             '>=':  (j.Binary, j.Binary.Type.GreaterThanOrEqual),
             '==':  (j.Binary, j.Binary.Type.Equal),
             '!=':  (j.Binary, j.Binary.Type.NotEqual),
-            '<>':  (j.Binary, j.Binary.Type.NotEqual),  # Py2 spelling; tagged via marker
+            # Py2 spelling of '!='. parso < 0.8 never emits '<>' as a
+            # token (it pre-rewrites it to '!='), so this entry is
+            # unreachable through the normal fold path; it is kept so
+            # that a future parso upgrade — or source pre-processing
+            # that injects a '<>' operator leaf directly — finds the
+            # marker/printer wiring already in place.
+            '<>':  (j.Binary, j.Binary.Type.NotEqual),
             'and': (j.Binary, j.Binary.Type.And),
             'or':  (j.Binary, j.Binary.Type.Or),
             '//':  (py.Binary, py.Binary.Type.FloorDivision),
@@ -2994,8 +3088,6 @@ class Py2ParserVisitor:
             '@':   (py.Binary, py.Binary.Type.MatrixMultiplication),
             'in':  (py.Binary, py.Binary.Type.In),
             'is':  (py.Binary, py.Binary.Type.Is),
-            # TODO: '<>' (Py2 not-equal) requires a LegacyNotEqual marker + printer support.
-            # TODO: 'not in' / 'is not' are two-token operators; need lookahead in the fold.
         }
 
     # parso unary-operator text -> j.Unary.Type
@@ -3116,144 +3208,3 @@ class Py2ParserVisitor:
             None,
         )
 
-    # --- Placeholder methods for complex constructs ---
-
-    def _placeholder_method(self, prefix: Space, name: str) -> j.MethodDeclaration:
-        """Create a placeholder method declaration."""
-        return j.MethodDeclaration(
-            random_id(),
-            prefix,
-            Markers.EMPTY,
-            [],  # leading_annotations
-            [],  # modifiers
-            None,  # type_parameters
-            None,  # return_type_expression
-            [],  # name_annotations
-            j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], name, None, None),
-            JContainer(Space.EMPTY, [], Markers.EMPTY),  # parameters
-            None,  # throws
-            j.Block(random_id(), Space.EMPTY, Markers.EMPTY,
-                    JRightPadded(False, Space.EMPTY, Markers.EMPTY), [], Space.EMPTY),
-            None,  # default_value
-            None   # method_type
-        )
-
-    def _placeholder_class(self, prefix: Space, name: str) -> j.ClassDeclaration:
-        """Create a placeholder class declaration."""
-        return j.ClassDeclaration(
-            random_id(),
-            prefix,
-            Markers.EMPTY,
-            [],  # leading_annotations
-            [],  # modifiers
-            j.ClassDeclaration.Kind([], random_id(), Space.EMPTY, Markers.EMPTY,
-                                     j.ClassDeclaration.Kind.Type.Class),
-            j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], name, None, None),
-            None,  # type_parameters
-            None,  # primary_constructor
-            None,  # extends
-            None,  # implements
-            None,  # permits
-            j.Block(random_id(), Space.EMPTY, Markers.EMPTY,
-                    JRightPadded(False, Space.EMPTY, Markers.EMPTY), [], Space.EMPTY),
-            None   # class_type
-        )
-
-    def _placeholder_if(self, prefix: Space) -> j.If:
-        """Create a placeholder if statement."""
-        return j.If(
-            random_id(),
-            prefix,
-            Markers.EMPTY,
-            j.ControlParentheses(
-                random_id(), Space.EMPTY, Markers.EMPTY,
-                JRightPadded(
-                    j.Literal(random_id(), Space.EMPTY, Markers.EMPTY, True, "True", None, None),
-                    Space.EMPTY, Markers.EMPTY
-                )
-            ),
-            JRightPadded(
-                j.Block(random_id(), Space.EMPTY, Markers.EMPTY,
-                        JRightPadded(False, Space.EMPTY, Markers.EMPTY), [], Space.EMPTY),
-                Space.EMPTY, Markers.EMPTY
-            ),
-            None  # else
-        )
-
-    def _placeholder_while(self, prefix: Space) -> j.WhileLoop:
-        """Create a placeholder while loop."""
-        return j.WhileLoop(
-            random_id(),
-            prefix,
-            Markers.EMPTY,
-            j.ControlParentheses(
-                random_id(), Space.EMPTY, Markers.EMPTY,
-                JRightPadded(
-                    j.Literal(random_id(), Space.EMPTY, Markers.EMPTY, True, "True", None, None),
-                    Space.EMPTY, Markers.EMPTY
-                )
-            ),
-            JRightPadded(
-                j.Block(random_id(), Space.EMPTY, Markers.EMPTY,
-                        JRightPadded(False, Space.EMPTY, Markers.EMPTY), [], Space.EMPTY),
-                Space.EMPTY, Markers.EMPTY
-            )
-        )
-
-    def _placeholder_for(self, prefix: Space) -> j.ForEachLoop:
-        """Create a placeholder for loop."""
-        return j.ForEachLoop(
-            random_id(),
-            prefix,
-            Markers.EMPTY,
-            j.ForEachLoop.Control(
-                random_id(), Space.EMPTY, Markers.EMPTY,
-                JRightPadded(
-                    j.VariableDeclarations(
-                        random_id(), Space.EMPTY, Markers.EMPTY, [], [], None, None, [],
-                        [JRightPadded(
-                            j.VariableDeclarations.NamedVariable(
-                                random_id(), Space.EMPTY, Markers.EMPTY,
-                                j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "_", None, None),
-                                [], None, None
-                            ),
-                            Space.EMPTY, Markers.EMPTY
-                        )]
-                    ),
-                    Space.EMPTY, Markers.EMPTY
-                ),
-                JRightPadded(
-                    j.Literal(random_id(), Space.EMPTY, Markers.EMPTY, [], "[]", None, None),
-                    Space.EMPTY, Markers.EMPTY
-                )
-            ),
-            JRightPadded(
-                j.Block(random_id(), Space.EMPTY, Markers.EMPTY,
-                        JRightPadded(False, Space.EMPTY, Markers.EMPTY), [], Space.EMPTY),
-                Space.EMPTY, Markers.EMPTY
-            )
-        )
-
-    def _placeholder_try(self, prefix: Space) -> j.Try:
-        """Create a placeholder try statement."""
-        return j.Try(
-            random_id(),
-            prefix,
-            Markers.EMPTY,
-            None,  # resources
-            j.Block(random_id(), Space.EMPTY, Markers.EMPTY,
-                    JRightPadded(False, Space.EMPTY, Markers.EMPTY), [], Space.EMPTY),
-            [],    # catches
-            None   # finally
-        )
-
-    def _placeholder_import(self, prefix: Space) -> j.Import:
-        """Create a placeholder import."""
-        return j.Import(
-            random_id(),
-            prefix,
-            Markers.EMPTY,
-            JLeftPadded(Space.EMPTY, False, Markers.EMPTY),  # static
-            j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "placeholder", None, None),
-            None  # alias
-        )
