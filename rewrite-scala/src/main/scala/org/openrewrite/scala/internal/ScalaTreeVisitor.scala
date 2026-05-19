@@ -2160,12 +2160,46 @@ class ScalaTreeVisitor(
           firstClazz
         }
 
-        // Create the anonymous class body when source has a `{` between the parents
-        // and the end of the New expression.
+        // Create the anonymous class body when source has a `{` (braced) or `:`
+        // (Scala 3 braceless, end-of-line colon) between the parents and the end
+        // of the New expression.
         val newTreeEnd = Math.max(0, newTree.span.end - offsetAdjustment)
-        val hasBodyBraces = cursor < newTreeEnd && newTreeEnd <= source.length &&
-          source.substring(cursor, newTreeEnd).contains("{")
-        val body = if (hasBodyBraces) {
+        val (bodyDelimiter, bodyDelimiterIndex) = if (cursor < newTreeEnd && newTreeEnd <= source.length) {
+          val afterCursor = source.substring(cursor, newTreeEnd)
+          val braceIndex = positionOfNextIn(afterCursor, "{", 0)
+          // For Scala 3 braceless: look for `:` at end of line (not `: Type` annotation).
+          // A braceless body colon is followed by a newline, not by a type name.
+          val colonIndex = {
+            var result = -1
+            var idx = positionOfNextIn(afterCursor, ":", 0)
+            while (idx >= 0 && result < 0) {
+              if (idx + 1 >= afterCursor.length) {
+                result = idx
+              } else {
+                val afterColon = afterCursor.substring(idx + 1)
+                val nextNonSpace = afterColon.indexWhere(c => c != ' ' && c != '\t')
+                if (nextNonSpace < 0 || afterColon.charAt(nextNonSpace) == '\n' || afterColon.charAt(nextNonSpace) == '\r') {
+                  result = idx
+                }
+              }
+              if (result < 0) idx = positionOfNextIn(afterCursor, ":", idx + 1)
+            }
+            result
+          }
+          if (braceIndex >= 0 && (colonIndex < 0 || braceIndex < colonIndex)) {
+            ('{', braceIndex)
+          } else if (colonIndex >= 0) {
+            (':', colonIndex)
+          } else {
+            (' ', -1)
+          }
+        } else {
+          (' ', -1)
+        }
+
+        val body = if (bodyDelimiterIndex >= 0) {
+          val isBraceless = bodyDelimiter == ':'
+
           // Filter out synthetic nodes, the compiler-added constructor, and self-reference
           val bodyStatements = template.body.filter { stat =>
             if (stat.span.isSynthetic || !stat.span.exists) false
@@ -2176,20 +2210,10 @@ class ScalaTreeVisitor(
             }
           }
 
-          // Search for `{` after the parents/args have been consumed.
-          var beforeBrace = Space.EMPTY
-          if (newTree.span.exists) {
-            val newEnd = Math.max(0, newTree.span.end - offsetAdjustment)
-            val searchStart = Math.max(0, cursor)
-            if (searchStart < newEnd && newEnd <= source.length) {
-              val sourceText = source.substring(searchStart, newEnd)
-              val braceIndex = positionOfNextIn(sourceText, "{", 0)
-              if (braceIndex >= 0) {
-                beforeBrace = Space.format(sourceText.substring(0, braceIndex))
-                updateCursor(searchStart + braceIndex + 1)
-              }
-            }
-          }
+          // Consume up to and past the body delimiter.
+          val searchStart = Math.max(0, cursor)
+          val beforeDelim = Space.format(source.substring(searchStart, searchStart + bodyDelimiterIndex))
+          updateCursor(searchStart + bodyDelimiterIndex + 1)
 
           // Convert body statements
           val statementPaddings = new util.ArrayList[JRightPadded[Statement]]()
@@ -2205,27 +2229,36 @@ class ScalaTreeVisitor(
             }
           }
 
-          // Extract space before closing brace
-          var beforeCloseBrace = Space.EMPTY
+          // Extract end space (before `}` for braced; remaining whitespace for braceless).
+          var endSpace = Space.EMPTY
           if (newTree.span.exists) {
             val newEnd = Math.max(0, newTree.span.end - offsetAdjustment)
-            if (cursor < newEnd && cursor >= 0 && newEnd <= source.length) {
+            if (isBraceless) {
+              if (cursor < newEnd && newEnd <= source.length) {
+                endSpace = Space.format(source, cursor, Math.min(newEnd, source.length))
+                updateCursor(newEnd)
+              }
+            } else if (cursor < newEnd && cursor >= 0 && newEnd <= source.length) {
               val remaining = source.substring(cursor, newEnd)
               val closeBraceIndex = remaining.lastIndexOf('}')
               if (closeBraceIndex >= 0) {
-                beforeCloseBrace = Space.format(remaining.substring(0, closeBraceIndex))
+                endSpace = Space.format(remaining.substring(0, closeBraceIndex))
                 updateCursor(cursor + closeBraceIndex + 1)
               }
             }
           }
 
+          val blockMarkers = if (isBraceless) {
+            Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
+          } else Markers.EMPTY
+
           new J.Block(
             Tree.randomId(),
-            beforeBrace,
-            Markers.EMPTY,
+            beforeDelim,
+            blockMarkers,
             new JRightPadded[java.lang.Boolean](false, Space.EMPTY, Markers.EMPTY),
             statementPaddings,
-            beforeCloseBrace
+            endSpace
           )
         } else {
           null
