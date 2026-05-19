@@ -136,4 +136,134 @@ public class AnnotationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void annotationOnOwnLineBeforeLazyVal() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @JsonIgnore
+                  lazy val schema: String = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeFinalClass() {
+        rewriteRun(
+            scala(
+                """
+                @SerialVersionUID(1L)
+                final class Box(val x: Int)
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeOverrideDef() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @Override
+                  override def toString: String = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforePrivateVal() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @JsonIgnore
+                  private val secret: String = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeSealedTrait() {
+        rewriteRun(
+            scala(
+                """
+                @SerialVersionUID(1L)
+                sealed trait Status
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeObject() {
+        rewriteRun(
+            scala(
+                """
+                @deprecated
+                object Marker
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnSameLineBeforeObject() {
+        rewriteRun(
+            scala(
+                """
+                @deprecated object Marker
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeCaseObject() {
+        rewriteRun(
+            scala(
+                """
+                @SerialVersionUID(1L)
+                case object Marker
+                """
+            )
+        );
+    }
+
+    @Test
+    void multipleAnnotationsBeforeLazyVal() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @JsonIgnore
+                  @transient
+                  lazy val schema: String = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeImplicitVal() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @JsonIgnore
+                  implicit val schema: String = "x"
+                }
+                """
+            )
+        );
+    }
 }

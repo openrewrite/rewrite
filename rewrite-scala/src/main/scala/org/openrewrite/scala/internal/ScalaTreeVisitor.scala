@@ -2750,7 +2750,13 @@ class ScalaTreeVisitor(
       var scanning = true
       while (scanning && modifierEndPos < sourceSnippet.length) {
         val remaining = sourceSnippet.substring(modifierEndPos)
-        val modSpace = if (modifierEndPos > leadingWs) Space.SINGLE_SPACE else Space.EMPTY
+        // When the first modifier in this loop sits directly after annotations (no preceding access
+        // modifier consumed leadingWs), preserve that whitespace as the modifier's prefix. Otherwise
+        // a newline between `@Ann` and e.g. `lazy val` is silently collapsed to nothing on print.
+        val modSpace =
+          if (modifierEndPos > leadingWs) Space.SINGLE_SPACE
+          else if (leadingWs > 0) Space.format(sourceSnippet.substring(0, leadingWs))
+          else Space.EMPTY
 
         if (remaining.startsWith("final ")) {
           hasExplicitFinal = true
@@ -3074,16 +3080,32 @@ class ScalaTreeVisitor(
   }
   
   private def visitModuleDef(md: untpd.ModuleDef): J.ClassDeclaration = {
-    val prefix = extractPrefix(md.span)
-    
-    // Extract the source text to find modifiers  
+    val hasAnnotations = md.mods != null && md.mods.annotations.nonEmpty
+    // When annotations are present they own the leading whitespace; otherwise
+    // the prefix lives on the ModuleDef itself.
+    val prefix = if (hasAnnotations) Space.EMPTY else extractPrefix(md.span)
+
+    val leadingAnnotations = new util.ArrayList[J.Annotation]()
+    if (hasAnnotations) {
+      for (annot <- md.mods.annotations) {
+        visitTree(annot) match {
+          case ann: J.Annotation => leadingAnnotations.add(ann)
+          case _ =>
+        }
+      }
+    }
+
+    // Extract the source text to find modifiers
     val adjustedStart = Math.max(0, md.span.start - offsetAdjustment)
     val adjustedEnd = Math.max(0, md.span.end - offsetAdjustment)
     var modifierText = ""
     var objectIndex = -1
-    
+
     var isEnumCase = false
-    if (adjustedStart >= cursor && adjustedEnd <= source.length) {
+    // When annotations were consumed, cursor sits after them; modifierText must
+    // be derived from the post-annotation position, not the ModuleDef span start.
+    val modifierScanStart = if (hasAnnotations) cursor else adjustedStart
+    if (modifierScanStart >= cursor && adjustedEnd <= source.length) {
       val sourceSnippet = source.substring(cursor, adjustedEnd)
       objectIndex = findKeyword(sourceSnippet, "object")
       val caseIndex = findKeyword(sourceSnippet, "case")
@@ -3415,7 +3437,7 @@ class ScalaTreeVisitor(
       Tree.randomId(),
       prefix,
       objectMarkers,
-      Collections.emptyList(), // annotations
+      leadingAnnotations,
       modifiers,
       kind,
       name,
