@@ -2717,7 +2717,13 @@ class ScalaTreeVisitor(
       var scanning = true
       while (scanning && modifierEndPos < sourceSnippet.length) {
         val remaining = sourceSnippet.substring(modifierEndPos)
-        val modSpace = if (modifierEndPos > leadingWs) Space.SINGLE_SPACE else Space.EMPTY
+        // When the first modifier in this loop sits directly after annotations (no preceding access
+        // modifier consumed leadingWs), preserve that whitespace as the modifier's prefix. Otherwise
+        // a newline between `@Ann` and e.g. `lazy val` is silently collapsed to nothing on print.
+        val modSpace =
+          if (modifierEndPos > leadingWs) Space.SINGLE_SPACE
+          else if (leadingWs > 0) Space.format(sourceSnippet.substring(0, leadingWs))
+          else Space.EMPTY
 
         if (remaining.startsWith("final ")) {
           hasExplicitFinal = true

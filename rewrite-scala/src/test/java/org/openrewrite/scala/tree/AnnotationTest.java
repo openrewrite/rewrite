@@ -136,4 +136,18 @@ public class AnnotationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void annotationOnOwnLineBeforeLazyVal() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @JsonIgnore
+                  lazy val schema: String = "x"
+                }
+                """
+            )
+        );
+    }
 }
