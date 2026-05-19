@@ -153,7 +153,33 @@ public class LatestRelease implements VersionComparator {
         }
 
         // Both are either pre-release or release versions, do string comparison
-        return normalized1.compareTo(normalized2);
+        int normalizedCompare = normalized1.compareTo(normalized2);
+        if (normalizedCompare != 0) {
+            return normalizedCompare;
+        }
+        // When the metadata-stripped versions are equal, fall back to comparing the
+        // un-normalized versions lexicographically — but only when BOTH originals match
+        // the metadata pattern, so that build-metadata-only differences within a matching
+        // family (e.g. 1.2.3+backpatch.001 vs 1.2.3+backpatch.002) are ordered
+        // deterministically while heterogeneous metadata (e.g. 29.0-jre vs 29, under
+        // pattern `-jre`) continues to compare equal as a HyphenRange would expect.
+        if (metadataPattern != null && bothMatchMetadata(nv1, nv2, metadataPattern)) {
+            return nv1.compareTo(nv2);
+        }
+        return 0;
+    }
+
+    private static boolean bothMatchMetadata(String nv1, String nv2, String metadataPattern) {
+        return matchesMetadata(nv1, metadataPattern) && matchesMetadata(nv2, metadataPattern);
+    }
+
+    private static boolean matchesMetadata(String version, String metadataPattern) {
+        java.util.regex.Matcher m = VersionComparator.RELEASE_PATTERN.matcher(version);
+        if (!m.matches()) {
+            return false;
+        }
+        String qualifier = m.group("qualifier");
+        return qualifier != null && qualifier.matches(metadataPattern);
     }
 
     /**
