@@ -228,6 +228,20 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    void newAnonymousClassBracelessIndentedBody() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val runnable = new Runnable:
+                def run(): Unit = println("Running")
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void significantCharactersInComments() {
         // visitNewClassWithArgs — close paren in line comment
         rewriteRun(

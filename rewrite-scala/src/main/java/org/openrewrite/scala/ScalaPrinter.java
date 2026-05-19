@@ -1765,6 +1765,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visitSpace(forLoop.getBeforeBody(), Space.Location.LANGUAGE_EXTENSION, p);
         if (forLoop.isYielding()) {
             p.append("yield");
+        } else if (parenless) {
+            p.append("do");
         }
         visit(forLoop.getBody(), p);
         afterSyntax(forLoop, p);

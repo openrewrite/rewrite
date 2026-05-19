@@ -2160,12 +2160,46 @@ class ScalaTreeVisitor(
           firstClazz
         }
 
-        // Create the anonymous class body when source has a `{` between the parents
-        // and the end of the New expression.
+        // Create the anonymous class body when source has a `{` (braced) or `:`
+        // (Scala 3 braceless, end-of-line colon) between the parents and the end
+        // of the New expression.
         val newTreeEnd = Math.max(0, newTree.span.end - offsetAdjustment)
-        val hasBodyBraces = cursor < newTreeEnd && newTreeEnd <= source.length &&
-          source.substring(cursor, newTreeEnd).contains("{")
-        val body = if (hasBodyBraces) {
+        val (bodyDelimiter, bodyDelimiterIndex) = if (cursor < newTreeEnd && newTreeEnd <= source.length) {
+          val afterCursor = source.substring(cursor, newTreeEnd)
+          val braceIndex = positionOfNextIn(afterCursor, "{", 0)
+          // For Scala 3 braceless: look for `:` at end of line (not `: Type` annotation).
+          // A braceless body colon is followed by a newline, not by a type name.
+          val colonIndex = {
+            var result = -1
+            var idx = positionOfNextIn(afterCursor, ":", 0)
+            while (idx >= 0 && result < 0) {
+              if (idx + 1 >= afterCursor.length) {
+                result = idx
+              } else {
+                val afterColon = afterCursor.substring(idx + 1)
+                val nextNonSpace = afterColon.indexWhere(c => c != ' ' && c != '\t')
+                if (nextNonSpace < 0 || afterColon.charAt(nextNonSpace) == '\n' || afterColon.charAt(nextNonSpace) == '\r') {
+                  result = idx
+                }
+              }
+              if (result < 0) idx = positionOfNextIn(afterCursor, ":", idx + 1)
+            }
+            result
+          }
+          if (braceIndex >= 0 && (colonIndex < 0 || braceIndex < colonIndex)) {
+            ('{', braceIndex)
+          } else if (colonIndex >= 0) {
+            (':', colonIndex)
+          } else {
+            (' ', -1)
+          }
+        } else {
+          (' ', -1)
+        }
+
+        val body = if (bodyDelimiterIndex >= 0) {
+          val isBraceless = bodyDelimiter == ':'
+
           // Filter out synthetic nodes, the compiler-added constructor, and self-reference
           val bodyStatements = template.body.filter { stat =>
             if (stat.span.isSynthetic || !stat.span.exists) false
@@ -2176,20 +2210,10 @@ class ScalaTreeVisitor(
             }
           }
 
-          // Search for `{` after the parents/args have been consumed.
-          var beforeBrace = Space.EMPTY
-          if (newTree.span.exists) {
-            val newEnd = Math.max(0, newTree.span.end - offsetAdjustment)
-            val searchStart = Math.max(0, cursor)
-            if (searchStart < newEnd && newEnd <= source.length) {
-              val sourceText = source.substring(searchStart, newEnd)
-              val braceIndex = positionOfNextIn(sourceText, "{", 0)
-              if (braceIndex >= 0) {
-                beforeBrace = Space.format(sourceText.substring(0, braceIndex))
-                updateCursor(searchStart + braceIndex + 1)
-              }
-            }
-          }
+          // Consume up to and past the body delimiter.
+          val searchStart = Math.max(0, cursor)
+          val beforeDelim = Space.format(source.substring(searchStart, searchStart + bodyDelimiterIndex))
+          updateCursor(searchStart + bodyDelimiterIndex + 1)
 
           // Convert body statements
           val statementPaddings = new util.ArrayList[JRightPadded[Statement]]()
@@ -2205,27 +2229,36 @@ class ScalaTreeVisitor(
             }
           }
 
-          // Extract space before closing brace
-          var beforeCloseBrace = Space.EMPTY
+          // Extract end space (before `}` for braced; remaining whitespace for braceless).
+          var endSpace = Space.EMPTY
           if (newTree.span.exists) {
             val newEnd = Math.max(0, newTree.span.end - offsetAdjustment)
-            if (cursor < newEnd && cursor >= 0 && newEnd <= source.length) {
+            if (isBraceless) {
+              if (cursor < newEnd && newEnd <= source.length) {
+                endSpace = Space.format(source, cursor, Math.min(newEnd, source.length))
+                updateCursor(newEnd)
+              }
+            } else if (cursor < newEnd && cursor >= 0 && newEnd <= source.length) {
               val remaining = source.substring(cursor, newEnd)
               val closeBraceIndex = remaining.lastIndexOf('}')
               if (closeBraceIndex >= 0) {
-                beforeCloseBrace = Space.format(remaining.substring(0, closeBraceIndex))
+                endSpace = Space.format(remaining.substring(0, closeBraceIndex))
                 updateCursor(cursor + closeBraceIndex + 1)
               }
             }
           }
 
+          val blockMarkers = if (isBraceless) {
+            Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
+          } else Markers.EMPTY
+
           new J.Block(
             Tree.randomId(),
-            beforeBrace,
-            Markers.EMPTY,
+            beforeDelim,
+            blockMarkers,
             new JRightPadded[java.lang.Boolean](false, Space.EMPTY, Markers.EMPTY),
             statementPaddings,
-            beforeCloseBrace
+            endSpace
           )
         } else {
           null
@@ -3817,10 +3850,17 @@ class ScalaTreeVisitor(
   }
   
   private def visitForDo(forTree: untpd.ForDo): J = {
-    // Only handle the simple single-generator case: for (x <- iterable) body
-    // Multi-generator or guarded forms produce S.For.
+    // Detect Scala 3 paren-less form (`for x <- xs do body`): after `for`, the next
+    // non-whitespace is neither `(` nor `{`. The single-generator J.ForEachLoop
+    // shortcut assumes parens, so for paren-less route through buildSFor.
+    val isParenless = {
+      val forStart = Math.max(0, forTree.span.start - offsetAdjustment)
+      var i = forStart + 3 // skip "for"
+      while (i < source.length && source.charAt(i).isWhitespace) i += 1
+      i < source.length && source.charAt(i) != '(' && source.charAt(i) != '{'
+    }
     val enums = forTree.enums
-    if (enums.size == 1) {
+    if (!isParenless && enums.size == 1) {
       enums.head match {
         case genFrom: untpd.GenFrom if genFrom.pat.isInstanceOf[Trees.Ident[?]] =>
           return visitSimpleForEach(forTree, genFrom)
@@ -6874,10 +6914,22 @@ class ScalaTreeVisitor(
     }
     val parameters = JContainer.build(beforeParen, rpParams, Markers.EMPTY)
 
-    // Visit method declarations as a block. Find the opening brace.
-    val braceIdx = positionOfNext("{", cursor)
-    val blockPrefix = if (braceIdx > cursor) Space.format(source, cursor, braceIdx) else Space.EMPTY
-    if (braceIdx >= 0) cursor = braceIdx + 1
+    // Visit method declarations as a block. Find the opening brace within the
+    // extension's span. Scala 3 extension can also use indented (braceless) form,
+    // in which case there is no `{` between `)` and the span end.
+    val extEnd = Math.max(0, ext.span.end - offsetAdjustment)
+    val remainingBeforeBody = if (cursor < extEnd && extEnd <= source.length) source.substring(cursor, extEnd) else ""
+    val localBraceIdx = positionOfNextIn(remainingBeforeBody, "{", 0)
+    val isExtBraceless = localBraceIdx < 0
+
+    val blockPrefix = if (isExtBraceless) {
+      Space.EMPTY
+    } else {
+      val braceIdx = cursor + localBraceIdx
+      val bp = if (braceIdx > cursor) Space.format(source, cursor, braceIdx) else Space.EMPTY
+      cursor = braceIdx + 1
+      bp
+    }
 
     val methodStmts = new util.ArrayList[JRightPadded[Statement]]()
     val methods = ext.methods.asJava
@@ -6895,10 +6947,17 @@ class ScalaTreeVisitor(
 
     val endPos = Math.max(0, ext.span.end - offsetAdjustment)
     val remaining = if (cursor < endPos && endPos <= source.length) source.substring(cursor, endPos) else ""
-    val closeBrace = remaining.lastIndexOf('}')
-    val endSpace = if (closeBrace > 0) Space.format(remaining.substring(0, closeBrace)) else Space.EMPTY
+    val endSpace = if (isExtBraceless) {
+      Space.format(remaining)
+    } else {
+      val closeBrace = remaining.lastIndexOf('}')
+      if (closeBrace > 0) Space.format(remaining.substring(0, closeBrace)) else Space.EMPTY
+    }
     cursor = endPos
-    val body = new J.Block(Tree.randomId(), blockPrefix, Markers.EMPTY,
+    val blockMarkers = if (isExtBraceless) {
+      Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
+    } else Markers.EMPTY
+    val body = new J.Block(Tree.randomId(), blockPrefix, blockMarkers,
       JRightPadded.build(false), methodStmts, endSpace)
     S.ExtensionMethods.build(Tree.randomId(), prefix, Markers.EMPTY, parameters, body)
   }
@@ -7020,7 +7079,11 @@ class ScalaTreeVisitor(
           if (yielding) {
             val yieldIdx = positionOfNext("yield", cursor)
             if (yieldIdx >= 0 && yieldIdx < bodyStart) yieldIdx else bodyStart
-          } else bodyStart
+          } else {
+            // Paren-less `for ... do <body>`: enumerator region ends at `do`.
+            val doIdx = positionOfNext("do", cursor)
+            if (doIdx >= 0 && doIdx < bodyStart) doIdx else bodyStart
+          }
         }
         else {
           val closeIdx = positionOfNext(closeChar.toString, cursor)
@@ -7037,7 +7100,7 @@ class ScalaTreeVisitor(
       if (closeIdx >= 0) cursor = closeIdx + 1
     }
 
-    // Capture space before body / `yield`
+    // Capture space before body / `yield` / `do`
     val bodyStart = Math.max(0, body.span.start - offsetAdjustment)
     val rawBetween = if (cursor < bodyStart && bodyStart <= source.length) source.substring(cursor, bodyStart) else ""
     val beforeBody: Space = if (yielding) {
@@ -7047,10 +7110,19 @@ class ScalaTreeVisitor(
         cursor = cursor + yieldIdx + "yield".length
         s
       } else Space.EMPTY
+    } else if (isParenless) {
+      // Paren-less `do` form: capture space before `do`, advance past `do`.
+      // Whitespace after `do` becomes the body's prefix.
+      val doIdx = positionOfNextIn(rawBetween, "do", 0)
+      if (doIdx >= 0) {
+        val s = Space.format(rawBetween.substring(0, doIdx))
+        cursor = cursor + doIdx + "do".length
+        s
+      } else Space.EMPTY
     } else {
       Space.format(rawBetween)
     }
-    if (!yielding) cursor = bodyStart
+    if (!yielding && !isParenless) cursor = bodyStart
 
     val bodyJ = visitTree(body)
     updateCursor(spanEnd)
