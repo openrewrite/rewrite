@@ -2525,10 +2525,9 @@ class ScalaTreeVisitor(
       )
     }
 
-    // Whitespace between the qualifier and the `.`.
+    // Whitespace (and comments) between the qualifier and the `.`.
     val afterQualifier = cursor
-    var i = afterQualifier
-    while (i < source.length && Character.isWhitespace(source.charAt(i))) i += 1
+    val i = indexOfNextNonWhitespace(afterQualifier)
     val qualifierRightPad = Space.format(source.substring(afterQualifier, i))
     if (i >= source.length || source.charAt(i) != '.') {
       throw new IllegalStateException(
@@ -2537,10 +2536,9 @@ class ScalaTreeVisitor(
     }
     cursor = i + 1
 
-    // Whitespace between `.` and `{`.
+    // Whitespace (and comments) between `.` and `{`.
     val afterDot = cursor
-    var j = afterDot
-    while (j < source.length && Character.isWhitespace(source.charAt(j))) j += 1
+    val j = indexOfNextNonWhitespace(afterDot)
     val beforeBrace = Space.format(source.substring(afterDot, j))
     if (j >= source.length || source.charAt(j) != '{') {
       throw new IllegalStateException(
@@ -2556,16 +2554,14 @@ class ScalaTreeVisitor(
       val sel = selectors(idx)
 
       val selStart = cursor
-      var p = selStart
-      while (p < source.length && Character.isWhitespace(source.charAt(p))) p += 1
+      val p = indexOfNextNonWhitespace(selStart)
       val selPrefix = Space.format(source.substring(selStart, p))
       cursor = p
 
       val selectorNode = parseImportSelector(sel)
 
       val afterSel = cursor
-      var q = afterSel
-      while (q < source.length && Character.isWhitespace(source.charAt(q))) q += 1
+      val q = indexOfNextNonWhitespace(afterSel)
       val afterChar = if (q < source.length) source.charAt(q) else 0.toChar
       if (afterChar == ',') {
         val sepSpace = Space.format(source.substring(afterSel, q))

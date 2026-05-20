@@ -238,6 +238,99 @@ class ImportTest implements RewriteTest {
     }
 
     @Test
+    void hidingAliasUnderscore() {
+        // Classic Scala idiom: import everything from Predef except `println`.
+        rewriteRun(
+          scala(
+            """
+            import scala.Predef.{println => _, _}
+            """
+          )
+        );
+    }
+
+    @Test
+    void hidingAliasAsUnderscore() {
+        // Scala 3 spelling of the same idiom.
+        rewriteRun(
+          scala(
+            """
+            import scala.Predef.{println as _, *}
+            """
+          )
+        );
+    }
+
+    @Test
+    void givenWithParameterizedType() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{given Conversion[Int, String]}
+            """
+          )
+        );
+    }
+
+    @Test
+    void backtickedSelector() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{`weird name`, c}
+            """
+          )
+        );
+    }
+
+    @Test
+    void backtickedQualifier() {
+        rewriteRun(
+          scala(
+            """
+            import a.`weird name`.c
+            """
+          )
+        );
+    }
+
+    @Test
+    void wildcardGivenWithoutBraces() {
+        // Imports all givens from a.b — Scala 3 shorthand.
+        rewriteRun(
+          scala(
+            """
+            import a.b.given
+            """
+          )
+        );
+    }
+
+    @Test
+    void commentInsideBraceSelectors() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{c /* the c */, d}
+            """
+          )
+        );
+    }
+
+    @Test
+    void importInsideMethodBody() {
+        rewriteRun(
+          scala(
+            """
+            def foo(): Int =
+              import scala.math._
+              max(1, 2)
+            """
+          )
+        );
+    }
+
+    @Test
     void commaContinuationBrace() {
         rewriteRun(
           scala(
