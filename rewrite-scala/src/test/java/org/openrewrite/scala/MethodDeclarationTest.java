@@ -300,6 +300,21 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void curriedParamsWithDefaults() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo(name: String)(insert: String = null, targetSchema: String = null): Unit = {
+                    println(insert)
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void tripleCurriedParamList() {
         rewriteRun(
             scala(

@@ -575,6 +575,14 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     }
                     visit(te, p);
                 }
+                if (!vd.getVariables().isEmpty()) {
+                    JLeftPadded<Expression> init = vd.getVariables().get(0).getPadding().getInitializer();
+                    if (init != null) {
+                        visitSpace(init.getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
+                        p.append('=');
+                        visit(init.getElement(), p);
+                    }
+                }
             } else {
                 visit(elem, p);
             }
