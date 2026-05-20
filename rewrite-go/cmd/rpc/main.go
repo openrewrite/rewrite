@@ -877,12 +877,11 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 // ActivatePkg is the full Go import path of the package that defines
 // func Activate(*recipe.Registry) inside the just-installed module. The
 // caller (e.g. Moderne CLI) needs it to generate the import line when
-// rebuilding rewrite-go-rpc with the recipe module linked in. Omitted from
-// the JSON when empty so the field is purely additive on the wire.
+// rebuilding rewrite-go-rpc with the recipe module linked in.
 type installRecipesResponse struct {
 	RecipesInstalled int     `json:"recipesInstalled"`
 	Version          *string `json:"version"`
-	ActivatePkg      string  `json:"activatePkg,omitempty"`
+	ActivatePkg      string  `json:"activatePkg"`
 }
 
 // handleInstallRecipes handles recipe installation requests.

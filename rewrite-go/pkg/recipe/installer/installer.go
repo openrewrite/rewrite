@@ -130,12 +130,7 @@ func (inst *Installer) InstallFromPath(localPath string, registry *recipe.Regist
 	// Build and run the helper to discover recipes. Producing an
 	// executable RPC binary that links the recipe module is the
 	// responsibility of the caller (e.g. Moderne CLI).
-	info, err := inst.loadRecipes(modulePath, registry)
-	if err != nil {
-		return nil, err
-	}
-	info.ActivatePkg = activatePkg
-	return info, nil
+	return inst.loadRecipes(modulePath, activatePkg, registry)
 }
 
 // InstallFromPackage installs recipes from a remote Go module.
@@ -159,13 +154,12 @@ func (inst *Installer) InstallFromPackage(packageName string, version *string, r
 	// Read resolved version from go.mod
 	resolvedVersion := inst.readResolvedVersion(packageName)
 
-	info, err := inst.loadRecipes(packageName, registry)
+	// For remote modules we don't introspect subpackages; the convention is
+	// that the module root defines Activate.
+	info, err := inst.loadRecipes(packageName, packageName, registry)
 	if err != nil {
 		return nil, err
 	}
-	// For remote modules we don't introspect subpackages; the convention is
-	// that the module root defines Activate.
-	info.ActivatePkg = packageName
 	if resolvedVersion != "" {
 		info.Version = resolvedVersion
 	}
@@ -179,7 +173,7 @@ func (inst *Installer) InstallFromPackage(packageName string, version *string, r
 // Producing an executable RPC binary that links the recipe module is
 // intentionally out of scope: Moderne CLI builds and places the custom
 // rewrite-go-rpc binary based on the workspace prepared here.
-func (inst *Installer) loadRecipes(modulePath string, registry *recipe.Registry) (*RecipeModuleInfo, error) {
+func (inst *Installer) loadRecipes(modulePath, activatePkg string, registry *recipe.Registry) (*RecipeModuleInfo, error) {
 	helperDir := filepath.Join(inst.WorkspaceDir, "helper")
 	helperSrc := filepath.Join(helperDir, "main.go")
 
@@ -187,7 +181,7 @@ func (inst *Installer) loadRecipes(modulePath string, registry *recipe.Registry)
 		if err := os.MkdirAll(helperDir, 0755); err != nil {
 			return nil, fmt.Errorf("create helper dir: %w", err)
 		}
-		if err := generateHelper(helperSrc, modulePath); err != nil {
+		if err := generateHelper(helperSrc, activatePkg); err != nil {
 			return nil, fmt.Errorf("generate helper: %w", err)
 		}
 	}
@@ -232,8 +226,9 @@ func (inst *Installer) loadRecipes(modulePath string, registry *recipe.Registry)
 
 	os.RemoveAll(helperDir)
 	return &RecipeModuleInfo{
-		ImportPath: modulePath,
-		Recipes:    descriptors,
+		ImportPath:  modulePath,
+		ActivatePkg: activatePkg,
+		Recipes:     descriptors,
 	}, nil
 }
 
