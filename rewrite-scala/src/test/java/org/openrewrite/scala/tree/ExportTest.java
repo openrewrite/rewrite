@@ -102,4 +102,43 @@ class ExportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void braceExport() {
+        rewriteRun(
+          scala(
+            """
+            class C(a: A) {
+              export a.{x, y}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void braceExportWithAlias() {
+        rewriteRun(
+          scala(
+            """
+            class C(a: A) {
+              export a.{x as X, y}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void braceExportWithArrowAlias() {
+        rewriteRun(
+          scala(
+            """
+            class C(a: A) {
+              export a.{x => X}
+            }
+            """
+          )
+        );
+    }
 }

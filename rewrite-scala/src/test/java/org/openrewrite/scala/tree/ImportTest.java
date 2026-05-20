@@ -126,11 +126,115 @@ class ImportTest implements RewriteTest {
           scala(
             """
             package com.example
-            
+
             import scala.collection.mutable
             import java.util.List
-            
+
             val x = 42
+            """
+          )
+        );
+    }
+
+    @Test
+    void scala3AliasKeyword() {
+        rewriteRun(
+          scala(
+            """
+            import java.io.{File as JFile}
+            """
+          )
+        );
+    }
+
+    @Test
+    void givenSelector() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{given}
+            """
+          )
+        );
+    }
+
+    @Test
+    void givenWithTypeSelector() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{given Ordering[Int]}
+            """
+          )
+        );
+    }
+
+    @Test
+    void mixedSelectorsIncludingGiven() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{c, d => D, given Foo, *}
+            """
+          )
+        );
+    }
+
+    @Test
+    void importInsideClass() {
+        rewriteRun(
+          scala(
+            """
+            class C {
+              import scala.util._
+              val x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void braceImportFollowedByClass() {
+        rewriteRun(
+          scala(
+            """
+            package com.example
+
+            import a.b.{c, d}
+
+            class X {
+              val y = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void braceImportInterleavedWithPlainImports() {
+        rewriteRun(
+          scala(
+            """
+            package com.example
+
+            import a.b
+            import c.d.{e, f}
+            import g.h
+            """
+          )
+        );
+    }
+
+    @Test
+    void importAfterStatement() {
+        // Scala allows imports to appear after other top-level statements.
+        rewriteRun(
+          scala(
+            """
+            class A { val x = 1 }
+            import scala.collection.mutable
+            class B { val y = 2 }
             """
           )
         );

@@ -35,6 +35,7 @@ import org.openrewrite.scala.marker.Semicolon
 import org.openrewrite.scala.marker.TypeProjection
 import org.openrewrite.scala.marker.ScalaForLoop
 import org.openrewrite.scala.marker.BlockArgument
+import org.openrewrite.scala.marker.CommaContinuation
 import org.openrewrite.scala.marker.FunctionApplication
 import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
@@ -2291,83 +2292,390 @@ class ScalaTreeVisitor(
   }
 
   private def visitImport(imp: Trees.Import[?]): J = {
-    if (isSimpleImportOrExport(imp, "import")) {
-      val (prefix, qualid) = buildImportOrExportQualid(imp)
-      // J.Import requires a static-import flag and supports an alias slot;
-      // Scala has neither for simple imports.
-      new J.Import(
-        Tree.randomId(),
-        prefix,
-        Markers.EMPTY,
-        JLeftPadded.build(false),
-        qualid,
-        null
-      )
-    } else {
-      // Complex imports: braces, aliases (as/=>), wildcards with braces, etc.
-      // Preserve the full source text since these can't map cleanly to J.Import's
-      // FieldAccess-based qualid model.
-      val prefix = extractPrefix(imp.span)
-      val sourceText = extractSource(imp.span)
-      val isContinuation = !sourceText.trim.startsWith("import")
-      if (isContinuation) {
-        // Continuation of a comma-separated import: `import A._, B._`
-        // The prefix may contain a comma — include it in the source text.
-        // Find the comma before this import's span and include everything from there.
-        val adjustedStart = Math.max(0, imp.span.start - offsetAdjustment)
-        val commaSearch = if (adjustedStart > 0) source.lastIndexOf(',', adjustedStart) else -1
-        val fullText = if (commaSearch >= 0 && commaSearch < adjustedStart) {
-          source.substring(commaSearch, Math.max(0, imp.span.end - offsetAdjustment))
-        } else sourceText
-        updateCursor(imp.span.end)
-        return new J.Unknown(
-          Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-          new J.Unknown.Source(Tree.randomId(), Space.EMPTY, Markers.EMPTY, fullText)
+    val classification = classifyImportOrExport(imp, "import")
+    classification match {
+      case ImportShape.Simple =>
+        val (prefix, qualid) = buildImportOrExportQualid(imp)
+        new J.Import(
+          Tree.randomId(),
+          prefix,
+          Markers.EMPTY,
+          JLeftPadded.build(false),
+          qualid,
+          null
         )
-      }
-
-      val afterImportStart = "import".length
-      val afterImport = sourceText.substring(afterImportStart)
-      val qualidStart = afterImport.indexWhere(ch => !Character.isWhitespace(ch))
-      val qualidPrefix = if (qualidStart > 1) Space.format(afterImport.substring(1, qualidStart)) else Space.EMPTY
-      val qualidText = if (qualidStart >= 0) afterImport.substring(qualidStart) else ""
-
-      // Wrap in FieldAccess with Empty target (required by J.Import).
-      val qualid = new J.FieldAccess(
-        Tree.randomId(), qualidPrefix, Markers.EMPTY,
-        new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY),
-        JLeftPadded.build(ident(qualidText)),
-        null
-      )
-
-      updateCursor(imp.span.end)
-
-      new J.Import(
-        Tree.randomId(),
-        prefix,
-        Markers.EMPTY,
-        JLeftPadded.build(false),
-        qualid,
-        null
-      )
+      case ImportShape.Brace =>
+        visitBraceImportOrExport(imp, "import")
+      case ImportShape.SimpleContinuation =>
+        visitContinuationSimple(imp, "import")
+      case ImportShape.BraceContinuation =>
+        throw new IllegalStateException(
+          s"Comma-continuation brace imports not yet modelled: '${spanSource(imp)}'"
+        )
     }
   }
 
   private def visitExport(exp: Trees.Export[?]): J = {
     // Scala 3 export clauses share their AST shape with imports
     // (Dotty: both extend `Trees.ImportOrExport` with `expr` + `selectors`),
-    // so we reuse the same qualid-building logic. Brace and alias forms are
-    // not yet modelled; visitUnknown throws so the gap surfaces in tests.
-    if (!isSimpleImportOrExport(exp, "export")) {
-      return visitUnknown(exp)
+    // so we reuse the same qualid-building logic.
+    val classification = classifyImportOrExport(exp, "export")
+    classification match {
+      case ImportShape.Simple =>
+        val (prefix, qualid) = buildImportOrExportQualid(exp)
+        new S.Export(Tree.randomId(), prefix, Markers.EMPTY, qualid)
+      case ImportShape.Brace =>
+        visitBraceImportOrExport(exp, "export")
+      case ImportShape.SimpleContinuation =>
+        visitContinuationSimple(exp, "export")
+      case ImportShape.BraceContinuation =>
+        throw new IllegalStateException(
+          s"Comma-continuation brace exports not yet modelled: '${spanSource(exp)}'"
+        )
     }
-    val (prefix, qualid) = buildImportOrExportQualid(exp)
-    new S.Export(
-      Tree.randomId(),
-      prefix,
-      Markers.EMPTY,
-      qualid
-    )
+  }
+
+  private object ImportShape extends Enumeration {
+    val Simple, Brace, SimpleContinuation, BraceContinuation = Value
+  }
+
+  private def spanSource(tree: Trees.ImportOrExport[?]): String = {
+    if (!tree.span.exists) return ""
+    val s = Math.max(0, tree.span.start - offsetAdjustment)
+    val e = Math.max(0, tree.span.end - offsetAdjustment)
+    if (s < e && e <= source.length) source.substring(s, e) else ""
+  }
+
+  private def classifyImportOrExport(
+    tree: Trees.ImportOrExport[?],
+    keyword: String
+  ): ImportShape.Value = {
+    val text = spanSource(tree)
+    val hasBraces = text.contains("{") || text.contains(" as ") || text.contains("=>")
+    val startsWithKeyword = text.trim.startsWith(keyword)
+    if (startsWithKeyword) {
+      if (hasBraces) ImportShape.Brace else ImportShape.Simple
+    } else {
+      if (hasBraces) ImportShape.BraceContinuation else ImportShape.SimpleContinuation
+    }
+  }
+
+  /**
+   * Emit a `J.Import` (or simple `S.Export`) for the *continuation* of a
+   * comma-separated group, e.g. the second {@code b._} in
+   * {@code import a._, b._}. The Dotty tree's span starts at the qualifier
+   * (after the comma); whitespace before the comma becomes the statement's
+   * prefix, whitespace after the comma is folded into the qualifier's
+   * prefix. The resulting statement carries a `CommaContinuation` marker so
+   * the printer emits {@code ,} instead of the keyword.
+   */
+  private def visitContinuationSimple(
+    tree: Trees.ImportOrExport[?],
+    keyword: String
+  ): J = {
+    val adjustedStart = Math.max(0, tree.span.start - offsetAdjustment)
+    val commaIdx = source.lastIndexOf(',', adjustedStart - 1)
+    if (commaIdx < cursor) {
+      throw new IllegalStateException(
+        s"Continuation $keyword without preceding ',': '${spanSource(tree)}'"
+      )
+    }
+    val prefix = if (cursor < commaIdx)
+      Space.format(source.substring(cursor, commaIdx))
+    else Space.EMPTY
+    cursor = commaIdx + 1
+
+    val qualid = buildQualidFromTree(tree)
+    val markers = Markers.EMPTY.addIfAbsent(new CommaContinuation(Tree.randomId()))
+
+    if (keyword == "import") {
+      new J.Import(Tree.randomId(), prefix, markers, JLeftPadded.build(false), qualid, null)
+    } else {
+      new S.Export(Tree.randomId(), prefix, markers, qualid)
+    }
+  }
+
+  /**
+   * Shared qualid construction used by both the keyword-led path and the
+   * continuation path. Assumes the cursor is positioned at (or before) the
+   * qualifier — whitespace between cursor and the qualifier's source span
+   * is captured as the qualifier element's prefix via {@code visitTree}.
+   */
+  private def buildQualidFromTree(tree: Trees.ImportOrExport[?]): J.FieldAccess = {
+    val oldInImportContext = isInImportContext
+    isInImportContext = true
+    val expr = visitTree(tree.expr)
+    isInImportContext = oldInImportContext
+
+    var qualid: J.FieldAccess = expr match {
+      case fa: J.FieldAccess => fa
+      case id: J.Identifier if tree.selectors.nonEmpty =>
+        val selector = tree.selectors.head
+        selector match {
+          case is @ untpd.ImportSelector(sIdent: Trees.Ident[?], untpd.EmptyTree, untpd.EmptyTree) =>
+            if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
+            val selName = wildcardOrName(is, sIdent, tree.span)
+            val displaySelName = if (cursor < source.length && source.charAt(cursor) == '`') "`" + selName + "`" else selName
+            val selectorType: JavaType = lookupSelectorType(tree.expr, selName)
+            new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+              id, JLeftPadded.build(ident(displaySelName, Space.EMPTY, selectorType)), selectorType)
+          case _ =>
+            throw new IllegalStateException("Unexpected non-simple selector in continuation")
+        }
+      case _ =>
+        throw new IllegalStateException(
+          s"Expected FieldAccess or Identifier qualifier, got ${expr.getClass.getSimpleName}"
+        )
+    }
+
+    val alreadyHandledSelector = expr.isInstanceOf[J.Identifier] && tree.selectors.nonEmpty
+    if (!alreadyHandledSelector && tree.selectors.nonEmpty && tree.selectors.size == 1) {
+      val selector = tree.selectors.head
+      selector match {
+        case is @ untpd.ImportSelector(idTree: Trees.Ident[?], untpd.EmptyTree, untpd.EmptyTree) =>
+          if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
+          val selectorName = wildcardOrName(is, idTree, tree.span)
+          val displaySelectorName = if (cursor < source.length && source.charAt(cursor) == '`') "`" + selectorName + "`" else selectorName
+          val selectorType: JavaType = lookupSelectorType(tree.expr, selectorName)
+          qualid = new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+            qualid, JLeftPadded.build(ident(displaySelectorName, Space.EMPTY, selectorType)), selectorType)
+        case _ =>
+      }
+    }
+
+    if (tree.span.exists) {
+      val adjustedEnd = Math.max(0, tree.span.end - offsetAdjustment)
+      updateCursor(adjustedEnd)
+    }
+
+    qualid
+  }
+
+  /**
+   * Parse a brace-form import or export: `keyword qualifier.{ selector, ... }`.
+   * Returns an `S.Import` (for `keyword == "import"`) or an `S.Export`
+   * (for `"export"`). Comma-continuation forms (e.g. `import a._, b._`) are
+   * not yet modelled and raise an exception.
+   */
+  private def visitBraceImportOrExport(
+    tree: Trees.ImportOrExport[?],
+    keyword: String
+  ): J = {
+    val adjustedStart = Math.max(0, tree.span.start - offsetAdjustment)
+    val adjustedEnd = Math.max(0, tree.span.end - offsetAdjustment)
+    val spanText = if (adjustedStart < adjustedEnd && adjustedEnd <= source.length)
+      source.substring(adjustedStart, adjustedEnd)
+    else ""
+    if (!spanText.trim.startsWith(keyword)) {
+      throw new IllegalStateException(
+        s"Comma-continuation $keyword forms are not yet modelled: '$spanText'"
+      )
+    }
+
+    val prefix: Space = if (cursor < adjustedStart) {
+      val text = source.substring(cursor, adjustedStart)
+      cursor = adjustedStart
+      Space.format(text)
+    } else Space.EMPTY
+
+    // Consume the keyword and at most one trailing whitespace (additional
+    // whitespace becomes the qualifier element's prefix).
+    cursor = adjustedStart + keyword.length
+    if (cursor < source.length && Character.isWhitespace(source.charAt(cursor))) {
+      cursor += 1
+    }
+
+    val oldInImportContext = isInImportContext
+    isInImportContext = true
+    val qualifierJ = visitTree(tree.expr)
+    isInImportContext = oldInImportContext
+    val qualifier: Expression = qualifierJ match {
+      case e: Expression => e
+      case other => throw new IllegalStateException(
+        s"Expected Expression for $keyword qualifier, got ${other.getClass.getSimpleName}"
+      )
+    }
+
+    // Whitespace between the qualifier and the `.`.
+    val afterQualifier = cursor
+    var i = afterQualifier
+    while (i < source.length && Character.isWhitespace(source.charAt(i))) i += 1
+    val qualifierRightPad = Space.format(source.substring(afterQualifier, i))
+    if (i >= source.length || source.charAt(i) != '.') {
+      throw new IllegalStateException(
+        s"Expected '.' before brace in $keyword at position $i: '${spanText}'"
+      )
+    }
+    cursor = i + 1
+
+    // Whitespace between `.` and `{`.
+    val afterDot = cursor
+    var j = afterDot
+    while (j < source.length && Character.isWhitespace(source.charAt(j))) j += 1
+    val beforeBrace = Space.format(source.substring(afterDot, j))
+    if (j >= source.length || source.charAt(j) != '{') {
+      throw new IllegalStateException(
+        s"Expected '{' after '.' in $keyword at position $j: '${spanText}'"
+      )
+    }
+    cursor = j + 1
+
+    val selectorElems = new util.ArrayList[JRightPadded[S.ImportSelector]]()
+    val selectors = tree.selectors
+    var idx = 0
+    while (idx < selectors.size) {
+      val sel = selectors(idx)
+
+      // Whitespace before this selector (after `{` for the first, after `,` for the rest).
+      val selStart = cursor
+      var p = selStart
+      while (p < source.length && Character.isWhitespace(source.charAt(p))) p += 1
+      val selPrefix = Space.format(source.substring(selStart, p))
+      cursor = p
+
+      val selectorNode = parseImportSelector(sel)
+
+      // After the selector, expect `,` (more selectors) or `}` (end).
+      val afterSel = cursor
+      var q = afterSel
+      while (q < source.length && Character.isWhitespace(source.charAt(q))) q += 1
+      val afterChar = if (q < source.length) source.charAt(q) else 0.toChar
+      if (afterChar == ',') {
+        val sepSpace = Space.format(source.substring(afterSel, q))
+        cursor = q + 1
+        selectorElems.add(new JRightPadded(selectorNode.withPrefix(selPrefix), sepSpace, Markers.EMPTY))
+      } else if (afterChar == '}') {
+        val tailSpace = Space.format(source.substring(afterSel, q))
+        cursor = q
+        selectorElems.add(new JRightPadded(selectorNode.withPrefix(selPrefix), tailSpace, Markers.EMPTY))
+      } else {
+        throw new IllegalStateException(
+          s"Expected ',' or '}' after selector in $keyword at position $q (got '$afterChar')"
+        )
+      }
+      idx += 1
+    }
+
+    if (cursor >= source.length || source.charAt(cursor) != '}') {
+      throw new IllegalStateException(
+        s"Expected '}' to close $keyword selectors at position $cursor: '${spanText}'"
+      )
+    }
+    cursor += 1
+    if (cursor < adjustedEnd) cursor = adjustedEnd
+
+    val selectorContainer: JContainer[S.ImportSelector] =
+      JContainer.build(Space.EMPTY, selectorElems, Markers.EMPTY)
+
+    if (keyword == "import") {
+      S.Import.build(
+        Tree.randomId(),
+        prefix,
+        Markers.EMPTY,
+        new JRightPadded(qualifier, qualifierRightPad, Markers.EMPTY),
+        beforeBrace,
+        selectorContainer
+      )
+    } else {
+      S.Export.build(
+        Tree.randomId(),
+        prefix,
+        Markers.EMPTY,
+        qualifier,
+        beforeBrace,
+        selectorContainer
+      )
+    }
+  }
+
+  /**
+   * Parse a single brace-import / brace-export selector, advancing the cursor.
+   * The prefix space is set by the caller; this method produces a selector
+   * with `Space.EMPTY` prefix.
+   */
+  private def parseImportSelector(sel: untpd.ImportSelector): S.ImportSelector = {
+    if (sel.isGiven) {
+      val kw = "given"
+      if (cursor + kw.length > source.length || !source.startsWith(kw, cursor)) {
+        throw new IllegalStateException(s"Expected 'given' selector at position $cursor")
+      }
+      cursor += kw.length
+      val givenType: TypeTree = sel.bound match {
+        case untpd.EmptyTree => null
+        case bound =>
+          visitTree(bound) match {
+            case tt: TypeTree => tt
+            case other => throw new IllegalStateException(
+              s"Expected TypeTree for given bound, got ${other.getClass.getSimpleName}"
+            )
+          }
+      }
+      S.ImportSelector.build(
+        Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+        true /* given */, givenType,
+        false /* wildcard */, false /* legacyUnderscore */,
+        null /* name */, null /* alias */, false /* useAsKeyword */
+      )
+    } else if (sel.isWildcard) {
+      if (cursor >= source.length) {
+        throw new IllegalStateException("Unexpected EOF for wildcard selector")
+      }
+      val wildcardChar = source.charAt(cursor)
+      if (wildcardChar != '_' && wildcardChar != '*') {
+        throw new IllegalStateException(
+          s"Expected '_' or '*' for wildcard selector at position $cursor, got '$wildcardChar'"
+        )
+      }
+      cursor += 1
+      S.ImportSelector.build(
+        Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+        false, null, true, wildcardChar == '_', null, null, false
+      )
+    } else {
+      // Named selector, optionally with `=> alias` or `as alias`.
+      val nameStartAbs = Math.max(0, sel.imported.span.start - offsetAdjustment)
+      val nameEndAbs = Math.max(0, sel.imported.span.end - offsetAdjustment)
+      val displayName = source.substring(nameStartAbs, nameEndAbs)
+      val nameIdent = ident(displayName, Space.EMPTY, null)
+      cursor = nameEndAbs
+
+      sel.renamed match {
+        case untpd.EmptyTree =>
+          S.ImportSelector.build(
+            Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+            false, null, false, false, nameIdent, null, false
+          )
+        case renamed: Trees.Ident[?] =>
+          var p = cursor
+          while (p < source.length && Character.isWhitespace(source.charAt(p))) p += 1
+          val beforeArrow = Space.format(source.substring(cursor, p))
+          val useAsKeyword = source.startsWith("as", p)
+          val useArrow = source.startsWith("=>", p)
+          if (!useAsKeyword && !useArrow) {
+            throw new IllegalStateException(
+              s"Expected '=>' or 'as' between selector name and alias at position $p"
+            )
+          }
+          cursor = p + 2
+
+          val renamedStartAbs = Math.max(0, renamed.span.start - offsetAdjustment)
+          val renamedEndAbs = Math.max(0, renamed.span.end - offsetAdjustment)
+          val aliasPrefix = Space.format(source.substring(cursor, renamedStartAbs))
+          val aliasDisplay = source.substring(renamedStartAbs, renamedEndAbs)
+          cursor = renamedEndAbs
+          val aliasIdent = ident(aliasDisplay, aliasPrefix, null)
+          S.ImportSelector.build(
+            Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+            false, null, false, false, nameIdent,
+            new JLeftPadded(beforeArrow, aliasIdent, Markers.EMPTY),
+            useAsKeyword
+          )
+        case other =>
+          throw new IllegalStateException(
+            s"Unexpected rename tree in import selector: ${other.getClass.getSimpleName}"
+          )
+      }
+    }
   }
 
   /**
@@ -2401,63 +2709,7 @@ class ScalaTreeVisitor(
       cursor += 1
     }
 
-    // Identifier resolution inside an import/export path differs from regular
-    // expression context (e.g. `_` becomes `*` for wildcards), so flag the
-    // visit and restore the previous value when done.
-    val oldInImportContext = isInImportContext
-    isInImportContext = true
-
-    val expr = visitTree(tree.expr)
-    isInImportContext = oldInImportContext
-
-    // Build the qualid: for `(import|export) java.util.List`, expr is
-    // Select(Ident(java), util) and the trailing selector is `List`.
-    // For `(import|export) java.util`, expr is Ident(java) and the only
-    // selector is `util`.
-    var qualid: J.FieldAccess = expr match {
-      case fa: J.FieldAccess => fa
-      case id: J.Identifier if tree.selectors.nonEmpty =>
-        val selector = tree.selectors.head
-        selector match {
-          case is @ untpd.ImportSelector(sIdent: Trees.Ident[?], untpd.EmptyTree, untpd.EmptyTree) =>
-            if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
-            val selName = wildcardOrName(is, sIdent, tree.span)
-            val displaySelName = if (cursor < source.length && source.charAt(cursor) == '`') "`" + selName + "`" else selName
-            val selectorType: JavaType = lookupSelectorType(tree.expr, selName)
-            new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-              id, JLeftPadded.build(ident(displaySelName, Space.EMPTY, selectorType)), selectorType)
-          case _ =>
-            return visitUnknown(tree)
-        }
-      case _ =>
-        return visitUnknown(tree)
-    }
-
-    // Multi-segment paths (e.g., `import java.util.List`): apply the trailing
-    // selector to the FieldAccess produced from the expression. Skipped if the
-    // single-Ident-root branch above already consumed it.
-    val alreadyHandledSelector = expr.isInstanceOf[J.Identifier] && tree.selectors.nonEmpty
-    if (!alreadyHandledSelector && tree.selectors.nonEmpty && tree.selectors.size == 1) {
-      val selector = tree.selectors.head
-      selector match {
-        case is @ untpd.ImportSelector(idTree: Trees.Ident[?], untpd.EmptyTree, untpd.EmptyTree) =>
-          if (cursor < source.length && source.charAt(cursor) == '.') cursor += 1
-          val selectorName = wildcardOrName(is, idTree, tree.span)
-          val displaySelectorName = if (cursor < source.length && source.charAt(cursor) == '`') "`" + selectorName + "`" else selectorName
-          val selectorType: JavaType = lookupSelectorType(tree.expr, selectorName)
-          qualid = new J.FieldAccess(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-            qualid,
-            JLeftPadded.build(ident(displaySelectorName, Space.EMPTY, selectorType)),
-            selectorType)
-        case _ =>
-      }
-    }
-
-    if (tree.span.exists) {
-      val adjustedEnd = Math.max(0, tree.span.end - offsetAdjustment)
-      updateCursor(adjustedEnd)
-    }
-
+    val qualid = buildQualidFromTree(tree)
     (prefix, qualid)
   }
 

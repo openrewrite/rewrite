@@ -73,7 +73,6 @@ public class ScalaParserVisitor {
         CompilationUnitResult result = converter.convertToCompilationUnit(parseResult, source, typeFactory);
 
         J.Package packageDecl = result.getPackageDecl();
-        List<J.Import> imports = result.getImports();
         List<Statement> statements = result.getStatements();
 
 
@@ -102,8 +101,8 @@ public class ScalaParserVisitor {
         }
 
         // If we didn't get any statements and have source content, create an Unknown node
-        // But skip if we already have a package declaration or imports (to avoid duplication)
-        if (statements.isEmpty() && !source.trim().isEmpty() && packageDecl == null && imports.isEmpty()) {
+        // But skip if we already have a package declaration (to avoid duplication)
+        if (statements.isEmpty() && !source.trim().isEmpty() && packageDecl == null) {
             J.Unknown.Source unknownSource = new J.Unknown.Source(
                 randomId(),
                 EMPTY,
@@ -136,7 +135,6 @@ public class ScalaParserVisitor {
             charsetBomMarked,              // boolean charsetBomMarked
             null,                          // Checksum checksum
             packageDecl == null ? null : JRightPadded.build(packageDecl),
-            JRightPadded.withElements(Collections.emptyList(), imports),
             JRightPadded.withElements(Collections.emptyList(), statements),
             eof                            // Space eof
         );
