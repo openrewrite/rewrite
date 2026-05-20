@@ -125,6 +125,11 @@ type server struct {
 	logger    *log.Logger
 	registry  *recipe.Registry
 	installer *installer.Installer
+
+	// recipeWorkspaceCleanup removes the temp recipe install dir created
+	// when --recipe-install-dir was not supplied. Nil when the caller
+	// provided the path (in which case lifetime is the caller's concern).
+	recipeWorkspaceCleanup func()
 }
 
 // serverConfig holds CLI-driven configuration applied to the server at startup.
@@ -166,11 +171,28 @@ func newServer(cfg serverConfig) *server {
 
 	logger := log.New(logOut, "", log.LstdFlags)
 
-	inst := installer.NewInstaller()
-	inst.Logger = logger.Printf
-	if cfg.recipeInstallDir != "" {
-		inst.WorkspaceDir = cfg.recipeInstallDir
+	// Resolve the recipe install dir. When the caller (e.g. Moderne CLI)
+	// passes --recipe-install-dir, use it verbatim. Otherwise create an
+	// ephemeral workspace under the OS temp dir and remember to clean it
+	// up on shutdown — mirrors the JS server's behavior.
+	recipeInstallDir := cfg.recipeInstallDir
+	var recipeWorkspaceCleanup func()
+	if recipeInstallDir == "" {
+		tmpDir, err := os.MkdirTemp("", "rewrite-go-recipes-")
+		if err != nil {
+			logger.Printf("could not create temp recipe install dir: %v — recipe installation will fail", err)
+		} else {
+			recipeInstallDir = tmpDir
+			recipeWorkspaceCleanup = func() {
+				if err := os.RemoveAll(tmpDir); err != nil {
+					logger.Printf("recipe workspace cleanup failed for %s: %v", tmpDir, err)
+				}
+			}
+		}
 	}
+
+	inst := installer.NewInstaller(recipeInstallDir)
+	inst.Logger = logger.Printf
 
 	s := &server{
 		localObjects:         make(map[string]any),
@@ -193,6 +215,7 @@ func newServer(cfg serverConfig) *server {
 		logger:    logger,
 		registry:  reg,
 		installer: inst,
+		recipeWorkspaceCleanup: recipeWorkspaceCleanup,
 	}
 
 	if cfg.metricsCsv != "" {
@@ -260,7 +283,7 @@ func parseFlags() serverConfig {
 	flag.StringVar(&cfg.logFile, "log-file", "", "path to write server log; empty = OS temp file")
 	flag.BoolVar(&cfg.traceRpcMessages, "trace-rpc-messages", false, "log every GetObject batch send/receive")
 	flag.StringVar(&cfg.metricsCsv, "metrics-csv", "", "path to write per-RPC metrics as CSV")
-	flag.StringVar(&cfg.recipeInstallDir, "recipe-install-dir", "", "directory used as the installer workspace; defaults to ~/.rewrite/go-recipes")
+	flag.StringVar(&cfg.recipeInstallDir, "recipe-install-dir", "", "directory used as the recipe installer workspace; if empty, a temporary directory is created and cleaned up on shutdown")
 	flag.StringVar(&cfg.dataTablesCsvDir, "data-tables-csv-dir", "", "directory where DataTable rows are written as CSV; empty = in-memory only")
 	flag.Parse()
 	return cfg
@@ -317,6 +340,9 @@ func main() {
 
 	s.logger.Println("Go RPC server shutting down...")
 	s.closeMetrics()
+	if s.recipeWorkspaceCleanup != nil {
+		s.recipeWorkspaceCleanup()
+	}
 }
 
 // readMessage reads a Content-Length framed JSON-RPC message from stdin.
@@ -847,9 +873,16 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 }
 
 // installRecipesResponse is the response type for InstallRecipes.
+//
+// ActivatePkg is the full Go import path of the package that defines
+// func Activate(*recipe.Registry) inside the just-installed module. The
+// caller (e.g. Moderne CLI) needs it to generate the import line when
+// rebuilding rewrite-go-rpc with the recipe module linked in. Omitted from
+// the JSON when empty so the field is purely additive on the wire.
 type installRecipesResponse struct {
 	RecipesInstalled int     `json:"recipesInstalled"`
 	Version          *string `json:"version"`
+	ActivatePkg      string  `json:"activatePkg,omitempty"`
 }
 
 // handleInstallRecipes handles recipe installation requests.
@@ -873,7 +906,7 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 	var localPath string
 	if err := json.Unmarshal(recipesRaw, &localPath); err == nil {
 		s.logger.Printf("InstallRecipes from local path: %s", localPath)
-		_, err := s.installer.InstallFromPath(localPath, s.registry)
+		info, err := s.installer.InstallFromPath(localPath, s.registry)
 		if err != nil {
 			return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Install from path failed: %v", err)}
 		}
@@ -881,6 +914,7 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 		return &installRecipesResponse{
 			RecipesInstalled: afterCount - beforeCount,
 			Version:          nil,
+			ActivatePkg:      info.ActivatePkg,
 		}, nil
 	}
 
@@ -907,6 +941,7 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 	return &installRecipesResponse{
 		RecipesInstalled: afterCount - beforeCount,
 		Version:          version,
+		ActivatePkg:      info.ActivatePkg,
 	}, nil
 }
 
