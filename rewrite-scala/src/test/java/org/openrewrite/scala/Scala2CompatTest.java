@@ -888,6 +888,181 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
+    void parameterizedAnonymousGiven() {
+        rewriteRun(
+            scala(
+                """
+                trait Ord[T]
+                object Test {
+                  given [T](using Ord[T]): Ord[List[T]] = new Ord[List[T]] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void classConstructorWithUsingClause() {
+        rewriteRun(
+            scala(
+                """
+                trait Executor
+                class C(val coll: String, helper: Int)(using Executor):
+                  def foo = 1
+                """
+            )
+        );
+    }
+
+    @Test
+    void anonymousGivenWithModifier() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  private given BSONHandler[Int] = new BSONHandler[Int] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void namedGivenWithBodyAndScopedModifier() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  private[Test] given intHandler: BSONHandler[Int] with {
+                    def write(i: Int) = ???
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void namedGivenWithBody() {
+        rewriteRun(
+            scala(
+                """
+                trait Ord[T] {
+                  def compare(a: T, b: T): Int
+                }
+                object Test {
+                  given intOrd: Ord[Int] with {
+                    def compare(a: Int, b: Int): Int = a - b
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void anonymousGivenWithBody() {
+        rewriteRun(
+            scala(
+                """
+                trait Ord[T] {
+                  def compare(a: T, b: T): Int
+                }
+                object Test {
+                  given Ord[Int] with {
+                    def compare(a: Int, b: Int): Int = a - b
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenImportBare() {
+        rewriteRun(
+            scala(
+                """
+                trait Foo
+                object Givens {
+                  given Foo = new Foo {}
+                }
+                object Use {
+                  import Givens.given
+                  val x: Foo = summon[Foo]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenImportSelector() {
+        rewriteRun(
+            scala(
+                """
+                trait Foo
+                object Givens {
+                  given Foo = new Foo {}
+                }
+                object Use {
+                  import Givens.{given Foo}
+                  val x: Foo = summon[Foo]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenMethodShapeNoValueParams() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  given mapHandler[V: BSONHandler]: BSONHandler[V] = new BSONHandler[V] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenAnonymousTypeParamsOnly() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  given [T: BSONHandler]: BSONHandler[List[T]] = new BSONHandler[List[T]] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenAliasMethodShape() {
+        rewriteRun(
+            scala(
+                """
+                trait Ord[T] {
+                  def compare(a: T, b: T): Int
+                }
+                object Test {
+                  given listOrd[T](using ord: Ord[T]): Ord[List[T]] = new Ord[List[T]] {
+                    def compare(a: List[T], b: List[T]): Int = 0
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void specializedAnnotationOnTypeParam() {
         rewriteRun(
             scala(

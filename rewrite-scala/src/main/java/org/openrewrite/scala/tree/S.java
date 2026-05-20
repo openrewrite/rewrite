@@ -853,6 +853,68 @@ public interface S extends J {
     }
 
     /**
+     * Represents a Scala 3 anonymous {@code given} declaration. The compiler
+     * synthesizes a name, but no identifier appears in source. Modeled as its
+     * own LST node so no phantom name leaks into J types.
+     * <p>
+     * Examples:
+     * <ul>
+     *   <li>{@code given Ord[Int] = ord}</li>
+     *   <li>{@code given Foo = new Foo { def bar = 42 }}</li>
+     *   <li>{@code given Show[T] with { def show(t: T) = ... }} (initializer is a {@code J.NewClass})</li>
+     * </ul>
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class AnonymousGiven implements S, Statement {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        List<J.Annotation> leadingAnnotations;
+
+        @With @Getter
+        List<J.Modifier> modifiers;
+
+        @With @Getter
+        TypeTree type;
+
+        @With @Getter @Nullable
+        JLeftPadded<Expression> initializer;
+
+        public AnonymousGiven(UUID id, Space prefix, Markers markers,
+                              List<J.Annotation> leadingAnnotations,
+                              List<J.Modifier> modifiers,
+                              TypeTree type,
+                              @Nullable JLeftPadded<Expression> initializer) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.leadingAnnotations = leadingAnnotations;
+            this.modifiers = modifiers;
+            this.type = type;
+            this.initializer = initializer;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitAnonymousGiven(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
      * Represents a Scala pattern definition (destructuring declaration).
      * <p>
      * Examples:

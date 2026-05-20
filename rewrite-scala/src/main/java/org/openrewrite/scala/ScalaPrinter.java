@@ -361,17 +361,19 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
         visit(method.getLeadingAnnotations(), p);
         boolean defAlreadyPrinted = false;
+        String defaultKeyword = "def";
         for (J.Modifier m : method.getModifiers()) {
-            if ("def".equals(m.getKeyword()) && m.getType() == J.Modifier.Type.LanguageExtension) {
+            if (m.getType() == J.Modifier.Type.LanguageExtension &&
+                    ("def".equals(m.getKeyword()) || "given".equals(m.getKeyword()))) {
                 visitSpace(m.getPrefix(), Space.Location.MODIFIER_PREFIX, p);
-                p.append("def");
+                p.append(m.getKeyword());
                 defAlreadyPrinted = true;
             } else {
                 visit(m, p);
             }
         }
         if (!defAlreadyPrinted) {
-            p.append("def");
+            p.append(defaultKeyword);
         }
         visit(method.getName(), p);
 
@@ -396,9 +398,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 visitSpace(varDecl.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
                 // Print parameter annotations (@unchecked, etc.)
                 visit(varDecl.getLeadingAnnotations(), p);
-                // Print parameter modifiers (e.g., implicit)
+                // Print parameter modifiers (e.g., implicit, using)
                 visit(varDecl.getModifiers(), p);
-                if (!varDecl.getVariables().isEmpty()) {
+                boolean omitParamName = !varDecl.getVariables().isEmpty() &&
+                    varDecl.getVariables().get(0).getMarkers().findFirst(
+                        org.openrewrite.scala.marker.OmitName.class).isPresent();
+                if (!omitParamName && !varDecl.getVariables().isEmpty()) {
                     visit(varDecl.getVariables().get(0).getName(), p);
                 }
                 if (varDecl.getTypeExpression() != null) {
@@ -408,7 +413,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     if (varDecl.getVarargs() != null) {
                         visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
                     }
-                    p.append(":");
+                    if (!omitParamName) {
+                        p.append(":");
+                    }
                     visit(typeExpr, p);
                 }
                 if (!varDecl.getVariables().isEmpty() &&
@@ -553,7 +560,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 visitSpace(vd.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
                 visit(vd.getLeadingAnnotations(), p);
                 visit(vd.getModifiers(), p);
-                if (!vd.getVariables().isEmpty()) {
+                boolean omitName = !vd.getVariables().isEmpty() && vd.getVariables().get(0).getMarkers().findFirst(
+                        org.openrewrite.scala.marker.OmitName.class).isPresent();
+                if (!omitName && !vd.getVariables().isEmpty()) {
                     visit(vd.getVariables().get(0).getName(), p);
                 }
                 if (vd.getTypeExpression() != null) {
@@ -561,7 +570,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     if (vd.getVarargs() != null) {
                         visitSpace(vd.getVarargs(), Space.Location.VARARGS, p);
                     }
-                    p.append(":");
+                    if (!omitName) {
+                        p.append(":");
+                    }
                     visit(te, p);
                 }
             } else {
@@ -599,6 +610,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitExport((S.Export) tree, p);
         } else if (tree instanceof S.PatternDefinition) {
             return visitPatternDefinition((S.PatternDefinition) tree, p);
+        } else if (tree instanceof S.AnonymousGiven) {
+            return visitAnonymousGiven((S.AnonymousGiven) tree, p);
         } else if (tree instanceof S.FunctionCall) {
             return visitFunctionCall((S.FunctionCall) tree, p);
         } else if (tree instanceof S.SingletonType) {
@@ -741,7 +754,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     private boolean isWildcardImport(J.FieldAccess qualid) {
         J.Identifier name = qualid.getName();
-        return "*".equals(name.getSimpleName()) || "_".equals(name.getSimpleName());
+        String n = name.getSimpleName();
+        // Scala 2 (`._`), Scala 3 (`.*`), and the Scala 3 given form (`.given`) are all
+        // wildcard-style selectors. Printing routes through the wildcard path so the
+        // selector name (preserved verbatim by the parser) is appended as-is.
+        return "*".equals(n) || "_".equals(n) || "given".equals(n);
     }
     
     private void visitFieldAccessUpToWildcard(J.FieldAccess qualid, PrintOutputCapture<P> p) {
@@ -874,8 +891,13 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     }
                 }
                 p.append(')');
+                // Re-emit any additional curried constructor param lists captured verbatim
+                // from source (e.g. `(using Executor)`).
+                primaryConstructor.getMarkers()
+                    .findFirst(org.openrewrite.scala.marker.ExtraConstructorParamLists.class)
+                    .ifPresent(m -> p.append(m.text()));
             }
-            
+
             if (classDecl.getPadding().getExtends() != null) {
                 visitSpace(classDecl.getPadding().getExtends().getBefore(), Space.Location.EXTENDS, p);
                 p.append("extends");
@@ -1087,19 +1109,23 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             org.openrewrite.scala.marker.LambdaParameter.class).isPresent();
 
         // Print modifiers, but handle Final specially since Scala uses val/var.
-        // The implicit Final modifier (keyword=null) marks val; (keyword="given") marks given.
-        // Its prefix carries the source whitespace between the last visible modifier (or annotations)
-        // and the val/given keyword.
+        // The implicit Final modifier (keyword=null) marks val (or given, when a Given marker
+        // is present on the declaration). Its prefix carries the source whitespace between the
+        // last visible modifier (or annotations) and the val/given keyword.
         // An explicit "final" modifier prints normally.
+        boolean isGiven = multiVariable.getMarkers().findFirst(
+            org.openrewrite.scala.marker.Given.class).isPresent();
         boolean hasVisibleModifier = false;
-        String valVarKeyword = "var";
+        String valVarKeyword = isGiven ? "given" : "var";
         Space valVarPrefix = null;
         Optional<ValVarKeyword> valVarKeywordMarker = multiVariable.getMarkers().findFirst(ValVarKeyword.class);
         boolean annotationGapBridged = false;
         for (J.Modifier m : multiVariable.getModifiers()) {
             if (m.getType() == J.Modifier.Type.Final && !"final".equals(m.getKeyword())) {
                 // Implicit Final marking val/given — capture prefix, don't visit.
-                valVarKeyword = "given".equals(m.getKeyword()) ? "given" : "val";
+                if (!isGiven) {
+                    valVarKeyword = "val";
+                }
                 valVarPrefix = m.getPrefix();
             } else {
                 if (m.getType() == J.Modifier.Type.Final && "final".equals(m.getKeyword())) {
@@ -1142,9 +1168,14 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     @Override
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, PrintOutputCapture<P> p) {
         beforeSyntax(variable, Space.Location.VARIABLE_PREFIX, p);
-        
-        // Print the variable name
-        visit(variable.getName(), p);
+
+        // Print the variable name unless it's a synthesized name suppressed by OmitName
+        // (e.g. anonymous `using` parameters: `def f(using Ord[T])`).
+        boolean omitName = variable.getMarkers().findFirst(
+            org.openrewrite.scala.marker.OmitName.class).isPresent();
+        if (!omitName) {
+            visit(variable.getName(), p);
+        }
 
         // In Scala, type annotation comes after the name
         J.VariableDeclarations parent = getCursor().getParentOrThrow().getValue();
@@ -1154,7 +1185,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             if (parent.getVarargs() != null) {
                 visitSpace(parent.getVarargs(), Space.Location.VARARGS, p);
             }
-            p.append(":");
+            // Skip the colon when the name is omitted (anonymous `using` param).
+            if (!omitName) {
+                p.append(":");
+            }
             visit(parent.getTypeExpression(), p);
 
             // If there's an initializer, use visitLeftPadded to handle it properly
@@ -1544,6 +1578,28 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         p.append(patDef.getText());
         afterSyntax(patDef, p);
         return patDef;
+    }
+
+    public J visitAnonymousGiven(S.AnonymousGiven g, PrintOutputCapture<P> p) {
+        beforeSyntax(g, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(g.getLeadingAnnotations(), p);
+        for (J.Modifier m : g.getModifiers()) {
+            visit(m, p);
+        }
+        // Whitespace between the last modifier (or annotations) and `given`. Captured by
+        // the visitor when a modifier precedes the keyword.
+        g.getMarkers().findFirst(ValVarKeyword.class)
+                .ifPresent(m -> p.append(m.beforeKeyword()));
+        p.append("given");
+        visit(g.getType(), p);
+        JLeftPadded<Expression> init = g.getInitializer();
+        if (init != null) {
+            visitSpace(init.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+            p.append("=");
+            visit(init.getElement(), p);
+        }
+        afterSyntax(g, p);
+        return g;
     }
 
     public J visitSingletonType(S.SingletonType singletonType, PrintOutputCapture<P> p) {

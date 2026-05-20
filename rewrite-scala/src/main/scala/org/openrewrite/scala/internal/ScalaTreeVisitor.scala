@@ -207,6 +207,7 @@ class ScalaTreeVisitor(
       case pkg: Trees.PackageDef[?] => visitPackageDef(pkg)
       case newTree: Trees.New[?] => visitNew(newTree)
       case vd: Trees.ValDef[?] => visitValDef(vd)
+      case md: untpd.ModuleDef if isGivenWithBody(md, md.mods) => preserveGivenWithBodyAsText(md.span)
       case md: untpd.ModuleDef => visitModuleDef(md)
       case asg: Trees.Assign[?] => visitAssign(asg)
       case ifTree: Trees.If[?] => visitIf(ifTree)
@@ -214,6 +215,8 @@ class ScalaTreeVisitor(
       case forTree: untpd.ForDo => visitForDo(forTree)
       case xmlb: untpd.XMLBlock => visitXmlLiteral(xmlb)
       case block: Trees.Block[?] => visitBlock(block)
+      case td: Trees.TypeDef[?] if td.isClassDef && isGivenWithBody(td, td.mods) =>
+        preserveGivenWithBodyAsText(td.span)
       case td: Trees.TypeDef[?] if td.isClassDef => visitClassDef(td)
       case td: Trees.TypeDef[?] => visitTypeAlias(td)
       case pd: untpd.PatDef => visitPatDef(pd)
@@ -2456,8 +2459,9 @@ class ScalaTreeVisitor(
 
   /**
    * For a wildcard selector, read the wildcard char from source so we preserve
-   * `*` (Scala 3) vs `_` (legacy) verbatim. For a named selector, return the
-   * name as written in the AST.
+   * `*` (Scala 3) vs `_` (legacy) verbatim, and the `given` wildcard form
+   * (`import a.given`) which Dotty also models as a wildcard selector.
+   * For a named selector, return the name as written in the AST.
    */
   private def wildcardOrName(
     is: untpd.ImportSelector,
@@ -2466,7 +2470,16 @@ class ScalaTreeVisitor(
   ): String = {
     if (!is.isWildcard) return idTree.name.toString
     val adjustedEnd = Math.max(0, span.end - offsetAdjustment)
-    if (adjustedEnd > 0 && adjustedEnd <= source.length && source.charAt(adjustedEnd - 1) == '*') "*" else "_"
+    if (adjustedEnd > 0 && adjustedEnd <= source.length) {
+      val last = source.charAt(adjustedEnd - 1)
+      if (last == '*') return "*"
+      if (last == '_') return "_"
+      // `import a.given` — selector name in the AST is empty/"given"; reconstruct from source.
+      val start = Math.max(0, span.start - offsetAdjustment)
+      val text = if (start < adjustedEnd) source.substring(start, adjustedEnd) else ""
+      if (text.endsWith("given")) return "given"
+    }
+    "_"
   }
 
   /**
@@ -2830,14 +2843,10 @@ class ScalaTreeVisitor(
           afterValVar = Space.format(source, cursor, nameIndex)
           cursor = nameIndex
         } else if (keyword == "given") {
-          // Anonymous given: `given Ordering[Int] = ...`
-          // The name is synthesized and doesn't appear in source.
-          // Preserve as PatternDefinition (given declarations need their own S type later).
-          cursor = savedCursorEntry
-          val givenPrefix = extractPrefix(vd.span)
-          val givenText = extractSource(vd.span)
-          updateCursor(vd.span.end)
-          return new S.PatternDefinition(Tree.randomId(), givenPrefix, Markers.EMPTY, givenText)
+          // Anonymous given: `given Ordering[Int] = ...`.
+          // No identifier in source; map to S.AnonymousGiven so no phantom name leaks
+          // into a J type. cursor sits right after the `given` keyword.
+          return buildAnonymousGiven(vd, prefix, modifiers, leadingAnnotations, beforeValVar)
         }
       }
     }
@@ -2846,13 +2855,14 @@ class ScalaTreeVisitor(
     val isGiven = valVarKeyword == "given"
     val isFinal = valVarKeyword == "val" || isGiven
     if (isFinal && !hasExplicitFinal) {
-      // For `given` declarations, store the keyword so the printer outputs "given" not "val"
-      val finalKeyword = if (isGiven) "given" else null
+      // Add the implicit Final modifier. Whitespace before the keyword is carried in its prefix.
+      // The `Given` marker on the J.VariableDeclarations itself signals the printer to emit
+      // `given` instead of `val`.
       modifiers.add(new J.Modifier(
         Tree.randomId(),
         beforeValVar,
         Markers.EMPTY,
-        finalKeyword,
+        null,
         J.Modifier.Type.Final,
         Collections.emptyList()
       ))
@@ -3062,10 +3072,15 @@ class ScalaTreeVisitor(
     // even though it's syntactically attached to each variable
     // Use the varargs field (unused in Scala) to store space before colon
     val varargs: Space = if (beforeColon != Space.EMPTY) beforeColon else null
+    val markerList = new util.ArrayList[org.openrewrite.marker.Marker]()
+    if (beforeValVarRaw.nonEmpty) {
+      markerList.add(ValVarKeyword(Tree.randomId(), beforeValVarRaw))
+    }
+    if (isGiven) {
+      markerList.add(org.openrewrite.scala.marker.Given(Tree.randomId()))
+    }
     val variableMarkers =
-      if (beforeValVarRaw.nonEmpty)
-        Markers.build(Collections.singletonList(ValVarKeyword(Tree.randomId(), beforeValVarRaw)))
-      else Markers.EMPTY
+      if (markerList.isEmpty) Markers.EMPTY else Markers.build(markerList)
 
     new J.VariableDeclarations(
       Tree.randomId(),
@@ -3080,6 +3095,117 @@ class ScalaTreeVisitor(
     )
   }
   
+  /**
+   * Detect Scala 3 `given X with { ... }` (and the anonymous variant) lowered by
+   * Dotty into a synthesized ClassDef/ModuleDef. The synthesized definitions don't
+   * map cleanly to J.ClassDeclaration with the current modeling. Until form 3 has
+   * proper structured handling, we preserve the original source text via
+   * S.PatternDefinition. A `ModuleDef`/`ClassDef` with the `Given` flag is always a
+   * synthesized given-with-body — no other construct produces that combination.
+   */
+  private def isGivenWithBody(t: Trees.Tree[?], mods: untpd.Modifiers): Boolean = {
+    mods != null && mods.is(Flags.Given) && t.span.exists
+  }
+
+  private def preserveGivenWithBodyAsText(span: dotty.tools.dotc.util.Spans.Span): S.PatternDefinition = {
+    val txtPrefix = extractPrefix(span)
+    val txt = extractSource(span)
+    updateCursor(span.end)
+    new S.PatternDefinition(Tree.randomId(), txtPrefix, Markers.EMPTY, txt)
+  }
+
+/**
+   * Build an S.AnonymousGiven for `given <Type> = <expr>` (no source-visible name).
+   * Cursor must be positioned just past the `given` keyword.
+   */
+  private def buildAnonymousGiven(
+      vd: Trees.ValDef[?],
+      prefix: Space,
+      modifiers: util.ArrayList[J.Modifier],
+      leadingAnnotations: util.ArrayList[J.Annotation],
+      beforeKeyword: Space
+  ): S.AnonymousGiven = {
+    // Cursor sits right after `given`. Visit the type next.
+    val typeExpr: TypeTree = if (vd.tpt != null && !vd.tpt.isEmpty && vd.tpt.span.exists) {
+      val typeStart = Math.max(0, vd.tpt.span.start - offsetAdjustment)
+      val typePrefix = if (cursor < typeStart && typeStart <= source.length)
+        Space.format(source, cursor, typeStart)
+      else Space.SINGLE_SPACE
+      cursor = typeStart
+      visitTree(vd.tpt) match {
+        case tt: TypeTree => tt.withPrefix(typePrefix)
+        case other =>
+          // Fall back to source-text identifier — preserves printing fidelity but
+          // intentionally drops rich typing for unmapped type expressions.
+          val tText = extractSource(vd.tpt.span)
+          updateCursor(vd.tpt.span.end)
+          ident(tText, typePrefix).asInstanceOf[TypeTree]
+      }
+    } else {
+      // Shouldn't happen for anonymous givens; default to an empty identifier
+      ident("", Space.EMPTY).asInstanceOf[TypeTree]
+    }
+
+    // Initializer: look for `=` between cursor and rhs.span.start.
+    var init: JLeftPadded[Expression] = null
+    if (vd.rhs != null && !vd.rhs.isEmpty && vd.rhs.span.exists) {
+      val rhsStart = Math.max(0, vd.rhs.span.start - offsetAdjustment)
+      if (cursor < rhsStart && rhsStart <= source.length) {
+        val between = source.substring(cursor, rhsStart)
+        val equalsIndex = between.indexOf('=')
+        if (equalsIndex >= 0) {
+          val beforeEquals = Space.format(between.substring(0, equalsIndex))
+          val afterEqualsStr = between.substring(equalsIndex + 1)
+          cursor = rhsStart
+          val rhsTree = visitTree(vd.rhs)
+          var initExpr: Expression = null
+          rhsTree match {
+            case block: J.Block =>
+              initExpr = new S.StatementExpression(Tree.randomId(),
+                block.withPrefix(Space.format(afterEqualsStr)))
+            case expr: Expression =>
+              initExpr = expr.withPrefix(Space.format(afterEqualsStr)).asInstanceOf[Expression]
+            case stmt: Statement =>
+              initExpr = new S.StatementExpression(Tree.randomId(),
+                stmt.withPrefix(Space.format(afterEqualsStr)))
+            case _ =>
+          }
+          if (initExpr != null) {
+            init = JLeftPadded.build(initExpr).withBefore(beforeEquals)
+          }
+        }
+      }
+    }
+    updateCursor(vd.span.end)
+
+    // Whitespace handling around the `given` keyword:
+    // - No leading annotations/modifiers: `beforeKeyword` (gap between cursor and `given`)
+    //   collapses with the declaration prefix.
+    // - Otherwise: declaration prefix is unchanged, and `beforeKeyword` (the gap between
+    //   the last modifier and `given`) is preserved via a ValVarKeyword marker so the
+    //   printer can emit it before the keyword.
+    val (effectivePrefix, gMarkers) =
+      if (leadingAnnotations.isEmpty && modifiers.isEmpty) {
+        val effPrefix = if (beforeKeyword.getWhitespace.nonEmpty) beforeKeyword else prefix
+        (effPrefix, Markers.EMPTY)
+      } else if (beforeKeyword.getWhitespace.nonEmpty) {
+        (prefix, Markers.build(Collections.singletonList(
+          ValVarKeyword(Tree.randomId(), beforeKeyword.getWhitespace))))
+      } else {
+        (prefix, Markers.EMPTY)
+      }
+
+    new S.AnonymousGiven(
+      Tree.randomId(),
+      effectivePrefix,
+      gMarkers,
+      leadingAnnotations,
+      modifiers,
+      typeExpr,
+      init
+    )
+  }
+
   private def visitModuleDef(md: untpd.ModuleDef): J.ClassDeclaration = {
     val hasAnnotations = md.mods != null && md.mods.annotations.nonEmpty
     // When annotations are present they own the leading whitespace; otherwise
@@ -4507,7 +4633,42 @@ class ScalaTreeVisitor(
         if (closeParen >= 0) cursor = cursor + closeParen + 1
       }
 
-      JContainer.build(parenSpace, jParams, Markers.EMPTY)
+      // Scala 3 allows curried constructor param lists: `class C(a: Int)(using Executor)`.
+      // J.ClassDeclaration only models the first list; collect the rest verbatim from source
+      // so the printer can re-emit them. Stops at the first non-`(` non-whitespace char.
+      val extraListsBuf = new StringBuilder
+      var scanCursor = cursor
+      var keepScanning = true
+      while (keepScanning) {
+        var probe = scanCursor
+        while (probe < source.length && source.charAt(probe).isWhitespace) probe += 1
+        if (probe < source.length && source.charAt(probe) == '(') {
+          var depth = 1
+          var i = probe + 1
+          while (i < source.length && depth > 0) {
+            val c = source.charAt(i)
+            if (c == '(') depth += 1
+            else if (c == ')') depth -= 1
+            i += 1
+          }
+          if (depth == 0) {
+            extraListsBuf.append(source.substring(scanCursor, i))
+            scanCursor = i
+          } else {
+            keepScanning = false
+          }
+        } else {
+          keepScanning = false
+        }
+      }
+      val containerMarkers: Markers = if (extraListsBuf.nonEmpty) {
+        cursor = scanCursor
+        Markers.build(Collections.singletonList(
+          org.openrewrite.scala.marker.ExtraConstructorParamLists(
+            Tree.randomId(), extraListsBuf.toString)))
+      } else Markers.EMPTY
+
+      JContainer.build(parenSpace, jParams, containerMarkers)
     } else {
       // No `(` in source — non-constructor class definition. Emit an empty container
       // marked with OmitParentheses so the printer skips emitting `(...)`.
@@ -5294,10 +5455,27 @@ class ScalaTreeVisitor(
     // correctly (otherwise the alpha-only name scan stops at the first char and
     // mistakes the body's opening `(` for a parameter list).
     var hasParensInSource = true
+    // For `given foo[T]: Bar = ...` (named) or `given [T]: Bar = ...` (anonymous),
+    // we must skip past `[type-params]` before deciding. Both cases land here when
+    // the underlying DefDef has Given flag set.
+    val isGivenDefDef = dd.mods != null && dd.mods.is(Flags.Given)
     if (dd.nameSpan.exists) {
       val nameEnd = Math.max(0, dd.nameSpan.end - offsetAdjustment)
       var i = nameEnd
       while (i < source.length && source.charAt(i).isWhitespace) i += 1
+      // Skip a `[...]` type parameter list (only relevant for given aliases — for
+      // ordinary defs, `def foo[T]` always has either `()` or `:` after `]`).
+      if (isGivenDefDef && i < source.length && source.charAt(i) == '[') {
+        var depth = 1
+        i += 1
+        while (i < source.length && depth > 0) {
+          val c = source.charAt(i)
+          if (c == '[') depth += 1
+          else if (c == ']') depth -= 1
+          i += 1
+        }
+        while (i < source.length && source.charAt(i).isWhitespace) i += 1
+      }
       if (i < source.length) {
         val nextCh = source.charAt(i)
         if (nextCh == ':' || nextCh == '=') {
@@ -5306,15 +5484,29 @@ class ScalaTreeVisitor(
       }
     } else if (adjustedStart < adjustedEnd && adjustedEnd <= source.length) {
       val defSource = source.substring(adjustedStart, adjustedEnd)
-      val defIdx = positionOfNextIn(defSource, "def ", 0)
-      if (defIdx >= 0) {
-        val afterDef = defSource.substring(defIdx + 4)
-        val nameEnd = afterDef.indexWhere(c => !c.isLetterOrDigit && c != '_')
-        if (nameEnd >= 0) {
-          val afterName = afterDef.substring(nameEnd).trim()
-          if (afterName.startsWith(":") || afterName.startsWith("=")) {
-            hasParensInSource = false
+      val keyword = if (isGivenDefDef) "given" else "def"
+      val kwIdx = positionOfNextIn(defSource, keyword + " ", 0)
+      if (kwIdx >= 0) {
+        var rest = defSource.substring(kwIdx + keyword.length + 1).stripLeading
+        // Anonymous given: keyword is immediately followed by `[T]` (type params)
+        // or just `:`/`=`.
+        if (rest.startsWith("[")) {
+          var depth = 1
+          var j = 1
+          while (j < rest.length && depth > 0) {
+            val c = rest.charAt(j)
+            if (c == '[') depth += 1
+            else if (c == ']') depth -= 1
+            j += 1
           }
+          rest = rest.substring(j).stripLeading
+        } else {
+          // Named def: skip the name itself.
+          val nameEnd = rest.indexWhere(c => !c.isLetterOrDigit && c != '_')
+          if (nameEnd >= 0) rest = rest.substring(nameEnd).stripLeading
+        }
+        if (rest.startsWith(":") || rest.startsWith("=")) {
+          hasParensInSource = false
         }
       }
     }
@@ -5466,14 +5658,16 @@ class ScalaTreeVisitor(
       }
     }
 
+    val isGivenAlias = dd.mods != null && dd.mods.is(dotty.tools.dotc.core.Flags.Given)
+    val keyword = if (isGivenAlias) "given" else "def"
     val adjustedEnd = Math.max(0, dd.span.end - offsetAdjustment)
     var modifierText = ""
     var defIndex = -1
 
     if (cursor <= adjustedEnd && adjustedEnd <= source.length) {
       val sourceSnippet = source.substring(cursor, adjustedEnd)
-      defIndex = positionOfNextIn(sourceSnippet, "def ", 0)
-      if (defIndex < 0) defIndex = positionOfNextIn(sourceSnippet, "def\n", 0)
+      defIndex = positionOfNextIn(sourceSnippet, keyword + " ", 0)
+      if (defIndex < 0) defIndex = positionOfNextIn(sourceSnippet, keyword + "\n", 0)
       if (defIndex > 0) {
         modifierText = sourceSnippet.substring(0, defIndex)
       }
@@ -5481,15 +5675,15 @@ class ScalaTreeVisitor(
 
     val (modifiers, lastModEnd) = extractModifiersFromText(dd.mods, modifierText)
 
-    // Always capture the whitespace between the last modifier (or start) and "def"
-    // as the prefix of a synthetic "def" LanguageExtension modifier.
+    // Always capture the whitespace between the last modifier (or start) and "def" / "given"
+    // as the prefix of a synthetic LanguageExtension modifier so the keyword round-trips.
     if (defIndex >= 0) {
       val defPrefixText = if (lastModEnd <= modifierText.length) modifierText.substring(lastModEnd) else ""
       modifiers.add(new J.Modifier(Tree.randomId(), Space.format(defPrefixText), Markers.EMPTY,
-        "def", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+        keyword, J.Modifier.Type.LanguageExtension, Collections.emptyList()))
     }
 
-    val defKeywordPos = if (defIndex >= 0) cursor + defIndex + "def".length else cursor
+    val defKeywordPos = if (defIndex >= 0) cursor + defIndex + keyword.length else cursor
     cursor = defKeywordPos
 
     val methodType = try { methodTypeOfTree(dd) } catch { case _: Exception => null }
@@ -5813,8 +6007,9 @@ class ScalaTreeVisitor(
       var i = curriedParamLists.size - 1
       while (i >= 0) {
         val lambdaParams = curriedParamLists.get(i)
-        // Intermediate lambdas (not the last) get Curried marker
-        val lambdaMarkers = if (i > 0) {
+        // The printer descends through curried lambdas while the OUTER lambda carries a
+        // Curried marker. So every wrapper except the innermost needs the marker.
+        val lambdaMarkers = if (i < curriedParamLists.size - 1) {
           Markers.build(Collections.singletonList(new Curried(Tree.randomId())))
         } else Markers.EMPTY
         innerBody = new J.Lambda(Tree.randomId(), Space.EMPTY, lambdaMarkers,
@@ -5973,16 +6168,19 @@ class ScalaTreeVisitor(
   private def visitMethodParameter(vd: Trees.ValDef[?]): J = {
     import dotty.tools.dotc.core.Flags
     val paramModifiers = new util.ArrayList[J.Modifier]()
-    val prefix: Space = if (vd.mods != null && vd.mods.is(Flags.Implicit)) {
+    val isUsing = vd.mods != null && vd.mods.is(Flags.Given)
+    val isScala2Implicit = vd.mods != null && vd.mods.is(Flags.Implicit) && !isUsing
+    val prefix: Space = if (isScala2Implicit || isUsing) {
+      val keyword = if (isUsing) "using" else "implicit"
       val spanStart = Math.max(0, vd.span.start - offsetAdjustment)
       if (cursor < spanStart && spanStart <= source.length) {
         val leading = source.substring(cursor, spanStart)
-        val implicitIdx = positionOfNextIn(leading, "implicit", 0)
-        if (implicitIdx >= 0) {
-          val modPrefix = if (implicitIdx > 0) Space.format(leading.substring(0, implicitIdx)) else Space.EMPTY
+        val kwIdx = positionOfNextIn(leading, keyword, 0)
+        if (kwIdx >= 0) {
+          val modPrefix = if (kwIdx > 0) Space.format(leading.substring(0, kwIdx)) else Space.EMPTY
           paramModifiers.add(new J.Modifier(Tree.randomId(), modPrefix, Markers.EMPTY,
-            "implicit", J.Modifier.Type.LanguageExtension, Collections.emptyList()))
-          cursor += implicitIdx + "implicit".length
+            keyword, J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+          cursor += kwIdx + keyword.length
           Space.EMPTY
         } else extractPrefix(vd.span)
       } else extractPrefix(vd.span)
@@ -6022,20 +6220,49 @@ class ScalaTreeVisitor(
     }
 
     // Extract space between annotation (if any) and the parameter name, accounting for backticks.
-    val (namePrefix, displayParamName, paramNameEnd) = if (vd.nameSpan.exists) {
-      val rawNameStart = Math.max(0, vd.nameSpan.start - offsetAdjustment)
-      val rawNameLen = Math.max(0, vd.nameSpan.end - vd.nameSpan.start)
-      backtickAwareName(cursor, rawNameStart, rawNameLen, vd.name.toString)
-    } else (Space.EMPTY, vd.name.toString, cursor)
+    // For anonymous parameters (synthesized names that don't appear in source — only legal for
+    // `using` params in Scala 3), keep the synthesized name in the LST but attach an OmitName
+    // marker so the printer suppresses it. Detection: the param's name does not appear in
+    // source between the cursor and the type's start position.
+    val rawParamName = vd.name.toString
+    val nameInSource: Boolean = {
+      if (vd.tpt != null && vd.tpt.span.exists) {
+        val tStart = Math.max(0, vd.tpt.span.start - offsetAdjustment)
+        if (cursor < tStart && tStart <= source.length) {
+          source.substring(cursor, tStart).contains(rawParamName)
+        } else true
+      } else paramSource.contains(rawParamName)
+    }
+    val anonymousParam: Boolean = isUsing && !nameInSource
+    val (namePrefix, displayParamName, paramNameEnd) =
+      if (vd.nameSpan.exists && !anonymousParam) {
+        val rawNameStart = Math.max(0, vd.nameSpan.start - offsetAdjustment)
+        val rawNameLen = Math.max(0, vd.nameSpan.end - vd.nameSpan.start)
+        backtickAwareName(cursor, rawNameStart, rawNameLen, rawParamName)
+      } else (Space.EMPTY, rawParamName, cursor)
 
     val paramName = ident(displayParamName, namePrefix, variableTypeOfTree(vd))
 
-    if (vd.nameSpan.exists) {
+    if (vd.nameSpan.exists && !anonymousParam) {
       cursor = Math.max(cursor, paramNameEnd)
     }
 
     var beforeColon: Space = Space.EMPTY
-    val typeExpr: TypeTree = if (hasExplicitType && vd.tpt != untpd.EmptyTree) {
+    var typeExpr: TypeTree = null
+    if (anonymousParam && vd.tpt != untpd.EmptyTree && vd.tpt.span.exists) {
+      // Anonymous `using` parameter: source is just the type (e.g. `using Ord[T]`).
+      // Walk forward to the type span start, then visit the type.
+      val typeStart = Math.max(0, vd.tpt.span.start - offsetAdjustment)
+      if (cursor < typeStart && typeStart <= source.length) {
+        val typePrefix = Space.format(source, cursor, typeStart)
+        cursor = typeStart
+        typeExpr = visitTypeTree(vd.tpt).withPrefix(typePrefix).asInstanceOf[TypeTree]
+        updateCursor(vd.tpt.span.end)
+      } else {
+        typeExpr = visitTypeTree(vd.tpt)
+        updateCursor(vd.tpt.span.end)
+      }
+    } else if (hasExplicitType && vd.tpt != untpd.EmptyTree) {
       val colonSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 30, source.length)) else ""
       val colonIdx = positionOfNextIn(colonSearch, ":", 0)
       if (colonIdx >= 0) {
@@ -6043,12 +6270,11 @@ class ScalaTreeVisitor(
         cursor = cursor + colonIdx + 1
       }
 
-      val result = visitTypeTree(vd.tpt)
+      typeExpr = visitTypeTree(vd.tpt)
       if (vd.tpt.span.exists) {
         updateCursor(vd.tpt.span.end)
       }
-      result
-    } else null
+    }
 
     // Handle default value
     var initBefore: Space = Space.EMPTY
@@ -6068,10 +6294,15 @@ class ScalaTreeVisitor(
       }
     } else null
 
+    val namedVariableMarkers =
+      if (anonymousParam)
+        Markers.build(Collections.singletonList(org.openrewrite.scala.marker.OmitName(Tree.randomId())))
+      else Markers.EMPTY
+
     val variable = new J.VariableDeclarations.NamedVariable(
       Tree.randomId(),
       Space.EMPTY,
-      Markers.EMPTY,
+      namedVariableMarkers,
       paramName,
       Collections.emptyList(),
       if (initializer != null) new JLeftPadded(initBefore, initializer, Markers.EMPTY) else null,
@@ -7852,15 +8083,17 @@ class ScalaTreeVisitor(
             Space.format(source, cursor, colonIdx)
           } else Space.EMPTY
           val boundList = new util.ArrayList[JRightPadded[TypeTree]]()
-          // For each context bound, extract the bound type name
+          // For each context bound, extract the bound type name. Qualified names
+          // (`pkg.Zero`) are reconstructed from the Select chain — `sel.name.toString`
+          // alone drops the qualifier.
+          def selectToName(t: Trees.Tree[?]): String = t match {
+            case id: Trees.Ident[?] => id.name.toString
+            case sel: Trees.Select[?] => selectToName(sel.qualifier) + "." + sel.name.toString
+            case _ => t.toString
+          }
           cxBoundsList.foreach { cxBound =>
             val boundName = cxBound match {
-              case cbt: untpd.ContextBoundTypeTree =>
-                cbt.tycon match {
-                  case id: Trees.Ident[?] => id.name.toString
-                  case sel: Trees.Select[?] => sel.name.toString
-                  case _ => cxBound.toString
-                }
+              case cbt: untpd.ContextBoundTypeTree => selectToName(cbt.tycon)
               case _ => cxBound.toString
             }
             val boundId: TypeTree = ident(boundName, Space.format(" "))
