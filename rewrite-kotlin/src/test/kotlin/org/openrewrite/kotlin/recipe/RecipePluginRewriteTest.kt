@@ -407,6 +407,47 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `recipe targeting no-arg overload does not match the with-predicate overload`() {
+        // Regression: with a `(..)` wildcard arg pattern, the recipe
+        // `xs.filter(p).any() -> xs.any(p)` also matched the *predicate*
+        // overload `xs.filter(p1).any { p2 }` and silently dropped `p2` (along
+        // with the entire `.any { ... }` body the author wrote). `(..)` was
+        // tightened to `(*,*)` / `(*)` / `()` — the precise JVM arg count —
+        // so overloaded names no longer cross-match.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseAnyWithPredicateInsteadOfFilterAny = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, p: (Any) -> Boolean -> xs.filter(p).any() } to { xs, p -> xs.any(p) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseAnyWithPredicateInsteadOfFilterAny",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                // `filter { ... }.any { ... }` — the WITH-predicate any. The
+                // recipe targets the NO-arg any. Without the arg-count guard,
+                // the rewrite drops the inner `.any { p2 }` body. With the
+                // guard it leaves the source untouched (no expected diff).
+                """
+                fun hasMatch(xs: List<Int>): Boolean = xs
+                    .filter { it > 0 }
+                    .any { it > 10 }
+                """,
+            ),
+        )
+    }
+
+    @Test
     fun `multi-before mixed shapes — receiver in one, arg in the other`() {
         // Two before lambdas with the same param count but different
         // canonical signatures: `s.toInt()` binds `s` to the (extension)
