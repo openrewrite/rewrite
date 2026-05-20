@@ -1,0 +1,62 @@
+---
+name: npm-publish
+
+# Fires only after `ci` (push to main) or `publish` (version tag) finishes
+# successfully — so a failing build/test gate blocks the npm publish, matching
+# the prior behavior where npm publish was a step inside those workflows.
+on:
+  workflow_run:
+    workflows:
+      - ci
+      - publish
+    types:
+      - completed
+
+concurrency:
+  group: npm-publish-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      (github.repository_owner == 'openrewrite' || github.repository_owner == 'moderneinc')
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          develocity-access-key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+
+      # Trusted Publisher auto-detection in `npm publish` requires npm >= 11.5.1.
+      # GitHub-hosted ubuntu runners currently ship Node 22 / npm 10.x.
+      - shell: bash
+        run: npm install -g npm@latest
+
+      - shell: bash
+        env:
+          CI: 'true'
+        run: |
+          # head_branch is "main" for branch pushes and the tag name (e.g. "v8.83.0")
+          # for tag pushes. Treat anything starting with "v" + digit as a release.
+          ref='${{ github.event.workflow_run.head_branch }}'
+          if [[ "$ref" =~ ^v[0-9] ]]; then
+            ./gradlew --no-daemon --console=plain --info --stacktrace \
+              :rewrite-javascript:npmPublish -Preleasing
+          else
+            ./gradlew --no-daemon --console=plain --info --stacktrace \
+              :rewrite-javascript:npmPublish
+          fi
