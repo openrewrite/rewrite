@@ -42,9 +42,10 @@ jobs:
           develocity-access-key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
 
       # Trusted Publisher auto-detection in `npm publish` requires npm >= 11.5.1.
-      # GitHub-hosted ubuntu runners currently ship Node 22 / npm 10.x.
+      # GitHub-hosted ubuntu runners currently ship Node 22 / npm 10.x, and the
+      # global install needs sudo to write under /usr/local.
       - shell: bash
-        run: npm install -g npm@latest
+        run: sudo npm install -g npm@latest
 
       - shell: bash
         env:
