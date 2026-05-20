@@ -35,11 +35,13 @@ import java.util.zip.ZipFile;
  * Extracts the Go RPC server source tree bundled inside the rewrite-go JAR
  * (under {@code META-INF/rewrite-go/src/}) to a caller-provided directory.
  * <p>
- * The bundled tree contains the {@code cmd/rpc} entry point, its transitive
- * package closure inside the rewrite-go module, {@code go.mod}/{@code go.sum},
- * and vendored third-party dependencies, so consumers can run
- * {@code go build ./cmd/rpc} against the extracted directory without network
- * access.
+ * The bundled tree contains the {@code cmd/rpc} entry point, the complete
+ * {@code pkg/} subtree (every submodule, not only those reachable from
+ * {@code ./cmd/rpc}), {@code go.mod}/{@code go.sum}, and vendored
+ * third-party dependencies, so consumers can run {@code go build ./cmd/rpc}
+ * against the extracted directory without network access — and can also
+ * compile additional entry points that reference arbitrary {@code pkg/}
+ * subpackages without us shipping an allowlist.
  * <p>
  * Typical usage from the Moderne CLI:
  * <pre>{@code
