@@ -43,8 +43,6 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -297,8 +295,11 @@ public class RewriteRpc {
 
         String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
                 .getClass().getName();
-        VisitResponse response = send("Visit", new Visit(visitorName, sourceFileType, null,
+        Supplier<VisitResponse> doSend = () -> send("Visit", new Visit(visitorName, sourceFileType, null,
                 tree.getId().toString(), pId, cursorIds), VisitResponse.class);
+        VisitResponse response = p instanceof ExecutionContext
+                ? RewriteRpcExecutionContextView.view((ExecutionContext) p).withInFlightSlot(doSend)
+                : doSend.get();
         return response.isModified() ?
                 getObject(tree.getId().toString(), sourceFileType) :
                 tree;
@@ -314,14 +315,18 @@ public class RewriteRpc {
 
         String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
                 .getClass().getName();
-        return send("BatchVisit", new BatchVisit(sourceFileType, treeId, pId, cursorIds, visitors),
+        Supplier<BatchVisitResponse> doSend = () -> send("BatchVisit",
+                new BatchVisit(sourceFileType, treeId, pId, cursorIds, visitors),
                 BatchVisitResponse.class);
+        return p instanceof ExecutionContext
+                ? RewriteRpcExecutionContextView.view((ExecutionContext) p).withInFlightSlot(doSend)
+                : doSend.get();
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
         String ctxId = maybeUnwrapExecutionContext(ctx);
-        GenerateResponse response = send("Generate", new Generate(remoteRecipeId, ctxId),
-                GenerateResponse.class);
+        GenerateResponse response = RewriteRpcExecutionContextView.view(ctx).withInFlightSlot(() ->
+                send("Generate", new Generate(remoteRecipeId, ctxId), GenerateResponse.class));
         if (!response.getIds().isEmpty()) {
             List<SourceFile> generated = new ArrayList<>(response.getIds().size());
             for (int i = 0; i < response.getIds().size(); i++) {
@@ -402,8 +407,7 @@ public class RewriteRpc {
 
         List<TreeVisitor<?, ExecutionContext>> visitors = new ArrayList<>(preconditions.size());
         for (PrepareRecipeResponse.Precondition p : preconditions) {
-            visitors.add(preparedRecipes.instantiateVisitor(
-                    p.getVisitorName(), p.getVisitorOptions()));
+            visitors.add(buildPreconditionVisitor(p));
         }
 
         return new TreeVisitor<Tree, ExecutionContext>() {
@@ -424,8 +428,43 @@ public class RewriteRpc {
         };
     }
 
+    @SuppressWarnings("unchecked")
+    private TreeVisitor<?, ExecutionContext> buildPreconditionVisitor(PrepareRecipeResponse.Precondition p) {
+        String op = p.getOp();
+        if (op == null) {
+            return preparedRecipes.instantiateVisitor(p.getVisitorName(), p.getVisitorOptions());
+        }
+        List<PrepareRecipeResponse.Precondition> operands = p.getOperands();
+        if (operands == null || operands.isEmpty()) {
+            throw new IllegalStateException("Composite precondition op=" + op + " requires non-empty operands");
+        }
+        TreeVisitor<?, ExecutionContext>[] children = new TreeVisitor[operands.size()];
+        for (int i = 0; i < operands.size(); i++) {
+            children[i] = buildPreconditionVisitor(operands.get(i));
+        }
+        switch (op) {
+            case "or":
+                return Preconditions.or(children);
+            case "and":
+                return Preconditions.and(children);
+            case "not":
+                if (children.length != 1) {
+                    throw new IllegalStateException("Composite precondition op=not requires exactly one operand, got " + children.length);
+                }
+                return Preconditions.not(children[0]);
+            default:
+                throw new IllegalStateException("Unknown composite precondition op=" + op);
+        }
+    }
+
     public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo,
                                     Parser parser, String sourceFileType, ExecutionContext ctx) {
+        return parse(inputs, relativeTo, parser, sourceFileType, ctx, null);
+    }
+
+    public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo,
+                                    Parser parser, String sourceFileType, ExecutionContext ctx,
+                                    @Nullable Map<String, String> options) {
         List<Parser.Input> inputList = new ArrayList<>();
         List<Parse.Input> mappedInputs = new ArrayList<>();
         for (Parser.Input input : inputs) {
@@ -452,7 +491,8 @@ public class RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (ids == null) {
                     // FIXME handle `TimeoutException` gracefully
-                    ids = send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+                    ids = RewriteRpcExecutionContextView.view(ctx).withInFlightSlot(() ->
+                            send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null, options), ParseResponse.class));
                     assert ids.size() == inputList.size();
                 }
 
@@ -598,19 +638,27 @@ public class RewriteRpc {
             // Send the request and get the future
             CompletableFuture<JsonRpcSuccess> future = jsonRpc.send(JsonRpcRequest.newRequest(method, body));
 
-            // Poll for completion while checking if process is alive
+            // future.get(timeout) from a FJP worker triggers ManagedBlocker compensation,
+            // which spawns helper threads that can leak per-thread RewriteRpc state.
+            // Poll non-blockingly + Thread.sleep so FJP doesn't compensate.
             long totalTimeoutMs = timeout.toMillis();
-            long checkIntervalMs = 500; // Check every 500ms
+            long pollIntervalMs = 1;
+            long livenessIntervalMs = 500;
             long elapsedMs = 0;
-
+            long lastLivenessMs = 0;
             while (elapsedMs < totalTimeoutMs) {
-                try {
-                    // Try to get the result with a short timeout
-                    return future.get(checkIntervalMs, TimeUnit.MILLISECONDS).getResult(responseType);
-                } catch (TimeoutException e) {
+                JsonRpcSuccess result = future.getNow(null);
+                if (result != null) {
+                    return result.getResult(responseType);
+                }
+                if (future.isCompletedExceptionally()) {
+                    return future.get().getResult(responseType);
+                }
+                Thread.sleep(pollIntervalMs);
+                elapsedMs += pollIntervalMs;
+                if (elapsedMs - lastLivenessMs >= livenessIntervalMs) {
                     checkLiveness();
-                    elapsedMs += checkIntervalMs;
-                    // Continue waiting if process is still alive and we haven't hit total timeout
+                    lastLivenessMs = elapsedMs;
                 }
             }
 

@@ -255,20 +255,45 @@ def generate_id() -> str:
     return str(uuid4())
 
 
-def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None) -> dict:
+def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None,
+                      language_level: Optional[str] = None,
+                      project_language_level: Optional[str] = None) -> dict:
     """Parse a Python file and return its LST."""
     with open(path, 'r', encoding='utf-8') as f:
         source = f.read()
-    return parse_python_source(source, path, relative_to, ty_client)
+    return parse_python_source(source, path, relative_to, ty_client,
+                               language_level=language_level,
+                               project_language_level=project_language_level)
 
 
-def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None) -> dict:
+def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None,
+                        language_level: Optional[str] = None,
+                        project_language_level: Optional[str] = None) -> dict:
     """Parse Python source code and return its LST.
 
-    The parser used depends on the REWRITE_PYTHON_VERSION environment variable:
-    - "2" or "2.7": Use parso-based Py2ParserVisitor for Python 2 code
-    - "3" (default): Use ast-based ParserVisitor for Python 3 code
+    The parser used depends on the effective language version, resolved in
+    this order (first non-empty wins):
+
+    1. ``language_level`` — explicit per-parse override (from the RPC request).
+    2. In-source signals: PEP-263-style ``# -*- python: 2 -*-`` magic comment,
+       then ``#!/usr/bin/env python2`` shebang.
+    3. ``project_language_level`` — project metadata (pyproject.toml /
+       setup.cfg classifier or ``requires-python``); resolved once per RPC
+       call by the handler.
+    4. ``REWRITE_PYTHON_VERSION`` environment variable (process-wide default).
+
+    Values starting with "2" select the parso-based Py2ParserVisitor; anything
+    else uses the ast-based Python 3 parser.
     """
+    from rewrite.python._version_detect import detect_from_source
+
+    effective_version = (
+        language_level
+        or detect_from_source(source)
+        or project_language_level
+        or _python_version
+    )
+
     # Compute the source_path that will be stored on the LST
     source_path = Path(path)
     if relative_to is not None:
@@ -280,7 +305,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
     try:
         from rewrite import Markers
 
-        if _python_version.startswith("2"):
+        if effective_version.startswith("2"):
             # Python 2: Try Python 3 ast-based parser first (handles most Python 2 code),
             # fall back to parso-based parser for Python 2-specific syntax
             from rewrite.python._parser_visitor import ParserVisitor
@@ -290,7 +315,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
                 cu = ParserVisitor(source, path, ty_client).visit(tree)
             except SyntaxError:
                 from rewrite.python._py2_parser_visitor import Py2ParserVisitor
-                cu = Py2ParserVisitor(source, path, _python_version).parse()
+                cu = Py2ParserVisitor(source, path, effective_version).parse()
         else:
             # Python 3: Use standard ast-based parser
             from rewrite.python._parser_visitor import ParserVisitor
@@ -396,11 +421,21 @@ def handle_parse(params: dict) -> List[str]:
 
     inputs = params.get('inputs', [])
     relative_to = params.get('relativeTo')
+    # Per-parse options forwarded from the client (e.g. {"languageLevel": "2.7"}).
+    # Absent for older clients; absent or unknown keys are silently ignored.
+    options = params.get('options') or {}
+    language_level = options.get('languageLevel')
     results = []
 
     # If no relativeTo provided, try to infer from absolute input paths
     if not relative_to:
         relative_to = _infer_project_root(inputs)
+
+    # Resolve project-level language version once per request; per-file
+    # detection (shebang / magic comment) can still override this inside
+    # parse_python_source.
+    from rewrite.python._version_detect import detect_from_project
+    project_language_level = detect_from_project(relative_to) if relative_to else None
 
     # Create a ty-types client for this parse batch
     ty_client = None
@@ -421,9 +456,13 @@ def handle_parse(params: dict) -> List[str]:
     try:
         for i, input_item in enumerate(inputs):
             if isinstance(input_item, str):
-                result = parse_python_file(input_item, relative_to, ty_client)
+                result = parse_python_file(input_item, relative_to, ty_client,
+                                           language_level=language_level,
+                                           project_language_level=project_language_level)
             elif 'path' in input_item:
-                result = parse_python_file(input_item['path'], relative_to, ty_client)
+                result = parse_python_file(input_item['path'], relative_to, ty_client,
+                                           language_level=language_level,
+                                           project_language_level=project_language_level)
             elif 'text' in input_item or 'source' in input_item:
                 source = input_item.get('text') if 'text' in input_item else input_item.get('source')
                 path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
@@ -436,9 +475,13 @@ def handle_parse(params: dict) -> List[str]:
                     os.makedirs(os.path.dirname(disk_path), exist_ok=True)
                     with open(disk_path, 'w', encoding='utf-8') as f:
                         f.write(source)
-                    result = parse_python_source(source, disk_path, base_dir, ty_client)
+                    result = parse_python_source(source, disk_path, base_dir, ty_client,
+                                                 language_level=language_level,
+                                                 project_language_level=project_language_level)
                 else:
-                    result = parse_python_source(source, path, relative_to, ty_client)
+                    result = parse_python_source(source, path, relative_to, ty_client,
+                                                 language_level=language_level,
+                                                 project_language_level=project_language_level)
             else:
                 logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
                 continue
@@ -459,6 +502,14 @@ def handle_parse_project(params: dict) -> List[dict]:
     project_path = params.get('projectPath', '.')
     exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne'])
     relative_to = params.get('relativeTo') or project_path
+    # Per-request explicit override (mirror of the Parse RPC options carrier).
+    options = params.get('options') or {}
+    language_level = options.get('languageLevel')
+
+    # Resolve project-level language version once for the whole walk; each
+    # file may still override it via in-source signals inside parse_python_source.
+    from rewrite.python._version_detect import detect_from_project
+    project_language_level = detect_from_project(project_path)
 
     results = []
 
@@ -478,7 +529,9 @@ def handle_parse_project(params: dict) -> List[dict]:
                 if file.endswith('.py'):
                     path = os.path.join(root, file)
                     try:
-                        result = parse_python_file(path, relative_to, ty_client)
+                        result = parse_python_file(path, relative_to, ty_client,
+                                                   language_level=language_level,
+                                                   project_language_level=project_language_level)
                         results.append(result)
                     except Exception as e:
                         logger.error(f"Error parsing {path}: {e}")
@@ -602,6 +655,8 @@ def handle_reset(params: dict) -> bool:
     remote_objects.clear()
     remote_refs.clear()
     _prepared_recipes.clear()
+    _prepared_editor_overrides.clear()
+    _prepared_edit_preconditions.clear()
     _execution_contexts.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
@@ -1051,6 +1106,16 @@ def _serialize_value(value) -> Any:
 
 # Prepared recipes storage - maps recipe IDs to recipe instances
 _prepared_recipes: Dict[str, Any] = {}
+# Cached bare-editor visitors keyed by prepared recipe id. Populated at
+# PrepareRecipe time when recipe.editor() returns a Preconditions.check
+# wrapper: we strip the wrapper, register the precondition's wire identity
+# in editPreconditions (so the host evaluates it Java-side), and store the
+# bare editor here. When BatchVisit / Visit dispatches edit:<id> back, we
+# return this bare editor so the precondition does not double-run.
+_prepared_editor_overrides: Dict[str, Any] = {}
+# Per-recipe-edit-phase precondition wire entries collected at PrepareRecipe
+# time from a Preconditions.check(...) wrapper around recipe.editor().
+_prepared_edit_preconditions: Dict[str, List[Dict[str, Any]]] = {}
 # Execution contexts storage - maps context IDs to ExecutionContext instances
 _execution_contexts: Dict[str, Any] = {}
 # Accumulator storage for ScanningRecipes - maps recipe IDs to accumulators
@@ -1143,11 +1208,32 @@ def handle_prepare_recipe(params: dict) -> dict:
     from rewrite.recipe import ScanningRecipe
     is_scanning = isinstance(recipe, ScanningRecipe)
 
+    # Introspect recipe.editor() once at prepare time. If the recipe wrapped
+    # its editor in Preconditions.check(...), we extract the precondition's
+    # wire identity (so the Java host can evaluate it locally and skip the
+    # visit RPC for non-matching files) and cache the bare editor (so a
+    # subsequent dispatch via _instantiate_visitor returns the unwrapped
+    # editor — otherwise the precondition would also run Python-side and
+    # double the cost).
+    edit_preconditions: List[Dict[str, Any]] = list(_get_preconditions(recipe, 'edit'))
+    if not is_scanning:
+        try:
+            editor_visitor = recipe.editor()
+        except Exception:
+            editor_visitor = None
+        if editor_visitor is not None:
+            extracted = _extract_preconditions_from_editor(editor_visitor)
+            if extracted is not None:
+                bare_editor, wire_entries = extracted
+                _prepared_editor_overrides[prepared_id] = bare_editor
+                edit_preconditions.extend(wire_entries)
+    _prepared_edit_preconditions[prepared_id] = edit_preconditions
+
     response = {
         'id': prepared_id,
         'descriptor': _recipe_descriptor_to_dict(descriptor),
         'editVisitor': f'edit:{prepared_id}',
-        'editPreconditions': _get_preconditions(recipe, 'edit'),
+        'editPreconditions': edit_preconditions,
         'scanVisitor': f'scan:{prepared_id}' if is_scanning else None,
         'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
     }
@@ -1164,15 +1250,126 @@ def handle_prepare_recipe(params: dict) -> dict:
 
 
 def _get_preconditions(recipe, phase: str) -> List[dict]:
-    """Get preconditions for a recipe phase.
+    """Baseline preconditions for a recipe phase.
 
-    For now, we add a type precondition to ensure only Python files are visited.
+    Always includes the language gate (only visit Python source files). Recipe-
+    declared preconditions from a ``Preconditions.check(...)`` wrapper around
+    ``recipe.editor()`` are added on top by ``handle_prepare_recipe`` — see
+    :func:`_extract_preconditions_from_editor`.
     """
-    # Add precondition to only visit Python source files
     return [{
         'visitorName': 'org.openrewrite.rpc.internal.FindTreesOfType',
         'visitorOptions': {'type': 'org.openrewrite.python.tree.Py'}
     }]
+
+
+def _extract_preconditions_from_editor(editor_visitor):
+    """Walk a ``Preconditions.check(...)`` wrapper chain on an editor result.
+
+    If ``editor_visitor`` is a :class:`rewrite.preconditions.Check`, returns a
+    tuple ``(bare_editor, [precondition_wire_entry, ...])`` where ``bare_editor``
+    is the innermost non-Check visitor and the wire entries describe each
+    precondition in evaluation order. Returns ``None`` if no Check wrapper
+    is present.
+
+    Each precondition wire entry has shape ``{'visitorName': str,
+    'visitorOptions': dict | None}`` matching ``PrepareRecipeResponse.Precondition``.
+
+    Supported precondition shapes:
+      * ``RecipeCheck`` — uses the wrapped recipe's wire identity
+        (``edit:<id>``) when known.
+      * ``Check`` wrapping a :class:`PreparedJavaRecipe` — uses its
+        ``edit_visitor`` directly.
+      * ``Check`` wrapping a recipe with ``java_recipe_name`` — emits the
+        Java recipe name and options for Java-side instantiation.
+
+    Anything else (a generic in-process ``TreeVisitor`` for unit tests) is
+    not propagated to the wire — those would have to round-trip back to
+    Python anyway, which defeats the point of the precondition optimization.
+    For the in-process / test path the wrapper still works because Python
+    keeps using the wrapper (no override cached); see :class:`Check.visit`.
+    """
+    from rewrite.preconditions import Check, RecipeCheck
+
+    if not isinstance(editor_visitor, Check):
+        return None
+
+    wire_entries: List[Dict[str, Any]] = []
+    inner: Any = editor_visitor
+    while isinstance(inner, Check):
+        wire = _check_wire_entry(inner)
+        if wire is None:
+            # Cannot serialize this check to the wire; abort the optimization
+            # for this editor. Returning None leaves the wrapper intact so
+            # the precondition runs Python-side as a fallback.
+            return None
+        wire_entries.append(wire)
+        inner = inner.wrapped
+    return inner, wire_entries
+
+
+def _check_wire_entry(check) -> Optional[Dict[str, Any]]:
+    """Translate a single :class:`Check` to a precondition wire entry."""
+    from rewrite.preconditions import RecipeCheck
+
+    if isinstance(check, RecipeCheck):
+        recipe = check.recipe
+        prepared_id = _find_prepared_id(recipe)
+        if prepared_id is not None:
+            return {'visitorName': f'edit:{prepared_id}', 'visitorOptions': None}
+        java_name = getattr(recipe, 'java_recipe_name', None)
+        if java_name is not None:
+            options = getattr(recipe, 'delegates_to_options', {})
+            return {'visitorName': java_name, 'visitorOptions': dict(options)}
+        return None
+
+    return _condition_wire_entry(check.check)
+
+
+def _condition_wire_entry(condition) -> Optional[Dict[str, Any]]:
+    """Translate a precondition condition (operand) to a wire entry.
+
+    Mirrors ``PrepareRecipeResponse.Precondition``: leaves carry
+    ``visitorName`` + ``visitorOptions``; composites carry ``op`` +
+    ``operands`` (a list of nested wire entries). Returns ``None`` when
+    the condition can't be serialized — the caller leaves the wrapper
+    intact so the gate runs Python-side as a fallback.
+    """
+    from rewrite.preconditions import CompositePrecondition, RecipeRef
+    from rewrite.rpc.java_recipe import PreparedJavaRecipe
+
+    if isinstance(condition, CompositePrecondition):
+        operands: List[Dict[str, Any]] = []
+        for operand in condition.operands:
+            entry = _condition_wire_entry(operand)
+            if entry is None:
+                return None
+            operands.append(entry)
+        return {'op': condition.op, 'operands': operands}
+
+    # Common case: helpers like uses_method/uses_type return a lightweight
+    # RecipeRef so the recipe author can declare a precondition without firing
+    # an RPC at editor() time. Java's PreparedRecipeCache.instantiateVisitor
+    # constructs the named Recipe via Jackson and uses its visitor.
+    if isinstance(condition, RecipeRef):
+        return {
+            'visitorName': condition.recipe_name,
+            'visitorOptions': dict(condition.options),
+        }
+    if isinstance(condition, PreparedJavaRecipe):
+        return {'visitorName': condition.edit_visitor, 'visitorOptions': None}
+    java_name = getattr(condition, 'java_recipe_name', None)
+    if java_name is not None:
+        options = getattr(condition, 'delegates_to_options', {})
+        return {'visitorName': java_name, 'visitorOptions': dict(options)}
+    return None
+
+
+def _find_prepared_id(recipe) -> Optional[str]:
+    for prep_id, prep_recipe in _prepared_recipes.items():
+        if prep_recipe is recipe:
+            return prep_id
+    return None
 
 
 def handle_visit(params: dict) -> dict:
@@ -1317,8 +1514,10 @@ def handle_batch_visit(params: dict) -> dict:
         modified = after is not before
         deleted = after is None
 
-        # Diff SearchResult IDs against the running set
-        if deleted:
+        # Diff SearchResult IDs against the running set. When the visitor
+        # didn't modify the tree, no new SearchResult markers were added
+        # — skip the full-tree walk in that case.
+        if deleted or not modified:
             search_result_ids = []
         else:
             after_ids = _collect_search_result_ids(after)
@@ -1401,6 +1600,13 @@ def _instantiate_visitor(visitor_name: str, ctx):
             acc = _recipe_accumulators[recipe_id]
             return recipe.editor_with_data(acc)
 
+        # If the recipe wrapped its editor in Preconditions.check(...) and we
+        # captured the bare editor at PrepareRecipe time, return it here so
+        # the precondition does not double-run on the Python side. The host
+        # has already evaluated it via the editPreconditions wire slot.
+        override = _prepared_editor_overrides.get(recipe_id)
+        if override is not None:
+            return override
         return recipe.editor()
 
     elif visitor_name.startswith('scan:'):

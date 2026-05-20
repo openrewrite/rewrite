@@ -230,22 +230,13 @@ testing {
     }
 }
 
-// This task creates a `.npmrc` file with the given token, so that the `npm publish` succeeds
-// For local development the user would typically have a `~/.npmrc` file with the token in it
-val setupNpmrc = tasks.register("setupNpmrc") {
-    doLast {
-        if (project.hasProperty("nodeAuthToken")) {
-            val npmrcFile = file("rewrite/.npmrc")
-            npmrcFile.writeText("//registry.npmjs.org/:_authToken=${project.property("nodeAuthToken")}\n")
-        }
-    }
-}
-
-// Implicitly `--tag latest` if not specified
+// Implicitly `--tag latest` if not specified.
+// Auth is via npm Trusted Publisher (OIDC) from GitHub Actions — the `permissions: id-token: write`
+// block on the calling workflow exports `ACTIONS_ID_TOKEN_REQUEST_URL`, which `npm publish` auto-detects
+// and exchanges for a short-lived registry token. Local publishes use the developer's `~/.npmrc`.
 val npmPublish = tasks.register<NpmTask>("npmPublish") {
     inputs.files(npmPack)
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    dependsOn(setupNpmrc)
 
     args = provider { listOf("publish", npmPack.get().archiveFile.get().asFile.absolutePath) }
     if (!project.hasProperty("releasing")) {
@@ -263,9 +254,8 @@ val npmPublish = tasks.register<NpmTask>("npmPublish") {
             .directory(file("rewrite"))
             .redirectErrorStream(true)
             .start()
-        process.waitFor()
         val output = process.inputStream.bufferedReader().readText().trim()
-        val alreadyPublished = output.contains(versionToCheck)
+        val alreadyPublished = process.waitFor() == 0 && output.contains(versionToCheck)
         if (alreadyPublished) {
             logger.lifecycle("Skipping npmPublish: @openrewrite/rewrite@$versionToCheck already published")
         }
@@ -273,9 +263,10 @@ val npmPublish = tasks.register<NpmTask>("npmPublish") {
     }
 }
 
-tasks.named("publish") {
-    dependsOn(npmPublish)
-}
+// npm publishing is intentionally NOT wired into the standard `publish` task —
+// it runs in its own `.github/workflows/npm-publish.yml` so the dedicated workflow filename
+// can be matched by the package's npm Trusted Publisher (OIDC) record. CI/release workflows
+// still publish to Sonatype, PyPI, NuGet as before.
 
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
+using static OpenRewrite.CSharp.Recipes.Categories;
 using OpenRewrite.Xml;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -23,6 +24,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// Changes the target framework in .csproj files.
 /// Handles both single-TFM and multi-TFM elements.
 /// </summary>
+[Category, Csproj]
 public class ChangeDotNetTargetFramework : ScanningRecipe<DotNetBuildContext>
 {
     public override string DisplayName => "Change .NET target framework";
@@ -41,6 +43,14 @@ public class ChangeDotNetTargetFramework : ScanningRecipe<DotNetBuildContext>
         Example = "net9.0")]
     public string NewTargetFramework { get; set; } = "";
 
+    [Option(DisplayName = "Regenerate MSBuild marker",
+        Description = "Whether to re-run `dotnet restore` after the edit to refresh the project's " +
+                      "MSBuildProject marker. Defaults to `true`. Composite recipes that chain " +
+                      "multiple csproj-mutating steps may set this to `false` on intermediate steps " +
+                      "and finalize once with `EnsureCsprojAttestation`.",
+        Required = false)]
+    public bool RegenerateMarker { get; set; } = true;
+
     public override DotNetBuildContext GetInitialValue(ExecutionContext ctx) => DotNetBuildContext.GetOrCreate(ctx);
 
     public override ITreeVisitor<ExecutionContext> GetScanner(DotNetBuildContext acc) => new BuildContextScanner();
@@ -49,6 +59,6 @@ public class ChangeDotNetTargetFramework : ScanningRecipe<DotNetBuildContext>
     {
         return Preconditions.Check(
             new IsProjectFile(),
-            new ChangeDotNetTargetFrameworkVisitor(OldTargetFramework, NewTargetFramework));
+            new ChangeDotNetTargetFrameworkVisitor(OldTargetFramework, NewTargetFramework, RegenerateMarker));
     }
 }

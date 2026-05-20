@@ -65,6 +65,7 @@ import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.*;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.countOccurrences;
 import static org.openrewrite.internal.StringUtils.indexOf;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -2606,6 +2607,11 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         for (int k = last - 1; k >= 0; k--) {
             Comment c = comments.get(k);
             if (!c.isMultiline() && c instanceof TextComment tc && tc.getText().startsWith("/")) {
+                // A blank line between two `///` blocks separates them into distinct
+                // doc comments per JEP 467; only merge when the suffix contains a single line break.
+                if (countOccurrences(c.getSuffix(), "\n") > 1) {
+                    break;
+                }
                 first = k;
             } else {
                 break;

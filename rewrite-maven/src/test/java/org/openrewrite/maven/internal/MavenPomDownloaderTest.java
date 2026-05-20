@@ -36,13 +36,15 @@ import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -59,6 +61,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
+import static org.openrewrite.test.SourceSpecs.text;
 
 @SuppressWarnings({"HttpUrlsUsage"})
 class MavenPomDownloaderTest implements RewriteTest {
@@ -205,6 +208,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void onlyAccessRequiredRepositories() throws Exception {
             var ctx = MavenExecutionContextView.view(this.ctx);
+            ctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
             // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
             for (MavenRepository repository : ctx.getRepositories()) {
                 repository.setKnownToExist(true);
@@ -253,6 +257,9 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void mirrorsOverrideRepositoriesInPom() {
             var ctx = MavenExecutionContextView.view(this.ctx);
+            // normalizeRepository probes the mirror over HTTP; the class-level 250ms timeout
+            // is too aggressive under suite load and causes the probe to return null.
+            HttpSenderExecutionContextView.view(this.ctx).setHttpSender(new HttpUrlConnectionSender());
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
@@ -1122,6 +1129,7 @@ class MavenPomDownloaderTest implements RewriteTest {
 
         @Test
         void canResolveDifferentVersionOfProjectPom() {
+            MavenExecutionContextView.view(ctx).setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
             var gav = new GroupArtifactVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0");
 
             Path pomPath = Path.of("pom.xml");
@@ -1586,7 +1594,9 @@ class MavenPomDownloaderTest implements RewriteTest {
 
     @Test
     void resolveDependencies() throws Exception {
-        var doc = (Xml.Document) MavenParser.builder().build().parse("""
+        var ctx = new InMemoryExecutionContext();
+        MavenExecutionContextView.view(ctx).setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
+        var doc = (Xml.Document) MavenParser.builder().build().parse(ctx, """
           <project>
               <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -1606,7 +1616,6 @@ class MavenPomDownloaderTest implements RewriteTest {
               </dependencies>
           </project>
           """).toList().getFirst();
-        var ctx = new InMemoryExecutionContext();
         MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
           .resolveDependencies(new MavenPomDownloader(emptyMap(), ctx, null, null), ctx);
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
@@ -1619,7 +1628,9 @@ class MavenPomDownloaderTest implements RewriteTest {
         // `azure-spring-data-cosmos` brings in `azure-core-http-netty`, which uses property `<boring-ssl-classifier/>`
         // https://repo1.maven.org/maven2/com/azure/azure-spring-data-cosmos/3.45.0/azure-spring-data-cosmos-3.45.0.pom
         // https://repo1.maven.org/maven2/com/azure/azure-core-http-netty/1.16.2/azure-core-http-netty-1.16.2.pom
-        var doc = (Xml.Document) MavenParser.builder().build().parse("""
+        var ctx = new InMemoryExecutionContext();
+        MavenExecutionContextView.view(ctx).setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
+        var doc = (Xml.Document) MavenParser.builder().build().parse(ctx, """
           <project>
               <groupId>com.example</groupId>
               <artifactId>demo</artifactId>
@@ -1636,7 +1647,6 @@ class MavenPomDownloaderTest implements RewriteTest {
               </dependencies>
           </project>
           """).toList().getFirst();
-        var ctx = new InMemoryExecutionContext();
         MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
           .resolveDependencies(new MavenPomDownloader(emptyMap(), ctx, null, null), ctx);
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
@@ -1649,5 +1659,35 @@ class MavenPomDownloaderTest implements RewriteTest {
           .doesNotContain("something-else")
           .contains("")
           .anyMatch(c -> !"".equals(c));
+    }
+
+    @Test
+    void doesNotThrowONMissingModuleWhenNot404() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new PlainTextVisitor<>() {
+              @Override
+              public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                  List<MavenRepository> repositories = singletonList(new MavenRepository("cache-3", "https://artifactory.moderne.ninja/artifactory/moderne-cache-3/", null, null, null, null, null));
+                  GroupArtifact unexisting = new GroupArtifact("org.springframework.integration", "fail");
+                  GroupArtifact existing = new GroupArtifact("org.springframework.integration", "spring-integration-bom");
+                  MavenPomDownloader downloader = new MavenPomDownloader(ctx);
+
+                  //Artifactory virtual anonymous repo returns 401 on unexisting and 404 for authenticated unexisting
+                  assertThrows(MavenDownloadingException.class, () -> downloader.downloadMetadata(unexisting, null, repositories));
+                  assertDoesNotThrow(() -> downloader.downloadMetadata(existing, null, repositories));
+                  //Artifactory virtual anonymous repo returns 401 on unexisting and 404 for authenticated unexisting
+                  assertThrows(MavenDownloadingException.class, () -> downloader.downloadMetadata(new GroupArtifactVersion("com.fasterxml.jackson", "jackson-base", "2.19.3"), null, repositories));
+                  //Artifactory virtual returns 200 anonymous and authenticated existing
+                  assertDoesNotThrow(() -> downloader.downloadMetadata(new GroupArtifactVersion("com.fasterxml.jackson", "jackson-base", "2.19.3-SNAPSHOT"), null, repositories));
+                  //Artifactory virtual anonymous repo returns 401 on unexisting and 404 for authenticated unexisting
+                  assertThrows(MavenDownloadingException.class, () -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.-1"), null, null, repositories));
+                  //Artifactory virtual returns 200 anonymous and authenticated existing
+                  assertDoesNotThrow(() -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.0"), null, null, repositories));
+
+                  return super.visitText(text, ctx);
+              }
+          })),
+          text("")
+        );
     }
 }

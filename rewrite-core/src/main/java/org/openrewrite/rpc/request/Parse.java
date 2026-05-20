@@ -42,6 +42,15 @@ public class Parse implements RpcRequest {
     @Nullable
     String relativeTo;
 
+    /**
+     * Optional, parser-specific options forwarded to the RPC server. The handler
+     * interprets keys it recognizes and silently ignores the rest. Older clients
+     * that do not send this field deserialize to {@code null}, in which case the
+     * handler falls back to its process-wide defaults.
+     */
+    @Nullable
+    Map<String, String> options;
+
     @Value
     public static class Input {
         @Nullable

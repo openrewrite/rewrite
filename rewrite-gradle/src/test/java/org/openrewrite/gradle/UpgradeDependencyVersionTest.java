@@ -369,6 +369,54 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    /**
+     * The shared {@code guavaVersion} variable is used by the targeted artifact ({@code guava}) and
+     * by a neighbor ({@code guava-testlib}) that the recipe matcher does not match.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "def guavaVersion = 'VERSION'",
+      "ext { guavaVersion = 'VERSION' }"
+    })
+    void sharedVersionVariableWithUntargetedNeighbour(String variableDeclarationTemplate) {
+        String beforeDeclaration = variableDeclarationTemplate.replace("VERSION", "29.0-jre");
+        String afterDeclaration = variableDeclarationTemplate.replace("VERSION", "30.1.1-jre");
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              %s
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation "com.google.guava:guava:$guavaVersion"
+                implementation "com.google.guava:guava-testlib:$guavaVersion"
+              }
+              """.formatted(beforeDeclaration),
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              %s
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation "com.google.guava:guava:$guavaVersion"
+                implementation "com.google.guava:guava-testlib:$guavaVersion"
+              }
+              """.formatted(afterDeclaration)
+          )
+        );
+    }
+
     @Test
     void updateVersionInVariableToRelease() {
         rewriteRun(
@@ -879,6 +927,135 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
               dependencies {
                   implementation "com.google.guava:guava:${guavaVersion2}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCorruptSharedKotlinValVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation("com.fasterxml.jackson.core", "jackson-annotations", jacksonVersion)
+                  implementation("com.fasterxml.jackson.core", "jackson-core", jacksonVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation("com.fasterxml.jackson.core", "jackson-annotations", "2.21")
+                  implementation("com.fasterxml.jackson.core", "jackson-core", jacksonVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCorruptSharedExtProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  jacksonVersion = "2.17.3"
+              }
+
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-annotations:${jacksonVersion}"
+                  implementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  jacksonVersion = "2.17.3"
+              }
+
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-annotations:2.21"
+                  implementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCorruptSharedGradleProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null)),
+          properties(
+            """
+              jacksonVersion=2.17.3
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-annotations:${jacksonVersion}"
+                  implementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-annotations:2.21"
+                  implementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
               }
               """
           )

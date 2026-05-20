@@ -18,6 +18,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using NuGet.Versioning;
 using OpenRewrite.Core;
+using static OpenRewrite.CSharp.Recipes.Categories;
 using OpenRewrite.Xml;
 using Serilog;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -29,6 +30,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// Uses NuGet.Versioning for version parsing and comparison, correctly handling
 /// NuGet version ranges, 4-part versions, and prerelease labels.
 /// </summary>
+[Category, Csproj]
 public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVersion.Accumulator>
 {
     public override string DisplayName => "Upgrade NuGet package version";
@@ -53,6 +55,14 @@ public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVers
         Description = "Whether to include prerelease versions when resolving 'latest' or ranges.",
         Required = false)]
     public bool IncludePrerelease { get; set; }
+
+    [Option(DisplayName = "Regenerate MSBuild marker",
+        Description = "Whether to re-run `dotnet restore` after the edit to refresh the project's " +
+                      "MSBuildProject marker. Defaults to `true`. Composite recipes that chain " +
+                      "multiple csproj-mutating steps may set this to `false` on intermediate steps " +
+                      "and finalize once with `EnsureCsprojAttestation`.",
+        Required = false)]
+    public bool RegenerateMarker { get; set; } = true;
 
     public class Accumulator
     {
@@ -92,7 +102,7 @@ public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVers
     {
         return Preconditions.Check(
             new IsProjectFile(),
-            new UpgradeNuGetPackageVersionVisitor(PackageName, acc.ResolvedVersions, acc.PropertyUpdates));
+            new UpgradeNuGetPackageVersionVisitor(PackageName, acc.ResolvedVersions, acc.PropertyUpdates, RegenerateMarker));
     }
 
     /// <summary>

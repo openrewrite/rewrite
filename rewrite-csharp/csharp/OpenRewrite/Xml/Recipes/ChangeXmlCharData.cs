@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
+using static OpenRewrite.CSharp.Recipes.Categories;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Xml.Recipes;
@@ -22,6 +23,7 @@ namespace OpenRewrite.Xml.Recipes;
 /// A simple XML recipe that replaces text content in CharData nodes.
 /// Used for testing the XML RPC bridge.
 /// </summary>
+[Category, Xml]
 public class ChangeXmlCharData : Recipe
 {
     public override string DisplayName => "Change XML CharData text";
@@ -52,6 +54,7 @@ public class ChangeXmlCharData : Recipe
 /// A recipe that changes an XML attribute value by key name.
 /// Used for testing the XML RPC bridge.
 /// </summary>
+[Category, Xml]
 public class ChangeXmlAttribute : Recipe
 {
     public override string DisplayName => "Change XML attribute value";

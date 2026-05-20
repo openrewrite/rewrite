@@ -2989,5 +2989,20 @@ class JavadocTest implements RewriteTest {
               )
             );
         }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/7554")
+        @Test
+        void twoTripleSlashBlocksSeparatedByBlankLine() {
+            rewriteRun(
+              java(
+                """
+                  /// First doc-comment block.
+
+                  /// Second doc-comment block.
+                  class Test {}
+                  """
+              )
+            );
+        }
     }
 }

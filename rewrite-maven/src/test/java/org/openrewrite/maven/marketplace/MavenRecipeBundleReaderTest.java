@@ -31,6 +31,7 @@ import org.openrewrite.marketplace.RecipeClassLoader;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.maven.MavenExecutionContextView;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
@@ -55,7 +56,9 @@ class MavenRecipeBundleReaderTest {
     void setUp() {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
         HttpSenderExecutionContextView.view(ctx).setHttpSender(new HttpUrlConnectionSender());
-        MavenExecutionContextView.view(ctx).setAddCentralRepository(true);
+        MavenExecutionContextView.view(ctx)
+                .setAddCentralRepository(true)
+                .setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
 
         LocalMavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir.resolve("artifacts"));
         MavenArtifactDownloader downloader = new MavenArtifactDownloader(

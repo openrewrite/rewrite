@@ -23,6 +23,86 @@ import static org.openrewrite.scala.Assertions.scala;
 class VariableDeclarationsTest implements RewriteTest {
 
     @Test
+    void extraSpaceBetweenAnnotationAndVal() {
+        rewriteRun(
+          scala(
+            """
+            class Test {
+              @deprecated   val x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void annotationNewlineBeforeModifier() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              @deprecated
+              private var x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void extraSpaceBetweenModifierAndVal() {
+        rewriteRun(
+          scala(
+            """
+            class Test {
+              private   val x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void modifierExtraSpaceBeforeVar() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              private  var x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void annotationExtraSpaceBeforeVar() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              @deprecated  var x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void annotationNewlineBeforeVar() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              @deprecated
+              var x = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void valDeclaration() {
         rewriteRun(
           scala("val x = 5")
@@ -109,6 +189,42 @@ class VariableDeclarationsTest implements RewriteTest {
     void valWithNoInitializer() {
         rewriteRun(
           scala("var x: Int = _")
+        );
+    }
+
+    @Test
+    void tuplePatternWithExtraSpace() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val pair = (1, 2)
+              val (a, b) = pair
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitValDef — `(` in line comment between `val` and tuple pattern
+        rewriteRun(
+          scala(
+            """
+            val // (
+            (a, b) = (1, 2)
+            """
+          )
+        );
+        // visitValDef — `_` in line comment between `val` and underscore pattern
+        rewriteRun(
+          scala(
+            """
+            val // _
+            _ = println("x")
+            """
+          )
         );
     }
 }

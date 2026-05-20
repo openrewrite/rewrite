@@ -229,16 +229,15 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return maven;
                 }
 
-                // If the dependency is already in compile scope it will be available everywhere, no need to continue
+                // If the dependency is already on the classpath as a transitive dependency (and the recipe accepts that),
+                // no direct declaration is needed. Direct duplicates are handled by AddDependencyVisitor below.
                 Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
                 if (dependencies.get(Scope.Compile) != null) {
                     for (ResolvedDependency d : dependencies.get(Scope.Compile)) {
-                        if (hasAcceptableTransitivity(d, acc) &&
+                        if (d.isTransitive() &&
+                            hasAcceptableTransitivity(d, acc) &&
                             groupId.equals(d.getGroupId()) &&
-                            artifactId.equals(d.getArtifactId()) &&
-                            (d.isTransitive() ||
-                                    (d.isDirect() && version.equals(d.getVersion())))
-                        ) {
+                            artifactId.equals(d.getArtifactId())) {
                             return maven;
                         }
                     }
@@ -248,7 +247,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 Scope resolvedScopeEnum = Scope.fromName(resolvedScope);
                 if ((resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) && dependencies.get(resolvedScopeEnum) != null) {
                     for (ResolvedDependency d : dependencies.get(resolvedScopeEnum)) {
-                        if (hasAcceptableTransitivity(d, acc) &&
+                        if (d.isTransitive() &&
+                                hasAcceptableTransitivity(d, acc) &&
                                 groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                             return maven;
                         }

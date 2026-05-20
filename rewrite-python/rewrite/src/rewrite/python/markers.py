@@ -89,6 +89,58 @@ class SuppressNewline(Marker):
 
 
 @dataclass(frozen=True, eq=False)
+class LegacyNotEqual(Marker):
+    """Marker for the Python 2 ``<>`` not-equal operator on a :class:`j.Binary`.
+
+    The default printer renders ``Binary.Type.NotEqual`` as ``!=``; when
+    this marker is present it emits the legacy ``<>`` spelling instead.
+    """
+    _id: UUID
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    def with_id(self, id_: UUID) -> 'LegacyNotEqual':
+        return self if id_ is self._id else replace(self, _id=id_)
+
+
+@dataclass(frozen=True, eq=False)
+class RaiseTuple(Marker):
+    """Marker for the Python 2 three-argument ``raise E, v, tb`` form on a :class:`j.Throw`.
+
+    The exception slot of the Throw is a tuple literal of the three operands;
+    when this marker is present the printer drops the parentheses and renders
+    the legacy comma-separated form instead.
+    """
+    _id: UUID
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    def with_id(self, id_: UUID) -> 'RaiseTuple':
+        return self if id_ is self._id else replace(self, _id=id_)
+
+
+@dataclass(frozen=True, eq=False)
+class TupleExceptClause(Marker):
+    """Marker for the Python 2 ``except E, e:`` (comma) form on a J.Try.Catch.
+
+    The default printer renders the catch as ``except E as e:``; when this
+    marker is present it should emit the Py2 comma-based syntax instead.
+    """
+    _id: UUID
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    def with_id(self, id_: UUID) -> 'TupleExceptClause':
+        return self if id_ is self._id else replace(self, _id=id_)
+
+
+@dataclass(frozen=True, eq=False)
 class PrintSyntax(Marker):
     """Marker indicating a J.MethodInvocation represents a Python 2 print statement.
 

@@ -25,7 +25,7 @@ def test_handle_parse_preserves_empty_text(tmp_path, monkeypatch):
     observed = {}
 
     # given
-    def fake_parse_python_source(source, path="<unknown>", relative_to=None, ty_client=None):
+    def fake_parse_python_source(source, path="<unknown>", relative_to=None, ty_client=None, **_):
         observed["source"] = source
         observed["path"] = path
         return {"id": "empty-file"}

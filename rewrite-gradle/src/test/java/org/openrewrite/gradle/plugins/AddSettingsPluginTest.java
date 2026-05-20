@@ -15,7 +15,6 @@
  */
 package org.openrewrite.gradle.plugins;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -115,7 +114,6 @@ class AddSettingsPluginTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void addPluginApplyFalse() {
         rewriteRun(
           spec -> spec.beforeRecipe(withToolingApi())

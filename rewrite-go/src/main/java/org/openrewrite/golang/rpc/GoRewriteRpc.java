@@ -400,15 +400,14 @@ public class GoRewriteRpc extends RewriteRpc {
             String binaryPath;
             if (goBinaryPath != null) {
                 binaryPath = goBinaryPath.toString();
+            } else if (recipeInstallDir != null &&
+                    Files.isExecutable(recipeInstallDir.resolve("rewrite-go-rpc"))) {
+                // The installer rebuilds the RPC binary with recipe modules linked in
+                // and drops it at <recipeInstallDir>/rewrite-go-rpc. Prefer it so
+                // subsequent runs can execute the installed recipes.
+                binaryPath = recipeInstallDir.resolve("rewrite-go-rpc").toString();
             } else {
-                // Check for a custom binary with installed recipes
-                Path customBin = Paths.get(
-                        System.getProperty("user.home"), ".rewrite", "go-recipes", "rewrite-go-rpc");
-                if (Files.isExecutable(customBin)) {
-                    binaryPath = customBin.toString();
-                } else {
-                    binaryPath = "rewrite-go-rpc";
-                }
+                binaryPath = "rewrite-go-rpc";
             }
 
             Stream<@Nullable String> cmd = Stream.of(

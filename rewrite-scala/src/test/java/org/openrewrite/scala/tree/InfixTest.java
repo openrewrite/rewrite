@@ -15,6 +15,7 @@
  */
 package org.openrewrite.scala.tree;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
@@ -65,9 +66,18 @@ class InfixTest implements RewriteTest {
     }
 
     @Test
-    void rightAssocWithExtraWhitespace() {
+    void extraSpace() {
         rewriteRun(
-          scala("val xs = 1  ::  Nil")
+          scala(
+            """
+            import scala.language.postfixOps
+            object Test {
+              val rightAssoc = 1  ::  Nil
+              val binary = 1  +  2
+              val postfix = List(1, 2)  reverse
+            }
+            """
+          )
         );
     }
 
@@ -128,5 +138,219 @@ class InfixTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Test
+    void noSpaceOnTheRight() {
+        rewriteRun(
+          scala(
+            """
+            val plus = 1 +2
+            val minus = 5 -3
+            val mul = 2 *3
+            val div = 10 /2
+            val mod = 10 %3
+            val eq = 1 ==2
+            val neq = 1 !=2
+            val lt = 1 <2
+            val gt = 2 >1
+            val lte = 1 <=2
+            val gte = 2 >=1
+            val and = true &&false
+            val or = true ||false
+            val bitAnd = 1 &2
+            val bitOr = 1 |2
+            val xor = 1 ^2
+            val shl = 1 <<2
+            val shr = 8 >>2
+            val arrow = Map(1 ->2)
+            val cons = 1 ::Nil
+            object T {
+              var x = 10
+              x +=5
+              x -=5
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void noSpaceOnTheLeft() {
+        rewriteRun(
+          scala(
+            """
+            val arrowLeft = Map(key-> "true")
+            val plusNone = 1+2
+            val plusLeft = 1+ 2
+            val plusRight = 1 +2
+            val eqNone = 1==2
+            val arrowBoth = Map(1->2)
+            """
+          )
+        );
+    }
+
+    @Nested
+    class Postfix implements RewriteTest {
+
+        @Test
+        void chainInsideBlock() {
+            rewriteRun(
+              scala(
+                """
+                import scala.language.postfixOps
+                val r = {
+                  x must not beNull
+                }
+                """
+              )
+            );
+        }
+
+        @Test
+        void simple() {
+            rewriteRun(
+              scala(
+                """
+                import scala.language.postfixOps
+                val r = x foo
+                """
+              )
+            );
+        }
+
+        @Test
+        void onLiteral() {
+            rewriteRun(
+              scala(
+                """
+                import scala.language.postfixOps
+                val r = 5 toString
+                """
+              )
+            );
+        }
+
+        @Test
+        void onParenthesizedExpression() {
+            rewriteRun(
+              scala(
+                """
+                import scala.language.postfixOps
+                val r = (1 + 2) toString
+                """
+              )
+            );
+        }
+
+        @Test
+        void onMethodCall() {
+            rewriteRun(
+              scala(
+                """
+                import scala.language.postfixOps
+                val r = List(1, 2, 3).head toString
+                """
+              )
+            );
+        }
+
+        @Test
+        void asMiddleStatement() {
+            rewriteRun(
+              scala(
+                """
+                import scala.language.postfixOps
+                val r = {
+                  x foo
+                  y bar
+                  z
+                }
+                """
+              )
+            );
+        }
+
+        @Test
+        void insideMethodBody() {
+            rewriteRun(
+              scala(
+                """
+                import scala.language.postfixOps
+                object Test {
+                  def run() = {
+                    val x = 1
+                    x must not beNull
+                  }
+                }
+                """
+              )
+            );
+        }
+
+        @Test
+        void withSemicolon() {
+            rewriteRun(
+              scala(
+                """
+                import scala.language.postfixOps
+                val r = { x foo; y }
+                """
+              )
+            );
+        }
+
+        @Test
+        void inIfBranch() {
+            rewriteRun(
+              scala(
+                """
+                import scala.language.postfixOps
+                val r = if (true) x foo else y bar
+                """
+              )
+            );
+        }
+
+        @Test
+        void inMatchCase() {
+            rewriteRun(
+              scala(
+                """
+                import scala.language.postfixOps
+                val r = x match {
+                  case 1 => y foo
+                  case _ => z bar
+                }
+                """
+              )
+            );
+        }
+
+        @Test
+        void asLastInBlockNoNewline() {
+            rewriteRun(
+              scala(
+                """
+                import scala.language.postfixOps
+                val r = { x foo }
+                """
+              )
+            );
+        }
+
+        @Test
+        void inForYield() {
+            rewriteRun(
+              scala(
+                """
+                import scala.language.postfixOps
+                val r = for (i <- List(1)) yield i toString
+                """
+              )
+            );
+        }
+
     }
 }

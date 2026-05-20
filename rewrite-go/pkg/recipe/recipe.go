@@ -58,10 +58,6 @@ type Recipe interface {
 	// Options returns descriptors for this recipe's configurable options.
 	Options() []OptionDescriptor
 
-	// Preconditions returns sub-recipes that gate execution: this recipe only runs
-	// when all preconditions match. May be nil.
-	Preconditions() []Recipe
-
 	// DataTables returns descriptors for any DataTable rows this recipe emits.
 	// May be nil. The runtime for writing rows is provided by the DataTable
 	// type and DataTableStore (separate from these descriptors).
@@ -92,7 +88,6 @@ func (Base) EstimatedEffortPerOccurrence() time.Duration { return 5 * time.Minut
 func (Base) Editor() TreeVisitor                         { return nil }
 func (Base) RecipeList() []Recipe                        { return nil }
 func (Base) Options() []OptionDescriptor                 { return nil }
-func (Base) Preconditions() []Recipe                     { return nil }
 func (Base) DataTables() []DataTableDescriptor           { return nil }
 func (Base) Maintainers() []Maintainer                   { return nil }
 func (Base) Contributors() []Contributor                 { return nil }
@@ -227,6 +222,12 @@ type ExampleSource struct {
 }
 
 // RecipeDescriptor provides metadata about a recipe for display and serialization.
+//
+// Note: the Preconditions field carries declarative-recipe metadata
+// (the Java RecipeDescriptor.preconditions list, for YAML
+// DeclarativeRecipe). Runtime precondition gates are expressed via the
+// preconditions package's Check wrapper around Editor() and travel
+// through the editPreconditions wire slot, not this descriptor field.
 type RecipeDescriptor struct {
 	Name                         string
 	DisplayName                  string
@@ -243,8 +244,8 @@ type RecipeDescriptor struct {
 }
 
 // Describe creates a RecipeDescriptor from a Recipe. Recursive descriptors
-// (RecipeList, Preconditions) are protected against cycles via a visited set
-// keyed by recipe name; if a recipe name re-appears in the descent, a stub
+// (RecipeList) are protected against cycles via a visited set keyed by
+// recipe name; if a recipe name re-appears in the descent, a stub
 // descriptor with just the name and display name is returned in its place.
 func Describe(r Recipe) RecipeDescriptor {
 	return describe(r, map[string]bool{})
@@ -274,12 +275,6 @@ func describe(r Recipe, seen map[string]bool) RecipeDescriptor {
 		desc.RecipeList = make([]RecipeDescriptor, len(subs))
 		for i, sub := range subs {
 			desc.RecipeList[i] = describe(sub, seen)
-		}
-	}
-	if pres := r.Preconditions(); len(pres) > 0 {
-		desc.Preconditions = make([]RecipeDescriptor, len(pres))
-		for i, pre := range pres {
-			desc.Preconditions[i] = describe(pre, seen)
 		}
 	}
 	return desc

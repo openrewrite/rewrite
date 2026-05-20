@@ -23,6 +23,28 @@ import static org.openrewrite.scala.Assertions.scala;
 class CompilationUnitTest implements RewriteTest {
 
     @Test
+    void packageWithSemicolonBeforeImport() {
+        rewriteRun(
+          scala(
+            """
+            package foo;import bar.X
+            """
+          )
+        );
+    }
+
+    @Test
+    void packageWithSemicolonBeforeStatement() {
+        rewriteRun(
+          scala(
+            """
+            package foo;class Bar
+            """
+          )
+        );
+    }
+
+    @Test
     void emptyFile() {
         rewriteRun(
           scala("")
@@ -166,15 +188,238 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Test
+    void packageWithBraces() {
+        rewriteRun(
+          scala(
+            """
+            package foo.bar {
+              val x = 42
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedPackage() {
+        rewriteRun(
+          scala(
+            """
+            package com.example:
+              val x = 42
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedIfThenElse() {
+        rewriteRun(
+          scala(
+            """
+            val x =
+              if true then
+                1
+              else
+                2
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedWhileDo() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              var i = 0
+              while i < 10 do
+                i = i + 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedForYield() {
+        rewriteRun(
+          scala(
+            """
+            object O:
+              val xs =
+                for i <- 1 to 10
+                yield i * 2
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedTryCatch() {
+        rewriteRun(
+          scala(
+            """
+            val x =
+              try
+                42
+              catch
+                case _: Exception => 0
+            """
+          )
+        );
+    }
+
+    @Test
+    void indentedMatch() {
+        rewriteRun(
+          scala(
+            """
+            val x = 1 match
+              case 1 => "one"
+              case _ => "other"
+            """
+          )
+        );
+    }
+
+    @Test
     void withTrailingWhitespace() {
         rewriteRun(
           scala(
             """
             val x = 42
-            
-            
+
+
             """
           )
         );
     }
+
+    @Test
+    void foldLeftWithColonPartialFunction() {
+        rewriteRun(
+          scala(
+            """
+            val x = List(1, 2, 3).foldLeft(0):
+              case (acc, n) if n > 0 => acc + n
+              case (acc, _) => acc
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedMethodWithColonLambda() {
+        rewriteRun(
+          scala(
+            """
+            val x = List(1, 2, 3).foldLeft(0): (acc, n) =>
+              acc + n
+            """
+          )
+        );
+    }
+
+    @Test
+    void chainedMethodWithColonLambda() {
+        rewriteRun(
+          scala(
+            """
+            val x = List(1, 2).map: i =>
+              i + 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void topLevelMethodWithColonLambda() {
+        rewriteRun(
+          scala(
+            """
+            def f(g: Int => Int): Int = g(1)
+            val x = f: i =>
+              i + 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void chainedMethodWithColonPartialFunction() {
+        rewriteRun(
+          scala(
+            """
+            val x = List(1, 2).map:
+              case 1 => "one"
+              case _ => "other"
+            """
+          )
+        );
+    }
+
+    @Test
+    void colonArgWithMultilineBlock() {
+        rewriteRun(
+          scala(
+            """
+            def f(body: => Int): Int = body
+            val x = f:
+              val y = 1
+              y + 2
+            """
+          )
+        );
+    }
+
+    @Test
+    void typeApplyMethodWithColonArg() {
+        rewriteRun(
+          scala(
+            """
+            def f[A](g: A => A): Int = 0
+            val x = f[Int]:
+              n => n + 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void contextFunctionWithWildcardParam() {
+        rewriteRun(
+          scala(
+            """
+            val f: Int ?=> Int = _ ?=> 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void contextFunctionWithNamedParam() {
+        rewriteRun(
+          scala(
+            """
+            val f: Int ?=> Int = x ?=> x + 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void nestedColonArgLambdas() {
+        rewriteRun(
+          scala(
+            """
+            def f(g: Int => Int => Int): Int = 0
+            val x = f: a =>
+              b =>
+                a + b
+            """
+          )
+        );
+    }
+
 }

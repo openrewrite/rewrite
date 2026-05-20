@@ -39,6 +39,7 @@ import (
 	"github.com/grafana/pyroscope-go"
 
 	goparser "github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/preconditions"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
@@ -88,6 +89,12 @@ type server struct {
 	// Prepared recipe instances keyed by unique ID
 	preparedRecipes map[string]recipe.Recipe
 
+	// Bare editor cached at PrepareRecipe time when an editor was wrapped in
+	// preconditions.Check(...). Subsequent dispatch via instantiateVisitor
+	// returns the unwrapped editor — otherwise the precondition would also
+	// run Go-side and double the cost. Keyed by the prepared recipe ID.
+	preparedEditorOverrides map[string]recipe.TreeVisitor
+
 	// Per-prepared-recipe accumulator for ScanningRecipe. Lazily created on
 	// the first scan Visit call. Lifetime = prepared recipe instance; freed
 	// only on Reset (per the engineering review's D2 decision).
@@ -118,6 +125,11 @@ type server struct {
 	logger    *log.Logger
 	registry  *recipe.Registry
 	installer *installer.Installer
+
+	// recipeWorkspaceCleanup removes the temp recipe install dir created
+	// when --recipe-install-dir was not supplied. Nil when the caller
+	// provided the path (in which case lifetime is the caller's concern).
+	recipeWorkspaceCleanup func()
 }
 
 // serverConfig holds CLI-driven configuration applied to the server at startup.
@@ -159,11 +171,28 @@ func newServer(cfg serverConfig) *server {
 
 	logger := log.New(logOut, "", log.LstdFlags)
 
-	inst := installer.NewInstaller()
-	inst.Logger = logger.Printf
-	if cfg.recipeInstallDir != "" {
-		inst.WorkspaceDir = cfg.recipeInstallDir
+	// Resolve the recipe install dir. When the caller (e.g. Moderne CLI)
+	// passes --recipe-install-dir, use it verbatim. Otherwise create an
+	// ephemeral workspace under the OS temp dir and remember to clean it
+	// up on shutdown — mirrors the JS server's behavior.
+	recipeInstallDir := cfg.recipeInstallDir
+	var recipeWorkspaceCleanup func()
+	if recipeInstallDir == "" {
+		tmpDir, err := os.MkdirTemp("", "rewrite-go-recipes-")
+		if err != nil {
+			logger.Printf("could not create temp recipe install dir: %v — recipe installation will fail", err)
+		} else {
+			recipeInstallDir = tmpDir
+			recipeWorkspaceCleanup = func() {
+				if err := os.RemoveAll(tmpDir); err != nil {
+					logger.Printf("recipe workspace cleanup failed for %s: %v", tmpDir, err)
+				}
+			}
+		}
 	}
+
+	inst := installer.NewInstaller(recipeInstallDir)
+	inst.Logger = logger.Printf
 
 	s := &server{
 		localObjects:         make(map[string]any),
@@ -172,8 +201,9 @@ func newServer(cfg serverConfig) *server {
 		remoteRefs:           make(map[int]any),
 		reverseRemoteObjects: make(map[string]any),
 		reverseRemoteRefs:    make(map[int]any),
-		preparedRecipes:      make(map[string]recipe.Recipe),
-		preparedAccumulators: make(map[string]any),
+		preparedRecipes:         make(map[string]recipe.Recipe),
+		preparedEditorOverrides: make(map[string]recipe.TreeVisitor),
+		preparedAccumulators:    make(map[string]any),
 		preparedContexts:     make(map[string]*recipe.ExecutionContext),
 		batchSize:            1000,
 		traceReceive:         cfg.traceRpcMessages,
@@ -185,6 +215,7 @@ func newServer(cfg serverConfig) *server {
 		logger:    logger,
 		registry:  reg,
 		installer: inst,
+		recipeWorkspaceCleanup: recipeWorkspaceCleanup,
 	}
 
 	if cfg.metricsCsv != "" {
@@ -252,7 +283,7 @@ func parseFlags() serverConfig {
 	flag.StringVar(&cfg.logFile, "log-file", "", "path to write server log; empty = OS temp file")
 	flag.BoolVar(&cfg.traceRpcMessages, "trace-rpc-messages", false, "log every GetObject batch send/receive")
 	flag.StringVar(&cfg.metricsCsv, "metrics-csv", "", "path to write per-RPC metrics as CSV")
-	flag.StringVar(&cfg.recipeInstallDir, "recipe-install-dir", "", "directory used as the installer workspace; defaults to ~/.rewrite/go-recipes")
+	flag.StringVar(&cfg.recipeInstallDir, "recipe-install-dir", "", "directory used as the recipe installer workspace; if empty, a temporary directory is created and cleaned up on shutdown")
 	flag.StringVar(&cfg.dataTablesCsvDir, "data-tables-csv-dir", "", "directory where DataTable rows are written as CSV; empty = in-memory only")
 	flag.Parse()
 	return cfg
@@ -309,6 +340,9 @@ func main() {
 
 	s.logger.Println("Go RPC server shutting down...")
 	s.closeMetrics()
+	if s.recipeWorkspaceCleanup != nil {
+		s.recipeWorkspaceCleanup()
+	}
 }
 
 // readMessage reads a Content-Length framed JSON-RPC message from stdin.
@@ -839,9 +873,15 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 }
 
 // installRecipesResponse is the response type for InstallRecipes.
+//
+// ActivatePkg is the full Go import path of the package that defines
+// func Activate(*recipe.Registry) inside the just-installed module. The
+// caller (e.g. Moderne CLI) needs it to generate the import line when
+// rebuilding rewrite-go-rpc with the recipe module linked in.
 type installRecipesResponse struct {
 	RecipesInstalled int     `json:"recipesInstalled"`
 	Version          *string `json:"version"`
+	ActivatePkg      string  `json:"activatePkg"`
 }
 
 // handleInstallRecipes handles recipe installation requests.
@@ -865,7 +905,7 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 	var localPath string
 	if err := json.Unmarshal(recipesRaw, &localPath); err == nil {
 		s.logger.Printf("InstallRecipes from local path: %s", localPath)
-		_, err := s.installer.InstallFromPath(localPath, s.registry)
+		info, err := s.installer.InstallFromPath(localPath, s.registry)
 		if err != nil {
 			return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Install from path failed: %v", err)}
 		}
@@ -873,6 +913,7 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 		return &installRecipesResponse{
 			RecipesInstalled: afterCount - beforeCount,
 			Version:          nil,
+			ActivatePkg:      info.ActivatePkg,
 		}, nil
 	}
 
@@ -899,6 +940,7 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 	return &installRecipesResponse{
 		RecipesInstalled: afterCount - beforeCount,
 		Version:          version,
+		ActivatePkg:      info.ActivatePkg,
 	}, nil
 }
 
@@ -911,6 +953,7 @@ func (s *server) handleReset() bool {
 	s.reverseRemoteObjects = make(map[string]any)
 	s.reverseRemoteRefs = make(map[int]any)
 	s.preparedRecipes = make(map[string]recipe.Recipe)
+	s.preparedEditorOverrides = make(map[string]recipe.TreeVisitor)
 	s.preparedAccumulators = make(map[string]any)
 	s.preparedContexts = make(map[string]*recipe.ExecutionContext)
 	return true
@@ -1283,6 +1326,26 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 		ScanPreconditions: []any{},
 	}
 
+	// Introspect Editor() once at prepare time. If the recipe wrapped its
+	// editor in preconditions.Check(...), extract the precondition's wire
+	// identity (so the Java host can evaluate it locally and skip the
+	// visit RPC for non-matching files) and cache the bare editor (so a
+	// subsequent dispatch via instantiateVisitor returns the unwrapped
+	// editor — otherwise the precondition would also run Go-side and
+	// double the cost).
+	if instance != nil {
+		if _, isScan := instance.(recipe.ScanningRecipe); !isScan {
+			if editor := instance.Editor(); editor != nil {
+				if checkV, ok := editor.(*preconditions.CheckVisitor); ok {
+					if entry, ok := preconditionWireEntry(checkV.Check); ok {
+						resp.EditPreconditions = append(resp.EditPreconditions, entry)
+						s.preparedEditorOverrides[recipeID] = checkV.V
+					}
+				}
+			}
+		}
+	}
+
 	// Check if this is a scanning recipe
 	if instance != nil {
 		if _, isScan := instance.(recipe.ScanningRecipe); isScan {
@@ -1302,6 +1365,37 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 	}
 
 	return resp, nil
+}
+
+// preconditionWireEntry translates a precondition condition (operand) to
+// a wire entry matching org.openrewrite.rpc.request.PrepareRecipeResponse.Precondition.
+//
+// Leaves carry visitorName + visitorOptions; composites carry op +
+// operands (a list of nested wire entries). Returns ok=false when the
+// condition can't be serialized (e.g. an opaque local TreeVisitor with
+// no recipe identity) — the caller leaves the wrapper intact so the
+// gate runs Go-side as a fallback.
+func preconditionWireEntry(condition preconditions.CheckArg) (map[string]any, bool) {
+	switch c := condition.(type) {
+	case *preconditions.RecipeRef:
+		entry := map[string]any{"visitorName": c.RecipeName}
+		if len(c.Options) > 0 {
+			entry["visitorOptions"] = c.Options
+		}
+		return entry, true
+	case *preconditions.Composite:
+		operands := make([]any, 0, len(c.Operands))
+		for _, operand := range c.Operands {
+			nested, ok := preconditionWireEntry(operand)
+			if !ok {
+				return nil, false
+			}
+			operands = append(operands, nested)
+		}
+		return map[string]any{"op": c.Op, "operands": operands}, true
+	default:
+		return nil, false
+	}
 }
 
 // visitRequest is the parameter type for Visit.
@@ -1455,6 +1549,12 @@ func (s *server) instantiateVisitor(visitorName string, ctx *recipe.ExecutionCon
 		if sr, ok := r.(recipe.ScanningRecipe); ok {
 			acc := s.getOrCreateAccumulator(recipeID, sr, ctx)
 			return sr.EditorWithData(acc)
+		}
+		// If the recipe wrapped its editor in preconditions.Check(...) and
+		// we captured the bare editor at PrepareRecipe time, return it here
+		// so the precondition isn't re-evaluated Go-side.
+		if bare, ok := s.preparedEditorOverrides[recipeID]; ok {
+			return bare
 		}
 		return r.Editor()
 	case "scan":

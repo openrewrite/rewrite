@@ -38,6 +38,7 @@ public class RecipeClassLoader extends URLClassLoader {
 
     // Core OpenRewrite types that must be loaded from parent (from Moderne's RecipeClassLoader)
     private static final List<String> PARENT_DELEGATED_PREFIXES = Arrays.asList(
+            "org.openrewrite.AbstractRecipe",
             "org.openrewrite.Column",
             "org.openrewrite.Cursor",
             "org.openrewrite.DelegatingExecutionContext",
@@ -51,9 +52,16 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.Result",
             "org.openrewrite.ScanningRecipe",
             "org.openrewrite.SourceFile",
+            "org.openrewrite.Singleton",
             "org.openrewrite.Charset",
             "org.openrewrite.Checksum",
             "org.openrewrite.remote",
+            "org.openrewrite.rpc.Reference",
+            "org.openrewrite.rpc.RpcCodec",
+            "org.openrewrite.rpc.RpcObjectData",
+            "org.openrewrite.rpc.RpcReceiveQueue",
+            "org.openrewrite.rpc.RpcRecipe",
+            "org.openrewrite.rpc.RpcSendQueue",
             "org.openrewrite.Parser",
             "org.openrewrite.Tree",
             "org.openrewrite.Validated",
@@ -62,15 +70,24 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.internal",
             "org.openrewrite.marker",
             "org.openrewrite.scheduling",
+            "org.openrewrite.semver",
             "org.openrewrite.style",
             "org.openrewrite.template",
             "org.openrewrite.trait",
+            "org.openrewrite.polyglot",
             "org.openrewrite.FileAttributes",
             "org.openrewrite.ParseErrorVisitor",
             "org.openrewrite.PrintOutputCapture",
             "org.openrewrite.ipc.http.HttpSender",
+            "org.openrewrite.gradle.attributes.Category",
+            "org.openrewrite.gradle.attributes.ProjectAttribute",
             "org.openrewrite.java.JavadocVisitor",
+            "org.openrewrite.java.JavaParser",
+            "org.openrewrite.java.Java17Parser",
+            "org.openrewrite.java.MethodMatcher",
+            "org.openrewrite.java.TypeNameMatcher",
             "org.openrewrite.java.internal.TypesInUse",
+            "org.openrewrite.java.TypeNameMatcher",
             // Cursor-message wiring (TYPE_FACTORY_PROVIDER_KEY) passes a Provider
             // implementation across the recipe/parent classloader boundary; the
             // interface must be shared so the cast in JavaTemplateParser succeeds.
@@ -80,10 +97,10 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.maven.MavenExecutionContextView",
             "org.openrewrite.maven.MavenSettings",
             "org.openrewrite.maven.internal",
+            "org.openrewrite.maven.attributes.Attributed",
+            "org.openrewrite.protobuf.ProtoVisitor",
             "org.openrewrite.text.PlainText",
-            "org.openrewrite.quark.Quark",
-            "org.openrewrite.java.JavaParser",
-            "org.openrewrite.java.MethodMatcher"
+            "org.openrewrite.quark.Quark"
     );
 
     public RecipeClassLoader(@Nullable Path recipeJar, List<Path> classpath) {
@@ -164,8 +181,15 @@ public class RecipeClassLoader extends URLClassLoader {
             }
         }
 
-        // SLF4J and Jackson should always be from parent
-        if (className.startsWith("org.slf4j") || className.startsWith("com.fasterxml.jackson")) {
+        // SLF4J, Jackson, and the Kotlin runtime should always come from the parent.
+        // Why kotlin: if both the parent and a recipe jar ship kotlin-stdlib, types like
+        // kotlin.jvm.functions.Function1 get defined by both loaders. When Jackson (loaded
+        // from parent) interacts with jackson-module-kotlin (typically bundled in the recipe
+        // jar), the JVM raises a LinkageError on loader-constraint violations.
+        // See moderneinc/customer-requests#2372.
+        if (className.startsWith("org.slf4j") ||
+            className.startsWith("com.fasterxml.jackson") ||
+            className.startsWith("kotlin.")) {
             return true;
         }
 

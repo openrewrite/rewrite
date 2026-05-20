@@ -1758,7 +1758,7 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) tree.Expression {
 
 	switch f := fun.(type) {
 	case *tree.FieldAccess:
-		selRP := tree.RightPadded[tree.Expression]{Element: f.Target}
+		selRP := tree.RightPadded[tree.Expression]{Element: f.Target, After: f.Name.Before}
 		sel = &selRP
 		name = f.Name.Element
 	case *tree.Identifier:

@@ -64,6 +64,12 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                     return m;
                 }
 
+                // Don't convert when the argument is a closure (e.g., version { strictly("1.0") })
+                // as that's a method call to configure a spec, not a simple property setter
+                if (m.getArguments().get(0) instanceof J.Lambda) {
+                    return m;
+                }
+
                 if (!propertyName.equals(m.getSimpleName())) {
                     return m;
                 }

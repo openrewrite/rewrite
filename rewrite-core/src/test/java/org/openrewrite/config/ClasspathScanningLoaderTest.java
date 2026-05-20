@@ -17,6 +17,7 @@ package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.AbstractRecipe;
 import org.openrewrite.Recipe;
 
 import java.net.URL;
@@ -109,5 +110,17 @@ class ClasspathScanningLoaderTest {
         Recipe recipe = env.activateRecipes("com.example.SubdirRecipe");
         assertThat(recipe).isNotNull();
         assertThat(recipe.getName()).isEqualTo("com.example.SubdirRecipe");
+    }
+
+    @Test
+    void abstractRecipeAnnotatedClassesAreNotEnumerated() {
+        ClasspathScanningLoader loader = new ClasspathScanningLoader(
+                new Properties(),
+                new String[]{AbstractRecipeFixtures.class.getPackageName()});
+
+        assertThat(loader.listRecipeDescriptors())
+                .extracting(RecipeDescriptor::getName)
+                .contains(AbstractRecipeFixtures.ConcreteRecipe.class.getName())
+                .doesNotContain(AbstractRecipeFixtures.AbstractlyMarkedRecipe.class.getName());
     }
 }

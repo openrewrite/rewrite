@@ -186,7 +186,14 @@ public class GradleWrapper {
 
     private static List<GradleVersion> listAllPrivateArtifactoryVersions(String artifactoryUrl, ExecutionContext ctx) {
         URI artifactoryUri = URI.create(artifactoryUrl);
-        String artifactoryApiUrl = String.format("%s://%s%s", artifactoryUri.getScheme(), artifactoryUri.getHost(), artifactoryUri.getPath().replace("/artifactory", "/artifactory/api/storage"));
+        String path = artifactoryUri.getPath();
+        String lastSegment = path.substring(path.lastIndexOf('/') + 1);
+        // Maven-layout repos store each version in its own subdirectory (e.g. .../gradle/8.10.1/gradle-8.10.1-all.zip).
+        // When distributionUrl points inside such a version directory, crawl up one level to discover sibling versions.
+        boolean mavenLayout = MAVEN_VERSION_FOLDER_PATTERN.matcher(lastSegment).matches();
+        String listingPath = mavenLayout ? path.substring(0, path.lastIndexOf('/')) : path;
+        String downloadBaseUrl = mavenLayout ? artifactoryUrl.substring(0, artifactoryUrl.lastIndexOf('/')) : artifactoryUrl;
+        String artifactoryApiUrl = String.format("%s://%s%s", artifactoryUri.getScheme(), artifactoryUri.getHost(), listingPath.replace("/artifactory", "/artifactory/api/storage"));
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
         try (HttpSender.Response resp = httpSender.send(httpSender.get(artifactoryApiUrl).build())) {
             if (resp.isSuccessful()) {
@@ -194,12 +201,19 @@ public class GradleWrapper {
                 List<GradleVersion> gradleVersions = new ArrayList<>();
                 for (JsonNode child : node.get("children")) {
                     boolean folder = child.get("folder").asBoolean();
-                    if (!folder) {
-                        String uri = child.get("uri").asText();
+                    String uri = child.get("uri").asText();
+                    if (mavenLayout && folder) {
+                        String version = uri.startsWith("/") ? uri.substring(1) : uri;
+                        if (MAVEN_VERSION_FOLDER_PATTERN.matcher(version).matches()) {
+                            String folderUrl = downloadBaseUrl + uri;
+                            gradleVersions.add(new GradleVersion(version, folderUrl + "/gradle-" + version + "-bin.zip", DistributionType.Bin, null, null));
+                            gradleVersions.add(new GradleVersion(version, folderUrl + "/gradle-" + version + "-all.zip", DistributionType.All, null, null));
+                        }
+                    } else if (!folder) {
                         Matcher matcher = GRADLE_VERSION_PATTERN.matcher(uri);
                         if (matcher.find()) {
                             String version = matcher.group(1);
-                            gradleVersions.add(new GradleVersion(version, artifactoryUrl + uri, uri.endsWith("-all.zip") ? DistributionType.All : DistributionType.Bin, null, null));
+                            gradleVersions.add(new GradleVersion(version, downloadBaseUrl + uri, uri.endsWith("-all.zip") ? DistributionType.All : DistributionType.Bin, null, null));
                         }
                     }
                 }
@@ -216,6 +230,7 @@ public class GradleWrapper {
     }
 
     private static final Pattern GRADLE_VERSION_PATTERN = Pattern.compile("gradle-([0-9.]+)");
+    private static final Pattern MAVEN_VERSION_FOLDER_PATTERN = Pattern.compile("\\d+\\.\\d+(?:\\.\\d+)?(?:-[\\w.-]+)?");
 
     /**
      * Construct a Gradle wrapper from a URI.
