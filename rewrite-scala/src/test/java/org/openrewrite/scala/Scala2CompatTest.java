@@ -1313,6 +1313,20 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
+    void trailingPostfixAfterInfixChain() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo(xs: List[Int]) =
+                    xs filter (_ > 0) sortBy (_.toString) list
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void forComprehensionWithBlockBody() {
         rewriteRun(
             scala(

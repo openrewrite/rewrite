@@ -65,6 +65,12 @@ class ScalaCompilerBridge {
       val fresh = baseCtx.fresh
       // Accept both Scala 2 and Scala 3 syntax (including indentation-based).
       fresh.setSetting(fresh.settings.source, "3.6-migration")
+      // Enable `postfixOps` so the parser emits `PostfixOp` AST nodes for trailing
+      // postfix calls (e.g., `xs filter p list`). Without this, Dotty's parser
+      // silently drops the trailing token rather than emitting an AST node.
+      fresh.setSetting(fresh.settings.language, List(
+        new dotty.tools.dotc.config.Settings.Setting.ChoiceWithHelp[String]("postfixOps", "")
+      ))
       fresh.setReporter(storeReporter)
       // Send compiler output to a designated dir so .class files don't pollute cwd.
       if (outputDir != null) {
@@ -224,6 +230,12 @@ class ScalaCompilerBridge {
     val configuredCtx: Context = {
       val fresh = driver.getInitialContext.fresh
       fresh.setSetting(fresh.settings.source, "3.6-migration")
+      // Enable `postfixOps` so the parser emits `PostfixOp` AST nodes for trailing
+      // postfix calls (e.g., `xs filter p list`). Without this, Dotty's parser
+      // silently drops the trailing token rather than emitting an AST node.
+      fresh.setSetting(fresh.settings.language, List(
+        new dotty.tools.dotc.config.Settings.Setting.ChoiceWithHelp[String]("postfixOps", "")
+      ))
       fresh.setReporter(storeReporter)
       fresh
     }
