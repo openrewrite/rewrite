@@ -1,9 +1,9 @@
 ---
 name: npm-publish
 
-# Fires only after `ci` (push to main) or `publish` (version tag) finishes
-# successfully — so a failing build/test gate blocks the npm publish, matching
-# the prior behavior where npm publish was a step inside those workflows.
+# Publishes only after `ci` succeeds for a push to main or `publish` succeeds
+# for a version tag. `ci` also runs for PRs, schedules, and manual dispatches;
+# those must not publish to npm.
 on:
   workflow_run:
     workflows:
@@ -21,6 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     if: >
       github.event.workflow_run.conclusion == 'success' &&
+      (
+        (
+          github.event.workflow_run.name == 'ci' &&
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_branch == 'main'
+        ) ||
+        (
+          github.event.workflow_run.name == 'publish' &&
+          github.event.workflow_run.event == 'push'
+        )
+      ) &&
       (github.repository_owner == 'openrewrite' || github.repository_owner == 'moderneinc')
     permissions:
       contents: read
@@ -54,10 +65,9 @@ jobs:
         env:
           CI: 'true'
         run: |
-          # head_branch is "main" for branch pushes and the tag name (e.g. "v8.83.0")
-          # for tag pushes. Treat anything starting with "v" + digit as a release.
-          ref='${{ github.event.workflow_run.head_branch }}'
-          if [[ "$ref" =~ ^v[0-9] ]]; then
+          # The upstream `publish` workflow is tag-only and already restricts
+          # releases to version tags.
+          if [[ '${{ github.event.workflow_run.name }}' == 'publish' ]]; then
             ./gradlew --no-daemon --console=plain --info --stacktrace \
               :rewrite-javascript:npmPublish -Preleasing
           else
