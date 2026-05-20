@@ -585,6 +585,41 @@ class KotlinTypeMappingTest {
             );
         }
 
+        @Issue("https://github.com/openrewrite/rewrite/issues/7730")
+        @Test
+        void staticMethodParameterTypesRemapKotlinBuiltinsForJavaOrigin() {
+            // Companion to constructorParameterTypesRemapKotlinBuiltinsForJavaOrigin: a Kotlin
+            // call to a Java-origin static method taking `String` must also surface the JVM
+            // `java.lang.String`. The static-method path reaches KotlinTypeMapping with an
+            // Enhancement-origin FIR wrapper as `parent` rather than the FirJavaClass, so it
+            // previously skipped the remap and leaked `kotlin.String` into parameterTypes.
+            rewriteRun(
+              kotlin(
+                """
+                  import com.fasterxml.jackson.core.JsonPointer
+
+                  fun example() = JsonPointer.compile("/x")
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var matcher = new MethodMatcher("com.fasterxml.jackson.core.JsonPointer compile(String)");
+                    AtomicBoolean found = new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
+                            if ("compile".equals(method.getSimpleName())) {
+                                var paramTypes = method.getMethodType().getParameterTypes();
+                                assertThat(paramTypes.get(0).toString()).isEqualTo("java.lang.String");
+                                assertThat(matcher.matches(method)).isTrue();
+                                found.set(true);
+                            }
+                            return super.visitMethodInvocation(method, found);
+                        }
+                    }.reduce(cu, new AtomicBoolean());
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
         @Test
         void whenExpression() {
             rewriteRun(
