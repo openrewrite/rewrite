@@ -227,6 +227,50 @@ class ImportTest implements RewriteTest {
     }
 
     @Test
+    void multipleNamedSelectorsRealWorld() {
+        rewriteRun(
+          scala(
+            """
+            import com.a.b.{Inspection, InspectionContext, Inspector, Levels}
+            """
+          )
+        );
+    }
+
+    @Test
+    void commaContinuationBrace() {
+        rewriteRun(
+          scala(
+            """
+            import a.{x}, b.{y}
+            """
+          )
+        );
+    }
+
+    @Test
+    void commaContinuationSimpleAndBrace() {
+        rewriteRun(
+          scala(
+            """
+            import a._, b.{x, y}
+            """
+          )
+        );
+    }
+
+    @Test
+    void commaContinuationBraceWithAlias() {
+        rewriteRun(
+          scala(
+            """
+            import a.{x => X}, b.{y as Y}
+            """
+          )
+        );
+    }
+
+    @Test
     void importAfterStatement() {
         // Scala allows imports to appear after other top-level statements.
         rewriteRun(

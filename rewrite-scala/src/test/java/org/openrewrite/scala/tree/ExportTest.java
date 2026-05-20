@@ -141,4 +141,36 @@ class ExportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commaContinuationBraceExport() {
+        rewriteRun(
+          scala(
+            """
+            class C(a: A, b: B) {
+              export a.{x}, b.{y}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void scala3DocExample() {
+        rewriteRun(
+          scala(
+            """
+            object math:
+              def add(a: Int, b: Int) = a + b
+              def sub(a: Int, b: Int) = a - b
+
+            object api:
+              export math.{add, sub}
+
+            @main def run() =
+              println(api.add(1, 2))
+            """
+          )
+        );
+    }
 }

@@ -2309,9 +2309,7 @@ class ScalaTreeVisitor(
       case ImportShape.SimpleContinuation =>
         visitContinuationSimple(imp, "import")
       case ImportShape.BraceContinuation =>
-        throw new IllegalStateException(
-          s"Comma-continuation brace imports not yet modelled: '${spanSource(imp)}'"
-        )
+        visitContinuationBrace(imp, "import")
     }
   }
 
@@ -2329,9 +2327,7 @@ class ScalaTreeVisitor(
       case ImportShape.SimpleContinuation =>
         visitContinuationSimple(exp, "export")
       case ImportShape.BraceContinuation =>
-        throw new IllegalStateException(
-          s"Comma-continuation brace exports not yet modelled: '${spanSource(exp)}'"
-        )
+        visitContinuationBrace(exp, "export")
     }
   }
 
@@ -2454,24 +2450,13 @@ class ScalaTreeVisitor(
   /**
    * Parse a brace-form import or export: `keyword qualifier.{ selector, ... }`.
    * Returns an `S.Import` (for `keyword == "import"`) or an `S.Export`
-   * (for `"export"`). Comma-continuation forms (e.g. `import a._, b._`) are
-   * not yet modelled and raise an exception.
+   * (for `"export"`).
    */
   private def visitBraceImportOrExport(
     tree: Trees.ImportOrExport[?],
     keyword: String
   ): J = {
     val adjustedStart = Math.max(0, tree.span.start - offsetAdjustment)
-    val adjustedEnd = Math.max(0, tree.span.end - offsetAdjustment)
-    val spanText = if (adjustedStart < adjustedEnd && adjustedEnd <= source.length)
-      source.substring(adjustedStart, adjustedEnd)
-    else ""
-    if (!spanText.trim.startsWith(keyword)) {
-      throw new IllegalStateException(
-        s"Comma-continuation $keyword forms are not yet modelled: '$spanText'"
-      )
-    }
-
     val prefix: Space = if (cursor < adjustedStart) {
       val text = source.substring(cursor, adjustedStart)
       cursor = adjustedStart
@@ -2484,6 +2469,50 @@ class ScalaTreeVisitor(
     if (cursor < source.length && Character.isWhitespace(source.charAt(cursor))) {
       cursor += 1
     }
+
+    parseBraceImportOrExportBody(tree, keyword, prefix, Markers.EMPTY)
+  }
+
+  /**
+   * Emit a brace-form `S.Import` (or `S.Export`) for the continuation of a
+   * comma-separated group, e.g. the second `b.{y}` in
+   * `import a.{x}, b.{y}`. Mirrors [[visitContinuationSimple]] but feeds
+   * the brace parser.
+   */
+  private def visitContinuationBrace(
+    tree: Trees.ImportOrExport[?],
+    keyword: String
+  ): J = {
+    val adjustedStart = Math.max(0, tree.span.start - offsetAdjustment)
+    val commaIdx = source.lastIndexOf(',', adjustedStart - 1)
+    if (commaIdx < cursor) {
+      throw new IllegalStateException(
+        s"Continuation brace $keyword without preceding ',': '${spanSource(tree)}'"
+      )
+    }
+    val prefix = if (cursor < commaIdx)
+      Space.format(source.substring(cursor, commaIdx))
+    else Space.EMPTY
+    cursor = commaIdx + 1
+
+    val markers = Markers.EMPTY.addIfAbsent(new CommaContinuation(Tree.randomId()))
+    parseBraceImportOrExportBody(tree, keyword, prefix, markers)
+  }
+
+  /**
+   * Shared body of the brace-form parser. Assumes the cursor is positioned
+   * at the qualifier start (after the keyword for the leading form, after
+   * the comma for a continuation). The qualifier element's prefix absorbs
+   * any leading whitespace.
+   */
+  private def parseBraceImportOrExportBody(
+    tree: Trees.ImportOrExport[?],
+    keyword: String,
+    prefix: Space,
+    markers: Markers
+  ): J = {
+    val adjustedEnd = Math.max(0, tree.span.end - offsetAdjustment)
+    val spanText = spanSource(tree)
 
     val oldInImportContext = isInImportContext
     isInImportContext = true
@@ -2526,7 +2555,6 @@ class ScalaTreeVisitor(
     while (idx < selectors.size) {
       val sel = selectors(idx)
 
-      // Whitespace before this selector (after `{` for the first, after `,` for the rest).
       val selStart = cursor
       var p = selStart
       while (p < source.length && Character.isWhitespace(source.charAt(p))) p += 1
@@ -2535,7 +2563,6 @@ class ScalaTreeVisitor(
 
       val selectorNode = parseImportSelector(sel)
 
-      // After the selector, expect `,` (more selectors) or `}` (end).
       val afterSel = cursor
       var q = afterSel
       while (q < source.length && Character.isWhitespace(source.charAt(q))) q += 1
@@ -2571,7 +2598,7 @@ class ScalaTreeVisitor(
       S.Import.build(
         Tree.randomId(),
         prefix,
-        Markers.EMPTY,
+        markers,
         new JRightPadded(qualifier, qualifierRightPad, Markers.EMPTY),
         beforeBrace,
         selectorContainer
@@ -2580,7 +2607,7 @@ class ScalaTreeVisitor(
       S.Export.build(
         Tree.randomId(),
         prefix,
-        Markers.EMPTY,
+        markers,
         qualifier,
         beforeBrace,
         selectorContainer
