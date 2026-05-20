@@ -4797,12 +4797,13 @@ class ScalaTreeVisitor(
           // If there are body statements, we definitely have a body
           true
         } else if (td.span.exists) {
-          // For empty bodies, check if there's a "{" in the entire class span
-          val classStart = Math.max(0, td.span.start - offsetAdjustment)
+          // For empty bodies, check if there's a "{" in the source after the cursor.
+          // The cursor has been advanced past the name, type params, constructor params,
+          // and extends clause, so any `{` here is the body delimiter — not one that
+          // could appear earlier inside a string interpolation like `s"${x}"`.
           val classEnd = Math.max(0, td.span.end - offsetAdjustment)
-          if (classStart < classEnd && classEnd <= source.length) {
-            val classSource = source.substring(classStart, classEnd)
-            classSource.contains("{")
+          if (cursor < classEnd && classEnd <= source.length) {
+            source.substring(cursor, classEnd).contains("{")
           } else {
             false
           }
