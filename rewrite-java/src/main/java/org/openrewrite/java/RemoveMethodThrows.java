@@ -35,6 +35,7 @@ public class RemoveMethodThrows extends Recipe {
 
     private static final String KOTLIN_THROWS_FQN = "kotlin.jvm.Throws";
     private static final String ANNOTATION_REMOVED_KEY = "kotlinThrowsAnnotationRemoved";
+    private static final String METHOD_MATCHES_KEY = "methodMatches";
 
     @Option(displayName = "Method pattern",
             description = MethodMatcher.METHOD_PATTERN_INVOCATIONS_DESCRIPTION,
@@ -68,15 +69,20 @@ public class RemoveMethodThrows extends Recipe {
         return Preconditions.check(new DeclaresMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                        J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                        boolean matches = enclosingClass != null ?
+                                methodMatcher.matches(method, enclosingClass) :
+                                methodMatcher.matches(method.getMethodType());
+                        getCursor().putMessage(METHOD_MATCHES_KEY, matches);
+
                         J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                        // Close the gap if the dropped `@Throws` was the only leading annotation.
                         J.Annotation removedAnnotation = getCursor().pollMessage(ANNOTATION_REMOVED_KEY);
                         List<J.Annotation> originalAnnotations = method.getLeadingAnnotations();
                         if (removedAnnotation != null && originalAnnotations.size() == 1 &&
                                 originalAnnotations.get(0) == removedAnnotation) {
-                            m = collapseBlankLineLeftByRemovedAnnotation(m);
+                            m = collapseBlankLineLeftByRemovedAnnotation(m, enclosingClass == null);
                         }
-                        if (!matchesMethod(m) || m.getThrows() == null) {
+                        if (!matches || m.getThrows() == null) {
                             return m;
                         }
                         return m.withThrows(ListUtils.map(m.getThrows(), nt -> {
@@ -94,8 +100,7 @@ public class RemoveMethodThrows extends Recipe {
                         if (!TypeUtils.isOfClassType(a.getType(), KOTLIN_THROWS_FQN) || a.getArguments() == null) {
                             return a;
                         }
-                        J.MethodDeclaration enclosing = getCursor().firstEnclosing(J.MethodDeclaration.class);
-                        if (enclosing == null || !matchesMethod(enclosing)) {
+                        if (!Boolean.TRUE.equals(getCursor().getNearestMessage(METHOD_MATCHES_KEY))) {
                             return a;
                         }
                         List<Expression> originalArgs = a.getArguments();
@@ -110,7 +115,6 @@ public class RemoveMethodThrows extends Recipe {
                             return arg;
                         });
                         if (remaining == null || remaining.isEmpty()) {
-                            // Signal parent method for blank-line cleanup.
                             getCursor().dropParentUntil(J.MethodDeclaration.class::isInstance)
                                     .putMessage(ANNOTATION_REMOVED_KEY, annotation);
                             //noinspection DataFlowIssue
@@ -138,31 +142,24 @@ public class RemoveMethodThrows extends Recipe {
                         return jt;
                     }
 
-                    private boolean matchesMethod(J.MethodDeclaration m) {
-                        // Top-level Kotlin functions have no enclosing class; fall back to matching by
-                        // the method's declaring type from its type attribution.
-                        J.ClassDeclaration cd = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                        return cd != null ? methodMatcher.matches(m, cd) : methodMatcher.matches(m.getMethodType());
-                    }
-
                     /**
                      * Mirrors {@link RemoveAnnotationVisitor}'s blank-line cleanup, adapted for Kotlin:
                      * skip empty-prefix modifiers (the synthetic {@code final} sits at index 0 with no
                      * whitespace, while {@code fun} sits later with the actual line-leading whitespace),
                      * and for top-level functions also clear the method's own prefix.
                      */
-                    private J.MethodDeclaration collapseBlankLineLeftByRemovedAnnotation(J.MethodDeclaration m) {
-                        boolean topLevel = getCursor().firstEnclosing(J.ClassDeclaration.class) == null;
+                    private J.MethodDeclaration collapseBlankLineLeftByRemovedAnnotation(J.MethodDeclaration m, boolean topLevel) {
                         if (!m.getPrefix().getWhitespace().isEmpty()) {
                             m = m.withPrefix(m.getPrefix().withWhitespace(""));
                             if (!topLevel) {
                                 return m;
                             }
                         }
-                        for (int i = 0; i < m.getModifiers().size(); i++) {
-                            J.Modifier mod = m.getModifiers().get(i);
+                        List<J.Modifier> modifiers = m.getModifiers();
+                        for (int i = 0; i < modifiers.size(); i++) {
+                            J.Modifier mod = modifiers.get(i);
                             if (!mod.getPrefix().getWhitespace().isEmpty()) {
-                                List<J.Modifier> mods = new ArrayList<>(m.getModifiers());
+                                List<J.Modifier> mods = new ArrayList<>(modifiers);
                                 mods.set(i, mod.withPrefix(mod.getPrefix().withWhitespace("")));
                                 return m.withModifiers(mods);
                             }
