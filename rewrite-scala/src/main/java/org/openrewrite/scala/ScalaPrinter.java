@@ -616,6 +616,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitTypeAlias((S.TypeAlias) tree, p);
         } else if (tree instanceof S.Export) {
             return visitExport((S.Export) tree, p);
+        } else if (tree instanceof S.Import) {
+            return visitSImport((S.Import) tree, p);
+        } else if (tree instanceof S.ImportSelector) {
+            return visitImportSelector((S.ImportSelector) tree, p);
         } else if (tree instanceof S.PatternDefinition) {
             return visitPatternDefinition((S.PatternDefinition) tree, p);
         } else if (tree instanceof S.AnonymousGiven) {
@@ -660,28 +664,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         if (scu.getPackageDeclaration() != null) {
             visit(scu.getPackageDeclaration(), p);
             boolean packageEndsWithSemicolon = scu.getPackageDeclaration().getMarkers().findFirst(PackageSemicolon.class).isPresent();
-            // In Scala, package declarations are followed by a newline
-            // Check if the next element has a newline in its prefix, if not add one
-            if (!packageEndsWithSemicolon && !scu.getImports().isEmpty()) {
-                J.Import firstImport = scu.getImports().get(0);
-                String firstImportPrefix = firstImport.getPrefix().getWhitespace();
-                if (!firstImportPrefix.startsWith("\n") && !firstImportPrefix.startsWith(";")) {
-                    p.append("\n");
-                }
-            } else if (!packageEndsWithSemicolon && !scu.getStatements().isEmpty()) {
+            if (!packageEndsWithSemicolon && !scu.getStatements().isEmpty()) {
                 Statement firstStatement = scu.getStatements().get(0);
                 String firstStatementPrefix = firstStatement.getPrefix().getWhitespace();
                 if (!firstStatementPrefix.startsWith("\n") && !firstStatementPrefix.startsWith(";")) {
                     p.append("\n");
                 }
-            }
-        }
-
-        for (J.Import anImport : scu.getImports()) {
-            visit(anImport, p);
-            // Scala imports don't end with semicolons but need newlines between them
-            if (!anImport.getPrefix().getWhitespace().isEmpty() || scu.getImports().indexOf(anImport) < scu.getImports().size() - 1) {
-                // Already has whitespace or not the last import
             }
         }
 
@@ -727,8 +715,16 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     @Override
     public J visitImport(J.Import import_, PrintOutputCapture<P> p) {
         beforeSyntax(import_, Space.Location.IMPORT_PREFIX, p);
-        p.append("import ");
-        
+        // For the continuation in a comma-separated import (e.g. the second
+        // `b._` in `import a._, b._`), the parser emits a `J.Import` with a
+        // CommaContinuation marker. The prefix carries any whitespace before
+        // the `,`; the qualifier's prefix carries whitespace after.
+        if (import_.getMarkers().findFirst(org.openrewrite.scala.marker.CommaContinuation.class).isPresent()) {
+            p.append(',');
+        } else {
+            p.append("import ");
+        }
+
         // Visit the import expression
         // Wildcard imports: Scala 2 uses `._`, Scala 3 uses `.*`
         // The name field preserves which was used in source.
@@ -1568,9 +1564,20 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     public J visitExport(S.Export export, PrintOutputCapture<P> p) {
         beforeSyntax(export, Space.Location.LANGUAGE_EXTENSION, p);
-        p.append("export ");
+        if (export.getMarkers().findFirst(org.openrewrite.scala.marker.CommaContinuation.class).isPresent()) {
+            p.append(',');
+        } else {
+            p.append("export ");
+        }
         Expression clause = export.getExportClause();
-        if (clause instanceof J.FieldAccess && isWildcardImport((J.FieldAccess) clause)) {
+        if (export.getPadding().getSelectors() != null) {
+            visit(clause, p);
+            p.append('.');
+            if (export.getBeforeBrace() != null) {
+                visitSpace(export.getBeforeBrace(), Space.Location.LANGUAGE_EXTENSION, p);
+            }
+            visitContainer("{", export.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, ",", "}", p);
+        } else if (clause instanceof J.FieldAccess && isWildcardImport((J.FieldAccess) clause)) {
             J.FieldAccess fa = (J.FieldAccess) clause;
             visitFieldAccessUpToWildcard(fa, p);
             p.append("." + fa.getName().getSimpleName());
@@ -1579,6 +1586,43 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
         afterSyntax(export, p);
         return export;
+    }
+
+    public J visitSImport(S.Import sImport, PrintOutputCapture<P> p) {
+        beforeSyntax(sImport, Space.Location.LANGUAGE_EXTENSION, p);
+        if (sImport.getMarkers().findFirst(org.openrewrite.scala.marker.CommaContinuation.class).isPresent()) {
+            p.append(',');
+        } else {
+            p.append("import ");
+        }
+        visitRightPadded(sImport.getPadding().getQualifier(), JRightPadded.Location.LANGUAGE_EXTENSION, p);
+        p.append('.');
+        visitSpace(sImport.getBeforeBrace(), Space.Location.LANGUAGE_EXTENSION, p);
+        visitContainer("{", sImport.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, ",", "}", p);
+        afterSyntax(sImport, p);
+        return sImport;
+    }
+
+    public J visitImportSelector(S.ImportSelector selector, PrintOutputCapture<P> p) {
+        beforeSyntax(selector, Space.Location.LANGUAGE_EXTENSION, p);
+        if (selector.isGiven()) {
+            p.append("given");
+            if (selector.getGivenType() != null) {
+                visit(selector.getGivenType(), p);
+            }
+        } else if (selector.isWildcard()) {
+            p.append(selector.isLegacyUnderscore() ? "_" : "*");
+        } else if (selector.getName() != null) {
+            visit(selector.getName(), p);
+            JLeftPadded<J.Identifier> alias = selector.getPadding().getAlias();
+            if (alias != null) {
+                visitSpace(alias.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+                p.append(selector.isUseAsKeyword() ? "as" : "=>");
+                visit(alias.getElement(), p);
+            }
+        }
+        afterSyntax(selector, p);
+        return selector;
     }
 
     public J visitPatternDefinition(S.PatternDefinition patDef, PrintOutputCapture<P> p) {

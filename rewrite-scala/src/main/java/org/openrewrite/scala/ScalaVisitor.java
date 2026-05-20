@@ -58,7 +58,6 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
             c = c.withPackageDeclaration(visitAndCast(c.getPackageDeclaration(), p));
         }
 
-        c = c.withImports(ListUtils.map(c.getImports(), i -> visitAndCast(i, p)));
         c = c.withStatements(ListUtils.map(c.getStatements(), s -> {
             try {
                 return visitAndCast(s, p);
@@ -95,9 +94,7 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         // Sync changes from the J.CompilationUnit back to S.CompilationUnit
         if (result != tempJcu) {
             List<JRightPadded<J.Import>> newImports = result.getPadding().getImports();
-            if (newImports != c.getPadding().getImports()) {
-                c = (S.CompilationUnit) c.getPadding().withImports(newImports);
-            }
+            c = (S.CompilationUnit) c.getPadding().withImports(newImports);
             if (result.getPrefix() != c.getPrefix()) {
                 c = c.withPrefix(result.getPrefix());
             }
@@ -166,7 +163,44 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         }
         e = (S.Export) temp;
         e = e.withExportClause(visitAndCast(e.getExportClause(), p));
+        if (e.getBeforeBrace() != null) {
+            e = e.withBeforeBrace(visitSpace(e.getBeforeBrace(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (e.getPadding().getSelectors() != null) {
+            e = e.getPadding().withSelectors(visitContainer(e.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        }
         return e;
+    }
+
+    public J visitSImport(S.Import sImport, P p) {
+        S.Import i = sImport;
+        i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(i, p);
+        if (!(temp instanceof S.Import)) {
+            return temp;
+        }
+        i = (S.Import) temp;
+        i = i.getPadding().withQualifier(visitRightPadded(i.getPadding().getQualifier(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
+        i = i.withBeforeBrace(visitSpace(i.getBeforeBrace(), Space.Location.LANGUAGE_EXTENSION, p));
+        i = i.getPadding().withSelectors(visitContainer(i.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return i;
+    }
+
+    public J visitImportSelector(S.ImportSelector selector, P p) {
+        S.ImportSelector s = selector;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        if (s.getGivenType() != null) {
+            s = s.withGivenType(visitAndCast(s.getGivenType(), p));
+        }
+        if (s.getName() != null) {
+            s = s.withName(visitAndCast(s.getName(), p));
+        }
+        if (s.getPadding().getAlias() != null) {
+            s = s.getPadding().withAlias(visitLeftPadded(s.getPadding().getAlias(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        }
+        return s;
     }
 
     public J visitPatternDefinition(S.PatternDefinition patDef, P p) {
