@@ -577,6 +577,21 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void parameterlessDefWithTypeParameter() {
+        rewriteRun(
+            scala(
+                """
+                trait T {
+                  def underlying[A]: A
+                  def empty[A]: List[A] = Nil
+                  def nil[A] = List.empty[A]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void spaceBeforeEqualsWithNoSpaceAfter() {
         rewriteRun(scala("def f(): Unit ={ }"));
     }
