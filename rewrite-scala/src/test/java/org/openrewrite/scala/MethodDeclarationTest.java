@@ -688,4 +688,30 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void tryCatchCaseSingleLineWithDefault() {
+        rewriteRun(
+          scala(
+            """
+            def f(default: => String): String =
+              try "x"
+              catch case _: Exception => default
+            """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchCaseSingleLineWithThrow() {
+        rewriteRun(
+          scala(
+            """
+            def f: String =
+              try "x"
+              catch case e: Exception => throw e
+            """
+          )
+        );
+    }
 }
