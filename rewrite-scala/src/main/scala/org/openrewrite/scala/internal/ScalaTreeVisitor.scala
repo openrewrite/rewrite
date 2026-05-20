@@ -6441,6 +6441,7 @@ class ScalaTreeVisitor(
         val controlPrefix = if (catches.isEmpty) catchBraceSpace else Space.EMPTY
         val controlParens = new J.ControlParentheses[J.VariableDeclarations](Tree.randomId(), controlPrefix, Markers.EMPTY, JRightPadded.build(varDecl).withAfter(spaceBeforeArrow))
 
+        val caseBodyOmitBraces = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
         val caseBody = visitTree(caseDef.body) match {
           case block: J.Block if block.getMarkers.findFirst(classOf[OmitBraces]).isPresent => block
           case block: J.Block =>
@@ -6448,16 +6449,15 @@ class ScalaTreeVisitor(
             // OmitBraces shell so the inner block keeps its own end space and the
             // shell can carry the catch's trailing space (before the outer `}`).
             val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(block))
-            new J.Block(Tree.randomId(), Space.EMPTY,
-              Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId()))),
+            new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces,
               JRightPadded.build(false), s, Space.EMPTY)
           case stmt: Statement =>
             val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(stmt))
-            new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
+            new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
           case expr: Expression =>
             val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
-            new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
-          case _ => new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), new util.ArrayList(), Space.EMPTY)
+            new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
+          case _ => new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces, JRightPadded.build(false), new util.ArrayList(), Space.EMPTY)
         }
         updateCursor(caseDef.span.end)
         val thisCatchPrefix = if (catches.isEmpty) catchPrefix else casePrefix
@@ -6598,20 +6598,20 @@ class ScalaTreeVisitor(
         val controlPrefix = if (catches.isEmpty) catchBraceSpace else Space.EMPTY
         val controlParens = new J.ControlParentheses[J.VariableDeclarations](Tree.randomId(), controlPrefix, Markers.EMPTY, JRightPadded.build(varDecl).withAfter(spaceBeforeArrow))
 
+        val caseBodyOmitBraces = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
         val caseBody = visitTree(caseDef.body) match {
           case block: J.Block if block.getMarkers.findFirst(classOf[OmitBraces]).isPresent => block
           case block: J.Block =>
             val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(block))
-            new J.Block(Tree.randomId(), Space.EMPTY,
-              Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId()))),
+            new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces,
               JRightPadded.build(false), s, Space.EMPTY)
           case stmt: Statement =>
             val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(stmt))
-            new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
+            new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
           case expr: Expression =>
             val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
-            new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
-          case _ => new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), new util.ArrayList(), Space.EMPTY)
+            new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
+          case _ => new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces, JRightPadded.build(false), new util.ArrayList(), Space.EMPTY)
         }
         updateCursor(caseDef.span.end)
         // First catch gets catchPrefix (space before "catch"); subsequent get casePrefix
