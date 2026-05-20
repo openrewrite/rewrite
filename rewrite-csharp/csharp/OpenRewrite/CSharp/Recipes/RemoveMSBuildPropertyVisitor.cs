@@ -24,7 +24,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// <c>PropertyGroup</c> in .csproj files. Can be used standalone in custom recipe
 /// edit phases.
 /// </summary>
-public class RemoveMSBuildPropertyVisitor(string propertyName) : XmlVisitor<ExecutionContext>
+public class RemoveMSBuildPropertyVisitor(string propertyName, bool regenerateMarker = true) : XmlVisitor<ExecutionContext>
 {
     private bool _modified;
 
@@ -32,7 +32,7 @@ public class RemoveMSBuildPropertyVisitor(string propertyName) : XmlVisitor<Exec
     {
         _modified = false;
         var d = (Document)base.VisitDocument(document, ctx);
-        if (_modified)
+        if (_modified && regenerateMarker)
             DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
         return d;
     }
