@@ -809,26 +809,30 @@ class ScalaTreeVisitor(
       }
 
       for ((arg, i) <- app.args.zipWithIndex) {
-        visitTree(arg) match {
-          case expr: Expression =>
-            val isLast = i == app.args.length - 1
-            if (!isLast) {
-              val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
-              val commaPos = positionOfNext(",", Math.max(cursor, argEnd))
-              val beforeComma = if (commaPos > argEnd) Space.format(source, argEnd, commaPos) else Space.EMPTY
-              if (commaPos >= 0 && commaPos + 1 < source.length) {
-                cursor = commaPos + 1
-              }
-              args.add(JRightPadded.build(expr).withAfter(beforeComma))
-            } else {
-              val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
-              val closePos = positionOfNext(")", Math.max(cursor, argEnd))
-              val beforeClose = if (closePos > argEnd) {
-                Space.format(source, argEnd, closePos)
-              } else Space.EMPTY
-              args.add(new JRightPadded(expr, beforeClose, Markers.EMPTY))
+        val visited = visitTree(arg)
+        val expr: Expression = visited match {
+          case e: Expression => e
+          case j: J => new S.StatementExpression(Tree.randomId(), j)
+          case _ => null
+        }
+        if (expr != null) {
+          val isLast = i == app.args.length - 1
+          if (!isLast) {
+            val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+            val commaPos = positionOfNext(",", Math.max(cursor, argEnd))
+            val beforeComma = if (commaPos > argEnd) Space.format(source, argEnd, commaPos) else Space.EMPTY
+            if (commaPos >= 0 && commaPos + 1 < source.length) {
+              cursor = commaPos + 1
             }
-          case _ =>
+            args.add(JRightPadded.build(expr).withAfter(beforeComma))
+          } else {
+            val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+            val closePos = positionOfNext(")", Math.max(cursor, argEnd))
+            val beforeClose = if (closePos > argEnd) {
+              Space.format(source, argEnd, closePos)
+            } else Space.EMPTY
+            args.add(new JRightPadded(expr, beforeClose, Markers.EMPTY))
+          }
         }
       }
 
