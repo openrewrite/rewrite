@@ -5467,9 +5467,9 @@ class ScalaTreeVisitor(
       val nameEnd = Math.max(0, dd.nameSpan.end - offsetAdjustment)
       var i = nameEnd
       while (i < source.length && source.charAt(i).isWhitespace) i += 1
-      // Skip a `[...]` type parameter list (only relevant for given aliases — for
-      // ordinary defs, `def foo[T]` always has either `()` or `:` after `]`).
-      if (isGivenDefDef && i < source.length && source.charAt(i) == '[') {
+      // Skip a `[...]` type parameter list. After the type params, an ordinary
+      // def may have `()` (regular method) or `:`/`=` (parameterless method).
+      if (i < source.length && source.charAt(i) == '[') {
         var depth = 1
         i += 1
         while (i < source.length && depth > 0) {
