@@ -24,7 +24,7 @@ The OpenRewrite project (managed by [Moderne](https://www.moderne.ai/)) is an op
 
 It consists of an auto-refactoring engine that runs prepackaged, open source refactoring recipes for common framework migrations, security fixes, and stylistic consistency tasks—reducing your coding effort from hours or days to minutes. Build tool plugins like [OpenRewrite Gradle Plugin](https://docs.openrewrite.org/reference/gradle-plugin-configuration) and [OpenRewrite Maven Plugin](https://docs.openrewrite.org/reference/rewrite-maven-plugin) help you run these recipes on one repository at a time.
 
-OpenRewrite recipes have the deepest bench strength in Java, with a growing community expanding support for [additional languages and frameworks](https://docs.openrewrite.org/reference/supported-languages). It's thousands of great individuals and teams working to make software seamless to update and continuously secure. You can also easily customize recipes for your code.
+OpenRewrite has the strongest coverage in Java, and a growing community is expanding support for [additional languages and frameworks](https://docs.openrewrite.org/reference/supported-languages). Recipes are open source and easy to customize, so you can adapt any of them - or even write your own.
 
 Start with our [quickstart guide](https://docs.openrewrite.org/running-recipes/getting-started) and let OpenRewrite handle the boring parts of software development for you.
 
