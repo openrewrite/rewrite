@@ -29,6 +29,7 @@ import org.openrewrite.scala.marker.Implicit
 import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedSyntax
 import org.openrewrite.scala.marker.OmitBraces
+import org.openrewrite.scala.marker.OmitImportBraces
 import org.openrewrite.scala.marker.PackageObject
 import org.openrewrite.scala.marker.SObject
 import org.openrewrite.scala.marker.Semicolon
@@ -2536,19 +2537,59 @@ class ScalaTreeVisitor(
     }
     cursor = i + 1
 
-    // Whitespace (and comments) between `.` and `{`.
+    // Whitespace (and comments) between `.` and `{` (or, for the Scala 3
+    // unbraced single-selector rename form `import a.b.X as Y`, between `.`
+    // and the selector name).
     val afterDot = cursor
     val j = indexOfNextNonWhitespace(afterDot)
-    val beforeBrace = Space.format(source.substring(afterDot, j))
-    if (j >= source.length || source.charAt(j) != '{') {
-      throw new IllegalStateException(
-        s"Expected '{' after '.' in $keyword at position $j: '${spanText}'"
-      )
+    val isBraceless = j < source.length && source.charAt(j) != '{'
+    val beforeBrace = if (isBraceless) Space.EMPTY
+      else Space.format(source.substring(afterDot, j))
+    if (!isBraceless) {
+      cursor = j + 1
     }
-    cursor = j + 1
+    val bracelessMarkers = if (isBraceless)
+      markers.addIfAbsent(new OmitImportBraces(Tree.randomId()))
+      else markers
 
     val selectorElems = new util.ArrayList[JRightPadded[S.ImportSelector]]()
     val selectors = tree.selectors
+    if (isBraceless) {
+      if (selectors.size != 1) {
+        throw new IllegalStateException(
+          s"Expected exactly one selector for braceless $keyword at position $j: '${spanText}'"
+        )
+      }
+      val sel = selectors.head
+      val selStart = cursor
+      val p = indexOfNextNonWhitespace(selStart)
+      val selPrefix = Space.format(source.substring(selStart, p))
+      cursor = p
+      val selectorNode = parseImportSelector(sel)
+      selectorElems.add(new JRightPadded(selectorNode.withPrefix(selPrefix), Space.EMPTY, Markers.EMPTY))
+      if (cursor < adjustedEnd) cursor = adjustedEnd
+      val selectorContainerB: JContainer[S.ImportSelector] =
+        JContainer.build(Space.EMPTY, selectorElems, Markers.EMPTY)
+      return (if (keyword == "import") {
+        S.Import.build(
+          Tree.randomId(),
+          prefix,
+          bracelessMarkers,
+          new JRightPadded(qualifier, qualifierRightPad, Markers.EMPTY),
+          beforeBrace,
+          selectorContainerB
+        )
+      } else {
+        S.Export.build(
+          Tree.randomId(),
+          prefix,
+          bracelessMarkers,
+          qualifier,
+          beforeBrace,
+          selectorContainerB
+        )
+      })
+    }
     var idx = 0
     while (idx < selectors.size) {
       val sel = selectors(idx)
@@ -2669,8 +2710,7 @@ class ScalaTreeVisitor(
             false, null, false, false, nameIdent, null, false
           )
         case renamed: Trees.Ident[?] =>
-          var p = cursor
-          while (p < source.length && Character.isWhitespace(source.charAt(p))) p += 1
+          val p = indexOfNextNonWhitespace(cursor)
           val beforeArrow = Space.format(source.substring(cursor, p))
           val useAsKeyword = source.startsWith("as", p)
           val useArrow = source.startsWith("=>", p)
@@ -5145,7 +5185,9 @@ class ScalaTreeVisitor(
           val visitedSpans = new java.util.HashSet[Int]()
           // Sort by source position to preserve source order
           val sortedBody = template.body.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
-          for (stat <- sortedBody) {
+          val classEndForBody = if (td.span.exists) Math.max(0, td.span.end - offsetAdjustment) else source.length
+          for (idx <- sortedBody.indices) {
+            val stat = sortedBody(idx)
             val isSyntheticStat = stat.span.isSynthetic || {
               def hasTripleQ(t: Trees.Tree[?]): Boolean = t match {
                 case sel: Trees.Select[?] => sel.name.toString == "???" || sel.name.toString == "$qmark$qmark$qmark" || hasTripleQ(sel.qualifier)
@@ -5158,13 +5200,30 @@ class ScalaTreeVisitor(
             }
             if (stat.span.exists && !isSyntheticStat) {
               if (visitedSpans.add(stat.span.start)) {
-                visitTree(stat) match {
-                  case null =>
-                  case stmt: Statement =>
-                    statements.add(JRightPadded.build(stmt))
-                  case expr: Expression =>
-                    statements.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
-                  case _ =>
+                val visitedStmt: Statement = visitTree(stat) match {
+                  case null => null
+                  case stmt: Statement => stmt
+                  case expr: Expression => new S.ExpressionStatement(Tree.randomId(), expr)
+                  case _ => null
+                }
+                if (visitedStmt != null) {
+                  val statEnd = Math.max(0, stat.span.end - offsetAdjustment)
+                  val nextStart = {
+                    var k = idx + 1
+                    var ns = classEndForBody
+                    while (k < sortedBody.size) {
+                      val s = sortedBody(k)
+                      if (s.span.exists && !s.span.isSynthetic) {
+                        ns = Math.max(0, s.span.start - offsetAdjustment)
+                        k = sortedBody.size
+                      } else {
+                        k += 1
+                      }
+                    }
+                    ns
+                  }
+                  val (trailingSpace, rpMarkers) = consumeTrailingSemicolon(statEnd, nextStart)
+                  statements.add(new JRightPadded[Statement](visitedStmt, trailingSpace, rpMarkers))
                 }
               }
             }
@@ -8123,6 +8182,35 @@ class ScalaTreeVisitor(
    * position of the next significant character. Returns `source.length` if no
    * such character exists.
    */
+  /**
+   * After visiting a statement that ended at `statEnd`, detect an explicit `;`
+   * separator on the same line and consume it. Returns the JRightPadded
+   * trailing space and markers; advances `cursor`.
+   */
+  private def consumeTrailingSemicolon(statEnd: Int, nextStart: Int): (Space, Markers) = {
+    val trailStart = Math.max(statEnd, cursor)
+    if (trailStart >= nextStart || nextStart > source.length) {
+      return (Space.EMPTY, Markers.EMPTY)
+    }
+    val between = source.substring(trailStart, nextStart)
+    var semiIdx = -1
+    var j = 0
+    while (semiIdx < 0 && j < between.length) {
+      val c = between.charAt(j)
+      if (c == ';') semiIdx = j
+      else if (c == '\n' || c == '\r') j = between.length
+      else if (c != ' ' && c != '\t') j = between.length
+      else j += 1
+    }
+    if (semiIdx >= 0) {
+      val trailing = if (semiIdx > 0) Space.format(between.substring(0, semiIdx)) else Space.EMPTY
+      cursor = trailStart + semiIdx + 1
+      (trailing, Markers.EMPTY.add(new Semicolon(Tree.randomId())))
+    } else {
+      (Space.EMPTY, Markers.EMPTY)
+    }
+  }
+
   private def indexOfNextNonWhitespace(startFrom: Int = cursor): Int = {
     var i = startFrom
     while (i < source.length) {
