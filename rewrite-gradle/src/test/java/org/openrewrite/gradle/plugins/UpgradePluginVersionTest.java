@@ -305,6 +305,49 @@ class UpgradePluginVersionTest implements RewriteTest {
     }
 
     @Test
+    void unresolvableNewVersionWithInterpolatedVersionDoesNotThrow() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "999.x", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version "$rewriteVersion"
+              }
+              """
+          ),
+          properties(
+            """
+              rewriteVersion=5.40.0
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @Test
+    void unresolvableNewVersionWithIdentifierVersionDoesNotThrow() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "999.x", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  plugins {
+                      String rewriteVersion = '5.40.0'
+                      id 'org.openrewrite.rewrite' version rewriteVersion
+                  }
+              }
+              """
+          ),
+          properties(
+            """
+              rewriteVersion=
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @Test
     void defaultsToLatestRelease() {
         rewriteRun(
           spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", null, null)),
