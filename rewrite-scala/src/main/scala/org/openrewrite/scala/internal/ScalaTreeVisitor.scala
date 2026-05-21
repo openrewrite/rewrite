@@ -2060,18 +2060,21 @@ class ScalaTreeVisitor(
                     val argContainer = if (app.args.nonEmpty) {
                       val args = new util.ArrayList[JRightPadded[Expression]]()
 
-                      // Find the opening parenthesis
+                      // Find the opening parenthesis between the type and the first arg.
+                      // `app.span.start` may coincide with the type's start, so search
+                      // from the type's end up to the first arg's start instead.
                       var beforeParenSpace = Space.EMPTY
-                      if (app.span.exists) {
+                      if (app.span.exists && app.args.nonEmpty) {
                         val typeEnd = Math.max(0, newInner.tpt.span.end - offsetAdjustment)
-                        val argsStart = Math.max(0, app.span.start - offsetAdjustment)
+                        val firstArgStart = Math.max(0, app.args.head.span.start - offsetAdjustment)
+                        val searchStart = Math.max(cursor, typeEnd)
 
-                        if (typeEnd < argsStart && typeEnd >= cursor && argsStart <= source.length) {
-                          val between = source.substring(typeEnd, argsStart)
+                        if (searchStart < firstArgStart && firstArgStart <= source.length) {
+                          val between = source.substring(searchStart, firstArgStart)
                           val parenIndex = positionOfNextIn(between, "(", 0)
                           if (parenIndex >= 0) {
                             beforeParenSpace = Space.format(between.substring(0, parenIndex))
-                            updateCursor(typeEnd + parenIndex + 1)
+                            updateCursor(searchStart + parenIndex + 1)
                           }
                         }
                       }
@@ -2079,7 +2082,13 @@ class ScalaTreeVisitor(
                       // Visit arguments
                       for ((arg, i) <- app.args.zipWithIndex) {
                         var argPrefix = Space.EMPTY
-                        if (i > 0) {
+                        if (i == 0) {
+                          val thisStart = Math.max(0, arg.span.start - offsetAdjustment)
+                          if (cursor < thisStart && thisStart <= source.length) {
+                            argPrefix = Space.format(source, cursor, thisStart)
+                            updateCursor(thisStart)
+                          }
+                        } else {
                           val prevEnd = Math.max(0, app.args(i - 1).span.end - offsetAdjustment)
                           val thisStart = Math.max(0, arg.span.start - offsetAdjustment)
                           if (prevEnd < thisStart && prevEnd >= cursor && thisStart <= source.length) {

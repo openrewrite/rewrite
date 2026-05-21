@@ -1313,6 +1313,25 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
+    void newWithAnonymousBodyAndNewlineBeforeFirstArg() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def make() =
+                    new Foo(
+                      a,
+                      b
+                    ) {
+                      override def x() = 1
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void trailingPostfixAfterInfixChain() {
         rewriteRun(
             scala(
