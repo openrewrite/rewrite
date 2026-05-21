@@ -53,7 +53,7 @@ Moderne also includes a [multi-repo command line interface (CLI)](https://docs.m
 
 [![Moderne](./doc/moderne_cli.png)](https://www.youtube.com/watch?v=fdPX9e2vsFw)
 
-Moderne runs a free [public service](https://www.moderne.io/try-moderne) for open source projects. To learn more about how Moderne can help your team, [contact us](https://www.moderne.io/contact-us).
+Moderne runs a free [public service](https://www.moderne.io/try-moderne) for the benefit of tens of thousands of open source projects. To learn more about how Moderne can help your team, [contact us](https://www.moderne.io/contact-us).
 
 ## Contributing
 
