@@ -6495,11 +6495,14 @@ class ScalaTreeVisitor(
     val typeExpr: TypeTree = if (anonymousParam && vd.tpt != untpd.EmptyTree && vd.tpt.span.exists) {
       // Anonymous `using` param: source is just the type (e.g. `using Executor`). Walk
       // forward to the type span start, then visit the type — no preceding colon.
+      // Match the named-param branch by tolerating a null result from visitTypeTree
+      // (some type constructs like infix `A =:= B` are still mapped to null here).
       val typeStart = Math.max(0, vd.tpt.span.start - offsetAdjustment)
       val tt = if (cursor < typeStart && typeStart <= source.length) {
         val typePrefix = Space.format(source, cursor, typeStart)
         cursor = typeStart
-        visitTypeTree(vd.tpt).withPrefix(typePrefix).asInstanceOf[TypeTree]
+        val visited = visitTypeTree(vd.tpt)
+        if (visited != null) visited.withPrefix(typePrefix).asInstanceOf[TypeTree] else null
       } else {
         visitTypeTree(vd.tpt)
       }
