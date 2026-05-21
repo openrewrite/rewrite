@@ -53,6 +53,8 @@ import org.jetbrains.kotlin.ir.expressions.IrCall
 import org.jetbrains.kotlin.ir.expressions.IrConst
 import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.expressions.IrExpression
+import org.jetbrains.kotlin.ir.expressions.IrTypeOperator
+import org.jetbrains.kotlin.ir.expressions.IrTypeOperatorCall
 import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
 import org.jetbrains.kotlin.ir.expressions.IrReturn
@@ -788,7 +790,12 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 wrappedInNotNull = wrappedInNotNull, propertyAccess = propertyAccess)
         }
 
-        val rawReceiver: IrExpression? = rootCall.dispatchReceiver ?: rootCall.extensionReceiver
+        // K2 wraps Java-platform-typed call results (e.g. `Optional.of(x)`
+        // returning `Optional<T>!`) in an `IrTypeOperatorCall(IMPLICIT_CAST)`.
+        // Peel those off when looking at the receiver — for the chain
+        // validator, the wrapped IrCall IS the inner segment we care about,
+        // and the cast is downstream-visible only through the same IR offsets.
+        val rawReceiver: IrExpression? = unwrapImplicitCasts(rootCall.dispatchReceiver ?: rootCall.extensionReceiver)
         val paramSyms: Set<IrValueSymbol> = params.map { it.symbol }.toSet()
 
         // Chain detection (v1: depth-2 only). When the root call's receiver is
@@ -800,14 +807,14 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         if (rawReceiver is IrCall && !wrappedInNotNull && !propertyAccess) {
             val outerSigs = mutableListOf<ArgSig>()
             for (i in 0 until rootCall.valueArgumentsCount) {
-                val arg = rootCall.getValueArgument(i) ?: continue
+                val arg = unwrapImplicitCasts(rootCall.getValueArgument(i)) ?: continue
                 when (arg) {
                     is IrConst -> outerSigs += ArgSig.LiteralConst(arg.kind, arg.value)
                     else -> return null  // outer args binding lambda params not yet supported
                 }
             }
             val innerCall = rawReceiver
-            val innerRawRecv: IrExpression? = innerCall.dispatchReceiver ?: innerCall.extensionReceiver
+            val innerRawRecv: IrExpression? = unwrapImplicitCasts(innerCall.dispatchReceiver ?: innerCall.extensionReceiver)
             // Reject depth-3+ chains: inner.receiver must not be another IrCall.
             val innerReceiverSym: IrValueSymbol? = when (innerRawRecv) {
                 null -> null
@@ -819,7 +826,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             }
             val innerSigs = mutableListOf<ArgSig>()
             for (i in 0 until innerCall.valueArgumentsCount) {
-                val arg = innerCall.getValueArgument(i) ?: continue
+                val arg = unwrapImplicitCasts(innerCall.getValueArgument(i)) ?: continue
                 when (arg) {
                     is IrGetValue -> {
                         if (arg.symbol !in paramSyms) return null
@@ -859,7 +866,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
         val sigs = mutableListOf<ArgSig>()
         for (i in 0 until rootCall.valueArgumentsCount) {
-            val arg = rootCall.getValueArgument(i) ?: continue
+            val arg = unwrapImplicitCasts(rootCall.getValueArgument(i)) ?: continue
             when (arg) {
                 is IrGetValue -> {
                     if (arg.symbol !in paramSyms) return null
@@ -999,6 +1006,26 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
      * — the function's own `name` is the synthetic `<get-foo>` accessor name,
      * which doesn't match the source-level identifier.
      */
+    /**
+     * Peel off `IrTypeOperatorCall` wrappers that K2 inserts to mark implicit
+     * coercions — most commonly the platform-type-to-Kotlin cast on the return
+     * of a Java call (`Optional<T>!` → `Optional<T>`). For the validator's
+     * purposes, the cast is invisible: the wrapped IrCall has the same source
+     * offsets and is the call we want to introspect.
+     *
+     * Unwraps both `IMPLICIT_CAST` and `IMPLICIT_NOTNULL` recursively. Other
+     * type ops (`SAFE_CAST`, `INSTANCEOF`, `CAST`) are intentionally left
+     * alone — they're load-bearing for matcher dispatch.
+     */
+    private fun unwrapImplicitCasts(expr: IrExpression?): IrExpression? {
+        var e: IrExpression? = expr
+        while (e is IrTypeOperatorCall &&
+            (e.operator == IrTypeOperator.IMPLICIT_CAST || e.operator == IrTypeOperator.IMPLICIT_NOTNULL)) {
+            e = e.argument
+        }
+        return e
+    }
+
     private fun computeMatcherSpec(rootCall: IrCall, propertyAccess: Boolean): String {
         val owner = rootCall.symbol.owner
         if (propertyAccess) {
@@ -1011,10 +1038,11 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             return "$ownerFqn#$propName"
         }
         val methodName = owner.name.asString()
+        val argsPattern = computeArgsPattern(owner)
 
         val dispatchFqn = owner.dispatchReceiverParameter?.type?.classFqName?.asString()
         if (dispatchFqn != null) {
-            return "$dispatchFqn $methodName(..)"
+            return "$dispatchFqn $methodName($argsPattern)"
         }
 
         // Java static methods (and `@JvmStatic` companions): the IrSimpleFunction's
@@ -1025,15 +1053,42 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // tripping the test framework's single-cycle stability check.
         val parent = owner.parent
         if (parent is IrClass) {
-            return "${parent.kotlinFqName.asString()} $methodName(..)"
+            return "${parent.kotlinFqName.asString()} $methodName($argsPattern)"
         }
 
         val facadeFqn = computeJvmFacadeFqn(owner)
         return if (facadeFqn != null) {
-            "$facadeFqn $methodName(..)"
+            "$facadeFqn $methodName($argsPattern)"
         } else {
-            "* $methodName(..)"
+            "* $methodName($argsPattern)"
         }
+    }
+
+    /**
+     * Emit a precise MethodMatcher arg pattern (e.g. `*,*` for two args, empty for
+     * zero) instead of the `..` wildcard. Tightening the arg count is what
+     * distinguishes overloaded methods on the same name: `Iterable<T>.any()` (no
+     * predicate) versus `Iterable<T>.any(predicate: (T) -> Boolean)`. A recipe
+     * authored as `xs.filter(p).any()` would otherwise also match
+     * `xs.filter(p1).any { p2 }` via `(..)` and silently drop the `p2` predicate.
+     *
+     * Arg count is computed against the JVM-resolved signature, which differs by
+     * call shape:
+     * <ul>
+     *   <li>Member call (dispatch receiver, e.g. {@code String.lowercase()}): the
+     *       receiver is dispatched, so the JVM arg list is just the source-level
+     *       value args.</li>
+     *   <li>Extension or top-level facade call (e.g. {@code Iterable<T>.any(p)}):
+     *       the receiver is lifted to the first arg of the static facade method,
+     *       so the JVM arg list is the (extension) receiver plus value args.</li>
+     * </ul>
+     */
+    private fun computeArgsPattern(owner: IrSimpleFunction): String {
+        val isDispatched = owner.dispatchReceiverParameter != null
+        val extReceiverArg = if (!isDispatched && owner.extensionReceiverParameter != null) 1 else 0
+        val jvmArgCount = owner.valueParameters.size + extReceiverArg
+        if (jvmArgCount == 0) return ""
+        return List(jvmArgCount) { "*" }.joinToString(",")
     }
 
     private fun computeJvmFacadeFqn(fn: IrSimpleFunction): String? {
@@ -1200,7 +1255,13 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         )
         val spots = mutableListOf<Spot>()
 
-        expr.acceptChildrenVoid(object : IrVisitorVoid() {
+        // `accept(visitor, null)` includes `expr` itself; `acceptChildrenVoid`
+        // would only visit its children. The distinction matters for after
+        // bodies that are a single bare param reference (`{ x -> x }`) — the
+        // IrGetValue IS the expression, not a child, so a children-only walk
+        // would miss it and the template would render the literal `x` instead
+        // of a substitution placeholder.
+        expr.accept(object : IrVisitorVoid() {
             override fun visitElement(element: IrElement) { element.acceptChildrenVoid(this) }
 
             override fun visitGetValue(expression: IrGetValue) {
@@ -1224,7 +1285,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                     typeFqn = renderPlaceholderType(expression.type),
                 )
             }
-        })
+        }, null)
 
         val inSliceSpots = mutableListOf<Spot>()
         val prependSpots = mutableListOf<Spot>()

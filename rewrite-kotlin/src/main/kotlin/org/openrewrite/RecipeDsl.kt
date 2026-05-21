@@ -104,7 +104,23 @@ public class KotlinCompositeRecipe @JsonCreator constructor(
     @JsonProperty("description") private val description: String?,
     @JsonProperty("recipeList") private val recipeList: List<Recipe>?,
 ) : Recipe() {
-    override fun getDisplayName(): String = displayName ?: "Composite recipe"
+    init {
+        // Refuse the no-arg Jackson construction that ClasspathScanningLoader
+        // uses to probe instantiability. The [AbstractRecipe] annotation is the
+        // canonical filter, but older scanners (pre-8.83.0, or any version where
+        // recipe-JAR classloader delegation routes the annotation type away from
+        // the scanner's own classloader) can't see it. Throwing here trips the
+        // scanner's catch-Throwable in `configureRecipe`, so the class is silently
+        // skipped rather than enumerated as a phantom empty composite.
+        //
+        // FIXME: remove this `require` once 8.83.0+ (which parent-delegates
+        //  `org.openrewrite.AbstractRecipe` in `RecipeClassLoader`) is the
+        //  minimum supported version of build-plugin/CLI scanners in the wild.
+        //  At that point the annotation alone is sufficient.
+        require(displayName != null) { "KotlinCompositeRecipe requires a non-null displayName" }
+    }
+
+    override fun getDisplayName(): String = displayName!!
     override fun getDescription(): String = description ?: "A composite recipe."
     override fun getRecipeList(): List<Recipe> = recipeList ?: emptyList()
 }

@@ -56,6 +56,14 @@ public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVers
         Required = false)]
     public bool IncludePrerelease { get; set; }
 
+    [Option(DisplayName = "Regenerate MSBuild marker",
+        Description = "Whether to re-run `dotnet restore` after the edit to refresh the project's " +
+                      "MSBuildProject marker. Defaults to `true`. Composite recipes that chain " +
+                      "multiple csproj-mutating steps may set this to `false` on intermediate steps " +
+                      "and finalize once with `EnsureCsprojAttestation`.",
+        Required = false)]
+    public bool RegenerateMarker { get; set; } = true;
+
     public class Accumulator
     {
         /// <summary>
@@ -94,7 +102,7 @@ public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVers
     {
         return Preconditions.Check(
             new IsProjectFile(),
-            new UpgradeNuGetPackageVersionVisitor(PackageName, acc.ResolvedVersions, acc.PropertyUpdates));
+            new UpgradeNuGetPackageVersionVisitor(PackageName, acc.ResolvedVersions, acc.PropertyUpdates, RegenerateMarker));
     }
 
     /// <summary>

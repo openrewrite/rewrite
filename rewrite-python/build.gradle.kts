@@ -363,6 +363,7 @@ val pythonPublish by tasks.registering(Exec::class) {
     commandLine(
         pythonExe.absolutePath, "-m", "twine", "upload",
         "--config-file", ".pypirc",
+        "--skip-existing",
         "dist/*"
     )
 

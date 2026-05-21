@@ -22,22 +22,23 @@ import org.openrewrite.java.internal.JavaTypeFactory
 import org.openrewrite.java.tree.*
 import org.openrewrite.marker.Markers
 import org.openrewrite.scala.marker.{IndentedSyntax, PackageBraces, PackageSemicolon}
+import org.openrewrite.scala.tree.S
 
 import java.util
 import java.util.{Collections, List as JList}
 
 /**
  * Result of converting a Scala AST to compilation unit components.
+ * Imports (plain `J.Import` and brace-form `S.Import`) are part of
+ * [[statements]] in source order — Scala allows them anywhere a statement
+ * can appear, so there is no separate imports list.
  */
 class CompilationUnitResult(
                              val packageDecl: J.Package,
-                             val imports: JList[J.Import],
                              val statements: JList[Statement],
                              val lastCursorPosition: Int
                            ) {
   def getPackageDecl: J.Package = packageDecl
-
-  def getImports: JList[J.Import] = imports
 
   def getStatements: JList[Statement] = statements
 
@@ -53,7 +54,6 @@ class ScalaASTConverter {
    * Converts a Scala parse result to compilation unit components.
    */
   def convertToCompilationUnit(parseResult: ScalaParseResult, source: String, typeFactory: JavaTypeFactory = null): CompilationUnitResult = {
-    val imports = new util.ArrayList[J.Import]()
     val statements = new util.ArrayList[Statement]()
     var packageDecl: J.Package = null
 
@@ -80,7 +80,7 @@ class ScalaASTConverter {
     // Check if tree is empty (parse error case)
     if (tree.isEmpty) {
       // Return empty result for parse errors
-      return new CompilationUnitResult(packageDecl, imports, statements, 0)
+      return new CompilationUnitResult(packageDecl, statements, 0)
     }
 
     // Handle different types of top-level trees
@@ -103,15 +103,9 @@ class ScalaASTConverter {
           case imp: Trees.Import[?] =>
             val converted = visitor.visitTree(imp)
             converted match {
-              case jImport: J.Import =>
-                imports.add(jImport)
-              case unknown: J.Unknown =>
-                // Complex imports (braces, aliases) that can't map to J.Import.
-                // Add as statements - they'll be interleaved correctly since
-                // both lists are in source order.
-                statements.add(unknown)
+              case stmt: Statement =>
+                statements.add(stmt)
               case null =>
-              case _: J.Empty =>
               case _ =>
             }
           case stat =>
@@ -146,16 +140,11 @@ class ScalaASTConverter {
           }
         }
       case imp: Trees.Import[?] =>
-        // Top-level import - simple ones as J.Import, complex ones as statements
+        // Top-level import (no enclosing package).
         val converted = visitor.visitTree(imp)
         converted match {
-          case jImport: J.Import =>
-            imports.add(jImport)
-          case unknown: J.Unknown =>
-            // Complex imports that we can't map to J.Import yet
-            statements.add(unknown)
+          case stmt: Statement => statements.add(stmt)
           case null => // Skip null returns
-          case _: J.Empty => // Skip empty nodes
           case _ => // Skip non-statements
         }
       case _ =>
@@ -170,7 +159,7 @@ class ScalaASTConverter {
         }
     }
 
-    new CompilationUnitResult(packageDecl, imports, statements, visitor.getCursor)
+    new CompilationUnitResult(packageDecl, statements, visitor.getCursor)
   }
 
   /**

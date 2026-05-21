@@ -61,10 +61,16 @@ class ScalaCompilerBridge {
     val storeReporter = new StoreReporter(null)
 
     // Configure source version, output directory, and classpath.
-    given ctx: Context = {
+    val configuredCtx: Context = {
       val fresh = baseCtx.fresh
       // Accept both Scala 2 and Scala 3 syntax (including indentation-based).
       fresh.setSetting(fresh.settings.source, "3.6-migration")
+      // Enable `postfixOps` so the parser emits `PostfixOp` AST nodes for trailing
+      // postfix calls (e.g., `xs filter p list`). Without this, Dotty's parser
+      // silently drops the trailing token rather than emitting an AST node.
+      fresh.setSetting(fresh.settings.language, List(
+        new dotty.tools.dotc.config.Settings.Setting.ChoiceWithHelp[String]("postfixOps", "")
+      ))
       fresh.setReporter(storeReporter)
       // Send compiler output to a designated dir so .class files don't pollute cwd.
       if (outputDir != null) {
@@ -76,6 +82,27 @@ class ScalaCompilerBridge {
       }
       fresh
     }
+
+    // Create the Run up front. Run construction initializes Definitions and
+    // ContextBase state (e.g., `ctx.base.TypeBoundsEmpty`) that the parser
+    // requires when it sees `A with B` types — those go through
+    // `untpd.makeAndType` → `Definitions.andType`, which would NPE on an
+    // uninitialized base. Parsing under `run.runContext` keeps that path safe.
+    //
+    // Run construction requires the Scala stdlib on the classpath (to resolve
+    // `scala.Any`, etc.). Some callers (e.g. ScalaTemplate-style usage that
+    // intentionally narrows the classpath) supply none, so fall back to the
+    // configured base context if Run init fails. Code paths that don't hit
+    // `with` types continue to parse fine; `with` types will fail loudly.
+    val compiler = new Compiler()
+    val (runOpt, parseContext): (Option[Run], Context) =
+      try {
+        val r = compiler.newRun(using configuredCtx)
+        (Some(r), r.runContext)
+      } catch {
+        case _: Throwable => (None, configuredCtx)
+      }
+    given ctx: Context = parseContext
 
     // Phase 1: Parse all sources into CompilationUnits
     val units = new ArrayList[CompilationUnit]()
@@ -117,43 +144,42 @@ class ScalaCompilerBridge {
       sourceEntries.add(entry)
     }
 
-    // Phase 2: Attempt batch type-checking
-    try {
-      val compiler = new Compiler()
-      val run = compiler.newRun(using ctx)
-
-      // Convert to Scala list for the compiler
-      val unitList = {
-        val buf = new ListBuffer[CompilationUnit]()
-        val uIter = units.iterator()
-        while (uIter.hasNext) buf += uIter.next()
-        buf.toList
-      }
-
-      run.compileUnits(unitList)
-
-      // Use the run's context — symbols from tpd.Tree are only valid in this context
-      given runCtx: Context = run.runContext
-
-      // Extract typed trees per unit
-      for (i <- 0 until units.size()) {
-        val unit = units.get(i)
-        val entry = sourceEntries.get(i)
-        val path = entry.path
-        val existing = results.get(path)
-
-        try {
-          val typedTree = unit.tpdTree
-          if (typedTree != null && !typedTree.isEmpty) {
-            results.put(path, existing.copy(typedTree = Some(typedTree), context = runCtx))
-          }
-        } catch {
-          case _: Throwable =>
+    // Phase 2: Attempt batch type-checking (only if we managed to create a Run).
+    runOpt.foreach { run =>
+      try {
+        // Convert to Scala list for the compiler
+        val unitList = {
+          val buf = new ListBuffer[CompilationUnit]()
+          val uIter = units.iterator()
+          while (uIter.hasNext) buf += uIter.next()
+          buf.toList
         }
+
+        run.compileUnits(unitList)
+
+        // Use the run's context — symbols from tpd.Tree are only valid in this context
+        given runCtx: Context = run.runContext
+
+        // Extract typed trees per unit
+        for (i <- 0 until units.size()) {
+          val unit = units.get(i)
+          val entry = sourceEntries.get(i)
+          val path = entry.path
+          val existing = results.get(path)
+
+          try {
+            val typedTree = unit.tpdTree
+            if (typedTree != null && !typedTree.isEmpty) {
+              results.put(path, existing.copy(typedTree = Some(typedTree), context = runCtx))
+            }
+          } catch {
+            case _: Throwable =>
+          }
+        }
+      } catch {
+        case _: Throwable =>
+          // Batch compilation failed entirely; all units keep typedTree=None
       }
-    } catch {
-      case _: Throwable =>
-        // Batch compilation failed entirely; all units keep typedTree=None
     }
 
     // Drain buffered diagnostics into per-source `warnings` lists so callers
@@ -196,13 +222,27 @@ class ScalaCompilerBridge {
     // Buffer diagnostics in-memory so they don't leak to stderr via Dotty's default ConsoleReporter.
     val storeReporter = new StoreReporter(null)
 
-    // Create our custom driver and get a proper context with Scala 2 compat
+    // Create our custom driver and get a proper context with Scala 2 compat.
+    // Best-effort Run init so `ctx.base` is wired up for `A with B` parsing
+    // (which goes through `Definitions.andType` and NPEs on a bare context);
+    // fall back to the raw context if no Scala stdlib is on the classpath.
     val driver = new ParsingDriver()
-    given Context = {
+    val configuredCtx: Context = {
       val fresh = driver.getInitialContext.fresh
       fresh.setSetting(fresh.settings.source, "3.6-migration")
+      // Enable `postfixOps` so the parser emits `PostfixOp` AST nodes for trailing
+      // postfix calls (e.g., `xs filter p list`). Without this, Dotty's parser
+      // silently drops the trailing token rather than emitting an AST node.
+      fresh.setSetting(fresh.settings.language, List(
+        new dotty.tools.dotc.config.Settings.Setting.ChoiceWithHelp[String]("postfixOps", "")
+      ))
       fresh.setReporter(storeReporter)
       fresh
+    }
+    given Context = try {
+      (new Compiler()).newRun(using configuredCtx).runContext
+    } catch {
+      case _: Throwable => configuredCtx
     }
 
     // For simple expressions, wrap in a valid compilation unit
@@ -262,9 +302,14 @@ class ScalaCompilerBridge {
     val declarationPattern = """^\s*(package|import|class|object|trait|def|val|var|type|private|protected|public|final|lazy|implicit|case\s+class|case\s+object)\s""".r
     val startsWithDeclaration = declarationPattern.findFirstIn(trimmed).isDefined
 
+    // A leading `@Ann` (optionally `@Ann(...)`) is a declaration annotation, not an
+    // expression — wrapping it as `val result = @Ann object Foo` produces garbage.
+    val startsWithAnnotation = trimmed.startsWith("@")
+
     !hasMultipleLines &&
     !hasPostfixOperator &&
     !startsWithDeclaration &&
+    !startsWithAnnotation &&
     !trimmed.startsWith("//") &&
     !trimmed.startsWith("/*") &&
     trimmed.nonEmpty

@@ -18,7 +18,10 @@ package org.openrewrite.kotlin.recipe
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Preconditions
 import org.openrewrite.Recipe
+import org.openrewrite.java.search.UsesField
+import org.openrewrite.java.search.UsesMethod
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.kotlin.Assertions.kotlin
@@ -195,6 +198,556 @@ class RecipePluginRewriteTest : RewriteTest {
                     val newProp: Int get() = 2
                 }
                 fun use(f: Foo): Int = f.newProp
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `chain with Java-static inner segment — Optional_of_x_get to x`() {
+        // The chain validator must accept an inner segment that is a Java
+        // static call (`Optional.of(x)`). The inner has no dispatch receiver
+        // (statics carry the class via the symbol's parent IrClass) but does
+        // bind the lambda param to its value arg.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                import java.util.Optional
+                val UseValueForOptionalOfGet = recipe(
+                    displayName = "Optional.of(x).get() -> x",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { x: String -> Optional.of(x).get() } to { x -> x }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseValueForOptionalOfGet",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                import java.util.Optional
+                fun example(): String = Optional.of("hi").get()
+                """.trimIndent(),
+                """
+                import java.util.Optional
+                fun example(): String = "hi"
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `chain collapse preserves dot-on-its-own-line layout`() {
+        // Real-world Kotlin chains are formatted with each `.member(...)` on its
+        // own indented line. The chain-collapse rewrite synthesizes a single
+        // fused call (`xs.firstOrNull(p)`), whose select.after defaults to ""
+        // — jamming the trailing `.firstOrNull` onto the previous line and
+        // clobbering the author's formatting. `preserveSelectAfter` copies the
+        // matched outer call's select.after onto the result so the new outer
+        // sits on its own dot-prefixed line, matching where the matched outer
+        // originally was.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseFirstOrNullWithPredicate = recipe(
+                    displayName = "Use firstOrNull(p) instead of filter(p).firstOrNull()",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, p: (Any) -> Boolean -> xs.filter(p).firstOrNull() } to { xs, p -> xs.firstOrNull(p) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseFirstOrNullWithPredicate",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                // The synthesized `firstOrNull(p)` outer call doesn't get a
+                // resolved JavaType.Method on the template-substituted MethodInvocation;
+                // the formatting check is what this test is about, not type
+                // attribution.
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                """
+                fun first(xs: List<Int>): Int? = xs
+                    .filter { it > 0 }
+                    .firstOrNull()
+                """,
+                """
+                fun first(xs: List<Int>): Int? = xs
+                    .firstOrNull { it > 0 }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `chain collapse — single-line input stays single-line (no false-positive newline)`() {
+        // Negative case for `preserveSelectAfter`: if the matched outer call's
+        // select.after has no whitespace (the chain was on one line), we must
+        // NOT add any newline to the result. The helper's empty-whitespace
+        // guard short-circuits, leaving the result's select.after at the
+        // template-substituted default (also empty).
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseFirstOrNullWithPredicate = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, p: (Any) -> Boolean -> xs.filter(p).firstOrNull() } to { xs, p -> xs.firstOrNull(p) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseFirstOrNullWithPredicate",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                """
+                fun first(xs: List<Int>): Int? = xs.filter { it > 0 }.firstOrNull()
+                """,
+                """
+                fun first(xs: List<Int>): Int? = xs.firstOrNull { it > 0 }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `chain collapse — alternate shape (map then filterNotNull) also preserves layout`() {
+        // Second chain-shape variant to prove the fix isn't specific to
+        // filter/firstOrNull. The `map { f }.filterNotNull()` collapse is the
+        // pattern that surfaced the formatting bug in moderneinc/recipes-kotlin
+        // corpus runs.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseMapNotNull = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, f: (Any) -> Int? -> xs.map(f).filterNotNull() } to { xs, f -> xs.mapNotNull(f) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseMapNotNull",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                """
+                fun nonNull(xs: List<Int>): List<Int> = xs
+                    .map { it.takeIf { v -> v > 0 } }
+                    .filterNotNull()
+                """,
+                """
+                fun nonNull(xs: List<Int>): List<Int> = xs
+                    .mapNotNull { it.takeIf { v -> v > 0 } }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `chain collapse — three-deep chain preserves inner select layout`() {
+        // Real-world case from commercetools/rmf-codegen: the matched chain is
+        // three deep — `responses.filter(p1).filter(p2).firstOrNull()`. The
+        // recipe `filter(p).firstOrNull() -> firstOrNull(p)` fires on the
+        // outermost call. `xs` binds to `responses.filter(p1)` — itself a
+        // J.MethodInvocation whose `paddingSelect.after` carries the inner
+        // dot-on-newline whitespace. The bug we're guarding against: after
+        // substitution, the new outer's `.firstOrNull` line keeps its
+        // indentation (preserveSelectAfter handles that), but the SUBSTITUTED
+        // inner `.filter` loses its own `paddingSelect.after` and gets
+        // jammed up against `responses` (or onto a less-indented line).
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseFirstOrNullWithPredicate = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, p: (Any) -> Boolean -> xs.filter(p).firstOrNull() } to { xs, p -> xs.firstOrNull(p) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseFirstOrNullWithPredicate",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                // Byte-for-byte from commercetools/rmf-codegen
+                // codegen-renderers/.../MethodExtensions.kt#Method.returnType:
+                // four-space indent for the function body and an eight-space
+                // continuation indent on the chain dots (so `.filter` sits at
+                // column 12).
+                """
+                interface Body
+                interface Response { val statusCode: Int; val bodies: List<Body>? }
+                class NilType : Body
+                object TypesFactory { fun createNilType(): Body = NilType() }
+                class Method { val responses: List<Response> = emptyList() }
+                fun Response.isSuccessfull(): Boolean = statusCode in (200..299)
+                fun Method.returnType(): Body {
+                    return this.responses
+                            .filter { it.isSuccessfull() }
+                            .filter { it.bodies?.isNotEmpty() ?: false }
+                            .firstOrNull()
+                            ?.let { it.bodies!![0] }
+                            ?: TypesFactory.createNilType()
+                }
+                """,
+                """
+                interface Body
+                interface Response { val statusCode: Int; val bodies: List<Body>? }
+                class NilType : Body
+                object TypesFactory { fun createNilType(): Body = NilType() }
+                class Method { val responses: List<Response> = emptyList() }
+                fun Response.isSuccessfull(): Boolean = statusCode in (200..299)
+                fun Method.returnType(): Body {
+                    return this.responses
+                            .filter { it.isSuccessfull() }
+                            .firstOrNull { it.bodies?.isNotEmpty() ?: false }
+                            ?.let { it.bodies!![0] }
+                            ?: TypesFactory.createNilType()
+                }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `chain collapse — multi-line lambda body keeps internal indentation`() {
+        // Real-world case from aws/aws-toolkit-jetbrains: a `map { ... }` whose
+        // lambda body spans multiple statements gets rewritten to `mapNotNull
+        // { ... }`. The lambda body lines (4-space indented inside the lambda)
+        // must keep their indentation. The bug: the multi-statement lambda body
+        // collapses to flat / left-aligned text in the rewritten output.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseMapNotNull = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, f: (Any) -> Int? -> xs.map(f).filterNotNull() } to { xs, f -> xs.mapNotNull(f) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseMapNotNull",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                // Byte-for-byte from aws/aws-toolkit-jetbrains
+                // plugins/toolkit/jetbrains-rider/.../DotNetRuntimeUtils.kt.
+                // Chain at 12-space indent (function body 8 + 4-space chain),
+                // lambda body at 16-space indent (12 + 4), closing `}` at 12.
+                """
+                fun versions(runtimeList: List<String>): List<String?> {
+                    val versionRegex = Regex("(\\d+.\\d+.\\d+)")
+                    val versions = runtimeList
+                        .filter { it.startsWith("Microsoft.NETCore.App") }
+                        .map { runtimeString ->
+                            val match = versionRegex.find(runtimeString) ?: return@map null
+                            match.groups[1]?.value ?: return@map null
+                        }
+                        .filterNotNull()
+                    return versions
+                }
+                """,
+                """
+                fun versions(runtimeList: List<String>): List<String?> {
+                    val versionRegex = Regex("(\\d+.\\d+.\\d+)")
+                    val versions = runtimeList
+                        .filter { it.startsWith("Microsoft.NETCore.App") }
+                        .mapNotNull { runtimeString ->
+                            val match = versionRegex.find(runtimeString) ?: return@map null
+                            match.groups[1]?.value ?: return@map null
+                        }
+                    return versions
+                }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `chain collapse — long chain with intermediate plus calls preserves layout`() {
+        // Real-world case from commercetools/rmf-codegen
+        // (CsharpObjectTypeExtensions.kt). The matched chain has a long pre-chain
+        // (`map → plus → plus → filterNotNull → map → map`) before the
+        // collapsing `map(f).filterNotNull()` 2-segment match at the tail. The
+        // captured `xs` substitution is the entire long pre-chain; its interior
+        // newlines must survive intact when it's plugged back in as the new
+        // `mapNotNull` outer's select.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseMapNotNull = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, f: (Any) -> Int? -> xs.map(f).filterNotNull() } to { xs, f -> xs.mapNotNull(f) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseMapNotNull",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                // Byte-for-byte from commercetools/rmf-codegen
+                // languages/csharp/.../CsharpObjectTypeExtensions.kt#getUsings.
+                // 16-space chain indent inside an interface method body. The
+                // chain has comment lines mid-stream and a double-space after
+                // `=` — both should pass through unchanged.
+                """
+                interface VrapType { val name: String }
+                interface VrapTypeProvider { fun doSwitch(t: Any): VrapType }
+                interface Property { val type: Any? }
+                interface ObjectType {
+                    val allProperties: List<Property>
+                    val type: Any?
+                    fun discriminatorProperty(): Property?
+                    val vrapTypeProvider: VrapTypeProvider
+                    fun getUsingsForType(t: VrapType): String?
+                }
+
+                interface CsharpObjectTypeExtensions {
+                    fun ObjectType.getUsings(): List<String> {
+                        var usingsList =  this.allProperties
+                                .map { it.type }
+                                //If the subtypes are in the same package they should be imported
+                                //.plus(this.namedSubTypes())
+                                .plus(this.type)
+                                .plus(discriminatorProperty()?.type)
+                                .filterNotNull()
+                                .map { vrapTypeProvider.doSwitch(it) }
+                                .map { getUsingsForType(it) }
+                                .filterNotNull()
+                                .sortedBy { it }
+                                .distinct()
+                                .toList()
+                        return usingsList
+                    }
+                }
+                """,
+                """
+                interface VrapType { val name: String }
+                interface VrapTypeProvider { fun doSwitch(t: Any): VrapType }
+                interface Property { val type: Any? }
+                interface ObjectType {
+                    val allProperties: List<Property>
+                    val type: Any?
+                    fun discriminatorProperty(): Property?
+                    val vrapTypeProvider: VrapTypeProvider
+                    fun getUsingsForType(t: VrapType): String?
+                }
+
+                interface CsharpObjectTypeExtensions {
+                    fun ObjectType.getUsings(): List<String> {
+                        var usingsList =  this.allProperties
+                                .map { it.type }
+                                //If the subtypes are in the same package they should be imported
+                                //.plus(this.namedSubTypes())
+                                .plus(this.type)
+                                .plus(discriminatorProperty()?.type)
+                                .filterNotNull()
+                                .map { vrapTypeProvider.doSwitch(it) }
+                                .mapNotNull { getUsingsForType(it) }
+                                .sortedBy { it }
+                                .distinct()
+                                .toList()
+                        return usingsList
+                    }
+                }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `bare single-call rewrite — closing brace stays inline with lambda body end`() {
+        // Real-world case from ybonjour/test-store: rewrite
+        // `results.map { it.x }.sum()` to `results.sumOf { it.x }`. The lambda
+        // body is a single inline expression, so the closing `}` must stay on
+        // the same line as the body. The bug: the closing `}` ends up on its
+        // own line after the rewrite.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseSumOfWithSelector = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, f: (Any) -> Int -> xs.map(f).sum() } to { xs, f -> xs.sumOf(f) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseSumOfWithSelector",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                """
+                data class Result(val durationMillis: Long?, val testName: String)
+                data class Run(val id: java.util.UUID?, val testSuite: java.util.UUID?, val time: java.util.Date?)
+                class RunOverview(val run: Run, val total: Long)
+                class Repo { fun findAllByRunId(id: java.util.UUID): List<Result> = emptyList() }
+                class Svc(val resultRepository: Repo) {
+                    private fun getRunOverview(run: Run): RunOverview {
+                        val results = resultRepository.findAllByRunId(run.id!!)
+                        val totalDuration = results.map { it.durationMillis!! }.sum()
+
+                        run.testSuite?.let { testSuite ->
+                            run.time?.let { time ->
+                                run.id?.let { runId ->
+                                    return RunOverview(run, totalDuration)
+                                }
+                            }
+                        }
+
+                        return RunOverview(run, totalDuration)
+                    }
+                }
+                """,
+                """
+                data class Result(val durationMillis: Long?, val testName: String)
+                data class Run(val id: java.util.UUID?, val testSuite: java.util.UUID?, val time: java.util.Date?)
+                class RunOverview(val run: Run, val total: Long)
+                class Repo { fun findAllByRunId(id: java.util.UUID): List<Result> = emptyList() }
+                class Svc(val resultRepository: Repo) {
+                    private fun getRunOverview(run: Run): RunOverview {
+                        val results = resultRepository.findAllByRunId(run.id!!)
+                        val totalDuration = results.sumOf { it.durationMillis!! }
+
+                        run.testSuite?.let { testSuite ->
+                            run.time?.let { time ->
+                                run.id?.let { runId ->
+                                    return RunOverview(run, totalDuration)
+                                }
+                            }
+                        }
+
+                        return RunOverview(run, totalDuration)
+                    }
+                }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `bare single-call rewrite preserves dot-on-its-own-line layout`() {
+        // Same fix, different rewrite path: `methodInvocationRewrite` (the
+        // non-chain bare path) also runs the template through
+        // `KotlinTemplate.builder(...).apply(...)`, which loses the matched
+        // outer's `select.after`. The fix is the same shared helper, but the
+        // wiring is per-path — exercise the bare path explicitly so we don't
+        // regress one branch while fixing another. The recipe pair here
+        // (`lowercase` → `uppercase`) is semantically nonsensical; the test
+        // is about formatting only. `toUpperCase`-style stdlib deprecations
+        // are `@Deprecated(level=ERROR)` in modern Kotlin and won't compile
+        // inside `RecipePluginCompileFixture`.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseUppercase = recipe(
+                    displayName = "Use uppercase()",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseUppercase",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                """
+                fun upper(s: String): String = s
+                    .lowercase()
+                """,
+                """
+                fun upper(s: String): String = s
+                    .uppercase()
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `recipe targeting no-arg overload does not match the with-predicate overload`() {
+        // Regression: with a `(..)` wildcard arg pattern, the recipe
+        // `xs.filter(p).any() -> xs.any(p)` also matched the *predicate*
+        // overload `xs.filter(p1).any { p2 }` and silently dropped `p2` (along
+        // with the entire `.any { ... }` body the author wrote). `(..)` was
+        // tightened to `(*,*)` / `(*)` / `()` — the precise JVM arg count —
+        // so overloaded names no longer cross-match.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseAnyWithPredicateInsteadOfFilterAny = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, p: (Any) -> Boolean -> xs.filter(p).any() } to { xs, p -> xs.any(p) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseAnyWithPredicateInsteadOfFilterAny",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                // `filter { ... }.any { ... }` — the WITH-predicate any. The
+                // recipe targets the NO-arg any. Without the arg-count guard,
+                // the rewrite drops the inner `.any { p2 }` body. With the
+                // guard it leaves the source untouched (no expected diff).
+                """
+                fun hasMatch(xs: List<Int>): Boolean = xs
+                    .filter { it > 0 }
+                    .any { it > 10 }
                 """,
             ),
         )
@@ -399,6 +952,68 @@ class RecipePluginRewriteTest : RewriteTest {
         assertThat(r.recipeList).hasSize(2)
         assertThat(r.recipeList.map { it::class.java.simpleName })
             .containsExactly("A\$KtRecipe", "B\$KtRecipe")
+    }
+
+    @Test
+    fun `generated visitor is wrapped with UsesMethod precondition`() {
+        // Mirrors what Refaster does in its generated Java recipes: the
+        // synthesized `getVisitor()` returns a Preconditions.Check whose
+        // inner `check` visitor is a UsesMethod for the recipe's matcher
+        // spec. The framework uses this to skip files that don't reference
+        // the targeted member at all.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseUppercase = recipe("d", "desc") {
+                    edit {
+                        rewrite { s: String -> s.lowercase() } to { s -> s.uppercase() }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseUppercase",
+        )
+        val visitor = r.getVisitor()
+        assertThat(visitor).isInstanceOf(Preconditions.Check::class.java)
+        val check = (visitor as Preconditions.Check).check
+        assertThat(check).isInstanceOf(UsesMethod::class.java)
+        assertThat((check as UsesMethod<*>).methodMatcher.toString())
+            .contains("lowercase")
+    }
+
+    @Test
+    fun `property-access recipe is wrapped with UsesField precondition`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseKotlinMathPi = recipe("d", "desc") {
+                    edit {
+                        rewrite { -> Math.PI } to { -> kotlin.math.PI }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseKotlinMathPi",
+        )
+        val visitor = r.getVisitor()
+        assertThat(visitor).isInstanceOf(Preconditions.Check::class.java)
+        assertThat((visitor as Preconditions.Check).check).isInstanceOf(UsesField::class.java)
+    }
+
+    @Test
+    fun `precondition skips files that don't use the targeted method`() {
+        // A source that doesn't call `lowercase()` anywhere must be left
+        // untouched even though the walker, if invoked, would visit every
+        // method invocation in the file. RewriteTest's single-arg `kotlin(...)`
+        // form asserts no change.
+        rewriteRun(
+            kotlin(
+                """
+                fun unrelated() {
+                    val n = 1 + 2
+                    println(n)
+                }
+                """,
+            ),
+        )
     }
 
     @Test

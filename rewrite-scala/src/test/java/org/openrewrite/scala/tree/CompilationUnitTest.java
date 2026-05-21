@@ -387,6 +387,28 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Test
+    void contextFunctionWithWildcardParam() {
+        rewriteRun(
+          scala(
+            """
+            val f: Int ?=> Int = _ ?=> 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void contextFunctionWithNamedParam() {
+        rewriteRun(
+          scala(
+            """
+            val f: Int ?=> Int = x ?=> x + 1
+            """
+          )
+        );
+    }
+
+    @Test
     void nestedColonArgLambdas() {
         rewriteRun(
           scala(

@@ -26,7 +26,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// (<c>Microsoft.NET.Sdk.Web</c> implicitly references
 /// <c>Microsoft.AspNetCore.App</c>).
 /// </summary>
-public class AddFrameworkReferenceVisitor(string frameworkName, string? triggerPackageGlob = null) : XmlVisitor<ExecutionContext>
+public class AddFrameworkReferenceVisitor(string frameworkName, string? triggerPackageGlob = null, bool regenerateMarker = true) : XmlVisitor<ExecutionContext>
 {
     private bool _alreadyPresent;
     private bool _triggerMatched;
@@ -50,7 +50,8 @@ public class AddFrameworkReferenceVisitor(string frameworkName, string? triggerP
         var itemGroup = TagExtensions.BuildTag(
             $"<ItemGroup>\n    {tag}\n  </ItemGroup>");
         DoAfterVisit(new AddToTagVisitor<ExecutionContext>(d.Root, itemGroup));
-        DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+        if (regenerateMarker)
+            DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
         return d;
     }
 

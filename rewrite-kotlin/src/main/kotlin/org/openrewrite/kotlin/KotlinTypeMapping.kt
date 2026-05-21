@@ -664,7 +664,13 @@ class KotlinTypeMapping(
             // in line with the JVM signature so MethodMatcher patterns written against Java
             // FQNs match. Kotlin-declared methods are left alone — `kotlin.Any` there is the
             // author's intent, and Kotlin-aware matching belongs in KotlinTypeUtils.
-            val javaOrigin = parent is FirJavaClass
+            // Caller-supplied `parent` is the primary signal (covers the class-walk path); when
+            // it isn't a FirJavaClass we fall back to the symbol's owning class. PsiElement-
+            // Associations routes static method invocations through here with `parent` set to
+            // the Enhancement-origin FIR wrapper rather than the FirJavaClass, so the fallback
+            // is what catches that shape.
+            val javaOrigin = parent is FirJavaClass ||
+                    function.symbol.getOwnerLookupTag()?.toRegularClassSymbol(firSession)?.fir is FirJavaClass
             var returnType = if (javaOrigin) remapKotlinBuiltin(type(function.returnTypeRef)) else type(function.returnTypeRef)
             if (function.symbol is FirConstructorSymbol && returnType is Parameterized) {
                 returnType = returnType.type

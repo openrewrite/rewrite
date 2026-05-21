@@ -20,6 +20,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JLeftPadded;
@@ -57,7 +58,6 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
             c = c.withPackageDeclaration(visitAndCast(c.getPackageDeclaration(), p));
         }
 
-        c = c.withImports(ListUtils.map(c.getImports(), i -> visitAndCast(i, p)));
         c = c.withStatements(ListUtils.map(c.getStatements(), s -> {
             try {
                 return visitAndCast(s, p);
@@ -94,9 +94,7 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         // Sync changes from the J.CompilationUnit back to S.CompilationUnit
         if (result != tempJcu) {
             List<JRightPadded<J.Import>> newImports = result.getPadding().getImports();
-            if (newImports != c.getPadding().getImports()) {
-                c = (S.CompilationUnit) c.getPadding().withImports(newImports);
-            }
+            c = (S.CompilationUnit) c.getPadding().withImports(newImports);
             if (result.getPrefix() != c.getPrefix()) {
                 c = c.withPrefix(result.getPrefix());
             }
@@ -165,7 +163,44 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         }
         e = (S.Export) temp;
         e = e.withExportClause(visitAndCast(e.getExportClause(), p));
+        if (e.getBeforeBrace() != null) {
+            e = e.withBeforeBrace(visitSpace(e.getBeforeBrace(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (e.getPadding().getSelectors() != null) {
+            e = e.getPadding().withSelectors(visitContainer(e.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        }
         return e;
+    }
+
+    public J visitSImport(S.Import sImport, P p) {
+        S.Import i = sImport;
+        i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(i, p);
+        if (!(temp instanceof S.Import)) {
+            return temp;
+        }
+        i = (S.Import) temp;
+        i = i.getPadding().withQualifier(visitRightPadded(i.getPadding().getQualifier(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
+        i = i.withBeforeBrace(visitSpace(i.getBeforeBrace(), Space.Location.LANGUAGE_EXTENSION, p));
+        i = i.getPadding().withSelectors(visitContainer(i.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return i;
+    }
+
+    public J visitImportSelector(S.ImportSelector selector, P p) {
+        S.ImportSelector s = selector;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        if (s.getGivenType() != null) {
+            s = s.withGivenType(visitAndCast(s.getGivenType(), p));
+        }
+        if (s.getName() != null) {
+            s = s.withName(visitAndCast(s.getName(), p));
+        }
+        if (s.getPadding().getAlias() != null) {
+            s = s.getPadding().withAlias(visitLeftPadded(s.getPadding().getAlias(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        }
+        return s;
     }
 
     public J visitPatternDefinition(S.PatternDefinition patDef, P p) {
@@ -173,6 +208,24 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         pd = pd.withPrefix(visitSpace(pd.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         pd = pd.withMarkers(visitMarkers(pd.getMarkers(), p));
         return pd;
+    }
+
+    public J visitAnonymousGiven(S.AnonymousGiven anonymousGiven, P p) {
+        S.AnonymousGiven g = anonymousGiven;
+        g = g.withPrefix(visitSpace(g.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        g = g.withMarkers(visitMarkers(g.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(g, p);
+        if (!(temp instanceof S.AnonymousGiven)) {
+            return temp;
+        }
+        g = (S.AnonymousGiven) temp;
+        g = g.withLeadingAnnotations(ListUtils.map(g.getLeadingAnnotations(), a -> visitAndCast(a, p)));
+        g = g.withModifiers(ListUtils.map(g.getModifiers(), m -> visitAndCast(m, p)));
+        g = g.withType(visitAndCast(g.getType(), p));
+        if (g.getInitializer() != null) {
+            g = g.withInitializer(visitLeftPadded(g.getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p));
+        }
+        return g;
     }
 
     public J visitFunctionCall(S.FunctionCall functionCall, P p) {
@@ -200,6 +253,28 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         r = r.withElementType(visitAndCast(r.getElementType(), p));
         r = r.withBeforeStar(visitSpace(r.getBeforeStar(), Space.Location.LANGUAGE_EXTENSION, p));
         return r;
+    }
+
+    public J visitSplatExpression(S.SplatExpression splatExpression, P p) {
+        S.SplatExpression s = splatExpression;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withExpression(visitAndCast(s.getExpression(), p));
+        if (s.getBeforeColon() != null) {
+            s = s.withBeforeColon(visitSpace(s.getBeforeColon(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (s.getAfterColon() != null) {
+            s = s.withAfterColon(visitSpace(s.getAfterColon(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        s = s.withBeforeStar(visitSpace(s.getBeforeStar(), Space.Location.LANGUAGE_EXTENSION, p));
+        return s;
+    }
+
+    public J visitXmlLiteral(S.XmlLiteral xmlLiteral, P p) {
+        S.XmlLiteral x = xmlLiteral;
+        x = x.withPrefix(visitSpace(x.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        x = x.withMarkers(visitMarkers(x.getMarkers(), p));
+        return x;
     }
 
     public J visitAlternative(S.Alternative alternative, P p) {

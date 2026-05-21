@@ -261,6 +261,11 @@ public static class MSBuildProjectHelper
         if (tfm.StartsWith(".NETCoreApp,Version=v"))
         {
             var version = tfm[".NETCoreApp,Version=v".Length..];
+            // .NET Core 1.x/2.x/3.x ship as "netcoreappN.M" in project.frameworks;
+            // .NET 5+ unified to "netN.M". Match the short-form on each side so
+            // declared deps cross-reference the resolved target correctly.
+            if (version.Length > 0 && (version[0] is '1' or '2' or '3'))
+                return "netcoreapp" + version;
             return "net" + version;
         }
 
@@ -534,6 +539,88 @@ public static class MSBuildProjectHelper
         {
             return new RestoreResult(false, ex.Message);
         }
+    }
+
+    #endregion
+
+    #region Direct version resolution
+
+    /// <summary>
+    ///     Returns the resolved concrete version of a direct package dependency from
+    ///     <c>obj/project.assets.json</c>. Used by callers (such as the InstallRecipes
+    ///     RPC handler) that need the concrete SemVer that NuGet selected after a
+    ///     restore, rather than the version constraint authored in the csproj —
+    ///     <c>dotnet add package &lt;pkg&gt; --version *</c> preserves the wildcard
+    ///     verbatim in the csproj, so the resolved version must be read from the
+    ///     NuGet restore output.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when <c>obj/project.assets.json</c> is missing (restore did not
+    ///     complete), when the package is not a direct dependency under any TFM, or
+    ///     when no matching resolved entry exists in the assets file's libraries.
+    /// </exception>
+    public static string GetResolvedPackageVersion(string projectDir, string packageName)
+    {
+        var assetsPath = Path.Combine(projectDir, "obj", "project.assets.json");
+        if (!File.Exists(assetsPath))
+        {
+            throw new InvalidOperationException(
+                $"project.assets.json not found at {assetsPath}; restore did not complete");
+        }
+
+        using var doc = JsonDocument.Parse(File.ReadAllText(assetsPath));
+        var root = doc.RootElement;
+
+        if (!IsDirectDependency(root, packageName))
+        {
+            throw new InvalidOperationException(
+                $"{packageName} is not a direct dependency in {assetsPath}");
+        }
+
+        // Read from targets — NuGet's per-TFM resolution map — rather than libraries,
+        // which is a flat package graph including PackageDownload assets that don't
+        // resolve to a single version. Matches what ReadResolvedPackages does above.
+        if (root.TryGetProperty("targets", out var targets))
+        {
+            foreach (var tfm in targets.EnumerateObject())
+            foreach (var entry in tfm.Value.EnumerateObject())
+            {
+                if (!entry.Value.TryGetProperty("type", out var typeProp) ||
+                    typeProp.GetString() != "package")
+                    continue;
+
+                var slash = entry.Name.IndexOf('/');
+                if (slash > 0 &&
+                    string.Equals(entry.Name[..slash], packageName, StringComparison.OrdinalIgnoreCase))
+                {
+                    var version = entry.Name[(slash + 1)..];
+                    if (!string.IsNullOrEmpty(version))
+                        return version;
+                }
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Could not find resolved version for {packageName} in {assetsPath}");
+    }
+
+    private static bool IsDirectDependency(JsonElement root, string packageName)
+    {
+        if (!root.TryGetProperty("project", out var project) ||
+            !project.TryGetProperty("frameworks", out var frameworks))
+            return false;
+
+        foreach (var fw in frameworks.EnumerateObject())
+        {
+            if (!fw.Value.TryGetProperty("dependencies", out var deps))
+                continue;
+
+            foreach (var dep in deps.EnumerateObject())
+                if (string.Equals(dep.Name, packageName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+        }
+
+        return false;
     }
 
     #endregion

@@ -39,6 +39,14 @@ public class RemoveMSBuildProperty : ScanningRecipe<DotNetBuildContext>
         Example = "RuntimeFrameworkVersion")]
     public string PropertyName { get; set; } = "";
 
+    [Option(DisplayName = "Regenerate MSBuild marker",
+        Description = "Whether to re-run `dotnet restore` after the edit to refresh the project's " +
+                      "MSBuildProject marker. Defaults to `true`. Composite recipes that chain " +
+                      "multiple csproj-mutating steps may set this to `false` on intermediate steps " +
+                      "and finalize once with `EnsureCsprojAttestation`.",
+        Required = false)]
+    public bool RegenerateMarker { get; set; } = true;
+
     public override DotNetBuildContext GetInitialValue(ExecutionContext ctx) => DotNetBuildContext.GetOrCreate(ctx);
 
     public override ITreeVisitor<ExecutionContext> GetScanner(DotNetBuildContext acc) => new BuildContextScanner();
@@ -47,6 +55,6 @@ public class RemoveMSBuildProperty : ScanningRecipe<DotNetBuildContext>
     {
         return Preconditions.Check(
             new IsProjectFile(),
-            new RemoveMSBuildPropertyVisitor(PropertyName));
+            new RemoveMSBuildPropertyVisitor(PropertyName, RegenerateMarker));
     }
 }

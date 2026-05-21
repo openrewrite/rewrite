@@ -368,6 +368,9 @@ public class TreeVisitorAdapter {
                                 throw new IllegalStateException(
                                         "Registered mixin " + line + " is not a TreeVisitor (registered at " + url + ").");
                             }
+                            if (!adaptTo.isAssignableFrom(mixinClass)) {
+                                continue;
+                            }
                             return (TreeVisitor<?, ?>) mixinClass.getDeclaredConstructor().newInstance();
                         } catch (ReflectiveOperationException e) {
                             throw new IllegalStateException(
