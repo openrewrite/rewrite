@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    api(platform("org.junit:junit-bom:5.14.0"))
+    api(platform("org.junit:junit-bom:latest.release"))
     api(project(":rewrite-core"))
     compileOnly("io.micrometer:micrometer-core:latest.release")
     api("org.junit.jupiter:junit-jupiter-api")

@@ -6,6 +6,9 @@ plugins {
 }
 
 dependencies {
+    // TCK classes target Java 8 bytecode and are loaded by the rewrite-java-8 test launcher.
+    // JUnit 6 is compiled with `--release 17`, so we pin to JUnit 5 here to stay loadable on Java 8.
+    implementation(enforcedPlatform("org.junit:junit-bom:5.14.0"))
     implementation("org.assertj:assertj-core:latest.release")
     implementation(project(":rewrite-java"))
     implementation(project(":rewrite-java-test"))
