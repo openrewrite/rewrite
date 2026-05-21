@@ -1313,11 +1313,49 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
-    void newWithAnonymousBodyAndNewlineBeforeFirstArg() {
+    void preservesWhitespaceBeforeFirstElementInDelimitedList() {
         rewriteRun(
             scala(
                 """
+                class Foo[
+                  A,
+                  B
+                ](
+                  a: A,
+                  b: B
+                )
+
                 object Test {
+                  val x: Map[
+                    String,
+                    Int
+                  ] = ???
+
+                  val xs = List.empty[
+                    String
+                  ]
+
+                  def f[A, B](a: A, b: B) = (a, b)
+
+                  val y = f[
+                    Int,
+                    String
+                  ](
+                    1,
+                    "x"
+                  )
+
+                  val t = (
+                    1,
+                    2,
+                    3
+                  )
+
+                  val g = (
+                    a: Int,
+                    b: Int
+                  ) => a + b
+
                   def make() =
                     new Foo(
                       a,
@@ -1325,6 +1363,16 @@ class Scala2CompatTest implements RewriteTest {
                     ) {
                       override def x() = 1
                     }
+
+                  def matchIt(z: Any) = z match {
+                    case Foo(
+                      a,
+                      b
+                    ) => a
+                  }
+
+                  def cast(w: Any) = w.isInstanceOf[
+                    String]
                 }
                 """
             )
