@@ -36,6 +36,19 @@ import static java.util.Collections.emptyList;
 public class RecipeClassLoader extends URLClassLoader {
     private final ClassLoader parent;
 
+    // Classes whose FQN collides with a {@link #PARENT_DELEGATED_PREFIXES} entry by
+    // accident — `org.openrewrite.RecipeBuilder` etc. all `startsWith("org.openrewrite.Recipe")`
+    // — but which are Kotlin recipe-DSL internals that must resolve through the recipe-jar's
+    // classloader. Without this exclusion the lambda receivers (child-loaded `EditScope`,
+    // `ScanScope`, etc.) and the anonymous `Recipe` synthesized inside `RecipeBuilder.build()`
+    // (parent-loaded) end up on different loaders, producing a `ClassCastException` on the
+    // first `getVisitor()` call. See moderneinc/moderne-cli#3949.
+    private static final Set<String> NON_DELEGATED_CLASSES = new HashSet<>(Arrays.asList(
+            "org.openrewrite.RecipeBuilder",
+            "org.openrewrite.RecipeDsl",
+            "org.openrewrite.RecipeDslKt"
+    ));
+
     // Core OpenRewrite types that must be loaded from parent (from Moderne's RecipeClassLoader)
     private static final List<String> PARENT_DELEGATED_PREFIXES = Arrays.asList(
             "org.openrewrite.AbstractRecipe",
@@ -178,6 +191,21 @@ public class RecipeClassLoader extends URLClassLoader {
         for (String prefix : getAdditionalParentDelegatedPackages()) {
             if (className.startsWith(prefix)) {
                 return true;
+            }
+        }
+
+        // Force child-load for Kotlin recipe-DSL types that would otherwise be caught by
+        // a coarse `org.openrewrite.Recipe*` prefix match below. Recipe authors compile
+        // their `recipe { … }` lambdas against the bundled rewrite-kotlin version; the
+        // receiver-type linkage and the in-builder `EditScope()` construction must agree
+        // on which `Class<?>` they resolve to. Covers nested anonymous classes
+        // (`RecipeBuilder$buildSimpleRecipe$1`, etc.).
+        if (NON_DELEGATED_CLASSES.contains(className)) {
+            return false;
+        }
+        for (String cls : NON_DELEGATED_CLASSES) {
+            if (className.startsWith(cls + "$")) {
+                return false;
             }
         }
 
