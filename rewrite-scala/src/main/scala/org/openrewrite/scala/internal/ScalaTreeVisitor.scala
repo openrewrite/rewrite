@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.*
 import org.openrewrite.java.marker.ImplicitReturn
 import org.openrewrite.java.marker.OmitParentheses
 import org.openrewrite.marker.Markers
+import org.openrewrite.scala.marker.AnnotatedType
 import org.openrewrite.scala.marker.Implicit
 import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedSyntax
@@ -7353,12 +7354,15 @@ class ScalaTreeVisitor(
       case _ => throw new UnsupportedOperationException(
         s"Annotated.arg did not produce an Expression: ${ann.arg.getClass.getSimpleName}")
     }
-    // Find ":" between expression and annotation
+    // Find ":" between expression and annotation. Annotated types (`T @ann`) have no
+    // colon; annotated expressions (`e: @ann`) do. Distinguish them so the printer can
+    // round-trip both forms.
     val annotStart = Math.max(0, ann.annot.span.start - offsetAdjustment)
     val between = if (cursor < annotStart && annotStart <= source.length) source.substring(cursor, annotStart) else ""
     val colonIdx = positionOfNextIn(between, ":", 0)
     val beforeColon = if (colonIdx > 0) Space.format(between.substring(0, colonIdx)) else Space.EMPTY
     if (colonIdx >= 0) cursor = cursor + colonIdx + 1
+    val markers = if (colonIdx < 0) Markers.EMPTY.addIfAbsent(AnnotatedType.create()) else Markers.EMPTY
     // The annot is typically Apply(Select(New(Ident), <init>), args). Convert to J.Annotation.
     val annotation = visitTree(ann.annot) match {
       case a: J.Annotation => a
@@ -7366,7 +7370,7 @@ class ScalaTreeVisitor(
         s"Annotated.annot did not produce a J.Annotation: ${ann.annot.getClass.getSimpleName}")
     }
     updateCursor(ann.span.end)
-    new S.AnnotatedExpression(Tree.randomId(), prefix, Markers.EMPTY,
+    new S.AnnotatedExpression(Tree.randomId(), prefix, markers,
       expr, beforeColon, annotation, typeFor(ann.span))
   }
 

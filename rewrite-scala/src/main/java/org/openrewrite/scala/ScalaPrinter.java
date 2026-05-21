@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.scala.marker.AnnotatedType;
 import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.PackageBraces;
@@ -1721,7 +1722,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         beforeSyntax(annotatedExpression, Space.Location.LANGUAGE_EXTENSION, p);
         visit(annotatedExpression.getExpression(), p);
         visitSpace(annotatedExpression.getBeforeColon(), Space.Location.LANGUAGE_EXTENSION, p);
-        p.append(':');
+        if (!annotatedExpression.getMarkers().findFirst(AnnotatedType.class).isPresent()) {
+            p.append(':');
+        }
         visit(annotatedExpression.getAnnotation(), p);
         afterSyntax(annotatedExpression, p);
         return annotatedExpression;

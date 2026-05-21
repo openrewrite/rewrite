@@ -254,6 +254,20 @@ public class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void annotationOnTypeArgument() {
+        rewriteRun(
+            scala(
+                """
+                class Box[A]
+                trait Test {
+                  def f: Box[Int @deprecated]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void annotationOnOwnLineBeforeImplicitVal() {
         rewriteRun(
             scala(
