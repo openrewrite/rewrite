@@ -22,9 +22,9 @@
 
 The OpenRewrite project (managed by [Moderne](https://www.moderne.ai/)) is an open-source automated refactoring ecosystem for source code, enabling developers to effectively eliminate technical debt within their repositories.
 
-It consists of an auto-refactoring engine that runs prepackaged, open source refactoring recipes for common framework migrations, security fixes, and stylistic consistency tasks—reducing your coding effort from hours or days to minutes. Build tool plugins like [OpenRewrite Gradle Plugin](https://docs.openrewrite.org/reference/gradle-plugin-configuration) and [OpenRewrite Maven Plugin](https://docs.openrewrite.org/reference/rewrite-maven-plugin) help you run these recipes on one repository at a time.
+It consists of an auto-refactoring engine that runs prepackaged, open source refactoring recipes for common framework migrations, security fixes, and stylistic consistency tasks—reducing your coding effort from hours or days to minutes.
 
-OpenRewrite supports [multiple languages and frameworks](https://docs.openrewrite.org/reference/supported-languages). Recipes are open source and easy to customize, so you can adapt any of them - or even write your own.
+OpenRewrite provides open-source parsers and base recipes for [multiple languages](https://docs.openrewrite.org/reference/supported-languages), including Java, Kotlin, Groovy, JavaScript/TypeScript, Python, and C#. For Java, the [OpenRewrite Gradle Plugin](https://docs.openrewrite.org/reference/gradle-plugin-configuration) and [OpenRewrite Maven Plugin](https://docs.openrewrite.org/reference/rewrite-maven-plugin) let you run one recipe at a time against a single repository. Recipes are easy to customize, so you can adapt any of them - or even write your own.
 
 Start with our [quickstart guide](https://docs.openrewrite.org/running-recipes/getting-started) and let OpenRewrite handle the boring parts of software development for you.
 
@@ -39,9 +39,7 @@ OpenRewrite is maintained by Moderne. The core framework is Apache2 licensed and
 
 ## Building on OpenRewrite with Moderne
  
-OpenRewrite is built to migrate, secure, and refactor code one repository at a time. [Moderne](https://www.moderne.ai/) is the commercial platform built on that foundation, extending OpenRewrite from a single repo to an entire codebase and from individual developers to teams and coding agents.
- 
-Running an OpenRewrite recipe across one repo is where most teams begin, and migrations are a common starting point. Moderne runs those same recipes across hundreds or thousands of repositories at once. The platform also expands on this to include large-scale impact analysis, security remediation, and the tools coding agents use to understand and change code across a whole organization.
+OpenRewrite is built to migrate, secure, and refactor code one repository at a time. [Moderne](https://www.moderne.ai/) is the commercial platform built on that foundation, running the same recipes across hundreds or thousands of repositories at once. Migrations are a common starting point with OpenRewrite, and the platform expands on this to include large-scale impact analysis, security remediation, and the tools coding agents use to understand and change code across a whole organization. Moderne also extends OpenRewrite from Java to additional languages and from individual developers to teams and coding agents. While the parsers and base recipes for those additional languages are open source, running recipes against them requires a Moderne license. 
  
 A lot of this comes down to how the [Lossless Semantic Tree (LST)](https://docs.openrewrite.org/concepts-and-explanations/lossless-semantic-trees) is handled. The LST is OpenRewrite's type-aware model of your source code, built in memory each time a recipe runs. Moderne batch-builds LSTs once and serializes them, so they can be reused across repos and across teams without rebuilding. That same LST gives coding agents pre-computed context, type-aware search, and direct access to OpenRewrite recipes as deterministic tool calls through tools like [Prethink](https://docs.moderne.io/user-documentation/agent-tools/prethink), [Trigrep](https://docs.moderne.io/user-documentation/agent-tools/trigrep), and a [local MCP server](https://docs.moderne.io/user-documentation/agent-tools/mcp). Agents work with less token overhead and more accuracy than they would reading a codebase file by file.
  
