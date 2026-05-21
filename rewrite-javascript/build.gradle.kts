@@ -76,13 +76,13 @@ fun gitCommitTimestamp(): String {
         .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
 }
 
-val datedSnapshotVersion = if (System.getenv("CI") != null) {
-    project.version.toString().replace(
-        "SNAPSHOT",
-        gitCommitTimestamp()
-    )
-} else {
-    project.version.toString()
+// `-PnpmPublishVersion=<v>` (set by the npm-publish workflow on the tag-triggered path)
+// pins the version verbatim, so e.g. tag `v8.83.0` publishes `8.83.0`. Otherwise CI builds
+// substitute `SNAPSHOT` for the git commit timestamp, and local builds use the raw version.
+val datedSnapshotVersion = when {
+    project.hasProperty("npmPublishVersion") -> project.property("npmPublishVersion").toString()
+    System.getenv("CI") != null -> project.version.toString().replace("SNAPSHOT", gitCommitTimestamp())
+    else -> project.version.toString()
 }
 
 // Helper function to extract version from the JAR if it exists
@@ -230,43 +230,12 @@ testing {
     }
 }
 
-// Implicitly `--tag latest` if not specified.
-// Auth is via npm Trusted Publisher (OIDC) from GitHub Actions — the `permissions: id-token: write`
-// block on the calling workflow exports `ACTIONS_ID_TOKEN_REQUEST_URL`, which `npm publish` auto-detects
-// and exchanges for a short-lived registry token. Local publishes use the developer's `~/.npmrc`.
-val npmPublish = tasks.register<NpmTask>("npmPublish") {
-    inputs.files(npmPack)
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-
-    args = provider { listOf("publish", npmPack.get().archiveFile.get().asFile.absolutePath) }
-    if (!project.hasProperty("releasing")) {
-        args.addAll("--tag", "next")
-    }
-
-    workingDir.set(file("rewrite"))
-
-    // npm has no `--skip-duplicate`; the daily scheduled publish would fail with a 403
-    // whenever no new commit had landed since the previous run (the snapshot version is
-    // derived from the latest commit timestamp). Skip the task if the version already exists.
-    onlyIf {
-        val versionToCheck = extractVersionFromJar() ?: datedSnapshotVersion
-        val process = ProcessBuilder("npm", "view", "@openrewrite/rewrite@$versionToCheck", "version")
-            .directory(file("rewrite"))
-            .redirectErrorStream(true)
-            .start()
-        val output = process.inputStream.bufferedReader().readText().trim()
-        val alreadyPublished = process.waitFor() == 0 && output.contains(versionToCheck)
-        if (alreadyPublished) {
-            logger.lifecycle("Skipping npmPublish: @openrewrite/rewrite@$versionToCheck already published")
-        }
-        !alreadyPublished
-    }
-}
-
-// npm publishing is intentionally NOT wired into the standard `publish` task —
-// it runs in its own `.github/workflows/npm-publish.yml` so the dedicated workflow filename
-// can be matched by the package's npm Trusted Publisher (OIDC) record. CI/release workflows
-// still publish to Sonatype, PyPI, NuGet as before.
+// npm publishing is performed directly by `.github/workflows/npm-publish.yml` (which runs
+// `npm publish <tgz>` against the artifact produced by the `npmPack` task above). The workflow
+// owns version selection (via `-PnpmPublishVersion=<v>`), dist-tag selection (`latest` vs
+// `next`), and the duplicate-publish guard. The dedicated workflow filename is also what the
+// package's npm Trusted Publisher (OIDC) record matches against. CI/release workflows still
+// publish to Sonatype, PyPI, NuGet as before.
 
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
