@@ -1727,6 +1727,18 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         return annotatedExpression;
     }
 
+    @Override
+    public J visitAnnotatedType(J.AnnotatedType annotatedType, PrintOutputCapture<P> p) {
+        // Scala writes annotated types as `T @ann` (type first), the reverse of Java's
+        // `@ann T`. Scala syntax never produces prefix-form annotated types, so every
+        // J.AnnotatedType in a Scala LST is the postfix flavor.
+        beforeSyntax(annotatedType, Space.Location.ANNOTATED_TYPE_PREFIX, p);
+        visit(annotatedType.getTypeExpression(), p);
+        visit(annotatedType.getAnnotations(), p);
+        afterSyntax(annotatedType, p);
+        return annotatedType;
+    }
+
     public J visitFunctionType(S.FunctionType functionType, PrintOutputCapture<P> p) {
         beforeSyntax(functionType, Space.Location.LANGUAGE_EXTENSION, p);
         JContainer<TypeTree> params = functionType.getPadding().getParameters();

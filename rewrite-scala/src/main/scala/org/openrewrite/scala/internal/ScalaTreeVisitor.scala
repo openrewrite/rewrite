@@ -7344,21 +7344,19 @@ class ScalaTreeVisitor(
     new S.RefinedType(Tree.randomId(), prefix, Markers.EMPTY, parent, refinements, typeFor(rtt.span))
   }
 
-  private def visitAnnotated(ann: Trees.Annotated[?]): S.AnnotatedExpression = {
-    // Annotated expression/type: `x: @switch`, `(pos: @switch) match {...}`
+  private def visitAnnotated(ann: Trees.Annotated[?]): J = {
+    // Dotty's `Annotated` covers both annotated expressions (`e: @ann`, with colon) and
+    // annotated types (`T @ann`, without colon). Branch on the source to produce the
+    // right LST node: `S.AnnotatedExpression` for the former, `S.AnnotatedType` for
+    // the latter.
     val prefix = extractPrefix(ann.span)
-    val expr: Expression = visitTree(ann.arg) match {
-      case e: Expression => e
-      case j: J => new S.StatementExpression(Tree.randomId(), j)
-      case _ => throw new UnsupportedOperationException(
-        s"Annotated.arg did not produce an Expression: ${ann.arg.getClass.getSimpleName}")
-    }
-    // Find ":" between expression and annotation
+    val arg: J = visitTree(ann.arg)
     val annotStart = Math.max(0, ann.annot.span.start - offsetAdjustment)
     val between = if (cursor < annotStart && annotStart <= source.length) source.substring(cursor, annotStart) else ""
     val colonIdx = positionOfNextIn(between, ":", 0)
-    val beforeColon = if (colonIdx > 0) Space.format(between.substring(0, colonIdx)) else Space.EMPTY
-    if (colonIdx >= 0) cursor = cursor + colonIdx + 1
+    val isAnnotatedType = colonIdx < 0
+    val beforeColon = if (!isAnnotatedType && colonIdx > 0) Space.format(between.substring(0, colonIdx)) else Space.EMPTY
+    if (!isAnnotatedType) cursor = cursor + colonIdx + 1
     // The annot is typically Apply(Select(New(Ident), <init>), args). Convert to J.Annotation.
     val annotation = visitTree(ann.annot) match {
       case a: J.Annotation => a
@@ -7366,8 +7364,26 @@ class ScalaTreeVisitor(
         s"Annotated.annot did not produce a J.Annotation: ${ann.annot.getClass.getSimpleName}")
     }
     updateCursor(ann.span.end)
-    new S.AnnotatedExpression(Tree.randomId(), prefix, Markers.EMPTY,
-      expr, beforeColon, annotation, typeFor(ann.span))
+    if (isAnnotatedType) {
+      val typeExpr: TypeTree = arg match {
+        case tt: TypeTree => tt
+        case _ => throw new UnsupportedOperationException(
+          s"Annotated.arg in type position did not produce a TypeTree: ${ann.arg.getClass.getSimpleName}")
+      }
+      // Reuse J.AnnotatedType, even though Java prints annotations before the type.
+      // ScalaPrinter overrides visitAnnotatedType to print `T @ann` (type first).
+      new J.AnnotatedType(Tree.randomId(), prefix, Markers.EMPTY,
+        Collections.singletonList(annotation), typeExpr)
+    } else {
+      val expr: Expression = arg match {
+        case e: Expression => e
+        case j: J => new S.StatementExpression(Tree.randomId(), j)
+        case _ => throw new UnsupportedOperationException(
+          s"Annotated.arg did not produce an Expression: ${ann.arg.getClass.getSimpleName}")
+      }
+      new S.AnnotatedExpression(Tree.randomId(), prefix, Markers.EMPTY,
+        expr, beforeColon, annotation, typeFor(ann.span))
+    }
   }
 
   private def visitMacroTree(mac: untpd.MacroTree): S.Macro = {
