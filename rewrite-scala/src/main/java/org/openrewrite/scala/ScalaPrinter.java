@@ -743,12 +743,19 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     }
     
     private boolean isSyntheticPredefChain(J.FieldAccess fa) {
-        // Detect _root_.scala.Predef.??? chains added by compiler for procedure syntax
-        if ("???".equals(fa.getSimpleName()) || "$qmark$qmark$qmark".equals(fa.getSimpleName())) {
-            return true;
+        // Detect compiler-synthetic _root_.scala.Predef.??? chains from procedure-syntax
+        // desugaring. Require both the `???` leaf and the `_root_` root so that real
+        // user-written `_root_.foo.bar` imports/qualifiers aren't suppressed.
+        String leaf = fa.getSimpleName();
+        if (!"???".equals(leaf) && !"$qmark$qmark$qmark".equals(leaf)) {
+            return false;
         }
+        return chainStartsAtRoot(fa);
+    }
+
+    private boolean chainStartsAtRoot(J.FieldAccess fa) {
         if (fa.getTarget() instanceof J.FieldAccess) {
-            return isSyntheticPredefChain((J.FieldAccess) fa.getTarget());
+            return chainStartsAtRoot((J.FieldAccess) fa.getTarget());
         }
         if (fa.getTarget() instanceof J.Identifier) {
             return "_root_".equals(((J.Identifier) fa.getTarget()).getSimpleName());
@@ -1576,7 +1583,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             if (export.getBeforeBrace() != null) {
                 visitSpace(export.getBeforeBrace(), Space.Location.LANGUAGE_EXTENSION, p);
             }
-            visitContainer("{", export.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, ",", "}", p);
+            if (export.getMarkers().findFirst(org.openrewrite.scala.marker.OmitImportBraces.class).isPresent()) {
+                visitContainer("", export.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, ",", "", p);
+            } else {
+                visitContainer("{", export.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, ",", "}", p);
+            }
         } else if (clause instanceof J.FieldAccess && isWildcardImport((J.FieldAccess) clause)) {
             J.FieldAccess fa = (J.FieldAccess) clause;
             visitFieldAccessUpToWildcard(fa, p);
@@ -1598,7 +1609,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visitRightPadded(sImport.getPadding().getQualifier(), JRightPadded.Location.LANGUAGE_EXTENSION, p);
         p.append('.');
         visitSpace(sImport.getBeforeBrace(), Space.Location.LANGUAGE_EXTENSION, p);
-        visitContainer("{", sImport.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, ",", "}", p);
+        if (sImport.getMarkers().findFirst(org.openrewrite.scala.marker.OmitImportBraces.class).isPresent()) {
+            visitContainer("", sImport.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, ",", "", p);
+        } else {
+            visitContainer("{", sImport.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, ",", "}", p);
+        }
         afterSyntax(sImport, p);
         return sImport;
     }

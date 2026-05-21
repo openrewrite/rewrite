@@ -295,6 +295,50 @@ class ImportTest implements RewriteTest {
     }
 
     @Test
+    void scala3AliasKeywordWithoutBraces() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.c.X as Y
+            """
+          )
+        );
+    }
+
+    @Test
+    void rootPrefix() {
+        rewriteRun(
+          scala(
+            """
+            import _root_.scala.collection.mutable
+            """
+          )
+        );
+    }
+
+    @Test
+    void semicolonAfterImportInsideClass() {
+        rewriteRun(
+          scala(
+            """
+            class C { import scala.math._; val x = 1 }
+            """
+          )
+        );
+    }
+
+    @Test
+    void commentBetweenSelectorNameAndAs() {
+        rewriteRun(
+          scala(
+            """
+            import a.b.{X /* hi */ as Y}
+            """
+          )
+        );
+    }
+
+    @Test
     void wildcardGivenWithoutBraces() {
         // Imports all givens from a.b — Scala 3 shorthand.
         rewriteRun(
