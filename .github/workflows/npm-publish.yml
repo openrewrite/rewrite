@@ -66,10 +66,14 @@ jobs:
           CI: 'true'
         run: |
           # The upstream `publish` workflow is tag-only and already restricts
-          # releases to version tags.
+          # releases to version tags. Mirror its nebula-release flags so the
+          # version is inferred from the tag (e.g. 8.83.0) rather than falling
+          # back to a SNAPSHOT — npm 11 refuses to publish a prerelease without
+          # an explicit --tag.
           if [[ '${{ github.event.workflow_run.name }}' == 'publish' ]]; then
             ./gradlew --no-daemon --console=plain --info --stacktrace \
-              :rewrite-javascript:npmPublish -Preleasing
+              -Preleasing -Prelease.disableGitChecks=true -Prelease.useLastTag=true \
+              final :rewrite-javascript:npmPublish
           else
             ./gradlew --no-daemon --console=plain --info --stacktrace \
               :rewrite-javascript:npmPublish
