@@ -26,8 +26,6 @@ dependencies {
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.ow2.asm:asm:latest.release")
 
-    // JUnit 6 is compiled with `--release 17`; pin to the latest JUnit 5 BOM for the Java 11 toolchain.
-    testImplementation(enforcedPlatform("org.junit:junit-bom:5.+"))
     testImplementation(project(":rewrite-test"))
     "javaTck"(project(":rewrite-java-tck"))
 }
@@ -83,7 +81,6 @@ testing {
 
         register("compatibilityTest", JvmTestSuite::class) {
             dependencies {
-                implementation(enforcedPlatform("org.junit:junit-bom:5.+"))
                 implementation(project())
                 implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-java-tck"))
