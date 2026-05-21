@@ -6401,14 +6401,40 @@ class ScalaTreeVisitor(
    * `private[scope] val`, ...) that turn the param into a class field.
    */
   private def visitConstructorParameter(vd: Trees.ValDef[?], isFirstInList: Boolean): J.VariableDeclarations = {
+    import dotty.tools.dotc.core.Flags
     val paramStart = Math.max(0, vd.span.start - offsetAdjustment)
     val nameStart = if (vd.nameSpan.exists) Math.max(0, vd.nameSpan.start - offsetAdjustment) else paramStart
 
-    // Prefix = whitespace from current cursor up to the start of this param's span
-    val prefix: Space = if (cursor < paramStart && paramStart <= source.length) {
+    // Detect `using` (Scala 3 context) / `implicit` (Scala 2) on this clause. The keyword
+    // appears once before the first param of its clause; consume it from source and surface
+    // it as a J.Modifier so the printer can re-emit it.
+    val isUsing = vd.mods != null && vd.mods.is(Flags.Given)
+    val isScala2Implicit = vd.mods != null && vd.mods.is(Flags.Implicit) && !isUsing
+    val paramModifiers = new util.ArrayList[J.Modifier]()
+
+    var modifierConsumed = false
+    val prefix: Space = if ((isUsing || isScala2Implicit) && isFirstInList) {
+      val keyword = if (isUsing) "using" else "implicit"
+      if (cursor < paramStart && paramStart <= source.length) {
+        val leading = source.substring(cursor, paramStart)
+        val kwIdx = positionOfNextIn(leading, keyword, 0)
+        if (kwIdx >= 0) {
+          val outerPrefix = if (kwIdx > 0) Space.format(leading.substring(0, kwIdx)) else Space.EMPTY
+          paramModifiers.add(new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+            keyword, J.Modifier.Type.LanguageExtension, Collections.emptyList()))
+          cursor = cursor + kwIdx + keyword.length
+          modifierConsumed = true
+          outerPrefix
+        } else if (cursor < paramStart && paramStart <= source.length) {
+          Space.format(source, cursor, paramStart)
+        } else Space.EMPTY
+      } else Space.EMPTY
+    } else if (cursor < paramStart && paramStart <= source.length) {
       Space.format(source, cursor, paramStart)
     } else Space.EMPTY
-    cursor = Math.max(cursor, paramStart)
+    if (!modifierConsumed) {
+      cursor = Math.max(cursor, paramStart)
+    }
 
     // Parameter-level annotations (e.g. @transient val name)
     val paramAnnotations = new util.ArrayList[J.Annotation]()
@@ -6426,29 +6452,60 @@ class ScalaTreeVisitor(
 
     // Scan source between the current cursor and the parameter name for modifiers
     // (`val`/`var`, access modifiers, `override`, `final`).
-    val paramModifiers = if (cursor < nameStart && nameStart <= source.length) {
+    if (cursor < nameStart && nameStart <= source.length) {
       val modText = source.substring(cursor, nameStart)
       val (mods, consumed) = parseModifierKeywords(modText, constructorParamModifierKeywords)
+      paramModifiers.addAll(mods)
       cursor += consumed
-      mods
-    } else new util.ArrayList[J.Modifier]()
+    }
+
+    // Anonymous `using` param: dotty synthesizes a name like `x$1` that does not appear in
+    // source. Keep the synthesized name in the LST but attach an OmitName marker so the
+    // printer suppresses it. Detection: name matches the `x$N` synthesized pattern, or the
+    // text between cursor and the type's start position doesn't contain the name.
+    val rawParamName = vd.name.toString
+    val anonymousParam: Boolean = isUsing && {
+      rawParamName.matches("x\\$\\d+") || {
+        if (vd.tpt != null && vd.tpt.span.exists) {
+          val tStart = Math.max(0, vd.tpt.span.start - offsetAdjustment)
+          if (cursor < tStart && tStart <= source.length) {
+            !source.substring(cursor, tStart).contains(rawParamName)
+          } else true
+        } else true
+      }
+    }
 
     // Space between modifiers (or annotations) and the parameter name. Use the backtick-aware
     // helper so `case class CC(`type`: String)` keeps both backticks — `vd.name.toString` strips
     // them, and the closing backtick lives one past `vd.nameSpan.end`.
-    val (namePrefix, displayName, nameEndCursor) = if (vd.nameSpan.exists) {
-      val rawNameLen = Math.max(0, vd.nameSpan.end - vd.nameSpan.start)
-      backtickAwareName(cursor, nameStart, rawNameLen, vd.name.toString)
-    } else {
-      (Space.EMPTY, vd.name.toString, cursor)
-    }
+    val (namePrefix, displayName, nameEndCursor) =
+      if (vd.nameSpan.exists && !anonymousParam) {
+        val rawNameLen = Math.max(0, vd.nameSpan.end - vd.nameSpan.start)
+        backtickAwareName(cursor, nameStart, rawNameLen, rawParamName)
+      } else {
+        (Space.EMPTY, rawParamName, cursor)
+      }
     val paramName = ident(displayName, namePrefix, variableTypeOfTree(vd))
-    cursor = Math.max(cursor, nameEndCursor)
+    if (vd.nameSpan.exists && !anonymousParam) {
+      cursor = Math.max(cursor, nameEndCursor)
+    }
 
-    // Type ascription `: Type`
     val paramEnd = Math.max(0, vd.span.end - offsetAdjustment)
     var beforeColon: Space = Space.EMPTY
-    val typeExpr: TypeTree = if (vd.tpt != untpd.EmptyTree && vd.tpt.span.exists) {
+    val typeExpr: TypeTree = if (anonymousParam && vd.tpt != untpd.EmptyTree && vd.tpt.span.exists) {
+      // Anonymous `using` param: source is just the type (e.g. `using Executor`). Walk
+      // forward to the type span start, then visit the type — no preceding colon.
+      val typeStart = Math.max(0, vd.tpt.span.start - offsetAdjustment)
+      val tt = if (cursor < typeStart && typeStart <= source.length) {
+        val typePrefix = Space.format(source, cursor, typeStart)
+        cursor = typeStart
+        visitTypeTree(vd.tpt).withPrefix(typePrefix).asInstanceOf[TypeTree]
+      } else {
+        visitTypeTree(vd.tpt)
+      }
+      updateCursor(vd.tpt.span.end)
+      tt
+    } else if (vd.tpt != untpd.EmptyTree && vd.tpt.span.exists) {
       val colonSearchEnd = Math.min(paramEnd, source.length)
       val between = if (cursor < colonSearchEnd) source.substring(cursor, colonSearchEnd) else ""
       val colonIdx = positionOfNextIn(between, ":", 0)
@@ -6479,10 +6536,15 @@ class ScalaTreeVisitor(
       }
     } else null
 
+    val namedVariableMarkers =
+      if (anonymousParam)
+        Markers.build(Collections.singletonList(org.openrewrite.scala.marker.OmitName(Tree.randomId())))
+      else Markers.EMPTY
+
     val variable = new J.VariableDeclarations.NamedVariable(
       Tree.randomId(),
       Space.EMPTY,
-      Markers.EMPTY,
+      namedVariableMarkers,
       paramName,
       Collections.emptyList(),
       if (initializer != null) new JLeftPadded(initBefore, initializer, Markers.EMPTY) else null,
