@@ -31,7 +31,6 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.scala.marker.AnnotatedType;
 import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.PackageBraces;
@@ -1722,12 +1721,22 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         beforeSyntax(annotatedExpression, Space.Location.LANGUAGE_EXTENSION, p);
         visit(annotatedExpression.getExpression(), p);
         visitSpace(annotatedExpression.getBeforeColon(), Space.Location.LANGUAGE_EXTENSION, p);
-        if (!annotatedExpression.getMarkers().findFirst(AnnotatedType.class).isPresent()) {
-            p.append(':');
-        }
+        p.append(':');
         visit(annotatedExpression.getAnnotation(), p);
         afterSyntax(annotatedExpression, p);
         return annotatedExpression;
+    }
+
+    @Override
+    public J visitAnnotatedType(J.AnnotatedType annotatedType, PrintOutputCapture<P> p) {
+        // Scala writes annotated types as `T @ann` (type first), the reverse of Java's
+        // `@ann T`. Scala syntax never produces prefix-form annotated types, so every
+        // J.AnnotatedType in a Scala LST is the postfix flavor.
+        beforeSyntax(annotatedType, Space.Location.ANNOTATED_TYPE_PREFIX, p);
+        visit(annotatedType.getTypeExpression(), p);
+        visit(annotatedType.getAnnotations(), p);
+        afterSyntax(annotatedType, p);
+        return annotatedType;
     }
 
     public J visitFunctionType(S.FunctionType functionType, PrintOutputCapture<P> p) {
