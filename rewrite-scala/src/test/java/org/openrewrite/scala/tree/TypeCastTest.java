@@ -135,4 +135,16 @@ class TypeCastTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void chainedAsInstanceOfOnNewLine() {
+        rewriteRun(
+          scala(
+            """
+            val hudiSchemaAsStruct = something.dataType
+              .asInstanceOf[StructType]
+            """
+          )
+        );
+    }
 }
