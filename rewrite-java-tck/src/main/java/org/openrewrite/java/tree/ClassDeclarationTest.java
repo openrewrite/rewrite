@@ -22,7 +22,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 
@@ -35,7 +34,6 @@ class ClassDeclarationTest implements RewriteTest {
      * @see <a href="https://docs.oracle.com/en/java/javase/17/language/sealed-classes-and-interfaces.html>Sealed classes</a> documentation.
      */
     @Issue("https://github.com/openrewrite/rewrite/pull/2569")
-    @MinimumJava17
     @Test
     void sealedClasses() {
         rewriteRun(
@@ -65,7 +63,6 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/pull/2569")
-    @MinimumJava17
     @Test
     void sealedInterfaces() {
         rewriteRun(

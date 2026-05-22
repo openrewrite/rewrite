@@ -17,7 +17,6 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,7 +39,6 @@ class InstanceOfTest implements RewriteTest {
         );
     }
 
-    @MinimumJava17
     @Test
     void patternMatch() {
         rewriteRun(
@@ -68,7 +66,6 @@ class InstanceOfTest implements RewriteTest {
         );
     }
 
-    @MinimumJava17
     @Test
     void instanceofPatternMatchWithFinalModifier() {
         rewriteRun(
@@ -87,7 +84,6 @@ class InstanceOfTest implements RewriteTest {
         );
     }
 
-    @MinimumJava17
     @Test
     void instanceofPatternMatchWithoutModifier() {
         rewriteRun(

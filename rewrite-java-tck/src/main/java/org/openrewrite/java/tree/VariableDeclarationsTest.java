@@ -21,7 +21,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MinimumJava11;
-import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -198,7 +197,6 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @MinimumJava17
     @Test
     void implicitlyDeclaredLocalVariable() {
         rewriteRun(
@@ -218,7 +216,6 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @MinimumJava17
     @Test
     void string() {
         rewriteRun(
@@ -242,7 +239,6 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @MinimumJava17
     @Test
     void typeOnVarKeyword() {
         rewriteRun(
