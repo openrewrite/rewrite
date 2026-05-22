@@ -130,6 +130,95 @@ func add(a int, b int) int {
 	}
 }
 
+func TestTypeAttributionMultiReturn(t *testing.T) {
+	// given
+	p := parser.NewGoParser()
+	cu, err := p.Parse("test.go", `package main
+
+func divmod(a int, b int) (int, int) {
+	return a / b, a % b
+}
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	v := visitor.Init(&methodTypeCollector{methodTypes: make(map[string]*tree.JavaTypeMethod)})
+	v.Visit(cu, nil)
+
+	// then
+	mt, ok := v.methodTypes["divmod"]
+	if !ok {
+		t.Fatal("no method type for divmod()")
+	}
+	param, ok := mt.ReturnType.(*tree.JavaTypeParameterized)
+	if !ok {
+		t.Fatalf("expected parameterized return type, got %T", mt.ReturnType)
+	}
+	if param.Type == nil || param.Type.FullyQualifiedName != "go.tuple" {
+		t.Errorf("expected tuple FQN 'go.tuple', got %+v", param.Type)
+	}
+	if len(param.TypeParameters) != 2 {
+		t.Fatalf("expected 2 tuple type parameters, got %d", len(param.TypeParameters))
+	}
+	for i, tp := range param.TypeParameters {
+		prim, ok := tp.(*tree.JavaTypePrimitive)
+		if !ok {
+			t.Errorf("tuple element %d: expected primitive, got %T", i, tp)
+			continue
+		}
+		if prim.Keyword != "int" {
+			t.Errorf("tuple element %d: expected int, got %s", i, prim.Keyword)
+		}
+	}
+}
+
+func TestTypeAttributionMultiReturnHeterogeneous(t *testing.T) {
+	// given
+	p := parser.NewGoParser()
+	cu, err := p.Parse("test.go", `package main
+
+func split() (string, int, bool) {
+	return "x", 1, true
+}
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	v := visitor.Init(&methodTypeCollector{methodTypes: make(map[string]*tree.JavaTypeMethod)})
+	v.Visit(cu, nil)
+
+	// then
+	mt, ok := v.methodTypes["split"]
+	if !ok {
+		t.Fatal("no method type for split()")
+	}
+	param, ok := mt.ReturnType.(*tree.JavaTypeParameterized)
+	if !ok {
+		t.Fatalf("expected parameterized return type, got %T", mt.ReturnType)
+	}
+	if param.Type == nil || param.Type.FullyQualifiedName != "go.tuple" {
+		t.Errorf("expected tuple FQN 'go.tuple', got %+v", param.Type)
+	}
+	if len(param.TypeParameters) != 3 {
+		t.Fatalf("expected 3 tuple type parameters, got %d", len(param.TypeParameters))
+	}
+	expectedKeywords := []string{"String", "int", "boolean"}
+	for i, want := range expectedKeywords {
+		prim, ok := param.TypeParameters[i].(*tree.JavaTypePrimitive)
+		if !ok {
+			t.Errorf("tuple element %d: expected primitive, got %T", i, param.TypeParameters[i])
+			continue
+		}
+		if prim.Keyword != want {
+			t.Errorf("tuple element %d: expected %s, got %s", i, want, prim.Keyword)
+		}
+	}
+}
+
 func TestTypeAttributionStdlib(t *testing.T) {
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", `package main
