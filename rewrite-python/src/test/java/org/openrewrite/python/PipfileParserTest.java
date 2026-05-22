@@ -14,7 +14,6 @@ import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.toml.tree.Toml;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -26,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PipfileParserTest {
 
     @Test
-    void parsesWithResolvedDependencies(@TempDir Path tempDir) throws IOException {
+    void parsesWithResolvedDependencies(@TempDir Path tempDir) throws Exception {
         String pipfile = """
           [[source]]
           url = "https://pypi.org/simple"
@@ -102,7 +101,7 @@ class PipfileParserTest {
     }
 
     @Test
-    void parsesWithoutLockFile(@TempDir Path tempDir) throws IOException {
+    void parsesWithoutLockFile(@TempDir Path tempDir) throws Exception {
         // Without a Pipfile.lock and without pipenv on PATH the marker should still
         // be produced — just without resolved dependencies.
         String pipfile = """

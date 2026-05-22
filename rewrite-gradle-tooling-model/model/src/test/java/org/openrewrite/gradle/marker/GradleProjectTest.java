@@ -119,7 +119,7 @@ class GradleProjectTest {
         }
 
         @Test
-        void serializable() throws IOException {
+        void serializable() throws Exception {
             ObjectMapper m = new RecipeSerializer().getMapper();
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             m.writeValue(baos, gradleProject);
@@ -236,7 +236,7 @@ class GradleProjectTest {
         }
 
         @Test
-        void serializable() throws IOException {
+        void serializable() throws Exception {
             ObjectMapper m = new RecipeSerializer().getMapper();
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             m.writeValue(baos, gradleProject);

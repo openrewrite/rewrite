@@ -338,7 +338,7 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
-    void testMultilineString() {
+    void multilineString() {
         rewriteRun(
           groovy(
             """
@@ -351,7 +351,7 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
-    void testMultilineStringInterpolation() {
+    void multilineStringInterpolation() {
         rewriteRun(
           groovy(
             """
@@ -364,7 +364,7 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
-    void testMultilineStringInterpolationFollowedByTripleQuote() {
+    void multilineStringInterpolationFollowedByTripleQuote() {
         rewriteRun(
           groovy(
             """
@@ -375,7 +375,7 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
-    void testMultilineStringDollarVariable() {
+    void multilineStringDollarVariable() {
         rewriteRun(
           groovy(
             """
@@ -389,7 +389,7 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
-    void testMultilineStringWithEmbeddedQuotes() {
+    void multilineStringWithEmbeddedQuotes() {
         rewriteRun(
           groovy(
             """
@@ -402,7 +402,7 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
-    void testMultilineStringWithEscapedDollar() {
+    void multilineStringWithEscapedDollar() {
         rewriteRun(
           groovy(
             """

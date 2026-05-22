@@ -26,7 +26,7 @@ import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RpcSendQueueTest {
+class RpcSendQueueTest {
 
     @Test
     void sendList() throws Exception {

@@ -25,7 +25,6 @@ import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.text.PlainText;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -55,7 +54,7 @@ class SetupCfgParserTest {
     }
 
     @Test
-    void markerContainsDependenciesFromFreeze(@TempDir Path tempDir) throws IOException {
+    void markerContainsDependenciesFromFreeze(@TempDir Path tempDir) throws Exception {
         assumeTrue(PackageManagerExecutor.UV.find() != null, "uv is not installed");
 
         Files.writeString(tempDir.resolve("setup.cfg"), """

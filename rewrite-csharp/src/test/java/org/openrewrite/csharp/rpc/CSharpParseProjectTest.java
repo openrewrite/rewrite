@@ -26,7 +26,6 @@ import org.openrewrite.csharp.marker.MSBuildProject;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -271,7 +270,7 @@ class CSharpParseProjectTest implements RewriteTest {
     @Tag("workingSet-full")
     @Test
     @Timeout(value = 3600, unit = TimeUnit.SECONDS)
-    void parseWorkingSetSolution() throws IOException {
+    void parseWorkingSetSolution() throws Exception {
         String rootProperty = System.getProperty("workingSetRoot");
         assumeTrue(rootProperty != null, "System property 'workingSetRoot' not set");
         Path workingSetRoot = Paths.get(rootProperty);
