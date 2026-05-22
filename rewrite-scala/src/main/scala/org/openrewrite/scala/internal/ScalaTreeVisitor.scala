@@ -29,6 +29,7 @@ import org.openrewrite.scala.marker.Implicit
 import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedSyntax
 import org.openrewrite.scala.marker.OmitBraces
+import org.openrewrite.scala.marker.OmitImportBraces
 import org.openrewrite.scala.marker.PackageObject
 import org.openrewrite.scala.marker.SObject
 import org.openrewrite.scala.marker.Semicolon
@@ -37,6 +38,7 @@ import org.openrewrite.scala.marker.ScalaForLoop
 import org.openrewrite.scala.marker.BlockArgument
 import org.openrewrite.scala.marker.CommaContinuation
 import org.openrewrite.scala.marker.FunctionApplication
+import org.openrewrite.scala.marker.AsInstanceOfPrefix
 import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.marker.PartialFunctionLiteral
@@ -2545,19 +2547,59 @@ class ScalaTreeVisitor(
     }
     cursor = i + 1
 
-    // Whitespace (and comments) between `.` and `{`.
+    // Whitespace (and comments) between `.` and `{` (or, for the Scala 3
+    // unbraced single-selector rename form `import a.b.X as Y`, between `.`
+    // and the selector name).
     val afterDot = cursor
     val j = indexOfNextNonWhitespace(afterDot)
-    val beforeBrace = Space.format(source.substring(afterDot, j))
-    if (j >= source.length || source.charAt(j) != '{') {
-      throw new IllegalStateException(
-        s"Expected '{' after '.' in $keyword at position $j: '${spanText}'"
-      )
+    val isBraceless = j < source.length && source.charAt(j) != '{'
+    val beforeBrace = if (isBraceless) Space.EMPTY
+      else Space.format(source.substring(afterDot, j))
+    if (!isBraceless) {
+      cursor = j + 1
     }
-    cursor = j + 1
+    val bracelessMarkers = if (isBraceless)
+      markers.addIfAbsent(new OmitImportBraces(Tree.randomId()))
+      else markers
 
     val selectorElems = new util.ArrayList[JRightPadded[S.ImportSelector]]()
     val selectors = tree.selectors
+    if (isBraceless) {
+      if (selectors.size != 1) {
+        throw new IllegalStateException(
+          s"Expected exactly one selector for braceless $keyword at position $j: '${spanText}'"
+        )
+      }
+      val sel = selectors.head
+      val selStart = cursor
+      val p = indexOfNextNonWhitespace(selStart)
+      val selPrefix = Space.format(source.substring(selStart, p))
+      cursor = p
+      val selectorNode = parseImportSelector(sel)
+      selectorElems.add(new JRightPadded(selectorNode.withPrefix(selPrefix), Space.EMPTY, Markers.EMPTY))
+      if (cursor < adjustedEnd) cursor = adjustedEnd
+      val selectorContainerB: JContainer[S.ImportSelector] =
+        JContainer.build(Space.EMPTY, selectorElems, Markers.EMPTY)
+      return (if (keyword == "import") {
+        S.Import.build(
+          Tree.randomId(),
+          prefix,
+          bracelessMarkers,
+          new JRightPadded(qualifier, qualifierRightPad, Markers.EMPTY),
+          beforeBrace,
+          selectorContainerB
+        )
+      } else {
+        S.Export.build(
+          Tree.randomId(),
+          prefix,
+          bracelessMarkers,
+          qualifier,
+          beforeBrace,
+          selectorContainerB
+        )
+      })
+    }
     var idx = 0
     while (idx < selectors.size) {
       val sel = selectors(idx)
@@ -2678,8 +2720,7 @@ class ScalaTreeVisitor(
             false, null, false, false, nameIdent, null, false
           )
         case renamed: Trees.Ident[?] =>
-          var p = cursor
-          while (p < source.length && Character.isWhitespace(source.charAt(p))) p += 1
+          val p = indexOfNextNonWhitespace(cursor)
           val beforeArrow = Space.format(source.substring(cursor, p))
           val useAsKeyword = source.startsWith("as", p)
           val useArrow = source.startsWith("=>", p)
@@ -5154,7 +5195,9 @@ class ScalaTreeVisitor(
           val visitedSpans = new java.util.HashSet[Int]()
           // Sort by source position to preserve source order
           val sortedBody = template.body.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
-          for (stat <- sortedBody) {
+          val classEndForBody = if (td.span.exists) Math.max(0, td.span.end - offsetAdjustment) else source.length
+          for (idx <- sortedBody.indices) {
+            val stat = sortedBody(idx)
             val isSyntheticStat = stat.span.isSynthetic || {
               def hasTripleQ(t: Trees.Tree[?]): Boolean = t match {
                 case sel: Trees.Select[?] => sel.name.toString == "???" || sel.name.toString == "$qmark$qmark$qmark" || hasTripleQ(sel.qualifier)
@@ -5167,13 +5210,30 @@ class ScalaTreeVisitor(
             }
             if (stat.span.exists && !isSyntheticStat) {
               if (visitedSpans.add(stat.span.start)) {
-                visitTree(stat) match {
-                  case null =>
-                  case stmt: Statement =>
-                    statements.add(JRightPadded.build(stmt))
-                  case expr: Expression =>
-                    statements.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
-                  case _ =>
+                val visitedStmt: Statement = visitTree(stat) match {
+                  case null => null
+                  case stmt: Statement => stmt
+                  case expr: Expression => new S.ExpressionStatement(Tree.randomId(), expr)
+                  case _ => null
+                }
+                if (visitedStmt != null) {
+                  val statEnd = Math.max(0, stat.span.end - offsetAdjustment)
+                  val nextStart = {
+                    var k = idx + 1
+                    var ns = classEndForBody
+                    while (k < sortedBody.size) {
+                      val s = sortedBody(k)
+                      if (s.span.exists && !s.span.isSynthetic) {
+                        ns = Math.max(0, s.span.start - offsetAdjustment)
+                        k = sortedBody.size
+                      } else {
+                        k += 1
+                      }
+                    }
+                    ns
+                  }
+                  val (trailingSpace, rpMarkers) = consumeTrailingSemicolon(statEnd, nextStart)
+                  statements.add(new JRightPadded[Statement](visitedStmt, trailingSpace, rpMarkers))
                 }
               }
             }
@@ -5326,8 +5386,19 @@ class ScalaTreeVisitor(
             case _ => return visitUnknown(ta)
           }
           
+          // Capture whitespace between the qualifier and ".asInstanceOf"
+          // (e.g. when ".asInstanceOf" sits on its own line as part of a chain).
+          val asInstanceOfEnd = Math.max(0, sel.span.end - offsetAdjustment)
+          val asInstanceOfNameLen = "asInstanceOf".length
+          val dotPos = asInstanceOfEnd - asInstanceOfNameLen - 1
+          val asInstanceOfPrefix: Space =
+            if (cursor >= 0 && cursor <= dotPos && dotPos <= source.length) {
+              Space.format(source.substring(cursor, dotPos))
+            } else {
+              Space.EMPTY
+            }
+
           // Update cursor past ".asInstanceOf"
-          val asInstanceOfEnd = sel.span.end
           if (asInstanceOfEnd > cursor) {
             cursor = asInstanceOfEnd
           }
@@ -5360,10 +5431,17 @@ class ScalaTreeVisitor(
             cursor = ta.span.end
           }
           
+          val typeCastMarkers =
+            if (asInstanceOfPrefix.getWhitespace.nonEmpty || !asInstanceOfPrefix.getComments.isEmpty) {
+              Markers.EMPTY.addIfAbsent(AsInstanceOfPrefix.create(asInstanceOfPrefix))
+            } else {
+              Markers.EMPTY
+            }
+
           return new J.TypeCast(
             Tree.randomId(),
             Space.EMPTY,  // TypeCast itself has no prefix - the space is handled by the variable initializer
-            Markers.EMPTY,
+            typeCastMarkers,
             new J.ControlParentheses[TypeTree](
               Tree.randomId(),
               spaceBeforeBracket,
@@ -5395,7 +5473,19 @@ class ScalaTreeVisitor(
             case j: J => new S.StatementExpression(Tree.randomId(), j)
             case _ => return visitUnknown(ta)
           }
-          
+
+          // Capture whitespace between the qualifier and ".isInstanceOf"
+          // (e.g. when ".isInstanceOf" sits on its own line as part of a chain).
+          val isInstanceOfEnd = Math.max(0, sel.span.end - offsetAdjustment)
+          val isInstanceOfNameLen = "isInstanceOf".length
+          val isInstanceOfDotPos = isInstanceOfEnd - isInstanceOfNameLen - 1
+          val exprAfterSpace: Space =
+            if (cursor >= 0 && cursor <= isInstanceOfDotPos && isInstanceOfDotPos <= source.length) {
+              Space.format(source.substring(cursor, isInstanceOfDotPos))
+            } else {
+              Space.EMPTY
+            }
+
           // Advance cursor to just after `[` so the target type's own prefix
           // captures any whitespace between `[` and the type.
           val openBracket = positionOfNext("[", cursor)
@@ -5410,15 +5500,15 @@ class ScalaTreeVisitor(
             case tt: TypeTree => tt
             case _ => return visitUnknown(ta)
           }
-          
+
           // Update cursor to the end of the TypeApply
           updateCursor(ta.span.end)
-          
+
           return new J.InstanceOf(
             Tree.randomId(),
             prefix,
             Markers.EMPTY,
-            JRightPadded.build(expr),
+            new JRightPadded(expr, exprAfterSpace, Markers.EMPTY),
             clazz,
             null, // pattern (not used in Scala)
             null  // type
@@ -7359,21 +7449,19 @@ class ScalaTreeVisitor(
     new S.RefinedType(Tree.randomId(), prefix, Markers.EMPTY, parent, refinements, typeFor(rtt.span))
   }
 
-  private def visitAnnotated(ann: Trees.Annotated[?]): S.AnnotatedExpression = {
-    // Annotated expression/type: `x: @switch`, `(pos: @switch) match {...}`
+  private def visitAnnotated(ann: Trees.Annotated[?]): J = {
+    // Dotty's `Annotated` covers both annotated expressions (`e: @ann`, with colon) and
+    // annotated types (`T @ann`, without colon). Branch on the source to produce the
+    // right LST node: `S.AnnotatedExpression` for the former, `S.AnnotatedType` for
+    // the latter.
     val prefix = extractPrefix(ann.span)
-    val expr: Expression = visitTree(ann.arg) match {
-      case e: Expression => e
-      case j: J => new S.StatementExpression(Tree.randomId(), j)
-      case _ => throw new UnsupportedOperationException(
-        s"Annotated.arg did not produce an Expression: ${ann.arg.getClass.getSimpleName}")
-    }
-    // Find ":" between expression and annotation
+    val arg: J = visitTree(ann.arg)
     val annotStart = Math.max(0, ann.annot.span.start - offsetAdjustment)
     val between = if (cursor < annotStart && annotStart <= source.length) source.substring(cursor, annotStart) else ""
     val colonIdx = positionOfNextIn(between, ":", 0)
-    val beforeColon = if (colonIdx > 0) Space.format(between.substring(0, colonIdx)) else Space.EMPTY
-    if (colonIdx >= 0) cursor = cursor + colonIdx + 1
+    val isAnnotatedType = colonIdx < 0
+    val beforeColon = if (!isAnnotatedType && colonIdx > 0) Space.format(between.substring(0, colonIdx)) else Space.EMPTY
+    if (!isAnnotatedType) cursor = cursor + colonIdx + 1
     // The annot is typically Apply(Select(New(Ident), <init>), args). Convert to J.Annotation.
     val annotation = visitTree(ann.annot) match {
       case a: J.Annotation => a
@@ -7381,8 +7469,26 @@ class ScalaTreeVisitor(
         s"Annotated.annot did not produce a J.Annotation: ${ann.annot.getClass.getSimpleName}")
     }
     updateCursor(ann.span.end)
-    new S.AnnotatedExpression(Tree.randomId(), prefix, Markers.EMPTY,
-      expr, beforeColon, annotation, typeFor(ann.span))
+    if (isAnnotatedType) {
+      val typeExpr: TypeTree = arg match {
+        case tt: TypeTree => tt
+        case _ => throw new UnsupportedOperationException(
+          s"Annotated.arg in type position did not produce a TypeTree: ${ann.arg.getClass.getSimpleName}")
+      }
+      // Reuse J.AnnotatedType, even though Java prints annotations before the type.
+      // ScalaPrinter overrides visitAnnotatedType to print `T @ann` (type first).
+      new J.AnnotatedType(Tree.randomId(), prefix, Markers.EMPTY,
+        Collections.singletonList(annotation), typeExpr)
+    } else {
+      val expr: Expression = arg match {
+        case e: Expression => e
+        case j: J => new S.StatementExpression(Tree.randomId(), j)
+        case _ => throw new UnsupportedOperationException(
+          s"Annotated.arg did not produce an Expression: ${ann.arg.getClass.getSimpleName}")
+      }
+      new S.AnnotatedExpression(Tree.randomId(), prefix, Markers.EMPTY,
+        expr, beforeColon, annotation, typeFor(ann.span))
+    }
   }
 
   private def visitMacroTree(mac: untpd.MacroTree): S.Macro = {
@@ -8122,6 +8228,35 @@ class ScalaTreeVisitor(
    * position of the next significant character. Returns `source.length` if no
    * such character exists.
    */
+  /**
+   * After visiting a statement that ended at `statEnd`, detect an explicit `;`
+   * separator on the same line and consume it. Returns the JRightPadded
+   * trailing space and markers; advances `cursor`.
+   */
+  private def consumeTrailingSemicolon(statEnd: Int, nextStart: Int): (Space, Markers) = {
+    val trailStart = Math.max(statEnd, cursor)
+    if (trailStart >= nextStart || nextStart > source.length) {
+      return (Space.EMPTY, Markers.EMPTY)
+    }
+    val between = source.substring(trailStart, nextStart)
+    var semiIdx = -1
+    var j = 0
+    while (semiIdx < 0 && j < between.length) {
+      val c = between.charAt(j)
+      if (c == ';') semiIdx = j
+      else if (c == '\n' || c == '\r') j = between.length
+      else if (c != ' ' && c != '\t') j = between.length
+      else j += 1
+    }
+    if (semiIdx >= 0) {
+      val trailing = if (semiIdx > 0) Space.format(between.substring(0, semiIdx)) else Space.EMPTY
+      cursor = trailStart + semiIdx + 1
+      (trailing, Markers.EMPTY.add(new Semicolon(Tree.randomId())))
+    } else {
+      (Space.EMPTY, Markers.EMPTY)
+    }
+  }
+
   private def indexOfNextNonWhitespace(startFrom: Int = cursor): Int = {
     var i = startFrom
     while (i < source.length) {

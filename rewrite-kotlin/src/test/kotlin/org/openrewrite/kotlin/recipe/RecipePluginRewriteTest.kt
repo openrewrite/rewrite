@@ -363,6 +363,312 @@ class RecipePluginRewriteTest : RewriteTest {
     }
 
     @Test
+    fun `chain collapse — three-deep chain preserves inner select layout`() {
+        // Real-world case from commercetools/rmf-codegen: the matched chain is
+        // three deep — `responses.filter(p1).filter(p2).firstOrNull()`. The
+        // recipe `filter(p).firstOrNull() -> firstOrNull(p)` fires on the
+        // outermost call. `xs` binds to `responses.filter(p1)` — itself a
+        // J.MethodInvocation whose `paddingSelect.after` carries the inner
+        // dot-on-newline whitespace. The bug we're guarding against: after
+        // substitution, the new outer's `.firstOrNull` line keeps its
+        // indentation (preserveSelectAfter handles that), but the SUBSTITUTED
+        // inner `.filter` loses its own `paddingSelect.after` and gets
+        // jammed up against `responses` (or onto a less-indented line).
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseFirstOrNullWithPredicate = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, p: (Any) -> Boolean -> xs.filter(p).firstOrNull() } to { xs, p -> xs.firstOrNull(p) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseFirstOrNullWithPredicate",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                // Byte-for-byte from commercetools/rmf-codegen
+                // codegen-renderers/.../MethodExtensions.kt#Method.returnType:
+                // four-space indent for the function body and an eight-space
+                // continuation indent on the chain dots (so `.filter` sits at
+                // column 12).
+                """
+                interface Body
+                interface Response { val statusCode: Int; val bodies: List<Body>? }
+                class NilType : Body
+                object TypesFactory { fun createNilType(): Body = NilType() }
+                class Method { val responses: List<Response> = emptyList() }
+                fun Response.isSuccessfull(): Boolean = statusCode in (200..299)
+                fun Method.returnType(): Body {
+                    return this.responses
+                            .filter { it.isSuccessfull() }
+                            .filter { it.bodies?.isNotEmpty() ?: false }
+                            .firstOrNull()
+                            ?.let { it.bodies!![0] }
+                            ?: TypesFactory.createNilType()
+                }
+                """,
+                """
+                interface Body
+                interface Response { val statusCode: Int; val bodies: List<Body>? }
+                class NilType : Body
+                object TypesFactory { fun createNilType(): Body = NilType() }
+                class Method { val responses: List<Response> = emptyList() }
+                fun Response.isSuccessfull(): Boolean = statusCode in (200..299)
+                fun Method.returnType(): Body {
+                    return this.responses
+                            .filter { it.isSuccessfull() }
+                            .firstOrNull { it.bodies?.isNotEmpty() ?: false }
+                            ?.let { it.bodies!![0] }
+                            ?: TypesFactory.createNilType()
+                }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `chain collapse — multi-line lambda body keeps internal indentation`() {
+        // Real-world case from aws/aws-toolkit-jetbrains: a `map { ... }` whose
+        // lambda body spans multiple statements gets rewritten to `mapNotNull
+        // { ... }`. The lambda body lines (4-space indented inside the lambda)
+        // must keep their indentation. The bug: the multi-statement lambda body
+        // collapses to flat / left-aligned text in the rewritten output.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseMapNotNull = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, f: (Any) -> Int? -> xs.map(f).filterNotNull() } to { xs, f -> xs.mapNotNull(f) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseMapNotNull",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                // Byte-for-byte from aws/aws-toolkit-jetbrains
+                // plugins/toolkit/jetbrains-rider/.../DotNetRuntimeUtils.kt.
+                // Chain at 12-space indent (function body 8 + 4-space chain),
+                // lambda body at 16-space indent (12 + 4), closing `}` at 12.
+                """
+                fun versions(runtimeList: List<String>): List<String?> {
+                    val versionRegex = Regex("(\\d+.\\d+.\\d+)")
+                    val versions = runtimeList
+                        .filter { it.startsWith("Microsoft.NETCore.App") }
+                        .map { runtimeString ->
+                            val match = versionRegex.find(runtimeString) ?: return@map null
+                            match.groups[1]?.value ?: return@map null
+                        }
+                        .filterNotNull()
+                    return versions
+                }
+                """,
+                """
+                fun versions(runtimeList: List<String>): List<String?> {
+                    val versionRegex = Regex("(\\d+.\\d+.\\d+)")
+                    val versions = runtimeList
+                        .filter { it.startsWith("Microsoft.NETCore.App") }
+                        .mapNotNull { runtimeString ->
+                            val match = versionRegex.find(runtimeString) ?: return@map null
+                            match.groups[1]?.value ?: return@map null
+                        }
+                    return versions
+                }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `chain collapse — long chain with intermediate plus calls preserves layout`() {
+        // Real-world case from commercetools/rmf-codegen
+        // (CsharpObjectTypeExtensions.kt). The matched chain has a long pre-chain
+        // (`map → plus → plus → filterNotNull → map → map`) before the
+        // collapsing `map(f).filterNotNull()` 2-segment match at the tail. The
+        // captured `xs` substitution is the entire long pre-chain; its interior
+        // newlines must survive intact when it's plugged back in as the new
+        // `mapNotNull` outer's select.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseMapNotNull = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, f: (Any) -> Int? -> xs.map(f).filterNotNull() } to { xs, f -> xs.mapNotNull(f) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseMapNotNull",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                // Byte-for-byte from commercetools/rmf-codegen
+                // languages/csharp/.../CsharpObjectTypeExtensions.kt#getUsings.
+                // 16-space chain indent inside an interface method body. The
+                // chain has comment lines mid-stream and a double-space after
+                // `=` — both should pass through unchanged.
+                """
+                interface VrapType { val name: String }
+                interface VrapTypeProvider { fun doSwitch(t: Any): VrapType }
+                interface Property { val type: Any? }
+                interface ObjectType {
+                    val allProperties: List<Property>
+                    val type: Any?
+                    fun discriminatorProperty(): Property?
+                    val vrapTypeProvider: VrapTypeProvider
+                    fun getUsingsForType(t: VrapType): String?
+                }
+
+                interface CsharpObjectTypeExtensions {
+                    fun ObjectType.getUsings(): List<String> {
+                        var usingsList =  this.allProperties
+                                .map { it.type }
+                                //If the subtypes are in the same package they should be imported
+                                //.plus(this.namedSubTypes())
+                                .plus(this.type)
+                                .plus(discriminatorProperty()?.type)
+                                .filterNotNull()
+                                .map { vrapTypeProvider.doSwitch(it) }
+                                .map { getUsingsForType(it) }
+                                .filterNotNull()
+                                .sortedBy { it }
+                                .distinct()
+                                .toList()
+                        return usingsList
+                    }
+                }
+                """,
+                """
+                interface VrapType { val name: String }
+                interface VrapTypeProvider { fun doSwitch(t: Any): VrapType }
+                interface Property { val type: Any? }
+                interface ObjectType {
+                    val allProperties: List<Property>
+                    val type: Any?
+                    fun discriminatorProperty(): Property?
+                    val vrapTypeProvider: VrapTypeProvider
+                    fun getUsingsForType(t: VrapType): String?
+                }
+
+                interface CsharpObjectTypeExtensions {
+                    fun ObjectType.getUsings(): List<String> {
+                        var usingsList =  this.allProperties
+                                .map { it.type }
+                                //If the subtypes are in the same package they should be imported
+                                //.plus(this.namedSubTypes())
+                                .plus(this.type)
+                                .plus(discriminatorProperty()?.type)
+                                .filterNotNull()
+                                .map { vrapTypeProvider.doSwitch(it) }
+                                .mapNotNull { getUsingsForType(it) }
+                                .sortedBy { it }
+                                .distinct()
+                                .toList()
+                        return usingsList
+                    }
+                }
+                """,
+            ),
+        )
+    }
+
+    @Test
+    fun `bare single-call rewrite — closing brace stays inline with lambda body end`() {
+        // Real-world case from ybonjour/test-store: rewrite
+        // `results.map { it.x }.sum()` to `results.sumOf { it.x }`. The lambda
+        // body is a single inline expression, so the closing `}` must stay on
+        // the same line as the body. The bug: the closing `}` ends up on its
+        // own line after the rewrite.
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseSumOfWithSelector = recipe(
+                    displayName = "...",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { xs: List<Any>, f: (Any) -> Int -> xs.map(f).sum() } to { xs, f -> xs.sumOf(f) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseSumOfWithSelector",
+        )
+        rewriteRun(
+            { spec ->
+                spec.recipe(r)
+                spec.typeValidationOptions(org.openrewrite.test.TypeValidation.none())
+            },
+            kotlin(
+                """
+                data class Result(val durationMillis: Long?, val testName: String)
+                data class Run(val id: java.util.UUID?, val testSuite: java.util.UUID?, val time: java.util.Date?)
+                class RunOverview(val run: Run, val total: Long)
+                class Repo { fun findAllByRunId(id: java.util.UUID): List<Result> = emptyList() }
+                class Svc(val resultRepository: Repo) {
+                    private fun getRunOverview(run: Run): RunOverview {
+                        val results = resultRepository.findAllByRunId(run.id!!)
+                        val totalDuration = results.map { it.durationMillis!! }.sum()
+
+                        run.testSuite?.let { testSuite ->
+                            run.time?.let { time ->
+                                run.id?.let { runId ->
+                                    return RunOverview(run, totalDuration)
+                                }
+                            }
+                        }
+
+                        return RunOverview(run, totalDuration)
+                    }
+                }
+                """,
+                """
+                data class Result(val durationMillis: Long?, val testName: String)
+                data class Run(val id: java.util.UUID?, val testSuite: java.util.UUID?, val time: java.util.Date?)
+                class RunOverview(val run: Run, val total: Long)
+                class Repo { fun findAllByRunId(id: java.util.UUID): List<Result> = emptyList() }
+                class Svc(val resultRepository: Repo) {
+                    private fun getRunOverview(run: Run): RunOverview {
+                        val results = resultRepository.findAllByRunId(run.id!!)
+                        val totalDuration = results.sumOf { it.durationMillis!! }
+
+                        run.testSuite?.let { testSuite ->
+                            run.time?.let { time ->
+                                run.id?.let { runId ->
+                                    return RunOverview(run, totalDuration)
+                                }
+                            }
+                        }
+
+                        return RunOverview(run, totalDuration)
+                    }
+                }
+                """,
+            ),
+        )
+    }
+
+    @Test
     fun `bare single-call rewrite preserves dot-on-its-own-line layout`() {
         // Same fix, different rewrite path: `methodInvocationRewrite` (the
         // non-chain bare path) also runs the template through

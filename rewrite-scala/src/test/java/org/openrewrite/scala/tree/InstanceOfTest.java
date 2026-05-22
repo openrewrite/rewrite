@@ -135,4 +135,16 @@ class InstanceOfTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void chainedIsInstanceOfOnNewLine() {
+        rewriteRun(
+          scala(
+            """
+            val b = something.dataType
+              .isInstanceOf[StructType]
+            """
+          )
+        );
+    }
 }

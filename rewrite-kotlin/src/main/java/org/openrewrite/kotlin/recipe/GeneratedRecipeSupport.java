@@ -10,7 +10,10 @@
 package org.openrewrite.kotlin.recipe;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
@@ -134,6 +137,7 @@ public final class GeneratedRecipeSupport {
                         }
                         result = preserveSelectAfter((J.MethodInvocation) result, method);
                         result = preserveTrailingLambdaShape((J.MethodInvocation) result);
+                        result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                     }
                     return result.withPrefix(method.getPrefix());
                 }
@@ -200,11 +204,65 @@ public final class GeneratedRecipeSupport {
                     }
                     result = preserveSelectAfter((J.MethodInvocation) result, method);
                     result = preserveTrailingLambdaShape((J.MethodInvocation) result);
+                    result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                 }
                 return result.withPrefix(method.getPrefix());
             }
         };
         return wrapWithPrecondition(matcherSpecsLine, walker);
+    }
+
+    /**
+     * Restore the interior whitespace of every substituted argument.
+     * {@link JavaTemplate#apply} runs {@code AutoFormat} over the parsed-then-
+     * substituted tree, which re-indents interior lines (lambda bodies,
+     * dot-on-newline chain layouts) relative to the new call's cursor position
+     * — typically shifting interior lines several columns to the left and
+     * losing the author's original formatting. The captured arguments (passed
+     * in {@code substitutions}) still carry their original absolute interior
+     * whitespace, since substitution only clears each captured node's outer
+     * prefix (see {@code Substitutions#substituteTypedPattern}).
+     *
+     * <p>Match captures to result-tree nodes by {@link Tree#getId()} — both
+     * {@code withPrefix} and AutoFormat's whitespace edits preserve UUIDs, so
+     * this is a precise alignment. For each matched node, swap the entire
+     * captured node back into place but keep the result node's outer prefix
+     * (so the captured arg lands at the call site's chosen position) — the
+     * captured node's interior (the body lines, the chain {@code .x} dots, the
+     * statement prefixes, the closing {@code }} indent) is preserved verbatim.
+     */
+    private static J.MethodInvocation restoreSubstitutedInteriors(
+            J.MethodInvocation result, Object[] substitutions) {
+        Map<UUID, J> capturedById = null;
+        for (Object s : substitutions) {
+            if (s instanceof J) {
+                if (capturedById == null) {
+                    capturedById = new HashMap<>();
+                }
+                capturedById.put(((J) s).getId(), (J) s);
+            }
+        }
+        if (capturedById == null) {
+            return result;
+        }
+        Map<UUID, J> finalCapturedById = capturedById;
+        //noinspection DataFlowIssue
+        return (J.MethodInvocation) new JavaVisitor<Integer>() {
+            @Override
+            public J visit(@Nullable Tree tree, Integer p) {
+                if (tree instanceof J) {
+                    J captured = finalCapturedById.get(((J) tree).getId());
+                    if (captured != null) {
+                        // Keep the result-tree node's outer prefix (set by
+                        // preserveTrailingLambdaShape or the template-substituted
+                        // default); swap the captured contents (interior
+                        // whitespace and all) back in.
+                        return captured.withPrefix(((J) tree).getPrefix());
+                    }
+                }
+                return super.visit(tree, p);
+            }
+        }.visit(result, 0);
     }
 
     /**
@@ -329,6 +387,7 @@ public final class GeneratedRecipeSupport {
                     }
                     result = preserveSelectAfter((J.MethodInvocation) result, method);
                     result = preserveTrailingLambdaShape((J.MethodInvocation) result);
+                    result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                 }
                 return result.withPrefix(unary.getPrefix());
             }
@@ -474,6 +533,7 @@ public final class GeneratedRecipeSupport {
                             result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
                         }
                         result = preserveSelectAfter((J.MethodInvocation) result, method);
+                        result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                     }
                     return result.withPrefix(method.getPrefix());
                 }
