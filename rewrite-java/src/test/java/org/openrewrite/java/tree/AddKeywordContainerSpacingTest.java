@@ -38,11 +38,6 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
  */
 class AddKeywordContainerSpacingTest implements RewriteTest {
 
-    @Override
-    public void defaults(RecipeSpec spec) {
-        // Reused across tests; each test sets its own recipe.
-    }
-
     @Test
     void withThrowsAddsLeadingSpaceWhenMethodHasNoExistingThrowsClause() {
         rewriteRun(
