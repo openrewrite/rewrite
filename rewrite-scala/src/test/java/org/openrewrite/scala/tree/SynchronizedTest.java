@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.scala.Assertions.scala;
 
-public class SynchronizedTest implements RewriteTest {
+class SynchronizedTest implements RewriteTest {
     
     @Test
     void synchronizedBlock() {

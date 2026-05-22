@@ -72,7 +72,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void parsesProjectDirectory() throws IOException {
+    void parsesProjectDirectory() throws Exception {
         // Create a project structure
         Path projectDir = tempDir.resolve("project");
         Files.createDirectories(projectDir);
@@ -100,7 +100,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void parsesNestedDirectories() throws IOException {
+    void parsesNestedDirectories() throws Exception {
         // Create nested structure
         Path projectDir = tempDir.resolve("nested");
         Path subDir = projectDir.resolve("subpackage");
@@ -122,7 +122,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void excludesPycacheByDefault() throws IOException {
+    void excludesPycacheByDefault() throws Exception {
         Path projectDir = tempDir.resolve("with_cache");
         Path cacheDir = projectDir.resolve("__pycache__");
         Files.createDirectories(cacheDir);
@@ -140,7 +140,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void parsesEmptyDirectory() throws IOException {
+    void parsesEmptyDirectory() throws Exception {
         Path projectDir = tempDir.resolve("empty");
         Files.createDirectories(projectDir);
 
@@ -153,7 +153,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void parsesAbsolutePath() throws IOException {
+    void parsesAbsolutePath() throws Exception {
         Path projectDir = tempDir.resolve("absolute");
         Files.createDirectories(projectDir);
         Files.writeString(projectDir.resolve("test.py"), "pass");
@@ -170,7 +170,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void includesPyprojectToml() throws IOException {
+    void includesPyprojectToml() throws Exception {
         Path projectDir = tempDir.resolve("with_pyproject");
         Files.createDirectories(projectDir);
 
@@ -200,7 +200,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void includesRequirementsTxt() throws IOException {
+    void includesRequirementsTxt() throws Exception {
         Path projectDir = tempDir.resolve("with_requirements");
         Files.createDirectories(projectDir);
 
@@ -228,7 +228,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void includesPipfile() throws IOException {
+    void includesPipfile() throws Exception {
         Path projectDir = tempDir.resolve("with_pipfile");
         Files.createDirectories(projectDir);
 
@@ -269,7 +269,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void pyprojectTomlTakesPriorityOverRequirementsTxt() throws IOException {
+    void pyprojectTomlTakesPriorityOverRequirementsTxt() throws Exception {
         Path projectDir = tempDir.resolve("both_manifests");
         Files.createDirectories(projectDir);
 
@@ -298,7 +298,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void includesAllRequirementsTxtFiles() throws IOException {
+    void includesAllRequirementsTxtFiles() throws Exception {
         Path projectDir = tempDir.resolve("multi_requirements");
         Files.createDirectories(projectDir);
 

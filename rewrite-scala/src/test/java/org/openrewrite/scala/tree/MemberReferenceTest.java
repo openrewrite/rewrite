@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.scala.Assertions.scala;
 
-public class MemberReferenceTest implements RewriteTest {
+class MemberReferenceTest implements RewriteTest {
     
     @Test
     void simpleMemberReference() {
