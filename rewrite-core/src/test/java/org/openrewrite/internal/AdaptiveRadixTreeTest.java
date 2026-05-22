@@ -20,10 +20,10 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class AdaptiveRadixTreeTest {
+class AdaptiveRadixTreeTest {
 
     @Test
-    public void insertAndSearch_SingleKey() {
+    void insertAndSearch_SingleKey() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("cat", 1);
 
@@ -34,7 +34,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void fullInternaNode() {
+    void fullInternaNode() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("cat", 1);
         tree.insert("child", 1);
@@ -44,7 +44,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void copy() {
+    void copy() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("cat", 1);
         AdaptiveRadixTree<Integer> copy = tree.copy();
@@ -55,7 +55,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_MultipleKeys() {
+    void insertAndSearch_MultipleKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("cat", 1);
         tree.insert("car", 2);
@@ -74,7 +74,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_OverlappingKeys() {
+    void insertAndSearch_OverlappingKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("test", 1);
         tree.insert("testing", 2);
@@ -89,7 +89,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_PrefixKeys() {
+    void insertAndSearch_PrefixKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("a", 1);
         tree.insert("ab", 2);
@@ -106,7 +106,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_EmptyString() {
+    void insertAndSearch_EmptyString() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("", 1);
 
@@ -116,7 +116,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_SpecialCharacters() {
+    void insertAndSearch_SpecialCharacters() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("hello-world", 1);
         tree.insert("hello_world", 2);
@@ -131,7 +131,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_CaseSensitivity() {
+    void insertAndSearch_CaseSensitivity() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("Apple", 1);
         tree.insert("apple", 2);
@@ -144,7 +144,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_NumericKeys() {
+    void insertAndSearch_NumericKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("123", 1);
         tree.insert("1234", 2);
@@ -159,7 +159,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_MixedCharacterKeys() {
+    void insertAndSearch_MixedCharacterKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("user1", 1);
         tree.insert("user2", 2);
@@ -176,7 +176,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_LongKeys() {
+    void insertAndSearch_LongKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         String longKey1 = "a".repeat(1000);
         String longKey2 = "a".repeat(999) + "b";
@@ -191,7 +191,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_NullValue() {
+    void insertAndSearch_NullValue() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("key", null);
 
@@ -200,7 +200,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_UnicodeKeys() {
+    void insertAndSearch_UnicodeKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("こんにちは", 1); // "Hello" in Japanese
         tree.insert("こんばんは", 2); // "Good evening" in Japanese
@@ -215,13 +215,13 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_EmptyTree() {
+    void insertAndSearch_EmptyTree() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         assertThat(tree.search("anykey")).isNull();
     }
 
     @Test
-    public void insert_DuplicateKeys() {
+    void insert_DuplicateKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("duplicate", 1);
         tree.insert("duplicate", 2);
@@ -230,7 +230,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void Search_NonExistentKeys() {
+    void Search_NonExistentKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("exist", 1);
 
@@ -240,7 +240,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_SimilarKeys() {
+    void insertAndSearch_SimilarKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("ab", 1);
         tree.insert("abc", 2);
@@ -256,7 +256,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_CommonPrefixes() {
+    void insertAndSearch_CommonPrefixes() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("prefix", 1);
         tree.insert("preface", 2);
@@ -275,7 +275,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_SingleCharacterKeys() {
+    void insertAndSearch_SingleCharacterKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("a", 1);
         tree.insert("b", 2);
@@ -289,14 +289,14 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_NullKey() {
+    void insertAndSearch_NullKey() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         assertThatThrownBy(() -> tree.insert((String) null, 1))
           .isInstanceOf(NullPointerException.class);
     }
 
     @Test
-    public void insertAndSearch_SpecialCaseKeys() {
+    void insertAndSearch_SpecialCaseKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("user_name", 1);
         tree.insert("user-name", 2);
@@ -314,7 +314,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_CyrillicKeys() {
+    void insertAndSearch_CyrillicKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("привет", 1); // "Hello" in Russian
         tree.insert("проект", 2); // "Project" in Russian
@@ -327,7 +327,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_EmojiKeys() {
+    void insertAndSearch_EmojiKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("😀", 1);
         tree.insert("😀😁", 2);
@@ -341,7 +341,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_MixedLanguageKeys() {
+    void insertAndSearch_MixedLanguageKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("hello世界", 1); // "hello world" mixing English and Chinese
         tree.insert("こんにちはworld", 2); // "hello world" mixing Japanese and English
@@ -354,7 +354,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_SpacesInKeys() {
+    void insertAndSearch_SpacesInKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("key with spaces", 1);
         tree.insert("another key with spaces", 2);
@@ -367,7 +367,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_SpecialUnicodeCharacters() {
+    void insertAndSearch_SpecialUnicodeCharacters() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("naïve", 1);
         tree.insert("café", 2);
@@ -382,7 +382,7 @@ public class AdaptiveRadixTreeTest {
     }
 
     @Test
-    public void insertAndSearch_ControlCharacters() {
+    void insertAndSearch_ControlCharacters() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("line1\nline2", 1);
         tree.insert("tab\tcharacter", 2);

@@ -19,6 +19,7 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -45,7 +46,7 @@ class AddPlatformDependencyTest implements RewriteTest {
             }
       """;
 
-    @CsvSource({
+    @ValueSource(strings = {
       "implementation",
       "compileOnly",
       "runtimeOnly",
@@ -84,7 +85,7 @@ class AddPlatformDependencyTest implements RewriteTest {
             )));
     }
 
-    @CsvSource({
+    @ValueSource(strings = {
       "implementation",
       "compileOnly",
       "runtimeOnly",

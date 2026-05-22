@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class HttpUrlConnectionSenderTest {
+class HttpUrlConnectionSenderTest {
 
     @Test
     void withMultipartContentWithApplicationJsonType() throws Exception {

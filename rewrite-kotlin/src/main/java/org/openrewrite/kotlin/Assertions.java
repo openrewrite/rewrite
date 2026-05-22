@@ -18,6 +18,7 @@ package org.openrewrite.kotlin;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Assertions;
 import org.openrewrite.*;
 import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.java.JavaParser;
@@ -43,7 +44,6 @@ import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.sourceSet;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 import static org.openrewrite.test.SourceSpecs.dir;
@@ -284,16 +284,14 @@ public final class Assertions {
                     return next(space);
                 }
             }.visit(cu, 0);
-            try {
+            Assertions.assertDoesNotThrow(() -> {
                 String s = visited.printAll();
                 InMemoryExecutionContext ctx = new InMemoryExecutionContext();
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
                 SourceFile cu2 = spec.getParser().build().parse(ctx, s).findFirst().get();
                 String s1 = cu2.printAll();
                 assertEquals(s, s1, "Parser is not whitespace print idempotent");
-            } catch (Exception e) {
-                fail(e);
-            }
+            });
         };
     }
 

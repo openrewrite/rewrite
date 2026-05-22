@@ -25,7 +25,6 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.StringUtils;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
@@ -90,7 +89,7 @@ class RecipeClassLoaderTest {
     }
 
     @Test
-    void resourcesShouldBeChildLoaded(@TempDir Path tempDir) throws IOException {
+    void resourcesShouldBeChildLoaded(@TempDir Path tempDir) throws Exception {
         Path lib1 = tempDir.resolve("lib1");
         Files.createDirectories(lib1);
         Path file1 = lib1.resolve("rewrite.txt");
@@ -109,7 +108,7 @@ class RecipeClassLoaderTest {
     }
 
     @Test
-    void resourcesShouldFindFromParentLast(@TempDir Path tempDir) throws IOException {
+    void resourcesShouldFindFromParentLast(@TempDir Path tempDir) throws Exception {
         Path lib1 = tempDir.resolve("lib1");
         Files.createDirectories(lib1);
         Path file1 = lib1.resolve("rewrite.txt");
@@ -126,7 +125,7 @@ class RecipeClassLoaderTest {
     }
 
     @Test
-    void allResourcesShouldFindFromChildFirst(@TempDir Path tempDir) throws IOException {
+    void allResourcesShouldFindFromChildFirst(@TempDir Path tempDir) throws Exception {
         Path lib1 = tempDir.resolve("lib1");
         Files.createDirectories(lib1);
         Path file1 = lib1.resolve("rewrite.txt");
@@ -199,7 +198,7 @@ class RecipeClassLoaderTest {
     }
 
     @Test
-    void allResourcesShouldFindFromParentLast(@TempDir Path tempDir) throws IOException {
+    void allResourcesShouldFindFromParentLast(@TempDir Path tempDir) throws Exception {
         Path lib1 = tempDir.resolve("lib1");
         Files.createDirectories(lib1);
         Path file1 = lib1.resolve("rewrite.txt");

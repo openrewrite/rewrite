@@ -52,7 +52,7 @@ class PlainTextParserTest {
 
     @ParameterizedTest
     @MethodSource
-    void testUtf8WithAndWithoutBom(String text, boolean hasBom) {
+    void utf8WithAndWithoutBom(String text, boolean hasBom) {
         PlainTextParser parser = PlainTextParser.builder().build();
         SourceFile parsed = parser.parse(text).findFirst().orElseThrow();
 
@@ -68,7 +68,7 @@ class PlainTextParserTest {
         assertThat(checked).isSameAs(parsed);
     }
 
-    static Stream<Arguments> testUtf8WithAndWithoutBom() {
+    static Stream<Arguments> utf8WithAndWithoutBom() {
         return Stream.of(
           Arguments.of("""
               <?xml version="1.0" encoding="UTF-8"?><a />
