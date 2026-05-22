@@ -269,7 +269,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if (loc == LAMBDA_PARAMETERS_PREFIX && isScope(lambda.getParameters())) {
                     return lambda.withParameters(unsubstitute(templateParser.parseLambdaParameters(getCursor(), substitutedTemplate)));
                 }
-                return maybeReplaceStatement(lambda, J.class, 0);
+                if (loc == STATEMENT_PREFIX && isScope(lambda)) {
+                    return maybeReplaceStatement(lambda, J.class, 0);
+                }
+                // Recurse into the lambda's body so that templates targeting an expression or
+                // statement inside the body (e.g. `lambda.getBody().getCoordinates().replace()`)
+                // can find their scope. Without this, the visitor stops at the lambda and the
+                // apply call silently returns the input unchanged.
+                return super.visitLambda(lambda, p);
             }
 
             @Override
