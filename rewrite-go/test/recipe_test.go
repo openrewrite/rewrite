@@ -111,6 +111,34 @@ func TestRecipeNoChange(t *testing.T) {
 	)
 }
 
+// TestSearchRecipeViaRewriteRun verifies that RewriteRun prints SearchResult
+// markers as /*~~(...)~~>*/ comments by default, so search-style recipes can
+// be tested with the same convention used in Java and TypeScript.
+func TestSearchRecipeViaRewriteRun(t *testing.T) {
+	spec := test.NewRecipeSpec().WithRecipe(&findFoo{})
+	spec.RewriteRun(t,
+		test.GolangRaw(
+			"package main\n\nfunc foo() {\n}\n",
+			"package main\n\nfunc /*~~(found foo)~~>*/foo() {\n}\n",
+		),
+	)
+}
+
+// TestSearchRecipeWithSanitizedMarkerPrinter verifies that
+// WithMarkerPrinter(SanitizedMarkerPrinter) lets tests opt out of marker
+// rendering — matching Java's spec.markerPrinter(SANITIZED).
+func TestSearchRecipeWithSanitizedMarkerPrinter(t *testing.T) {
+	spec := test.NewRecipeSpec().
+		WithRecipe(&findFoo{}).
+		WithMarkerPrinter(printer.SanitizedMarkerPrinter)
+	spec.RewriteRun(t,
+		test.GolangRaw(
+			"package main\n\nfunc foo() {\n}\n",
+			"package main\n\nfunc foo() {\n}\n",
+		),
+	)
+}
+
 func TestSearchRecipeWithMarkerPrinting(t *testing.T) {
 	r := &findFoo{}
 	editor := r.Editor()
