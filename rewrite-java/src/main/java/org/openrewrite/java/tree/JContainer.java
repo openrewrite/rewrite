@@ -161,28 +161,11 @@ public class JContainer<T> {
     }
 
     public static <J2 extends J> @Nullable JContainer<J2> withElementsNullable(@Nullable JContainer<J2> before, @Nullable List<J2> elements) {
-        return withElementsNullable(before, elements, Space.EMPTY, Space.EMPTY);
-    }
-
-    /**
-     * Replace or build the elements of a {@link JContainer}. When the container is newly built
-     * ({@code before} is {@code null} and {@code elements} is non-empty), {@code defaultBefore}
-     * becomes its leading {@link Space} (printed before the delimiter or keyword), and
-     * {@code defaultFirstElementPrefix} becomes the first element's prefix (printed between the
-     * delimiter/keyword and the first element) if that prefix is currently empty. Existing
-     * containers are untouched; only the elements are replaced.
-     */
-    public static <J2 extends J> @Nullable JContainer<J2> withElementsNullable(@Nullable JContainer<J2> before, @Nullable List<J2> elements, Space defaultBefore, Space defaultFirstElementPrefix) {
         if (elements == null || elements.isEmpty()) {
             return null;
         }
         if (before == null) {
-            List<J2> normalized = elements;
-            if (!defaultFirstElementPrefix.isEmpty() && elements.get(0).getPrefix().isEmpty()) {
-                normalized = new java.util.ArrayList<>(elements);
-                normalized.set(0, elements.get(0).withPrefix(defaultFirstElementPrefix));
-            }
-            return JContainer.build(defaultBefore, JRightPadded.withElements(emptyList(), normalized), Markers.EMPTY);
+            return JContainer.build(Space.EMPTY, JRightPadded.withElements(emptyList(), elements), Markers.EMPTY);
         }
         return before.getPadding().withElements(JRightPadded.withElements(before.elements, elements));
     }

@@ -1330,7 +1330,13 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withImplements(@Nullable List<TypeTree> implementings) {
-            return getPadding().withImplements(JContainer.withElementsNullable(this.implementings, implementings, Space.SINGLE_SPACE, Space.SINGLE_SPACE));
+            JContainer<TypeTree> updated = JContainer.withElementsNullable(this.implementings, implementings);
+            if (updated != null && this.implementings == null) {
+                List<TypeTree> normalized = ListUtils.mapFirst(updated.getElements(), first ->
+                        first.getPrefix().isEmpty() ? first.withPrefix(Space.SINGLE_SPACE) : first);
+                updated = JContainer.withElements(updated, normalized).withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withImplements(updated);
         }
 
         @Nullable
@@ -1341,7 +1347,13 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withPermits(@Nullable List<TypeTree> permitting) {
-            return getPadding().withPermits(JContainer.withElementsNullable(this.permitting, permitting, Space.SINGLE_SPACE, Space.SINGLE_SPACE));
+            JContainer<TypeTree> updated = JContainer.withElementsNullable(this.permitting, permitting);
+            if (updated != null && this.permitting == null) {
+                List<TypeTree> normalized = ListUtils.mapFirst(updated.getElements(), first ->
+                        first.getPrefix().isEmpty() ? first.withPrefix(Space.SINGLE_SPACE) : first);
+                updated = JContainer.withElements(updated, normalized).withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withPermits(updated);
         }
 
         @With
@@ -3976,7 +3988,13 @@ public interface J extends Tree {
         }
 
         public MethodDeclaration withThrows(@Nullable List<NameTree> throwz) {
-            return getPadding().withThrows(JContainer.withElementsNullable(this.throwz, throwz, Space.SINGLE_SPACE, Space.SINGLE_SPACE));
+            JContainer<NameTree> updated = JContainer.withElementsNullable(this.throwz, throwz);
+            if (updated != null && this.throwz == null) {
+                List<NameTree> normalized = ListUtils.mapFirst(updated.getElements(), first ->
+                        first.getPrefix().isEmpty() ? first.withPrefix(Space.SINGLE_SPACE) : first);
+                updated = JContainer.withElements(updated, normalized).withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withThrows(updated);
         }
 
         /**
@@ -5619,7 +5637,11 @@ public interface J extends Tree {
         }
 
         public Try withResources(@Nullable List<Resource> resources) {
-            return getPadding().withResources(JContainer.withElementsNullable(this.resources, resources, Space.SINGLE_SPACE, Space.EMPTY));
+            JContainer<Resource> updated = JContainer.withElementsNullable(this.resources, resources);
+            if (updated != null && this.resources == null) {
+                updated = updated.withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withResources(updated);
         }
 
         @With
@@ -5850,7 +5872,13 @@ public interface J extends Tree {
         }
 
         public TypeParameter withBounds(@Nullable List<TypeTree> bounds) {
-            return getPadding().withBounds(JContainer.withElementsNullable(this.bounds, bounds, Space.SINGLE_SPACE, Space.SINGLE_SPACE));
+            JContainer<TypeTree> updated = JContainer.withElementsNullable(this.bounds, bounds);
+            if (updated != null && this.bounds == null) {
+                List<TypeTree> normalized = ListUtils.mapFirst(updated.getElements(), first ->
+                        first.getPrefix().isEmpty() ? first.withPrefix(Space.SINGLE_SPACE) : first);
+                updated = JContainer.withElements(updated, normalized).withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withBounds(updated);
         }
 
         @Override
