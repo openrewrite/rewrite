@@ -3648,6 +3648,168 @@ class AutoFormatTest implements RewriteTest {
     }
 
     @Nested
+    @SuppressWarnings("TrailingWhitespacesInTextBlock")
+    class NormalizeTabsOrSpacesComposed {
+
+        // Pin the style so the test does not depend on Autodetect: tabs, indent 4.
+        private Consumer<RecipeSpec> withTabStyle() {
+            return spec -> spec.parser(JavaParser.fromJavaVersion()
+              .styles(singletonList(
+                new NamedStyles(
+                  Tree.randomId(), "tabs", "Tabs", "Tabs.", emptySet(),
+                  List.of(new TabsAndIndentsStyle(true, 4, 4, 8, false))
+                ))));
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/7579")
+        @Test
+        void normalizeTabsOrSpacesAloneDropsIndentationLevels() {
+            rewriteRun(
+              withTabStyle().andThen(spec -> spec.recipeFromYaml(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: com.example.whitespace-pedantry
+                  displayName: Whitespace pedantry
+                  description: Normalize trailing whitespace, tabs/spaces, and end-of-file newlines.
+                  recipeList:
+                    - org.openrewrite.java.format.RemoveTrailingWhitespace
+                    - org.openrewrite.java.format.NormalizeTabsOrSpaces
+                    - org.openrewrite.java.format.EmptyNewlineAtEndOfFile
+                  """,
+                "com.example.whitespace-pedantry"
+              )),
+              java(
+                """
+                  public class CursedIndents {
+                      public void spacesThenTabs() {
+                      \tSystem.out.println("a");
+                      \tif (true) {
+                      \t\tSystem.out.println("b");
+                      \t\tif (false) {
+                      \t\t\tSystem.out.println("c");
+                      \t\t}
+                      \t}
+                      }
+
+                  \tpublic void trulyCursed() {
+                      \tSystem.out.println("a");
+                  \t    if (true) {
+                  \t    \tSystem.out.println("b");
+                      \t    if (false) {
+                  \t    \t    System.out.println("c");
+                      \t    \tSystem.out.println("d");
+                  \t\t\t}
+                      \t}
+                  \t}
+                  }
+                  """,
+                // Bug: indentation collapses to one tab (or wrong depth) because
+                // NormalizeTabsOrSpaces alone strips the leading 4-space chunks
+                // without re-computing the indent depth that TabsAndIndents would
+                // otherwise restore.
+                """
+                  public class CursedIndents {
+                  \tpublic void spacesThenTabs() {
+                  \tSystem.out.println("a");
+                  \tif (true) {
+                  \tSystem.out.println("b");
+                  \tif (false) {
+                  \t\tSystem.out.println("c");
+                  \t}
+                  \t}
+                  \t}
+
+                  \tpublic void trulyCursed() {
+                  \tSystem.out.println("a");
+                  \t\tif (true) {
+                  \t\tSystem.out.println("b");
+                  \t\tif (false) {
+                  \t\t\t\tSystem.out.println("c");
+                  \t\t\tSystem.out.println("d");
+                  \t\t\t}
+                  \t}
+                  \t}
+                  }
+                  """,
+                SourceSpec::noTrim
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/7579")
+        @Test
+        void addingTabsAndIndentsRestoresCorrectIndentation() {
+            rewriteRun(
+              withTabStyle().andThen(spec -> spec.recipeFromYaml(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: com.example.whitespace-pedantry
+                  displayName: Whitespace pedantry
+                  description: Normalize trailing whitespace, tabs/spaces, and end-of-file newlines.
+                  recipeList:
+                    - org.openrewrite.java.format.RemoveTrailingWhitespace
+                    - org.openrewrite.java.format.NormalizeTabsOrSpaces
+                    - org.openrewrite.java.format.TabsAndIndents
+                    - org.openrewrite.java.format.EmptyNewlineAtEndOfFile
+                  """,
+                "com.example.whitespace-pedantry"
+              )),
+              java(
+                """
+                  public class CursedIndents {
+                      public void spacesThenTabs() {
+                      \tSystem.out.println("a");
+                      \tif (true) {
+                      \t\tSystem.out.println("b");
+                      \t\tif (false) {
+                      \t\t\tSystem.out.println("c");
+                      \t\t}
+                      \t}
+                      }
+
+                  \tpublic void trulyCursed() {
+                      \tSystem.out.println("a");
+                  \t    if (true) {
+                  \t    \tSystem.out.println("b");
+                      \t    if (false) {
+                  \t    \t    System.out.println("c");
+                      \t    \tSystem.out.println("d");
+                  \t\t\t}
+                      \t}
+                  \t}
+                  }
+                  """,
+                """
+                  public class CursedIndents {
+                  \tpublic void spacesThenTabs() {
+                  \t\tSystem.out.println("a");
+                  \t\tif (true) {
+                  \t\t\tSystem.out.println("b");
+                  \t\t\tif (false) {
+                  \t\t\t\tSystem.out.println("c");
+                  \t\t\t}
+                  \t\t}
+                  \t}
+
+                  \tpublic void trulyCursed() {
+                  \t\tSystem.out.println("a");
+                  \t\tif (true) {
+                  \t\t\tSystem.out.println("b");
+                  \t\t\tif (false) {
+                  \t\t\t\tSystem.out.println("c");
+                  \t\t\t\tSystem.out.println("d");
+                  \t\t\t}
+                  \t\t}
+                  \t}
+                  }
+                  """,
+                SourceSpec::noTrim
+              )
+            );
+        }
+    }
+
+    @Nested
     class CheckstyleIntegration {
 
         private Consumer<RecipeSpec> withCheckstyleStyles(Style... styles) {
