@@ -1330,7 +1330,7 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withImplements(@Nullable List<TypeTree> implementings) {
-            return getPadding().withImplements(JContainer.withElementsNullable(this.implementings, implementings));
+            return getPadding().withImplements(JContainer.withElementsNullable(this.implementings, implementings, Space.SINGLE_SPACE, Space.SINGLE_SPACE));
         }
 
         @Nullable
@@ -1341,7 +1341,7 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withPermits(@Nullable List<TypeTree> permitting) {
-            return getPadding().withPermits(JContainer.withElementsNullable(this.permitting, permitting));
+            return getPadding().withPermits(JContainer.withElementsNullable(this.permitting, permitting, Space.SINGLE_SPACE, Space.SINGLE_SPACE));
         }
 
         @With
@@ -3976,7 +3976,7 @@ public interface J extends Tree {
         }
 
         public MethodDeclaration withThrows(@Nullable List<NameTree> throwz) {
-            return getPadding().withThrows(JContainer.withElementsNullable(this.throwz, throwz));
+            return getPadding().withThrows(JContainer.withElementsNullable(this.throwz, throwz, Space.SINGLE_SPACE, Space.SINGLE_SPACE));
         }
 
         /**
@@ -5619,7 +5619,7 @@ public interface J extends Tree {
         }
 
         public Try withResources(@Nullable List<Resource> resources) {
-            return getPadding().withResources(JContainer.withElementsNullable(this.resources, resources));
+            return getPadding().withResources(JContainer.withElementsNullable(this.resources, resources, Space.SINGLE_SPACE, Space.EMPTY));
         }
 
         @With
@@ -5850,7 +5850,7 @@ public interface J extends Tree {
         }
 
         public TypeParameter withBounds(@Nullable List<TypeTree> bounds) {
-            return getPadding().withBounds(JContainer.withElementsNullable(this.bounds, bounds));
+            return getPadding().withBounds(JContainer.withElementsNullable(this.bounds, bounds, Space.SINGLE_SPACE, Space.SINGLE_SPACE));
         }
 
         @Override
