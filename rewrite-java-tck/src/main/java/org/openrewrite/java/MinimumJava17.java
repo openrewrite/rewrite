@@ -27,6 +27,11 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Retention(RUNTIME)
 @Target({TYPE, METHOD})
-@EnabledForJreRange(min = JRE.JAVA_17)
+// `maxVersion` is set just below `JRE.OTHER.version()` (Integer.MAX_VALUE) so this resolves to a
+// non-default upper bound. JUnit 6 raised `DEFAULT_MINIMUM_JRE` to `JAVA_17`, so plain
+// `@EnabledForJreRange(min = JRE.JAVA_17)` matches `(DEFAULT_MIN, DEFAULT_MAX)` exactly and trips
+// the precondition: "You must declare a non-default value for the minimum or maximum value in
+// @EnabledForJreRange". This keeps the annotation unbounded above without restricting future JDKs.
+@EnabledForJreRange(min = JRE.JAVA_17, maxVersion = Integer.MAX_VALUE - 1)
 public @interface MinimumJava17 {
 }
