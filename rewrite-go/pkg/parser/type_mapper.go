@@ -204,9 +204,17 @@ func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringTy
 	} else if results.Len() == 1 {
 		mt.ReturnType = m.mapType(results.At(0).Type())
 	} else {
-		// Multiple return values — use a tuple-like representation
-		// Map as Unknown since Java doesn't have multi-return
-		mt.ReturnType = tree.UnknownType
+		tupleParams := make([]tree.JavaType, 0, results.Len())
+		for i := 0; i < results.Len(); i++ {
+			tupleParams = append(tupleParams, m.mapType(results.At(i).Type()))
+		}
+		mt.ReturnType = &tree.JavaTypeParameterized{
+			Type: &tree.JavaTypeClass{
+				FullyQualifiedName: "go.tuple",
+				Kind:               "Class",
+			},
+			TypeParameters: tupleParams,
+		}
 	}
 
 	// Parameters
