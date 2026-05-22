@@ -24,6 +24,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MinimumJava11;
+import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -595,6 +596,7 @@ class LombokTest implements RewriteTest {
     }
 
     //TODO fix for Java 8 and 11
+    @MinimumJava17
     @Test
     void with() {
         rewriteRun(
@@ -619,6 +621,7 @@ class LombokTest implements RewriteTest {
     }
 
     //TODO fix for Java 8 and 11
+    @MinimumJava17
     @Test
     void withWithParams() {
         rewriteRun(
@@ -648,6 +651,7 @@ class LombokTest implements RewriteTest {
     }
 
     //TODO fix for Java 8 and 11
+    @MinimumJava17
     @Test
     void withOnClass() {
         rewriteRun(

@@ -17,10 +17,12 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
+@MinimumJava17
 class RecordTest implements RewriteTest {
 
     @Test

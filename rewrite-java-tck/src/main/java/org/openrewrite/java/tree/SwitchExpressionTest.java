@@ -18,11 +18,13 @@ package org.openrewrite.java.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
+@MinimumJava17
 class SwitchExpressionTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2550")

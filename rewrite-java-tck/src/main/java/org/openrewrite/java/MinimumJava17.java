@@ -13,30 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.java;
 
-import org.junit.jupiter.api.Test;
-import org.openrewrite.java.MinimumJava17;
-import org.openrewrite.test.RewriteTest;
+import org.junit.jupiter.api.condition.DisabledOnJre;
+import org.junit.jupiter.api.condition.JRE;
 
-import static org.openrewrite.java.Assertions.java;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-@MinimumJava17
-class TextBlockTest implements RewriteTest {
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-    @Test
-    void textBlock() {
-        rewriteRun(
-          java(
-            """
-              public class Test {
-                  String s = \"""
-                      Hello
-                      World
-                      \""";
-              }
-              """
-          )
-        );
-    }
+@Retention(RUNTIME)
+@Target({TYPE, METHOD})
+@DisabledOnJre({JRE.JAVA_8, JRE.JAVA_11})
+public @interface MinimumJava17 {
 }
