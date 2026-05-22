@@ -148,6 +148,69 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void partialFunctionBlockAndTupleLambdaBlockArgs() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def quick[A](read: PartialFunction[Any, A], write: (Int, Int) => Any): A = ???
+                val h = quick(
+                  { case s: String => s },
+                  { (a, b) => a + b }
+                )
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void partialFunctionFollowedByPlainLambda() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def quick[A](read: PartialFunction[Any, A], write: Int => Any): A = ???
+                val h = quick({ case s: String => s }, x => x)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void partialFunctionFollowedByBlockLambda() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def quick[A](read: PartialFunction[Any, A], write: Int => Any): A = ???
+                val h = quick({ case s: String => s }, { x => x })
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void quickHandlerLilaPattern() {
+        rewriteRun(
+          scala(
+            """
+              object Handlers {
+                trait BSONHandler[T]
+                def quickHandler[T](read: PartialFunction[Any, T], write: (Int, Int) => Any): BSONHandler[T] = ???
+                val h: BSONHandler[Int] = quickHandler(
+                  { case Seq(a, b) => a },
+                  { (a, b) => Seq(a, b) }
+                )
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void methodCallInExpression() {
         rewriteRun(
           scala(

@@ -284,6 +284,50 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void qualifiedContextBound() {
+        rewriteRun(
+            scala(
+                """
+                object pkg {
+                  trait Zero[A]
+                }
+                object Test {
+                  def f[A: pkg.Zero](x: A): A = x
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void curriedParamsWithDefaults() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo(name: String)(insert: String = null, targetSchema: String = null): Unit = {
+                    println(insert)
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void tripleCurriedParamList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(a: Int)(b: Int)(c: Int): Int = a + b + c
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void curriedMethodParameterTypeNoSpaceAfterColon() {
         rewriteRun(
             scala(
@@ -379,6 +423,80 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Nested
+    class Using implements RewriteTest {
+
+        @Test
+        void inSecondParamList() {
+            rewriteRun(
+                scala(
+                    """
+                    object Test {
+                      def apply(obj: String)(using c: Int): String = obj
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void inFirstParamList() {
+            rewriteRun(
+                scala(
+                    """
+                    object Test {
+                      def apply(using c: Int): String = c.toString
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void inThirdParamListSingleLine() {
+            rewriteRun(
+                scala(
+                    """
+                    trait BSONHandler[T]
+                    object Test {
+                      def valueMapHandler[K, V](mapping: Map[K, V])(toKey: V => K)(using keyHandler: BSONHandler[K]): BSONHandler[V] = new BSONHandler[V] {}
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void inThirdParamListMultiline() {
+            rewriteRun(
+                scala(
+                    """
+                    trait BSONHandler[T]
+                    object Test {
+                      def valueMapHandler[K, V](mapping: Map[K, V])(toKey: V => K)(using
+                          keyHandler: BSONHandler[K]
+                      ): BSONHandler[V] = new BSONHandler[V] {}
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void anonymousParameter() {
+            rewriteRun(
+                scala(
+                    """
+                    trait Ord[T]
+                    object Test {
+                      def sort[T](xs: List[T])(using Ord[T]): List[T] = xs
+                    }
+                    """
+                )
+            );
+        }
+    }
+
+    @Nested
     class ExtensionMethods implements RewriteTest {
 
         @Test
@@ -467,6 +585,21 @@ class MethodDeclarationTest implements RewriteTest {
                 """
                 trait T {
                   def bar: String
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void parameterlessDefWithTypeParameter() {
+        rewriteRun(
+            scala(
+                """
+                trait T {
+                  def underlying[A]: A
+                  def empty[A]: List[A] = Nil
+                  def nil[A] = List.empty[A]
                 }
                 """
             )
@@ -582,6 +715,32 @@ class MethodDeclarationTest implements RewriteTest {
             """
               def f[A /* : */ : Ordering](x: A): A = x
               """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchCaseSingleLineWithDefault() {
+        rewriteRun(
+          scala(
+            """
+            def f(default: => String): String =
+              try "x"
+              catch case _: Exception => default
+            """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchCaseSingleLineWithThrow() {
+        rewriteRun(
+          scala(
+            """
+            def f: String =
+              try "x"
+              catch case e: Exception => throw e
+            """
           )
         );
     }

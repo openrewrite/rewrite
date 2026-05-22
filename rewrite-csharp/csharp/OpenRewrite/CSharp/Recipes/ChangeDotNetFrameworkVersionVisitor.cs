@@ -23,7 +23,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// Visitor that changes the .NET Framework version in legacy .csproj &lt;TargetFrameworkVersion&gt;
 /// elements and in app.config &lt;supportedRuntime sku=...&gt; attributes.
 /// </summary>
-public class ChangeDotNetFrameworkVersionVisitor(string oldVersion, string newVersion) : XmlVisitor<ExecutionContext>
+public class ChangeDotNetFrameworkVersionVisitor(string oldVersion, string newVersion, bool regenerateMarker = true) : XmlVisitor<ExecutionContext>
 {
     // ".NETFramework,Version=v4.7.2" — the prefix that precedes the version inside the sku attribute.
     private const string SkuVersionPrefix = ".NETFramework,Version=";
@@ -37,7 +37,7 @@ public class ChangeDotNetFrameworkVersionVisitor(string oldVersion, string newVe
     {
         _modified = false;
         var d = (Document)base.VisitDocument(document, ctx);
-        if (_modified && d.Markers.FindFirst<MSBuildProject>() != null)
+        if (_modified && regenerateMarker && d.Markers.FindFirst<MSBuildProject>() != null)
             DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
         return d;
     }

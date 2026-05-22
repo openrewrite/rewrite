@@ -377,6 +377,17 @@ val csharpPublishLocal by tasks.registering {
                     packageCacheDir.deleteRecursively()
                 }
 
+                // Clear the persistent tool-path install for the C# Tool so that
+                // CSharpRewriteRpc reinstalls from the freshly published nupkg on the
+                // next run instead of reusing a stale binary.
+                if (packageId.equals("OpenRewrite.CSharp.Tool", ignoreCase = true)) {
+                    val toolPathDir = file("${System.getProperty("user.home")}/.dotnet/rewrite-tools/$nugetVersion")
+                    if (toolPathDir.exists()) {
+                        logger.lifecycle("Clearing installed tool: ${toolPathDir.absolutePath}")
+                        toolPathDir.deleteRecursively()
+                    }
+                }
+
                 nupkg.copyTo(localFeed.resolve(nupkg.name), overwrite = true)
                 logger.lifecycle("Published $packageId@$nugetVersion to ${localFeed.absolutePath}")
             }

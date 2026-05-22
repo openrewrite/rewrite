@@ -23,7 +23,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// Visitor that removes a <c>&lt;DotNetCliToolReference&gt;</c> element from
 /// .csproj files. Supports glob patterns for the tool name.
 /// </summary>
-public class RemoveDotNetCliToolReferenceVisitor(string toolName) : XmlVisitor<ExecutionContext>
+public class RemoveDotNetCliToolReferenceVisitor(string toolName, bool regenerateMarker = true) : XmlVisitor<ExecutionContext>
 {
     private bool _modified;
 
@@ -31,7 +31,7 @@ public class RemoveDotNetCliToolReferenceVisitor(string toolName) : XmlVisitor<E
     {
         _modified = false;
         var d = (Document)base.VisitDocument(document, ctx);
-        if (_modified)
+        if (_modified && regenerateMarker)
             DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
         return d;
     }

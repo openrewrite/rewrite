@@ -44,6 +44,14 @@ public class ChangeDotNetFrameworkVersion : Recipe
         Example = "v4.8")]
     public string NewVersion { get; set; } = "";
 
+    [Option(DisplayName = "Regenerate MSBuild marker",
+        Description = "Whether to re-run `dotnet restore` after the edit to refresh the project's " +
+                      "MSBuildProject marker. Defaults to `true`. Composite recipes that chain " +
+                      "multiple csproj-mutating steps may set this to `false` on intermediate steps " +
+                      "and finalize once with `EnsureCsprojAttestation`.",
+        Required = false)]
+    public bool RegenerateMarker { get; set; } = true;
+
     public override ITreeVisitor<ExecutionContext> GetVisitor() =>
-        new ChangeDotNetFrameworkVersionVisitor(OldVersion, NewVersion);
+        new ChangeDotNetFrameworkVersionVisitor(OldVersion, NewVersion, RegenerateMarker);
 }

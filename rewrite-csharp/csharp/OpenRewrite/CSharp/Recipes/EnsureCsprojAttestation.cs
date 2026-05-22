@@ -21,31 +21,21 @@ using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 namespace OpenRewrite.CSharp.Recipes;
 
 /// <summary>
-/// Removes an MSBuild property element (e.g. <c>RuntimeFrameworkVersion</c>) from a
-/// <c>PropertyGroup</c> in .csproj files. Useful for stripping legacy properties that
-/// are no longer applicable after upgrading the target framework.
+/// Regenerates the <see cref="MSBuildProject"/> marker on every .csproj that carries one,
+/// by running <c>dotnet restore</c> against the current (possibly modified) project state.
+/// Intended as the terminator step in a composite recipe that suppresses intermediate
+/// marker reattestation via <c>RegenerateMarker = false</c> on csproj-mutating sub-recipes.
 /// </summary>
 [Category, Csproj]
-public class RemoveMSBuildProperty : ScanningRecipe<DotNetBuildContext>
+public class EnsureCsprojAttestation : ScanningRecipe<DotNetBuildContext>
 {
-    public override string DisplayName => "Remove MSBuild property";
+    public override string DisplayName => "Ensure csproj attestation";
 
     public override string Description =>
-        "Removes an MSBuild property element (e.g. `<RuntimeFrameworkVersion>`) from " +
-        "`<PropertyGroup>` in .csproj files.";
-
-    [Option(DisplayName = "Property name",
-        Description = "The MSBuild property element name to remove (case-sensitive).",
-        Example = "RuntimeFrameworkVersion")]
-    public string PropertyName { get; set; } = "";
-
-    [Option(DisplayName = "Regenerate MSBuild marker",
-        Description = "Whether to re-run `dotnet restore` after the edit to refresh the project's " +
-                      "MSBuildProject marker. Defaults to `true`. Composite recipes that chain " +
-                      "multiple csproj-mutating steps may set this to `false` on intermediate steps " +
-                      "and finalize once with `EnsureCsprojAttestation`.",
-        Required = false)]
-    public bool RegenerateMarker { get; set; } = true;
+        "Re-runs `dotnet restore` against each .csproj that has an `MSBuildProject` marker and " +
+        "refreshes the marker from the resulting `project.assets.json`. Use this at the end of a " +
+        "composite recipe whose csproj-mutating sub-recipes have `RegenerateMarker = false`, " +
+        "so reattestation happens once on the final consistent state instead of after every edit.";
 
     public override DotNetBuildContext GetInitialValue(ExecutionContext ctx) => DotNetBuildContext.GetOrCreate(ctx);
 
@@ -55,6 +45,6 @@ public class RemoveMSBuildProperty : ScanningRecipe<DotNetBuildContext>
     {
         return Preconditions.Check(
             new IsProjectFile(),
-            new RemoveMSBuildPropertyVisitor(PropertyName, RegenerateMarker));
+            MSBuildProjectHelper.RegenerateMarkerVisitor());
     }
 }

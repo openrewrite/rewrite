@@ -261,6 +261,11 @@ public static class MSBuildProjectHelper
         if (tfm.StartsWith(".NETCoreApp,Version=v"))
         {
             var version = tfm[".NETCoreApp,Version=v".Length..];
+            // .NET Core 1.x/2.x/3.x ship as "netcoreappN.M" in project.frameworks;
+            // .NET 5+ unified to "netN.M". Match the short-form on each side so
+            // declared deps cross-reference the resolved target correctly.
+            if (version.Length > 0 && (version[0] is '1' or '2' or '3'))
+                return "netcoreapp" + version;
             return "net" + version;
         }
 
