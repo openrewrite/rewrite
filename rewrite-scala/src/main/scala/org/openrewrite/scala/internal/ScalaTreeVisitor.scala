@@ -38,6 +38,7 @@ import org.openrewrite.scala.marker.ScalaForLoop
 import org.openrewrite.scala.marker.BlockArgument
 import org.openrewrite.scala.marker.CommaContinuation
 import org.openrewrite.scala.marker.FunctionApplication
+import org.openrewrite.scala.marker.AsInstanceOfPrefix
 import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.marker.PartialFunctionLiteral
@@ -5376,8 +5377,19 @@ class ScalaTreeVisitor(
             case _ => return visitUnknown(ta)
           }
           
+          // Capture whitespace between the qualifier and ".asInstanceOf"
+          // (e.g. when ".asInstanceOf" sits on its own line as part of a chain).
+          val asInstanceOfEnd = Math.max(0, sel.span.end - offsetAdjustment)
+          val asInstanceOfNameLen = "asInstanceOf".length
+          val dotPos = asInstanceOfEnd - asInstanceOfNameLen - 1
+          val asInstanceOfPrefix: Space =
+            if (cursor >= 0 && cursor <= dotPos && dotPos <= source.length) {
+              Space.format(source.substring(cursor, dotPos))
+            } else {
+              Space.EMPTY
+            }
+
           // Update cursor past ".asInstanceOf"
-          val asInstanceOfEnd = sel.span.end
           if (asInstanceOfEnd > cursor) {
             cursor = asInstanceOfEnd
           }
@@ -5410,10 +5422,17 @@ class ScalaTreeVisitor(
             cursor = ta.span.end
           }
           
+          val typeCastMarkers =
+            if (asInstanceOfPrefix.getWhitespace.nonEmpty || !asInstanceOfPrefix.getComments.isEmpty) {
+              Markers.EMPTY.addIfAbsent(AsInstanceOfPrefix.create(asInstanceOfPrefix))
+            } else {
+              Markers.EMPTY
+            }
+
           return new J.TypeCast(
             Tree.randomId(),
             Space.EMPTY,  // TypeCast itself has no prefix - the space is handled by the variable initializer
-            Markers.EMPTY,
+            typeCastMarkers,
             new J.ControlParentheses[TypeTree](
               Tree.randomId(),
               spaceBeforeBracket,
@@ -5445,24 +5464,36 @@ class ScalaTreeVisitor(
             case j: J => new S.StatementExpression(Tree.randomId(), j)
             case _ => return visitUnknown(ta)
           }
-          
+
+          // Capture whitespace between the qualifier and ".isInstanceOf"
+          // (e.g. when ".isInstanceOf" sits on its own line as part of a chain).
+          val isInstanceOfEnd = Math.max(0, sel.span.end - offsetAdjustment)
+          val isInstanceOfNameLen = "isInstanceOf".length
+          val isInstanceOfDotPos = isInstanceOfEnd - isInstanceOfNameLen - 1
+          val exprAfterSpace: Space =
+            if (cursor >= 0 && cursor <= isInstanceOfDotPos && isInstanceOfDotPos <= source.length) {
+              Space.format(source.substring(cursor, isInstanceOfDotPos))
+            } else {
+              Space.EMPTY
+            }
+
           // Update cursor to start of type argument
           cursor = Math.max(0, ta.args.head.span.start - offsetAdjustment)
-          
+
           // Visit the target type
           val clazz = visitTree(ta.args.head) match {
             case tt: TypeTree => tt
             case _ => return visitUnknown(ta)
           }
-          
+
           // Update cursor to the end of the TypeApply
           updateCursor(ta.span.end)
-          
+
           return new J.InstanceOf(
             Tree.randomId(),
             prefix,
             Markers.EMPTY,
-            JRightPadded.build(expr),
+            new JRightPadded(expr, exprAfterSpace, Markers.EMPTY),
             clazz,
             null, // pattern (not used in Scala)
             null  // type

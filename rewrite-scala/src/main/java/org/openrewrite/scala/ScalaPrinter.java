@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.scala.marker.AsInstanceOfPrefix;
 import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.PackageBraces;
@@ -1098,6 +1099,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         // asInstanceOf handling
         beforeSyntax(typeCast, Space.Location.TYPE_CAST_PREFIX, p);
         visit(typeCast.getExpression(), p);
+        Optional<AsInstanceOfPrefix> asInstanceOfPrefix = typeCast.getMarkers().findFirst(AsInstanceOfPrefix.class);
+        if (asInstanceOfPrefix.isPresent()) {
+            visitSpace(asInstanceOfPrefix.get().getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
+        }
         p.append(".asInstanceOf");
         if (typeCast.getClazz() instanceof J.ControlParentheses) {
             J.ControlParentheses<?> controlParens = (J.ControlParentheses<?>) typeCast.getClazz();
