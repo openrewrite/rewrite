@@ -21,7 +21,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class PomTest {
+class PomTest {
 
     @ParameterizedTest
     @ValueSource(strings={"jar", "bundle"})

@@ -31,9 +31,6 @@ dependencies {
 
     implementation("io.micrometer:micrometer-core:1.9.+")
 
-    testImplementation("org.junit.jupiter:junit-jupiter-api")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
-
     testImplementation(project(":rewrite-test"))
     "javaTck"(project(":rewrite-java-tck"))
 }

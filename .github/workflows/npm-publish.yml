@@ -47,7 +47,6 @@ jobs:
         with:
           distribution: temurin
           java-version: |
-            26
             25
             21
 
@@ -61,16 +60,47 @@ jobs:
       - shell: bash
         run: sudo npm install -g npm@latest
 
+      # For a tag-triggered upstream `publish` run, `head_branch` is the tag name
+      # (e.g. `v8.83.0`). Strip the leading `v` and publish to dist-tag `latest`.
+      # Otherwise this is the `ci`-triggered snapshot path: let Gradle derive the
+      # dated snapshot version and publish to dist-tag `next`.
+      - id: ver
+        shell: bash
+        env:
+          TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [[ '${{ github.event.workflow_run.name }}' == 'publish' ]]; then
+            echo "version=${TAG#v}"   >> "$GITHUB_OUTPUT"
+            echo "dist_tag=latest"    >> "$GITHUB_OUTPUT"
+          else
+            echo "version="           >> "$GITHUB_OUTPUT"
+            echo "dist_tag=next"      >> "$GITHUB_OUTPUT"
+          fi
+
+      - shell: bash
+        run: |
+          ARGS=()
+          if [[ -n '${{ steps.ver.outputs.version }}' ]]; then
+            ARGS+=("-PnpmPublishVersion=${{ steps.ver.outputs.version }}")
+          fi
+          ./gradlew --no-daemon --console=plain --info --stacktrace \
+            :rewrite-javascript:npmPack "${ARGS[@]}"
+
+      # npm has no `--skip-duplicate`. The daily scheduled snapshot publish would
+      # otherwise 403 whenever no new commit had landed since the previous run
+      # (the snapshot version is derived from the latest commit timestamp).
       - shell: bash
         env:
           CI: 'true'
+          DIST_TAG: ${{ steps.ver.outputs.dist_tag }}
         run: |
-          # The upstream `publish` workflow is tag-only and already restricts
-          # releases to version tags.
-          if [[ '${{ github.event.workflow_run.name }}' == 'publish' ]]; then
-            ./gradlew --no-daemon --console=plain --info --stacktrace \
-              :rewrite-javascript:npmPublish -Preleasing
-          else
-            ./gradlew --no-daemon --console=plain --info --stacktrace \
-              :rewrite-javascript:npmPublish
+          TGZ=$(ls rewrite-javascript/build/distributions/openrewrite-rewrite-*.tgz)
+          V=$(tar -xzOf "$TGZ" package/package.json | python3 -c 'import json,sys;print(json.load(sys.stdin)["version"])')
+          echo "Tarball: $TGZ"
+          echo "Version: $V"
+          echo "Dist-tag: $DIST_TAG"
+          if npm view "@openrewrite/rewrite@$V" version >/dev/null 2>&1; then
+            echo "Skipping npm publish: @openrewrite/rewrite@$V already published"
+            exit 0
           fi
+          npm publish "$TGZ" --tag "$DIST_TAG"

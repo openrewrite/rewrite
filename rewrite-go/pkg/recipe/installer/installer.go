@@ -25,6 +25,8 @@ import (
 	"strings"
 	"text/template"
 
+	"golang.org/x/mod/modfile"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 )
 
@@ -458,14 +460,17 @@ func (inst *Installer) propagateReplaces(moduleDir string) error {
 
 // readResolvedVersion reads the resolved version of a module from the workspace go.mod.
 func (inst *Installer) readResolvedVersion(modulePath string) string {
-	data, _ := os.ReadFile(filepath.Join(inst.WorkspaceDir, "go.mod"))
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.Contains(line, modulePath) && !strings.HasPrefix(line, "module") {
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				return parts[len(parts)-1]
-			}
+	data, err := os.ReadFile(filepath.Join(inst.WorkspaceDir, "go.mod"))
+	if err != nil {
+		return ""
+	}
+	f, err := modfile.Parse("go.mod", data, nil)
+	if err != nil {
+		return ""
+	}
+	for _, r := range f.Require {
+		if r.Mod.Path == modulePath {
+			return r.Mod.Version
 		}
 	}
 	return ""

@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class ScalaParserTest {
+class ScalaParserTest {
 
     @Test
     void parseSimpleValDeclaration() {
@@ -86,7 +86,7 @@ public class ScalaParserTest {
     }
 
     @Test
-    void testPackageDuplicationIssue() {
+    void packageDuplicationIssue() {
         ScalaParser parser = ScalaParser.builder().build();
         
         String source = "package com.example\n\nval x = 42";

@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.scala.Assertions.scala;
 
-public class AnnotationTest implements RewriteTest {
+class AnnotationTest implements RewriteTest {
     
     @Test
     void simpleAnnotation() {
@@ -247,6 +247,46 @@ public class AnnotationTest implements RewriteTest {
                   @JsonIgnore
                   @transient
                   lazy val schema: String = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnTypeArgument() {
+        rewriteRun(
+            scala(
+                """
+                class Box[A]
+                trait Test {
+                  def f: Box[Int @deprecated]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnReturnType() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f: String @deprecated = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnMethodParameterType() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(x: Int @deprecated): Unit = ()
                 }
                 """
             )

@@ -1859,6 +1859,7 @@ public interface S extends J {
         }
     }
 
+
     /**
      * Represents a Scala refined (structural) type:
      * {@code Parent { def foo: Int; val bar: String }} or just {@code { def foo: Int }}.
