@@ -35,8 +35,12 @@ public class ChangeDotNetTargetFrameworkVisitor(string oldTfm, string newTfm, bo
     {
         _modified = false;
         var d = (Document)base.VisitDocument(document, ctx);
-        if (_modified && regenerateMarker)
-            DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+        if (_modified)
+        {
+            MSBuildProjectHelper.MarkAttestationStale(ctx, d.SourcePath);
+            if (regenerateMarker)
+                DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+        }
         return d;
     }
 

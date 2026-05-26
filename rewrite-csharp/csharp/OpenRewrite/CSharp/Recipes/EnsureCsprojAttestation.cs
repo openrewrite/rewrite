@@ -21,10 +21,15 @@ using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 namespace OpenRewrite.CSharp.Recipes;
 
 /// <summary>
-/// Regenerates the <see cref="MSBuildProject"/> marker on every .csproj that carries one,
-/// by running <c>dotnet restore</c> against the current (possibly modified) project state.
-/// Intended as the terminator step in a composite recipe that suppresses intermediate
-/// marker reattestation via <c>RegenerateMarker = false</c> on csproj-mutating sub-recipes.
+/// Re-runs <c>dotnet restore</c> against each .csproj whose
+/// <see cref="MSBuildProject"/> marker has been marked stale by an earlier
+/// mutating recipe in this run, and refreshes the marker from the resulting
+/// <c>project.assets.json</c>. Files that no recipe touched are skipped — the
+/// staleness flag is set by mutating visitors via
+/// <see cref="MSBuildProjectHelper.MarkAttestationStale"/>. Intended as the
+/// terminator step in a composite recipe that suppresses intermediate marker
+/// reattestation via <c>RegenerateMarker = false</c> on csproj-mutating
+/// sub-recipes.
 /// </summary>
 [Category, Csproj]
 public class EnsureCsprojAttestation : ScanningRecipe<DotNetBuildContext>
@@ -32,10 +37,12 @@ public class EnsureCsprojAttestation : ScanningRecipe<DotNetBuildContext>
     public override string DisplayName => "Ensure csproj attestation";
 
     public override string Description =>
-        "Re-runs `dotnet restore` against each .csproj that has an `MSBuildProject` marker and " +
-        "refreshes the marker from the resulting `project.assets.json`. Use this at the end of a " +
-        "composite recipe whose csproj-mutating sub-recipes have `RegenerateMarker = false`, " +
-        "so reattestation happens once on the final consistent state instead of after every edit.";
+        "Re-runs `dotnet restore` against each .csproj whose `MSBuildProject` marker " +
+        "is stale (set by any csproj-mutating recipe in the run) and refreshes the marker " +
+        "from the resulting `project.assets.json`. Use this at the end of a composite " +
+        "recipe whose csproj-mutating sub-recipes have `RegenerateMarker = false`, so " +
+        "reattestation happens once on the final consistent state instead of after every edit. " +
+        "Unmodified .csproj files incur no `dotnet restore` cost.";
 
     public override DotNetBuildContext GetInitialValue(ExecutionContext ctx) => DotNetBuildContext.GetOrCreate(ctx);
 
