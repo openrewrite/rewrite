@@ -189,6 +189,35 @@ class GolangRecipeIntegTest implements RewriteTest {
     }
 
     @Test
+    void selfReferencingMethodSurvivesAddRoundtrip() {
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        String source = """
+          package main
+
+          type Counter struct {
+          \tvalue int
+          }
+
+          func (c *Counter) Inc(x int) {
+          }
+          """;
+        SourceFile cu = GolangParser.builder().build()
+          .parse(source).findFirst().orElseThrow();
+
+        // Force ADD path on Java→Go: Go has no baseline for this tree, so the
+        // entire JavaType graph (incl. the Counter ↔ Inc self-cycle) is sent
+        // as ADD, triggering the receive-side ref cache on the Go side.
+        rpc.reset();
+        var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
+        Tree result = recipe.getVisitor().visit(cu, new InMemoryExecutionContext());
+
+        // Before the fix, this throws
+        // `IllegalArgumentException: No enum constant ... JavaType.FullyQualified.Kind.`
+        // when Java deserializes the returned tree.
+        assertThat(result).isNotNull().isInstanceOf(SourceFile.class);
+    }
+
+    @Test
     void renameIdentifier() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
