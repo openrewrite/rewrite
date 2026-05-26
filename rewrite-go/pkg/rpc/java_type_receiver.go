@@ -40,7 +40,7 @@ func (r *JavaTypeReceiver) VisitAnnotation(a *tree.JavaTypeAnnotation, p any) tr
 	q := p.(*ReceiveQueue)
 	cc := *a
 	a = &cc
-	a.Type = receiveAsType[*tree.JavaTypeClass](r, q, a.Type)
+	a.Type = receiveAsFullyQualified(r, q, a.Type)
 	a.Values = r.receiveAnnotationElementValueList(q, a.Values)
 	return a
 }
@@ -122,18 +122,30 @@ func (r *JavaTypeReceiver) VisitIntersection(is *tree.JavaTypeIntersection, p an
 func (r *JavaTypeReceiver) VisitClass(c *tree.JavaTypeClass, p any) tree.JavaType {
 	q := p.(*ReceiveQueue)
 	cc := *c
-	c = &cc
+	r.receiveClassFields(&cc, q)
+	return &cc
+}
+
+// VisitShallowClass mirrors VisitClass — Java's ShallowClass extends Class
+// and uses the same field set; the discriminator is the wire valueType.
+func (r *JavaTypeReceiver) VisitShallowClass(sc *tree.JavaTypeShallowClass, p any) tree.JavaType {
+	q := p.(*ReceiveQueue)
+	cc := *sc
+	r.receiveClassFields(&cc.JavaTypeClass, q)
+	return &cc
+}
+
+func (r *JavaTypeReceiver) receiveClassFields(c *tree.JavaTypeClass, q *ReceiveQueue) {
 	c.FlagsBitMap = receiveScalar[int64](q, c.FlagsBitMap)
 	c.Kind = receiveScalar[string](q, c.Kind)
 	c.FullyQualifiedName = receiveScalar[string](q, c.FullyQualifiedName)
 	c.TypeParameters = receiveTypeList(r, q, c.TypeParameters)
-	c.Supertype = receiveAsType[*tree.JavaTypeClass](r, q, c.Supertype)
-	c.OwningClass = receiveAsType[*tree.JavaTypeClass](r, q, c.OwningClass)
+	c.Supertype = receiveAsFullyQualified(r, q, c.Supertype)
+	c.OwningClass = receiveAsFullyQualified(r, q, c.OwningClass)
 	c.Annotations = receiveClassList(r, q, c.Annotations)
 	c.Interfaces = receiveClassList(r, q, c.Interfaces)
 	c.Members = receiveVariableList(r, q, c.Members)
 	c.Methods = receiveMethodList(r, q, c.Methods)
-	return c
 }
 
 // VisitParameterized mirrors JavaTypeReceiver.visitParameterized
@@ -141,7 +153,7 @@ func (r *JavaTypeReceiver) VisitParameterized(pt *tree.JavaTypeParameterized, p 
 	q := p.(*ReceiveQueue)
 	cc := *pt
 	pt = &cc
-	pt.Type = receiveAsType[*tree.JavaTypeClass](r, q, pt.Type)
+	pt.Type = receiveAsFullyQualified(r, q, pt.Type)
 	pt.TypeParameters = receiveTypeList(r, q, pt.TypeParameters)
 	return pt
 }
@@ -183,7 +195,7 @@ func (r *JavaTypeReceiver) VisitMethod(m *tree.JavaTypeMethod, p any) tree.JavaT
 	q := p.(*ReceiveQueue)
 	cc := *m
 	m = &cc
-	m.DeclaringType = receiveAsType[*tree.JavaTypeClass](r, q, m.DeclaringType)
+	m.DeclaringType = receiveAsFullyQualified(r, q, m.DeclaringType)
 	m.Name = receiveScalar[string](q, m.Name)
 	m.FlagsBitMap = receiveScalar[int64](q, m.FlagsBitMap)
 	m.ReturnType = receiveAsType[tree.JavaType](r, q, m.ReturnType)
@@ -275,8 +287,11 @@ func receiveTypeList(r *JavaTypeReceiver, q *ReceiveQueue, before []tree.JavaTyp
 	return result
 }
 
-// receiveClassList receives a list of *JavaTypeClass from the queue.
-func receiveClassList(r *JavaTypeReceiver, q *ReceiveQueue, before []*tree.JavaTypeClass) []*tree.JavaTypeClass {
+// receiveClassList receives a list of FullyQualified class types from the
+// queue. The element type is widened (vs. concrete *JavaTypeClass) so
+// that JavaType$ShallowClass payloads keep their wire identity through
+// the round-trip.
+func receiveClassList(r *JavaTypeReceiver, q *ReceiveQueue, before []tree.FullyQualified) []tree.FullyQualified {
 	beforeAny := classSlice(before)
 	afterAny := q.ReceiveList(beforeAny, func(v any) any {
 		return r.Visit(v.(tree.JavaType), q)
@@ -284,14 +299,33 @@ func receiveClassList(r *JavaTypeReceiver, q *ReceiveQueue, before []*tree.JavaT
 	if afterAny == nil {
 		return nil
 	}
-	result := make([]*tree.JavaTypeClass, len(afterAny))
+	result := make([]tree.FullyQualified, len(afterAny))
 	for i, v := range afterAny {
-		if cls, ok := v.(*tree.JavaTypeClass); ok {
-			result[i] = cls
+		if fq, ok := v.(tree.FullyQualified); ok {
+			result[i] = fq
 		}
-		// Unknown types are skipped (nil in the list)
+		// Unknown / non-fully-qualified types are skipped (nil in the list)
 	}
 	return result
+}
+
+// receiveAsFullyQualified receives a class-typed JavaType (Class or
+// ShallowClass) and preserves its concrete identity.
+func receiveAsFullyQualified(r *JavaTypeReceiver, q *ReceiveQueue, before tree.FullyQualified) tree.FullyQualified {
+	var beforeAny any
+	if before != nil {
+		beforeAny = before
+	}
+	result := q.Receive(beforeAny, func(v any) any {
+		return r.Visit(v.(tree.JavaType), q)
+	})
+	if result == nil {
+		return nil
+	}
+	if fq, ok := result.(tree.FullyQualified); ok {
+		return fq
+	}
+	return nil
 }
 
 // receiveVariableList receives a list of *JavaTypeVariable from the queue.

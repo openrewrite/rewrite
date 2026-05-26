@@ -187,7 +187,7 @@ func (m *MethodMatcher) MatchesMethod(mt *tree.JavaTypeMethod) bool {
 	if m.declaringTypePattern != nil {
 		declFQN := ""
 		if mt.DeclaringType != nil {
-			declFQN = mt.DeclaringType.FullyQualifiedName
+			declFQN = mt.DeclaringType.GetFullyQualifiedName()
 		}
 		if !m.declaringTypePattern.MatchString(declFQN) {
 			return false

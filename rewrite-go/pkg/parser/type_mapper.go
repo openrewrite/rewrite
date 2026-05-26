@@ -192,9 +192,11 @@ func (m *typeMapper) mapNamed(named *types.Named) *tree.JavaTypeClass {
 // mapSignature maps a function signature to JavaTypeMethod.
 func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringType *tree.JavaTypeClass) *tree.JavaTypeMethod {
 	mt := &tree.JavaTypeMethod{
-		Name:          name,
-		DeclaringType: declaringType,
-		FlagsBitMap:   flagsForExported(name),
+		Name:        name,
+		FlagsBitMap: flagsForExported(name),
+	}
+	if declaringType != nil {
+		mt.DeclaringType = declaringType
 	}
 
 	// Return type

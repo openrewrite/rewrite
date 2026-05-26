@@ -135,6 +135,29 @@ func SendMarkersCodec(m tree.Markers, q *SendQueue) {
 		func(v any) { sendMarkerCodecFields(v, q) })
 }
 
+// hasGenericMarkerCodec reports whether sendMarkerCodecFields will dispatch
+// sub-field messages for a tree.GenericMarker with the given Java FQN.
+// Markers not listed here have no RpcCodec on either side and must travel
+// inline (as the ADD message's Value) so the receiver does not desync waiting
+// for sub-fields that never arrive.
+func hasGenericMarkerCodec(javaType string) bool {
+	switch javaType {
+	case "org.openrewrite.Checksum",
+		"org.openrewrite.FileAttributes",
+		"org.openrewrite.marker.Markup$Error",
+		"org.openrewrite.marker.Markup$Warn",
+		"org.openrewrite.marker.Markup$Info",
+		"org.openrewrite.marker.Markup$Debug",
+		"org.openrewrite.java.marker.OmitBraces",
+		"org.openrewrite.java.marker.OmitParentheses",
+		"org.openrewrite.java.marker.Semicolon",
+		"org.openrewrite.java.marker.NullSafe",
+		"org.openrewrite.java.marker.TrailingComma":
+		return true
+	}
+	return false
+}
+
 // sendMarkerCodecFields sends the sub-fields for markers that implement RpcCodec on the Java side.
 // This must match the field order in each marker's rpcSend method.
 func sendMarkerCodecFields(v any, q *SendQueue) {

@@ -156,7 +156,7 @@ func divmod(a int, b int) (int, int) {
 	if !ok {
 		t.Fatalf("expected parameterized return type, got %T", mt.ReturnType)
 	}
-	if param.Type == nil || param.Type.FullyQualifiedName != "go.tuple" {
+	if param.Type == nil || param.Type.GetFullyQualifiedName() != "go.tuple" {
 		t.Errorf("expected tuple FQN 'go.tuple', got %+v", param.Type)
 	}
 	if len(param.TypeParameters) != 2 {
@@ -200,7 +200,7 @@ func split() (string, int, bool) {
 	if !ok {
 		t.Fatalf("expected parameterized return type, got %T", mt.ReturnType)
 	}
-	if param.Type == nil || param.Type.FullyQualifiedName != "go.tuple" {
+	if param.Type == nil || param.Type.GetFullyQualifiedName() != "go.tuple" {
 		t.Errorf("expected tuple FQN 'go.tuple', got %+v", param.Type)
 	}
 	if len(param.TypeParameters) != 3 {
