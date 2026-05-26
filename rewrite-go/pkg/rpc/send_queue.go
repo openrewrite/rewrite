@@ -204,11 +204,26 @@ func (q *SendQueue) add(after any, onChange func(any)) {
 
 	vt := getValueType(afterVal)
 	var val any
-	if onChange == nil && vt == nil {
+	skipDoChange := false
+	if gm, ok := afterVal.(tree.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
+		// No RpcCodec on either side for this marker — inline the marker's
+		// data as the ADD message's Value so the receiver can reconstruct
+		// the typed instance. Skip sub-field dispatch, which would otherwise
+		// emit nothing (sendMarkerCodecFields default case) and leave the
+		// receiver waiting for fields that never arrive.
+		if gm.Data == nil {
+			val = map[string]any{}
+		} else {
+			val = gm.Data
+		}
+		skipDoChange = true
+	} else if onChange == nil && vt == nil {
 		val = afterVal
 	}
 	q.Put(RpcObjectData{State: Add, ValueType: vt, Value: val, Ref: ref})
-	q.doChange(afterVal, nil, onChange)
+	if !skipDoChange {
+		q.doChange(afterVal, nil, onChange)
+	}
 }
 
 func (q *SendQueue) doChange(after, before any, onChange func(any)) {
