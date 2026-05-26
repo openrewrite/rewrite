@@ -151,7 +151,7 @@ func (s *JavaSender) VisitBlock(b *tree.Block, p any) tree.J {
 			for i, stmt := range stmts {
 				result[i] = stmt
 			}
-			return result
+			return dropNilElements(result)
 		},
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
@@ -406,17 +406,11 @@ func (s *JavaSender) VisitCase(c *tree.Case, p any) tree.J {
 	// caseLabels (container)
 	q.GetAndSend(c, func(v any) any { return v.(*tree.Case).Expressions },
 		func(v any) { sendContainer(s, v, q) })
-	// statements (container) — filter nil-Element entries so the Java side
-	// doesn't see a JRightPadded with a missing element (would NPE).
+	// statements (container) — sendContainer filters nil-Element entries.
 	q.GetAndSend(c, func(v any) any {
 		body := v.(*tree.Case).Body
-		result := make([]tree.RightPadded[tree.Statement], 0, len(body))
-		for _, rp := range body {
-			if rp.Element == nil {
-				continue
-			}
-			result = append(result, rp)
-		}
+		result := make([]tree.RightPadded[tree.Statement], len(body))
+		copy(result, body)
 		return tree.Container[tree.Statement]{Elements: result}
 	}, func(v any) { sendContainer(s, v, q) })
 	// body (right-padded, nil for Go-style case)

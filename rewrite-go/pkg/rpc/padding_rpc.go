@@ -83,14 +83,29 @@ func sendContainer(s Sender, c any, q *SendQueue) {
 	// Before space
 	q.GetAndSend(c, func(v any) any { return containerBefore(v) },
 		func(v any) { sendSpace(v.(tree.Space), q) })
-	// Elements (list of RightPadded)
+	// Elements (list of RightPadded) — filter nil-Element entries; see dropNilElements.
 	q.GetAndSendList(c,
-		func(v any) []any { return containerElements(v) },
+		func(v any) []any { return dropNilElements(containerElements(v)) },
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
 	// Markers
 	q.GetAndSend(c, func(v any) any { return containerMarkers(v) },
 		func(v any) { SendMarkersCodec(v.(tree.Markers), q) })
+}
+
+// dropNilElements drops RightPadded entries whose Element is nil. Java's
+// JRightPadded.element is non-nullable, so a nil leaks past sendRightPadded
+// as a NoChange wire message for the element slot, which NPEs on the Java
+// receiver. Apply before serializing any list of RightPadded values.
+func dropNilElements(elems []any) []any {
+	filtered := make([]any, 0, len(elems))
+	for _, e := range elems {
+		if rightPaddedElement(e) == nil {
+			continue
+		}
+		filtered = append(filtered, e)
+	}
+	return filtered
 }
 
 // receiveRightPadded deserializes a RightPadded element.

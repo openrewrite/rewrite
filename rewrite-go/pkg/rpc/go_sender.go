@@ -94,7 +94,7 @@ func (s *GoSender) VisitCompilationUnit(cu *tree.CompilationUnit, p any) tree.J 
 			for i, s := range stmts {
 				result[i] = s
 			}
-			return result
+			return dropNilElements(result)
 		},
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
@@ -285,7 +285,7 @@ func (s *GoSender) VisitMultiAssignment(ma *tree.MultiAssignment, p any) tree.J 
 			for i, e := range vars {
 				result[i] = e
 			}
-			return result
+			return dropNilElements(result)
 		},
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
@@ -298,7 +298,7 @@ func (s *GoSender) VisitMultiAssignment(ma *tree.MultiAssignment, p any) tree.J 
 			for i, e := range vals {
 				result[i] = e
 			}
-			return result
+			return dropNilElements(result)
 		},
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
@@ -318,7 +318,7 @@ func (s *GoSender) VisitCommClause(cc *tree.CommClause, p any) tree.J {
 			for i, e := range body {
 				result[i] = e
 			}
-			return result
+			return dropNilElements(result)
 		},
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
