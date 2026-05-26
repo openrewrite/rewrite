@@ -330,6 +330,45 @@ func coerceRightPaddedIdent(rp any) tree.RightPadded[*tree.Identifier] {
 	return tree.RightPadded[*tree.Identifier]{After: after, Markers: m}
 }
 
+// coerceLeftPaddedIdent converts a LeftPadded of any variant to LeftPadded[*Identifier].
+// Java may send the value generic-parameterized on Expression even though the element
+// is an *Identifier; this helper bridges that asymmetry.
+func coerceLeftPaddedIdent(lp any) tree.LeftPadded[*tree.Identifier] {
+	if lp, ok := lp.(tree.LeftPadded[*tree.Identifier]); ok {
+		return lp
+	}
+	elem := leftPaddedElement(lp)
+	before := leftPaddedBefore(lp).(tree.Space)
+	m := leftPaddedMarkers(lp).(tree.Markers)
+	if id, ok := elem.(*tree.Identifier); ok {
+		return tree.LeftPadded[*tree.Identifier]{Element: id, Before: before, Markers: m}
+	}
+	return tree.LeftPadded[*tree.Identifier]{Before: before, Markers: m}
+}
+
+// coerceLeftPaddedAssignOp converts a LeftPadded of any variant to LeftPadded[AssignOp].
+// Java ships the operator as a literal source symbol ("=", ":=") so leftPaddedFromElement
+// produces a LeftPadded[string] when ParseAssignOp can't resolve it; this helper
+// re-parses and falls back to AssignOpEquals defensively.
+func coerceLeftPaddedAssignOp(lp any) tree.LeftPadded[tree.AssignOp] {
+	if lp, ok := lp.(tree.LeftPadded[tree.AssignOp]); ok {
+		return lp
+	}
+	elem := leftPaddedElement(lp)
+	before := leftPaddedBefore(lp).(tree.Space)
+	m := leftPaddedMarkers(lp).(tree.Markers)
+	if op, ok := elem.(tree.AssignOp); ok {
+		return tree.LeftPadded[tree.AssignOp]{Element: op, Before: before, Markers: m}
+	}
+	if s, ok := elem.(string); ok {
+		if op := tree.ParseAssignOp(s); op != 0 {
+			return tree.LeftPadded[tree.AssignOp]{Element: op, Before: before, Markers: m}
+		}
+		return tree.LeftPadded[tree.AssignOp]{Element: tree.AssignOpEquals, Before: before, Markers: m}
+	}
+	return tree.LeftPadded[tree.AssignOp]{Element: tree.AssignOpEquals, Before: before, Markers: m}
+}
+
 func leftPaddedBefore(lp any) any {
 	switch v := lp.(type) {
 	case tree.LeftPadded[tree.J]:
@@ -536,6 +575,52 @@ func containerMarkers(c any) any {
 	}
 }
 
+// coerceContainerStatement converts a Container of any variant to Container[Statement].
+// When the inbound is Container[Expression], each element is coerced element-wise.
+func coerceContainerStatement(c any) tree.Container[tree.Statement] {
+	if c, ok := c.(tree.Container[tree.Statement]); ok {
+		return c
+	}
+	if ec, ok := c.(tree.Container[tree.Expression]); ok {
+		elems := make([]tree.RightPadded[tree.Statement], 0, len(ec.Elements))
+		for _, rp := range ec.Elements {
+			elems = append(elems, coerceToStatementRP(rp))
+		}
+		return tree.Container[tree.Statement]{Before: ec.Before, Elements: elems, Markers: ec.Markers}
+	}
+	if jc, ok := c.(tree.Container[tree.J]); ok {
+		elems := make([]tree.RightPadded[tree.Statement], 0, len(jc.Elements))
+		for _, rp := range jc.Elements {
+			elems = append(elems, coerceToStatementRP(rp))
+		}
+		return tree.Container[tree.Statement]{Before: jc.Before, Elements: elems, Markers: jc.Markers}
+	}
+	return tree.Container[tree.Statement]{}
+}
+
+// coerceContainerExpression converts a Container of any variant to Container[Expression].
+// When the inbound is Container[Statement], each element is coerced element-wise.
+func coerceContainerExpression(c any) tree.Container[tree.Expression] {
+	if c, ok := c.(tree.Container[tree.Expression]); ok {
+		return c
+	}
+	if sc, ok := c.(tree.Container[tree.Statement]); ok {
+		elems := make([]tree.RightPadded[tree.Expression], 0, len(sc.Elements))
+		for _, rp := range sc.Elements {
+			elems = append(elems, coerceToExpressionRP(rp))
+		}
+		return tree.Container[tree.Expression]{Before: sc.Before, Elements: elems, Markers: sc.Markers}
+	}
+	if jc, ok := c.(tree.Container[tree.J]); ok {
+		elems := make([]tree.RightPadded[tree.Expression], 0, len(jc.Elements))
+		for _, rp := range jc.Elements {
+			elems = append(elems, coerceToExpressionRP(rp))
+		}
+		return tree.Container[tree.Expression]{Before: jc.Before, Elements: elems, Markers: jc.Markers}
+	}
+	return tree.Container[tree.Expression]{}
+}
+
 // updateContainer creates a correctly-typed Container from the elements.
 // Always uses element-type detection since Go lacks generic covariance.
 func updateContainer(c any, before tree.Space, elements []any, markers tree.Markers) any {
@@ -551,24 +636,28 @@ func containerFromElements(before tree.Space, elements []any, markers tree.Marke
 		return tree.Container[tree.Expression]{Before: before, Markers: markers}
 	}
 
-	// Detect from first element
+	// Detect from first element. Java may send mixed RightPadded variants in one
+	// container (e.g. switch-case bodies). Coerce every element to the detected
+	// variant rather than raw-casting — raw casts panic on heterogeneous lists.
 	switch elements[0].(type) {
 	case tree.RightPadded[*tree.Import]:
 		elems := make([]tree.RightPadded[*tree.Import], len(elements))
 		for i, e := range elements {
-			elems[i] = e.(tree.RightPadded[*tree.Import])
+			if rp, ok := e.(tree.RightPadded[*tree.Import]); ok {
+				elems[i] = rp
+			}
 		}
 		return tree.Container[*tree.Import]{Before: before, Elements: elems, Markers: markers}
 	case tree.RightPadded[tree.Expression]:
 		elems := make([]tree.RightPadded[tree.Expression], len(elements))
 		for i, e := range elements {
-			elems[i] = e.(tree.RightPadded[tree.Expression])
+			elems[i] = coerceToExpressionRP(e)
 		}
 		return tree.Container[tree.Expression]{Before: before, Elements: elems, Markers: markers}
 	case tree.RightPadded[tree.Statement]:
 		elems := make([]tree.RightPadded[tree.Statement], len(elements))
 		for i, e := range elements {
-			elems[i] = e.(tree.RightPadded[tree.Statement])
+			elems[i] = coerceToStatementRP(e)
 		}
 		return tree.Container[tree.Statement]{Before: before, Elements: elems, Markers: markers}
 	default:

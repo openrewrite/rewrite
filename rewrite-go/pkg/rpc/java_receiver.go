@@ -223,7 +223,7 @@ func (r *JavaReceiver) VisitFieldAccess(fa *tree.FieldAccess, p any) tree.J {
 		fa.Target = result.(tree.Expression)
 	}
 	if result := q.Receive(fa.Name, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
-		fa.Name = result.(tree.LeftPadded[*tree.Identifier])
+		fa.Name = coerceLeftPaddedIdent(result)
 	}
 	fa.Type = r.receiveType(fa.Type, q)
 	return fa
@@ -511,7 +511,7 @@ func (r *JavaReceiver) VisitElse(el *tree.Else, p any) tree.J {
 	c := *el // shallow copy to avoid mutating remoteObjects baseline
 	el = &c
 	if result := q.Receive(el.Body, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
-		el.Body = result.(tree.RightPadded[tree.Statement])
+		el.Body = coerceToStatementRP(result)
 	}
 	return el
 }
@@ -546,7 +546,7 @@ func (r *JavaReceiver) VisitForControl(fc *tree.ForControl, p any) tree.J {
 	}
 	initList := q.ReceiveList(beforeInit, func(v any) any { return receiveRightPadded(r, q, v) })
 	if len(initList) > 0 {
-		rp := initList[0].(tree.RightPadded[tree.Statement])
+		rp := coerceToStatementRP(initList[0])
 		fc.Init = &rp
 	} else {
 		fc.Init = nil
@@ -569,7 +569,7 @@ func (r *JavaReceiver) VisitForControl(fc *tree.ForControl, p any) tree.J {
 	}
 	updateList := q.ReceiveList(beforeUpdate, func(v any) any { return receiveRightPadded(r, q, v) })
 	if len(updateList) > 0 {
-		rp := updateList[0].(tree.RightPadded[tree.Statement])
+		rp := coerceToStatementRP(updateList[0])
 		fc.Update = &rp
 	} else {
 		fc.Update = nil
@@ -624,7 +624,7 @@ func (r *JavaReceiver) VisitForEachControl(fc *tree.ForEachControl, p any) tree.
 	}
 	// operator (left-padded AssignOp as string)
 	if result := q.Receive(fc.Operator, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
-		fc.Operator = result.(tree.LeftPadded[tree.AssignOp])
+		fc.Operator = coerceLeftPaddedAssignOp(result)
 	}
 	// iterable
 	result := q.Receive(fc.Iterable, func(v any) any { return r.Visit(v.(tree.Tree), q) })
@@ -663,11 +663,11 @@ func (r *JavaReceiver) VisitCase(cs *tree.Case, p any) tree.J {
 	cs = &c
 	q.Receive(nil, nil) // type enum
 	if result := q.Receive(cs.Expressions, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
-		cs.Expressions = result.(tree.Container[tree.Expression])
+		cs.Expressions = coerceContainerExpression(result)
 	}
 	// statements - Java sends Container<RightPadded<Statement>>, extract to Go's []RightPadded[Statement]
 	if result := q.Receive(nil, func(v any) any { return receiveContainerAs(r, q, v, ContainerStatement) }); result != nil {
-		cont := result.(tree.Container[tree.Statement])
+		cont := coerceContainerStatement(result)
 		cs.Body = cont.Elements
 	}
 	q.Receive(nil, nil) // body
@@ -820,7 +820,7 @@ func (r *JavaReceiver) VisitImport(imp *tree.Import, p any) tree.J {
 		beforeAlias = *imp.Alias
 	}
 	if result := q.Receive(beforeAlias, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
-		lp := result.(tree.LeftPadded[*tree.Identifier])
+		lp := coerceLeftPaddedIdent(result)
 		imp.Alias = &lp
 	} else {
 		imp.Alias = nil
