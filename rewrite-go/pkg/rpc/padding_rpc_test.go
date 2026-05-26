@@ -294,7 +294,8 @@ func TestContainerFromElements_HeterogeneousElements(t *testing.T) {
 }
 
 func TestContainerFromElements_HeterogeneousStatementFirst(t *testing.T) {
-	// given: opposite ordering — Statement detected first, Expression follows.
+	// given: opposite ordering — Statement-labelled RightPadded first, Expression follows.
+	// Both elements are MethodInvocations, which implement Expression AND Statement.
 	mi1, mi2 := makeMethodInvocation(), makeMethodInvocation()
 	elements := []any{
 		tree.RightPadded[tree.Statement]{Element: mi1, Markers: tree.Markers{}},
@@ -304,7 +305,48 @@ func TestContainerFromElements_HeterogeneousStatementFirst(t *testing.T) {
 	// when
 	got := containerFromElements(tree.EmptySpace, elements, tree.Markers{})
 
-	// then
+	// then: the variant is chosen by "most specific interface all elements satisfy",
+	// not by which slot's label appeared first. Both MIs satisfy Expression, so the
+	// container should be [Expression] — matching the sibling Expression-first test.
+	cont, ok := got.(tree.Container[tree.Expression])
+	if !ok {
+		t.Fatalf("want Container[Expression], got %T", got)
+	}
+	if len(cont.Elements) != 2 {
+		t.Fatalf("want 2 elements, got %d", len(cont.Elements))
+	}
+	if cont.Elements[0].Element.(*tree.MethodInvocation) != mi1 {
+		t.Errorf("element[0] identity lost")
+	}
+	if cont.Elements[1].Element.(*tree.MethodInvocation) != mi2 {
+		t.Errorf("element[1] identity lost")
+	}
+}
+
+// makeReturnStatement returns a *tree.Return — implements Statement but NOT Expression.
+// Used to exercise mixed Case.Body containers whose elements include statement-only nodes.
+func makeReturnStatement() *tree.Return {
+	return &tree.Return{ID: uuid.New()}
+}
+
+func TestContainerFromElements_StatementOnlyElementSurvives(t *testing.T) {
+	// given: a Case.Body-shaped list with a method call (Expression+Statement) and
+	// a return (Statement-only). Before the variant-detection fix, picking the
+	// Expression variant from the first element caused coerceToExpressionRP to
+	// silently drop the return statement — surfacing as truncated Go source after
+	// a round trip. See diagnostic findings in /tmp/rewrite-go-rpc-nil-debug-patches.md.
+	mi := makeMethodInvocation()
+	ret := makeReturnStatement()
+	elements := []any{
+		tree.RightPadded[tree.Expression]{Element: mi, Markers: tree.Markers{}},
+		tree.RightPadded[tree.Statement]{Element: ret, Markers: tree.Markers{}},
+	}
+
+	// when
+	got := containerFromElements(tree.EmptySpace, elements, tree.Markers{})
+
+	// then: both elements survive in a Container[Statement] — Statement is the
+	// most specific interface every element satisfies.
 	cont, ok := got.(tree.Container[tree.Statement])
 	if !ok {
 		t.Fatalf("want Container[Statement], got %T", got)
@@ -312,8 +354,11 @@ func TestContainerFromElements_HeterogeneousStatementFirst(t *testing.T) {
 	if len(cont.Elements) != 2 {
 		t.Fatalf("want 2 elements, got %d", len(cont.Elements))
 	}
-	if cont.Elements[1].Element.(*tree.MethodInvocation) != mi2 {
-		t.Errorf("element[1] identity lost — coerce dropped the Expression-variant entry")
+	if cont.Elements[0].Element.(*tree.MethodInvocation) != mi {
+		t.Errorf("element[0] (method invocation) identity lost")
+	}
+	if cont.Elements[1].Element.(*tree.Return) != ret {
+		t.Errorf("element[1] (return statement) identity lost — pre-fix this was silently dropped")
 	}
 }
 
