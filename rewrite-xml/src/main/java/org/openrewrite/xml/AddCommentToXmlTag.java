@@ -18,13 +18,15 @@ package org.openrewrite.xml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
+import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 @Incubating(since = "7.24.0")
@@ -56,28 +58,18 @@ public class AddCommentToXmlTag extends Recipe {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
 
                 // (1) Prepend a sibling comment before any self-closing child tag that matches.
-                if (t.getContent() != null) {
-                    List<? extends Content> existing = t.getContent();
-                    List<Content> updated = null;
-                    for (int i = 0; i < existing.size(); i++) {
-                        Content c = existing.get(i);
+                List<? extends Content> originalContent = t.getContent();
+                if (originalContent != null) {
+                    t = t.withContent(ListUtils.flatMap(originalContent, (i, c) -> {
                         if (c instanceof Xml.Tag && ((Xml.Tag) c).getClosing() == null &&
-                                matcher.matches(new Cursor(getCursor(), c))) {
-                            boolean alreadyHasComment = i > 0 && isMatchingComment(existing.get(i - 1));
-                            if (!alreadyHasComment) {
-                                if (updated == null) {
-                                    updated = new ArrayList<>(existing.subList(0, i));
-                                }
-                                updated.add(new Xml.Comment(randomId(), c.getPrefix(), Markers.EMPTY, commentText));
-                            }
+                                matcher.matches(new Cursor(getCursor(), c)) &&
+                                !(i > 0 && isMatchingComment(originalContent.get(i - 1)))) {
+                            return Arrays.asList(
+                                    new Xml.Comment(randomId(), c.getPrefix(), Markers.EMPTY, commentText),
+                                    c);
                         }
-                        if (updated != null) {
-                            updated.add(c);
-                        }
-                    }
-                    if (updated != null) {
-                        t = t.withContent(updated);
-                    }
+                        return c;
+                    }));
                 }
 
                 // (2) For non-self-closing matched tags (or a self-closing root with no parent
@@ -93,16 +85,9 @@ public class AddCommentToXmlTag extends Recipe {
                     }
                     String prefix = (existing == null || existing.isEmpty()) ? "" : existing.get(0).getPrefix();
                     Xml.Comment comment = new Xml.Comment(randomId(), prefix, Markers.EMPTY, commentText);
-                    List<Content> contents;
-                    if (existing == null || existing.isEmpty()) {
-                        contents = new ArrayList<>();
-                        contents.add(comment);
-                    } else {
-                        contents = new ArrayList<>(existing.size() + 1);
-                        contents.add(comment);
-                        contents.addAll(existing);
-                    }
-                    t = t.withContent(contents);
+                    t = t.withContent(existing == null || existing.isEmpty() ?
+                            singletonList(comment) :
+                            ListUtils.concatAll(singletonList(comment), existing));
                 }
 
                 return t;
