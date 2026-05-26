@@ -151,3 +151,33 @@ func TestAnnotationRpcRoundTrip_PrefixPreserved(t *testing.T) {
 		t.Errorf("Prefix.Whitespace: got %q, want %q", got.Prefix.Whitespace, " ")
 	}
 }
+
+// A Case whose Body contains a nil-Element entry alongside a real statement
+// should round-trip with the nil dropped. Shipping it as-is would NPE on the
+// Java side, where the field is non-nullable.
+func TestCaseRpcRoundTrip_DropsNilStatementsFromBody(t *testing.T) {
+	// given
+	realStmt := makeMethodInvocation() // a call to doThing()
+	before := &tree.Case{
+		ID: uuid.New(),
+		Body: []tree.RightPadded[tree.Statement]{
+			{Element: realStmt, Markers: tree.Markers{}},
+			{Element: nil, Markers: tree.Markers{}},
+		},
+	}
+
+	// when
+	after := roundTripNode(t, before, &tree.Case{ID: before.ID}).(*tree.Case)
+
+	// then
+	if len(after.Body) != 1 {
+		t.Fatalf("expected the nil-Element entry to be dropped, got %d body entries", len(after.Body))
+	}
+	mi, ok := after.Body[0].Element.(*tree.MethodInvocation)
+	if !ok {
+		t.Fatalf("expected the valid statement to survive as *MethodInvocation, got %T", after.Body[0].Element)
+	}
+	if mi.Name == nil || mi.Name.Name != "doThing" {
+		t.Errorf("expected surviving statement to be a call to doThing, got %+v", mi.Name)
+	}
+}

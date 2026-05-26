@@ -665,8 +665,11 @@ func (r *JavaReceiver) VisitCase(cs *tree.Case, p any) tree.J {
 	if result := q.Receive(cs.Expressions, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
 		cs.Expressions = coerceContainerExpression(result)
 	}
-	// statements - Java sends Container<RightPadded<Statement>>, extract to Go's []RightPadded[Statement]
-	if result := q.Receive(nil, func(v any) any { return receiveContainerAs(r, q, v, ContainerStatement) }); result != nil {
+	// statements - Java sends Container<RightPadded<Statement>>, extract to Go's []RightPadded[Statement].
+	// Pass the existing body as BEFORE so NoChange responses preserve identity and position-based
+	// list tracking has a baseline (mirrors VisitBlock).
+	bodyBefore := tree.Container[tree.Statement]{Elements: cs.Body}
+	if result := q.Receive(bodyBefore, func(v any) any { return receiveContainerAs(r, q, v, ContainerStatement) }); result != nil {
 		cont := coerceContainerStatement(result)
 		cs.Body = cont.Elements
 	}
