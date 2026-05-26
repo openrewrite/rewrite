@@ -81,4 +81,36 @@ class AddCommentToXmlTagTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addCommentToSelfClosingTag() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToXmlTag("//foo", " hello ")),
+          xml(
+            "<root><foo bar=\"baz\"/></root>",
+            "<root><foo bar=\"baz\"><!-- hello --></foo></root>"
+          )
+        );
+    }
+
+    @Test
+    void addCommentToEmptyTag() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToXmlTag("//foo", " hello ")),
+          xml(
+            "<root><foo></foo></root>",
+            "<root><foo><!-- hello --></foo></root>"
+          )
+        );
+    }
+
+    @Test
+    void doesNotDuplicateCommentOnSelfClosingTag() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToXmlTag("//foo", " hello ")),
+          xml(
+            "<root><foo bar=\"baz\"><!-- hello --></foo></root>"
+          )
+        );
+    }
 }
