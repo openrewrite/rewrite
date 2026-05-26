@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
@@ -81,6 +82,21 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 			before = msg.Value
 		} else {
 			before = newObj(*msg.ValueType)
+			// Hydrate GenericMarker.Data from the inline value when the
+			// sender shipped a codec-less marker as `{ADD, valueType, value=map}`
+			// (matches what every other language's send queue does). Without
+			// this, the marker's fields would be silently dropped.
+			if gm, ok := before.(tree.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
+				if dataMap, ok := msg.Value.(map[string]any); ok {
+					gm.Data = dataMap
+					if idStr, ok := dataMap["id"].(string); ok {
+						if parsed, err := uuid.Parse(idStr); err == nil {
+							gm.Ident = parsed
+						}
+					}
+					before = gm
+				}
+			}
 		}
 		if ref != nil {
 			// Store before deserialization to handle cycles

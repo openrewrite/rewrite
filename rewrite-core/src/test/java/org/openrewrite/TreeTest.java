@@ -63,7 +63,7 @@ class TreeTest implements RewriteTest {
     }
 
     @Test
-    void randomIdIsUniqueAcrossThreads() throws InterruptedException {
+    void randomIdIsUniqueAcrossThreads() throws Exception {
         int threads = 16;
         int perThread = 100_000;
         Set<UUID> ids = ConcurrentHashMap.newKeySet(threads * perThread);

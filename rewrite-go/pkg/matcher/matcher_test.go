@@ -61,7 +61,7 @@ func TestIsAssignableTo(t *testing.T) {
 	stringer := &tree.JavaTypeClass{FullyQualifiedName: "fmt.Stringer"}
 	myType := &tree.JavaTypeClass{
 		FullyQualifiedName: "main.MyType",
-		Interfaces:         []*tree.JavaTypeClass{stringer},
+		Interfaces:         []tree.FullyQualified{stringer},
 	}
 
 	if !IsAssignableTo(myType, "main.MyType") {

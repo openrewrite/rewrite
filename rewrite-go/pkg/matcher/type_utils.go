@@ -29,7 +29,7 @@ func GetFullyQualifiedName(t tree.JavaType) string {
 		return v.FullyQualifiedName
 	case *tree.JavaTypeParameterized:
 		if v.Type != nil {
-			return v.Type.FullyQualifiedName
+			return v.Type.GetFullyQualifiedName()
 		}
 	case *tree.JavaTypePrimitive:
 		return v.Keyword
@@ -146,13 +146,23 @@ func IsBool(t tree.JavaType) bool {
 	return IsOfClassType(t, "bool")
 }
 
-// AsClass safely casts a JavaType to *JavaTypeClass, returning nil if not a class.
+// AsClass safely casts a JavaType to *JavaTypeClass, returning nil if not a
+// class. A JavaTypeShallowClass is unwrapped to its embedded JavaTypeClass
+// — callers that need to distinguish ShallowClass from Class should type
+// switch on the original JavaType, not on this accessor's result.
 func AsClass(t tree.JavaType) *tree.JavaTypeClass {
-	if c, ok := t.(*tree.JavaTypeClass); ok {
-		return c
-	}
-	if p, ok := t.(*tree.JavaTypeParameterized); ok {
-		return p.Type
+	switch v := t.(type) {
+	case *tree.JavaTypeClass:
+		return v
+	case *tree.JavaTypeShallowClass:
+		return &v.JavaTypeClass
+	case *tree.JavaTypeParameterized:
+		if c, ok := v.Type.(*tree.JavaTypeClass); ok {
+			return c
+		}
+		if sc, ok := v.Type.(*tree.JavaTypeShallowClass); ok {
+			return &sc.JavaTypeClass
+		}
 	}
 	return nil
 }
@@ -212,7 +222,7 @@ func TypeOfExpression(expr tree.Expression) tree.JavaType {
 // For `t.Sub(...)`, this returns the type of the receiver.
 func DeclaringTypeFQN(mi *tree.MethodInvocation) string {
 	if mi.MethodType != nil && mi.MethodType.DeclaringType != nil {
-		return mi.MethodType.DeclaringType.FullyQualifiedName
+		return mi.MethodType.DeclaringType.GetFullyQualifiedName()
 	}
 	// Fallback: infer from Select expression
 	if mi.Select != nil {

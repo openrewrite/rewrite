@@ -21,7 +21,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class LatestMinorTest {
+class LatestMinorTest {
     private final LatestMinor latestMinor = new LatestMinor(null);
 
     @Test

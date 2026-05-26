@@ -81,7 +81,7 @@ class CSharpRecipeTest implements RewriteTest {
     }
 
     @Test
-    void verifyMethodTypeAttribution() throws java.io.IOException {
+    void verifyMethodTypeAttribution() throws Exception {
         String source = "using Newtonsoft.Json;\nclass Foo {\n    void Test() {\n        var json = JsonConvert.SerializeObject(\"test\");\n    }\n}\n";
         CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
 
@@ -184,7 +184,7 @@ class CSharpRecipeTest implements RewriteTest {
     }
 
     @Test
-    void directRecipeApplication() throws java.io.IOException {
+    void directRecipeApplication() throws Exception {
         String source = "using Newtonsoft.Json;\nclass Foo {\n    void Test() {\n        var json = JsonConvert.SerializeObject(\"test\");\n    }\n}\n";
         CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
 

@@ -373,7 +373,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void parseProject(@TempDir Path projectDir) throws IOException {
+    void parseProject(@TempDir Path projectDir) throws Exception {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}
           """);
@@ -412,7 +412,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void parseProjectWithExclusions(@TempDir Path projectDir) throws IOException {
+    void parseProjectWithExclusions(@TempDir Path projectDir) throws Exception {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}
           """);
@@ -435,7 +435,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void parseProjectWithVariousYamlStructures(@TempDir Path projectDir) throws IOException {
+    void parseProjectWithVariousYamlStructures(@TempDir Path projectDir) throws Exception {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}
           """);
@@ -512,7 +512,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void parseProjectWithYamlContainingNestedFlowMappings(@TempDir Path projectDir) throws IOException {
+    void parseProjectWithYamlContainingNestedFlowMappings(@TempDir Path projectDir) throws Exception {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}
           """);
@@ -545,7 +545,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void parseProjectWithYamlFlowCollectionKeys(@TempDir Path projectDir) throws IOException {
+    void parseProjectWithYamlFlowCollectionKeys(@TempDir Path projectDir) throws Exception {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}
           """);

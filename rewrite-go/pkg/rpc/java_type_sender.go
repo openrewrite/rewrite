@@ -121,35 +121,64 @@ func (s *JavaTypeSender) VisitIntersection(is *tree.JavaTypeIntersection, p any)
 // flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype, owningClass,
 // annotations, interfaces, members, methods
 func (s *JavaTypeSender) VisitClass(c *tree.JavaTypeClass, p any) tree.JavaType {
-	q := p.(*SendQueue)
-	q.GetAndSend(c, func(v any) any { return v.(*tree.JavaTypeClass).FlagsBitMap }, nil)
-	q.GetAndSend(c, func(v any) any { return v.(*tree.JavaTypeClass).Kind }, nil)
-	q.GetAndSend(c, func(v any) any { return v.(*tree.JavaTypeClass).FullyQualifiedName }, nil)
-	q.GetAndSendListAsRef(c,
-		func(v any) []any { return javaTypeSlice(v.(*tree.JavaTypeClass).TypeParameters) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
-	q.GetAndSend(c, func(v any) any { return AsRef(v.(*tree.JavaTypeClass).Supertype) },
-		func(v any) { s.Visit(GetValueNonNull(v).(tree.JavaType), q) })
-	q.GetAndSend(c, func(v any) any { return AsRef(v.(*tree.JavaTypeClass).OwningClass) },
-		func(v any) { s.Visit(GetValueNonNull(v).(tree.JavaType), q) })
-	q.GetAndSendListAsRef(c,
-		func(v any) []any { return classSlice(v.(*tree.JavaTypeClass).Annotations) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
-	q.GetAndSendListAsRef(c,
-		func(v any) []any { return classSlice(v.(*tree.JavaTypeClass).Interfaces) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
-	q.GetAndSendListAsRef(c,
-		func(v any) []any { return variableSlice(v.(*tree.JavaTypeClass).Members) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
-	q.GetAndSendListAsRef(c,
-		func(v any) []any { return methodSlice(v.(*tree.JavaTypeClass).Methods) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+	s.visitClassFields(c, p.(*SendQueue))
 	return c
+}
+
+// VisitShallowClass walks the same field set as VisitClass — Java's
+// ShallowClass extends Class and uses the same wire shape; only the
+// outgoing valueType discriminator differs (handled by valueTypeMap).
+func (s *JavaTypeSender) VisitShallowClass(sc *tree.JavaTypeShallowClass, p any) tree.JavaType {
+	s.visitClassFields(sc, p.(*SendQueue))
+	return sc
+}
+
+// toClassFields normalizes a Class-or-ShallowClass any to the embedded
+// *JavaTypeClass that holds the actual fields. Returns nil for any other
+// shape so callers can no-op on type-mismatched `before` states.
+func toClassFields(v any) *tree.JavaTypeClass {
+	switch c := v.(type) {
+	case *tree.JavaTypeClass:
+		return c
+	case *tree.JavaTypeShallowClass:
+		return &c.JavaTypeClass
+	}
+	return nil
+}
+
+// visitClassFields walks the wire-shape fields shared by JavaType$Class
+// and JavaType$ShallowClass. The `parent` argument is whichever outer
+// pointer the visitor was invoked with (either *JavaTypeClass or
+// *JavaTypeShallowClass); the closures call toClassFields so the
+// `before` value supplied by q.GetAndSend works for either type.
+func (s *JavaTypeSender) visitClassFields(parent any, q *SendQueue) {
+	q.GetAndSend(parent, func(v any) any { return toClassFields(v).FlagsBitMap }, nil)
+	q.GetAndSend(parent, func(v any) any { return toClassFields(v).Kind }, nil)
+	q.GetAndSend(parent, func(v any) any { return toClassFields(v).FullyQualifiedName }, nil)
+	q.GetAndSendListAsRef(parent,
+		func(v any) []any { return javaTypeSlice(toClassFields(v).TypeParameters) },
+		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
+		func(v any) { s.Visit(v.(tree.JavaType), q) })
+	q.GetAndSend(parent, func(v any) any { return AsRef(toClassFields(v).Supertype) },
+		func(v any) { s.Visit(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(parent, func(v any) any { return AsRef(toClassFields(v).OwningClass) },
+		func(v any) { s.Visit(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSendListAsRef(parent,
+		func(v any) []any { return classSlice(toClassFields(v).Annotations) },
+		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
+		func(v any) { s.Visit(v.(tree.JavaType), q) })
+	q.GetAndSendListAsRef(parent,
+		func(v any) []any { return classSlice(toClassFields(v).Interfaces) },
+		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
+		func(v any) { s.Visit(v.(tree.JavaType), q) })
+	q.GetAndSendListAsRef(parent,
+		func(v any) []any { return variableSlice(toClassFields(v).Members) },
+		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
+		func(v any) { s.Visit(v.(tree.JavaType), q) })
+	q.GetAndSendListAsRef(parent,
+		func(v any) []any { return methodSlice(toClassFields(v).Methods) },
+		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
+		func(v any) { s.Visit(v.(tree.JavaType), q) })
 }
 
 // VisitParameterized matches JavaTypeSender.visitParameterized
@@ -261,7 +290,7 @@ func javaTypeSlice(types []tree.JavaType) []any {
 	return result
 }
 
-func classSlice(classes []*tree.JavaTypeClass) []any {
+func classSlice(classes []tree.FullyQualified) []any {
 	if classes == nil {
 		return nil
 	}

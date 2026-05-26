@@ -203,7 +203,7 @@ func (v *referencedPackagesVisitor) VisitIdentifier(ident *tree.Identifier, p an
 
 func (v *referencedPackagesVisitor) VisitMethodInvocation(mi *tree.MethodInvocation, p any) tree.J {
 	if mi.MethodType != nil && mi.MethodType.DeclaringType != nil {
-		if path := pkgPathOf(mi.MethodType.DeclaringType.FullyQualifiedName); path != "" {
+		if path := pkgPathOf(mi.MethodType.DeclaringType.GetFullyQualifiedName()); path != "" {
 			v.refs[path] = true
 		}
 	}

@@ -28,7 +28,7 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class RpcReceiveQueueTest {
+class RpcReceiveQueueTest {
 
     private Deque<List<RpcObjectData>> batches;
     private RpcSendQueue sq;

@@ -403,8 +403,9 @@ type JavaRecipeConfig struct {
 type RecipeSpec struct {
 	CheckParsePrintIdempotence bool
 	Recipe                     recipe.Recipe
-	JavaRecipe                 *JavaRecipeConfig // when set, delegates to Java RPC
-	JavaRpcClient              *JavaRpcClient    // injected Java RPC client
+	JavaRecipe                 *JavaRecipeConfig     // when set, delegates to Java RPC
+	JavaRpcClient              *JavaRpcClient        // injected Java RPC client
+	MarkerPrinter              printer.MarkerPrinter // printer for cross-cutting markers in recipe output; defaults to printer.DefaultMarkerPrinter
 }
 
 // NewRecipeSpec creates a new RecipeSpec with default settings.
@@ -433,6 +434,16 @@ func (spec *RecipeSpec) WithJavaRecipe(recipeName string, options map[string]any
 // WithJavaRpcClient sets the Java RPC client for recipe delegation.
 func (spec *RecipeSpec) WithJavaRpcClient(client *JavaRpcClient) *RecipeSpec {
 	spec.JavaRpcClient = client
+	return spec
+}
+
+// WithMarkerPrinter overrides the MarkerPrinter used when printing recipe output.
+// Mirrors RewriteTest's spec.markerPrinter(...) on the Java side. When unset,
+// RewriteRun uses printer.DefaultMarkerPrinter so SearchResult/Markup markers
+// surface as /*~~>*/ comments in the expected "after" source — matching Java
+// and TypeScript test conventions.
+func (spec *RecipeSpec) WithMarkerPrinter(mp printer.MarkerPrinter) *RecipeSpec {
+	spec.MarkerPrinter = mp
 	return spec
 }
 
@@ -522,7 +533,11 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 				}
 				continue
 			}
-			actual := printer.Print(result)
+			mp := spec.MarkerPrinter
+			if mp == nil {
+				mp = printer.DefaultMarkerPrinter
+			}
+			actual := printer.PrintWithMarkers(result, mp)
 			if src.After != nil {
 				if actual != *src.After {
 					t.Errorf("recipe result mismatch\n\nexpected:\n%s\n\nactual:\n%s", *src.After, actual)

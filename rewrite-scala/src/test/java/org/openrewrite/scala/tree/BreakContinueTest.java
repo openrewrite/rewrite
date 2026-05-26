@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.scala.Assertions.scala;
 
-public class BreakContinueTest implements RewriteTest {
+class BreakContinueTest implements RewriteTest {
     
     @Test
     void breakInWhileLoop() {
