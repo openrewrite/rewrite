@@ -3026,7 +3026,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         p.Append('#');
         p.Append(nullableDirective.HashSpacing);
         p.Append("nullable");
-        p.Append(' ');
+        p.Append(nullableDirective.KeywordSpacing);
         p.Append(nullableDirective.Setting.ToString().ToLower());
         if (nullableDirective.Target != null)
         {
