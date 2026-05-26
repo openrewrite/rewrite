@@ -25,7 +25,7 @@ import (
 func init() {
 	// Register JavaType factories for RPC deserialization
 	RegisterFactory(tree.JavaTypeClassKind, func() any { return &tree.JavaTypeClass{} })
-	RegisterFactory(tree.JavaTypeShallowClassKind, func() any { return &tree.JavaTypeClass{} })
+	RegisterFactory(tree.JavaTypeShallowClassKind, func() any { return &tree.JavaTypeShallowClass{} })
 	RegisterFactory(tree.JavaTypeParameterizedKind, func() any { return &tree.JavaTypeParameterized{} })
 	RegisterFactory(tree.JavaTypeGenericTypeVariableKind, func() any { return &tree.JavaTypeGenericTypeVariable{} })
 	RegisterFactory(tree.JavaTypeArrayKind, func() any { return &tree.JavaTypeArray{} })
@@ -41,6 +41,7 @@ func init() {
 
 	// Register Go types -> Java class name mappings for send queue
 	RegisterValueType(reflect.TypeOf(&tree.JavaTypeClass{}), tree.JavaTypeClassKind)
+	RegisterValueType(reflect.TypeOf(&tree.JavaTypeShallowClass{}), tree.JavaTypeShallowClassKind)
 	RegisterValueType(reflect.TypeOf(&tree.JavaTypeParameterized{}), tree.JavaTypeParameterizedKind)
 	RegisterValueType(reflect.TypeOf(&tree.JavaTypeGenericTypeVariable{}), tree.JavaTypeGenericTypeVariableKind)
 	RegisterValueType(reflect.TypeOf(&tree.JavaTypeArray{}), tree.JavaTypeArrayKind)

@@ -118,6 +118,7 @@ func init() {
 
 	// JavaType types
 	RegisterValueType(reflect.TypeOf((*tree.JavaTypeClass)(nil)), "org.openrewrite.java.tree.JavaType$Class")
+	RegisterValueType(reflect.TypeOf((*tree.JavaTypeShallowClass)(nil)), "org.openrewrite.java.tree.JavaType$ShallowClass")
 	RegisterValueType(reflect.TypeOf((*tree.JavaTypeParameterized)(nil)), "org.openrewrite.java.tree.JavaType$Parameterized")
 	RegisterValueType(reflect.TypeOf((*tree.JavaTypeGenericTypeVariable)(nil)), "org.openrewrite.java.tree.JavaType$GenericTypeVariable")
 	RegisterValueType(reflect.TypeOf((*tree.JavaTypeArray)(nil)), "org.openrewrite.java.tree.JavaType$Array")
@@ -248,6 +249,7 @@ func init() {
 
 
 	RegisterFactory("org.openrewrite.java.tree.JavaType$Class", func() any { return &tree.JavaTypeClass{} })
+	RegisterFactory("org.openrewrite.java.tree.JavaType$ShallowClass", func() any { return &tree.JavaTypeShallowClass{} })
 	RegisterFactory("org.openrewrite.java.tree.JavaType$Parameterized", func() any { return &tree.JavaTypeParameterized{} })
 	RegisterFactory("org.openrewrite.java.tree.JavaType$GenericTypeVariable", func() any { return &tree.JavaTypeGenericTypeVariable{} })
 	RegisterFactory("org.openrewrite.java.tree.JavaType$Array", func() any { return &tree.JavaTypeArray{} })
