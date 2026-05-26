@@ -25,6 +25,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.golang.GolangParser;
 import org.openrewrite.golang.marker.GoProject;
 import org.openrewrite.golang.marker.GoResolutionResult;
+import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
@@ -225,5 +226,43 @@ class MarkerRoundTripTest {
         assertThat(mrr.getModulePath()).isEqualTo("example.com/foo");
         assertThat(mrr.getRequires()).hasSize(1);
         assertThat(mrr.getRequires().get(0).getModulePath()).isEqualTo("github.com/google/uuid");
+    }
+
+    /**
+     * Reproduces an RPC codec desync where Go ships a {@link BuildTool} marker
+     * back to Java with {@code valueType="org.openrewrite.marker.BuildTool"} and
+     * {@code value=null}. Java has no {@code RpcCodec} for {@code BuildTool},
+     * so {@code RpcReceiveQueue.receive} throws
+     * {@code IllegalStateException("No RPC codec registered on the Java side
+     * for 'org.openrewrite.marker.BuildTool' ...")}.
+     * <p>
+     * The marker has no RpcCodec on either side; Go's send path sets a
+     * non-nil ValueType (from {@code GenericMarker.JavaType}) but emits no
+     * inline value and no sub-fields, which Java cannot decode.
+     */
+    @Test
+    void buildToolMarkerRoundTripsViaVisit() {
+        // given
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        String source = "package main\n\nfunc f() {\n\tvar x = true\n\t_ = x\n}\n";
+        SourceFile cu = GolangParser.builder().build()
+                .parse(source).findFirst().orElseThrow();
+
+        UUID buildToolId = UUID.randomUUID();
+        cu = cu.withMarkers(cu.getMarkers()
+                .addIfAbsent(new BuildTool(buildToolId, BuildTool.Type.Gradle, "8.5")));
+
+        // when
+        var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
+        Tree result = recipe.getVisitor().visit(cu, new org.openrewrite.InMemoryExecutionContext());
+
+        // then
+        assertThat(result).isInstanceOf(SourceFile.class);
+        Markers resultMarkers = ((SourceFile) result).getMarkers();
+        BuildTool bt = resultMarkers.findFirst(BuildTool.class).orElseThrow(
+                () -> new AssertionError("BuildTool marker missing from round-trip result"));
+        assertThat(bt.getId()).isEqualTo(buildToolId);
+        assertThat(bt.getType()).isEqualTo(BuildTool.Type.Gradle);
+        assertThat(bt.getVersion()).isEqualTo("8.5");
     }
 }
