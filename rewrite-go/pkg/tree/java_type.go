@@ -60,10 +60,10 @@ type JavaTypeClass struct {
 	Kind               string
 	FullyQualifiedName string
 	TypeParameters     []JavaType
-	Supertype          *JavaTypeClass
-	OwningClass        *JavaTypeClass
-	Annotations        []*JavaTypeClass
-	Interfaces         []*JavaTypeClass
+	Supertype          FullyQualified
+	OwningClass        FullyQualified
+	Annotations        []FullyQualified
+	Interfaces         []FullyQualified
 	Members            []*JavaTypeVariable
 	Methods            []*JavaTypeMethod
 }
@@ -71,12 +71,26 @@ type JavaTypeClass struct {
 func (*JavaTypeClass) isJavaType() {}
 
 func (c *JavaTypeClass) GetFullyQualifiedName() string {
+	if c == nil {
+		return ""
+	}
 	return c.FullyQualifiedName
 }
 
+// JavaTypeShallowClass mirrors Java's JavaType.ShallowClass — a Class
+// instance that carries minimal metadata (kind, FQN, owning class) and
+// otherwise behaves identically to JavaTypeClass. The wire format
+// preserves the distinction; on the Go side the embedded JavaTypeClass
+// supplies all fields and accessors.
+type JavaTypeShallowClass struct {
+	JavaTypeClass
+}
+
+func (*JavaTypeShallowClass) isJavaType() {}
+
 // JavaTypeParameterized represents a parameterized type like List<String>.
 type JavaTypeParameterized struct {
-	Type           *JavaTypeClass
+	Type           FullyQualified
 	TypeParameters []JavaType
 }
 
@@ -84,7 +98,7 @@ func (*JavaTypeParameterized) isJavaType() {}
 
 func (p *JavaTypeParameterized) GetFullyQualifiedName() string {
 	if p.Type != nil {
-		return p.Type.FullyQualifiedName
+		return p.Type.GetFullyQualifiedName()
 	}
 	return ""
 }
@@ -101,22 +115,22 @@ func (*JavaTypeGenericTypeVariable) isJavaType() {}
 // JavaTypeArray represents an array type.
 type JavaTypeArray struct {
 	ElemType    JavaType
-	Annotations []*JavaTypeClass
+	Annotations []FullyQualified
 }
 
 func (*JavaTypeArray) isJavaType() {}
 
 // JavaTypeMethod represents a method type signature.
 type JavaTypeMethod struct {
-	DeclaringType          *JavaTypeClass
-	Name                   string
-	FlagsBitMap            int64
-	ReturnType             JavaType
-	ParameterNames         []string
-	ParameterTypes         []JavaType
-	ThrownExceptions       []JavaType
-	Annotations            []*JavaTypeClass
-	DefaultValue           []string
+	DeclaringType           FullyQualified
+	Name                    string
+	FlagsBitMap             int64
+	ReturnType              JavaType
+	ParameterNames          []string
+	ParameterTypes          []JavaType
+	ThrownExceptions        []JavaType
+	Annotations             []FullyQualified
+	DefaultValue            []string
 	DeclaredFormalTypeNames []string
 }
 
@@ -127,14 +141,14 @@ type JavaTypeVariable struct {
 	Name        string
 	Owner       JavaType
 	Type        JavaType
-	Annotations []*JavaTypeClass
+	Annotations []FullyQualified
 }
 
 func (*JavaTypeVariable) isJavaType() {}
 
 // JavaTypeAnnotation represents an annotation type reference.
 type JavaTypeAnnotation struct {
-	Type   *JavaTypeClass
+	Type   FullyQualified
 	Values []JavaTypeAnnotationElementValue
 }
 
@@ -202,12 +216,14 @@ func TypeSignature(t JavaType) string {
 	switch v := t.(type) {
 	case *JavaTypePrimitive:
 		return v.Keyword
+	case *JavaTypeShallowClass:
+		return v.FullyQualifiedName
 	case *JavaTypeClass:
 		return v.FullyQualifiedName
 	case *JavaTypeParameterized:
 		sig := ""
 		if v.Type != nil {
-			sig = v.Type.FullyQualifiedName
+			sig = v.Type.GetFullyQualifiedName()
 		}
 		sig += "<"
 		for i, tp := range v.TypeParameters {
@@ -225,7 +241,7 @@ func TypeSignature(t JavaType) string {
 	case *JavaTypeMethod:
 		declSig := ""
 		if v.DeclaringType != nil {
-			declSig = v.DeclaringType.FullyQualifiedName
+			declSig = v.DeclaringType.GetFullyQualifiedName()
 		}
 		return fmt.Sprintf("%s{name=%s,return=%s,parameters=%s}",
 			declSig, v.Name, TypeSignature(v.ReturnType), typeListSignature(v.ParameterTypes))
@@ -234,7 +250,7 @@ func TypeSignature(t JavaType) string {
 		return fmt.Sprintf("%s{name=%s,type=%s}", ownerSig, v.Name, TypeSignature(v.Type))
 	case *JavaTypeAnnotation:
 		if v.Type != nil {
-			return "@" + v.Type.FullyQualifiedName
+			return "@" + v.Type.GetFullyQualifiedName()
 		}
 		return "@"
 	case *JavaTypeMultiCatch:

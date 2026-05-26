@@ -32,6 +32,7 @@ type JavaTypeVisitorI interface {
 	VisitAnnotation(annotation *tree.JavaTypeAnnotation, p any) tree.JavaType
 	VisitArray(array *tree.JavaTypeArray, p any) tree.JavaType
 	VisitClass(class_ *tree.JavaTypeClass, p any) tree.JavaType
+	VisitShallowClass(shallow *tree.JavaTypeShallowClass, p any) tree.JavaType
 	VisitGenericTypeVariable(generic *tree.JavaTypeGenericTypeVariable, p any) tree.JavaType
 	VisitIntersection(intersection *tree.JavaTypeIntersection, p any) tree.JavaType
 	VisitMethod(method *tree.JavaTypeMethod, p any) tree.JavaType
@@ -60,6 +61,8 @@ func (v *JavaTypeVisitor) Visit(javaType tree.JavaType, p any) tree.JavaType {
 		return v.self().VisitAnnotation(t, p)
 	case *tree.JavaTypeArray:
 		return v.self().VisitArray(t, p)
+	case *tree.JavaTypeShallowClass:
+		return v.self().VisitShallowClass(t, p)
 	case *tree.JavaTypeClass:
 		return v.self().VisitClass(t, p)
 	case *tree.JavaTypeGenericTypeVariable:
@@ -107,6 +110,10 @@ func (v *JavaTypeVisitor) VisitArray(array *tree.JavaTypeArray, p any) tree.Java
 
 func (v *JavaTypeVisitor) VisitClass(class_ *tree.JavaTypeClass, p any) tree.JavaType {
 	return class_
+}
+
+func (v *JavaTypeVisitor) VisitShallowClass(shallow *tree.JavaTypeShallowClass, p any) tree.JavaType {
+	return shallow
 }
 
 func (v *JavaTypeVisitor) VisitGenericTypeVariable(generic *tree.JavaTypeGenericTypeVariable, p any) tree.JavaType {

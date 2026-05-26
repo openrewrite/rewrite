@@ -93,7 +93,7 @@ func ExpectMethodType(t *testing.T, root tree.Tree, name string, expectedDeclari
 	if c.methodType.DeclaringType == nil {
 		t.Fatalf("ExpectMethodType(%q): method has nil DeclaringType", name)
 	}
-	if got := c.methodType.DeclaringType.FullyQualifiedName; got != expectedDeclaringFQN {
+	if got := c.methodType.DeclaringType.GetFullyQualifiedName(); got != expectedDeclaringFQN {
 		t.Errorf("ExpectMethodType(%q): declaring FQN = %q, want %q", name, got, expectedDeclaringFQN)
 	}
 }
