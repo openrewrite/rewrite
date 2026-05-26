@@ -41,9 +41,11 @@ public class UpgradeNuGetPackageVersionVisitor(
         {
             _modified = true;
         }
-        if (_modified && regenerateMarker)
+        if (_modified)
         {
-            DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+            MSBuildProjectHelper.MarkAttestationStale(ctx, d.SourcePath);
+            if (regenerateMarker)
+                DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
         }
         return d;
     }

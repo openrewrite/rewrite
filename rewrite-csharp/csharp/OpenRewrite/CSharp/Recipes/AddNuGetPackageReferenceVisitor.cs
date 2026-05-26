@@ -76,6 +76,7 @@ public class AddNuGetPackageReferenceVisitor(string packageName, string? version
             DoAfterVisit(new AddToTagVisitor<ExecutionContext>(d.Root, itemGroup));
         }
 
+        MSBuildProjectHelper.MarkAttestationStale(ctx, d.SourcePath);
         if (regenerateMarker)
             DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
         return d;

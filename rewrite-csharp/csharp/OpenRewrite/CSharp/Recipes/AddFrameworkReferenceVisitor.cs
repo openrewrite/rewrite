@@ -50,6 +50,7 @@ public class AddFrameworkReferenceVisitor(string frameworkName, string? triggerP
         var itemGroup = TagExtensions.BuildTag(
             $"<ItemGroup>\n    {tag}\n  </ItemGroup>");
         DoAfterVisit(new AddToTagVisitor<ExecutionContext>(d.Root, itemGroup));
+        MSBuildProjectHelper.MarkAttestationStale(ctx, d.SourcePath);
         if (regenerateMarker)
             DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
         return d;

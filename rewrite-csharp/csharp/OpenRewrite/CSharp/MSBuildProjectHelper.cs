@@ -37,7 +37,60 @@ namespace OpenRewrite.CSharp;
 /// </summary>
 public static class MSBuildProjectHelper
 {
-    private static readonly TimeSpan RestoreTimeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan RestoreTimeout = TimeSpan.FromMinutes(5);
+
+    // Keyed off ExecutionContext: the set of .csproj source paths that have been
+    // structurally modified during this run and whose MSBuildProject marker is
+    // therefore stale until the next dotnet restore. Mutating visitors add to
+    // this set; RegenerateMarkerVisitor consumes from it so files no one touched
+    // skip the (expensive) restore.
+    private const string StaleAttestationsKey = "OpenRewrite.CSharp.StaleCsprojAttestations";
+
+    /// <summary>
+    /// Marks the given .csproj source path as having pending changes whose
+    /// MSBuildProject marker no longer reflects on-disk state. Call this from
+    /// any visitor after it mutates a project file (independent of whether the
+    /// visitor reattests immediately or defers to a trailing
+    /// <see cref="Recipes.EnsureCsprojAttestation"/>).
+    /// </summary>
+    public static void MarkAttestationStale(ExecutionContext ctx, string sourcePath)
+    {
+        var set = ctx.ComputeMessageIfAbsent(
+            StaleAttestationsKey,
+            _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        lock (set)
+        {
+            set.Add(sourcePath);
+        }
+    }
+
+    /// <summary>
+    /// Returns true if the given .csproj source path has been marked stale and
+    /// has not yet been reattested in this execution.
+    /// </summary>
+    public static bool IsAttestationStale(ExecutionContext ctx, string sourcePath)
+    {
+        var set = ctx.GetMessage<HashSet<string>>(StaleAttestationsKey);
+        if (set == null) return false;
+        lock (set)
+        {
+            return set.Contains(sourcePath);
+        }
+    }
+
+    // Atomically removes the stale flag for this source path and returns whether
+    // it was set. Used by the marker-regen visitor so a stale flag drives exactly
+    // one reattestation regardless of whether it came from a mutating visitor's
+    // immediate DoAfterVisit or from a trailing EnsureCsprojAttestation pass.
+    private static bool TryConsumeStaleAttestation(ExecutionContext ctx, string sourcePath)
+    {
+        var set = ctx.GetMessage<HashSet<string>>(StaleAttestationsKey);
+        if (set == null) return false;
+        lock (set)
+        {
+            return set.Remove(sourcePath);
+        }
+    }
 
     #region Marker creation
 
@@ -468,9 +521,15 @@ public static class MSBuildProjectHelper
     {
         public override Xml.Xml VisitDocument(Document document, ExecutionContext ctx)
         {
-            if (document.Markers.FindFirst<MSBuildProject>() != null)
-                return RegenerateAndRefreshMarker(document, ctx);
-            return document;
+            if (document.Markers.FindFirst<MSBuildProject>() == null)
+                return document;
+            // Gate on the stale flag so files no mutating recipe touched don't
+            // trigger dotnet restore. Consuming clears the flag so a second
+            // reattestation pass (e.g., immediate + trailing
+            // EnsureCsprojAttestation) doesn't run restore twice.
+            if (!TryConsumeStaleAttestation(ctx, document.SourcePath))
+                return document;
+            return RegenerateAndRefreshMarker(document, ctx);
         }
     }
 

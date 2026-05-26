@@ -37,8 +37,12 @@ public class ChangeDotNetFrameworkVersionVisitor(string oldVersion, string newVe
     {
         _modified = false;
         var d = (Document)base.VisitDocument(document, ctx);
-        if (_modified && regenerateMarker && d.Markers.FindFirst<MSBuildProject>() != null)
-            DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+        if (_modified && d.Markers.FindFirst<MSBuildProject>() != null)
+        {
+            MSBuildProjectHelper.MarkAttestationStale(ctx, d.SourcePath);
+            if (regenerateMarker)
+                DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+        }
         return d;
     }
 
