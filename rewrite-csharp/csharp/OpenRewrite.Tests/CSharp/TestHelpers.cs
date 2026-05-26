@@ -75,9 +75,9 @@ internal static class TestHelpers
         new(Guid.NewGuid(), Space.Empty, Markers.Empty,
             new JRightPadded<Expression>(expr, Space.Empty, Markers.Empty));
 
-    public static IsPattern MakeIsPattern(Expression expression, Pattern pattern) =>
+    public static IsPattern MakeIsPattern(Expression expression, Expression pattern) =>
         new(Guid.NewGuid(), Space.Empty, Markers.Empty, expression,
-            new JLeftPadded<Pattern>(Space.Empty, pattern));
+            new JLeftPadded<Expression>(Space.Empty, pattern));
 
     public static ConstantPattern MakeConstantPattern(Expression value) =>
         new(Guid.NewGuid(), Space.Empty, Markers.Empty, value);

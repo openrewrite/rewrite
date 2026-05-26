@@ -2887,15 +2887,17 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var isPrefix = ExtractSpaceBefore(node.IsKeyword);
         _cursor = node.IsKeyword.Span.End;
 
-        // Visit the right-hand pattern
-        var pattern = Visit(node.Pattern)!;
+        // Visit the right-hand pattern. Use VisitPatternAsExpression so declaration patterns
+        // (which produce Statements) get wrapped, and parenthesized patterns (J.Parentheses<Expression>)
+        // are accepted via the Expression-typed IsPattern.Pattern field.
+        var pattern = VisitPatternAsExpression(node.Pattern);
 
         return new IsPattern(
             Guid.NewGuid(),
             prefix,
             Markers.Empty,
             expression,
-            new JLeftPadded<Pattern>(isPrefix, (Pattern)pattern)
+            new JLeftPadded<Expression>(isPrefix, pattern)
         );
     }
 
@@ -9066,7 +9068,11 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
     private NullableDirective ParseNullableDirective(Space prefix, string afterKeyword, string hashSpacing = "")
     {
+        // Preserve the original whitespace between "nullable" and the setting keyword
+        // (e.g. "  " in "#nullable  enable") so the LST round-trips byte-for-byte.
         var trimmed = afterKeyword.TrimStart();
+        var keywordSpacing = afterKeyword[..(afterKeyword.Length - trimmed.Length)];
+        if (keywordSpacing.Length == 0) keywordSpacing = " ";
 
         // Extract setting keyword
         var settingEnd = 0;
@@ -9104,7 +9110,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Capture any trailing comment (e.g., "// TODO: Fix this")
         var trailingComment = target != null ? remainder : (remainder.Length > 0 && settingEnd > 0 ? remainder : "");
 
-        return new NullableDirective(Guid.NewGuid(), prefix, Markers.Empty, setting, target, hashSpacing, trailingComment);
+        return new NullableDirective(Guid.NewGuid(), prefix, Markers.Empty, setting, target, hashSpacing, trailingComment, keywordSpacing);
     }
 
     private DefineDirective ParseDefineDirective(Space prefix, string afterKeyword)

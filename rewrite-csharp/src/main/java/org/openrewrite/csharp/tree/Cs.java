@@ -4569,13 +4569,13 @@ public interface Cs extends J {
         @Getter
         Expression expression;
 
-        JLeftPadded<Pattern> pattern;
+        JLeftPadded<Expression> pattern;
 
-        public Pattern getPattern() {
+        public Expression getPattern() {
             return pattern.getElement();
         }
 
-        public IsPattern withPattern(Pattern pattern) {
+        public IsPattern withPattern(Expression pattern) {
             return getPadding().withPattern(this.pattern.withElement(pattern));
         }
 
@@ -4619,11 +4619,11 @@ public interface Cs extends J {
         public static class Padding {
             private final IsPattern t;
 
-            public JLeftPadded<Pattern> getPattern() {
+            public JLeftPadded<Expression> getPattern() {
                 return t.pattern;
             }
 
-            public IsPattern withPattern(JLeftPadded<Pattern> pattern) {
+            public IsPattern withPattern(JLeftPadded<Expression> pattern) {
                 return t.pattern == pattern ? t : new IsPattern(t.id, t.prefix, t.markers, t.expression, pattern);
             }
         }
@@ -7610,6 +7610,14 @@ public interface Cs extends J {
         @With
         @Getter
         String trailingComment;
+
+        /**
+         * Whitespace between the {@code nullable} keyword and the setting keyword
+         * (e.g. {@code "  "} in {@code "#nullable  enable"}).
+         */
+        @With
+        @Getter
+        String keywordSpacing;
 
         public enum NullableSetting {
             Enable,
