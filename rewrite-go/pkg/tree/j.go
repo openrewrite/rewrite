@@ -720,9 +720,13 @@ func (op AssignOp) String() string {
 }
 
 // ParseAssignOp converts a string to an AssignOp.
+// Accepts both the Go enum names emitted by AssignOp.String() ("Equals", "Define")
+// and the Java-side source-symbol spellings ("=", ":=").
 func ParseAssignOp(s string) AssignOp {
 	switch s {
-	case "Define":
+	case "Equals", "=":
+		return AssignOpEquals
+	case "Define", ":=":
 		return AssignOpDefine
 	default:
 		return 0 // Unknown
