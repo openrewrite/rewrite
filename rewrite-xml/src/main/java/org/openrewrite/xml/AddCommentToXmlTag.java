@@ -59,17 +59,18 @@ public class AddCommentToXmlTag extends Recipe {
 
                 // (1) Prepend a sibling comment before any self-closing child tag that matches.
                 List<? extends Content> originalContent = t.getContent();
-                if (originalContent != null) {
-                    t = t.withContent(ListUtils.flatMap(originalContent, (i, c) -> {
-                        if (c instanceof Xml.Tag && ((Xml.Tag) c).getClosing() == null &&
-                                matcher.matches(new Cursor(getCursor(), c)) &&
-                                !(i > 0 && isMatchingComment(originalContent.get(i - 1)))) {
-                            return Arrays.asList(
-                                    new Xml.Comment(randomId(), c.getPrefix(), Markers.EMPTY, commentText),
-                                    c);
-                        }
-                        return c;
-                    }));
+                t = t.withContent(ListUtils.flatMap(originalContent, (i, c) -> {
+                    if (c instanceof Xml.Tag && ((Xml.Tag) c).getClosing() == null &&
+                            matcher.matches(new Cursor(getCursor(), c)) &&
+                            !(i > 0 && isMatchingComment(originalContent.get(i - 1)))) {
+                        return Arrays.asList(
+                                new Xml.Comment(randomId(), c.getPrefix(), Markers.EMPTY, commentText),
+                                c);
+                    }
+                    return c;
+                }));
+                if (t.getContent() != originalContent) {
+                    return t;
                 }
 
                 // (2) For non-self-closing matched tags (or a self-closing root with no parent
@@ -85,7 +86,7 @@ public class AddCommentToXmlTag extends Recipe {
                     }
                     String prefix = (existing == null || existing.isEmpty()) ? "" : existing.get(0).getPrefix();
                     Xml.Comment comment = new Xml.Comment(randomId(), prefix, Markers.EMPTY, commentText);
-                    t = t.withContent(existing == null || existing.isEmpty() ?
+                    return t.withContent(existing == null || existing.isEmpty() ?
                             singletonList(comment) :
                             ListUtils.concatAll(singletonList(comment), existing));
                 }
