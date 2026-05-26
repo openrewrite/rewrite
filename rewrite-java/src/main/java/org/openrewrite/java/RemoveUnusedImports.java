@@ -224,7 +224,12 @@ public class RemoveUnusedImports extends Recipe {
                             .filter(fq -> fq.getOwningClass() == null || !topLevelTypeNames.contains(fq.getOwningClass().getFullyQualifiedName()))
                             .collect(toSet());
                     JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
-                    if ((combinedTypes.isEmpty() && !unqualifiedTypeNames.contains(elem.getTypeName())) || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
+                    boolean noEvidenceOfUse = combinedTypes.isEmpty() &&
+                            !unqualifiedTypeNames.contains(elem.getTypeName()) &&
+                            !sourceIdentifierNames.contains(qualid.getSimpleName());
+                    boolean shadowedBySourcePackage = sourcePackage.equals(elem.getPackageName()) &&
+                            qualidType != null && !qualidType.getFullyQualifiedName().contains("$");
+                    if (noEvidenceOfUse || shadowedBySourcePackage) {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(elem.getQualid().getSimpleName())) {
@@ -266,12 +271,11 @@ public class RemoveUnusedImports extends Recipe {
                         // it only appears in type attribution (e.g., as a parameter type of a statically imported method)
                         anImport.used = false;
                         changed = true;
-                    } else if (combinedTypes.stream().noneMatch(c -> {
-                        if ("*".equals(elem.getQualid().getSimpleName())) {
-                            return elem.getPackageName().equals(c.getPackageName());
-                        }
-                        return fullyQualifiedNamesAreEqual(c.getFullyQualifiedName(), elem.getTypeName());
-                    }) && !unqualifiedTypeNames.contains(elem.getTypeName())) {
+                    } else if (!combinedTypes.isEmpty() &&
+                            combinedTypes.stream().noneMatch(c -> fullyQualifiedNamesAreEqual(c.getFullyQualifiedName(), elem.getTypeName())) &&
+                            !unqualifiedTypeNames.contains(elem.getTypeName())) {
+                        // Empty combinedTypes means type attribution is partial; the simple-name check
+                        // above is the only reliable signal, so keep the import.
                         anImport.used = false;
                         changed = true;
                     }
