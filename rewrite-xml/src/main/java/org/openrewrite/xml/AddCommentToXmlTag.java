@@ -54,29 +54,71 @@ public class AddCommentToXmlTag extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
-                if (!matcher.matches(getCursor())) {
-                    return t;
-                }
-                List<? extends Content> existing = t.getContent();
-                if (existing != null) {
-                    for (Content c : existing) {
-                        if (c instanceof Xml.Comment && commentText.equals(((Xml.Comment) c).getText())) {
-                            return t;
+
+                // (1) Prepend a sibling comment before any self-closing child tag that matches.
+                if (t.getContent() != null) {
+                    List<? extends Content> existing = t.getContent();
+                    List<Content> updated = null;
+                    for (int i = 0; i < existing.size(); i++) {
+                        Content c = existing.get(i);
+                        if (c instanceof Xml.Tag && ((Xml.Tag) c).getClosing() == null &&
+                                matcher.matches(new Cursor(getCursor(), c))) {
+                            boolean alreadyHasComment = i > 0 && isMatchingComment(existing.get(i - 1));
+                            if (!alreadyHasComment) {
+                                if (updated == null) {
+                                    updated = new ArrayList<>(existing.subList(0, i));
+                                }
+                                updated.add(new Xml.Comment(randomId(), c.getPrefix(), Markers.EMPTY, commentText));
+                            }
+                        }
+                        if (updated != null) {
+                            updated.add(c);
                         }
                     }
+                    if (updated != null) {
+                        t = t.withContent(updated);
+                    }
                 }
-                String prefix = (existing == null || existing.isEmpty()) ? "" : existing.get(0).getPrefix();
-                Xml.Comment comment = new Xml.Comment(randomId(), prefix, Markers.EMPTY, commentText);
-                List<Content> contents;
-                if (existing == null || existing.isEmpty()) {
-                    contents = new ArrayList<>();
-                    contents.add(comment);
-                } else {
-                    contents = new ArrayList<>(existing.size() + 1);
-                    contents.add(comment);
-                    contents.addAll(existing);
+
+                // (2) For non-self-closing matched tags (or a self-closing root with no parent
+                // tag to host a sibling), insert the comment as the first child of the tag.
+                if (matcher.matches(getCursor()) && (t.getClosing() != null || !hasAncestorTag())) {
+                    List<? extends Content> existing = t.getContent();
+                    if (existing != null) {
+                        for (Content c : existing) {
+                            if (isMatchingComment(c)) {
+                                return t;
+                            }
+                        }
+                    }
+                    String prefix = (existing == null || existing.isEmpty()) ? "" : existing.get(0).getPrefix();
+                    Xml.Comment comment = new Xml.Comment(randomId(), prefix, Markers.EMPTY, commentText);
+                    List<Content> contents;
+                    if (existing == null || existing.isEmpty()) {
+                        contents = new ArrayList<>();
+                        contents.add(comment);
+                    } else {
+                        contents = new ArrayList<>(existing.size() + 1);
+                        contents.add(comment);
+                        contents.addAll(existing);
+                    }
+                    t = t.withContent(contents);
                 }
-                return t.withContent(contents);
+
+                return t;
+            }
+
+            private boolean isMatchingComment(Content c) {
+                return c instanceof Xml.Comment && commentText.equals(((Xml.Comment) c).getText());
+            }
+
+            private boolean hasAncestorTag() {
+                for (Cursor c = getCursor().getParent(); c != null; c = c.getParent()) {
+                    if (c.getValue() instanceof Xml.Tag) {
+                        return true;
+                    }
+                }
+                return false;
             }
         };
     }

@@ -83,12 +83,32 @@ class AddCommentToXmlTagTest implements RewriteTest {
     }
 
     @Test
-    void addCommentToSelfClosingTag() {
+    void addCommentBeforeSelfClosingTag() {
         rewriteRun(
           spec -> spec.recipe(new AddCommentToXmlTag("//foo", " hello ")),
           xml(
             "<root><foo bar=\"baz\"/></root>",
-            "<root><foo bar=\"baz\"><!-- hello --></foo></root>"
+            "<root><!-- hello --><foo bar=\"baz\"/></root>"
+          )
+        );
+    }
+
+    @Test
+    void addCommentBeforeSelfClosingTagPreservesIndentation() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToXmlTag("//foo", " hello ")),
+          xml(
+            """
+              <root>
+                  <foo bar="baz"/>
+              </root>
+              """,
+            """
+              <root>
+                  <!-- hello -->
+                  <foo bar="baz"/>
+              </root>
+              """
           )
         );
     }
@@ -105,7 +125,17 @@ class AddCommentToXmlTagTest implements RewriteTest {
     }
 
     @Test
-    void doesNotDuplicateCommentOnSelfClosingTag() {
+    void doesNotDuplicateCommentBeforeSelfClosingTag() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToXmlTag("//foo", " hello ")),
+          xml(
+            "<root><!-- hello --><foo bar=\"baz\"/></root>"
+          )
+        );
+    }
+
+    @Test
+    void doesNotDuplicateCommentInsideTag() {
         rewriteRun(
           spec -> spec.recipe(new AddCommentToXmlTag("//foo", " hello ")),
           xml(
