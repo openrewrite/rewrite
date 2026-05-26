@@ -2062,18 +2062,21 @@ class ScalaTreeVisitor(
                     val argContainer = if (app.args.nonEmpty) {
                       val args = new util.ArrayList[JRightPadded[Expression]]()
 
-                      // Find the opening parenthesis
+                      // Find the opening parenthesis between the type and the first arg.
+                      // `app.span.start` may coincide with the type's start, so search
+                      // from the type's end up to the first arg's start instead.
                       var beforeParenSpace = Space.EMPTY
-                      if (app.span.exists) {
+                      if (app.span.exists && app.args.nonEmpty) {
                         val typeEnd = Math.max(0, newInner.tpt.span.end - offsetAdjustment)
-                        val argsStart = Math.max(0, app.span.start - offsetAdjustment)
+                        val firstArgStart = Math.max(0, app.args.head.span.start - offsetAdjustment)
+                        val searchStart = Math.max(cursor, typeEnd)
 
-                        if (typeEnd < argsStart && typeEnd >= cursor && argsStart <= source.length) {
-                          val between = source.substring(typeEnd, argsStart)
+                        if (searchStart < firstArgStart && firstArgStart <= source.length) {
+                          val between = source.substring(searchStart, firstArgStart)
                           val parenIndex = positionOfNextIn(between, "(", 0)
                           if (parenIndex >= 0) {
                             beforeParenSpace = Space.format(between.substring(0, parenIndex))
-                            updateCursor(typeEnd + parenIndex + 1)
+                            updateCursor(searchStart + parenIndex + 1)
                           }
                         }
                       }
@@ -2081,7 +2084,13 @@ class ScalaTreeVisitor(
                       // Visit arguments
                       for ((arg, i) <- app.args.zipWithIndex) {
                         var argPrefix = Space.EMPTY
-                        if (i > 0) {
+                        if (i == 0) {
+                          val thisStart = Math.max(0, arg.span.start - offsetAdjustment)
+                          if (cursor < thisStart && thisStart <= source.length) {
+                            argPrefix = Space.format(source, cursor, thisStart)
+                            updateCursor(thisStart)
+                          }
+                        } else {
                           val prevEnd = Math.max(0, app.args(i - 1).span.end - offsetAdjustment)
                           val thisStart = Math.max(0, arg.span.start - offsetAdjustment)
                           if (prevEnd < thisStart && prevEnd >= cursor && thisStart <= source.length) {
@@ -5477,8 +5486,14 @@ class ScalaTreeVisitor(
               Space.EMPTY
             }
 
-          // Update cursor to start of type argument
-          cursor = Math.max(0, ta.args.head.span.start - offsetAdjustment)
+          // Advance cursor to just after `[` so the target type's own prefix
+          // captures any whitespace between `[` and the type.
+          val openBracket = positionOfNext("[", cursor)
+          if (openBracket >= cursor && openBracket < source.length) {
+            cursor = openBracket + 1
+          } else {
+            cursor = Math.max(0, ta.args.head.span.start - offsetAdjustment)
+          }
 
           // Visit the target type
           val clazz = visitTree(ta.args.head) match {
@@ -5657,10 +5672,10 @@ class ScalaTreeVisitor(
     val typeArgs = new util.ArrayList[JRightPadded[Expression]]()
     
     if (at.args.nonEmpty) {
-      // Update cursor to the start of the first argument
-      val firstArgStart = Math.max(0, at.args.head.span.start - offsetAdjustment)
-      cursor = firstArgStart
-      
+      // Position cursor right after the opening bracket so that the first arg's
+      // own prefix-extraction picks up any whitespace between `[` and the arg.
+      cursor = openBracketAbs + 1
+
       for (i <- at.args.indices) {
         val arg = at.args(i)
         val argTree = visitTree(arg) match {
@@ -8837,21 +8852,42 @@ class ScalaTreeVisitor(
     val params = new util.ArrayList[JRightPadded[J]]()
     var hasParentheses = false
     
-    // Check if parameters are parenthesized by looking at the source
+    // Check if parameters are parenthesized by looking at the source.
+    // `extractSource` advances cursor to the span end; save and restore so the
+    // subsequent loop can extract prefixes from the right position.
+    val savedCursorBeforeFunc = cursor
     val funcSource = extractSource(func.span)
+    cursor = savedCursorBeforeFunc
     hasParentheses = funcSource.trim.startsWith("(")
     val arrowIndex = positionOfNextIn(funcSource, "=>", 0)
-    
+
+    // When parenthesized, advance cursor past `(` so the first parameter's
+    // extractPrefix captures the whitespace between `(` and the first arg.
+    // For braceless/curly forms, leave cursor at func.span.start so that any
+    // pre-name modifier (e.g. `implicit`) is handled by visitLambdaParameter
+    // rather than being absorbed into the parameter's prefix.
+    if (hasParentheses) {
+      val openParen = positionOfNext("(", cursor)
+      if (openParen >= cursor && openParen < source.length) {
+        cursor = openParen + 1
+      }
+    } else {
+      // Skip cursor past the func.span (matches pre-fix behavior) so a leading
+      // `implicit` keyword on the first parameter isn't double-counted.
+      val funcEnd = Math.max(0, func.span.end - offsetAdjustment)
+      if (funcEnd >= cursor && funcEnd <= source.length) cursor = funcEnd
+    }
+
     for (i <- func.args.indices) {
       val param = func.args(i)
-      
+
       // For parameters after the first, we need to handle the comma and space
       if (i > 0) {
         // Look for comma between previous and current parameter
         val prevParam = func.args(i - 1)
         val prevEnd = prevParam.span.end - offsetAdjustment
         val currentStart = param.span.start - offsetAdjustment
-        
+
         if (prevEnd < currentStart && prevEnd >= cursor && currentStart <= source.length) {
           val between = source.substring(prevEnd, currentStart)
           val commaIdx = positionOfNextIn(between, ",", 0)
@@ -8861,13 +8897,13 @@ class ScalaTreeVisitor(
           }
         }
       }
-      
+
       // Visit parameter as lambda parameter - it will extract its own prefix
       val paramTree = param match {
         case vd: Trees.ValDef[?] => visitLambdaParameter(vd)
         case _ => visitTree(param)
       }
-      
+
       // Extract space after the parameter (before comma or closing paren)
       var afterSpace = Space.EMPTY
       if (i < func.args.length - 1) {
@@ -8885,13 +8921,20 @@ class ScalaTreeVisitor(
           }
         }
       } else {
-        // Last parameter, look for space before closing paren
+        // Last parameter — when parenthesized, capture whitespace before `)`.
         val paramEnd = param.span.end - offsetAdjustment
         if (paramEnd >= cursor) {
           cursor = paramEnd
         }
+        if (hasParentheses) {
+          val closeParen = positionOfNext(")", cursor)
+          if (closeParen >= cursor && closeParen < source.length) {
+            afterSpace = Space.format(source, cursor, closeParen)
+            cursor = closeParen
+          }
+        }
       }
-      
+
       params.add(JRightPadded.build(paramTree).withAfter(afterSpace))
     }
     
