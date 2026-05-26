@@ -76,9 +76,12 @@ val csharpBuild by tasks.registering(Exec::class) {
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tests")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(csharpDir.resolve("OpenRewrite/bin"))
+    outputs.dir(csharpDir.resolve("OpenRewrite.Tests/bin"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin"))
 
     doFirst {
@@ -128,17 +131,25 @@ val csharpTest by tasks.registering(Exec::class) {
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tests")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.files(junitXmlFile)
     outputs.cacheIf { true }
 
     doFirst {
-        // Use relative path for JUnit XML to avoid absolute paths in cache key
-        val relativeJunitPath = junitXmlFile.relativeTo(csharpDir).path
+        // Target the OpenRewrite.Tests project explicitly. Running 'dotnet test' at solution
+        // level would also probe OpenRewrite and OpenRewrite.Tool (neither carries the junit
+        // logger after the test split), which fails the run even though all tests pass.
+        // JunitXml.TestLogger resolves a relative LogFilePath against the test project's
+        // TargetDir, so pin the absolute path and pass --results-directory to match.
+        junitXmlFile.parentFile.mkdirs()
         commandLine(
-            findDotnet(), "test", "--no-build", "--verbosity", "normal",
-            "--logger", "junit;LogFilePath=${relativeJunitPath}"
+            findDotnet(), "test", "OpenRewrite.Tests/OpenRewrite.Tests.csproj",
+            "--no-build", "--verbosity", "normal",
+            "--results-directory", junitXmlFile.parentFile.absolutePath,
+            "--logger", "junit;LogFilePath=${junitXmlFile.absolutePath}"
         )
         logger.lifecycle("Running C# tests in ${csharpDir}")
     }
@@ -313,7 +324,8 @@ val csharpPublish by tasks.registering(Exec::class) {
             findDotnet(), "nuget", "push",
             "dist/*.nupkg",
             "--source", "https://api.nuget.org/v3/index.json",
-            "--api-key", project.findProperty("nugetApiKey")?.toString() ?: ""
+            "--api-key", project.findProperty("nugetApiKey")?.toString() ?: "",
+            "--skip-duplicate"
         )
         logger.lifecycle("Publishing C# NuGet package (version: $nugetVersion)")
     }
@@ -363,6 +375,17 @@ val csharpPublishLocal by tasks.registering {
                 if (packageCacheDir.exists()) {
                     logger.lifecycle("Clearing cached: ${packageCacheDir.absolutePath}")
                     packageCacheDir.deleteRecursively()
+                }
+
+                // Clear the persistent tool-path install for the C# Tool so that
+                // CSharpRewriteRpc reinstalls from the freshly published nupkg on the
+                // next run instead of reusing a stale binary.
+                if (packageId.equals("OpenRewrite.CSharp.Tool", ignoreCase = true)) {
+                    val toolPathDir = file("${System.getProperty("user.home")}/.dotnet/rewrite-tools/$nugetVersion")
+                    if (toolPathDir.exists()) {
+                        logger.lifecycle("Clearing installed tool: ${toolPathDir.absolutePath}")
+                        toolPathDir.deleteRecursively()
+                    }
                 }
 
                 nupkg.copyTo(localFeed.resolve(nupkg.name), overwrite = true)

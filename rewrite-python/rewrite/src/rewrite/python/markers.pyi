@@ -94,3 +94,36 @@ class ExecSyntax(Marker):
     def id(self) -> UUID: ...
 
     def with_id(self, id_: UUID) -> 'ExecSyntax': ...
+
+@dataclass(frozen=True)
+class LegacyNotEqual(Marker):
+    _id: UUID
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+
+    def with_id(self, id_: UUID) -> 'LegacyNotEqual': ...
+
+@dataclass(frozen=True)
+class RaiseTuple(Marker):
+    _id: UUID
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+
+    def with_id(self, id_: UUID) -> 'RaiseTuple': ...
+
+@dataclass(frozen=True)
+class TupleExceptClause(Marker):
+    _id: UUID
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+
+    def with_id(self, id_: UUID) -> 'TupleExceptClause': ...

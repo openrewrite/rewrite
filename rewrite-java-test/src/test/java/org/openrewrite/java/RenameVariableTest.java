@@ -981,6 +981,159 @@ class RenameVariableTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/902")
+    @Test
+    void doNotRenameMethodReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("Foo", "foo", false)),
+          java(
+            """
+              class A {
+                  private Foo Foo;
+                  Foo create() { return new Foo(); }
+              }
+              class Foo {}
+              """,
+            """
+              class A {
+                  private Foo foo;
+                  Foo create() { return new Foo(); }
+              }
+              class Foo {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameTypeCast() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("Foo", "foo", false)),
+          java(
+            """
+              class A {
+                  private Foo Foo;
+                  Object get(Object o) { return (Foo) o; }
+              }
+              class Foo {}
+              """,
+            """
+              class A {
+                  private Foo foo;
+                  Object get(Object o) { return (Foo) o; }
+              }
+              class Foo {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameInstanceOf() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("Foo", "foo", false)),
+          java(
+            """
+              class A {
+                  private Foo Foo;
+                  boolean isFoo(Object o) { return o instanceof Foo; }
+              }
+              class Foo {}
+              """,
+            """
+              class A {
+                  private Foo foo;
+                  boolean isFoo(Object o) { return o instanceof Foo; }
+              }
+              class Foo {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameArrayReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("Foo", "foo", false)),
+          java(
+            """
+              class A {
+                  private Foo Foo;
+                  Foo[] all() { return new Foo[0]; }
+              }
+              class Foo {}
+              """,
+            """
+              class A {
+                  private Foo foo;
+                  Foo[] all() { return new Foo[0]; }
+              }
+              class Foo {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameAnnotatedReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("Foo", "foo", false)),
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              @Target(ElementType.TYPE_USE)
+              @interface Marker {}
+              class A {
+                  private Foo Foo;
+                  @Marker Foo create() { return new Foo(); }
+              }
+              class Foo {}
+              """,
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              @Target(ElementType.TYPE_USE)
+              @interface Marker {}
+              class A {
+                  private Foo foo;
+                  @Marker Foo create() { return new Foo(); }
+              }
+              class Foo {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameAnnotationType() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("Foo", "foo", false)),
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              @Target({ElementType.TYPE, ElementType.METHOD, ElementType.FIELD})
+              @interface Foo {}
+              class A {
+                  private Object Foo;
+                  @Foo Object get() { return Foo; }
+              }
+              """,
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              @Target({ElementType.TYPE, ElementType.METHOD, ElementType.FIELD})
+              @interface Foo {}
+              class A {
+                  private Object foo;
+                  @Foo Object get() { return foo; }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4059")
     @Test
     void renameTypeCastedField() {

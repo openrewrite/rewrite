@@ -507,6 +507,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(nd, n => (object?)n.Target);
         q.GetAndSend(nd, n => (object)n.HashSpacing);
         q.GetAndSend(nd, n => (object)n.TrailingComment);
+        q.GetAndSend(nd, n => (object)n.KeywordSpacing);
         return nd;
     }
 

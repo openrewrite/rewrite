@@ -547,6 +547,79 @@ class KotlinTypeMappingTest {
             );
         }
 
+        @Issue("https://github.com/openrewrite/rewrite/issues/7427")
+        @Test
+        void constructorParameterTypesRemapKotlinBuiltinsForJavaOrigin() {
+            // A Kotlin call into a Java-origin constructor taking `String` / `Throwable`
+            // must surface parameter types as the JVM `java.lang.String` /
+            // `java.lang.Throwable`, not the Kotlin builtins, so `MethodMatcher` patterns
+            // written against the Java FQN match. Jackson's JsonGenerationException is the
+            // motivating case from #7427. Kotlin-declared signatures are intentionally
+            // left as-is — see #7428 review discussion.
+            rewriteRun(
+              kotlin(
+                """
+                  import com.fasterxml.jackson.core.JsonGenerationException
+                  import com.fasterxml.jackson.core.JsonGenerator
+
+                  fun example(gen: JsonGenerator, cause: Throwable) {
+                      throw JsonGenerationException("message", cause, gen)
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var matcher = new MethodMatcher("com.fasterxml.jackson.core.JsonGenerationException <constructor>(String, Throwable, com.fasterxml.jackson.core.JsonGenerator)");
+                    AtomicBoolean found = new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.NewClass visitNewClass(J.NewClass newClass, AtomicBoolean found) {
+                            var paramTypes = newClass.getConstructorType().getParameterTypes();
+                            assertThat(paramTypes.get(0).toString()).isEqualTo("java.lang.String");
+                            assertThat(paramTypes.get(1).toString()).isEqualTo("java.lang.Throwable");
+                            assertThat(matcher.matches(newClass)).isTrue();
+                            found.set(true);
+                            return super.visitNewClass(newClass, found);
+                        }
+                    }.reduce(cu, new AtomicBoolean());
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/7730")
+        @Test
+        void staticMethodParameterTypesRemapKotlinBuiltinsForJavaOrigin() {
+            // Companion to constructorParameterTypesRemapKotlinBuiltinsForJavaOrigin: a Kotlin
+            // call to a Java-origin static method taking `String` must also surface the JVM
+            // `java.lang.String`. The static-method path reaches KotlinTypeMapping with an
+            // Enhancement-origin FIR wrapper as `parent` rather than the FirJavaClass, so it
+            // previously skipped the remap and leaked `kotlin.String` into parameterTypes.
+            rewriteRun(
+              kotlin(
+                """
+                  import com.fasterxml.jackson.core.JsonPointer
+
+                  fun example() = JsonPointer.compile("/x")
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var matcher = new MethodMatcher("com.fasterxml.jackson.core.JsonPointer compile(String)");
+                    AtomicBoolean found = new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
+                            if ("compile".equals(method.getSimpleName())) {
+                                var paramTypes = method.getMethodType().getParameterTypes();
+                                assertThat(paramTypes.get(0).toString()).isEqualTo("java.lang.String");
+                                assertThat(matcher.matches(method)).isTrue();
+                                found.set(true);
+                            }
+                            return super.visitMethodInvocation(method, found);
+                        }
+                    }.reduce(cu, new AtomicBoolean());
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
         @Test
         void whenExpression() {
             rewriteRun(

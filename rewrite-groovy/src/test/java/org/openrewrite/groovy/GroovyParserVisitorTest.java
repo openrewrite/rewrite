@@ -25,7 +25,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class GroovyParserVisitorTest {
+class GroovyParserVisitorTest {
 
     @Test
     void eraseCommentsSimple() {

@@ -60,7 +60,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.kotlin.internal.*;
 import org.openrewrite.kotlin.tree.K;
@@ -110,6 +112,7 @@ public class KotlinParser implements Parser {
     private final List<NamedStyles> styles;
     private final boolean logCompilationWarningsAndErrors;
     private final JavaTypeCache typeCache;
+    private final JavaTypeFactory typeFactory;
     private final String moduleName;
     private final KotlinLanguageLevel languageLevel;
     private final boolean isKotlinScript;
@@ -173,49 +176,53 @@ public class KotlinParser implements Parser {
 
         // TODO: FIR and disposable may not be necessary using the IR.
         Disposable disposable = Disposer.newDisposable();
-        CompiledSource compilerCus;
         List<Input> acceptedInputs = ListUtils.concatAll(resolvedDependsOn, acceptedInputs(sources).collect(toList()));
+        // Eagerly materialize all source files inside try/finally so the disposable
+        // is released even when downstream consumers short-circuit the returned
+        // stream (e.g. JavaTemplateParser uses `.findFirst()` when parsing
+        // template stubs). A previous implementation deferred disposal to a
+        // tail Stream.generate(...).limit(1) element, which never ran on a
+        // short-circuited consumer and leaked one KotlinCoreEnvironment plus
+        // ~25MB of classpath ProtoBuf metadata per template apply.
+        List<SourceFile> parsed;
         try {
-            compilerCus = parse(acceptedInputs, disposable, pctx);
+            CompiledSource compilerCus = parse(acceptedInputs, disposable, pctx);
+            FirSession firSession = compilerCus.getFirSession();
+            parsed = new ArrayList<>(compilerCus.getSources().size());
+            for (KotlinSource kotlinSource : compilerCus.getSources()) {
+                try {
+                    assert kotlinSource.getFirFile() != null;
+                    assert kotlinSource.getFirFile().getSource() != null;
+                    PsiElement psi = ((KtRealPsiSourceElement) kotlinSource.getFirFile().getSource()).getPsi();
+                    AnalyzerWithCompilerReport.SyntaxErrorReport report =
+                            AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true));
+                    if (report.isHasErrors()) {
+                        parsed.add(ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new RuntimeException()));
+                        continue;
+                    }
+
+                    KotlinTypeMapping typeMapping = new KotlinTypeMapping(firSession, kotlinSource.getFirFile(), typeFactory);
+                    PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
+                    associations.initialize();
+                    KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, associations, styles, relativeTo, ctx);
+                    SourceFile cu = psiParser.parse();
+
+                    parsingListener.parsed(kotlinSource.getInput(), cu);
+                    parsed.add(requirePrintEqualsInput(cu, kotlinSource.getInput(), relativeTo, ctx));
+                } catch (Throwable t) {
+                    ctx.getOnError().accept(t);
+                    parsed.add(ParseError.build(this, kotlinSource.getInput(), relativeTo, ctx, t));
+                }
+            }
         } catch (Throwable t) {
-            disposable.dispose();
-            return acceptedInputs.stream().map(input -> ParseError.build(this, input, relativeTo, ctx, t));
+            return acceptedInputs.stream()
+                    .filter(input -> !dependsOnPaths.contains(input.getRelativePath(relativeTo)))
+                    .map(input -> ParseError.build(this, input, relativeTo, ctx, t));
+        } finally {
+            Disposer.dispose(disposable);
         }
 
-        FirSession firSession = compilerCus.getFirSession();
-        return Stream.concat(
-                        compilerCus.getSources().stream()
-                                .map(kotlinSource -> {
-                                    try {
-                                        assert kotlinSource.getFirFile() != null;
-                                        assert kotlinSource.getFirFile().getSource() != null;
-                                        PsiElement psi = ((KtRealPsiSourceElement) kotlinSource.getFirFile().getSource()).getPsi();
-                                        AnalyzerWithCompilerReport.SyntaxErrorReport report =
-                                                AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true));
-                                        if (report.isHasErrors()) {
-                                            return ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new RuntimeException());
-                                        }
-
-                                        KotlinTypeMapping typeMapping = new KotlinTypeMapping(typeCache, firSession, kotlinSource.getFirFile());
-                                        PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
-                                        associations.initialize();
-                                        KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, associations, styles, relativeTo, ctx);
-                                        SourceFile cu = psiParser.parse();
-
-                                        parsingListener.parsed(kotlinSource.getInput(), cu);
-                                        return requirePrintEqualsInput(cu, kotlinSource.getInput(), relativeTo, ctx);
-                                    } catch (Throwable t) {
-                                        ctx.getOnError().accept(t);
-                                        return ParseError.build(this, kotlinSource.getInput(), relativeTo, ctx, t);
-                                    }
-                                }),
-                        Stream.generate(() -> {
-                                    // The disposable should be disposed of exactly once after all sources have been parsed
-                                    Disposer.dispose(disposable);
-                                    return (SourceFile) null;
-                                })
-                                .limit(1))
-                .filter(Objects::nonNull)
+        return parsed.stream()
                 .filter(source -> !dependsOnPaths.contains(source.getSourcePath()));
     }
 
@@ -273,6 +280,12 @@ public class KotlinParser implements Parser {
 
         private List<Input> dependsOn = emptyList();
         private JavaTypeCache typeCache = new JavaTypeCache();
+
+        @Nullable
+        private JavaTypeFactory typeFactory;
+
+        private JavaTypeFactory.@Nullable Provider typeFactoryProvider;
+
         private boolean logCompilationWarningsAndErrors;
         private final List<NamedStyles> styles = new ArrayList<>();
         private String moduleName = "main";
@@ -291,6 +304,8 @@ public class KotlinParser implements Parser {
             this.classpath = base.classpath;
             this.dependsOn = base.dependsOn;
             this.typeCache = base.typeCache;
+            this.typeFactory = base.typeFactory;
+            this.typeFactoryProvider = base.typeFactoryProvider;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
             this.moduleName = base.moduleName;
@@ -361,8 +376,26 @@ public class KotlinParser implements Parser {
             return this;
         }
 
+        /**
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} or
+         * {@link #typeFactoryProvider} instead. The cache becomes an implementation
+         * detail of the default {@link org.openrewrite.java.internal.DefaultJavaTypeFactory}.
+         */
+        @Deprecated
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;
+            return this;
+        }
+
+        @SuppressWarnings("unused")
+        public Builder typeFactory(JavaTypeFactory typeFactory) {
+            this.typeFactory = typeFactory;
+            return this;
+        }
+
+        @SuppressWarnings("unused")
+        public Builder typeFactoryProvider(JavaTypeFactory.Provider provider) {
+            this.typeFactoryProvider = provider;
             return this;
         }
 
@@ -393,7 +426,15 @@ public class KotlinParser implements Parser {
 
         @Override
         public KotlinParser build() {
-            return new KotlinParser(resolvedClasspath(), dependsOn, styles, logCompilationWarningsAndErrors, typeCache, moduleName, languageLevel, isKotlinScript, scriptImplicitReceivers, scriptDefaultImports);
+            Collection<Path> cp = resolvedClasspath();
+            JavaTypeFactory factory = typeFactory;
+            if (factory == null && typeFactoryProvider != null) {
+                factory = typeFactoryProvider.create(cp == null ? new ArrayList<>() : new ArrayList<>(cp), null);
+            }
+            if (factory == null) {
+                factory = new DefaultJavaTypeFactory(typeCache);
+            }
+            return new KotlinParser(cp, dependsOn, styles, logCompilationWarningsAndErrors, typeCache, factory, moduleName, languageLevel, isKotlinScript, scriptImplicitReceivers, scriptDefaultImports);
         }
 
         @Override

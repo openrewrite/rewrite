@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.json.tree.Json;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.text.PlainText;
@@ -71,7 +72,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void parsesProjectDirectory() throws IOException {
+    void parsesProjectDirectory() throws Exception {
         // Create a project structure
         Path projectDir = tempDir.resolve("project");
         Files.createDirectories(projectDir);
@@ -99,7 +100,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void parsesNestedDirectories() throws IOException {
+    void parsesNestedDirectories() throws Exception {
         // Create nested structure
         Path projectDir = tempDir.resolve("nested");
         Path subDir = projectDir.resolve("subpackage");
@@ -121,7 +122,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void excludesPycacheByDefault() throws IOException {
+    void excludesPycacheByDefault() throws Exception {
         Path projectDir = tempDir.resolve("with_cache");
         Path cacheDir = projectDir.resolve("__pycache__");
         Files.createDirectories(cacheDir);
@@ -139,7 +140,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void parsesEmptyDirectory() throws IOException {
+    void parsesEmptyDirectory() throws Exception {
         Path projectDir = tempDir.resolve("empty");
         Files.createDirectories(projectDir);
 
@@ -152,7 +153,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void parsesAbsolutePath() throws IOException {
+    void parsesAbsolutePath() throws Exception {
         Path projectDir = tempDir.resolve("absolute");
         Files.createDirectories(projectDir);
         Files.writeString(projectDir.resolve("test.py"), "pass");
@@ -169,7 +170,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void includesPyprojectToml() throws IOException {
+    void includesPyprojectToml() throws Exception {
         Path projectDir = tempDir.resolve("with_pyproject");
         Files.createDirectories(projectDir);
 
@@ -199,7 +200,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void includesRequirementsTxt() throws IOException {
+    void includesRequirementsTxt() throws Exception {
         Path projectDir = tempDir.resolve("with_requirements");
         Files.createDirectories(projectDir);
 
@@ -227,7 +228,48 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void pyprojectTomlTakesPriorityOverRequirementsTxt() throws IOException {
+    void includesPipfile() throws Exception {
+        Path projectDir = tempDir.resolve("with_pipfile");
+        Files.createDirectories(projectDir);
+
+        Files.writeString(projectDir.resolve("main.py"), "x = 1");
+        Files.writeString(projectDir.resolve("Pipfile"), """
+                [packages]
+                requests = ">=2.28.0"
+                """);
+        Files.writeString(projectDir.resolve("Pipfile.lock"), """
+                {
+                    "_meta": {"sources": [{"url": "https://pypi.org/simple"}]},
+                    "default": {"requests": {"version": "==2.31.0"}},
+                    "develop": {}
+                }
+                """);
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(Collectors.toList());
+
+        assertThat(sources)
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .contains("main.py", "Pipfile", "Pipfile.lock");
+
+        SourceFile pipfile = sources.stream()
+                .filter(sf -> sf.getSourcePath().getFileName().toString().equals("Pipfile"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(pipfile).isInstanceOf(Toml.Document.class);
+        assertThat(pipfile.getMarkers().findFirst(PythonResolutionResult.class)).isPresent();
+
+        SourceFile pipfileLock = sources.stream()
+                .filter(sf -> sf.getSourcePath().getFileName().toString().equals("Pipfile.lock"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(pipfileLock).isInstanceOf(Json.Document.class);
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void pyprojectTomlTakesPriorityOverRequirementsTxt() throws Exception {
         Path projectDir = tempDir.resolve("both_manifests");
         Files.createDirectories(projectDir);
 
@@ -256,7 +298,7 @@ class ParseProjectIntegTest {
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void includesAllRequirementsTxtFiles() throws IOException {
+    void includesAllRequirementsTxtFiles() throws Exception {
         Path projectDir = tempDir.resolve("multi_requirements");
         Files.createDirectories(projectDir);
 

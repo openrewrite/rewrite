@@ -153,6 +153,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(nullableDirective, Cs.NullableDirective::getTarget);
         q.getAndSend(nullableDirective, Cs.NullableDirective::getHashSpacing);
         q.getAndSend(nullableDirective, Cs.NullableDirective::getTrailingComment);
+        q.getAndSend(nullableDirective, Cs.NullableDirective::getKeywordSpacing);
         return nullableDirective;
     }
 

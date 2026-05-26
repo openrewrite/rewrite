@@ -93,12 +93,6 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
             } else {
                 c = c.withImplements(ListUtils.concat(c.getImplements(), impl));
             }
-
-            JContainer<TypeTree> anImplements = c.getPadding().getImplements();
-            assert anImplements != null;
-            if (anImplements.getBefore().getWhitespace().isEmpty()) {
-                c = c.getPadding().withImplements(anImplements.withBefore(Space.format(" ")));
-            }
         }
 
         return c;

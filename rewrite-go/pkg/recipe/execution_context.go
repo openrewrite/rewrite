@@ -57,3 +57,16 @@ func (ctx *ExecutionContext) GetMessageOrDefault(key string, defaultValue any) a
 	}
 	return defaultValue
 }
+
+// MessageKeys returns a snapshot of the current message keys. Used by the
+// BatchVisit handler to detect whether a visitor pass added new keys
+// (`hasNewMessages` in the per-visitor result).
+func (ctx *ExecutionContext) MessageKeys() []string {
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
+	keys := make([]string, 0, len(ctx.messages))
+	for k := range ctx.messages {
+		keys = append(keys, k)
+	}
+	return keys
+}

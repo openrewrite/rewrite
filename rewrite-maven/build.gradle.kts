@@ -35,6 +35,10 @@ dependencies {
 
     implementation("org.apache.commons:commons-text:latest.release")
 
+    // Align kotlin-stdlib-jdk7/-jdk8/-common with kotlin-stdlib
+    // (maven-resolver and friends would otherwise pull mixed 1.8.21/1.9.x stdlibs).
+    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:2.3.20"))
+
     testImplementation(project(":rewrite-test"))
 
     testImplementation("com.squareup.okhttp3:okhttp:4.+")

@@ -40,6 +40,24 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void memoizedMethod() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Memoized
+
+              class Foo {
+                  @Memoized
+                  Object bar() {
+                      return null
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void simpleFQN() {
         rewriteRun(
           groovy(
@@ -136,6 +154,55 @@ class AnnotationTest implements RewriteTest {
             """
               @Foo(bar = @Bar(@Baz(baz = @Qux("1.0"))))
               class Test {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/286")
+    @Test
+    void nestedAnnotationsInListLiteral() {
+        rewriteRun(
+          groovy(
+            """
+              @Tags(categories = [@Tag("tag1"), @Tag("tag2")])
+              class Main {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/291")
+    @Test
+    void nestedAnnotationsInListLiteralWithConstantReferenceUnderCompileStatic() {
+        rewriteRun(
+          groovy(
+            """
+              import java.lang.annotation.*
+              import groovy.transform.CompileStatic
+
+              interface TestConstants {
+                  public static final String PROVIDER = "Provider1"
+                  public static final String CATEGORY = "Category1"
+              }
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.TYPE)
+              @interface Tag {
+                  String id()
+                  String category()
+                  String provider()
+              }
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.TYPE)
+              @interface Tags { Tag[] value() }
+
+              @CompileStatic
+              @Tags(value = [@Tag(id="tag1", category= TestConstants.CATEGORY, provider = "prov1"),
+                             @Tag(id="tag2", category="cat2", provider = "prov2")])
+              class Main {}
               """
           )
         );
@@ -276,17 +343,53 @@ class AnnotationTest implements RewriteTest {
           groovy(
             """
             package org.dummy
-            
+
             import groovy.transform.Synchronized
-            
+
             class Foo {
-            
+
                 @Synchronized
                 void bar() {
                     println('Hello World')
                 }
             }
             """
+          )
+        );
+    }
+
+    @Test
+    void immutableAndToString() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Immutable
+              import groovy.transform.ToString
+
+              @Immutable @ToString
+              class A {
+                  void foo() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void notYetImplementedAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.test.NotYetImplemented
+
+              class Foo {
+                  @NotYetImplemented
+                  void m() {
+                      println("hello")
+                  }
+              }
+              """
           )
         );
     }

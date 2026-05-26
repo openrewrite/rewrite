@@ -159,4 +159,108 @@ class NewClassTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void newAnonymousClassWithMixin() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              trait Greeter { def greet(): String }
+              trait Logger { def log(msg: String): Unit }
+              val x = new Greeter with Logger {
+                def greet(): String = "hi"
+                def log(msg: String): Unit = println(msg)
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void newEmptyAnonymousClass() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val empty = new {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void newAnonymousClassWithThreeMixins() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              trait A { def a(): Int }
+              trait B { def b(): Int }
+              trait C { def c(): Int }
+              val x = new A with B with C {
+                def a(): Int = 1
+                def b(): Int = 2
+                def c(): Int = 3
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void mixinWithExtraSpaceAroundWith() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              trait A
+              trait B
+              trait C
+              val x = new A  with  B  with  C {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void newAnonymousClassBracelessIndentedBody() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val runnable = new Runnable:
+                def run(): Unit = println("Running")
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitNewClassWithArgs — close paren in line comment
+        rewriteRun(
+          scala(
+            """
+            class Foo(val x: Int)
+            val f = new Foo(1 // )
+            )
+            """
+          )
+        );
+        // visitNew — close paren in block comment within non-empty arg list
+        rewriteRun(
+          scala(
+            """
+            class Foo(a: Int, b: Int)
+            val f = new Foo(1 /* ) */, 2)
+            """
+          )
+        );
+    }
 }

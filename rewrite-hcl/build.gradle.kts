@@ -34,5 +34,5 @@ dependencies {
     }
 
     testImplementation(project(":rewrite-test"))
-    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
+    testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
 }

@@ -223,6 +223,7 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         Go.TypeDecl t = typeDecl;
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.withLeadingAnnotations(ListUtils.map(t.getLeadingAnnotations(), a -> visitAndCast(a, p)));
         t = t.withName((J.Identifier) visitAndCast(t.getName(), p));
         if (t.getDefinition() != null) {
             t = t.withDefinition((Expression) visitAndCast(t.getDefinition(), p));

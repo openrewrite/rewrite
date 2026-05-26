@@ -115,6 +115,57 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doNotRemoveImportUsedOnlyInNestedGeneric() {
+        rewriteRun(
+          java(
+            """
+              import com.google.common.hash.BloomFilter;
+              import java.util.concurrent.atomic.AtomicReference;
+
+              @SuppressWarnings("UnstableApiUsage")
+              public class BloomFilterRef<T> extends AtomicReference<BloomFilter<T>> {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7773")
+    @Test
+    void doNotRemoveImportUsedOnlyInNestedGenericWhenInnerTypeIsUnknown() {
+        // Simulates a multi-module Maven build where the parser classpath does not include
+        // the generic-parameter type, so its type attribution is partial/missing.
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion()),
+          java(
+            """
+              import com.google.common.hash.BloomFilter;
+              import java.util.concurrent.atomic.AtomicReference;
+
+              @SuppressWarnings("UnstableApiUsage")
+              public class BloomFilterRef<T> extends AtomicReference<BloomFilter<T>> {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRemoveLombokVal() {
+        rewriteRun(
+          java(
+            """
+              import lombok.val;
+
+              public class Foo {
+                  val myField = 10.0;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1798")
     @Test
     void doNotRemoveInnerClassInSamePackage() {

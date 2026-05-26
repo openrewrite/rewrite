@@ -96,6 +96,40 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     /**
+     * Targeted, low-blast-radius cleanup pass for the result of an LST edit.
+     * Runs only the whitespace-normalisation steps of auto-format:
+     * {@code NormalizeFormatVisitor} (which moves stranded whitespace out
+     * to the outermost LST element — OpenRewrite's "whitespace lives on the
+     * outermost element" convention) followed by {@code BlankLinesVisitor}
+     * (which normalises blank-line counts based on the host file's style).
+     *
+     * <p>Cheaper and far less invasive than {@link #autoFormat(J, Object)};
+     * it never touches indentation, brace style, annotation-list wrapping,
+     * spaces around operators, etc. Use after a manual prefix adjustment if
+     * you want to recover idiomatic whitespace without changing unrelated
+     * formatting in the surrounding source.
+     *
+     * <p>If {@code before == after} (no change), returns {@code after}
+     * unchanged.
+     */
+    public <J2 extends J> J2 maybeRemoveBlankLines(J2 before, J2 after, P p) {
+        return maybeRemoveBlankLines(before, after, p, getCursor().getParentTreeCursor());
+    }
+
+    @SuppressWarnings({"ConstantConditions", "unchecked"})
+    public <J2 extends J> J2 maybeRemoveBlankLines(J2 before, J2 after, P p, Cursor parent) {
+        if (before == after) {
+            return after;
+        }
+        JavaSourceFile cu = (after instanceof JavaSourceFile) ?
+                (JavaSourceFile) after :
+                getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
+        AutoFormatService service = cu.service(AutoFormatService.class);
+        J2 result = (J2) service.normalizeFormatVisitor(null).visit(after, p, parent);
+        return (J2) service.blankLinesVisitor(cu, null).visit(result, p, parent);
+    }
+
+    /**
      * This method will add an import to the compilation unit if there is a reference to the type. It adds an additional
      * visitor which means the "add import" is deferred and does not complete immediately. This operation is idempotent
      * and calling this method multiple times with the same arguments will only add an import once.

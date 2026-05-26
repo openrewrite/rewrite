@@ -12,6 +12,7 @@ rootProject.name = "rewrite"
 
 // Projects that can be selectively included/excluded via IDE.properties
 val allProjects = listOf(
+    "rewrite-android",
     "rewrite-benchmarks",
     "rewrite-bom",
     "rewrite-core",

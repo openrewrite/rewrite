@@ -2061,6 +2061,58 @@ class AddDependencyTest implements RewriteTest {
     }
 
 
+    @Test
+    void doesNotThrowWhenScannedConfigurationUnknownToGradleProject() {
+        // When the scanner sees a Java file marked with a source set whose corresponding
+        // `<sourceSet>Implementation` configuration is not present in the GradleProject marker
+        // (e.g. the script doesn't declare that source set, or the GradleProject was built from
+        // a script that failed to evaluate fully), the resulting `resolvedConfigurations` mixes
+        // known and unknown configuration names. The filter must not NPE on the unknown ones.
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath),
+              java(
+                """
+                  import com.google.common.math.IntMath;
+                  public class B {
+                      boolean getMap() {
+                          return IntMath.isPrime(5);
+                      }
+                  }
+                  """,
+                sourceSpecs -> sourceSet(sourceSpecs, "integrationTest")
+              )
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null);
     }

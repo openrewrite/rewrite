@@ -21,13 +21,9 @@ import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.MavenExecutionContextView;
-import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -40,6 +36,7 @@ import java.util.function.Consumer;
  * reflects the pre-change classpath. This utility downloads the new dependency's JAR,
  * scans it for type names, and updates the JavaSourceSet accordingly.
  */
+@Deprecated // Temporarily leaving this before deleting to minimize disruption during the transition
 public class JavaSourceSetUpdater {
     static final String TYPE_CACHE_KEY = "org.openrewrite.maven.jarTypeCache";
 

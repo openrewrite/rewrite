@@ -251,7 +251,7 @@ class SortDependenciesTest implements RewriteTest {
     }
 
     @Test
-    void testScopeDependenciesSortedAfterOthers() {
+    void scopeDependenciesSortedAfterOthers() {
         rewriteRun(
           pomXml(
             """
@@ -323,7 +323,7 @@ class SortDependenciesTest implements RewriteTest {
     }
 
     @Test
-    void testScopeAlreadySortedAfterOthersNoChange() {
+    void scopeAlreadySortedAfterOthersNoChange() {
         rewriteRun(
           pomXml(
             """
@@ -352,7 +352,7 @@ class SortDependenciesTest implements RewriteTest {
     }
 
     @Test
-    void testScopeSortedAlphabeticallyAmongThemselves() {
+    void scopeSortedAlphabeticallyAmongThemselves() {
         rewriteRun(
           pomXml(
             """

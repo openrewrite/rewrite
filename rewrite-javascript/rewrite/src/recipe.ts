@@ -96,14 +96,18 @@ export abstract class Recipe {
             description: this.description,
             tags: this.tags,
             estimatedEffortPerOccurrence: this.estimatedEffortPerOccurrence,
-            recipeList: await mapAsync(await this.recipeList(), async r => r.descriptor()),
             options: Object.entries(optionsRecord).map(([key, descriptor]) => ({
                 name: key,
                 value: (this as any)[key],
                 required: descriptor.required ?? true,
                 ...descriptor
             })),
-            dataTables: this.dataTables
+            preconditions: [],
+            recipeList: await mapAsync(await this.recipeList(), async r => r.descriptor()),
+            dataTables: this.dataTables,
+            maintainers: [],
+            contributors: [],
+            examples: []
         }
     }
 
@@ -135,9 +139,13 @@ export interface RecipeDescriptor {
     readonly description: string
     readonly tags: string[]
     readonly estimatedEffortPerOccurrence: Minutes
-    readonly recipeList: RecipeDescriptor[]
     readonly options: ({ name: string, value?: any } & OptionDescriptor)[]
+    readonly preconditions: RecipeDescriptor[]
+    readonly recipeList: RecipeDescriptor[]
     readonly dataTables: DataTableDescriptor[]
+    readonly maintainers: any[]
+    readonly contributors: any[]
+    readonly examples: any[]
 }
 
 export interface OptionDescriptor {

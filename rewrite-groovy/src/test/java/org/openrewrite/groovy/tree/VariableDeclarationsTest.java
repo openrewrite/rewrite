@@ -112,6 +112,18 @@ class VariableDeclarationsTest implements RewriteTest {
     }
 
     @Test
+    void diamondOperatorOnUnresolvedImportedType() {
+        rewriteRun(
+          groovy(
+            """
+              import a.b.Foo
+              def x = new Foo<>()
+              """
+          )
+        );
+    }
+
+    @Test
     void singleTypeMultipleVariableDeclaration() {
         rewriteRun(
           groovy("def a = 1, b = 1")
@@ -217,6 +229,37 @@ class VariableDeclarationsTest implements RewriteTest {
           groovy(
             """
               def defaultPublicStaticFinal = 0
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeParameterAsLocalVariableType() {
+        rewriteRun(
+          groovy(
+            """
+              class TaskRunner<E> {
+                  void run() {
+                      E task = null
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeParameterAsLocalVariableTypeFromMethodCall() {
+        rewriteRun(
+          groovy(
+            """
+              class TaskRunner<E> {
+                  java.util.concurrent.BlockingQueue<E> queue
+                  void run() {
+                      E task = queue.take()
+                  }
+              }
               """
           )
         );

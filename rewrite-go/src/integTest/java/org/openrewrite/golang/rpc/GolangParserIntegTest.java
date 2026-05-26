@@ -29,6 +29,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 
+import static org.openrewrite.golang.Assertions.expectMethodType;
+import static org.openrewrite.golang.Assertions.expectType;
 import static org.openrewrite.golang.Assertions.go;
 
 /**
@@ -106,12 +108,29 @@ class GolangParserIntegTest implements RewriteTest {
                                 \tfmt.Println("Hello")
                                 }
                                 """,
-                        spec -> spec.afterRecipe(cu -> {
-                            var methods = org.openrewrite.java.search.FindMethods.find(cu, "fmt Println(..)");
-                            org.assertj.core.api.Assertions.assertThat(methods)
-                                    .as("FindMethods should find fmt.Println invocation via type attribution")
-                                    .isNotEmpty();
-                        })
+                        spec -> spec.afterRecipe(cu -> expectMethodType(cu, "Println", "fmt"))
+                )
+        );
+    }
+
+    @Test
+    void verifyStructTypeAttribution() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Point struct {
+                                \tX int
+                                \tY int
+                                }
+
+                                func main() {
+                                \tp := Point{X: 1, Y: 2}
+                                \t_ = p
+                                }
+                                """,
+                        spec -> spec.afterRecipe(cu -> expectType(cu, "p", "main.Point"))
                 )
         );
     }

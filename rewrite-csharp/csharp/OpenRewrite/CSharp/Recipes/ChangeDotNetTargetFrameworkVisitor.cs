@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Text.RegularExpressions;
 using OpenRewrite.Core;
 using OpenRewrite.Xml;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -24,8 +25,10 @@ namespace OpenRewrite.CSharp.Recipes;
 /// Handles both single-TFM (&lt;TargetFramework&gt;) and multi-TFM (&lt;TargetFrameworks&gt;) elements.
 /// Can be used standalone in custom recipe edit phases.
 /// </summary>
-public class ChangeDotNetTargetFrameworkVisitor(string oldTfm, string newTfm) : XmlVisitor<ExecutionContext>
+public class ChangeDotNetTargetFrameworkVisitor(string oldTfm, string newTfm, bool regenerateMarker = true) : XmlVisitor<ExecutionContext>
 {
+    private static readonly Regex ShortFormTfm = new(@"^net\d+$", RegexOptions.Compiled);
+
     private bool _modified;
 
     public override Xml.Xml VisitDocument(Document document, ExecutionContext ctx)
@@ -33,7 +36,11 @@ public class ChangeDotNetTargetFrameworkVisitor(string oldTfm, string newTfm) : 
         _modified = false;
         var d = (Document)base.VisitDocument(document, ctx);
         if (_modified)
-            DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+        {
+            MSBuildProjectHelper.MarkAttestationStale(ctx, d.SourcePath);
+            if (regenerateMarker)
+                DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+        }
         return d;
     }
 
@@ -44,7 +51,7 @@ public class ChangeDotNetTargetFrameworkVisitor(string oldTfm, string newTfm) : 
         if (t.Name == "TargetFramework")
         {
             var value = t.GetValue() ?? "";
-            if (oldTfm == value)
+            if (TfmEquals(oldTfm, value))
             {
                 _modified = true;
                 DoAfterVisit(new ChangeTagValueVisitor<ExecutionContext>(t, newTfm));
@@ -59,7 +66,7 @@ public class ChangeDotNetTargetFrameworkVisitor(string oldTfm, string newTfm) : 
             foreach (var framework in frameworks)
             {
                 var fw = framework.Trim();
-                if (oldTfm == fw)
+                if (TfmEquals(oldTfm, fw))
                 {
                     changed = true;
                     fw = newTfm;
@@ -78,4 +85,11 @@ public class ChangeDotNetTargetFrameworkVisitor(string oldTfm, string newTfm) : 
 
         return t;
     }
+
+    // net8 and net8.0 are equivalent TFMs in MSBuild for .NET 5+. Match both forms.
+    private static bool TfmEquals(string a, string b) =>
+        a == b || Normalize(a) == Normalize(b);
+
+    private static string Normalize(string tfm) =>
+        ShortFormTfm.IsMatch(tfm) ? tfm + ".0" : tfm;
 }

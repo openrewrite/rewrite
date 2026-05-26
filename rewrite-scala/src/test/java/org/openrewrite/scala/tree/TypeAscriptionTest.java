@@ -61,4 +61,11 @@ class TypeAscriptionTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void spaceBeforeColon() {
+        rewriteRun(
+            scala("val r = (1 : Int)")
+        );
+    }
 }

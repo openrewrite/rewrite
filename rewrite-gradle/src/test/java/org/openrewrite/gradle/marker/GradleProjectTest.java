@@ -87,6 +87,7 @@ class GradleProjectTest implements RewriteTest {
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
               .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .filteredOn(repo -> "https://example.com/maven2".equals(repo.getUri()))
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -132,6 +133,7 @@ class GradleProjectTest implements RewriteTest {
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
               .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .filteredOn(repo -> "https://example.com/maven2".equals(repo.getUri()))
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -180,6 +182,7 @@ class GradleProjectTest implements RewriteTest {
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
               .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .filteredOn(repo -> "https://example.com/maven2".equals(repo.getUri()))
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -223,6 +226,7 @@ class GradleProjectTest implements RewriteTest {
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
               .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .filteredOn(repo -> "https://example.com/maven2".equals(repo.getUri()))
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");

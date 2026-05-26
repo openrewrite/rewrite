@@ -50,10 +50,11 @@ public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
             return tree;
         return Visit(tree, p);
     }
-    public Cursor Cursor { get; set; } = new();
+    public virtual Cursor Cursor { get; set; } = new();
     private int _visitCount;
     private bool _stopAfterPreVisit;
     private List<TreeVisitor<T, P>>? _afterVisit;
+    private Dictionary<Type, TreeVisitor<T, P>>? _adapterCache;
 
     public virtual T? PreVisit(T tree, P p) => tree;
 
@@ -65,6 +66,42 @@ public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
     /// implemented via switch pattern matching on the visitor side.
     /// </summary>
     protected virtual T? Accept(T tree, P p) => tree;
+
+    /// <summary>
+    /// Returns a visitor capable of dispatching <paramref name="tree"/> to language-specific
+    /// visit methods. By default consults <see cref="TreeVisitorAdapterRegistry"/>: if a more
+    /// specific language visitor (e.g. <c>JavaVisitor&lt;P&gt;</c>, <c>CSharpVisitor&lt;P&gt;</c>)
+    /// is registered for the tree's family and <c>this</c> is not already that kind of visitor,
+    /// returns a wrapper adapter that forwards lifecycle hooks back to <c>this</c> while
+    /// providing the language-specific Accept dispatch. Otherwise returns <c>this</c>.
+    /// <para/>
+    /// Without this routing, a bare <see cref="TreeVisitor{T,P}"/> traversing a Cs/J source
+    /// would silently no-op (default <see cref="Accept"/> is identity), and a
+    /// <c>JavaVisitor&lt;P&gt;</c> traversing a Cs source would throw on the first Cs node
+    /// that its switch doesn't recognize.
+    /// </summary>
+    protected virtual TreeVisitor<T, P> Adapt(T tree)
+    {
+        var factories = TreeVisitorAdapterRegistry.Factories;
+        for (int i = 0; i < factories.Count; i++)
+        {
+            var factory = factories[i];
+            if (!factory.TreeType.IsInstanceOfType(tree)) continue;
+
+            var closedLangType = factory.OpenLangVisitorType.MakeGenericType(typeof(P));
+            if (closedLangType.IsInstanceOfType(this)) return this;
+
+            _adapterCache ??= new Dictionary<Type, TreeVisitor<T, P>>(2);
+            if (!_adapterCache.TryGetValue(closedLangType, out var cached))
+            {
+                var closedAdapterType = factory.OpenAdapterType.MakeGenericType(typeof(P));
+                cached = (TreeVisitor<T, P>)Activator.CreateInstance(closedAdapterType, this)!;
+                _adapterCache[closedLangType] = cached;
+            }
+            return cached;
+        }
+        return this;
+    }
 
     public virtual T? Visit(Tree? tree, P p)
     {
@@ -78,7 +115,7 @@ public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
         T? t = PreVisit(typed, p);
         if (!_stopAfterPreVisit)
         {
-            if (t != null) t = Accept(t, p);
+            if (t != null) t = Adapt(t).Accept(t, p);
             if (t != null) t = PostVisit(t, p);
         }
         _stopAfterPreVisit = false;
@@ -150,6 +187,49 @@ public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
         public override T? Visit(Tree? tree, P p) => tree as T;
     }
 }
+/// <summary>
+/// Registry of language-specific visitor adapters used by <see cref="TreeVisitor{T,P}.Adapt"/>.
+/// Each language module registers its <c>(treeType, openLangVisitorType, openAdapterType)</c>
+/// triple at module load time via a <see cref="System.Runtime.CompilerServices.ModuleInitializerAttribute"/>.
+/// Entries are kept sorted with the most specific tree type first so that, e.g., a Cs node
+/// matches the CSharpVisitor adapter before falling through to the JavaVisitor adapter.
+/// </summary>
+public static class TreeVisitorAdapterRegistry
+{
+    public sealed record AdapterFactory(
+        Type TreeType,
+        Type OpenLangVisitorType,
+        Type OpenAdapterType);
+
+    private static readonly List<AdapterFactory> _factories = new();
+    private static readonly object _lock = new();
+
+    public static void Register(Type treeType, Type openLangVisitorType, Type openAdapterType)
+    {
+        lock (_lock)
+        {
+            // Deduplicate in case a module initializer somehow runs twice.
+            for (int i = 0; i < _factories.Count; i++)
+            {
+                if (_factories[i].TreeType == treeType && _factories[i].OpenLangVisitorType == openLangVisitorType)
+                    return;
+            }
+
+            _factories.Add(new AdapterFactory(treeType, openLangVisitorType, openAdapterType));
+            _factories.Sort((a, b) =>
+            {
+                if (a.TreeType == b.TreeType) return 0;
+                // Most specific first: if a is a base of b, b wins → a after b.
+                if (a.TreeType.IsAssignableFrom(b.TreeType)) return 1;
+                if (b.TreeType.IsAssignableFrom(a.TreeType)) return -1;
+                return 0;
+            });
+        }
+    }
+
+    internal static IReadOnlyList<AdapterFactory> Factories => _factories;
+}
+
 public static class TreeVisitorExtensions
 {
     public static ITreeVisitor<T> Combine<T>(this ITreeVisitor<T> first, ITreeVisitor<T> second) where T : class

@@ -27,7 +27,8 @@ namespace OpenRewrite.CSharp.Recipes;
 public class UpgradeNuGetPackageVersionVisitor(
     string packageName,
     Dictionary<string, string> resolvedVersions,
-    Dictionary<string, Dictionary<string, string>> propertyUpdates)
+    Dictionary<string, Dictionary<string, string>> propertyUpdates,
+    bool regenerateMarker = true)
     : XmlVisitor<ExecutionContext>
 {
     private bool _modified;
@@ -42,7 +43,9 @@ public class UpgradeNuGetPackageVersionVisitor(
         }
         if (_modified)
         {
-            DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+            MSBuildProjectHelper.MarkAttestationStale(ctx, d.SourcePath);
+            if (regenerateMarker)
+                DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
         }
         return d;
     }

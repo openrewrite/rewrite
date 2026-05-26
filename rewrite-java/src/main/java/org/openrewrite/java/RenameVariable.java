@@ -154,7 +154,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                 return m.getName() != ident;
             } else if (value instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) value;
-                return m.getName() != ident;
+                return m.getName() != ident && m.getReturnTypeExpression() != ident;
             } else if (value instanceof J.NewClass) {
                 J.NewClass m = (J.NewClass) value;
                 return m.getClazz() != ident;
@@ -164,6 +164,18 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             } else if (value instanceof J.VariableDeclarations) {
                 J.VariableDeclarations v = (J.VariableDeclarations) value;
                 return ident != v.getTypeExpression();
+            } else if (value instanceof J.InstanceOf) {
+                J.InstanceOf i = (J.InstanceOf) value;
+                return i.getClazz() != ident;
+            } else if (value instanceof J.ArrayType) {
+                J.ArrayType a = (J.ArrayType) value;
+                return a.getElementType() != ident;
+            } else if (value instanceof J.Annotation) {
+                J.Annotation a = (J.Annotation) value;
+                return a.getAnnotationType() != ident;
+            } else if (value instanceof J.ControlParentheses) {
+                // ControlParentheses wraps the type in a J.TypeCast (e.g. `(Foo) x`); elsewhere (if/while/switch) it wraps a value expression.
+                return !(getCursor().getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.TypeCast);
             } else return !(value instanceof J.ParameterizedType);
         }
 

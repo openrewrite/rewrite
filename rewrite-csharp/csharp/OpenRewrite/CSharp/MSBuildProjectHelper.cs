@@ -37,7 +37,60 @@ namespace OpenRewrite.CSharp;
 /// </summary>
 public static class MSBuildProjectHelper
 {
-    private static readonly TimeSpan RestoreTimeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan RestoreTimeout = TimeSpan.FromMinutes(5);
+
+    // Keyed off ExecutionContext: the set of .csproj source paths that have been
+    // structurally modified during this run and whose MSBuildProject marker is
+    // therefore stale until the next dotnet restore. Mutating visitors add to
+    // this set; RegenerateMarkerVisitor consumes from it so files no one touched
+    // skip the (expensive) restore.
+    private const string StaleAttestationsKey = "OpenRewrite.CSharp.StaleCsprojAttestations";
+
+    /// <summary>
+    /// Marks the given .csproj source path as having pending changes whose
+    /// MSBuildProject marker no longer reflects on-disk state. Call this from
+    /// any visitor after it mutates a project file (independent of whether the
+    /// visitor reattests immediately or defers to a trailing
+    /// <see cref="Recipes.EnsureCsprojAttestation"/>).
+    /// </summary>
+    public static void MarkAttestationStale(ExecutionContext ctx, string sourcePath)
+    {
+        var set = ctx.ComputeMessageIfAbsent(
+            StaleAttestationsKey,
+            _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        lock (set)
+        {
+            set.Add(sourcePath);
+        }
+    }
+
+    /// <summary>
+    /// Returns true if the given .csproj source path has been marked stale and
+    /// has not yet been reattested in this execution.
+    /// </summary>
+    public static bool IsAttestationStale(ExecutionContext ctx, string sourcePath)
+    {
+        var set = ctx.GetMessage<HashSet<string>>(StaleAttestationsKey);
+        if (set == null) return false;
+        lock (set)
+        {
+            return set.Contains(sourcePath);
+        }
+    }
+
+    // Atomically removes the stale flag for this source path and returns whether
+    // it was set. Used by the marker-regen visitor so a stale flag drives exactly
+    // one reattestation regardless of whether it came from a mutating visitor's
+    // immediate DoAfterVisit or from a trailing EnsureCsprojAttestation pass.
+    private static bool TryConsumeStaleAttestation(ExecutionContext ctx, string sourcePath)
+    {
+        var set = ctx.GetMessage<HashSet<string>>(StaleAttestationsKey);
+        if (set == null) return false;
+        lock (set)
+        {
+            return set.Remove(sourcePath);
+        }
+    }
 
     #region Marker creation
 
@@ -261,6 +314,11 @@ public static class MSBuildProjectHelper
         if (tfm.StartsWith(".NETCoreApp,Version=v"))
         {
             var version = tfm[".NETCoreApp,Version=v".Length..];
+            // .NET Core 1.x/2.x/3.x ship as "netcoreappN.M" in project.frameworks;
+            // .NET 5+ unified to "netN.M". Match the short-form on each side so
+            // declared deps cross-reference the resolved target correctly.
+            if (version.Length > 0 && (version[0] is '1' or '2' or '3'))
+                return "netcoreapp" + version;
             return "net" + version;
         }
 
@@ -463,9 +521,15 @@ public static class MSBuildProjectHelper
     {
         public override Xml.Xml VisitDocument(Document document, ExecutionContext ctx)
         {
-            if (document.Markers.FindFirst<MSBuildProject>() != null)
-                return RegenerateAndRefreshMarker(document, ctx);
-            return document;
+            if (document.Markers.FindFirst<MSBuildProject>() == null)
+                return document;
+            // Gate on the stale flag so files no mutating recipe touched don't
+            // trigger dotnet restore. Consuming clears the flag so a second
+            // reattestation pass (e.g., immediate + trailing
+            // EnsureCsprojAttestation) doesn't run restore twice.
+            if (!TryConsumeStaleAttestation(ctx, document.SourcePath))
+                return document;
+            return RegenerateAndRefreshMarker(document, ctx);
         }
     }
 
@@ -534,6 +598,88 @@ public static class MSBuildProjectHelper
         {
             return new RestoreResult(false, ex.Message);
         }
+    }
+
+    #endregion
+
+    #region Direct version resolution
+
+    /// <summary>
+    ///     Returns the resolved concrete version of a direct package dependency from
+    ///     <c>obj/project.assets.json</c>. Used by callers (such as the InstallRecipes
+    ///     RPC handler) that need the concrete SemVer that NuGet selected after a
+    ///     restore, rather than the version constraint authored in the csproj —
+    ///     <c>dotnet add package &lt;pkg&gt; --version *</c> preserves the wildcard
+    ///     verbatim in the csproj, so the resolved version must be read from the
+    ///     NuGet restore output.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when <c>obj/project.assets.json</c> is missing (restore did not
+    ///     complete), when the package is not a direct dependency under any TFM, or
+    ///     when no matching resolved entry exists in the assets file's libraries.
+    /// </exception>
+    public static string GetResolvedPackageVersion(string projectDir, string packageName)
+    {
+        var assetsPath = Path.Combine(projectDir, "obj", "project.assets.json");
+        if (!File.Exists(assetsPath))
+        {
+            throw new InvalidOperationException(
+                $"project.assets.json not found at {assetsPath}; restore did not complete");
+        }
+
+        using var doc = JsonDocument.Parse(File.ReadAllText(assetsPath));
+        var root = doc.RootElement;
+
+        if (!IsDirectDependency(root, packageName))
+        {
+            throw new InvalidOperationException(
+                $"{packageName} is not a direct dependency in {assetsPath}");
+        }
+
+        // Read from targets — NuGet's per-TFM resolution map — rather than libraries,
+        // which is a flat package graph including PackageDownload assets that don't
+        // resolve to a single version. Matches what ReadResolvedPackages does above.
+        if (root.TryGetProperty("targets", out var targets))
+        {
+            foreach (var tfm in targets.EnumerateObject())
+            foreach (var entry in tfm.Value.EnumerateObject())
+            {
+                if (!entry.Value.TryGetProperty("type", out var typeProp) ||
+                    typeProp.GetString() != "package")
+                    continue;
+
+                var slash = entry.Name.IndexOf('/');
+                if (slash > 0 &&
+                    string.Equals(entry.Name[..slash], packageName, StringComparison.OrdinalIgnoreCase))
+                {
+                    var version = entry.Name[(slash + 1)..];
+                    if (!string.IsNullOrEmpty(version))
+                        return version;
+                }
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Could not find resolved version for {packageName} in {assetsPath}");
+    }
+
+    private static bool IsDirectDependency(JsonElement root, string packageName)
+    {
+        if (!root.TryGetProperty("project", out var project) ||
+            !project.TryGetProperty("frameworks", out var frameworks))
+            return false;
+
+        foreach (var fw in frameworks.EnumerateObject())
+        {
+            if (!fw.Value.TryGetProperty("dependencies", out var deps))
+                continue;
+
+            foreach (var dep in deps.EnumerateObject())
+                if (string.Equals(dep.Name, packageName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+        }
+
+        return false;
     }
 
     #endregion

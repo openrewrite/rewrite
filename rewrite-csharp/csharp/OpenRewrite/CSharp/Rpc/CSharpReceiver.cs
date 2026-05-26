@@ -514,9 +514,11 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         };
         var hashSpacing = q.Receive(nd.HashSpacing)!;
         var trailingComment = q.Receive(nd.TrailingComment)!;
+        var keywordSpacing = q.Receive(nd.KeywordSpacing)!;
         return nd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
             .WithSetting(setting).WithTarget(target)
-            .WithHashSpacing(hashSpacing).WithTrailingComment(trailingComment);
+            .WithHashSpacing(hashSpacing).WithTrailingComment(trailingComment)
+            .WithKeywordSpacing(keywordSpacing);
     }
 
     // ---- RegionDirective ----

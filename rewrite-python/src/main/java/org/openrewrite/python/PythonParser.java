@@ -28,7 +28,9 @@ import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -43,6 +45,14 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class PythonParser implements Parser {
     private final long maxSizeBytes;
+
+    /**
+     * Per-parse Python language version override. When {@code null}, the RPC
+     * server uses its process-wide default (controlled by
+     * {@code REWRITE_PYTHON_VERSION} via
+     * {@link PythonRewriteRpc.Builder#pythonVersion(String)}).
+     */
+    private final @Nullable PythonLanguageLevel languageLevel;
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
@@ -69,8 +79,11 @@ public class PythonParser implements Parser {
         Stream<SourceFile> smallFileStream = Stream.empty();
         if (!smallFiles.isEmpty()) {
             PythonValidator<Integer> validator = new PythonValidator<>();
+            Map<String, String> options = languageLevel != null
+                    ? Collections.singletonMap("languageLevel", languageLevel.version())
+                    : null;
             smallFileStream = PythonRewriteRpc.getOrStart().parse(smallFiles, relativeTo, this,
-                    Py.CompilationUnit.class.getName(), ctx).map(source -> {
+                    Py.CompilationUnit.class.getName(), ctx, options).map(source -> {
                 try {
                     validator.visit(source, 0);
                     return source;
@@ -103,6 +116,7 @@ public class PythonParser implements Parser {
 
     public static class Builder extends Parser.Builder {
         private long maxSizeBytes = 2 * 1024 * 1024; // 2MB default
+        private @Nullable PythonLanguageLevel languageLevel;
 
         public Builder() {
             super(Py.CompilationUnit.class);
@@ -120,14 +134,58 @@ public class PythonParser implements Parser {
             return this;
         }
 
+        /**
+         * Per-parse Python language version. Overrides the RPC server's
+         * process-wide default for the inputs parsed through this parser
+         * instance only.
+         * <p>
+         * When unset, the server falls back to the version configured on
+         * {@link PythonRewriteRpc.Builder#pythonVersion(String)} (default
+         * {@link PythonLanguageLevel#PYTHON_3}).
+         *
+         * @param languageLevel The Python version to parse with.
+         * @return This builder.
+         */
+        public Builder languageLevel(@Nullable PythonLanguageLevel languageLevel) {
+            this.languageLevel = languageLevel;
+            return this;
+        }
+
         @Override
         public PythonParser build() {
-            return new PythonParser(maxSizeBytes);
+            return new PythonParser(maxSizeBytes, languageLevel);
         }
 
         @Override
         public String getDslName() {
             return "python";
+        }
+    }
+
+    /**
+     * Python language version selectable on the parser.
+     * <p>
+     * Only the levels the parser actually branches on are exposed: the Py2.7
+     * grammar (via the parso-based path) is distinct from the Py3 grammar
+     * (via the {@code ast} module). New minor versions are added as the
+     * parser starts to distinguish them.
+     */
+    public enum PythonLanguageLevel {
+        PYTHON_2_7("2.7"),
+        PYTHON_3("3");
+
+        private final String version;
+
+        PythonLanguageLevel(String version) {
+            this.version = version;
+        }
+
+        /**
+         * @return The version string sent over the RPC parse request to
+         * select the corresponding parser path on the server.
+         */
+        public String version() {
+            return version;
         }
     }
 }

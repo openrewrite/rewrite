@@ -220,4 +220,58 @@ class ChangeDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void renameQuotedKeyInPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("urllib3", "httpx", ">=0.24.0")),
+          pipfile(
+            """
+              [packages]
+              "urllib3" = "*"
+              """,
+            """
+              [packages]
+              httpx = ">=0.24.0"
+              """
+          )
+        );
+    }
+
+    @Test
+    void chainAddThenUpgradeAcrossRecipes() {
+        // The second recipe must see what the first recipe added, in the same cycle.
+        // Without that within-cycle propagation, UpgradeDependencyVersion would not
+        // see httpx (added by AddDependency) and the chain would not converge.
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.Chain
+              displayName: chain
+              description: Cross-recipe state-carryover smoke test.
+              recipeList:
+                - org.openrewrite.python.AddDependency:
+                    packageName: httpx
+                    version: ">=0.27"
+                - org.openrewrite.python.UpgradeDependencyVersion:
+                    packageName: httpx
+                    newVersion: ">=0.28"
+              """,
+            "com.example.Chain"
+          ),
+          pipfile(
+            """
+              [packages]
+              requests = "*"
+              """,
+            """
+              [packages]
+              requests = "*"
+              httpx = ">=0.28"
+              """
+          )
+        );
+    }
 }

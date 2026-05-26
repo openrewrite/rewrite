@@ -1240,12 +1240,28 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
                             arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, DependencyNotation.toStringNotation(updatedDep))));
                 } else if (dep == null && isMultiComponentDefinition(m.getArguments())) {
-                    // Multi-component form: update literal version; variable versions are handled by UpdateProperties/UpdateVariable
-                    if (m.getArguments().size() >= 3 && m.getArguments().get(2) instanceof J.Literal) {
-                        String currentVersion = (String) ((J.Literal) m.getArguments().get(2)).getValue();
-                        if (!newVersion.equals(currentVersion)) {
+                    // Multi-component form: update literal version, or detach a variable reference to a literal.
+                    if (m.getArguments().size() >= 3) {
+                        Expression versionArg = m.getArguments().get(2);
+                        if (versionArg instanceof J.Literal) {
+                            String currentVersion = (String) ((J.Literal) versionArg).getValue();
+                            if (!newVersion.equals(currentVersion)) {
+                                updated = m.withArguments(ListUtils.map(m.getArguments(), (i, arg) ->
+                                        i == 2 ? ChangeStringLiteral.withStringValue((J.Literal) arg, newVersion) : arg));
+                            }
+                        } else if (versionArg instanceof J.Identifier) {
+                            String delimiter = "\"";
+                            if (m.getArguments().get(1) instanceof J.Literal) {
+                                String src = ((J.Literal) m.getArguments().get(1)).getValueSource();
+                                if (src != null && !src.isEmpty()) {
+                                    delimiter = src.substring(0, 1);
+                                }
+                            }
+                            J.Literal replacement = new J.Literal(
+                                    Tree.randomId(), versionArg.getPrefix(), versionArg.getMarkers(),
+                                    newVersion, delimiter + newVersion + delimiter, null, JavaType.Primitive.String);
                             updated = m.withArguments(ListUtils.map(m.getArguments(), (i, arg) ->
-                                    i == 2 ? ChangeStringLiteral.withStringValue((J.Literal) arg, newVersion) : arg));
+                                    i == 2 ? replacement : arg));
                         }
                     }
                 }

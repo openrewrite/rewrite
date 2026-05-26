@@ -39,7 +39,10 @@ class MigrateToGradle9Test implements RewriteTest {
               plugins {
                   id 'java'
                   id 'jacoco'
+                  id 'application'
               }
+
+              mainClassName = "com.example.AppMain"
 
               repositories {
                   mavenCentral()
@@ -47,12 +50,30 @@ class MigrateToGradle9Test implements RewriteTest {
 
               dependencies {
                   implementation group: 'com.google.guava', name: 'guava', version: '31.1-jre'
+                  implementation("org.apache.httpcomponents:httpclient") {
+                      version = {
+                          strictly("4.5.13")
+                      }
+                  }
+              }
+
+              task doSomething(type: JavaExec) {
+                  main = "com.example.AppMain"
+              }
+
+              tasks.register("runEverything", JavaExec) {
+                  main = "com.example.AppMain"
               }
               """,
             """
               plugins {
                   id 'java'
                   id 'jacoco'
+                  id 'application'
+              }
+
+              application {
+                  mainClass = "com.example.AppMain"
               }
 
               repositories {
@@ -61,6 +82,78 @@ class MigrateToGradle9Test implements RewriteTest {
 
               dependencies {
                   implementation "com.google.guava:guava:31.1-jre"
+                  implementation("org.apache.httpcomponents:httpclient") {
+                      version {
+                          strictly("4.5.13")
+                      }
+                  }
+              }
+
+              task doSomething(type: JavaExec) {
+                  mainClass = "com.example.AppMain"
+              }
+
+              tasks.register("runEverything", JavaExec) {
+                  mainClass = "com.example.AppMain"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void wrapsTopLevelCompatibilityIntoJavaBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              sourceCompatibility = '17'
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              java {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void useMainClassPropertyInKotlinDsl() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java`
+                  `application`
+              }
+
+              mainClassName = "com.example.AppMain"
+
+              tasks.register<JavaExec>("doSomething") {
+                  main = "com.example.AppMain"
+              }
+              """,
+            """
+              plugins {
+                  `java`
+                  `application`
+              }
+
+              application {
+                  mainClass = "com.example.AppMain"
+              }
+
+              tasks.register<JavaExec>("doSomething") {
+                  mainClass = "com.example.AppMain"
               }
               """
           )

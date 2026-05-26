@@ -107,4 +107,53 @@ class PythonParserTest implements RewriteTest {
             softly.assertThat(sf.getMarkers().getMarkers()).isEmpty();
         });
     }
+
+    @Test
+    void parsePython2WithLanguageLevel() {
+        SourceFile sf = PythonParser.builder().languageLevel(PythonParser.PythonLanguageLevel.PYTHON_2_7).build()
+          .parse("print \"hello\"\n")
+          .findFirst()
+          .get();
+        SoftAssertions.assertSoftly(softly -> {
+            softly.assertThat(sf).isInstanceOf(Py.CompilationUnit.class);
+            softly.assertThat(sf.getMarkers().getMarkers()).isEmpty();
+        });
+    }
+
+    @Test
+    void parsePython2ComprehensiveRoundTrip() {
+        String source =
+          "import os\n" +
+          "from os.path import join, dirname\n" +
+          "\n" +
+          "\n" +
+          "def greet(name, greeting=\"hello\"):\n" +
+          "    if name:\n" +
+          "        print greeting, name\n" +
+          "    else:\n" +
+          "        print >> sys.stderr, \"missing name\"\n" +
+          "    return greeting + name\n" +
+          "\n" +
+          "\n" +
+          "class Worker(Base):\n" +
+          "    def run(self, items):\n" +
+          "        results = []\n" +
+          "        for item in items:\n" +
+          "            try:\n" +
+          "                results.append(self.process(item))\n" +
+          "            except ValueError, e:\n" +
+          "                self.log(e)\n" +
+          "        return results\n";
+
+        SourceFile sf = PythonParser.builder().languageLevel(PythonParser.PythonLanguageLevel.PYTHON_2_7).build()
+          .parse(source)
+          .findFirst()
+          .get();
+
+        SoftAssertions.assertSoftly(softly -> {
+            softly.assertThat(sf).isInstanceOf(Py.CompilationUnit.class);
+            softly.assertThat(sf.getMarkers().getMarkers()).isEmpty();
+            softly.assertThat(sf.printAll()).isEqualTo(source);
+        });
+    }
 }

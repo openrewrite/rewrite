@@ -17,8 +17,10 @@ package org.openrewrite.maven.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.maven.table.DependenciesDeclared;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class FindDependencyTest implements RewriteTest {
@@ -327,6 +329,149 @@ class FindDependencyTest implements RewriteTest {
                     <groupId>jakarta.activation</groupId>
                     <artifactId>jakarta.activation-api</artifactId>
                     <version>${activation.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void emitsDataTableRow() {
+        rewriteRun(spec -> spec.recipe(new FindDependency("jakarta.activation", "jakarta.activation-api", null, null))
+            .dataTable(DependenciesDeclared.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                DependenciesDeclared.Row row = rows.get(0);
+                assertThat(row.getGroupId()).isEqualTo("jakarta.activation");
+                assertThat(row.getArtifactId()).isEqualTo("jakarta.activation-api");
+                assertThat(row.getVersion()).isEqualTo("2.1.2");
+                assertThat(row.getScope()).isEqualTo("compile");
+                assertThat(row.getSourceSet()).isEqualTo("main");
+            }),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>jakarta.activation</groupId>
+                    <artifactId>jakarta.activation-api</artifactId>
+                    <version>2.1.2</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <!--~~>--><dependency>
+                    <groupId>jakarta.activation</groupId>
+                    <artifactId>jakarta.activation-api</artifactId>
+                    <version>2.1.2</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void declaredScopeRecordedInTable() {
+        rewriteRun(spec -> spec.recipe(new FindDependency("jakarta.activation", "jakarta.activation-api", null, null))
+            .dataTable(DependenciesDeclared.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                assertThat(rows.get(0).getScope()).isEqualTo("test");
+            }),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>jakarta.activation</groupId>
+                    <artifactId>jakarta.activation-api</artifactId>
+                    <version>2.1.2</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <!--~~>--><dependency>
+                    <groupId>jakarta.activation</groupId>
+                    <artifactId>jakarta.activation-api</artifactId>
+                    <version>2.1.2</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void rowOnlyEmittedForDeclaredCoordinate() {
+        rewriteRun(spec -> spec.recipe(new FindDependency("jakarta.activation", "jakarta.activation-api", null, null))
+            .dataTable(DependenciesDeclared.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                assertThat(rows.get(0).getArtifactId()).isEqualTo("jakarta.activation-api");
+            }),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>jakarta.activation</groupId>
+                    <artifactId>jakarta.activation-api</artifactId>
+                    <version>2.1.2</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>jakarta.servlet</groupId>
+                    <artifactId>jakarta.servlet-api</artifactId>
+                    <version>6.0.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <!--~~>--><dependency>
+                    <groupId>jakarta.activation</groupId>
+                    <artifactId>jakarta.activation-api</artifactId>
+                    <version>2.1.2</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>jakarta.servlet</groupId>
+                    <artifactId>jakarta.servlet-api</artifactId>
+                    <version>6.0.0</version>
                   </dependency>
                 </dependencies>
               </project>

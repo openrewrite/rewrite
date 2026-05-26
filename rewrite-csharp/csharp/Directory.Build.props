@@ -1,0 +1,14 @@
+<Project>
+  <!--
+    This file intentionally exists to terminate MSBuild's upward search for
+    Directory.Build.props. When the SDK source tree is mounted into a
+    consumer (e.g. the rewrite-migrate-csharp recipes workspace via a
+    symlink at external/openrewrite/rewrite), MSBuild would otherwise walk
+    UP the lexical path and inherit the consumer's Directory.Build.props,
+    which injects a ProjectReference back to OpenRewrite.csproj itself —
+    producing a circular dependency in the restore graph.
+
+    Keep this file empty so it does not impose any properties on the SDK
+    projects; its sole purpose is to act as a stop marker.
+  -->
+</Project>
