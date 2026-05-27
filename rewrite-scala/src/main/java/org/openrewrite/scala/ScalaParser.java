@@ -53,12 +53,15 @@ public class ScalaParser implements Parser {
 
     private static String derivedRelativePath(String sourceCode) {
         Matcher packageMatcher = PACKAGE_PATTERN.matcher(sourceCode);
-        String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
+        boolean hasPackage = packageMatcher.find();
+        String pkg = hasPackage ? packageMatcher.group(1).replace('.', '/') + "/" : "";
 
         Matcher classMatcher = CLASS_PATTERN.matcher(sourceCode);
-        String simpleName = classMatcher.find() ? classMatcher.group(3) : Long.toString(System.nanoTime());
+        boolean hasClass = classMatcher.find();
+        String simpleName = hasClass ? classMatcher.group(3) : Long.toString(System.nanoTime());
 
-        return pkg + simpleName + ".scala";
+        String extension = (!hasPackage && !hasClass) ? ".sbt" : ".scala";
+        return pkg + simpleName + extension;
     }
 
     @Override
@@ -145,7 +148,8 @@ public class ScalaParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".scala") || path.toString().endsWith(".sc");
+        String s = path.toString();
+        return s.endsWith(".scala") || s.endsWith(".sc") || s.endsWith(".sbt");
     }
 
     @Override

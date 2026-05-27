@@ -2462,8 +2462,9 @@ class ScalaTreeVisitor(
     }
 
     if (tree.span.exists) {
-      val adjustedEnd = Math.max(0, tree.span.end - offsetAdjustment)
-      updateCursor(adjustedEnd)
+      // updateCursor takes a raw (un-adjusted) span position and applies
+      // offsetAdjustment itself; don't pre-subtract here.
+      updateCursor(tree.span.end)
     }
 
     qualid
