@@ -422,4 +422,15 @@ class CompilationUnitTest implements RewriteTest {
         );
     }
 
+    @Test
+    void classUsingAnonymousContextParameter() {
+        rewriteRun(
+          scala(
+            """
+            class Divider(using Executor)
+            """
+          )
+        );
+    }
+
 }

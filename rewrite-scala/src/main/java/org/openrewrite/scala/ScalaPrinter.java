@@ -878,7 +878,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                         for (J.Modifier m : varDecl.getModifiers()) {
                             visit(m, p);
                         }
-                        if (!varDecl.getVariables().isEmpty()) {
+                        boolean omitParamName = !varDecl.getVariables().isEmpty() &&
+                            varDecl.getVariables().get(0).getMarkers().findFirst(
+                                org.openrewrite.scala.marker.OmitName.class).isPresent();
+                        if (!omitParamName && !varDecl.getVariables().isEmpty()) {
                             visit(varDecl.getVariables().get(0).getName(), p);
                         }
                         if (varDecl.getTypeExpression() != null) {
@@ -886,7 +889,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                             if (varDecl.getVarargs() != null) {
                                 visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
                             }
-                            p.append(":");
+                            if (!omitParamName) {
+                                p.append(":");
+                            }
                             visit(typeExpr, p);
                         }
                         if (!varDecl.getVariables().isEmpty() &&
