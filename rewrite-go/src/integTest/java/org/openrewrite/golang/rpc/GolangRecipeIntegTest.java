@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.openrewrite.golang.Assertions.go;
@@ -146,6 +147,7 @@ class GolangRecipeIntegTest implements RewriteTest {
         String source = "package main\n\nfunc f() {\n\tvar x = true\n\t_ = x\n}\n";
         SourceFile cu = GolangParser.builder().build()
                 .parse(source).findFirst().orElseThrow();
+        UUID originalId = cu.getId();
 
         // Reset Go RPC state to simulate a fresh session (like CLI's mod run)
         rpc.reset();
@@ -154,6 +156,7 @@ class GolangRecipeIntegTest implements RewriteTest {
         Tree result = recipe.getVisitor().visit(cu, new InMemoryExecutionContext());
         assertThat(result).isNotNull().isInstanceOf(SourceFile.class);
         assertThat(result).isNotSameAs(cu);
+        assertThat(((SourceFile) result).getId()).isEqualTo(originalId);
         String printed = rpc.print((SourceFile) result);
         assertThat(printed).contains("var flag = true").contains("_ = flag");
     }
