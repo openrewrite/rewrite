@@ -317,97 +317,97 @@
 - imageName: node
   tagPatterns: ["4", "4-*", "4.*"]
   eolDate: "2018-04-30"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["5", "5-*", "5.*"]
   eolDate: "2016-06-30"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["6", "6-*", "6.*"]
   eolDate: "2019-04-30"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["7", "7-*", "7.*"]
   eolDate: "2017-06-30"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["8", "8-*", "8.*"]
   eolDate: "2019-12-31"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["9", "9-*", "9.*"]
   eolDate: "2018-06-30"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["10", "10-*", "10.*"]
   eolDate: "2021-04-30"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["11", "11-*", "11.*"]
   eolDate: "2019-06-30"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["12", "12-*", "12.*"]
   eolDate: "2022-04-30"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["13", "13-*", "13.*"]
   eolDate: "2020-06-01"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["14", "14-*", "14.*"]
   eolDate: "2023-04-30"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["15", "15-*", "15.*"]
   eolDate: "2021-06-01"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["16", "16-*", "16.*"]
   eolDate: "2023-09-11"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["17", "17-*", "17.*"]
   eolDate: "2022-06-01"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["18", "18-*", "18.*"]
   eolDate: "2025-04-30"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["19", "19-*", "19.*"]
   eolDate: "2023-06-01"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["20", "20-*", "20.*"]
   eolDate: "2026-04-30"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["21", "21-*", "21.*"]
   eolDate: "2024-06-01"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 - imageName: node
   tagPatterns: ["23", "23-*", "23.*"]
   eolDate: "2025-06-01"
-  suggestedReplacement: 24 or 22
+  suggestedReplacement: 26 or 24
 
 # Eclipse Temurin (formerly AdoptOpenJDK) - most common OpenJDK distribution
 - imageName: eclipse-temurin
