@@ -177,4 +177,20 @@ class LockFileParserParityTest {
                 .map(d -> d.getName() + "@" + d.getVersion())
                 .collect(Collectors.toSet());
     }
+
+    @Test
+    void parityYarnBerryTinyProject() throws Exception {
+        Assumptions.assumeTrue(PackageManagerExecutor.YARN.find() != null,
+                "yarn not installed");
+        String packageJson = "{\n" +
+                "  \"name\": \"parity-yarn-berry\",\n" +
+                "  \"packageManager\": \"yarn@4.0.2\",\n" +
+                "  \"dependencies\": { \"is-even\": \"1.0.0\" }\n" +
+                "}\n";
+        Set<String> javaSet = parseLockInJavaForPm(packageJson, PackageManager.YarnBerry);
+        Set<String> tsSet = parseMarkerViaRpcForPm(packageJson, PackageManager.YarnBerry);
+
+        assertThat(javaSet).isEqualTo(tsSet);
+        assertThat(javaSet).contains("is-even@1.0.0");
+    }
 }
