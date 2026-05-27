@@ -87,6 +87,16 @@ public class Assertions {
                 if (Files.exists(lockFileSource) && !Files.exists(lockFileTarget)) {
                     Files.createSymbolicLink(lockFileTarget, lockFileSource);
                 }
+                // Yarn berry needs .yarnrc.yml (nodeLinker: node-modules) next to the
+                // package.json so any tool re-invoking yarn in this dir honors the
+                // same linker as the cached workspace.
+                if (pm == PackageManager.YarnBerry) {
+                    Path yarnrcSource = workspaceDir.resolve(".yarnrc.yml");
+                    Path yarnrcTarget = relativeTo.resolve(".yarnrc.yml");
+                    if (Files.exists(yarnrcSource) && !Files.exists(yarnrcTarget)) {
+                        Files.createSymbolicLink(yarnrcTarget, yarnrcSource);
+                    }
+                }
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to create symlink for node_modules", e);
             }
