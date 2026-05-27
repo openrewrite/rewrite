@@ -16,6 +16,7 @@
 package org.openrewrite.javascript;
 
 import lombok.experimental.UtilityClass;
+import org.openrewrite.javascript.internal.PackageManagerExecutor;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.io.IOException;
@@ -27,6 +28,7 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -169,39 +171,41 @@ class DependencyWorkspace {
      */
     private static void runInstall(Path workingDir, PackageManager pm)
             throws IOException, InterruptedException {
-        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("windows");
-        String suffix = isWindows ? ".cmd" : "";
-
-        String[] command;
+        PackageManagerExecutor executor;
+        String[] args;
         switch (pm) {
             case Npm:
-                command = new String[]{"npm" + suffix, "install", "--silent"};
+                executor = PackageManagerExecutor.NPM;
+                args = new String[]{"install", "--silent"};
                 break;
             case YarnClassic:
-                command = new String[]{"yarn" + suffix, "install", "--ignore-scripts"};
+                executor = PackageManagerExecutor.YARN;
+                args = new String[]{"install", "--ignore-scripts"};
                 break;
             case YarnBerry:
-                command = new String[]{"yarn" + suffix, "install", "--mode", "skip-build"};
+                executor = PackageManagerExecutor.YARN;
+                args = new String[]{"install", "--mode", "skip-build"};
                 break;
             case Pnpm:
-                command = new String[]{"pnpm" + suffix, "install",
-                        "--ignore-scripts", "--no-strict-peer-dependencies"};
+                executor = PackageManagerExecutor.PNPM;
+                args = new String[]{"install", "--ignore-scripts", "--no-strict-peer-dependencies"};
                 break;
             case Bun:
-                command = new String[]{"bun" + suffix, "install", "--ignore-scripts"};
+                executor = PackageManagerExecutor.BUN;
+                args = new String[]{"install", "--ignore-scripts"};
                 break;
             default:
                 throw new IllegalArgumentException("Unsupported package manager: " + pm);
         }
-
-        ProcessBuilder pb = new ProcessBuilder(command);
-        pb.directory(workingDir.toFile());
-        pb.inheritIO();
-        Process process = pb.start();
-        int exitCode = process.waitFor();
-
-        if (exitCode != 0) {
-            throw new RuntimeException(command[0] + " install failed with exit code: " + exitCode);
+        String exe = executor.find();
+        if (exe == null) {
+            throw new RuntimeException(executor.getName() + " is not installed or not on PATH");
+        }
+        PackageManagerExecutor.RunResult result = executor.run(
+                workingDir, exe, Collections.<String, String>emptyMap(), args);
+        if (!result.isSuccess()) {
+            throw new RuntimeException(executor.getName() + " install failed (exit "
+                    + result.getExitCode() + "): " + result.getStderr());
         }
     }
 
@@ -215,9 +219,7 @@ class DependencyWorkspace {
             return Base64.getUrlEncoder()
                     .withoutPadding()
                     .encodeToString(hash)
-                    .substring(0, 16)
-                    .replace('/', '_')
-                    .replace('+', '-');
+                    .substring(0, 16);
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("SHA-256 algorithm not available", e);
         }
