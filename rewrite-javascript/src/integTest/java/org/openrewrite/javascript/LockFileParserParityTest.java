@@ -100,27 +100,11 @@ class LockFileParserParityTest {
     }
 
     private static Set<String> parseLockInJava(String packageJson) throws Exception {
-        Path workspace = DependencyWorkspace.getOrCreateWorkspace(packageJson);
-        Path lockPath = workspace.resolve("package-lock.json");
-        String lockContent = Files.readString(lockPath);
-        return LockFileParser.parse(lockContent).getAll().stream()
-                .map(d -> d.getName() + "@" + d.getVersion())
-                .collect(Collectors.toSet());
+        return parseLockInJavaForPm(packageJson, PackageManager.Npm);
     }
 
     private static Set<String> parseMarkerViaRpc(String packageJson) throws Exception {
-        // The TS parser resolves the lock file relative to the package.json path on disk.
-        // We must point it at the workspace where package-lock.json actually exists.
-        Path workspace = DependencyWorkspace.getOrCreateWorkspace(packageJson);
-        Path packageJsonPath = workspace.resolve("package.json");
-        PackageJsonParser parser = new PackageJsonParser();
-        Parser.Input input = Parser.Input.fromString(packageJsonPath, packageJson);
-        SourceFile sf = parser.parseInputs(Collections.singletonList(input), null,
-                new InMemoryExecutionContext(Throwable::printStackTrace)).findFirst().orElseThrow();
-        NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElseThrow();
-        return marker.getResolvedDependencies().stream()
-                .map(d -> d.getName() + "@" + d.getVersion())
-                .collect(Collectors.toSet());
+        return parseMarkerViaRpcForPm(packageJson, PackageManager.Npm);
     }
 
     @Test
