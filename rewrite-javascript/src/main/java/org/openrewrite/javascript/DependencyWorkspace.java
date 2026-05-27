@@ -16,6 +16,7 @@
 package org.openrewrite.javascript;
 
 import lombok.experimental.UtilityClass;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -65,25 +66,40 @@ class DependencyWorkspace {
     }
 
     /**
-     * Gets or creates a workspace directory for the given package.json content.
-     * Workspaces are cached by content hash to avoid repeated npm installs.
+     * Gets or creates a workspace directory for the given package.json content,
+     * using npm as the package manager. Delegates to
+     * {@link #getOrCreateWorkspace(String, PackageManager)}.
      *
      * @param packageJsonContent The complete package.json file content
      * @return Path to the workspace directory containing node_modules
      */
     static Path getOrCreateWorkspace(String packageJsonContent) {
-        String hash = hashContent(packageJsonContent);
+        return getOrCreateWorkspace(packageJsonContent, PackageManager.Npm);
+    }
+
+    /**
+     * Gets or creates a workspace directory for the given package.json content.
+     * Workspaces are cached by a key combining the content hash and package manager
+     * name, so the same package.json installed with different PMs yields separate
+     * workspaces.
+     *
+     * @param packageJsonContent The complete package.json file content
+     * @param pm                 The package manager to use for installation
+     * @return Path to the workspace directory containing node_modules
+     */
+    static Path getOrCreateWorkspace(String packageJsonContent, PackageManager pm) {
+        String key = hashContent(packageJsonContent) + "_" + pm.name();
 
         // Check in-memory cache
-        Path cached = cache.get(hash);
+        Path cached = cache.get(key);
         if (cached != null && isWorkspaceValid(cached)) {
             return cached;
         }
 
         // Check disk cache (for cross-JVM reuse)
-        Path workspaceDir = WORKSPACE_BASE.resolve(hash);
+        Path workspaceDir = WORKSPACE_BASE.resolve(key);
         if (isWorkspaceValid(workspaceDir)) {
-            cache.put(hash, workspaceDir);
+            cache.put(key, workspaceDir);
             return workspaceDir;
         }
 
@@ -94,7 +110,7 @@ class DependencyWorkspace {
             Files.createDirectories(WORKSPACE_BASE);
 
             // Use temp directory for atomic creation
-            Path tempDir = Files.createTempDirectory(WORKSPACE_BASE, hash + ".tmp-");
+            Path tempDir = Files.createTempDirectory(WORKSPACE_BASE, key + ".tmp-");
 
             try {
                 // Write package.json
@@ -103,16 +119,16 @@ class DependencyWorkspace {
                         packageJsonContent.getBytes(StandardCharsets.UTF_8)
                 );
 
-                // Run npm install
-                ProcessBuilder pb = new ProcessBuilder(System.getProperty("os.name").toLowerCase().contains("windows") ? "npm.cmd" : "npm", "install", "--silent");
-                pb.directory(tempDir.toFile());
-                pb.inheritIO();
-                Process process = pb.start();
-                int exitCode = process.waitFor();
-
-                if (exitCode != 0) {
-                    throw new RuntimeException("npm install failed with exit code: " + exitCode);
+                // Yarn berry needs a yarnrc telling it to use node_modules instead of PnP,
+                // so the symlinking pattern in Assertions.nodePackageManager() works.
+                if (pm == PackageManager.YarnBerry) {
+                    Files.write(
+                            tempDir.resolve(".yarnrc.yml"),
+                            "nodeLinker: node-modules\n".getBytes(StandardCharsets.UTF_8)
+                    );
                 }
+
+                runInstall(tempDir, pm);
 
                 // Move to final location (atomic on POSIX systems)
                 try {
@@ -127,7 +143,7 @@ class DependencyWorkspace {
                     }
                 }
 
-                cache.put(hash, workspaceDir);
+                cache.put(key, workspaceDir);
                 return workspaceDir;
 
             } catch (Exception e) {
@@ -140,7 +156,50 @@ class DependencyWorkspace {
             throw new UncheckedIOException("Failed to create dependency workspace", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("npm install was interrupted", e);
+            throw new RuntimeException("install was interrupted", e);
+        }
+    }
+
+    /**
+     * Per-PM full install (produces both lockfile and node_modules). The args
+     * differ from {@link org.openrewrite.javascript.internal.LockFileRegeneration},
+     * which uses lock-only flags ({@code --package-lock-only}, {@code --lockfile-only});
+     * here we want a full install so that downstream tests have node_modules
+     * available for type attribution and recipe round-trips.
+     */
+    private static void runInstall(Path workingDir, PackageManager pm)
+            throws IOException, InterruptedException {
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("windows");
+        String suffix = isWindows ? ".cmd" : "";
+
+        String[] command;
+        switch (pm) {
+            case Npm:
+                command = new String[]{"npm" + suffix, "install", "--silent"};
+                break;
+            case YarnClassic:
+            case YarnBerry:
+                command = new String[]{"yarn" + suffix, "install", "--ignore-scripts"};
+                break;
+            case Pnpm:
+                command = new String[]{"pnpm" + suffix, "install",
+                        "--ignore-scripts", "--no-strict-peer-dependencies"};
+                break;
+            case Bun:
+                command = new String[]{"bun" + suffix, "install", "--ignore-scripts"};
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported package manager: " + pm);
+        }
+
+        ProcessBuilder pb = new ProcessBuilder(command);
+        pb.directory(workingDir.toFile());
+        pb.inheritIO();
+        Process process = pb.start();
+        int exitCode = process.waitFor();
+
+        if (exitCode != 0) {
+            throw new RuntimeException(command[0] + " install failed with exit code: " + exitCode);
         }
     }
 
@@ -221,8 +280,8 @@ class DependencyWorkspace {
                         }
                     })
                     .forEach(workspaceDir -> {
-                        String hash = workspaceDir.getFileName().toString();
-                        cache.put(hash, workspaceDir);
+                        String key = workspaceDir.getFileName().toString();
+                        cache.put(key, workspaceDir);
                     });
         } catch (IOException e) {
             // Ignore - cache will be empty and workspaces will be created as needed
