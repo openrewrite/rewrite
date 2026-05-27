@@ -370,3 +370,93 @@ func TestRawCastPanics_HeterogeneousRightPadded(t *testing.T) {
 		_ = second.(tree.RightPadded[tree.Expression])
 	})
 }
+
+// ----- Group 6: leftPaddedFromElement preserves pre-typed operator enums -----
+//
+// On the NO_CHANGE path, ReceiveQueue.Receive returns the existing `before`
+// value unchanged. For Binary/Unary/Assignment operator slots that value is
+// the already-typed enum (BinaryOperator/UnaryOperator/AssignmentOperator/
+// AssignOp — all int-based), not the wire-format string. Pre-fix,
+// leftPaddedFromElement only matched the string spellings and fell through
+// to the catch-all `LeftPadded[tree.J]{Before, Markers}` with the element
+// dropped — then VisitBinary's `result.(LeftPadded[BinaryOperator])` cast
+// at java_receiver.go:149 panicked. See /tmp/rewrite-go-rpc-print-panics-round3.md.
+
+func TestLeftPaddedFromElement_PreTypedBinaryOperator(t *testing.T) {
+	// given: NO_CHANGE handed back an already-typed BinaryOperator
+	op := tree.Add
+
+	// when
+	got := leftPaddedFromElement(tree.EmptySpace, op, tree.Markers{})
+
+	// then: correctly-typed LeftPadded with element preserved
+	lp, ok := got.(tree.LeftPadded[tree.BinaryOperator])
+	if !ok {
+		t.Fatalf("want LeftPadded[BinaryOperator], got %T", got)
+	}
+	if lp.Element != op {
+		t.Errorf("Element lost: want %v, got %v", op, lp.Element)
+	}
+}
+
+func TestLeftPaddedFromElement_PreTypedUnaryOperator(t *testing.T) {
+	// given
+	op := tree.Negate
+
+	// when
+	got := leftPaddedFromElement(tree.EmptySpace, op, tree.Markers{})
+
+	// then
+	lp, ok := got.(tree.LeftPadded[tree.UnaryOperator])
+	if !ok {
+		t.Fatalf("want LeftPadded[UnaryOperator], got %T", got)
+	}
+	if lp.Element != op {
+		t.Errorf("Element lost: want %v, got %v", op, lp.Element)
+	}
+}
+
+func TestLeftPaddedFromElement_PreTypedAssignmentOperator(t *testing.T) {
+	// given
+	op := tree.AddAssign
+
+	// when
+	got := leftPaddedFromElement(tree.EmptySpace, op, tree.Markers{})
+
+	// then
+	lp, ok := got.(tree.LeftPadded[tree.AssignmentOperator])
+	if !ok {
+		t.Fatalf("want LeftPadded[AssignmentOperator], got %T", got)
+	}
+	if lp.Element != op {
+		t.Errorf("Element lost: want %v, got %v", op, lp.Element)
+	}
+}
+
+func TestLeftPaddedFromElement_PreTypedAssignOp(t *testing.T) {
+	// given
+	op := tree.AssignOpDefine
+
+	// when
+	got := leftPaddedFromElement(tree.EmptySpace, op, tree.Markers{})
+
+	// then
+	lp, ok := got.(tree.LeftPadded[tree.AssignOp])
+	if !ok {
+		t.Fatalf("want LeftPadded[AssignOp], got %T", got)
+	}
+	if lp.Element != op {
+		t.Errorf("Element lost: want %v, got %v", op, lp.Element)
+	}
+}
+
+func TestRawCastPanics_LeftPaddedJOnBinaryOperatorSlot(t *testing.T) {
+	// Lock in the receiver-side panic shape that surfaced pre-fix: without the
+	// pre-typed-enum branches in leftPaddedFromElement, the catch-all returned
+	// LeftPadded[tree.J]{Before, Markers} (element dropped). VisitBinary then
+	// raw-cast that to LeftPadded[BinaryOperator] and panicked.
+	var wire any = tree.LeftPadded[tree.J]{Before: tree.EmptySpace, Markers: tree.Markers{}}
+	expectPanic(t, "raw cast LP[J]->LP[BinaryOperator]", func() {
+		_ = wire.(tree.LeftPadded[tree.BinaryOperator])
+	})
+}
