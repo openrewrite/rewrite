@@ -15,7 +15,7 @@
  */
 package org.openrewrite.scala.internal
 
-import dotty.tools.dotc.ast.Trees
+import dotty.tools.dotc.ast.{Trees, untpd}
 import dotty.tools.dotc.core.Contexts.*
 import org.openrewrite.Tree
 import org.openrewrite.java.internal.JavaTypeFactory
@@ -60,12 +60,13 @@ class ScalaASTConverter {
     // Use the context from the parse result (carries type info from batch compilation)
     given Context = if (parseResult.context != null) parseResult.context else dotty.tools.dotc.core.Contexts.NoContext
 
-    // Calculate offset adjustment if content was wrapped
-    val offsetAdjustment = if (parseResult.wasWrapped) {
-      "object ExprWrapper { val result = ".length
-    } else {
-      0
-    }
+    // Calculate offset adjustment if content was wrapped before parsing.
+    // For `.sbt` content wrapped as `object __SbtScript__ { ... }`, spans in
+    // the parsed tree are offset by the wrapper prefix (`object __SbtScript__ {\n`).
+    val offsetAdjustment =
+      if (parseResult.wasObjectWrapped) ScalaParseResultConstants.ObjectScriptPrefix.length
+      else if (parseResult.wasWrapped) "object ExprWrapper { val result = ".length
+      else 0
 
     // Build type mapping from typed tree if available
     val mapping: Option[ScalaTypeMapping] = if (typeFactory != null) {
@@ -94,10 +95,26 @@ class ScalaASTConverter {
           packageDecl = createPackageDeclaration(pkgDef, visitor)
         }
 
+        // For `.sbt` content the bridge wrapped statements in
+        // `object __SbtScript__ { ... }` so Dotty would accept them at the
+        // file level. Lift the wrapper's body back up here so downstream
+        // visiting sees the original statements as direct children of the
+        // compilation unit. Filter out empty/synthetic trees Dotty may emit
+        // for the object's constructor — those carry no span and would crash
+        // visitUnknown.
+        val rawStats: Seq[Trees.Tree[?]] =
+          if (parseResult.wasObjectWrapped) {
+            pkgDef.stats.collectFirst {
+              case mod: untpd.ModuleDef
+                if mod.name.toString == ScalaParseResultConstants.ObjectScriptWrapperName =>
+                mod.impl.body.filter(s => !s.isEmpty && s.span.exists)
+            }.getOrElse(pkgDef.stats)
+          } else pkgDef.stats
+
         // Process the statements within the package.
         // Sort by source position to ensure source order is preserved —
         // the Dotty parser may reorder brace imports internally.
-        val sortedStats = pkgDef.stats.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
+        val sortedStats = rawStats.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
         sortedStats.foreach {
           case _: Trees.PackageDef[?] =>
           case imp: Trees.Import[?] =>

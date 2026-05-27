@@ -45,4 +45,106 @@ class SbtFileTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void importsAdjacentToStatement() {
+        rewriteRun(
+          sbt(
+            """
+            import sbt._
+            import Keys._
+            libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.17" % Test
+            """
+          )
+        );
+    }
+
+    @Test
+    void importsWithBlankLineBeforeStatement() {
+        rewriteRun(
+          sbt(
+            """
+            import sbt._
+            import Keys._
+
+            libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.17" % Test
+            """
+          )
+        );
+    }
+
+    @Test
+    void thisBuildScopedSetting() {
+        rewriteRun(
+          sbt(
+            """
+            ThisBuild / scalaVersion := "3.3.1"
+            ThisBuild / organization := "com.example"
+            """
+          )
+        );
+    }
+
+    @Test
+    void crossScalaVersions() {
+        rewriteRun(
+          sbt(
+            """
+            crossScalaVersions := Seq("2.13.12", "3.3.1")
+            """
+          )
+        );
+    }
+
+    @Test
+    void lineComments() {
+        rewriteRun(
+          sbt(
+            """
+            // top of file comment
+            name := "demo" // trailing comment
+            // standalone comment between settings
+            version := "0.1.0"
+            """
+          )
+        );
+    }
+
+    @Test
+    void blockComment() {
+        rewriteRun(
+          sbt(
+            """
+            /* multi
+               line
+               comment */
+            name := "demo"
+            """
+          )
+        );
+    }
+
+    @Test
+    void valDeclaration() {
+        rewriteRun(
+          sbt(
+            """
+            val scala3 = "3.3.1"
+            scalaVersion := scala3
+            """
+          )
+        );
+    }
+
+    @Test
+    void multiProjectLazyVals() {
+        rewriteRun(
+          sbt(
+            """
+            lazy val core = project.in(file("core"))
+            lazy val root = project.in(file(".")).aggregate(core).dependsOn(core)
+            """
+          )
+        );
+    }
 }
