@@ -548,7 +548,7 @@ class PythonTypeMapping:
         elif kind in ('dynamic', 'never'):
             return _UNKNOWN
 
-        elif kind == 'enumLiteral':
+        elif kind in ('enumLiteral', 'enumComplement'):
             class_name = descriptor.get('className', '')
             class_type = self._create_class_type(class_name)
             class_type._kind = JavaType.FullyQualified.Kind.Enum
