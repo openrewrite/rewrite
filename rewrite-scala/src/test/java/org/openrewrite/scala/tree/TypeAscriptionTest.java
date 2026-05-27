@@ -68,4 +68,20 @@ class TypeAscriptionTest implements RewriteTest {
             scala("val r = (1 : Int)")
         );
     }
+
+    @Test
+    void blockLambdaTypeAscribedInsideBlockArg() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  type Step = String => String
+                  List(1).map { spec =>
+                    { (s: String) => s }: Step
+                  }
+                }
+                """
+            )
+        );
+    }
 }
