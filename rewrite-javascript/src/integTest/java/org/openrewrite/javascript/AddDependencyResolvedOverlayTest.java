@@ -15,9 +15,12 @@
  */
 package org.openrewrite.javascript;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.javascript.internal.PackageManagerExecutor;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.test.RewriteTest;
@@ -31,6 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.npm;
 import static org.openrewrite.javascript.Assertions.packageJson;
+import static org.openrewrite.javascript.Assertions.yarnBerry;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class AddDependencyResolvedOverlayTest implements RewriteTest {
@@ -89,6 +93,58 @@ class AddDependencyResolvedOverlayTest implements RewriteTest {
         assertThat(lodash.getVersion()).matches("4\\.\\d+\\.\\d+");
 
         // The declared lodash Dependency entry should have its `resolved` populated.
+        assertThat(after.getDependencies())
+                .filteredOn(d -> "lodash".equals(d.getName()))
+                .singleElement()
+                .satisfies(d -> assertThat(d.getResolved()).isNotNull());
+    }
+
+    @Test
+    void addDependencyOverlaysResolvedVersionYarnBerry(@TempDir Path tempDir) throws IOException {
+        Assumptions.assumeTrue(PackageManagerExecutor.YARN.find() != null,
+                "yarn not installed");
+        String packageJsonContent = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"packageManager\": \"yarn@4.0.2\",\n" +
+                "  \"dependencies\": {\n" +
+                "    \"uuid\": \"^9.0.0\"\n" +
+                "  }\n" +
+                "}\n";
+        Path workspace = DependencyWorkspace.getOrCreateWorkspace(packageJsonContent, PackageManager.YarnBerry);
+        String lockFileContent = Files.readString(workspace.resolve("yarn.lock"));
+
+        AtomicReference<NodeResolutionResult> capturedAfterMarker = new AtomicReference<>();
+
+        rewriteRun(
+                spec -> spec.recipe(new AddDependency("lodash", "^4.17.21", "dependencies")),
+                yarnBerry(tempDir,
+                        packageJson(
+                                packageJsonContent,
+                                "{\n" +
+                                "  \"name\": \"x\",\n" +
+                                "  \"packageManager\": \"yarn@4.0.2\",\n" +
+                                "  \"dependencies\": {\n" +
+                                "    \"uuid\": \"^9.0.0\",\n" +
+                                "    \"lodash\": \"^4.17.21\"\n" +
+                                "  }\n" +
+                                "}\n",
+                                spec -> spec.afterRecipe(d -> {
+                                    if (d instanceof Json.Document) {
+                                        capturedAfterMarker.set(((Json.Document) d).getMarkers()
+                                                .findFirst(NodeResolutionResult.class).orElse(null));
+                                    }
+                                })),
+                        text(lockFileContent, s -> s.path("yarn.lock")
+                                .after(after -> after)
+                                .noTrim())));
+
+        NodeResolutionResult after = capturedAfterMarker.get();
+        assertThat(after).as("modified package.json must have a marker").isNotNull();
+
+        NodeResolutionResult.ResolvedDependency lodash = after.getResolvedDependency("lodash");
+        assertThat(lodash).as("lodash should be resolved post-edit").isNotNull();
+        assertThat(lodash.getVersion()).matches("4\\.\\d+\\.\\d+");
+
         assertThat(after.getDependencies())
                 .filteredOn(d -> "lodash".equals(d.getName()))
                 .singleElement()
