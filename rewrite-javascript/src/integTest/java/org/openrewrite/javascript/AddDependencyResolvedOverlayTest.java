@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.npm;
 import static org.openrewrite.javascript.Assertions.packageJson;
+import static org.openrewrite.javascript.Assertions.pnpm;
 import static org.openrewrite.javascript.Assertions.yarnBerry;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -135,6 +136,58 @@ class AddDependencyResolvedOverlayTest implements RewriteTest {
                                     }
                                 })),
                         text(lockFileContent, s -> s.path("yarn.lock")
+                                .after(after -> after)
+                                .noTrim())));
+
+        NodeResolutionResult after = capturedAfterMarker.get();
+        assertThat(after).as("modified package.json must have a marker").isNotNull();
+
+        NodeResolutionResult.ResolvedDependency lodash = after.getResolvedDependency("lodash");
+        assertThat(lodash).as("lodash should be resolved post-edit").isNotNull();
+        assertThat(lodash.getVersion()).matches("4\\.\\d+\\.\\d+");
+
+        assertThat(after.getDependencies())
+                .filteredOn(d -> "lodash".equals(d.getName()))
+                .singleElement()
+                .satisfies(d -> assertThat(d.getResolved()).isNotNull());
+    }
+
+    @Test
+    void addDependencyOverlaysResolvedVersionPnpm(@TempDir Path tempDir) throws IOException {
+        Assumptions.assumeTrue(PackageManagerExecutor.PNPM.find() != null,
+                "pnpm not installed");
+        String packageJsonContent = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"packageManager\": \"pnpm@8.15.4\",\n" +
+                "  \"dependencies\": {\n" +
+                "    \"uuid\": \"^9.0.0\"\n" +
+                "  }\n" +
+                "}\n";
+        Path workspace = DependencyWorkspace.getOrCreateWorkspace(packageJsonContent, PackageManager.Pnpm);
+        String lockFileContent = Files.readString(workspace.resolve("pnpm-lock.yaml"));
+
+        AtomicReference<NodeResolutionResult> capturedAfterMarker = new AtomicReference<>();
+
+        rewriteRun(
+                spec -> spec.recipe(new AddDependency("lodash", "^4.17.21", "dependencies")),
+                pnpm(tempDir,
+                        packageJson(
+                                packageJsonContent,
+                                "{\n" +
+                                "  \"name\": \"x\",\n" +
+                                "  \"packageManager\": \"pnpm@8.15.4\",\n" +
+                                "  \"dependencies\": {\n" +
+                                "    \"uuid\": \"^9.0.0\",\n" +
+                                "    \"lodash\": \"^4.17.21\"\n" +
+                                "  }\n" +
+                                "}\n",
+                                spec -> spec.afterRecipe(d -> {
+                                    if (d instanceof Json.Document) {
+                                        capturedAfterMarker.set(((Json.Document) d).getMarkers()
+                                                .findFirst(NodeResolutionResult.class).orElse(null));
+                                    }
+                                })),
+                        text(lockFileContent, s -> s.path("pnpm-lock.yaml")
                                 .after(after -> after)
                                 .noTrim())));
 
