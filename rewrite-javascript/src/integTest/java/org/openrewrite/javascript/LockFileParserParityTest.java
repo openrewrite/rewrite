@@ -23,6 +23,8 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.LockFileParser;
 import org.openrewrite.javascript.internal.PackageManagerExecutor;
+import org.openrewrite.javascript.internal.PnpmLockAdapter;
+import org.openrewrite.javascript.internal.YarnBerryLockAdapter;
 import org.openrewrite.javascript.internal.YarnClassicLockAdapter;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -146,11 +148,11 @@ class LockFileParserParityTest {
                 break;
             case YarnBerry:
                 lockContent = Files.readString(workspace.resolve("yarn.lock"));
-                lockContent = org.openrewrite.javascript.internal.YarnBerryLockAdapter.toNpmV3(lockContent);
+                lockContent = YarnBerryLockAdapter.toNpmV3(lockContent);
                 break;
             case Pnpm:
                 lockContent = Files.readString(workspace.resolve("pnpm-lock.yaml"));
-                lockContent = org.openrewrite.javascript.internal.PnpmLockAdapter.toNpmV3(lockContent);
+                lockContent = PnpmLockAdapter.toNpmV3(lockContent);
                 break;
             case Npm:
                 lockContent = Files.readString(workspace.resolve("package-lock.json"));
