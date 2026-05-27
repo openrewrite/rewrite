@@ -1230,10 +1230,30 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visitRightPadded(newClass.getPadding().getEnclosing(), JRightPadded.Location.NEW_CLASS_ENCLOSING, ".", p);
         }
         p.append("new");
-        visit(newClass.getClazz(), p);
-        // In Scala, constructors can be called without parentheses
-        if (newClass.getPadding().getArguments() != null) {
-            visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+        if (newClass.getClazz() instanceof J.IntersectionType && newClass.getPadding().getArguments() != null) {
+            J.IntersectionType intersectionType = (J.IntersectionType) newClass.getClazz();
+            beforeSyntax(intersectionType, Space.Location.INTERSECTION_TYPE_PREFIX, p);
+            visitSpace(intersectionType.getPadding().getBounds().getBefore(), Space.Location.TYPE_BOUNDS, p);
+
+            List<JRightPadded<TypeTree>> bounds = intersectionType.getPadding().getBounds().getPadding().getElements();
+            if (!bounds.isEmpty()) {
+                JRightPadded<TypeTree> first = bounds.get(0);
+                visit(first.getElement(), p);
+                visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+                for (int i = 1; i < bounds.size(); i++) {
+                    visitSpace(bounds.get(i - 1).getAfter(), Space.Location.TYPE_BOUND_SUFFIX, p);
+                    p.append("with");
+                    JRightPadded<TypeTree> bound = bounds.get(i);
+                    visit(bound.getElement(), p);
+                }
+            }
+            afterSyntax(intersectionType, p);
+        } else {
+            visit(newClass.getClazz(), p);
+            // In Scala, constructors can be called without parentheses
+            if (newClass.getPadding().getArguments() != null) {
+                visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+            }
         }
         visit(newClass.getBody(), p);
         afterSyntax(newClass, p);

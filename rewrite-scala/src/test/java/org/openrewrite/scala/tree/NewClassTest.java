@@ -144,6 +144,24 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    void newClassWithArgumentsAndMixin() {
+        rewriteRun(
+          scala(
+            """
+            class Service(conf: String, client: String)
+            trait Logging
+            object Test {
+              val service = new Service(
+                "conf",
+                "client") with Logging {
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void newClassWithMultiLineArguments() {
         rewriteRun(
           scala(
