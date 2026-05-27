@@ -26,6 +26,8 @@ import org.openrewrite.java.JavaParserExecutionContextView;
 
 import java.io.*;
 import java.net.URL;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -422,10 +424,20 @@ public class TypeTable implements JavaParserClasspathLoader {
                         jos.closeEntry();
                     }
                 }
-                // Atomic publish: callers blocked on `future` see either the prior jar
-                // (if any) or the fully-written one — never a half-written file.
-                Files.move(tmpJar, jarPath,
-                        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                // Atomic publish: callers blocked on `future` see either no jar or the
+                // fully-written one — never a half-written file. If another JVM
+                // produced the same jar concurrently on a shared cache directory,
+                // keep its version and discard our temp file. Windows raises
+                // AccessDeniedException when the target is held open in another JVM,
+                // which we treat the same as FileAlreadyExistsException.
+                try {
+                    Files.move(tmpJar, jarPath, StandardCopyOption.ATOMIC_MOVE);
+                } catch (FileAlreadyExistsException | AccessDeniedException e) {
+                    Files.deleteIfExists(tmpJar);
+                    if (!Files.exists(jarPath)) {
+                        throw e;
+                    }
+                }
                 future.complete(jarPath);
             } catch (Exception e) {
                 future.completeExceptionally(e);
