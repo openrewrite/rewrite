@@ -242,6 +242,8 @@ class DependencyWorkspaceTest implements RewriteTest {
 
     @Test
     void cachesPerPackageManagerSeparately() {
+        Assumptions.assumeTrue(PackageManagerExecutor.NPM.find() != null,
+                "npm not installed");
         Assumptions.assumeTrue(PackageManagerExecutor.PNPM.find() != null,
                 "pnpm not installed");
         String packageJson = "{\n" +
