@@ -399,7 +399,7 @@ class ScalaTreeVisitor(
       case sel: Trees.Select[?] if app.args.isEmpty && isUnaryOperator(sel.name.toString) =>
         // This is a unary operation
         visitUnary(sel)
-      case sel: Trees.Select[?] if app.args.length == 1 && isBinaryOperator(sel.name.toString) =>
+      case sel: Trees.Select[?] if app.args.length == 1 && isBinaryOperator(sel.name.toString) && !isExplicitDotSelect(sel) =>
         // This is likely a binary operation (infix notation)
         visitBinary(sel, app.args.head, Some(app.span))
       case sel: Trees.Select[?] =>
@@ -1384,6 +1384,17 @@ class ScalaTreeVisitor(
     // infix method invocations to preserve their source text.
     Set("+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">=",
         "&&", "||", "&", "|", "^", "<<", ">>", ">>>").contains(name)
+  }
+
+  private def isExplicitDotSelect(sel: Trees.Select[?]): Boolean = {
+    if (!sel.qualifier.span.exists || !sel.nameSpan.exists) {
+      return false
+    }
+    val qualifierEnd = Math.max(0, sel.qualifier.span.end - offsetAdjustment)
+    val nameStart = Math.max(0, sel.nameSpan.start - offsetAdjustment)
+    qualifierEnd < nameStart &&
+      nameStart <= source.length &&
+      source.substring(qualifierEnd, nameStart).indexOf('.') >= 0
   }
   
   private def visitBinary(sel: Trees.Select[?], right: Trees.Tree[?], appSpan: Option[Spans.Span] = None): J = {
@@ -7795,16 +7806,44 @@ class ScalaTreeVisitor(
                         yielding: Boolean, spanEnd: Int): S.For = {
     // Find opening bracket: ( or {. If we encounter a non-whitespace character before either,
     // we're in the Scala 3 paren-less form (e.g. `for i <- 1 to 10 yield ...`).
+    // A tuple-pattern generator may also start with `(` in paren-less form:
+    // `for (a, b) <- xs yield ...`. Do not mistake that pattern delimiter for
+    // the comprehension's optional control delimiter.
+    def isTuplePatternGeneratorOpen(openIdx: Int): Boolean = {
+      var depth = 1
+      var j = openIdx + 1
+      while (depth > 0 && j < source.length) {
+        source.charAt(j) match {
+          case '(' => depth += 1
+          case ')' => depth -= 1
+          case _ =>
+        }
+        j += 1
+      }
+      if (depth != 0) {
+        false
+      } else {
+        val afterClose = indexOfNextNonWhitespace(j)
+        afterClose < source.length &&
+          (source.startsWith("<-", afterClose) || source.charAt(afterClose) == '=')
+      }
+    }
+
     val (openIdx, openBracket): (Int, Char) = {
       var i = cursor
       while (i < source.length && source.charAt(i).isWhitespace) i += 1
-      if (i < source.length && (source.charAt(i) == '(' || source.charAt(i) == '{')) (i, source.charAt(i))
-      else (-1, ' ')  // ' ' sentinel: no bracket (Scala 3 indented form)
+      if (i < source.length && source.charAt(i) == '{') {
+        (i, source.charAt(i))
+      } else if (i < source.length && source.charAt(i) == '(' && !isTuplePatternGeneratorOpen(i)) {
+        (i, source.charAt(i))
+      } else {
+        (-1, ' ')  // ' ' sentinel: no bracket (Scala 3 indented form)
+      }
     }
     val isParenless = openBracket == ' '
     val beforeOpen: Space = if (openIdx > cursor) Space.format(source, cursor, openIdx) else Space.EMPTY
     if (openIdx >= 0) cursor = openIdx + 1
-    val closeChar = if (openBracket == '(') ')' else if (openBracket == '{') '}' else ' '
+    val closeChar = if (openBracket == '(') ')' else if (openBracket == '{') '}' else '\u0000'
 
     import scala.jdk.CollectionConverters.*
     val enumsList = enums.asJava
