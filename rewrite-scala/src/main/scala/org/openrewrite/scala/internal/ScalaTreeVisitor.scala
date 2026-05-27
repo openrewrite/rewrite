@@ -4515,11 +4515,20 @@ class ScalaTreeVisitor(
 
     // Now find and advance past '{'
     var hasBraces = false
-    if (blockStart < source.length && source.charAt(blockStart) == '{') {
+    // A `{` at blockStart belongs to this Block only when the Block actually wraps
+    // braced syntax. When dotty synthesises a Block to wrap a single-expression
+    // function body (e.g. the body of `spec => { ... }: Step`), the wrapper Block's
+    // span starts at the inner expression's `{`, but the brace belongs to that inner
+    // expression — not to the wrapper. Detect this case and treat the wrapper as
+    // braceless so the inner expression's braces aren't printed twice.
+    val isSyntheticWrapper = block.stats.isEmpty && !block.expr.isEmpty &&
+      block.expr.span.exists &&
+      Math.max(0, block.expr.span.start - offsetAdjustment) <= blockStart
+    if (!isSyntheticWrapper && blockStart < source.length && source.charAt(blockStart) == '{') {
       // Brace at block span start
       cursor = blockStart + 1
       hasBraces = true
-    } else if (savedCursorBeforePrefix < blockStart) {
+    } else if (!isSyntheticWrapper && savedCursorBeforePrefix < blockStart) {
       // Check if there's a brace BEFORE the block span (e.g., while/for body)
       val beforeSpan = source.substring(savedCursorBeforePrefix, blockStart)
       val braceIdx = positionOfNextIn(beforeSpan, "{", 0)
