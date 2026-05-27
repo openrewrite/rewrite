@@ -19,14 +19,8 @@ namespace OpenRewrite.CSharp.Recipes;
 
 public class CsprojRecipeActivator : IRecipeActivator
 {
-    private static readonly CategoryDescriptor CsprojCategory = new(".NET", ".NET project file transformation recipes");
-
     public void Activate(RecipeMarketplace marketplace)
     {
-        marketplace.Install(new AddNuGetPackageReference(), CsprojCategory);
-        marketplace.Install(new RemoveNuGetPackageReference(), CsprojCategory);
-        marketplace.Install(new UpgradeNuGetPackageVersion(), CsprojCategory);
-        marketplace.Install(new ChangeDotNetTargetFramework(), CsprojCategory);
-        marketplace.Install(new FindNuGetPackageReference(), CsprojCategory);
+        marketplace.InstallAssembly(typeof(CsprojRecipeActivator).Assembly);
     }
 }

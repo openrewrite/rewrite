@@ -86,6 +86,19 @@ public class TypesInUse {
     }
 
     /**
+     * Constructs a {@link TypesInUse} directly from pre-built sets, skipping the full LST walk
+     * performed by {@link #build(JavaSourceFile)}. Intended for callers that can source the same
+     * information from outside the tree (e.g. a serialized index).
+     */
+    public static TypesInUse of(JavaSourceFile cu,
+                                Set<JavaType> typesInUse,
+                                Set<JavaType.Method> declaredMethods,
+                                Set<JavaType.Method> usedMethods,
+                                Set<JavaType.Variable> variables) {
+        return new TypesInUse(cu, typesInUse, declaredMethods, usedMethods, variables);
+    }
+
+    /**
      * Whether any type referenced in this compilation unit is assignable to {@code fullyQualifiedType}.
      * Mirrors the loop in {@code UsesType.visit}: types-in-use, imports, and (when {@code includeImplicit})
      * the declaring/return/parameter types of used methods.

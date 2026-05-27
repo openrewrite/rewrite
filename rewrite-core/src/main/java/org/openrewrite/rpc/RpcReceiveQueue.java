@@ -132,13 +132,17 @@ public class RpcReceiveQueue {
                 // TODO handle enums here
 
                 RpcCodec<T> codec;
+                T inlineValue;
                 if (onChange != null) {
                     after = onChange.apply(before);
                 } else if (before != null && (codec = RpcCodec.forInstance(before, sourceFileType)) != null) {
                     after = codec.rpcReceive(before, this);
-                } else if (message.getValueType() == null) {
-                    after = message.getValue();
-                } else if (message.getState() == RpcObjectData.State.ADD && message.getValue() == null) {
+                } else if ((inlineValue = message.getValue()) != null) {
+                    // The remote inlined the value (no codec on this side, or none on either
+                    // side). getValue() Jackson-converts the map to the typed instance when
+                    // valueType is set; otherwise it returns the raw value.
+                    after = inlineValue;
+                } else if (message.getState() == RpcObjectData.State.ADD && message.getValueType() != null) {
                     throw new IllegalStateException(
                             "No RPC codec registered on the Java side for '" + message.getValueType() + "'. " +
                                     "The remote side has a codec and sent property messages that will not be consumed, " +

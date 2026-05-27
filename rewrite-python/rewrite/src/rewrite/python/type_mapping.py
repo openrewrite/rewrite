@@ -548,7 +548,7 @@ class PythonTypeMapping:
         elif kind in ('dynamic', 'never'):
             return _UNKNOWN
 
-        elif kind == 'enumLiteral':
+        elif kind in ('enumLiteral', 'enumComplement'):
             class_name = descriptor.get('className', '')
             class_type = self._create_class_type(class_name)
             class_type._kind = JavaType.FullyQualified.Kind.Enum
@@ -941,19 +941,41 @@ class PythonTypeMapping:
         names = [f"arg{i}" for i in range(len(param_types))]
         return names, param_types
 
-    def _get_declaring_type(self, node: ast.Call) -> Optional[JavaType.FullyQualified]:
-        """Get the declaring type (class/module) for a method call."""
+    def _get_declaring_type(self, node: ast.Call) -> JavaType.FullyQualified:
+        """Get the declaring type (class/module) for a method call.
+
+        Always returns a non-null FullyQualified — falls back to
+        :data:`_UNKNOWN` (a shared ``JavaType.Unknown`` singleton) when
+        Ty can't resolve the receiver and AST inference doesn't yield a
+        recognizable type. This keeps ``JavaType.Method.declaring_type``
+        non-null for every method invocation, which is what
+        ``org.openrewrite.java.search.HasMethod`` / ``UsesMethod`` /
+        ``MethodMatcher`` expect: those gates accept ``JavaType.Unknown``
+        receivers under wildcard patterns (``*..*``) but reject method
+        types whose declaring type is null.
+
+        Without this, a precondition like
+        ``Preconditions.check(uses_method("*..* tostring(..)"), V())``
+        was failing on unattributed Python sources (e.g. test fixtures
+        that don't import the receiver type), because the host's
+        wire-side HasMethod gate could not find a matching method use
+        in ``TypesInUse``.
+        """
         if isinstance(node.func, ast.Attribute):
             receiver = node.func.value
 
             # For chained calls like "hello".upper().split(), the receiver is a Call
             if isinstance(receiver, ast.Call):
-                return self._get_call_return_type(receiver)
+                resolved = self._get_call_return_type(receiver)
+                if resolved is not None:
+                    return resolved
 
             # Try to look up receiver type in ty-types index
             type_id = self._lookup_type_id(receiver)
             if type_id is not None:
-                return self._resolve_declaring_type(type_id)
+                resolved = self._resolve_declaring_type(type_id)
+                if resolved is not None:
+                    return resolved
 
         elif isinstance(node.func, ast.Name):
             # For function calls, look up the function name
@@ -976,7 +998,8 @@ class PythonTypeMapping:
                         if module_name and module_name != 'builtins':
                             return self._create_class_type(module_name)
 
-        return self._infer_declaring_type_from_ast(node)
+        inferred = self._infer_declaring_type_from_ast(node)
+        return inferred if inferred is not None else _UNKNOWN
 
     def _resolve_declaring_type(self, type_id: int) -> Optional[JavaType.FullyQualified]:
         """Resolve a type ID to a declaring type, maximizing object reuse.

@@ -111,6 +111,27 @@ class SearchResult(Marker):
         desc = self._description or ""
         return comment_wrapper(f"({desc})" if desc else "")
 
+    @staticmethod
+    def found(tree: Any, description: Optional[str] = None) -> Any:
+        """Add a :class:`SearchResult` marker to ``tree``.
+
+        Mirrors Java's ``org.openrewrite.marker.SearchResult.found(tree)``:
+        returns a new tree (different identity from the input) carrying a
+        fresh :class:`SearchResult` marker. Returns ``None`` unchanged so
+        callers can safely chain through nullable trees.
+
+        Used by search recipes and search-as-precondition visitors to
+        signal "this tree matched"; the wrapping :class:`Check` interprets
+        the identity flip as the gate matching.
+        """
+        if tree is None:
+            return None
+        current = tree.markers
+        new_markers = Markers(
+            current.id, list(current.markers) + [SearchResult(random_id(), description)]
+        )
+        return tree.replace(_markers=new_markers)
+
 
 class Markup(Marker, ABC):
     """

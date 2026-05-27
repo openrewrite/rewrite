@@ -192,9 +192,11 @@ func (m *typeMapper) mapNamed(named *types.Named) *tree.JavaTypeClass {
 // mapSignature maps a function signature to JavaTypeMethod.
 func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringType *tree.JavaTypeClass) *tree.JavaTypeMethod {
 	mt := &tree.JavaTypeMethod{
-		Name:          name,
-		DeclaringType: declaringType,
-		FlagsBitMap:   flagsForExported(name),
+		Name:        name,
+		FlagsBitMap: flagsForExported(name),
+	}
+	if declaringType != nil {
+		mt.DeclaringType = declaringType
 	}
 
 	// Return type
@@ -204,9 +206,17 @@ func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringTy
 	} else if results.Len() == 1 {
 		mt.ReturnType = m.mapType(results.At(0).Type())
 	} else {
-		// Multiple return values — use a tuple-like representation
-		// Map as Unknown since Java doesn't have multi-return
-		mt.ReturnType = tree.UnknownType
+		tupleParams := make([]tree.JavaType, 0, results.Len())
+		for i := 0; i < results.Len(); i++ {
+			tupleParams = append(tupleParams, m.mapType(results.At(i).Type()))
+		}
+		mt.ReturnType = &tree.JavaTypeParameterized{
+			Type: &tree.JavaTypeClass{
+				FullyQualifiedName: "go.tuple",
+				Kind:               "Class",
+			},
+			TypeParameters: tupleParams,
+		}
 	}
 
 	// Parameters
@@ -332,6 +342,26 @@ func (m *typeMapper) mapObject(obj types.Object) tree.JavaType {
 	}
 	if fn, ok := obj.(*types.Func); ok {
 		return m.mapMethodObject(fn)
+	}
+	// Package-alias identifiers (the `y` in `y.Hello()` after
+	// `import "github.com/x/y"`) come back as *types.PkgName, whose .Type()
+	// is the Invalid sentinel. Map them to a JavaTypeClass tagged with the
+	// imported package's path so recipes can recognize the reference even
+	// when the package's symbols aren't loaded.
+	if pn, ok := obj.(*types.PkgName); ok {
+		imported := pn.Imported()
+		if imported == nil {
+			return nil
+		}
+		// JavaType.FullyQualified.Kind is a fixed enum (Class, Enum,
+		// Interface, Annotation, Record, Value) without a Package value.
+		// Map package aliases to "Class" with the import path as the FQN;
+		// recipes can recognize package references by the FQN containing
+		// path separators (e.g. "github.com/x/y").
+		return &tree.JavaTypeClass{
+			Kind:               "Class",
+			FullyQualifiedName: imported.Path(),
+		}
 	}
 	return m.mapType(obj.Type())
 }

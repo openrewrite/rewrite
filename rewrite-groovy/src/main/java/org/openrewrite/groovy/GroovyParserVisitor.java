@@ -1180,6 +1180,13 @@ public class GroovyParserVisitor {
                         } else {
                             body = bodyVisitor.doVisit(method.getCode());
                         }
+                    } else if (annotations.stream().anyMatch(a -> TypeUtils.isOfClassType(a.getAnnotationType().getType(), "groovy.transform.Memoized"))) {
+                        // The @Memoized AST transformation moves the original body into a synthetic
+                        // `memoizedMethodPriv$<name>` method (optionally prefixed with `_` on naming collisions)
+                        // and replaces the original method body with cache-lookup logic that has no source
+                        // positions. Find the private helper and visit its body so source positions align.
+                        MethodNode original = findMemoizedOriginalMethod(method);
+                        body = bodyVisitor.doVisit(original != null ? original.getCode() : method.getCode());
                     } else {
                         body = bodyVisitor.doVisit(method.getCode());
                     }
@@ -1205,6 +1212,22 @@ public class GroovyParserVisitor {
         @SuppressWarnings({"ConstantConditions", "unchecked"})
         private <T> T pollQueue() {
             return (T) queue.poll();
+        }
+
+        private @Nullable MethodNode findMemoizedOriginalMethod(MethodNode method) {
+            String suffix = "memoizedMethodPriv$" + method.getName();
+            for (MethodNode candidate : method.getDeclaringClass().getMethods()) {
+                String name = candidate.getName();
+                int start = 0;
+                while (start < name.length() && name.charAt(start) == '_') {
+                    start++;
+                }
+                if (name.substring(start).equals(suffix) &&
+                        candidate.getParameters().length == method.getParameters().length) {
+                    return candidate;
+                }
+            }
+            return null;
         }
     }
 
@@ -3481,7 +3504,7 @@ public class GroovyParserVisitor {
                                 if (arg.getValue() instanceof AnnotationConstantExpression) {
                                     expression = visitAnnotation((AnnotationNode) ((AnnotationConstantExpression) arg.getValue()).getValue(), classVisitor);
                                 } else {
-                                    expression = bodyVisitor.doVisit(arg.getValue());
+                                    expression = recoverFoldedAnnotationMemberValue(arg.getValue(), bodyVisitor);
                                 }
                                 Expression element = isImplicitValue ? expression.withPrefix(argPrefix) :
                                         (new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
@@ -3505,6 +3528,37 @@ public class GroovyParserVisitor {
         }
 
         return new J.Annotation(randomId(), prefix, Markers.EMPTY, annotationType, arguments);
+    }
+
+    /**
+     * Under {@code @CompileStatic}, Groovy's compiler folds constant references like
+     * {@code TestConstants.CATEGORY} inside nested annotation arguments into a
+     * {@link ConstantExpression} carrying the resolved value. When that happens, the original
+     * source position is preserved via {@code setSourcePosition}, but the AST node no longer
+     * matches what is in the source. Recover the original identifier chain from source so the
+     * round-trip is preserved.
+     */
+    private Expression recoverFoldedAnnotationMemberValue(org.codehaus.groovy.ast.expr.Expression value, RewriteGroovyVisitor bodyVisitor) {
+        if (value instanceof ConstantExpression && !(value instanceof AnnotationConstantExpression)) {
+            int savedCursor = cursor;
+            Space prefix = whitespace();
+            if (cursor < source.length()) {
+                char c = source.charAt(cursor);
+                boolean isKeywordLiteral = source.startsWith("null", cursor) ||
+                        source.startsWith("true", cursor) ||
+                        source.startsWith("false", cursor);
+                if (Character.isJavaIdentifierStart(c) && !isKeywordLiteral) {
+                    String name = name();
+                    if (!name.isEmpty()) {
+                        return TypeTree.build(name)
+                                .withType(typeMapping.type(value.getType()))
+                                .withPrefix(prefix);
+                    }
+                }
+            }
+            cursor = savedCursor;
+        }
+        return bodyVisitor.doVisit(value);
     }
 
     private static LineColumn pos(ASTNode node) {

@@ -134,7 +134,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
                     } else if ("*".equals(imported) && (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) ||
-                            TypeUtils.fullyQualifiedNamesAreEqual(typeName + type.substring(type.lastIndexOf('.')), type))) {
+                            !owner.isEmpty() && TypeUtils.fullyQualifiedNamesAreEqual(typeName, owner))) {
                         if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
                             spaceForNextImport.set(import_.getPrefix());
                             return null;

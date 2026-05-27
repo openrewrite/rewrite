@@ -21,7 +21,9 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.tree.*;
 
 import java.io.ByteArrayInputStream;
@@ -154,6 +156,7 @@ class LocalMavenArtifactCacheTest {
 
     private static ResolvedDependency findDependency() {
         ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+        MavenExecutionContextView.view(ctx).setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
         ResolvedGroupArtifactVersion recipeGav = new ResolvedGroupArtifactVersion(
           "https://repo1.maven.org/maven2",
           "org.openrewrite.recipe",

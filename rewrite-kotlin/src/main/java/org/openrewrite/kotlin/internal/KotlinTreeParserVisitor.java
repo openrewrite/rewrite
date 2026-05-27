@@ -3098,7 +3098,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 x instanceof KtSimpleNameStringTemplateEntry);
 
         if (hasStringTemplateEntry) {
-            String delimiter = expression.getFirstChild().getText();
+            PsiElement openQuote;
+            String prefix;
+            if (expression.getInterpolationPrefix() == null) {
+                openQuote = expression.getFirstChild();
+                prefix = "";
+            } else {
+                openQuote = expression.getFirstChild().getNextSibling();
+                prefix = expression.getInterpolationPrefix().getInterpolationPrefix();
+            }
+            String delimiter = prefix + openQuote.getText();
             List<J> values = new ArrayList<>(entries.length);
 
             for (KtStringTemplateEntry entry : entries) {

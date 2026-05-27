@@ -24,7 +24,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// Supports glob patterns for the package name.
 /// Can be used standalone in custom recipe edit phases.
 /// </summary>
-public class RemoveNuGetPackageReferenceVisitor(string packageName) : XmlVisitor<ExecutionContext>
+public class RemoveNuGetPackageReferenceVisitor(string packageName, bool regenerateMarker = true) : XmlVisitor<ExecutionContext>
 {
     private bool _modified;
 
@@ -33,7 +33,11 @@ public class RemoveNuGetPackageReferenceVisitor(string packageName) : XmlVisitor
         _modified = false;
         var d = (Document)base.VisitDocument(document, ctx);
         if (_modified)
-            DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+        {
+            MSBuildProjectHelper.MarkAttestationStale(ctx, d.SourcePath);
+            if (regenerateMarker)
+                DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+        }
         return d;
     }
 

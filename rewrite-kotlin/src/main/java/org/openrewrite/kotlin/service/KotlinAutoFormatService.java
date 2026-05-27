@@ -16,15 +16,32 @@
 package org.openrewrite.kotlin.service;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.kotlin.format.AutoFormatVisitor;
+import org.openrewrite.kotlin.format.BlankLinesVisitor;
+import org.openrewrite.kotlin.format.NormalizeFormatVisitor;
+import org.openrewrite.kotlin.style.BlankLinesStyle;
+import org.openrewrite.style.Style;
+
+import static org.openrewrite.kotlin.style.IntelliJ.blankLines;
 
 public class KotlinAutoFormatService extends AutoFormatService {
 
     @Override
     public <P> JavaVisitor<P> autoFormatVisitor(@Nullable Tree stopAfter) {
         return new AutoFormatVisitor<>(stopAfter);
+    }
+
+    @Override
+    public <P> JavaVisitor<P> normalizeFormatVisitor(@Nullable Tree stopAfter) {
+        return new NormalizeFormatVisitor<>(stopAfter);
+    }
+
+    @Override
+    public <P> JavaVisitor<P> blankLinesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        return new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, sourceFile, () -> blankLines()), stopAfter);
     }
 }

@@ -739,7 +739,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withSetting(q.receiveAndGet(nullableDirective.getSetting(), toEnum(Cs.NullableDirective.NullableSetting.class)))
                 .withTarget(q.receiveAndGet(nullableDirective.getTarget(), toEnum(Cs.NullableDirective.NullableTarget.class)))
                 .withHashSpacing(q.receive(nullableDirective.getHashSpacing()))
-                .withTrailingComment(q.receive(nullableDirective.getTrailingComment()));
+                .withTrailingComment(q.receive(nullableDirective.getTrailingComment()))
+                .withKeywordSpacing(q.receive(nullableDirective.getKeywordSpacing()));
     }
 
     @Override

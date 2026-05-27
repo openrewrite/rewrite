@@ -25,7 +25,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// Handles both single-TFM (&lt;TargetFramework&gt;) and multi-TFM (&lt;TargetFrameworks&gt;) elements.
 /// Can be used standalone in custom recipe edit phases.
 /// </summary>
-public class ChangeDotNetTargetFrameworkVisitor(string oldTfm, string newTfm) : XmlVisitor<ExecutionContext>
+public class ChangeDotNetTargetFrameworkVisitor(string oldTfm, string newTfm, bool regenerateMarker = true) : XmlVisitor<ExecutionContext>
 {
     private static readonly Regex ShortFormTfm = new(@"^net\d+$", RegexOptions.Compiled);
 
@@ -36,7 +36,11 @@ public class ChangeDotNetTargetFrameworkVisitor(string oldTfm, string newTfm) : 
         _modified = false;
         var d = (Document)base.VisitDocument(document, ctx);
         if (_modified)
-            DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+        {
+            MSBuildProjectHelper.MarkAttestationStale(ctx, d.SourcePath);
+            if (regenerateMarker)
+                DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+        }
         return d;
     }
 

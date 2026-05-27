@@ -33,7 +33,6 @@ import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
@@ -338,8 +337,34 @@ public abstract class Recipe implements Cloneable {
             dataTableDescriptorFromDataTable(new RecipeRunStats(Recipe.noop()))
     );
 
+    private static final Set<String> GLOBAL_DATA_TABLE_NAMES;
+
+    static {
+        Set<String> names = new HashSet<>();
+        for (DataTableDescriptor dt : GLOBAL_DATA_TABLES) {
+            names.add(dt.getName());
+        }
+        GLOBAL_DATA_TABLE_NAMES = names;
+    }
+
     public List<DataTableDescriptor> getDataTableDescriptors() {
-        return ListUtils.concatAll(dataTables == null ? emptyList() : dataTables, GLOBAL_DATA_TABLES);
+        Map<String, DataTableDescriptor> byName = new LinkedHashMap<>();
+        if (dataTables != null) {
+            for (DataTableDescriptor dt : dataTables) {
+                byName.putIfAbsent(dt.getName(), dt);
+            }
+        }
+        for (Recipe sub : getRecipeList()) {
+            for (DataTableDescriptor dt : sub.getDataTableDescriptors()) {
+                if (!GLOBAL_DATA_TABLE_NAMES.contains(dt.getName())) {
+                    byName.putIfAbsent(dt.getName(), dt);
+                }
+            }
+        }
+        for (DataTableDescriptor dt : GLOBAL_DATA_TABLES) {
+            byName.putIfAbsent(dt.getName(), dt);
+        }
+        return new ArrayList<>(byName.values());
     }
 
     /**

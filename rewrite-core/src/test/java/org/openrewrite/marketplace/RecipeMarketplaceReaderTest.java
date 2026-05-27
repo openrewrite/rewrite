@@ -463,6 +463,45 @@ class RecipeMarketplaceReaderTest {
     }
 
     @Test
+    void mergeDoesNotAliasCategoryBranches() {
+        // Regression: when the target lacks a category that the source has, merge
+        // must deep-copy the branch rather than aliasing the source's Category
+        // instance. Otherwise later mutations to the target's tree mutate the
+        // source as well, and when the source is a cached marketplace shared
+        // across requests, concurrent readers iterate while a writer mutates,
+        // producing ConcurrentModificationException.
+        RecipeMarketplace source = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,category2,ecosystem,packageName
+          org.example.SourceRecipe,Inner,Outer,maven,org.example:source
+          """);
+        RecipeMarketplace target = new RecipeMarketplace();
+
+        target.getRoot().merge(source.getRoot());
+
+        RecipeMarketplace.Category sourceOuter = findCategory(source.getRoot(), "Outer");
+        RecipeMarketplace.Category targetOuter = findCategory(target.getRoot(), "Outer");
+        assertThat(targetOuter).isNotSameAs(sourceOuter);
+        assertThat(findCategory(targetOuter, "Inner")).isNotSameAs(findCategory(sourceOuter, "Inner"));
+
+        // Mutate the target by merging an overlay that overlaps the same path.
+        // If the target's branches were aliased to source, this would also mutate source.
+        RecipeMarketplace overlay = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,category2,ecosystem,packageName
+          org.example.OverlayRecipe,Inner,Outer,maven,org.example:overlay
+          """);
+        target.getRoot().merge(overlay.getRoot());
+
+        assertThat(findCategory(sourceOuter, "Inner").getRecipes())
+          .as("Source category must not be mutated by changes to merge target")
+          .extracting(RecipeListing::getName)
+          .containsExactly("org.example.SourceRecipe");
+
+        assertThat(findCategory(targetOuter, "Inner").getRecipes())
+          .extracting(RecipeListing::getName)
+          .containsExactlyInAnyOrder("org.example.SourceRecipe", "org.example.OverlayRecipe");
+    }
+
+    @Test
     void installCategoriesCaseInsensitive() {
         // When installing recipes via CSV where one uses "AI" and another uses "ai"
         // in the same category position, they should land in the same category

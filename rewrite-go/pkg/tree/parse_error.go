@@ -29,6 +29,15 @@ type ParseError struct {
 	Text           string
 }
 
+// ParseError isn't a J node (no Prefix, no acceptVisitor double-
+// dispatch in the J hierarchy) but it does flow through the same
+// Tree-typed Visit pipeline as a SourceFile alternate, so it satisfies
+// Tree to allow visitor.GoVisitor.Visit to receive it. The visitor
+// framework's switch has no case for ParseError; it falls through to
+// the default arm. RPC senders/receivers special-case it ahead of the
+// dispatch.
+func (*ParseError) isTree() {}
+
 // NewParseError creates a ParseError from a source path, source text, and error.
 func NewParseError(sourcePath string, source string, err error) *ParseError {
 	marker := ParseExceptionResult{

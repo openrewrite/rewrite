@@ -40,6 +40,36 @@ class TryTest implements RewriteTest {
     }
 
     @Test
+    void tryCatchExtraSpaceBeforeBrace() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                try { 1 } catch  {
+                  case _: Exception => 2
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchCommentBeforeBrace() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                try { 1 } catch /* note */ {
+                  case _: Exception => 2
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void tryWithFinally() {
         rewriteRun(
           scala(
@@ -152,6 +182,94 @@ class TryTest implements RewriteTest {
     }
 
     @Test
+    void catchWithExtraWhitespaceBeforeArrow() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def run(): Unit = try {
+                  println("risky")
+                } catch {
+                  case e: RuntimeException   => println("rt")
+                  case e: Exception          => println("ex")
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchEmptyCaseBody() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def run(): Unit = {
+                  try {
+                    println("risky")
+                  } catch {
+                    case _: Throwable =>
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchLongCommentBeforeCatch() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def run(): Unit = {
+                  try { 1 } /* an absurdly long block comment intended to push the catch keyword past any reasonable fixed-size lookahead window */ catch {
+                    case _: Exception => 2
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryWithLongCommentBeforeFinally() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def run(): Unit = {
+                  try { 1 } catch { case _: Exception => 2 } /* an absurdly long block comment intended to push the finally keyword past any reasonable fixed-size lookahead window */ finally { 3 }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchEmptyCaseBodyWithLineComment() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def run(): Unit = {
+                  try {
+                    println("risky")
+                  } catch {
+                    case _: Throwable => // If traversal fails, maps stay empty; types will be null
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void tryWithTypedPattern() {
         rewriteRun(
           scala(
@@ -162,12 +280,127 @@ class TryTest implements RewriteTest {
                 } catch {
                   case _: IllegalArgumentException | _: IllegalStateException => 
                     println("illegal argument or state")
-                  case e: Throwable => 
+                  case e: Throwable =>
                     println(s"unexpected error: ${e.getMessage}")
                 }
               }
               """
           )
         );
+    }
+
+    @Test
+    void catchCaseWithMultipleStatementBody() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                try {
+                  println("risky")
+                } catch {
+                  case _: Exception =>
+                    Thread.sleep(500)
+                    println("recover")
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void catchMultipleCasesWithMultiStatementBodies() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                try {
+                  println("risky")
+                } catch {
+                  case _: NumberFormatException =>
+                    println("nfe a")
+                    println("nfe b")
+                  case _: Exception =>
+                    println("ex a")
+                    println("ex b")
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void catchCaseWithSemicolonSeparatedBody() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                try { 1 } catch { case _: Exception => println("a"); println("b") }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void catchCaseWithBlockBody() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def foo: Boolean = {
+                  try {
+                    true
+                  } catch {
+                    case e: Exception => {
+                      e.printStackTrace()
+                      false
+                    }
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void spaceBeforeColonOnCatchParameter() {
+        rewriteRun(scala(
+            """
+            object T {
+              try { 1 } catch { case e : Exception => 2 }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void catchExtractorPatternWithBinding() {
+        rewriteRun(scala(
+            """
+            object Test {
+              try {
+                println("risky")
+              } catch {
+                case NonFatal(e) => println(e)
+              }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitParsedTry / visitTryImpl — `=>` arrow in catch case line comment
+        rewriteRun(scala(
+            """
+            val r = try { 1 } catch {
+              case e: Exception // =>
+              => 2
+            }
+            """
+        ));
     }
 }

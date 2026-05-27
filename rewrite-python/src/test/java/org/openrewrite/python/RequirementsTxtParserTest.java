@@ -27,7 +27,6 @@ import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.text.PlainText;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -161,7 +160,7 @@ class RequirementsTxtParserTest {
     }
 
     @Test
-    void linkDependenciesFromMetadataBuildsGraph(@TempDir Path tempDir) throws IOException {
+    void linkDependenciesFromMetadataBuildsGraph(@TempDir Path tempDir) throws Exception {
         // Create a fake site-packages with METADATA files
         Path sitePackages = tempDir.resolve(".venv/lib/python3.12/site-packages");
 

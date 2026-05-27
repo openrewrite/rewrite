@@ -23,6 +23,22 @@ import static org.openrewrite.scala.Assertions.scala;
 class MatchTest implements RewriteTest {
 
     @Test
+    void emptyCaseBodyWithGuardPreservesAlignmentBeforeArrow() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def handle(x: Int): Unit = x match {
+                case 1 if x > 0   =>
+                case _ => println(x)
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void simpleMatch() {
         rewriteRun(
           scala(
@@ -31,6 +47,36 @@ class MatchTest implements RewriteTest {
               def handle(x: Any): String = x match {
                 case s: String => s
                 case _ => "unknown"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchExtraSpaceBeforeKeyword() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val r = 1  match {
+                case _ => 0
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchExtraSpaceBeforeBrace() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val r = 1 match  {
+                case _ => 0
               }
             }
             """
@@ -215,6 +261,191 @@ class MatchTest implements RewriteTest {
     }
 
     @Test
+    void matchWithExtraWhitespaceBeforeArrow() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def handle(x: Any): String = x match {
+                case "a"   => "1"
+                case _ => "0"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCasesSeparatedBySemicolon() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def label(x: Any): String = x match { case s: String => s; case _ => null }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCasesSeparatedBySemicolonWithMultiplePatterns() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def label(x: Any): String = x match {
+                case s: String => s
+                case i: Int => i.toString; case d: Double => d.toString
+                case _ => null
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithCallInForLoopFollowedByCase() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo(args: java.util.ArrayList[Int]): Unit = {
+                for (a <- List(1, 2, 3)) {
+                  a match {
+                    case x: Int =>
+                      val y = x + 1
+                      args.add(y)
+                    case _ => return
+                  }
+                }
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithMultipleStatementsEndingWithCallFollowedByCase() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val args = new java.util.ArrayList[String]()
+              def visit(t: Any): Unit = t match {
+                case block: String =>
+                  val blockExpr = wrap(block)
+                  args.add(blockExpr.asInstanceOf[String])
+                case _ => cursor = savedCursor
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithNestedDefsAndMultiLineReturn() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def visit(t: Any): String = t match {
+                case innerApp: String =>
+                  def asExpression(j: Int): Int = j match {
+                    case e: Int => e
+                    case _ => 0
+                  }
+                  def finishAtEnd(): Unit = if (true) {
+                    val adjustedEnd = 1
+                    if (adjustedEnd > 0) cursor = adjustedEnd
+                  }
+                  val methodType = "x" match { case m: String => m; case _ => null }
+                  finishAtEnd()
+                  return doCall(prefix, Empty,
+                    new Wrapper(fn, Empty),
+                    Container.build(Empty, args, Empty), methodType)
+
+                case _ =>
+                  ""
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithNestedDefAndReturn() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo(x: Any): Int = x match {
+                case _: String =>
+                  def helper(): Int = if (true) {
+                    42
+                  } else {
+                    0
+                  }
+                  return helper()
+
+                case _ =>
+                  0
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithMultiLineReturnFollowedByCase() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo(x: Any): String = x match {
+                case s: String =>
+                  doFirst()
+                  return doSecond(
+                    "a",
+                    "b")
+
+                case _ =>
+                  "other"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithIfBlockBeforeReturn() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo(x: Any): String = x match {
+                case s: String =>
+                  if (s.nonEmpty) {
+                    doSomething()
+                  }
+                  return s
+                case _ =>
+                  "other"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void matchWithLineCommentContainingIfBeforeGuard() {
         rewriteRun(
           scala(
@@ -225,6 +456,61 @@ class MatchTest implements RewriteTest {
                     if s.nonEmpty => s
                 case _ => "empty"
               }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithMultiStatementBody() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def handle(x: Any): String = x match {
+                case s: String =>
+                  println("got string")
+                  s
+                case _ =>
+                  println("other")
+                  "other"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void partialFunctionLiteralWithMultiStatementCaseBody() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val handler: PartialFunction[Any, String] = {
+                case s: String =>
+                  println("got string")
+                  s
+                case _ =>
+                  println("other")
+                  "other"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // buildCasesBlock — `=>` arrow in case line comment
+        rewriteRun(
+          scala(
+            """
+            val r = 1 match {
+              case x // =>
+              => x
             }
             """
           )

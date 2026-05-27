@@ -22,9 +22,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"text/template"
+
+	"golang.org/x/mod/modfile"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 )
@@ -32,21 +33,28 @@ import (
 // RecipeModuleInfo holds information about an installed recipe module.
 type RecipeModuleInfo struct {
 	ImportPath string
-	Version    string
-	Recipes    []recipe.RecipeDescriptor
+	// ActivatePkg is the full Go import path of the package that contains
+	// func Activate(*recipe.Registry). Equal to ImportPath when the module
+	// root itself defines Activate; otherwise ImportPath + "/" + subdir.
+	// Callers (e.g. Moderne CLI) use this to import the recipe module from
+	// a generated RPC main when they rebuild rewrite-go-rpc.
+	ActivatePkg string
+	Version     string
+	Recipes     []recipe.RecipeDescriptor
 }
 
 // Installer manages the Go recipe workspace and installs recipe modules.
 type Installer struct {
-	WorkspaceDir string            // e.g., ~/.rewrite/go-recipes/
+	WorkspaceDir string               // workspace directory provided by the caller
 	Logger       func(string, ...any) // optional logger
 }
 
-// NewInstaller creates an Installer with the default workspace directory.
-func NewInstaller() *Installer {
-	home, _ := os.UserHomeDir()
+// NewInstaller creates an Installer rooted at the given workspace directory.
+// The caller is responsible for choosing (and, where appropriate, cleaning
+// up) the directory; the installer does not impose a default location.
+func NewInstaller(workspaceDir string) *Installer {
 	return &Installer{
-		WorkspaceDir: filepath.Join(home, ".rewrite", "go-recipes"),
+		WorkspaceDir: workspaceDir,
 	}
 }
 
@@ -121,8 +129,9 @@ func (inst *Installer) InstallFromPath(localPath string, registry *recipe.Regist
 		return nil, fmt.Errorf("go mod tidy: %w", err)
 	}
 
-	// Build and run the helper to discover recipes, then build a custom
-	// RPC binary that includes the recipe module for actual execution.
+	// Build and run the helper to discover recipes. Producing an
+	// executable RPC binary that links the recipe module is the
+	// responsibility of the caller (e.g. Moderne CLI).
 	return inst.loadRecipes(modulePath, activatePkg, registry)
 }
 
@@ -147,7 +156,8 @@ func (inst *Installer) InstallFromPackage(packageName string, version *string, r
 	// Read resolved version from go.mod
 	resolvedVersion := inst.readResolvedVersion(packageName)
 
-	// Load recipes (for remote packages, activatePkg is the package name itself)
+	// For remote modules we don't introspect subpackages; the convention is
+	// that the module root defines Activate.
 	info, err := inst.loadRecipes(packageName, packageName, registry)
 	if err != nil {
 		return nil, err
@@ -158,31 +168,26 @@ func (inst *Installer) InstallFromPackage(packageName string, version *string, r
 	return info, nil
 }
 
-// loadRecipes builds a custom RPC binary that includes the recipe module,
-// registers recipe descriptors in the current registry, and stores the custom
-// binary path for the Java side to use on subsequent RPC sessions.
+// loadRecipes builds and runs a short-lived helper program that imports the
+// installed recipe module, calls its Activate, and prints recipe descriptors
+// as JSON. Descriptors are registered in the session registry.
 //
-// Go plugins have type identity issues (types from a plugin are not identical
-// to types in the host binary), so instead we rebuild the entire RPC binary
-// with the recipe module linked in. The custom binary is stored at
-// ~/.rewrite/go-recipes/rewrite-go-rpc and used by subsequent mod run calls.
+// Producing an executable RPC binary that links the recipe module is
+// intentionally out of scope: Moderne CLI builds and places the custom
+// rewrite-go-rpc binary based on the workspace prepared here.
 func (inst *Installer) loadRecipes(modulePath, activatePkg string, registry *recipe.Registry) (*RecipeModuleInfo, error) {
 	helperDir := filepath.Join(inst.WorkspaceDir, "helper")
 	helperSrc := filepath.Join(helperDir, "main.go")
 
-	// Generate the helper source if it doesn't already exist.
-	// This program both outputs recipe descriptors AND serves as a
-	// recipe-enabled RPC server.
 	if _, err := os.Stat(helperSrc); os.IsNotExist(err) {
 		if err := os.MkdirAll(helperDir, 0755); err != nil {
 			return nil, fmt.Errorf("create helper dir: %w", err)
 		}
-		if err := generateHelper(helperSrc, modulePath); err != nil {
+		if err := generateHelper(helperSrc, activatePkg); err != nil {
 			return nil, fmt.Errorf("generate helper: %w", err)
 		}
 	}
 
-	// Build the helper binary
 	helperBin := filepath.Join(helperDir, "helper")
 	cmd := exec.Command("go", "build", "-o", helperBin, ".")
 	cmd.Dir = helperDir
@@ -191,7 +196,6 @@ func (inst *Installer) loadRecipes(modulePath, activatePkg string, registry *rec
 		return nil, fmt.Errorf("build helper: %s: %w", string(output), err)
 	}
 
-	// Run the helper to discover recipe descriptors
 	cmd = exec.Command(helperBin)
 	cmd.Dir = helperDir
 	output, err := cmd.Output()
@@ -204,7 +208,6 @@ func (inst *Installer) loadRecipes(modulePath, activatePkg string, registry *rec
 		return nil, fmt.Errorf("parse helper output: %w", err)
 	}
 
-	// Register recipes in the current session's registry (descriptors only)
 	var descriptors []recipe.RecipeDescriptor
 	for _, entry := range entries {
 		desc := recipe.RecipeDescriptor{
@@ -223,125 +226,12 @@ func (inst *Installer) loadRecipes(modulePath, activatePkg string, registry *rec
 		descriptors = append(descriptors, desc)
 	}
 
-	// Now build a custom RPC binary that includes the recipe module.
-	// This binary will be used by subsequent mod run calls.
-	customBin := filepath.Join(inst.WorkspaceDir, "rewrite-go-rpc")
-	if err := inst.buildCustomRpc(activatePkg, customBin); err != nil {
-		if inst.Logger != nil {
-			inst.Logger("warning: failed to build custom RPC binary: %v", err)
-		}
-		// Non-fatal: recipes will be discovered but not executable
-	}
-
 	os.RemoveAll(helperDir)
 	return &RecipeModuleInfo{
-		ImportPath: modulePath,
-		Recipes:    descriptors,
+		ImportPath:  modulePath,
+		ActivatePkg: activatePkg,
+		Recipes:     descriptors,
 	}, nil
-}
-
-// buildCustomRpc copies the original RPC server source and adds recipe
-// module activation. The resulting binary can execute installed recipes.
-func (inst *Installer) buildCustomRpc(activatePkg, outputPath string) error {
-	rpcDir := filepath.Join(inst.WorkspaceDir, "rpc")
-	if err := os.MkdirAll(rpcDir, 0755); err != nil {
-		return fmt.Errorf("create rpc dir: %w", err)
-	}
-
-	// Find the original RPC source
-	rpcSrcDir := inst.findRpcSource()
-	if rpcSrcDir == "" {
-		return fmt.Errorf("could not find rewrite-go-rpc source directory")
-	}
-
-	// Copy main.go and inject recipe activation
-	origSrc, err := os.ReadFile(filepath.Join(rpcSrcDir, "main.go"))
-	if err != nil {
-		return fmt.Errorf("read original main.go: %w", err)
-	}
-
-	// Inject the recipe import and activation call
-	modified := injectRecipeActivation(string(origSrc), activatePkg)
-	if err := os.WriteFile(filepath.Join(rpcDir, "main.go"), []byte(modified), 0644); err != nil {
-		return fmt.Errorf("write custom main.go: %w", err)
-	}
-
-	cmd := exec.Command("go", "build", "-o", outputPath, ".")
-	cmd.Dir = rpcDir
-	cmd.Env = append(os.Environ(), "GO111MODULE=on")
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("build custom rpc: %s: %w", string(output), err)
-	}
-
-	os.RemoveAll(rpcDir)
-	return nil
-}
-
-// findRpcSource looks for the rewrite-go-rpc source directory.
-func (inst *Installer) findRpcSource() string {
-	// Try relative to the current binary
-	exe, err := os.Executable()
-	if err == nil {
-		dir := filepath.Dir(exe)
-		// The source is typically at rewrite-go/rewrite/cmd/rpc relative to the build
-		candidates := []string{
-			filepath.Join(dir, "..", "rewrite", "cmd", "rpc"),
-			filepath.Join(dir, "..", "..", "rewrite", "cmd", "rpc"),
-		}
-		for _, c := range candidates {
-			if _, err := os.Stat(filepath.Join(c, "main.go")); err == nil {
-				return c
-			}
-		}
-	}
-
-	// Try via go/build to find the module
-	gopath := os.Getenv("GOPATH")
-	if gopath == "" {
-		home, _ := os.UserHomeDir()
-		gopath = filepath.Join(home, "go")
-	}
-
-	_ = filepath.Join(gopath, "pkg", "mod") // for future GOMODCACHE lookup
-	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
-		// For local development, check the workspace's replace directive
-		data, err := os.ReadFile(filepath.Join(inst.WorkspaceDir, "go.mod"))
-		if err == nil {
-			for _, line := range strings.Split(string(data), "\n") {
-				if strings.Contains(line, "openrewrite/rewrite/rewrite-go") && strings.Contains(line, "=>") {
-					parts := strings.SplitN(line, "=>", 2)
-					if len(parts) == 2 {
-						localPath := strings.TrimSpace(parts[1])
-						candidate := filepath.Join(localPath, "cmd", "rpc")
-						if _, err := os.Stat(filepath.Join(candidate, "main.go")); err == nil {
-							return candidate
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return ""
-}
-
-// injectRecipeActivation modifies the RPC server source to import and activate
-// the recipe module. It adds an import and inserts an Activate call in newServer.
-func injectRecipeActivation(src, activatePkg string) string {
-	// Add import
-	importLine := fmt.Sprintf("\trecipes %q\n", activatePkg)
-	src = strings.Replace(src,
-		"\"github.com/openrewrite/rewrite/rewrite-go/pkg/rpc\"\n",
-		"\"github.com/openrewrite/rewrite/rewrite-go/pkg/rpc\"\n"+importLine,
-		1)
-
-	// Add Activate call after the built-in golang.Activate
-	src = strings.Replace(src,
-		"reg.Activate(golang.Activate)\n",
-		"reg.Activate(golang.Activate)\n\treg.Activate(recipes.Activate)\n",
-		1)
-
-	return src
 }
 
 // helperOutput is the JSON format output by the helper program.
@@ -570,14 +460,17 @@ func (inst *Installer) propagateReplaces(moduleDir string) error {
 
 // readResolvedVersion reads the resolved version of a module from the workspace go.mod.
 func (inst *Installer) readResolvedVersion(modulePath string) string {
-	data, _ := os.ReadFile(filepath.Join(inst.WorkspaceDir, "go.mod"))
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.Contains(line, modulePath) && !strings.HasPrefix(line, "module") {
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				return parts[len(parts)-1]
-			}
+	data, err := os.ReadFile(filepath.Join(inst.WorkspaceDir, "go.mod"))
+	if err != nil {
+		return ""
+	}
+	f, err := modfile.Parse("go.mod", data, nil)
+	if err != nil {
+		return ""
+	}
+	for _, r := range f.Require {
+		if r.Mod.Path == modulePath {
+			return r.Mod.Version
 		}
 	}
 	return ""

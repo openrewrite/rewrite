@@ -77,13 +77,13 @@ fun gitCommitTimestamp(): String {
         .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
 }
 
-val datedSnapshotVersion = if (System.getenv("CI") != null) {
-    project.version.toString().replace(
-        "SNAPSHOT",
-        gitCommitTimestamp()
-    )
-} else {
-    project.version.toString()
+// `-PnpmPublishVersion=<v>` (set by the npm-publish workflow on the tag-triggered path)
+// pins the version verbatim, so e.g. tag `v8.83.0` publishes `8.83.0`. Otherwise CI builds
+// substitute `SNAPSHOT` for the git commit timestamp, and local builds use the raw version.
+val datedSnapshotVersion = when {
+    project.hasProperty("npmPublishVersion") -> project.property("npmPublishVersion").toString()
+    System.getenv("CI") != null -> project.version.toString().replace("SNAPSHOT", gitCommitTimestamp())
+    else -> project.version.toString()
 }
 
 // Helper function to extract version from the JAR if it exists
@@ -231,34 +231,12 @@ testing {
     }
 }
 
-// This task creates a `.npmrc` file with the given token, so that the `npm publish` succeeds
-// For local development the user would typically have a `~/.npmrc` file with the token in it
-val setupNpmrc = tasks.register("setupNpmrc") {
-    doLast {
-        if (project.hasProperty("nodeAuthToken")) {
-            val npmrcFile = file("rewrite/.npmrc")
-            npmrcFile.writeText("//registry.npmjs.org/:_authToken=${project.property("nodeAuthToken")}\n")
-        }
-    }
-}
-
-// Implicitly `--tag latest` if not specified
-val npmPublish = tasks.register<NpmTask>("npmPublish") {
-    inputs.files(npmPack)
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    dependsOn(setupNpmrc)
-
-    args = provider { listOf("publish", npmPack.get().archiveFile.get().asFile.absolutePath) }
-    if (!project.hasProperty("releasing")) {
-        args.addAll("--tag", "next")
-    }
-
-    workingDir.set(file("rewrite"))
-}
-
-tasks.named("publish") {
-    dependsOn(npmPublish)
-}
+// npm publishing is performed directly by `.github/workflows/npm-publish.yml` (which runs
+// `npm publish <tgz>` against the artifact produced by the `npmPack` task above). The workflow
+// owns version selection (via `-PnpmPublishVersion=<v>`), dist-tag selection (`latest` vs
+// `next`), and the duplicate-publish guard. The dedicated workflow filename is also what the
+// package's npm Trusted Publisher (OIDC) record matches against. CI/release workflows still
+// publish to Sonatype, PyPI, NuGet as before.
 
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")

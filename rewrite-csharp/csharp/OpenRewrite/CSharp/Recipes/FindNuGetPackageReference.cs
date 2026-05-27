@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
+using static OpenRewrite.CSharp.Recipes.Categories;
 using OpenRewrite.Xml;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -23,6 +24,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// Searches for .csproj files that reference a specific NuGet package.
 /// Supports glob patterns.
 /// </summary>
+[Category, Csproj]
 public class FindNuGetPackageReference : Recipe
 {
     public override string DisplayName => "Find NuGet package reference";

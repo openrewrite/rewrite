@@ -83,3 +83,71 @@ case class Curried(id: UUID) extends Marker {
   override def getId(): UUID = id
   override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
 }
+
+/**
+ * Carries the source text between the last annotation/modifier and the
+ * `val`/`var`/`given` keyword for Scala variable declarations.
+ */
+case class ValVarKeyword(id: UUID, beforeKeyword: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * Marks a `J.Package` that uses Scala's braced package syntax:
+ * `package foo.bar { ... }`. The printer uses this to re-emit the
+ * opening brace after the package name. The closing brace is preserved
+ * in the compilation unit's EOF whitespace.
+ *
+ * @param beforeBrace whitespace between the package name and the opening brace
+ * @param afterBody whitespace between the last statement and the closing brace
+ */
+case class PackageBraces(id: UUID, beforeBrace: String, afterBody: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * Marks a package declaration followed by an explicit semicolon:
+ * `package foo;class Bar`.
+ */
+case class PackageSemicolon(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * Marks a Scala 3 `given` declaration. Applied to:
+ * - `J.VariableDeclarations` for named given aliases (`given x: Int = 42`)
+ *   and named given instances with `with` bodies (`given x: Foo with { ... }`).
+ * - `J.MethodDeclaration` for method-shaped given aliases
+ *   (`given listOrd[T](using Ord[T]): Ord[List[T]] = ...`).
+ *
+ * The printer uses this to emit `given` in place of `val`/`def`.
+ */
+case class Given(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * Marks a `J.VariableDeclarations.NamedVariable` whose name is synthesized by the
+ * Scala compiler and does not appear in source. The printer omits the name.
+ * Used for anonymous `using` parameters (`def f(using Ord[T])`).
+ */
+case class OmitName(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * Captures additional constructor parameter lists for a Scala 3 class declared
+ * with curried constructor params, e.g. `class C(a: Int)(using Executor)`.
+ * The J.ClassDeclaration's `primaryConstructor` JContainer only models the first
+ * list; this marker holds the verbatim source text of the remaining lists so the
+ * printer can re-emit them after the first `)`. Includes the surrounding parens.
+ */
+case class ExtraConstructorParamLists(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}

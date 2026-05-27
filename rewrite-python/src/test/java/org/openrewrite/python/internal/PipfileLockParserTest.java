@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -129,7 +128,7 @@ class PipfileLockParserTest {
     }
 
     @Test
-    void findLockFileInSameDirectory(@TempDir Path tempDir) throws IOException {
+    void findLockFileInSameDirectory(@TempDir Path tempDir) throws Exception {
         Path lockFile = tempDir.resolve("Pipfile.lock");
         Files.write(lockFile, "{}".getBytes());
 
@@ -138,7 +137,7 @@ class PipfileLockParserTest {
     }
 
     @Test
-    void findLockFileInParentDirectory(@TempDir Path tempDir) throws IOException {
+    void findLockFileInParentDirectory(@TempDir Path tempDir) throws Exception {
         Path lockFile = tempDir.resolve("Pipfile.lock");
         Files.write(lockFile, "{}".getBytes());
 
@@ -150,7 +149,7 @@ class PipfileLockParserTest {
     }
 
     @Test
-    void findLockFileRespectsBoundary(@TempDir Path tempDir) throws IOException {
+    void findLockFileRespectsBoundary(@TempDir Path tempDir) throws Exception {
         Path lockFile = tempDir.resolve("Pipfile.lock");
         Files.write(lockFile, "{}".getBytes());
 

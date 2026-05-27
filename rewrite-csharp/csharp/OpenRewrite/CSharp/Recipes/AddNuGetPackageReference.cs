@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
+using static OpenRewrite.CSharp.Recipes.Categories;
 using OpenRewrite.Xml;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -22,6 +23,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// <summary>
 /// Adds a NuGet PackageReference to .csproj files if not already present.
 /// </summary>
+[Category, Csproj]
 public class AddNuGetPackageReference : ScanningRecipe<DotNetBuildContext>
 {
     public override string DisplayName => "Add NuGet package reference";
@@ -40,6 +42,14 @@ public class AddNuGetPackageReference : ScanningRecipe<DotNetBuildContext>
         Required = false)]
     public string? Version { get; set; }
 
+    [Option(DisplayName = "Regenerate MSBuild marker",
+        Description = "Whether to re-run `dotnet restore` after the edit to refresh the project's " +
+                      "MSBuildProject marker. Defaults to `true`. Composite recipes that chain " +
+                      "multiple csproj-mutating steps may set this to `false` on intermediate steps " +
+                      "and finalize once with `EnsureCsprojAttestation`.",
+        Required = false)]
+    public bool RegenerateMarker { get; set; } = true;
+
     public override DotNetBuildContext GetInitialValue(ExecutionContext ctx) => DotNetBuildContext.GetOrCreate(ctx);
 
     public override ITreeVisitor<ExecutionContext> GetScanner(DotNetBuildContext acc) => new BuildContextScanner();
@@ -48,6 +58,6 @@ public class AddNuGetPackageReference : ScanningRecipe<DotNetBuildContext>
     {
         return Preconditions.Check(
             new IsProjectFile(),
-            new AddNuGetPackageReferenceVisitor(PackageName, Version));
+            new AddNuGetPackageReferenceVisitor(PackageName, Version, RegenerateMarker));
     }
 }

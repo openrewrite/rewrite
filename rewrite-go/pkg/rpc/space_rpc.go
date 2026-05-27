@@ -29,6 +29,17 @@ func nilableString(s *string) any {
 	return *s
 }
 
+// emptyAsNil converts an empty Go string to wire-null, mirroring how Java
+// serializes a {@code @Nullable String} field whose value is null. Use this
+// for marker fields that are typed `string` on the Go side but `@Nullable`
+// on the Java side (where the Java-side empty case is null, not "").
+func emptyAsNil(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 // sendSpace serializes a Space to the send queue.
 // Matches JavaSender.visitSpace field order: comments (list), whitespace.
 func sendSpace(s tree.Space, q *SendQueue) {
@@ -124,6 +135,29 @@ func SendMarkersCodec(m tree.Markers, q *SendQueue) {
 		func(v any) { sendMarkerCodecFields(v, q) })
 }
 
+// hasGenericMarkerCodec reports whether sendMarkerCodecFields will dispatch
+// sub-field messages for a tree.GenericMarker with the given Java FQN.
+// Markers not listed here have no RpcCodec on either side and must travel
+// inline (as the ADD message's Value) so the receiver does not desync waiting
+// for sub-fields that never arrive.
+func hasGenericMarkerCodec(javaType string) bool {
+	switch javaType {
+	case "org.openrewrite.Checksum",
+		"org.openrewrite.FileAttributes",
+		"org.openrewrite.marker.Markup$Error",
+		"org.openrewrite.marker.Markup$Warn",
+		"org.openrewrite.marker.Markup$Info",
+		"org.openrewrite.marker.Markup$Debug",
+		"org.openrewrite.java.marker.OmitBraces",
+		"org.openrewrite.java.marker.OmitParentheses",
+		"org.openrewrite.java.marker.Semicolon",
+		"org.openrewrite.java.marker.NullSafe",
+		"org.openrewrite.java.marker.TrailingComma":
+		return true
+	}
+	return false
+}
+
 // sendMarkerCodecFields sends the sub-fields for markers that implement RpcCodec on the Java side.
 // This must match the field order in each marker's rpcSend method.
 func sendMarkerCodecFields(v any, q *SendQueue) {
@@ -173,6 +207,17 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		q.GetAndSend(m, func(x any) any { return x.(tree.TrailingComma).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(tree.TrailingComma).Before.Whitespace }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(tree.TrailingComma).After.Whitespace }, nil)
+	case tree.Semicolon:
+		// Semicolon.rpcSend sends: id (UUID string)
+		q.GetAndSend(m, func(x any) any { return x.(tree.Semicolon).Ident.String() }, nil)
+	case tree.GoProject:
+		// GoProject.rpcSend sends: id (UUID string), projectName (string)
+		q.GetAndSend(m, func(x any) any { return x.(tree.GoProject).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(tree.GoProject).ProjectName }, nil)
+	case tree.GoResolutionResult:
+		// Field order mirrors Java's GoResolutionResult#rpcSend exactly;
+		// see go_resolution_result_codec.go for the per-field commentary.
+		sendGoResolutionResult(m, q)
 	case tree.GenericMarker:
 		// Send codec sub-fields matching what Java expects
 		d := m.Data
@@ -382,6 +427,25 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 			afterWs := receiveScalar[string](q, m.After.Whitespace)
 			m.After = tree.Space{Whitespace: afterWs}
 			return m
+		case tree.Semicolon:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			return m
+		case tree.GoProject:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			m.ProjectName = receiveScalar[string](q, m.ProjectName)
+			return m
+		case tree.GoResolutionResult:
+			return receiveGoResolutionResult(m, q)
 		case tree.GenericMarker:
 			// Read codec sub-fields based on the original Java marker type.
 			// Each Java marker's rpcSend sends specific sub-fields that we must consume.

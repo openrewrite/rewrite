@@ -23,7 +23,7 @@ namespace OpenRewrite.CSharp.Recipes;
 /// Visitor that adds a NuGet PackageReference to .csproj files if not already present.
 /// Can be used standalone in custom recipe edit phases.
 /// </summary>
-public class AddNuGetPackageReferenceVisitor(string packageName, string? version) : XmlVisitor<ExecutionContext>
+public class AddNuGetPackageReferenceVisitor(string packageName, string? version, bool regenerateMarker = true) : XmlVisitor<ExecutionContext>
 {
     private bool _alreadyPresent;
     private Tag? _lastItemGroup;
@@ -76,7 +76,9 @@ public class AddNuGetPackageReferenceVisitor(string packageName, string? version
             DoAfterVisit(new AddToTagVisitor<ExecutionContext>(d.Root, itemGroup));
         }
 
-        DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
+        MSBuildProjectHelper.MarkAttestationStale(ctx, d.SourcePath);
+        if (regenerateMarker)
+            DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
         return d;
     }
 

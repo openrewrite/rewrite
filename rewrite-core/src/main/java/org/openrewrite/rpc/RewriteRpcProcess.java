@@ -69,9 +69,18 @@ public class RewriteRpcProcess extends Thread {
     @Setter
     private @Nullable Path stderrRedirect;
 
+    @Nullable
+    private Thread shutdownHook;
+
+    @Nullable
+    private Thread stderrDrainThread;
+
+    @Nullable
+    private IOException startupFailure;
+
     public RewriteRpcProcess(String... command) {
         this.command = command;
-        this.setName("JavaScriptRewriteRpcProcess");
+        this.setName("RewriteRpcProcess");
         this.setDaemon(false);
     }
 
@@ -96,13 +105,15 @@ public class RewriteRpcProcess extends Thread {
             // parent-side file handle after process termination, preventing deletion
             // of the log file.  Instead we drain stderr in a daemon thread.
             process = pb.start();
-            drainStderr(process, stderrRedirect);
+            stderrDrainThread = drainStderr(process, stderrRedirect);
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            // Record the failure so start() can surface it instead of busy-waiting forever
+            // on `process == null`. Throwing here would just kill this thread silently.
+            this.startupFailure = e;
         }
     }
 
-    private static void drainStderr(Process process, @Nullable Path stderrRedirect) {
+    private static Thread drainStderr(Process process, @Nullable Path stderrRedirect) {
         Thread thread = new Thread(() -> {
             byte[] buf = new byte[8192];
             try (InputStream stderr = process.getErrorStream()) {
@@ -125,6 +136,7 @@ public class RewriteRpcProcess extends Thread {
         }, "rpc-stderr-drain");
         thread.setDaemon(true);
         thread.start();
+        return thread;
     }
 
     public @Nullable RuntimeException getLivenessCheck() {
@@ -157,9 +169,18 @@ public class RewriteRpcProcess extends Thread {
     }
 
     @Override
-    public synchronized void start() {
+    public void start() {
         super.start();
         while (this.process == null) {
+            if (!this.isAlive()) {
+                if (startupFailure != null) {
+                    throw new UncheckedIOException(
+                            "Failed to start RPC process: " + String.join(" ", command),
+                            startupFailure);
+                }
+                throw new IllegalStateException(
+                        "RPC startup thread exited without starting process: " + String.join(" ", command));
+            }
             try {
                 //noinspection BusyWait
                 Thread.sleep(100);
@@ -167,6 +188,16 @@ public class RewriteRpcProcess extends Thread {
                 throw new RuntimeException(e);
             }
         }
+
+        // Hold a reference so shutdown() can deregister the hook; otherwise each
+        // RPC process leaks its full RewriteRpc graph via ApplicationShutdownHooks.
+        shutdownHook = new Thread(() -> {
+            try {
+                shutdown();
+            } catch (Throwable ignored) {
+            }
+        }, "rpc-shutdown");
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
 
         SimpleModule module = new SimpleModule();
         module.addSerializer(Path.class, new PathSerializer());
@@ -181,6 +212,14 @@ public class RewriteRpcProcess extends Thread {
     }
 
     public void shutdown() {
+        if (shutdownHook != null) {
+            try {
+                Runtime.getRuntime().removeShutdownHook(shutdownHook);
+            } catch (IllegalStateException ignored) {
+                // JVM is already shutting down (e.g. shutdown() invoked from the hook itself).
+            }
+            shutdownHook = null;
+        }
         if (process != null && process.isAlive()) {
             process.destroy();
             try {
@@ -191,11 +230,27 @@ public class RewriteRpcProcess extends Thread {
                 }
                 int exitCode = process.exitValue();
                 if (exitCode != 0 && exitCode != 1 && exitCode != 143) { // 143 = SIGTERM
-                    throw new RuntimeException("JavaScript Rewrite RPC process crashed with exit code: " + exitCode);
+                    throw new RuntimeException("Rewrite RPC process crashed with exit code: " + exitCode);
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
+        }
+        // Wait for the drain thread to observe EOF and close its handle on
+        // stderrRedirect. Without this, the parent-side file handle outlives
+        // shutdown(); on Windows that breaks `@TempDir` test cleanup and any
+        // reopen-the-same-path flow, because the file can't be deleted or
+        // replaced while a handle is held without FILE_SHARE_DELETE. This is
+        // the same hazard the drain-thread approach exists to avoid (see
+        // run() above). Done outside the isAlive() guard so the join also
+        // runs when the subprocess already exited on its own.
+        if (stderrDrainThread != null) {
+            try {
+                stderrDrainThread.join(TimeUnit.SECONDS.toMillis(2));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            stderrDrainThread = null;
         }
     }
 

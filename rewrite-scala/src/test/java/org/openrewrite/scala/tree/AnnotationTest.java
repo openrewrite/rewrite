@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.scala.Assertions.scala;
 
-public class AnnotationTest implements RewriteTest {
+class AnnotationTest implements RewriteTest {
     
     @Test
     void simpleAnnotation() {
@@ -111,11 +111,197 @@ public class AnnotationTest implements RewriteTest {
     }
     
     @Test
+    void annotationWithArrayArgumentMultiline() {
+        rewriteRun(
+            scala(
+                """
+                @SuppressWarnings(
+                  Array(
+                    "a", "b"
+                  )
+                )
+                val x = 1
+                """
+            )
+        );
+    }
+
+    @Test
     void annotationOnParameter() {
         rewriteRun(
             scala(
                 """
                 def process(@unchecked value: Any): Unit = {}
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeLazyVal() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @JsonIgnore
+                  lazy val schema: String = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeFinalClass() {
+        rewriteRun(
+            scala(
+                """
+                @SerialVersionUID(1L)
+                final class Box(val x: Int)
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeOverrideDef() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @Override
+                  override def toString: String = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforePrivateVal() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @JsonIgnore
+                  private val secret: String = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeSealedTrait() {
+        rewriteRun(
+            scala(
+                """
+                @SerialVersionUID(1L)
+                sealed trait Status
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeObject() {
+        rewriteRun(
+            scala(
+                """
+                @deprecated
+                object Marker
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnSameLineBeforeObject() {
+        rewriteRun(
+            scala(
+                """
+                @deprecated object Marker
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeCaseObject() {
+        rewriteRun(
+            scala(
+                """
+                @SerialVersionUID(1L)
+                case object Marker
+                """
+            )
+        );
+    }
+
+    @Test
+    void multipleAnnotationsBeforeLazyVal() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @JsonIgnore
+                  @transient
+                  lazy val schema: String = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnTypeArgument() {
+        rewriteRun(
+            scala(
+                """
+                class Box[A]
+                trait Test {
+                  def f: Box[Int @deprecated]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnReturnType() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f: String @deprecated = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnMethodParameterType() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(x: Int @deprecated): Unit = ()
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeImplicitVal() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @JsonIgnore
+                  implicit val schema: String = "x"
+                }
                 """
             )
         );

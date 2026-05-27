@@ -1,0 +1,12 @@
+{
+  "modulePath": "example.com/withtoolchain",
+  "goVersion": "1.22",
+  "toolchain": "go1.22.5",
+  "requires": [
+    {"modulePath": "github.com/x/y", "version": "v1.0.0", "indirect": false}
+  ],
+  "replaces": [],
+  "excludes": [],
+  "retracts": [],
+  "resolvedDependencies": []
+}
