@@ -1931,7 +1931,9 @@ public interface S extends J {
             /** {@code '{expr}} */
             QuoteBlock,
             /** {@code 'name} (single-token quote) */
-            QuoteIdent
+            QuoteIdent,
+            /** Scala 2 macro implementation reference: {@code macro impl} */
+            Scala2Macro
         }
 
         @With @Getter @EqualsAndHashCode.Include

@@ -7579,20 +7579,30 @@ class ScalaTreeVisitor(
 
   private def visitMacroTree(mac: untpd.MacroTree): S.Macro = {
     // Scala 3 inline/macro expressions: ${ ... }, '{ ... }, or 'name
-    val prefix = extractPrefix(mac.span)
     val startAdj = Math.max(0, mac.span.start - offsetAdjustment)
     val firstChar = if (startAdj < source.length) source.charAt(startAdj) else ' '
     val secondChar = if (startAdj + 1 < source.length) source.charAt(startAdj + 1) else ' '
     val kind: S.Macro.Kind =
       if (firstChar == '$' && secondChar == '{') S.Macro.Kind.Splice
       else if (firstChar == '\'' && secondChar == '{') S.Macro.Kind.QuoteBlock
-      else S.Macro.Kind.QuoteIdent
+      else if (firstChar == '\'') S.Macro.Kind.QuoteIdent
+      else S.Macro.Kind.Scala2Macro
+    val macroKeywordStart =
+      if (kind == S.Macro.Kind.Scala2Macro) source.lastIndexOf("macro", Math.max(0, startAdj - 1)) else -1
+    val prefix =
+      if (kind == S.Macro.Kind.Scala2Macro && macroKeywordStart >= cursor) {
+        Space.format(source, cursor, macroKeywordStart)
+      } else {
+        extractPrefix(mac.span)
+      }
 
     // Advance past the prefix tokens: `${`, `'{`, or `'`
-    cursor = startAdj + (kind match {
-      case S.Macro.Kind.Splice | S.Macro.Kind.QuoteBlock => 2
-      case S.Macro.Kind.QuoteIdent => 1
-    })
+    cursor = kind match {
+      case S.Macro.Kind.Splice | S.Macro.Kind.QuoteBlock => startAdj + 2
+      case S.Macro.Kind.QuoteIdent => startAdj + 1
+      case S.Macro.Kind.Scala2Macro if macroKeywordStart >= 0 => macroKeywordStart + "macro".length
+      case S.Macro.Kind.Scala2Macro => startAdj
+    }
 
     val expr: Expression = visitTree(mac.expr) match {
       case e: Expression => e
