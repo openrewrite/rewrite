@@ -178,8 +178,10 @@ class DependencyWorkspace {
                 command = new String[]{"npm" + suffix, "install", "--silent"};
                 break;
             case YarnClassic:
-            case YarnBerry:
                 command = new String[]{"yarn" + suffix, "install", "--ignore-scripts"};
+                break;
+            case YarnBerry:
+                command = new String[]{"yarn" + suffix, "install", "--mode", "skip-build"};
                 break;
             case Pnpm:
                 command = new String[]{"pnpm" + suffix, "install",
