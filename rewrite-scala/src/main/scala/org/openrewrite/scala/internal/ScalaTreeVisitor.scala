@@ -1957,7 +1957,18 @@ class ScalaTreeVisitor(
           } else Space.EMPTY
 
           args.add(new JRightPadded[Expression](exprWithPrefix, afterSpace, Markers.EMPTY))
-        case j: J => args.add(JRightPadded.build(new S.StatementExpression(Tree.randomId(), j).asInstanceOf[Expression]))
+        case j: J =>
+          // Scala statement-as-expression (e.g. if/else, match, block, try) wrapped so it
+          // can sit in an argument list. Apply argPrefix and trailing space the same way
+          // the Expression branch does so leading newlines and comments aren't lost.
+          val stmtExpr: Expression = new S.StatementExpression(Tree.randomId(), j).withPrefix(argPrefix)
+          val afterSpace = if (i == app.args.size - 1) {
+            val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+            val closePos = positionOfNext(")", Math.max(cursor, argEnd))
+            if (closePos > argEnd) Space.format(source, argEnd, closePos)
+            else Space.EMPTY
+          } else Space.EMPTY
+          args.add(new JRightPadded[Expression](stmtExpr, afterSpace, Markers.EMPTY))
         case _ => return visitUnknown(app)
       }
     }
