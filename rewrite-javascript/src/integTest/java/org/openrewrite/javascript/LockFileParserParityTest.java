@@ -193,4 +193,20 @@ class LockFileParserParityTest {
         assertThat(javaSet).isEqualTo(tsSet);
         assertThat(javaSet).contains("is-even@1.0.0");
     }
+
+    @Test
+    void parityPnpmTinyProject() throws Exception {
+        Assumptions.assumeTrue(PackageManagerExecutor.PNPM.find() != null,
+                "pnpm not installed");
+        String packageJson = "{\n" +
+                "  \"name\": \"parity-pnpm\",\n" +
+                "  \"packageManager\": \"pnpm@8.15.4\",\n" +
+                "  \"dependencies\": { \"is-even\": \"1.0.0\" }\n" +
+                "}\n";
+        Set<String> javaSet = parseLockInJavaForPm(packageJson, PackageManager.Pnpm);
+        Set<String> tsSet = parseMarkerViaRpcForPm(packageJson, PackageManager.Pnpm);
+
+        assertThat(javaSet).isEqualTo(tsSet);
+        assertThat(javaSet).contains("is-even@1.0.0");
+    }
 }
