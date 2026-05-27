@@ -1155,13 +1155,23 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         VisitSpace(accessor.Kind.Before, p);
         p.Append(GetAccessorKindString(accessor.Kind.Element));
 
-        // Print expression body, block body, or semicolon
+        // Print expression body, block body, or auto-implemented semicolon.
+        // For auto-impl, ExpressionBody.Element is J.Empty; its Prefix carries any
+        // whitespace between the keyword and the trailing ';' (e.g. "get ;").
         if (accessor.ExpressionBody != null)
         {
-            VisitSpace(accessor.ExpressionBody.Before, p);
-            p.Append("=>");
-            Visit(accessor.ExpressionBody.Element, p);
-            p.Append(';');
+            if (accessor.ExpressionBody.Element is Empty)
+            {
+                Visit(accessor.ExpressionBody.Element, p);
+                p.Append(';');
+            }
+            else
+            {
+                VisitSpace(accessor.ExpressionBody.Before, p);
+                p.Append("=>");
+                Visit(accessor.ExpressionBody.Element, p);
+                p.Append(';');
+            }
         }
         else if (accessor.Body != null)
         {
@@ -1169,6 +1179,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         }
         else
         {
+            // Legacy fallback for LSTs created before the J.Empty change.
             p.Append(';');
         }
 

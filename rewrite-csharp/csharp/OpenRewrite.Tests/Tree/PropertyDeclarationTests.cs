@@ -34,6 +34,22 @@ public class PropertyDeclarationTests : RewriteTest
     }
 
     [Fact]
+    public void AutoPropertyWithSpaceBeforeSemicolon()
+    {
+        // The space between "get" and ";" must round-trip: stored as J.Empty.Prefix
+        // inside the AccessorDeclaration.ExpressionBody slot.
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    public int X { get ; set; }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void GetOnlyAutoProperty()
     {
         RewriteRun(
