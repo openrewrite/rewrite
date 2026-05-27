@@ -17,6 +17,7 @@ package org.openrewrite.javascript;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.json.tree.Json;
@@ -95,15 +96,11 @@ public class Assertions {
     }
 
     private static String lockFileName(PackageManager pm) {
-        switch (pm) {
-            case Npm:         return "package-lock.json";
-            case YarnClassic:
-            case YarnBerry:   return "yarn.lock";
-            case Pnpm:        return "pnpm-lock.yaml";
-            case Bun:         return "bun.lock";
-            default:
-                throw new IllegalArgumentException("Unsupported package manager: " + pm);
+        LockFileRegeneration regen = LockFileRegeneration.forPackageManager(pm);
+        if (regen == null) {
+            throw new IllegalArgumentException("Unsupported package manager: " + pm);
         }
+        return regen.getLockFile();
     }
 
     public static SourceSpecs packageJson(@Language("json5") @Nullable String before) {

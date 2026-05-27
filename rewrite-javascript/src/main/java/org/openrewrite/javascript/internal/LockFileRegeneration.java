@@ -99,6 +99,10 @@ public final class LockFileRegeneration {
         this.installArgs = installArgs;
     }
 
+    public String getLockFile() {
+        return lockFile;
+    }
+
     public Result regenerate(String packageJsonContent) {
         return regenerate(packageJsonContent, null, null);
     }
