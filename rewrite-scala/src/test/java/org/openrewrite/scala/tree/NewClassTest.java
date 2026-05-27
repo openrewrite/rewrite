@@ -242,6 +242,21 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    void newClassFirstArgIsIfElseOnNewLine() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val x = new Foo(
+                if (cond) 1 else 2,
+                3)
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void significantCharactersInComments() {
         // visitNewClassWithArgs — close paren in line comment
         rewriteRun(
