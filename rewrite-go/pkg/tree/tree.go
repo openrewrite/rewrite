@@ -30,13 +30,13 @@ type Tree interface{ isTree() }
 // Concrete impls live in j_methods.go (keep in sync with the J types
 // in j.go and go.go).
 //
-// Mutation: the J interface is read-only. To produce a modified node,
-// use the typed `WithPrefix(Space) *T` / `WithMarkers(Markers) *T`
-// per-type methods — they return a *new* instance so the visitor
-// framework's change-detection (pointer identity) works correctly.
-// Framework code that needs to invoke them polymorphically (e.g. the
-// RPC receiver's PreVisit) goes through reflection — see the
-// `withPrefixViaReflection` helper in pkg/rpc.
+// Mutation: the J interface exposes only the common ID wither. For
+// prefix/markers, use the typed `WithPrefix(Space) *T` /
+// `WithMarkers(Markers) *T` per-type methods — they return a *new*
+// instance so the visitor framework's change-detection (pointer
+// identity) works correctly. Framework code that needs to invoke those
+// polymorphically (e.g. the RPC receiver's PreVisit) goes through
+// reflection — see the `withPrefixViaReflection` helper in pkg/rpc.
 //
 // In-place mutation of Prefix / Markers / ID is never safe because it
 // would silently bypass RecipeScheduler's "did this recipe change the
@@ -45,6 +45,7 @@ type J interface {
 	Tree
 	isJ()
 	GetID() uuid.UUID
+	WithID(uuid.UUID) J
 	GetPrefix() Space
 	GetMarkers() Markers
 }
