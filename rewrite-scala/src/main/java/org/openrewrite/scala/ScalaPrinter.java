@@ -1857,6 +1857,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 p.append('\'');
                 visit(macro.getExpression(), p);
                 break;
+            case Scala2Macro:
+                p.append("macro");
+                visit(macro.getExpression(), p);
+                break;
         }
         afterSyntax(macro, p);
         return macro;
