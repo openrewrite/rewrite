@@ -15,13 +15,17 @@
  */
 package org.openrewrite.javascript;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.LockFileParser;
+import org.openrewrite.javascript.internal.PackageManagerExecutor;
+import org.openrewrite.javascript.internal.YarnClassicLockAdapter;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.marker.NodeResolutionResult.ResolvedDependency;
 
 import java.nio.file.Files;
@@ -106,6 +110,61 @@ class LockFileParserParityTest {
         // The TS parser resolves the lock file relative to the package.json path on disk.
         // We must point it at the workspace where package-lock.json actually exists.
         Path workspace = DependencyWorkspace.getOrCreateWorkspace(packageJson);
+        Path packageJsonPath = workspace.resolve("package.json");
+        PackageJsonParser parser = new PackageJsonParser();
+        Parser.Input input = Parser.Input.fromString(packageJsonPath, packageJson);
+        SourceFile sf = parser.parseInputs(Collections.singletonList(input), null,
+                new InMemoryExecutionContext(Throwable::printStackTrace)).findFirst().orElseThrow();
+        NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElseThrow();
+        return marker.getResolvedDependencies().stream()
+                .map(d -> d.getName() + "@" + d.getVersion())
+                .collect(Collectors.toSet());
+    }
+
+    @Test
+    void parityYarnClassicTinyProject() throws Exception {
+        Assumptions.assumeTrue(PackageManagerExecutor.YARN.find() != null,
+                "yarn not installed");
+        String packageJson = "{\n" +
+                "  \"name\": \"parity-yarn-classic\",\n" +
+                "  \"dependencies\": { \"is-even\": \"1.0.0\" }\n" +
+                "}\n";
+        Set<String> javaSet = parseLockInJavaForPm(packageJson, PackageManager.YarnClassic);
+        Set<String> tsSet = parseMarkerViaRpcForPm(packageJson, PackageManager.YarnClassic);
+
+        assertThat(javaSet).isEqualTo(tsSet);
+        assertThat(javaSet).contains("is-even@1.0.0");
+    }
+
+    private static Set<String> parseLockInJavaForPm(String packageJson, PackageManager pm) throws Exception {
+        Path workspace = DependencyWorkspace.getOrCreateWorkspace(packageJson, pm);
+        String lockContent;
+        switch (pm) {
+            case YarnClassic:
+                lockContent = Files.readString(workspace.resolve("yarn.lock"));
+                lockContent = YarnClassicLockAdapter.toNpmV3(lockContent);
+                break;
+            case YarnBerry:
+                lockContent = Files.readString(workspace.resolve("yarn.lock"));
+                lockContent = org.openrewrite.javascript.internal.YarnBerryLockAdapter.toNpmV3(lockContent);
+                break;
+            case Pnpm:
+                lockContent = Files.readString(workspace.resolve("pnpm-lock.yaml"));
+                lockContent = org.openrewrite.javascript.internal.PnpmLockAdapter.toNpmV3(lockContent);
+                break;
+            case Npm:
+                lockContent = Files.readString(workspace.resolve("package-lock.json"));
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported PM in parity test: " + pm);
+        }
+        return LockFileParser.parse(lockContent).getAll().stream()
+                .map(d -> d.getName() + "@" + d.getVersion())
+                .collect(Collectors.toSet());
+    }
+
+    private static Set<String> parseMarkerViaRpcForPm(String packageJson, PackageManager pm) throws Exception {
+        Path workspace = DependencyWorkspace.getOrCreateWorkspace(packageJson, pm);
         Path packageJsonPath = workspace.resolve("package.json");
         PackageJsonParser parser = new PackageJsonParser();
         Parser.Input input = Parser.Input.fromString(packageJsonPath, packageJson);
