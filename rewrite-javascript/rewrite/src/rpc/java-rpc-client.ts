@@ -15,6 +15,7 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as readline from "node:readline";
 import {ChildProcessWithoutNullStreams, spawn} from "node:child_process";
 import * as rpc from "vscode-jsonrpc/node";
 import {RewriteRpc} from "./rewrite-rpc";
@@ -31,7 +32,10 @@ export interface JavaRpcOptions {
     marketplaceCsv?: string;
     /** Enable RPC tracing on the Java side (passed as `--trace`). */
     trace?: boolean;
-    /** Pre-built marketplace passed into the TS-side RewriteRpc. */
+    /**
+     * Pre-built {@link RecipeMarketplace} for the TS-side {@link RewriteRpc} instance
+     * only. Does NOT configure the Java side — for that, use {@link marketplaceCsv}.
+     */
     marketplace?: RecipeMarketplace;
 }
 
@@ -73,30 +77,30 @@ export class JavaRpcTestServer {
         if (opts.marketplaceCsv) args.push(`--marketplace=${opts.marketplaceCsv}`);
         if (opts.trace) args.push("--trace");
 
-        const child = spawn(javaCmd, args, {stdio: ["pipe", "pipe", "pipe"]});
+        const child = spawn(javaCmd, args);
 
         // Forward Java stderr line-by-line so stack traces surface in the test output.
-        child.stderr.setEncoding("utf8");
-        let stderrTail = "";
-        child.stderr.on("data", (chunk: string) => {
-            stderrTail = (stderrTail + chunk);
-            const lines = stderrTail.split(/\r?\n/);
-            stderrTail = lines.pop() ?? "";
-            for (const line of lines) {
+        // `readline` handles partial-line buffering and flushes a non-newline-terminated
+        // final line on `close` (a hand-rolled split would silently drop it).
+        readline.createInterface({input: child.stderr, crlfDelay: Infinity})
+            .on("line", line => {
                 if (line.length > 0) process.stderr.write(`[Java RPC] ${line}\n`);
-            }
-        });
+            });
 
         // If the JVM dies before we can talk to it, surface that immediately rather
-        // than letting the first RPC request hang waiting for a response.
+        // than letting the first RPC request hang waiting for a response. Capture the
+        // listener so we can detach it after the race resolves — otherwise the normal
+        // exit during dispose() fires it, rejecting a Promise nobody is observing
+        // (UnhandledPromiseRejection under Node 15+).
+        let onEarlyExit!: (code: number | null, signal: NodeJS.Signals | null) => void;
         const earlyExit = new Promise<never>((_, reject) => {
-            const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+            onEarlyExit = (code, signal) => {
                 reject(new Error(
                     `Java RPC server exited before any request was sent ` +
                     `(code=${code}, signal=${signal}). Check the [Java RPC] stderr above.`
                 ));
             };
-            child.once("exit", onExit);
+            child.once("exit", onEarlyExit);
         });
 
         const connection = rpc.createMessageConnection(
@@ -119,21 +123,21 @@ export class JavaRpcTestServer {
                 earlyExit,
             ]);
         } catch (e) {
-            try {
-                connection.end();
-            } catch { /* ignore */ }
             child.kill("SIGKILL");
             throw e;
+        } finally {
+            child.removeListener("exit", onEarlyExit);
         }
 
         return new JavaRpcTestServer(child, rewriteRpc);
     }
 
-    /** Reset accumulated state on the Java side so the next test starts clean. */
+    /**
+     * Reset accumulated state on both the Java side and the TS-side
+     * {@link RewriteRpc} caches so the next test starts clean.
+     */
     async reset(): Promise<void> {
-        await this.rpc.connection.sendRequest(
-            new rpc.RequestType0<boolean, Error>("Reset"),
-        );
+        await this.rpc.reset();
     }
 
     /**
@@ -141,6 +145,18 @@ export class JavaRpcTestServer {
      * to SIGKILL after a short grace period to ensure no orphan JVMs are left behind.
      */
     async dispose(): Promise<void> {
+        // Attach the exit listener BEFORE signalling shutdown so we never miss the
+        // event in a TOCTOU race between checking exitCode and registering the
+        // listener. The Promise also resolves immediately if the process is
+        // already gone — see the exitCode shortcut below.
+        const exited = new Promise<void>((resolve) => {
+            this.child.once("exit", resolve);
+        });
+
+        if (this.child.exitCode !== null) {
+            return;
+        }
+
         // End the connection before killing the process: this triggers an EOF on the
         // Java side's stdin reader, which lets it shut down cleanly. Killing first
         // can race with in-flight requests and leak the connection-close handler.
@@ -148,18 +164,14 @@ export class JavaRpcTestServer {
             this.rpc.end();
         } catch { /* ignore — already closed */ }
 
-        if (this.child.exitCode !== null || this.child.killed) {
-            return;
+        const grace = setTimeout(() => {
+            this.child.kill("SIGKILL");
+        }, 5_000);
+        try {
+            await exited;
+        } finally {
+            clearTimeout(grace);
         }
-        await new Promise<void>((resolve) => {
-            const grace = setTimeout(() => {
-                this.child.kill("SIGKILL");
-            }, 5_000);
-            this.child.once("exit", () => {
-                clearTimeout(grace);
-                resolve();
-            });
-        });
     }
 }
 
@@ -180,13 +192,13 @@ export function findTestClasspath(): string | undefined {
         return env;
     }
 
-    // src/rpc/java-rpc-client.ts        → ../../test-classpath.txt
-    // dist/rpc/java-rpc-client.js       → ../../test-classpath.txt
+    // From src/rpc/ (vitest source mode) or dist/rpc/ (compiled), the classpath
+    // sits two levels up at the package root. The cwd fallback handles
+    // consumer projects where this module is in node_modules but the file
+    // lives next to the consumer's package root.
     const candidates = [
         path.resolve(__dirname, "..", "..", "test-classpath.txt"),
-        path.resolve(__dirname, "..", "..", "..", "test-classpath.txt"),
         path.resolve(process.cwd(), "test-classpath.txt"),
-        path.resolve(process.cwd(), "rewrite", "test-classpath.txt"),
     ];
     for (const candidate of candidates) {
         if (fs.existsSync(candidate)) {

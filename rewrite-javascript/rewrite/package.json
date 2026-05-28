@@ -44,6 +44,10 @@
       "types": "./dist/test/index.d.ts",
       "default": "./dist/test/index.js"
     },
+    "./test/java-rpc": {
+      "types": "./dist/test/java-rpc.d.ts",
+      "default": "./dist/test/java-rpc.js"
+    },
     "./yaml": {
       "types": "./dist/yaml/index.d.ts",
       "default": "./dist/yaml/index.js"

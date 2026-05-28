@@ -122,6 +122,10 @@ val npmInstall = tasks.named("npmInstall")
 
 val npmTest = tasks.register<NpmTask>("npmTest") {
     dependsOn(npmInstall)
+    // RPC integration tests under test/rpc/ need the classpath of org.openrewrite.maven.rpc.JavaRewriteRpc.
+    // Generating it before npmTest means devs running `./gradlew :rewrite-javascript:test` get the RPC
+    // tests for free — devs running `npx vitest` directly still need to run :generateTestClasspath once.
+    dependsOn(tasks.named("generateTestClasspath"))
     inputs.files(fileTree("rewrite/node_modules") { exclude(".vite-temp/**", ".vite/**", ".cache/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite") {
@@ -132,6 +136,8 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/test"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(tasks.named("generateTestClasspath").map { it.outputs.files })
+        .withNormalizer(ClasspathNormalizer::class)
     outputs.files("rewrite/build/test-results/vitest/junit.xml")
     outputs.cacheIf { true }
 
