@@ -1,0 +1,5 @@
+org.openrewrite.golang.internal.rpc.GolangRpcCodec
+org.openrewrite.golang.internal.rpc.GolangRightPaddedRpcCodec
+org.openrewrite.golang.internal.rpc.GolangLeftPaddedRpcCodec
+org.openrewrite.golang.internal.rpc.GolangContainerRpcCodec
+org.openrewrite.golang.internal.rpc.GolangSpaceRpcCodec

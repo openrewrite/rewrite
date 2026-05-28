@@ -28,6 +28,12 @@ import {replaceMarkerByKind} from "../../markers";
 export interface ParseProjectResponseItem {
     id: UUID;
     sourceFileType: string;
+    /**
+     * Relative source path of the discovered file. Used by the Java side to report
+     * per-file failures (e.g., a failed `GetObject` deserialization) without aborting
+     * the rest of the stream. Optional for older callers.
+     */
+    sourcePath?: string;
 }
 
 /**
@@ -88,7 +94,7 @@ export class ParseProject {
                         });
                         const generator = parser.parse(...discovered.packageJsonFiles);
 
-                        for (const _ of discovered.packageJsonFiles) {
+                        for (const filePath of discovered.packageJsonFiles) {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
@@ -96,7 +102,8 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: "org.openrewrite.json.tree.Json$Document" // break cycle
+                                sourceFileType: "org.openrewrite.json.tree.Json$Document", // break cycle
+                                sourcePath: path.relative(relativeTo, filePath)
                             });
                         }
                     }
@@ -106,7 +113,7 @@ export class ParseProject {
                         const parser = Parsers.createParser("json", {ctx, relativeTo});
                         const generator = parser.parse(...discovered.lockFiles.json);
 
-                        for (const _ of discovered.lockFiles.json) {
+                        for (const filePath of discovered.lockFiles.json) {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
@@ -114,7 +121,8 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: "org.openrewrite.json.tree.Json$Document" // break cycle
+                                sourceFileType: "org.openrewrite.json.tree.Json$Document", // break cycle
+                                sourcePath: path.relative(relativeTo, filePath)
                             });
                         }
                     }
@@ -124,7 +132,7 @@ export class ParseProject {
                         const parser = Parsers.createParser("yaml", {ctx, relativeTo});
                         const generator = parser.parse(...discovered.lockFiles.yaml);
 
-                        for (const _ of discovered.lockFiles.yaml) {
+                        for (const filePath of discovered.lockFiles.yaml) {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
@@ -132,7 +140,8 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: "org.openrewrite.yaml.tree.Yaml$Documents" // break cycle
+                                sourceFileType: "org.openrewrite.yaml.tree.Yaml$Documents", // break cycle
+                                sourcePath: path.relative(relativeTo, filePath)
                             });
                         }
                     }
@@ -142,7 +151,7 @@ export class ParseProject {
                         const parser = Parsers.createParser("plainText", {ctx, relativeTo});
                         const generator = parser.parse(...discovered.lockFiles.text);
 
-                        for (const _ of discovered.lockFiles.text) {
+                        for (const filePath of discovered.lockFiles.text) {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
@@ -150,7 +159,8 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: "org.openrewrite.text.PlainText" // break cycle
+                                sourceFileType: "org.openrewrite.text.PlainText", // break cycle
+                                sourcePath: path.relative(relativeTo, filePath)
                             });
                         }
                     }
@@ -185,16 +195,18 @@ export class ParseProject {
                                 });
                                 resultItems.push({
                                     id,
-                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit" // break cycle
+                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit", // break cycle
+                                    sourcePath: path.relative(relativeTo, filePath)
                                 });
                             }
                         } else {
                             // Prettier is NOT available: auto-detect styles from parsed files
                             // Parse all files first to sample them
-                            const parsedFiles: {id: string, sourceFile: SourceFile}[] = [];
+                            const parsedFiles: {id: string, sourceFile: SourceFile, filePath: string}[] = [];
+                            let fileIndex = 0;
                             for await (const sourceFile of parser.parse(...discovered.jsFiles)) {
                                 const id = randomId();
-                                parsedFiles.push({id, sourceFile});
+                                parsedFiles.push({id, sourceFile, filePath: discovered.jsFiles[fileIndex++]});
                             }
 
                             // Sample all parsed files and build Autodetect marker using ProjectParser helper
@@ -203,7 +215,7 @@ export class ParseProject {
                             );
 
                             // Store thunks that add the Autodetect marker
-                            for (const {id, sourceFile} of parsedFiles) {
+                            for (const {id, sourceFile, filePath} of parsedFiles) {
                                 localObjects.set(id, async (newId: string) => {
                                     return {
                                         ...sourceFile,
@@ -213,7 +225,8 @@ export class ParseProject {
                                 });
                                 resultItems.push({
                                     id,
-                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit" // break cycle
+                                    sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit", // break cycle
+                                    sourcePath: path.relative(relativeTo, filePath)
                                 });
                             }
                         }
@@ -224,7 +237,7 @@ export class ParseProject {
                         const parser = Parsers.createParser("yaml", {ctx, relativeTo});
                         const generator = parser.parse(...discovered.yamlFiles);
 
-                        for (const _ of discovered.yamlFiles) {
+                        for (const filePath of discovered.yamlFiles) {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
@@ -232,7 +245,8 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: "org.openrewrite.yaml.tree.Yaml$Documents" // break cycle
+                                sourceFileType: "org.openrewrite.yaml.tree.Yaml$Documents", // break cycle
+                                sourcePath: path.relative(relativeTo, filePath)
                             });
                         }
                     }
@@ -242,7 +256,7 @@ export class ParseProject {
                         const parser = Parsers.createParser("json", {ctx, relativeTo});
                         const generator = parser.parse(...discovered.jsonFiles);
 
-                        for (const _ of discovered.jsonFiles) {
+                        for (const filePath of discovered.jsonFiles) {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
@@ -250,7 +264,8 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: "org.openrewrite.json.tree.Json$Document" // break cycle
+                                sourceFileType: "org.openrewrite.json.tree.Json$Document", // break cycle
+                                sourcePath: path.relative(relativeTo, filePath)
                             });
                         }
                     }
@@ -260,7 +275,7 @@ export class ParseProject {
                         const parser = Parsers.createParser("plainText", {ctx, relativeTo});
                         const generator = parser.parse(...discovered.textFiles);
 
-                        for (const _ of discovered.textFiles) {
+                        for (const filePath of discovered.textFiles) {
                             const id = randomId();
                             localObjects.set(id, async (id: string) => {
                                 const sourceFile: SourceFile = (await generator.next()).value;
@@ -268,7 +283,8 @@ export class ParseProject {
                             });
                             resultItems.push({
                                 id,
-                                sourceFileType: "org.openrewrite.text.PlainText" // break cycle
+                                sourceFileType: "org.openrewrite.text.PlainText", // break cycle
+                                sourcePath: path.relative(relativeTo, filePath)
                             });
                         }
                     }

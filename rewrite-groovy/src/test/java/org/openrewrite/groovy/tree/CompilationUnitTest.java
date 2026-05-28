@@ -105,7 +105,7 @@ class CompilationUnitTest implements RewriteTest {
     void scriptImportsCanBeAnywhere() {
         rewriteRun(
           spec -> spec.parser(GroovyParser.builder().compilerCustomizers(config -> {
-              ImportCustomizer imports = new ImportCustomizer();
+              var imports = new ImportCustomizer();
               imports.addStarImports("java.nio.file");
               config.addCompilationCustomizers(imports);
           })),

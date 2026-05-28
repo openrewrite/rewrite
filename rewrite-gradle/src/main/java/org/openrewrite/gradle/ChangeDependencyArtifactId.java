@@ -129,7 +129,7 @@ public class ChangeDependencyArtifactId extends Recipe {
                         }
                         return requested;
                     }));
-                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> {
+                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolvedShallow(), resolved -> {
                         if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
                             return resolved.withGav(resolved.getGav().withArtifactId(newArtifactId));
                         }

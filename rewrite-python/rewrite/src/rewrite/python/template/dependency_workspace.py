@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import logging
 import os
@@ -168,45 +169,48 @@ class DependencyWorkspace:
         """Create a new workspace, install dependencies, and move it into place."""
         os.makedirs(WORKSPACE_BASE, exist_ok=True)
 
-        tmp_dir = os.path.join(
-            WORKSPACE_BASE,
-            f".tmp-{os.getpid()}-{cache_key}",
-        )
         final_dir = os.path.join(WORKSPACE_BASE, cache_key)
+        lock_path = os.path.join(WORKSPACE_BASE, f".{cache_key}.lock")
 
-        try:
-            # Clean up any leftover temp directory from a previous crash
-            if os.path.exists(tmp_dir):
-                shutil.rmtree(tmp_dir)
-            os.makedirs(tmp_dir)
+        # Serialize concurrent creators for the same cache_key. Holding the lock
+        # across uv sync is intentional — only one process should build the same
+        # workspace at a time.
+        with open(lock_path, "w") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
 
-            # Write pyproject.toml
-            with open(os.path.join(tmp_dir, "pyproject.toml"), "w") as f:
-                f.write(pyproject_content)
+            # Another holder may have built it while we waited for the lock.
+            if cls._is_valid(final_dir):
+                return final_dir
 
-            # Run uv sync
-            cls._run_uv_sync(tmp_dir)
+            # Remove any half-built leftover at the target. macOS rename(2)
+            # refuses to replace a non-empty directory (ENOTEMPTY), so we must
+            # clear the target before renaming.
+            if os.path.exists(final_dir):
+                shutil.rmtree(final_dir)
 
-            # Write version marker
-            with open(os.path.join(tmp_dir, "version.txt"), "w") as f:
-                f.write(WORKSPACE_VERSION)
-
-            # Atomic rename
+            tmp_dir = os.path.join(
+                WORKSPACE_BASE,
+                f".tmp-{os.getpid()}-{cache_key}",
+            )
             try:
+                if os.path.exists(tmp_dir):
+                    shutil.rmtree(tmp_dir)
+                os.makedirs(tmp_dir)
+
+                with open(os.path.join(tmp_dir, "pyproject.toml"), "w") as f:
+                    f.write(pyproject_content)
+
+                cls._run_uv_sync(tmp_dir)
+
+                with open(os.path.join(tmp_dir, "version.txt"), "w") as f:
+                    f.write(WORKSPACE_VERSION)
+
                 os.rename(tmp_dir, final_dir)
-            except OSError:
-                # Another process may have won the race
-                if cls._is_valid(final_dir):
-                    shutil.rmtree(tmp_dir, ignore_errors=True)
-                else:
-                    raise
+                return final_dir
 
-            return final_dir
-
-        except Exception:
-            # Clean up on failure
-            shutil.rmtree(tmp_dir, ignore_errors=True)
-            raise
+            except Exception:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                raise
 
     _PEP508_COMPARATORS = ('>=', '<=', '==', '!=', '~=', '>', '<')
 

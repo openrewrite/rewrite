@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Generic;
+
 namespace OpenRewrite.Core;
 
 /// <summary>
@@ -117,10 +119,20 @@ public class Cursor
     }
 
     /// <summary>
-    /// Return the first parent pointing to a Tree element, skipping padding.
+    /// The first parent pointing to a Tree element, skipping padding.
     /// </summary>
-    public Cursor GetParentTreeCursor()
+    public Cursor ParentTree => DropParentUntil(it => it is Tree || Equals(it, ROOT_VALUE));
+
+    /// <summary>
+    /// Enumerates all ancestor cursors from the immediate parent to the root.
+    /// </summary>
+    public IEnumerable<Cursor> PathToRoot()
     {
-        return DropParentUntil(it => it is Tree || Equals(it, ROOT_VALUE));
+        var cursor = _parent;
+        while (cursor != null)
+        {
+            yield return cursor;
+            cursor = cursor._parent;
+        }
     }
 }

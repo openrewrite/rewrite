@@ -55,7 +55,7 @@ intsubset
     :   (markupdecl | declSep)* ;
 
 markupdecl
-    :   (MARKUP_OPEN MARKUP_TEXT? MARKUP_SUBSET* MARKUP_TEXT? MARK_UP_CLOSE)
+    :   (MARKUP_OPEN (MARKUP_TEXT | MARKUP_STRING)* MARKUP_SUBSET* (MARKUP_TEXT | MARKUP_STRING)* MARK_UP_CLOSE)
     |   processinginstruction
     |   COMMENT
     ;

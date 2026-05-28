@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.csharp.tree.CsDocCommentRawComment;
 import org.openrewrite.csharp.tree.Linq;
 import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
@@ -61,6 +62,9 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(cu, Cs.CompilationUnit::isCharsetBomMarked);
         q.getAndSend(cu, Cs.CompilationUnit::getChecksum);
         q.getAndSend(cu, Cs.CompilationUnit::getFileAttributes);
+        q.getAndSendList(cu, c -> c.getPadding().getExterns(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
+        q.getAndSendList(cu, c -> c.getPadding().getUsings(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
+        q.getAndSendList(cu, Cs.CompilationUnit::getAttributeLists, Tree::getId, el -> visit(el, q));
         q.getAndSendList(cu, c -> c.getPadding().getMembers(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
         q.getAndSend(cu, Cs.CompilationUnit::getEof, space -> visitSpace(space, q));
         return cu;
@@ -149,6 +153,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(nullableDirective, Cs.NullableDirective::getTarget);
         q.getAndSend(nullableDirective, Cs.NullableDirective::getHashSpacing);
         q.getAndSend(nullableDirective, Cs.NullableDirective::getTrailingComment);
+        q.getAndSend(nullableDirective, Cs.NullableDirective::getKeywordSpacing);
         return nullableDirective;
     }
 
@@ -168,15 +173,14 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitConditionalDirective(Cs.ConditionalDirective conditionalDirective, RpcSendQueue q) {
-        List<Cs.DirectiveLine> directiveLines = conditionalDirective.getDirectiveLines();
-        q.getAndSend(conditionalDirective, c -> directiveLines.size());
-        for (Cs.DirectiveLine dl : directiveLines) {
-            q.getAndSend(conditionalDirective, c -> dl.getLineNumber());
-            q.getAndSend(conditionalDirective, c -> dl.getText());
-            q.getAndSend(conditionalDirective, c -> dl.getKind().ordinal());
-            q.getAndSend(conditionalDirective, c -> dl.getGroupId());
-            q.getAndSend(conditionalDirective, c -> dl.getActiveBranchIndex());
-        }
+        q.getAndSendList(conditionalDirective, Cs.ConditionalDirective::getDirectiveLines,
+                dl -> dl.getLineNumber(), dl -> {
+                    q.getAndSend(dl, Cs.DirectiveLine::getLineNumber);
+                    q.getAndSend(dl, Cs.DirectiveLine::getText);
+                    q.getAndSend(dl, d -> d.getKind().ordinal());
+                    q.getAndSend(dl, Cs.DirectiveLine::getGroupId);
+                    q.getAndSend(dl, Cs.DirectiveLine::getActiveBranchIndex);
+                });
         q.getAndSendList(conditionalDirective, c -> c.getPadding().getBranches(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         return conditionalDirective;
     }
@@ -298,6 +302,8 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J visitNamespaceDeclaration(Cs.NamespaceDeclaration namespaceDeclaration, RpcSendQueue q) {
         q.getAndSend(namespaceDeclaration, n -> n.getPadding().getName(), el -> visitRightPadded(el, q));
+        q.getAndSendList(namespaceDeclaration, n -> n.getPadding().getExterns(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
+        q.getAndSendList(namespaceDeclaration, n -> n.getPadding().getUsings(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         q.getAndSendList(namespaceDeclaration, n -> n.getPadding().getMembers(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         q.getAndSend(namespaceDeclaration, Cs.NamespaceDeclaration::getEnd, space -> visitSpace(space, q));
         return namespaceDeclaration;
@@ -383,20 +389,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitMethodDeclaration(Cs.MethodDeclaration methodDeclaration, RpcSendQueue q) {
-        q.getAndSendList(methodDeclaration, Cs.MethodDeclaration::getAttributes, Tree::getId, el -> visit(el, q));
-        q.getAndSendList(methodDeclaration, Cs.MethodDeclaration::getModifiers, Tree::getId, el -> visit(el, q));
-        q.getAndSend(methodDeclaration, m -> m.getPadding().getTypeParameters(), el -> visitContainer(el, q));
-        q.getAndSend(methodDeclaration, Cs.MethodDeclaration::getReturnTypeExpression, el -> visit(el, q));
-        q.getAndSend(methodDeclaration, m -> m.getPadding().getExplicitInterfaceSpecifier(), el -> visitRightPadded(el, q));
-        q.getAndSend(methodDeclaration, Cs.MethodDeclaration::getName, el -> visit(el, q));
-        q.getAndSend(methodDeclaration, m -> m.getPadding().getParameters(), el -> visitContainer(el, q));
-        q.getAndSend(methodDeclaration, Cs.MethodDeclaration::getBody, el -> visit(el, q));
-        q.getAndSend(methodDeclaration, el -> asRef(el.getMethodType()), el -> visitType(getValueNonNull(el), q));
-        return methodDeclaration;
-    }
-
-    @Override
     public J visitUsingStatement(Cs.UsingStatement usingStatement, RpcSendQueue q) {
         q.getAndSend(usingStatement, u -> u.getPadding().getExpression(), el -> visitLeftPadded(el, q));
         q.getAndSend(usingStatement, Cs.UsingStatement::getStatement, el -> visit(el, q));
@@ -478,12 +470,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitDestructorDeclaration(Cs.DestructorDeclaration destructorDeclaration, RpcSendQueue q) {
-        q.getAndSend(destructorDeclaration, Cs.DestructorDeclaration::getMethodCore, el -> visit(el, q));
-        return destructorDeclaration;
-    }
-
-    @Override
     public J visitUnary(Cs.Unary unary, RpcSendQueue q) {
         q.getAndSend(unary, u -> u.getPadding().getOperator(), el -> visitLeftPadded(el, q));
         q.getAndSend(unary, Cs.Unary::getExpression, el -> visit(el, q));
@@ -503,13 +489,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(tupleElement, Cs.TupleElement::getType, el -> visit(el, q));
         q.getAndSend(tupleElement, Cs.TupleElement::getName, el -> visit(el, q));
         return tupleElement;
-    }
-
-    @Override
-    public J visitNewClass(Cs.NewClass newClass, RpcSendQueue q) {
-        q.getAndSend(newClass, Cs.NewClass::getNewClassCore, el -> visit(el, q));
-        q.getAndSend(newClass, Cs.NewClass::getInitializer, el -> visit(el, q));
-        return newClass;
     }
 
     @Override
@@ -744,6 +723,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     public J visitConversionOperatorDeclaration(Cs.ConversionOperatorDeclaration conversionOperatorDeclaration, RpcSendQueue q) {
         q.getAndSendList(conversionOperatorDeclaration, Cs.ConversionOperatorDeclaration::getModifiers, Tree::getId, el -> visit(el, q));
         q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getKind(), el -> visitLeftPadded(el, q));
+        q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getInterfaceSpecifier(), el -> visitRightPadded(el, q));
         q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getReturnType(), el -> visitLeftPadded(el, q));
         q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getParameters(), el -> visitContainer(el, q));
         q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q));
@@ -776,14 +756,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(aliasQualifiedName, a -> a.getPadding().getAlias(), el -> visitRightPadded(el, q));
         q.getAndSend(aliasQualifiedName, Cs.AliasQualifiedName::getName, el -> visit(el, q));
         return aliasQualifiedName;
-    }
-
-    @Override
-    public J visitArrayType(Cs.ArrayType arrayType, RpcSendQueue q) {
-        q.getAndSend(arrayType, Cs.ArrayType::getTypeExpression, el -> visit(el, q));
-        q.getAndSendList(arrayType, Cs.ArrayType::getDimensions, Tree::getId, el -> visit(el, q));
-        q.getAndSend(arrayType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        return arrayType;
     }
 
     @Override
@@ -842,6 +814,26 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         return functionPointerType;
     }
 
+    @Override
+    public J visitTypeWithArguments(Cs.TypeWithArguments typeWithArguments, RpcSendQueue q) {
+        q.getAndSend(typeWithArguments, Cs.TypeWithArguments::getTypeExpression, el -> visit(el, q));
+        q.getAndSend(typeWithArguments, t -> t.getPadding().getArguments(), el -> visitContainer(el, q));
+        return typeWithArguments;
+    }
+
+    @Override
+    public J visitExplicitInterfaceMember(Cs.ExplicitInterfaceMember explicitInterfaceMember, RpcSendQueue q) {
+        q.getAndSend(explicitInterfaceMember, e -> e.getPadding().getInterfaceSpecifier(), el -> visitRightPadded(el, q));
+        q.getAndSend(explicitInterfaceMember, Cs.ExplicitInterfaceMember::getMethodDeclaration, el -> visit(el, q));
+        return explicitInterfaceMember;
+    }
+
+    @Override
+    public J visitWhenClause(Cs.WhenClause whenClause, RpcSendQueue q) {
+        q.getAndSend(whenClause, Cs.WhenClause::getCondition, el -> visit(el, q));
+        return whenClause;
+    }
+
     // Delegate methods to JavaSender
     public <T> void visitLeftPadded(JLeftPadded<T> left, RpcSendQueue q) {
         delegate.visitLeftPadded(left, q);
@@ -877,6 +869,35 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
+        }
+
+        @Override
+        public void visitSpace(Space space, RpcSendQueue q) {
+            q.getAndSendList(space, Space::getComments,
+                    c -> {
+                        if (c instanceof TextComment) {
+                            return ((TextComment) c).getText() + c.getSuffix();
+                        } else if (c instanceof CsDocCommentRawComment) {
+                            return ((CsDocCommentRawComment) c).getText() + c.getSuffix();
+                        }
+                        throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
+                    },
+                    c -> {
+                        if (c instanceof TextComment) {
+                            TextComment tc = (TextComment) c;
+                            q.getAndSend(tc, TextComment::isMultiline);
+                            q.getAndSend(tc, TextComment::getText);
+                        } else if (c instanceof CsDocCommentRawComment) {
+                            CsDocCommentRawComment dc = (CsDocCommentRawComment) c;
+                            q.getAndSend(dc, CsDocCommentRawComment::isMultiline);
+                            q.getAndSend(dc, CsDocCommentRawComment::getText);
+                        } else {
+                            throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
+                        }
+                        q.getAndSend(c, Comment::getSuffix);
+                        q.getAndSend(c, Comment::getMarkers);
+                    });
+            q.getAndSend(space, Space::getWhitespace);
         }
     }
 }

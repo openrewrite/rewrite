@@ -13,62 +13,113 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using OpenRewrite.Core.Rpc;
-using OpenRewrite.CSharp.Rpc;
-using ExecutionContext = OpenRewrite.Core.ExecutionContext;
+using OpenRewrite.Core;
 
 namespace OpenRewrite.Java.Search;
 
 /// <summary>
-/// Convenience functions for common precondition visitors.
-/// When connected to Java via RPC, delegates to Java's implementations.
-/// Otherwise falls back to local implementations.
+/// Search-based precondition helpers that name a Java recipe to evaluate
+/// the gate over the wire.
+///
+/// Each helper returns a <see cref="RecipeRef"/> placeholder that carries
+/// the Java recipe class name + options. The framework introspects a
+/// <c>Preconditions.Check(RecipeRef, editor)</c> wrapper at PrepareRecipe
+/// time and emits the recipe identity directly in
+/// <c>editPreconditions</c>; the Java host's <c>PreparedRecipeCache.instantiateVisitor</c>
+/// constructs the recipe and uses its visitor — no extra RPC round-trip
+/// needed at <c>GetVisitor()</c> construction time, so unit tests can call
+/// <c>recipe.GetVisitor()</c> without an active RPC connection to a Java host.
 /// </summary>
 public static class Preconditions
 {
     /// <summary>
-    /// Creates a UsesType precondition. If connected to Java via RPC, delegates to
-    /// Java's org.openrewrite.java.search.HasType. Otherwise falls back to local implementation.
+    /// Match source files by path glob. Delegates to
+    /// <c>org.openrewrite.FindSourceFiles</c> on the Java host. Bundles
+    /// a native <see cref="IsSourceFile"/> visitor so unit tests
+    /// without an active RPC connection still see real filtering.
     /// </summary>
-    public static JavaVisitor<ExecutionContext> UsesType(string fullyQualifiedTypeName)
+    public static RecipeRef HasSourcePath(string filePattern)
     {
-        var rpc = RewriteRpcServer.Current;
-        if (rpc != null)
-        {
-            var response = rpc.PrepareRecipeOnRemote(
-                "org.openrewrite.java.search.HasType",
-                new Dictionary<string, object?>
-                {
-                    ["fullyQualifiedType"] = fullyQualifiedTypeName,
-                    ["checkAssignability"] = false
-                }
-            );
-            return new RpcVisitor(rpc, response.EditVisitor);
-        }
-
-        return new LocalUsesType<ExecutionContext>(fullyQualifiedTypeName);
+        return new RecipeRef(
+            "org.openrewrite.FindSourceFiles",
+            new Dictionary<string, object?>
+            {
+                ["filePattern"] = filePattern
+            },
+            new IsSourceFile(filePattern));
     }
 
     /// <summary>
-    /// Creates a UsesMethod precondition. If connected to Java via RPC, delegates to
-    /// Java's org.openrewrite.java.search.HasMethod.
+    /// Match files using a specific type. Delegates to
+    /// <c>org.openrewrite.java.search.HasType</c> on the Java host.
+    /// Bundles a native <see cref="UsesType"/> visitor so unit tests
+    /// without an active RPC connection still see real filtering.
     /// </summary>
-    public static JavaVisitor<ExecutionContext> UsesMethod(string methodPattern)
+    public static RecipeRef UsesType(string fullyQualifiedTypeName, bool checkAssignability = false)
     {
-        var rpc = RewriteRpcServer.Current;
-        if (rpc != null)
-        {
-            var response = rpc.PrepareRecipeOnRemote(
-                "org.openrewrite.java.search.HasMethod",
-                new Dictionary<string, object?>
-                {
-                    ["methodPattern"] = methodPattern,
-                    ["matchOverrides"] = false
-                }
-            );
-            return new RpcVisitor(rpc, response.EditVisitor);
-        }
+        return new RecipeRef(
+            "org.openrewrite.java.search.HasType",
+            new Dictionary<string, object?>
+            {
+                ["fullyQualifiedTypeName"] = fullyQualifiedTypeName,
+                ["checkAssignability"] = checkAssignability
+            },
+            new UsesType(fullyQualifiedTypeName));
+    }
 
-        throw new InvalidOperationException("UsesMethod requires an RPC connection to Java");
+    /// <summary>
+    /// Match files using a specific method. <paramref name="methodPattern"/>
+    /// follows the OpenRewrite method-pattern syntax
+    /// <c>&lt;receiver-type&gt; &lt;method-name&gt;(&lt;args&gt;)</c>
+    /// — e.g. <c>"*..* tostring(..)"</c>. Delegates to
+    /// <c>org.openrewrite.java.search.HasMethod</c> on the Java host.
+    /// Bundles a native <see cref="UsesMethod"/> visitor so unit tests
+    /// without an active RPC connection still see real filtering.
+    /// </summary>
+    public static RecipeRef UsesMethod(string methodPattern, bool matchOverrides = false)
+    {
+        return new RecipeRef(
+            "org.openrewrite.java.search.HasMethod",
+            new Dictionary<string, object?>
+            {
+                ["methodPattern"] = methodPattern,
+                ["matchOverrides"] = matchOverrides
+            },
+            new UsesMethod(methodPattern, matchOverrides));
+    }
+
+    /// <summary>
+    /// Find and mark methods matching a pattern. Delegates to
+    /// <c>org.openrewrite.java.search.FindMethods</c> on the Java host.
+    /// Bundles a native <see cref="UsesMethod"/> visitor so unit tests
+    /// without an active RPC connection still see real filtering.
+    /// </summary>
+    public static RecipeRef FindMethods(string methodPattern, bool matchOverrides = false)
+    {
+        return new RecipeRef(
+            "org.openrewrite.java.search.FindMethods",
+            new Dictionary<string, object?>
+            {
+                ["methodPattern"] = methodPattern,
+                ["matchOverrides"] = matchOverrides
+            },
+            new UsesMethod(methodPattern, matchOverrides));
+    }
+
+    /// <summary>
+    /// Find and mark usages of a type. Delegates to
+    /// <c>org.openrewrite.java.search.FindTypes</c> on the Java host.
+    /// Bundles a native <see cref="UsesType"/> visitor so unit tests
+    /// without an active RPC connection still see real filtering.
+    /// </summary>
+    public static RecipeRef FindTypes(string fullyQualifiedTypeName)
+    {
+        return new RecipeRef(
+            "org.openrewrite.java.search.FindTypes",
+            new Dictionary<string, object?>
+            {
+                ["fullyQualifiedTypeName"] = fullyQualifiedTypeName
+            },
+            new UsesType(fullyQualifiedTypeName));
     }
 }

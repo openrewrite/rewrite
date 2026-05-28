@@ -44,7 +44,7 @@ class JavaTypeTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-                    MethodMatcher matcher = new MethodMatcher("java.util.List add(..)");
+                    var matcher = new MethodMatcher("java.util.List add(..)");
                     JavaType.Method methodType = method.getMethodType();
                     assertThat(matcher.matches(methodType)).isTrue();
                     assertThat(methodType.getOverride()).isNotNull();

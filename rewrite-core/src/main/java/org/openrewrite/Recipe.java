@@ -33,7 +33,6 @@ import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
@@ -52,6 +51,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
@@ -274,7 +274,7 @@ public abstract class Recipe implements Cloneable {
                         option.displayName(),
                         option.description(),
                         option.example().isEmpty() ? null : option.example(),
-                        option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                        validValues(option, field.getType()),
                         option.required(),
                         value));
             }
@@ -289,7 +289,7 @@ public abstract class Recipe implements Cloneable {
                             option.displayName(),
                             option.description(),
                             option.example().isEmpty() ? null : option.example(),
-                            option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                            validValues(option, method.getReturnType()),
                             option.required(),
                             null));
                 }
@@ -305,7 +305,7 @@ public abstract class Recipe implements Cloneable {
                             option.displayName(),
                             option.description(),
                             option.example().isEmpty() ? null : option.example(),
-                            option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                            validValues(option, parameter.getType()),
                             option.required(),
                             null));
                 }
@@ -318,6 +318,18 @@ public abstract class Recipe implements Cloneable {
         return options;
     }
 
+    private static @Nullable List<String> validValues(Option option, Class<?> type) {
+        if (!(option.valid().length == 1 && option.valid()[0].isEmpty())) {
+            return Arrays.asList(option.valid());
+        }
+        if (type.isEnum()) {
+            return Arrays.stream(type.getEnumConstants())
+                    .map(e -> ((Enum<?>) e).name())
+                    .collect(Collectors.toList());
+        }
+        return null;
+    }
+
     private static final List<DataTableDescriptor> GLOBAL_DATA_TABLES = Arrays.asList(
             dataTableDescriptorFromDataTable(new SourcesFileResults(Recipe.noop())),
             dataTableDescriptorFromDataTable(new SearchResults(Recipe.noop())),
@@ -325,8 +337,34 @@ public abstract class Recipe implements Cloneable {
             dataTableDescriptorFromDataTable(new RecipeRunStats(Recipe.noop()))
     );
 
+    private static final Set<String> GLOBAL_DATA_TABLE_NAMES;
+
+    static {
+        Set<String> names = new HashSet<>();
+        for (DataTableDescriptor dt : GLOBAL_DATA_TABLES) {
+            names.add(dt.getName());
+        }
+        GLOBAL_DATA_TABLE_NAMES = names;
+    }
+
     public List<DataTableDescriptor> getDataTableDescriptors() {
-        return ListUtils.concatAll(dataTables == null ? emptyList() : dataTables, GLOBAL_DATA_TABLES);
+        Map<String, DataTableDescriptor> byName = new LinkedHashMap<>();
+        if (dataTables != null) {
+            for (DataTableDescriptor dt : dataTables) {
+                byName.putIfAbsent(dt.getName(), dt);
+            }
+        }
+        for (Recipe sub : getRecipeList()) {
+            for (DataTableDescriptor dt : sub.getDataTableDescriptors()) {
+                if (!GLOBAL_DATA_TABLE_NAMES.contains(dt.getName())) {
+                    byName.putIfAbsent(dt.getName(), dt);
+                }
+            }
+        }
+        for (DataTableDescriptor dt : GLOBAL_DATA_TABLES) {
+            byName.putIfAbsent(dt.getName(), dt);
+        }
+        return new ArrayList<>(byName.values());
     }
 
     /**

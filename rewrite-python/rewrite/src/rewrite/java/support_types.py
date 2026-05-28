@@ -16,6 +16,12 @@ if TYPE_CHECKING:
 
 P = TypeVar('P')
 
+# Cached on first use to avoid the import-machinery cost of repeating
+# `from .visitor import JavaVisitor` inside is_acceptable / accept on every
+# visited Java node (millions of calls per recipe run). The lazy-then-cached
+# pattern preserves the original circular-import workaround.
+_JavaVisitor: Any = None
+
 
 class J(Tree):
     @property
@@ -24,12 +30,18 @@ class J(Tree):
         ...
 
     def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool:
-        from .visitor import JavaVisitor
-        return v.is_adaptable_to(JavaVisitor)
+        global _JavaVisitor
+        if _JavaVisitor is None:
+            from .visitor import JavaVisitor
+            _JavaVisitor = JavaVisitor
+        return v.is_adaptable_to(_JavaVisitor)
 
     def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]:
-        from .visitor import JavaVisitor
-        return self.accept_java(v.adapt(J, JavaVisitor), p)
+        global _JavaVisitor
+        if _JavaVisitor is None:
+            from .visitor import JavaVisitor
+            _JavaVisitor = JavaVisitor
+        return self.accept_java(v.adapt(J, _JavaVisitor), p)
 
     def accept_java(self, v: 'JavaVisitor[P]', p: P) -> Optional['J']:
         ...
@@ -237,6 +249,71 @@ class JavaType(ABC):
             if t is not None and hasattr(t, 'fully_qualified_name'):
                 return t.fully_qualified_name
             return ''
+
+    class Annotation(FullyQualified):
+        _type: JavaType.FullyQualified
+        _values: Optional[List[JavaType.Annotation.ElementValue]]
+
+        @property
+        def type(self) -> JavaType.FullyQualified:
+            return self._type
+
+        @property
+        def values(self) -> List[JavaType.Annotation.ElementValue]:
+            return self._values if self._values is not None else []
+
+        @property
+        def fully_qualified_name(self) -> str:
+            t = getattr(self, '_type', None)
+            if t is not None and hasattr(t, 'fully_qualified_name'):
+                return t.fully_qualified_name
+            return ''
+
+        class ElementValue(ABC):
+            """Base class for annotation element values."""
+
+            @property
+            @abstractmethod
+            def element(self) -> Optional[JavaType]:
+                ...
+
+        @dataclass
+        class SingleElementValue(ElementValue):
+            """A single annotation element value (one constant or one reference)."""
+            _element: Optional[JavaType] = field(default=None)
+            _constant_value: Optional[Any] = field(default=None)
+            _reference_value: Optional[JavaType] = field(default=None)
+
+            @property
+            def element(self) -> Optional[JavaType]:
+                return self._element
+
+            @property
+            def constant_value(self) -> Optional[Any]:
+                return self._constant_value
+
+            @property
+            def reference_value(self) -> Optional[JavaType]:
+                return self._reference_value
+
+        @dataclass
+        class ArrayElementValue(ElementValue):
+            """An array of annotation element values."""
+            _element: Optional[JavaType] = field(default=None)
+            _constant_values: Optional[List[Any]] = field(default=None)
+            _reference_values: Optional[List[JavaType]] = field(default=None)
+
+            @property
+            def element(self) -> Optional[JavaType]:
+                return self._element
+
+            @property
+            def constant_values(self) -> Optional[List[Any]]:
+                return self._constant_values
+
+            @property
+            def reference_values(self) -> Optional[List[JavaType]]:
+                return self._reference_values
 
     @dataclass
     class GenericTypeVariable:

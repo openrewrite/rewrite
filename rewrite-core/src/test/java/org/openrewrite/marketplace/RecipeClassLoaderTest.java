@@ -17,6 +17,7 @@ package org.openrewrite.marketplace;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.objectweb.asm.ClassWriter;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.ClasspathScanningLoader;
 import org.openrewrite.config.Environment;
@@ -24,7 +25,6 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.StringUtils;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
@@ -34,6 +34,9 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
+
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.V1_8;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -86,7 +89,7 @@ class RecipeClassLoaderTest {
     }
 
     @Test
-    void resourcesShouldBeChildLoaded(@TempDir Path tempDir) throws IOException {
+    void resourcesShouldBeChildLoaded(@TempDir Path tempDir) throws Exception {
         Path lib1 = tempDir.resolve("lib1");
         Files.createDirectories(lib1);
         Path file1 = lib1.resolve("rewrite.txt");
@@ -105,7 +108,7 @@ class RecipeClassLoaderTest {
     }
 
     @Test
-    void resourcesShouldFindFromParentLast(@TempDir Path tempDir) throws IOException {
+    void resourcesShouldFindFromParentLast(@TempDir Path tempDir) throws Exception {
         Path lib1 = tempDir.resolve("lib1");
         Files.createDirectories(lib1);
         Path file1 = lib1.resolve("rewrite.txt");
@@ -122,7 +125,7 @@ class RecipeClassLoaderTest {
     }
 
     @Test
-    void allResourcesShouldFindFromChildFirst(@TempDir Path tempDir) throws IOException {
+    void allResourcesShouldFindFromChildFirst(@TempDir Path tempDir) throws Exception {
         Path lib1 = tempDir.resolve("lib1");
         Files.createDirectories(lib1);
         Path file1 = lib1.resolve("rewrite.txt");
@@ -145,7 +148,122 @@ class RecipeClassLoaderTest {
     }
 
     @Test
-    void allResourcesShouldFindFromParentLast(@TempDir Path tempDir) throws IOException {
+    void kotlinClassesShouldDelegateToParent(@TempDir Path tempDir) throws Exception {
+        // Reproduces moderneinc/customer-requests#2372: when both the parent and the
+        // recipe classloader can define a kotlin.* class (e.g., kotlin.jvm.functions.Function1),
+        // the JVM raises LinkageError on loader-constraint violations once Jackson, loaded
+        // from the parent, interacts with jackson-module-kotlin from the recipe jar.
+        // The fix is to delegate kotlin.* classes to the parent, mirroring slf4j/jackson.
+        Path parentLib = tempDir.resolve("parent");
+        Files.createDirectories(parentLib.resolve("kotlin/jvm/functions"));
+        Files.write(parentLib.resolve("kotlin/jvm/functions/Function1.class"),
+          stubClass("kotlin/jvm/functions/Function1"));
+
+        Path childLib = tempDir.resolve("child");
+        Files.createDirectories(childLib.resolve("kotlin/jvm/functions"));
+        Files.write(childLib.resolve("kotlin/jvm/functions/Function1.class"),
+          stubClass("kotlin/jvm/functions/Function1"));
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{parentLib.toUri().toURL()}, null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{childLib.toUri().toURL()}, parent)) {
+            Class<?> loaded = classLoader.loadClass("kotlin.jvm.functions.Function1");
+            assertThat(loaded.getClassLoader())
+              .as("kotlin.* classes must come from the parent to avoid LinkageError")
+              .isSameAs(parent);
+        }
+    }
+
+    @Test
+    void kotlinClassesFallBackToChildWhenParentLacksThem(@TempDir Path tempDir) throws Exception {
+        // The parent-first delegation must still fall back to the child if the parent
+        // does not provide the kotlin class, so recipes can ship their own kotlin runtime
+        // when the host application has none.
+        Path childLib = tempDir.resolve("child");
+        Files.createDirectories(childLib.resolve("kotlin"));
+        Files.write(childLib.resolve("kotlin/Standalone.class"),
+          stubClass("kotlin/Standalone"));
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[0], null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{childLib.toUri().toURL()}, parent)) {
+            Class<?> loaded = classLoader.loadClass("kotlin.Standalone");
+            assertThat(loaded.getClassLoader()).isSameAs(classLoader);
+        }
+    }
+
+    private static byte[] stubClass(String internalName) {
+        ClassWriter cw = new ClassWriter(0);
+        cw.visit(V1_8, ACC_PUBLIC, internalName, null, "java/lang/Object", null);
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
+    @Test
+    void kotlinRecipeDslClassesShouldBeChildLoaded(@TempDir Path tempDir) throws Exception {
+        // Reproduces moderneinc/moderne-cli#3949: `org.openrewrite.RecipeBuilder` collides with
+        // the `org.openrewrite.Recipe` allowlist entry under startsWith() matching, which would
+        // route it to the parent classloader. That conflicts with the lambda receivers
+        // (EditScope, ScanScope) — those don't match any prefix and are child-loaded —
+        // producing a ClassCastException on the first getVisitor() call. The Kotlin
+        // recipe-DSL builder must come from the recipe jar so all DSL types resolve through
+        // one loader.
+        Path parentLib = tempDir.resolve("parent");
+        Files.createDirectories(parentLib.resolve("org/openrewrite"));
+        Files.write(parentLib.resolve("org/openrewrite/RecipeBuilder.class"),
+          stubClass("org/openrewrite/RecipeBuilder"));
+        Files.write(parentLib.resolve("org/openrewrite/RecipeBuilder$buildSimpleRecipe$1.class"),
+          stubClass("org/openrewrite/RecipeBuilder$buildSimpleRecipe$1"));
+        Files.write(parentLib.resolve("org/openrewrite/RecipeDslKt.class"),
+          stubClass("org/openrewrite/RecipeDslKt"));
+
+        Path childLib = tempDir.resolve("child");
+        Files.createDirectories(childLib.resolve("org/openrewrite"));
+        Files.write(childLib.resolve("org/openrewrite/RecipeBuilder.class"),
+          stubClass("org/openrewrite/RecipeBuilder"));
+        Files.write(childLib.resolve("org/openrewrite/RecipeBuilder$buildSimpleRecipe$1.class"),
+          stubClass("org/openrewrite/RecipeBuilder$buildSimpleRecipe$1"));
+        Files.write(childLib.resolve("org/openrewrite/RecipeDslKt.class"),
+          stubClass("org/openrewrite/RecipeDslKt"));
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{parentLib.toUri().toURL()}, null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{childLib.toUri().toURL()}, parent)) {
+            assertThat(classLoader.loadClass("org.openrewrite.RecipeBuilder").getClassLoader())
+              .as("RecipeBuilder must be child-loaded for DSL receiver/constructor agreement")
+              .isSameAs(classLoader);
+            assertThat(classLoader.loadClass("org.openrewrite.RecipeBuilder$buildSimpleRecipe$1").getClassLoader())
+              .as("RecipeBuilder's synthetic inner classes must share the loader of their host")
+              .isSameAs(classLoader);
+            assertThat(classLoader.loadClass("org.openrewrite.RecipeDslKt").getClassLoader())
+              .as("RecipeDslKt (top-level fn holder) must be child-loaded")
+              .isSameAs(classLoader);
+        }
+    }
+
+    @Test
+    void recipeFrameworkClassesStillDelegateToParent(@TempDir Path tempDir) throws Exception {
+        // The NON_DELEGATED_CLASSES override is narrow: framework types under the
+        // `org.openrewrite.Recipe*` umbrella that aren't DSL internals — RecipeException,
+        // RecipeRun, RecipeSerializer, etc. — must remain parent-delegated so exceptions
+        // thrown across the loader boundary are catchable and result objects round-trip.
+        Path parentLib = tempDir.resolve("parent");
+        Files.createDirectories(parentLib.resolve("org/openrewrite"));
+        Files.write(parentLib.resolve("org/openrewrite/RecipeException.class"),
+          stubClass("org/openrewrite/RecipeException"));
+
+        Path childLib = tempDir.resolve("child");
+        Files.createDirectories(childLib.resolve("org/openrewrite"));
+        Files.write(childLib.resolve("org/openrewrite/RecipeException.class"),
+          stubClass("org/openrewrite/RecipeException"));
+
+        try (URLClassLoader parent = new URLClassLoader(new URL[]{parentLib.toUri().toURL()}, null);
+             RecipeClassLoader classLoader = new RecipeClassLoader(new URL[]{childLib.toUri().toURL()}, parent)) {
+            assertThat(classLoader.loadClass("org.openrewrite.RecipeException").getClassLoader())
+              .as("RecipeException stays parent-delegated under the Recipe-prefix entry")
+              .isSameAs(parent);
+        }
+    }
+
+    @Test
+    void allResourcesShouldFindFromParentLast(@TempDir Path tempDir) throws Exception {
         Path lib1 = tempDir.resolve("lib1");
         Files.createDirectories(lib1);
         Path file1 = lib1.resolve("rewrite.txt");

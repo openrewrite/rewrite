@@ -18,7 +18,9 @@ package org.openrewrite.maven.search;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class FindManagedDependencyTest implements RewriteTest {
@@ -271,6 +273,130 @@ class FindManagedDependencyTest implements RewriteTest {
           </dependencyManagement>
         </project>
         """
+          )
+        );
+    }
+
+    @Test
+    void versionFromProjectParentVersion() {
+        rewriteRun(spec -> spec.recipe(new FindManagedDependency("jakarta.activation", "jakarta.activation-api", "1.0.0", null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+                <packaging>pom</packaging>
+              </project>
+              """,
+            SourceSpec::skip
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>org.sample</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>jakarta.activation</groupId>
+                        <artifactId>jakarta.activation-api</artifactId>
+                        <version>${project.parent.version}</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                  <parent>
+                    <groupId>org.sample</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencyManagement>
+                    <dependencies>
+                      <!--~~>--><dependency>
+                        <groupId>jakarta.activation</groupId>
+                        <artifactId>jakarta.activation-api</artifactId>
+                        <version>${project.parent.version}</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void bomImportVersionFromProjectParentVersion() {
+        rewriteRun(spec -> spec.recipe(new FindManagedDependency("org.junit", "junit-bom", "5.12.2", null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>parent</artifactId>
+                <version>5.12.2</version>
+                <packaging>pom</packaging>
+              </project>
+              """,
+            SourceSpec::skip
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>org.sample</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>5.12.2</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.junit</groupId>
+                        <artifactId>junit-bom</artifactId>
+                        <version>${project.parent.version}</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """,
+              """
+                <project>
+                  <parent>
+                    <groupId>org.sample</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>5.12.2</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <dependencyManagement>
+                    <dependencies>
+                      <!--~~>--><dependency>
+                        <groupId>org.junit</groupId>
+                        <artifactId>junit-bom</artifactId>
+                        <version>${project.parent.version}</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """
+            )
           )
         );
     }

@@ -553,4 +553,24 @@ class RunTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dollarSingleQuote() {
+        rewriteRun(
+          docker(
+            "FROM ubuntu:latest\n" +
+            "RUN echo $'hello'"
+          )
+        );
+    }
+
+    @Test
+    void flagWithQuotedValue() {
+        rewriteRun(
+          docker(
+            "FROM ubuntu:latest\n" +
+            "RUN wget --header=\"Auth: tok\"\n"
+          )
+        );
+    }
 }

@@ -445,19 +445,24 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     }
 
     /**
-     * Override this method to disable simplification of equals expressions,
-     * specifically for Kotlin while that is not yet part of the OpenRewrite/rewrite.
+     * Determines whether an equals comparison with a boolean literal can be simplified.
      * <p>
-     * Comparing Kotlin nullable type `?` with tree/false can not be simplified,
-     * e.g. `X?.fun() == true` is not equivalent to `X?.fun()`
+     * In Java, {@code x == true} can always be simplified to {@code x}.
+     * In Kotlin and other languages, nullable types like {@code Boolean?} compared
+     * with {@code == true} have different semantics than using the value directly,
+     * e.g. {@code nullableBoolean == true} evaluates to {@code false} when null,
+     * whereas using {@code nullableBoolean} directly would be a type error.
      * <p>
-     * Subclasses will want to check if the `org.openrewrite.kotlin.marker.IsNullSafe`
-     * marker is present.
+     * For non-Java languages, simplification is only allowed when the expression
+     * type is primitive boolean (non-nullable).
      *
      * @param j the expression to simplify
-     * @return true by default, unless overridden
+     * @return true if the equals comparison can be safely simplified
      */
     protected boolean shouldSimplifyEqualsOn(J j) {
-        return true;
+        if (getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit) {
+            return true;
+        }
+        return j instanceof Expression && ((Expression) j).getType() == JavaType.Primitive.Boolean;
     }
 }

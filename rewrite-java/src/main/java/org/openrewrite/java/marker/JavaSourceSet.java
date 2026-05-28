@@ -23,20 +23,26 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.PathUtils;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SourceSet;
 
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.*;
 import java.util.*;
+import java.util.function.Function;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -54,6 +60,300 @@ public class JavaSourceSet implements SourceSet {
      * Does not include java standard library types.
      */
     Map<String, List<JavaType.FullyQualified>> gavToTypes;
+
+    /**
+     * SPI for {@link #classpath} backings that can resolve a fully-qualified name
+     * without scanning the entire list. The default {@code ArrayList} backing does
+     * not implement this; lazy partition-backed implementations (e.g., V4 LST
+     * deserialization) do, allowing recipes to query the classpath in
+     * O(log n) per partition rather than forcing materialization of every entry.
+     * <p>
+     * Implementations must accept the FQN in {@code .}-separated form (nested
+     * classes use {@code .}, not {@code $}); {@link #findClasspathType(String)}
+     * normalizes input before delegating.
+     */
+    public interface ClasspathIndex {
+        Optional<JavaType.FullyQualified> findFullyQualified(String fqn);
+
+        /**
+         * Stream the types whose package name equals {@code packageName} (i.e.,
+         * top-level types in the package — sub-package types and nested-class
+         * entries do not match). Stream-based to allow short-circuit operations
+         * like {@link Stream#anyMatch} to terminate before all partitions are
+         * scanned.
+         */
+        Stream<JavaType.FullyQualified> typesInPackage(String packageName);
+
+        /**
+         * Return the {@code (classpath, gavToTypes)} subset with the given GAV keys
+         * removed, preserving lazy semantics where the implementation supports it.
+         * Default returns {@code null}, signalling the caller to fall back to
+         * identity-based filtering. Lazy backings that track GAV provenance can
+         * implement this to skip materialization of the entire classpath when
+         * recipes call {@link JavaSourceSet#removeTypesMatching(String, String)}
+         * or {@link JavaSourceSet#removeTypesForGav(String)}.
+         */
+        default @Nullable Subset withGavsRemoved(Set<String> gavKeysToRemove) {
+            return null;
+        }
+
+        /**
+         * Lazy-aware result of {@link ClasspathIndex#withGavsRemoved}: a paired
+         * {@code (classpath, gavToTypes)} view onto the surviving partitions.
+         */
+        interface Subset {
+            List<JavaType.FullyQualified> getClasspath();
+            Map<String, List<JavaType.FullyQualified>> getGavToTypes();
+        }
+    }
+
+    /**
+     * Resolve a fully-qualified type name through this source set's classpath.
+     * Equivalent to walking {@link #getClasspath()} and matching via
+     * {@link TypeUtils#fullyQualifiedNamesAreEqual(String, String)}, but uses the
+     * {@link ClasspathIndex} fast path when the backing list provides one.
+     * Recipes that previously hand-rolled the loop over {@code getClasspath()}
+     * should prefer this accessor.
+     */
+    public Optional<JavaType.FullyQualified> findClasspathType(String fqn) {
+        String normalized = fqn.indexOf('$') >= 0 ? fqn.replace('$', '.') : fqn;
+        if (classpath instanceof ClasspathIndex) {
+            return ((ClasspathIndex) classpath).findFullyQualified(normalized);
+        }
+        for (JavaType.FullyQualified fq : classpath) {
+            if (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), normalized)) {
+                return Optional.of(fq);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Stream the classpath types whose package name equals {@code packageName}.
+     * Uses the {@link ClasspathIndex} fast path when available; otherwise filters
+     * {@link #getClasspath()} via {@link JavaType.FullyQualified#getPackageName()}.
+     * Recipes that need to enumerate or test types in a specific package should
+     * prefer this over scanning the full classpath.
+     */
+    public Stream<JavaType.FullyQualified> classpathTypesInPackage(String packageName) {
+        if (classpath instanceof ClasspathIndex) {
+            return ((ClasspathIndex) classpath).typesInPackage(packageName);
+        }
+        return classpath.stream().filter(fq -> packageName.equals(fq.getPackageName()));
+    }
+
+    /**
+     * Registry of project names whose dependencies have been mutated by an earlier recipe in
+     * the current run, leaving their {@link #getClasspath() classpath} potentially stale. The
+     * {@code org.openrewrite.maven.*} prefix is required by
+     * {@link org.openrewrite.CursorValidatingExecutionContextView}'s allowlist for cross-recipe
+     * ExecutionContext mutation; the registry itself is not Maven-specific.
+     */
+    private static final String DIRTY_CTX_KEY = "org.openrewrite.maven.dirtyJavaProjects";
+
+    /**
+     * @return the set of project names that have been marked dirty in the current recipe run,
+     * or {@code null} when no project has been marked dirty. Returned set is the internal
+     * registry; callers must not mutate it.
+     */
+    public static @Nullable Set<String> dirtyProjects(ExecutionContext ctx) {
+        return ctx.getMessage(DIRTY_CTX_KEY);
+    }
+
+    /**
+     * Whether a source file's classpath may be stale because a dependency-mutating recipe ran
+     * earlier in this recipe run. When {@code sourceFile} carries a {@link ProjectIdentity}
+     * marker the check is project-scoped; otherwise it falls back to "any project in the run is
+     * dirty" so ambiguity-sensitive decisions still take the safe path conservatively.
+     * <p>
+     * This is a static accessor (not an instance method) so that callers which can't find a
+     * {@link JavaSourceSet} on the source file can still consult the registry — the dirty signal
+     * is project-scoped, not source-set-scoped.
+     */
+    public static boolean isDirty(ExecutionContext ctx, @Nullable SourceFile sourceFile) {
+        Set<String> dirty = ctx.getMessage(DIRTY_CTX_KEY);
+        if (dirty == null || dirty.isEmpty()) {
+            return false;
+        }
+        if (sourceFile == null) {
+            return true;
+        }
+        return sourceFile.getMarkers().findFirst(ProjectIdentity.class)
+                .map(p -> dirty.contains(p.getProjectName()))
+                .orElse(true);
+    }
+
+    /**
+     * Producer-side: mark {@code projectName} as having had its classpath invalidated by a
+     * dependency mutation earlier in this recipe run. Ambiguity-sensitive consumer recipes read
+     * the registry via {@link #isDirty(ExecutionContext, SourceFile)} and take the safe path
+     * when the project is dirty.
+     */
+    public static void markDirty(ExecutionContext ctx, String projectName) {
+        ctx.putMessageInSet(DIRTY_CTX_KEY, projectName);
+    }
+
+    /**
+     * Producer-side: mark the project identified by {@code sourceFile}'s {@link ProjectIdentity}
+     * marker as dirty. No-op when {@code sourceFile} is {@code null} or has no project marker.
+     */
+    public static void markDirty(ExecutionContext ctx, @Nullable SourceFile sourceFile) {
+        if (sourceFile == null) {
+            return;
+        }
+        sourceFile.getMarkers().findFirst(ProjectIdentity.class)
+                .ifPresent(p -> markDirty(ctx, p.getProjectName()));
+    }
+
+    /**
+     * Add types for the given GAV key to this source set's classpath and gavToTypes mapping.
+     *
+     * @param gavKey a "group:artifact:version" string
+     * @param types  the types provided by the artifact
+     * @return a new JavaSourceSet with the types added
+     */
+    public JavaSourceSet addTypesForGav(String gavKey, List<JavaType.FullyQualified> types) {
+        List<JavaType.FullyQualified> existing = gavToTypes.get(gavKey);
+        if (existing != null && existing.equals(types)) {
+            return this;
+        }
+
+        List<JavaType.FullyQualified> newClasspath = new ArrayList<>(classpath);
+        newClasspath.addAll(types);
+
+        Map<String, List<JavaType.FullyQualified>> newGavToTypes = new LinkedHashMap<>(gavToTypes);
+        newGavToTypes.put(gavKey, types);
+
+        return withClasspath(newClasspath).withGavToTypes(newGavToTypes);
+    }
+
+    /**
+     * Remove all types associated with the given GAV key from this source set's classpath and gavToTypes mapping.
+     *
+     * @param gavKey a "group:artifact:version" string
+     * @return a new JavaSourceSet with the types removed, or this instance if the key is not present
+     */
+    public JavaSourceSet removeTypesForGav(String gavKey) {
+        if (gavToTypes.isEmpty() || !gavToTypes.containsKey(gavKey)) {
+            return this;
+        }
+        if (classpath instanceof ClasspathIndex) {
+            ClasspathIndex.Subset subset = ((ClasspathIndex) classpath).withGavsRemoved(Collections.singleton(gavKey));
+            if (subset != null) {
+                return withClasspath(subset.getClasspath()).withGavToTypes(subset.getGavToTypes());
+            }
+        }
+        Set<JavaType.FullyQualified> oldTypesSet = new HashSet<>(gavToTypes.get(gavKey));
+
+        List<JavaType.FullyQualified> newClasspath = new ArrayList<>(classpath.size());
+        for (JavaType.FullyQualified type : classpath) {
+            if (!oldTypesSet.contains(type)) {
+                newClasspath.add(type);
+            }
+        }
+
+        Map<String, List<JavaType.FullyQualified>> newGavToTypes = new LinkedHashMap<>(gavToTypes);
+        newGavToTypes.remove(gavKey);
+
+        return withClasspath(newClasspath).withGavToTypes(newGavToTypes);
+    }
+
+    /**
+     * Remove types from this source set whose GAV keys match the given groupId and artifactId glob patterns.
+     *
+     * @param groupIdPattern    glob pattern for groupId matching
+     * @param artifactIdPattern glob pattern for artifactId matching
+     * @return a new JavaSourceSet with matching types removed, or this instance if no keys match
+     */
+    public JavaSourceSet removeTypesMatching(String groupIdPattern, String artifactIdPattern) {
+        if (gavToTypes.isEmpty()) {
+            return this;
+        }
+        Set<String> keysToRemove = new HashSet<>();
+        for (String key : gavToTypes.keySet()) {
+            String[] parts = key.split(":");
+            if (parts.length >= 2 &&
+                matchesGlob(parts[0], groupIdPattern) &&
+                matchesGlob(parts[1], artifactIdPattern)) {
+                keysToRemove.add(key);
+            }
+        }
+        if (keysToRemove.isEmpty()) {
+            return this;
+        }
+        if (classpath instanceof ClasspathIndex) {
+            ClasspathIndex.Subset subset = ((ClasspathIndex) classpath).withGavsRemoved(keysToRemove);
+            if (subset != null) {
+                return withClasspath(subset.getClasspath()).withGavToTypes(subset.getGavToTypes());
+            }
+        }
+        Set<JavaType.FullyQualified> typesToRemove = new HashSet<>();
+        for (String key : keysToRemove) {
+            typesToRemove.addAll(gavToTypes.get(key));
+        }
+        List<JavaType.FullyQualified> newClasspath = new ArrayList<>(classpath.size());
+        for (JavaType.FullyQualified type : classpath) {
+            if (!typesToRemove.contains(type)) {
+                newClasspath.add(type);
+            }
+        }
+        Map<String, List<JavaType.FullyQualified>> newGavToTypes = new LinkedHashMap<>(gavToTypes);
+        for (String key : keysToRemove) {
+            newGavToTypes.remove(key);
+        }
+        return withClasspath(newClasspath).withGavToTypes(newGavToTypes);
+    }
+
+    /**
+     * Apply a transformation to the {@link JavaSourceSet} marker on a source file and replace it if changed.
+     *
+     * @param sf        the source file to update
+     * @param transform a function that takes the current JavaSourceSet and returns an updated one
+     * @return the source file with the updated marker, or unchanged if no JavaSourceSet is present or the transform is a no-op
+     */
+    public static SourceFile updateOnSourceFile(SourceFile sf, Function<JavaSourceSet, JavaSourceSet> transform) {
+        Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
+        if (!maybeSourceSet.isPresent()) {
+            return sf;
+        }
+        JavaSourceSet updated = transform.apply(maybeSourceSet.get());
+        if (updated != maybeSourceSet.get()) {
+            return sf.withMarkers(sf.getMarkers().setByType(updated));
+        }
+        return sf;
+    }
+
+    /**
+     * Apply a transformation to the {@link JavaSourceSet} marker on a source file, using a cache keyed by
+     * {@link JavaProject} ID and source set name to avoid redundant recomputation across files in the same source set.
+     *
+     * @param sf        the source file to update
+     * @param cache     a mutable map used to cache updated JavaSourceSets across calls
+     * @param transform a function that takes the current JavaSourceSet and returns an updated one
+     * @return the source file with the updated marker, or unchanged if no JavaSourceSet/JavaProject is present
+     */
+    public static SourceFile updateOnSourceFile(SourceFile sf, Map<String, JavaSourceSet> cache,
+                                                Function<JavaSourceSet, JavaSourceSet> transform) {
+        Optional<JavaProject> maybeJp = sf.getMarkers().findFirst(JavaProject.class);
+        Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
+        if (!maybeJp.isPresent() || !maybeSourceSet.isPresent()) {
+            return sf;
+        }
+        String cacheKey = maybeJp.get().getId().toString() + ":" + maybeSourceSet.get().getName();
+        JavaSourceSet cached = cache.get(cacheKey);
+        if (cached != null) {
+            if (cached == maybeSourceSet.get()) {
+                return sf;
+            }
+            return sf.withMarkers(sf.getMarkers().setByType(cached));
+        }
+        JavaSourceSet updated = transform.apply(maybeSourceSet.get());
+        if (updated != maybeSourceSet.get()) {
+            cache.put(cacheKey, updated);
+            return sf.withMarkers(sf.getMarkers().setByType(updated));
+        }
+        return sf;
+    }
 
     /**
      * Extract type information from the provided classpath.
@@ -235,10 +535,15 @@ public class JavaSourceSet implements SourceSet {
                 version = pathParts.get(pathParts.size() - 3);
             } else if (pathParts.contains(".tt")) {
                 int ttIndex = pathParts.indexOf(".tt");
-                if (pathParts.size() - ttIndex > 3) {
-                    groupId = String.join(".", pathParts.subList(ttIndex + 1, pathParts.size() - 2));
-                    artifactId = pathParts.get(pathParts.size() - 2);
-                    version = pathParts.get(pathParts.size() - 1);
+                int last = pathParts.size() - 1;
+                // Legacy layout ends at the version directory; post-#7528 layout adds
+                // a trailing <artifact>-<version>.jar file inside the version directory.
+                int versionIndex = pathParts.get(last).endsWith(".jar") ? last - 1 : last;
+                int artifactIndex = versionIndex - 1;
+                if (artifactIndex - (ttIndex + 1) >= 1) {
+                    groupId = String.join(".", pathParts.subList(ttIndex + 1, artifactIndex));
+                    artifactId = pathParts.get(artifactIndex);
+                    version = pathParts.get(versionIndex);
                 }
             } else if (pathParts.size() >= 4) {
                 version = pathParts.get(pathParts.size() - 2);
@@ -269,7 +574,7 @@ public class JavaSourceSet implements SourceSet {
 
     // Worth caching as there is typically substantial overlap in dependencies in use within the same repository
     // Even a single module project will typically have at least two source sets, main and test
-    private static List<JavaType.FullyQualified> typesFromPath(Path path, @Nullable String acceptPackage) {
+    public static List<JavaType.FullyQualified> typesFromPath(Path path, @Nullable String acceptPackage) {
         List<JavaType.FullyQualified> types = new ArrayList<>();
         try {
             // Paths will be to either directories of class files or jar files
@@ -278,7 +583,7 @@ public class JavaSourceSet implements SourceSet {
                     Enumeration<JarEntry> entries = jarFile.entries();
                     while (entries.hasMoreElements()) {
                         String entryName = entries.nextElement().getName();
-                        if (entryName.endsWith(".class")) {
+                        if (entryName.endsWith(".class") && !isMetaInfEntry(entryName)) {
                             String s = entryNameToClassName(entryName);
                             if (isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
@@ -292,6 +597,9 @@ public class JavaSourceSet implements SourceSet {
                     public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
                         if (file.getFileName().toString().endsWith(".class")) {
                             String pathStr = file.isAbsolute() ? path.relativize(file).toString() : file.toString();
+                            if (isMetaInfEntry(pathStr)) {
+                                return java.nio.file.FileVisitResult.CONTINUE;
+                            }
                             String s = entryNameToClassName(pathStr);
                             if ((acceptPackage == null || s.startsWith(acceptPackage)) && isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
@@ -305,6 +613,17 @@ public class JavaSourceSet implements SourceSet {
             // Partial results better than no results
         }
         return types;
+    }
+
+    /**
+     * Per the JAR specification {@code META-INF/} is reserved for metadata (manifests, services, multi-release
+     * versioned entries, etc.) and never contains application classes. Any {@code .class} file under this directory
+     * would otherwise yield an FQN like {@code META-INF.versions.9.foo.Bar} that collides with the base-path entry in
+     * downstream consumers that dedupe by FQN.
+     */
+    static boolean isMetaInfEntry(String entryName) {
+        String normalized = entryName.replace('\\', '/');
+        return normalized.startsWith("META-INF/");
     }
 
     private static List<JavaType.FullyQualified> getJavaStandardLibraryTypes() {

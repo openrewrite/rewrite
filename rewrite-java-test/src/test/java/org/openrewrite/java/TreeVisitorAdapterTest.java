@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
@@ -47,26 +46,15 @@ class TreeVisitorAdapterTest {
     }
 
     @Test
-    @Disabled
     void mixins() {
         AtomicInteger n = new AtomicInteger();
+        CountingMixin mixin = new CountingMixin();
+        mixin.n = n;
         //noinspection unchecked
         JavaVisitor<Integer> jv = TreeVisitorAdapter.adapt(
           new Adaptable(n),
           JavaVisitor.class,
-          new JavaIsoVisitor<Integer>() {
-              @Override
-              public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
-                  n.incrementAndGet();
-                  return identifier;
-              }
-
-              @Override
-              public J preVisit(J tree, Integer integer) {
-                  n.incrementAndGet();
-                  return tree;
-              }
-          }
+          mixin
         );
         J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}")
           .findFirst()
@@ -77,6 +65,29 @@ class TreeVisitorAdapterTest {
           /* Adaptable preVisit */ 4 +
             /* mixin preVisit */ 4 +
             /* mixin visitIdentifier */ 1);
+    }
+
+    /**
+     * Mixins must be no-arg constructible so the Gizmo-generated proxy
+     * (which extends the mixin class) can call {@code super()} at proxy
+     * construction. {@code TreeVisitorAdapter} copies the user-provided
+     * mixin instance's fields onto the proxy after instantiation, so
+     * state set on the mixin (here, the shared counter) propagates.
+     */
+    public static class CountingMixin extends JavaIsoVisitor<Integer> {
+        public AtomicInteger n;
+
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+            n.incrementAndGet();
+            return identifier;
+        }
+
+        @Override
+        public J preVisit(J tree, Integer integer) {
+            n.incrementAndGet();
+            return tree;
+        }
     }
 
     @Test

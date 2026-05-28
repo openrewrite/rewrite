@@ -78,7 +78,21 @@ artifacts {
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     dependsOn(testManifestTask)
-    systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", testManifestFile.get().asFile)
+    val manifest = testManifestFile.get().asFile
+    jvmArgumentProviders.add(object : CommandLineArgumentProvider {
+        // Track the actual classpath JARs for cache key (content-aware, path-insensitive)
+        @get:Classpath
+        val pluginClasspathFiles: FileCollection = pluginLocalTestClasspath
+
+        // The manifest file contains absolute paths, so exclude it from cache key;
+        // the classpath property above already tracks the actual content
+        @get:Internal
+        val manifestFile: File = manifest
+
+        override fun asArguments() = listOf(
+            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifestFile.absolutePath}"
+        )
+    })
 }
 
 tasks.named("check").configure {

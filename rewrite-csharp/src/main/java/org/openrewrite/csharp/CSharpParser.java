@@ -96,7 +96,8 @@ public class CSharpParser implements Parser {
                 }
             }
 
-            return CSharpRewriteRpc.getOrStart().parseSolution(csproj, tempDir, ctx);
+            return CSharpRewriteRpc.getOrStart().parseSolution(csproj, tempDir, ctx)
+                    .filter(sf -> sf.getSourcePath().toString().endsWith(".cs") || sf instanceof org.openrewrite.tree.ParseError);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

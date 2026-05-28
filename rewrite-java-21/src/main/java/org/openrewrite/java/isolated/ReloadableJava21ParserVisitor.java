@@ -37,7 +37,7 @@ import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.marker.CompactConstructor;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.TrailingComma;
@@ -110,7 +110,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                                          @Nullable FileAttributes fileAttributes,
                                          EncodingDetectingInputStream source,
                                          Collection<NamedStyles> styles,
-                                         JavaTypeCache typeCache,
+                                         JavaTypeFactory typeFactory,
                                          ExecutionContext ctx,
                                          Context context) {
         this.sourcePath = sourcePath;
@@ -121,7 +121,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         this.styles = styles;
         this.ctx = ctx;
         this.context = context;
-        this.typeMapping = new ReloadableJava21TypeMapping(typeCache);
+        this.typeMapping = new ReloadableJava21TypeMapping(typeFactory);
     }
 
     @Override
@@ -547,10 +547,12 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 return Markers.EMPTY;
             });
 
+            Space enumValueSetPrefix = enumValues.get(0).getElement().getPrefix();
+            enumValues.set(0, enumValues.get(0).withElement(enumValues.get(0).getElement().withPrefix(EMPTY)));
             enumSet = padRight(
                     new J.EnumValueSet(
                             randomId(),
-                            EMPTY,
+                            enumValueSetPrefix,
                             Markers.EMPTY,
                             enumValues,
                             skip(";") != null
@@ -830,7 +832,12 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitImport(ImportTree node, Space fmt) {
-        skip("import");
+        Space beforeImport = sourceBefore("import");
+        if (!beforeImport.isEmpty()) {
+            fmt = Space.build(
+                    fmt.getWhitespace() + beforeImport.getWhitespace(),
+                    ListUtils.concatAll(fmt.getComments(), beforeImport.getComments()));
+        }
         return new J.Import(randomId(), fmt, Markers.EMPTY,
                 new JLeftPadded<>(node.isStatic() ? sourceBefore("static") : EMPTY,
                         node.isStatic(), Markers.EMPTY),
@@ -1547,7 +1554,12 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
         List<J.Annotation> leadingAnnotations = leadingAnnotations(annotationPosTable);
         Space prefix = whitespace();
-        TypeTree elemType = convert(typeIdent);
+        TypeTree elemType;
+        if (!annotationPosTable.isEmpty() && typeIdent instanceof JCFieldAccess) {
+            elemType = annotatedTypeTree(typeIdent, annotationPosTable);
+        } else {
+            elemType = convert(typeIdent);
+        }
         List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
         JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
         assert arrayTypeTree != null;

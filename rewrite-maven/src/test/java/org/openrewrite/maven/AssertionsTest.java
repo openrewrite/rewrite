@@ -45,7 +45,7 @@ class AssertionsTest implements RewriteTest {
     void mavenSettingsPropagateToRecipeExecutionContext() {
         // When a separate recipeExecutionContext is used, Maven settings should
         // still be propagated from the parsing context customizations
-        AtomicInteger settingsChecked = new AtomicInteger();
+        var settingsChecked = new AtomicInteger();
         rewriteRun(
           spec -> spec
             .recipe(toRecipe(() -> new MavenIsoVisitor<>() {

@@ -1,0 +1,503 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.scala.tree;
+
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RewriteTest;
+
+import static org.openrewrite.scala.Assertions.scala;
+
+@SuppressWarnings("ZeroIndexToHead")
+class MethodInvocationTest implements RewriteTest {
+
+    @Test
+    void simpleMethodCall() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                println("Hello")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodCallNoArgs() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val s = "hello"
+                val len = s.length()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodCallMultipleArgs() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val result = Math.max(10, 20)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void chainedMethodCalls() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val result = "hello".toUpperCase().substring(1)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodCallOnFieldAccess() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                System.out.println("test")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodCallWithNamedArguments() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def greet(name: String, age: Int) = s"$name is $age"
+                val msg = greet(name = "Alice", age = 30)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void infixMethodCall() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val list = List(1, 2, 3)
+                val result = list map (_ * 2)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void applyMethod() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val list = List(1, 2, 3)
+                val first = list(0)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void explicitApplyMethod() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val list = List(1, 2, 3)
+                val explicit = list.apply(0)
+                val implicitApply = list(0)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void partialFunctionBlockAndTupleLambdaBlockArgs() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def quick[A](read: PartialFunction[Any, A], write: (Int, Int) => Any): A = ???
+                val h = quick(
+                  { case s: String => s },
+                  { (a, b) => a + b }
+                )
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void partialFunctionFollowedByPlainLambda() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def quick[A](read: PartialFunction[Any, A], write: Int => Any): A = ???
+                val h = quick({ case s: String => s }, x => x)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void partialFunctionFollowedByBlockLambda() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def quick[A](read: PartialFunction[Any, A], write: Int => Any): A = ???
+                val h = quick({ case s: String => s }, { x => x })
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void quickHandlerLilaPattern() {
+        rewriteRun(
+          scala(
+            """
+              object Handlers {
+                trait BSONHandler[T]
+                def quickHandler[T](read: PartialFunction[Any, T], write: (Int, Int) => Any): BSONHandler[T] = ???
+                val h: BSONHandler[Int] = quickHandler(
+                  { case Seq(a, b) => a },
+                  { (a, b) => Seq(a, b) }
+                )
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodCallInExpression() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val result = Math.sqrt(16) + Math.pow(2, 3)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedMethodCalls() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val result = Math.max(Math.min(10, 20), 5)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodCallWithBlock() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val result = List(1, 2, 3).map { x =>
+                  x * 2
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void curriedMethodCall() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def add(x: Int)(y: Int) = x + y
+                val result = add(5)(10)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodCallWithTypeArguments() {
+        rewriteRun(
+          scala(
+            """
+              import java.time.Instant
+              object Test {
+                val builder = List.newBuilder[Instant]
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodCallWithTypeArgumentsAndArgs() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val list = List.empty[Int]
+                val set = Set.apply[String]("a", "b")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodCallWithTypeArgumentsAndValueArgs() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val builder = List.fill[Int](3)(0)
+                val single = Option.apply[String]("hello")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void curriedCallWithBlockArgInsideBlock() {
+        rewriteRun(
+          scala(
+            """
+            val x = {
+              foo(1) { in => bar(in) }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedCall() {
+        rewriteRun(
+          scala(
+            """
+              class Test {
+                def f(x: Int)(y: Int): Int = x + y
+                f(1)(2)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void extraSpace() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def f(a: Int)(b: Int): Int = a + b
+                def fBlock(a: Int)(g: Int => Int): Int = g(a)
+                def fType[T](x: T): T = x
+
+                val m = Map (
+                  "a" -> 1
+                )
+                val lambda = ((x: Int) => x + 1) (5)
+                val blockArg = fBlock(1)  { x => x + 1 }
+                val curried = f(1) (2)
+                val typeApplied = fType[Int] (5)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitFunctionApplication — last-arg close paren in line comment
+        rewriteRun(
+          scala(
+            """
+              val xs = Seq(
+                1 // )
+              )
+              """
+          )
+        );
+        // visitFunctionApplication — comma between args in block comment
+        rewriteRun(
+          scala(
+            """
+              val xs = Seq(1 /* , */ , 2)
+              """
+          )
+        );
+        // visitApply default branch — close paren in line comment with non-Ident callee
+        rewriteRun(
+          scala(
+            """
+              val f: Int => Int = _ + 1
+              val r = (f)(1 // )
+              )
+              """
+          )
+        );
+        // visitMethodInvocation — close paren of last arg in line comment
+        rewriteRun(
+          scala(
+            """
+              val s = "abc"
+              val i = s.indexOf("b" // )
+              )
+              """
+          )
+        );
+        // visitMethodInvocation — comma between args in line comment
+        rewriteRun(
+          scala(
+            """
+              val s = "abc"
+              val i = s.indexOf("b" // ,
+              , 1)
+              """
+          )
+        );
+        // visitMethodInvocation — open paren in line comment before arg list
+        rewriteRun(
+          scala(
+            """
+              val xs = List(1, 2)
+              val n = xs // (
+              .size
+              """
+          )
+        );
+        // visitMethodInvocation — dot lookup with trailing line comment before dot
+        rewriteRun(
+          scala(
+            """
+              val n = List(1, 2) // .
+              .length
+              """
+          )
+        );
+        // visitMethodInvocationFromTypeApply — dot lookup with trailing line comment before dot
+        rewriteRun(
+          scala(
+            """
+              val xs = List(1, 2) // .
+              .map[Int](_ + 1)
+              """
+          )
+        );
+    }
+
+    @Nested
+    class VarargSplat implements RewriteTest {
+
+        @Test
+        void scala3Splat() {
+            rewriteRun(
+              scala(
+                """
+                object Test {
+                  val xs = Seq(1, 2)
+                  def f(x: Int*): Unit = ()
+                  f(xs*)
+                }
+                """
+              )
+            );
+        }
+
+        @Test
+        void scala2Splat() {
+            rewriteRun(
+              scala(
+                """
+                object Test {
+                  val xs = Seq(1, 2)
+                  def f(x: Int*): Unit = ()
+                  f(xs: _*)
+                }
+                """
+              )
+            );
+        }
+
+        @Test
+        void scala3SplatWithSpaceBeforeStar() {
+            rewriteRun(
+              scala(
+                """
+                object Test {
+                  val xs = Seq(1, 2)
+                  def f(x: Int*): Unit = ()
+                  f(xs *)
+                }
+                """
+              )
+            );
+        }
+
+        @Test
+        void scala3SplatOfMethodCall() {
+            rewriteRun(
+              scala(
+                """
+                object Test {
+                  def f(x: Int*): Unit = ()
+                  def g(): Seq[Int] = Seq(1, 2)
+                  f(g()*)
+                }
+                """
+              )
+            );
+        }
+    }
+}

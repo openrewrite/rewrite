@@ -13,43 +13,62 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Concurrent;
+
 namespace OpenRewrite.Core;
 
 /// <summary>
-/// Stores data table rows in memory.
+/// Stores data table rows in memory, keyed by (name, scope).
 /// </summary>
 public class InMemoryDataTableStore : IDataTableStore
 {
-    private bool _acceptRows;
-    private readonly Dictionary<string, DataTableDescriptor> _dataTables = new();
-    private readonly Dictionary<string, List<object>> _rows = new();
+    private readonly ConcurrentDictionary<string, Bucket> _buckets = new();
+
+    private sealed class Bucket(object dataTable)
+    {
+        public object DataTable { get; } = dataTable;
+        public List<object> Rows { get; } = [];
+    }
+
+    private static string BucketKey(string name, string scope) => $"{name}\0{scope}";
 
     public void InsertRow<TRow>(DataTable<TRow> dataTable, ExecutionContext ctx, TRow row) where TRow : notnull
     {
-        if (!_acceptRows) return;
-
-        var name = dataTable.Name;
-        _dataTables[name] = dataTable.Descriptor;
-
-        if (!_rows.TryGetValue(name, out var list))
+        var suffix = dataTable.Group ?? dataTable.InstanceName;
+        var key = BucketKey(dataTable.Name, suffix);
+        var bucket = _buckets.GetOrAdd(key, _ => new Bucket(dataTable));
+        lock (bucket.Rows)
         {
-            list = [];
-            _rows[name] = list;
+            bucket.Rows.Add(row);
         }
-
-        list.Add(row);
     }
 
-    public void AcceptRows(bool accept) => _acceptRows = accept;
+    public IEnumerable<object> GetRows(string dataTableName, string? group)
+    {
+        if (group != null)
+        {
+            var key = BucketKey(dataTableName, group);
+            if (!_buckets.TryGetValue(key, out var bucket))
+                return [];
+            List<object> snapshot;
+            lock (bucket.Rows) { snapshot = [..bucket.Rows]; }
+            return snapshot;
+        }
+        // For ungrouped, find by name with no group
+        foreach (var bucket in _buckets.Values)
+        {
+            if (bucket.DataTable is DataTable<object> dt && dt.Name == dataTableName && dt.Group == null)
+            {
+                List<object> snapshot;
+                lock (bucket.Rows) { snapshot = [..bucket.Rows]; }
+                return snapshot;
+            }
+        }
+        return [];
+    }
 
-    /// <summary>
-    /// All stored rows keyed by data table name.
-    /// </summary>
-    public IReadOnlyDictionary<string, IReadOnlyList<object>> Rows =>
-        _rows.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<object>)kv.Value);
-
-    /// <summary>
-    /// Descriptors for all data tables that have rows.
-    /// </summary>
-    public IReadOnlyDictionary<string, DataTableDescriptor> DataTables => _dataTables;
+    public IReadOnlyList<object> GetDataTables()
+    {
+        return _buckets.Values.Select(b => b.DataTable).ToList();
+    }
 }

@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.yaml.MultilineScalarChanged;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.IndentsStyle;
@@ -27,6 +28,7 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -78,12 +80,21 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             if (y instanceof Yaml.Sequence.Entry) {
                 indent = getCursor().getParentOrThrow().getMessage("sequenceEntryIndent", indent);
 
-                y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
+                int seqIndentOffset = evaluate(() -> style.isIndentedSequences(), true) ? style.getIndentSize() : 0;
+                int dashColumn = indent + seqIndentOffset;
+                y = y.withPrefix(indentTo(y.getPrefix(), dashColumn));
 
                 getCursor().getParentOrThrow().putMessage("sequenceEntryIndent", indent);
                 // the +1 is for the '-' character
-                getCursor().getParentOrThrow().putMessage("lastIndent",
-                        indent + firstIndent(((Yaml.Sequence.Entry) y).getBlock()).length() + 1);
+                String fi = firstIndent(((Yaml.Sequence.Entry) y).getBlock());
+                int contentIndent;
+                if (StringUtils.hasLineBreak(fi)) {
+                    // When the dash is on its own line, content is indented by indentSize from the dash
+                    contentIndent = dashColumn;
+                } else {
+                    contentIndent = dashColumn + fi.length() + 1 - style.getIndentSize();
+                }
+                getCursor().getParentOrThrow().putMessage("lastIndent", contentIndent);
             } else if (y instanceof Yaml.Mapping.Entry) {
                 y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
                 getCursor().putMessage("lastIndent", indent + style.getIndentSize());
@@ -218,6 +229,16 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             }
         }
         return size;
+    }
+
+    @ToBeRemoved(after = "2026-06-01", reason = "All parent runtimes have had few weeks to update")
+    private <T> T evaluate(Supplier<T> supplier, T defaultValue) {
+        try {
+            return supplier.get();
+        } catch (NoSuchMethodError | NoSuchFieldError e) {
+            // Handle newly introduced method calls on style that are not part of lst yet
+            return defaultValue;
+        }
     }
 
     private String firstIndent(Yaml yaml) {

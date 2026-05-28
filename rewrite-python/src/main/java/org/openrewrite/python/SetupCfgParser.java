@@ -29,6 +29,7 @@ import org.openrewrite.text.PlainTextParser;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.openrewrite.Tree.randomId;
@@ -41,6 +42,15 @@ import static org.openrewrite.Tree.randomId;
 public class SetupCfgParser implements Parser {
 
     private final PlainTextParser plainTextParser = new PlainTextParser();
+    private final Map<String, String> subprocessEnvironment;
+
+    public SetupCfgParser() {
+        this(Collections.emptyMap());
+    }
+
+    public SetupCfgParser(Map<String, String> subprocessEnvironment) {
+        this.subprocessEnvironment = subprocessEnvironment;
+    }
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
@@ -56,7 +66,7 @@ public class SetupCfgParser implements Parser {
                 projectDir = filePath.getParent();
             }
             Path workspace = DependencyWorkspace.getOrCreateSetuptoolsWorkspace(
-                    text.getText(), projectDir);
+                    text.getText(), projectDir, subprocessEnvironment);
             if (workspace == null) {
                 return sf;
             }
@@ -94,7 +104,7 @@ public class SetupCfgParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return "setup.cfg".equals(path.getFileName().toString());
+        return path.endsWith("setup.cfg");
     }
 
     @Override

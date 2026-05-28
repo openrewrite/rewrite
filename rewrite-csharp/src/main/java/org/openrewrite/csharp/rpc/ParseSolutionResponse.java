@@ -18,12 +18,22 @@ package org.openrewrite.csharp.rpc;
 import lombok.Value;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Response from ParseSolution RPC call.
- * Contains a list of parsed source file items with their IDs, types, and project paths.
+ * Contains a list of parsed source file items with their IDs and types.
  */
-class ParseSolutionResponse extends ArrayList<ParseSolutionResponse.Item> {
+class ParseSolutionResponse {
+    private List<Item> items = new ArrayList<>();
+
+    public List<Item> getItems() {
+        return items;
+    }
+
+    public void setItems(List<Item> items) {
+        this.items = items;
+    }
 
     /**
      * A single parsed source file item.
@@ -40,10 +50,5 @@ class ParseSolutionResponse extends ArrayList<ParseSolutionResponse.Item> {
          * Example: org.openrewrite.csharp.tree.Cs$CompilationUnit
          */
         String sourceFileType;
-
-        /**
-         * The path of the project this file belongs to.
-         */
-        String projectPath;
     }
 }

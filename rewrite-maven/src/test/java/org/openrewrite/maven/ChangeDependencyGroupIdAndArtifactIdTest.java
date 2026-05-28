@@ -18,13 +18,18 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
+import org.openrewrite.java.ChangePackage;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
@@ -765,7 +770,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
     @Test
     void requireNewGroupIdOrNewArtifactId() {
-       ChangeDependencyGroupIdAndArtifactId recipe = new ChangeDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", null, null, null, null);;
+       var recipe = new ChangeDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", null, null, null, null);;
         assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
             .contains("newGroupId OR newArtifactId must be different from before");
     }
@@ -773,7 +778,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
     @Test
     void requireNewGroupIdOrNewArtifactIdToBeDifferentFromBefore() {
-        ChangeDependencyGroupIdAndArtifactId recipe = new ChangeDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", "javax.activation", null, null, null);
+        var recipe = new ChangeDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", "javax.activation", null, null, null);
         assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
             .contains("newGroupId OR newArtifactId must be different from before");
     }
@@ -3535,6 +3540,187 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                 </project>
                 """
             )
+          )
+        );
+    }
+
+    @Test
+    void marksProjectDirtyAfterChangingDependencyCoordinates() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.0.1",
+            null,
+            false,
+            false
+          )).executionContext(ctx),
+          mavenProject("project",
+            srcMainJava(
+              java("class A {}")
+            ),
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>2.0.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+
+        Set<String> dirty = JavaSourceSet.dirtyProjects(ctx);
+        assertThat(dirty)
+            .as("Dependency mutation should mark the project dirty so downstream ambiguity-sensitive recipes take the safe path")
+            .isNotNull()
+            .contains("project");
+    }
+
+
+    @Test
+    void composedWithChangePackageUpdatesImports() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeDependencyGroupIdAndArtifactId(
+              "javax.activation",
+              "javax.activation-api",
+              "jakarta.activation",
+              "jakarta.activation-api",
+              "2.0.1",
+              null,
+              false,
+              false
+            ),
+            new ChangePackage("javax.activation", "jakarta.activation", true)
+          ).executionContext(ctx),
+          mavenProject("project",
+            srcMainJava(
+              java(
+                """
+                  import javax.activation.DataHandler;
+                  import javax.activation.MimeType;
+
+                  class A {
+                      DataHandler handler;
+                      MimeType type;
+                  }
+                  """,
+                """
+                  import jakarta.activation.DataHandler;
+                  import jakarta.activation.MimeType;
+
+                  class A {
+                      DataHandler handler;
+                      MimeType type;
+                  }
+                  """
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>2.0.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+
+        Set<String> dirty = JavaSourceSet.dirtyProjects(ctx);
+        assertThat(dirty)
+            .as("Composed run should leave the project marked dirty for any downstream ambiguity-sensitive recipe")
+            .isNotNull()
+            .contains("project");
+    }
+
+    @Test
+    void noDependencyManagementSection() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "junit",
+            "junit",
+            "org.junit.jupiter",
+            "junit-jupiter",
+            "5.14.3",
+            null,
+            false,
+            false
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>4.13.2</version>
+                          <scope>test</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            spec -> spec.after(actual -> assertThat(actual)
+              .containsPattern("<groupId>org\\.junit\\.jupiter</groupId>\\s*<artifactId>junit-jupiter</artifactId>\\s*<version>5\\.\\d+(\\.\\d+)?</version>")
+              .doesNotContain("<groupId>junit</groupId>")
+              .actual())
           )
         );
     }

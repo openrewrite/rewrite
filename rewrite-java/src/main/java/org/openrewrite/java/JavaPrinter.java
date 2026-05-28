@@ -190,6 +190,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitArrayAccess(ArrayAccess arrayAccess, PrintOutputCapture<P> p) {
+        beforeSyntax(arrayAccess, Space.Location.ARRAY_ACCESS_PREFIX, p);
+        visit(arrayAccess.getIndexed(), p);
+        visit(arrayAccess.getDimension(), p);
+        afterSyntax(arrayAccess, p);
+        return arrayAccess;
+    }
+
+    @Override
     public J visitArrayDimension(ArrayDimension arrayDimension, PrintOutputCapture<P> p) {
         beforeSyntax(arrayDimension, Space.Location.DIMENSION_PREFIX, p);
         p.append('[');

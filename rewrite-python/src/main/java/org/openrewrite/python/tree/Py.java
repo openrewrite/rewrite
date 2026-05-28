@@ -22,10 +22,12 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.python.PythonVisitor;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
+import org.openrewrite.python.service.PythonAutoFormatService;
 import org.openrewrite.rpc.request.Print;
 
 import java.beans.Transient;
@@ -548,6 +550,16 @@ public interface Py extends J {
         }
 
         @Override
+        @Incubating(since = "8.2.0")
+        @SuppressWarnings("unchecked")
+        public <S, T extends S> T service(Class<S> service) {
+            if (AutoFormatService.class.getName().equals(service.getName())) {
+                return (T) new PythonAutoFormatService();
+            }
+            return JavaSourceFile.super.service(service);
+        }
+
+        @Override
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -675,11 +687,17 @@ public interface Py extends J {
         @SuppressWarnings("unchecked")
         @Override
         public ExpressionTypeTree withType(@Nullable JavaType type) {
-            if (reference instanceof Expression) {
-                return withReference(((Expression) reference).withType(type));
-            }
-            if (reference instanceof TypedTree) {
-                return withReference(((TypedTree) reference).withType(type));
+            try {
+                if (reference instanceof Expression) {
+                    return withReference(((Expression) reference).withType(type));
+                }
+                if (reference instanceof TypedTree) {
+                    return withReference(((TypedTree) reference).withType(type));
+                }
+            } catch (UnsupportedOperationException ignored) {
+                // Some J types (e.g., MethodInvocation, MethodDeclaration) throw on withType()
+                // and require withMethodType() instead. When wrapped in ExpressionTypeTree,
+                // the inner node's type is already handled by the visitor directly.
             }
             return this;
         }

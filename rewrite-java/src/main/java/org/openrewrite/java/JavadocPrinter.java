@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.java.marker.LeadingBrace;
+import org.openrewrite.java.marker.LineComment;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -67,9 +68,15 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     @Override
     public Javadoc visitDocComment(Javadoc.DocComment javadoc, PrintOutputCapture<P> p) {
         beforeSyntax(javadoc, p, JAVA_MARKER_WRAPPER);
-        p.append("/**");
+        if (javadoc.getMarkers().findFirst(LineComment.class).isPresent()) {
+            p.append("///");
+        } else {
+            p.append("/**");
+        }
         visit(javadoc.getBody(), p);
-        p.append("*/");
+        if (!javadoc.getMarkers().findFirst(LineComment.class).isPresent()) {
+            p.append("*/");
+        }
         afterSyntax(javadoc, p);
         return javadoc;
     }

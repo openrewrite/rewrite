@@ -61,7 +61,7 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
             if (j instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) j;
                 // no new line for constructor
-                if ("<constructor>".equals(Optional.ofNullable(m.getMethodType()).map(JavaType.Method::getName).orElse(""))) {
+                if (Optional.ofNullable(m.getMethodType()).map(JavaType.Method::isConstructor).orElse(false)) {
                     return j;
                 }
             }

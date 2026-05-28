@@ -19,14 +19,15 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.DependencyNotation;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.DependencyMatcher;
@@ -216,6 +217,10 @@ public class ChangeDependencyConfiguration extends Recipe {
                     return m;
                 }
 
+                SourceFile sf = getCursor().firstEnclosing(SourceFile.class);
+                if (sf != null) {
+                    JavaSourceSet.markDirty(ctx, sf);
+                }
                 return m.withName(m.getName().withSimpleName(newConfiguration));
             }
 

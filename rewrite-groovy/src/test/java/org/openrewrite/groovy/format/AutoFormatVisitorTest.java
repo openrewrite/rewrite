@@ -17,6 +17,7 @@ package org.openrewrite.groovy.format;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,6 +28,33 @@ class AutoFormatVisitorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new AutoFormat());
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4531")
+    @Test
+    void preserveSpaceBeforeAsKeywordInCast() {
+        rewriteRun(
+          groovy(
+            """
+              int something = sh(
+                      script: 'echo 1',
+                      returnStatus: true
+              ).trim() as Integer
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4531")
+    @Test
+    void preserveSpaceBeforeAsKeywordInSimpleCast() {
+        rewriteRun(
+          groovy(
+            """
+              String foo = "hallo" as String
+              """
+          )
+        );
     }
 
     @DocumentExample

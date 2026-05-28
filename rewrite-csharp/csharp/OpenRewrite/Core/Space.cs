@@ -185,6 +185,43 @@ public sealed class Space(string whitespace, IList<Comment> comments)
             }
         }
 
+        // Group consecutive /// doc comments into a single XmlDocComment.
+        // After rotation, doc comment lines are TextComment with text starting with "/".
+        if (comments.Count > 0)
+        {
+            var grouped = new List<Comment>();
+            int j = 0;
+            while (j < comments.Count)
+            {
+                var cmt = comments[j];
+                if (cmt is TextComment tc && !tc.Multiline && tc.Text.StartsWith("/"))
+                {
+                    // Start of a doc comment block — group consecutive /// lines.
+                    var sb = new System.Text.StringBuilder();
+                    sb.Append(tc.Text);
+                    string lastSuffix = tc.Suffix;
+                    j++;
+                    while (j < comments.Count &&
+                           comments[j] is TextComment next && !next.Multiline &&
+                           next.Text.StartsWith("/"))
+                    {
+                        sb.Append(lastSuffix);
+                        sb.Append("//");
+                        sb.Append(next.Text);
+                        lastSuffix = next.Suffix;
+                        j++;
+                    }
+                    grouped.Add(new XmlDocComment(sb.ToString(), lastSuffix, true));
+                }
+                else
+                {
+                    grouped.Add(cmt);
+                    j++;
+                }
+            }
+            comments = grouped;
+        }
+
         return comments.Count > 0 ? new Space(ws, comments) : Build(formatting, []);
     }
 
@@ -211,4 +248,12 @@ public abstract class Comment(string text, string suffix, bool multiline)
 /// A single-line or multi-line text comment.
 /// </summary>
 public sealed class TextComment(string text, string suffix, bool multiline)
+    : Comment(text, suffix, multiline);
+
+/// <summary>
+/// An XML documentation comment (///) block.
+/// The Text property contains the raw content after the initial "//",
+/// including continuation "///" prefixes on subsequent lines.
+/// </summary>
+public sealed class XmlDocComment(string text, string suffix, bool multiline)
     : Comment(text, suffix, multiline);

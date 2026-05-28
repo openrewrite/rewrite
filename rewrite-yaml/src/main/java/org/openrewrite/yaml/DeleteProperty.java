@@ -168,8 +168,7 @@ public class DeleteProperty extends Recipe {
                 String trailingInlineComment = null;
                 for (Yaml.Mapping.Entry entry : m.getEntries()) {
                     if (ToBeRemoved.hasMarker(entry.getValue()) ||
-                        ToBeRemoved.hasMarker(entry) ||
-                        (entry.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) entry.getValue()).getEntries().isEmpty())) {
+                        ToBeRemoved.hasMarker(entry)) {
                         // Entry is being deleted - capture prefix from the first deleted entry before any kept entries
                         if (entries.isEmpty() && firstDeletedPrefix == null) {
                             firstDeletedPrefix = entry.getPrefix();

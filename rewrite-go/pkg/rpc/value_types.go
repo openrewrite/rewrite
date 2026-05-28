@@ -1,0 +1,288 @@
+/*
+ * Copyright 2025 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package rpc
+
+import (
+	"reflect"
+	"strings"
+
+	"github.com/google/uuid"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+)
+
+func init() {
+	// G (Go-specific) node types
+	RegisterValueType(reflect.TypeOf((*tree.CompilationUnit)(nil)), "org.openrewrite.golang.tree.Go$CompilationUnit")
+	RegisterValueType(reflect.TypeOf((*tree.GoStmt)(nil)), "org.openrewrite.golang.tree.Go$GoStatement")
+	RegisterValueType(reflect.TypeOf((*tree.Defer)(nil)), "org.openrewrite.golang.tree.Go$Defer")
+	RegisterValueType(reflect.TypeOf((*tree.Send)(nil)), "org.openrewrite.golang.tree.Go$Send")
+	RegisterValueType(reflect.TypeOf((*tree.Goto)(nil)), "org.openrewrite.golang.tree.Go$Goto")
+	RegisterValueType(reflect.TypeOf((*tree.Fallthrough)(nil)), "org.openrewrite.golang.tree.Go$Fallthrough")
+	RegisterValueType(reflect.TypeOf((*tree.Composite)(nil)), "org.openrewrite.golang.tree.Go$Composite")
+	RegisterValueType(reflect.TypeOf((*tree.KeyValue)(nil)), "org.openrewrite.golang.tree.Go$KeyValue")
+	RegisterValueType(reflect.TypeOf((*tree.Slice)(nil)), "org.openrewrite.golang.tree.Go$SliceExpr")
+	RegisterValueType(reflect.TypeOf((*tree.MapType)(nil)), "org.openrewrite.golang.tree.Go$MapType")
+	RegisterValueType(reflect.TypeOf((*tree.PointerType)(nil)), "org.openrewrite.golang.tree.Go$PointerType")
+	RegisterValueType(reflect.TypeOf((*tree.Channel)(nil)), "org.openrewrite.golang.tree.Go$Channel")
+	RegisterValueType(reflect.TypeOf((*tree.FuncType)(nil)), "org.openrewrite.golang.tree.Go$FuncType")
+	RegisterValueType(reflect.TypeOf((*tree.StructType)(nil)), "org.openrewrite.golang.tree.Go$StructType")
+	RegisterValueType(reflect.TypeOf((*tree.InterfaceType)(nil)), "org.openrewrite.golang.tree.Go$InterfaceType")
+	RegisterValueType(reflect.TypeOf((*tree.TypeList)(nil)), "org.openrewrite.golang.tree.Go$TypeList")
+	RegisterValueType(reflect.TypeOf((*tree.TypeDecl)(nil)), "org.openrewrite.golang.tree.Go$TypeDecl")
+	RegisterValueType(reflect.TypeOf((*tree.MultiAssignment)(nil)), "org.openrewrite.golang.tree.Go$MultiAssignment")
+	RegisterValueType(reflect.TypeOf((*tree.CommClause)(nil)), "org.openrewrite.golang.tree.Go$CommClause")
+	RegisterValueType(reflect.TypeOf((*tree.IndexList)(nil)), "org.openrewrite.golang.tree.Go$IndexList")
+	RegisterValueType(reflect.TypeOf((*tree.StatementExpression)(nil)), "org.openrewrite.golang.tree.Go$StatementExpression")
+
+	// J (shared Java-like) node types
+	RegisterValueType(reflect.TypeOf((*tree.Identifier)(nil)), "org.openrewrite.java.tree.J$Identifier")
+	RegisterValueType(reflect.TypeOf((*tree.Literal)(nil)), "org.openrewrite.java.tree.J$Literal")
+	RegisterValueType(reflect.TypeOf((*tree.Binary)(nil)), "org.openrewrite.java.tree.J$Binary")
+	RegisterValueType(reflect.TypeOf((*tree.Block)(nil)), "org.openrewrite.java.tree.J$Block")
+	RegisterValueType(reflect.TypeOf((*tree.Return)(nil)), "org.openrewrite.java.tree.J$Return")
+	RegisterValueType(reflect.TypeOf((*tree.If)(nil)), "org.openrewrite.java.tree.J$If")
+	RegisterValueType(reflect.TypeOf((*tree.Else)(nil)), "org.openrewrite.java.tree.J$If$Else")
+	RegisterValueType(reflect.TypeOf((*tree.Assignment)(nil)), "org.openrewrite.java.tree.J$Assignment")
+	RegisterValueType(reflect.TypeOf((*tree.AssignmentOperation)(nil)), "org.openrewrite.java.tree.J$AssignmentOperation")
+	RegisterValueType(reflect.TypeOf((*tree.MethodDeclaration)(nil)), "org.openrewrite.java.tree.J$MethodDeclaration")
+	RegisterValueType(reflect.TypeOf((*tree.ForLoop)(nil)), "org.openrewrite.java.tree.J$ForLoop")
+	RegisterValueType(reflect.TypeOf((*tree.ForControl)(nil)), "org.openrewrite.java.tree.J$ForLoop$Control")
+	RegisterValueType(reflect.TypeOf((*tree.ForEachLoop)(nil)), "org.openrewrite.java.tree.J$ForEachLoop")
+	RegisterValueType(reflect.TypeOf((*tree.ForEachControl)(nil)), "org.openrewrite.java.tree.J$ForEachLoop$Control")
+	RegisterValueType(reflect.TypeOf((*tree.Switch)(nil)), "org.openrewrite.java.tree.J$Switch")
+	RegisterValueType(reflect.TypeOf((*tree.Case)(nil)), "org.openrewrite.java.tree.J$Case")
+	RegisterValueType(reflect.TypeOf((*tree.Break)(nil)), "org.openrewrite.java.tree.J$Break")
+	RegisterValueType(reflect.TypeOf((*tree.Continue)(nil)), "org.openrewrite.java.tree.J$Continue")
+	RegisterValueType(reflect.TypeOf((*tree.Label)(nil)), "org.openrewrite.java.tree.J$Label")
+	RegisterValueType(reflect.TypeOf((*tree.Empty)(nil)), "org.openrewrite.java.tree.J$Empty")
+	RegisterValueType(reflect.TypeOf((*tree.Annotation)(nil)), "org.openrewrite.java.tree.J$Annotation")
+	RegisterValueType(reflect.TypeOf((*tree.Unary)(nil)), "org.openrewrite.java.tree.J$Unary")
+	RegisterValueType(reflect.TypeOf((*tree.FieldAccess)(nil)), "org.openrewrite.java.tree.J$FieldAccess")
+	RegisterValueType(reflect.TypeOf((*tree.MethodInvocation)(nil)), "org.openrewrite.java.tree.J$MethodInvocation")
+	RegisterValueType(reflect.TypeOf((*tree.VariableDeclarations)(nil)), "org.openrewrite.java.tree.J$VariableDeclarations")
+	RegisterValueType(reflect.TypeOf((*tree.VariableDeclarator)(nil)), "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable")
+	RegisterValueType(reflect.TypeOf((*tree.ArrayType)(nil)), "org.openrewrite.java.tree.J$ArrayType")
+	RegisterValueType(reflect.TypeOf((*tree.ArrayAccess)(nil)), "org.openrewrite.java.tree.J$ArrayAccess")
+	RegisterValueType(reflect.TypeOf((*tree.ParameterizedType)(nil)), "org.openrewrite.java.tree.J$ParameterizedType")
+	RegisterValueType(reflect.TypeOf((*tree.ArrayDimension)(nil)), "org.openrewrite.java.tree.J$ArrayDimension")
+	RegisterValueType(reflect.TypeOf((*tree.Parentheses)(nil)), "org.openrewrite.java.tree.J$Parentheses")
+	RegisterValueType(reflect.TypeOf((*tree.TypeCast)(nil)), "org.openrewrite.java.tree.J$TypeCast")
+	RegisterValueType(reflect.TypeOf((*tree.ControlParentheses)(nil)), "org.openrewrite.java.tree.J$ControlParentheses")
+	RegisterValueType(reflect.TypeOf((*tree.Import)(nil)), "org.openrewrite.java.tree.J$Import")
+
+	// ParseError
+	RegisterValueType(reflect.TypeOf((*tree.ParseError)(nil)), "org.openrewrite.tree.ParseError")
+
+	// Non-tree types that Java needs valueType for
+	RegisterValueType(reflect.TypeOf(tree.Space{}), "org.openrewrite.java.tree.Space")
+	RegisterValueType(reflect.TypeOf(tree.Markers{}), "org.openrewrite.marker.Markers")
+	RegisterValueType(reflect.TypeOf(tree.Comment{}), "org.openrewrite.java.tree.TextComment")
+
+	// Go-specific marker valueType registrations (for send-side type resolution)
+	RegisterValueType(reflect.TypeOf(tree.GroupedImport{}), "org.openrewrite.golang.marker.GroupedImport")
+	RegisterValueType(reflect.TypeOf(tree.ImportBlock{}), "org.openrewrite.golang.marker.ImportBlock")
+	RegisterValueType(reflect.TypeOf(tree.ShortVarDecl{}), "org.openrewrite.golang.marker.ShortVarDecl")
+	RegisterValueType(reflect.TypeOf(tree.VarKeyword{}), "org.openrewrite.golang.marker.VarKeyword")
+	RegisterValueType(reflect.TypeOf(tree.ConstDecl{}), "org.openrewrite.golang.marker.ConstDecl")
+	RegisterValueType(reflect.TypeOf(tree.GroupedSpec{}), "org.openrewrite.golang.marker.GroupedSpec")
+	RegisterValueType(reflect.TypeOf(tree.InterfaceMethod{}), "org.openrewrite.golang.marker.InterfaceMethod")
+	RegisterValueType(reflect.TypeOf(tree.SelectStmt{}), "org.openrewrite.golang.marker.SelectStmt")
+	RegisterValueType(reflect.TypeOf(tree.TypeSwitchGuard{}), "org.openrewrite.golang.marker.TypeSwitchGuard")
+	RegisterValueType(reflect.TypeOf(tree.StructTag{}), "org.openrewrite.golang.marker.StructTag")
+	RegisterValueType(reflect.TypeOf(tree.TrailingComma{}), "org.openrewrite.golang.marker.TrailingComma")
+	RegisterValueType(reflect.TypeOf(tree.SearchResult{}), "org.openrewrite.marker.SearchResult")
+	RegisterValueType(reflect.TypeOf(tree.ParseExceptionResult{}), "org.openrewrite.ParseExceptionResult")
+	RegisterValueType(reflect.TypeOf(tree.Semicolon{}), "org.openrewrite.java.marker.Semicolon")
+	RegisterValueType(reflect.TypeOf(tree.GoProject{}), "org.openrewrite.golang.marker.GoProject")
+	RegisterValueType(reflect.TypeOf(tree.GoResolutionResult{}), "org.openrewrite.golang.marker.GoResolutionResult")
+	// Inner-class types of GoResolutionResult; Java emits them via
+	// getAndSendListAsRef so each item's wire shape carries a valueType.
+	RegisterValueType(reflect.TypeOf(tree.GoRequire{}), "org.openrewrite.golang.marker.GoResolutionResult$Require")
+	RegisterValueType(reflect.TypeOf(tree.GoReplace{}), "org.openrewrite.golang.marker.GoResolutionResult$Replace")
+	RegisterValueType(reflect.TypeOf(tree.GoExclude{}), "org.openrewrite.golang.marker.GoResolutionResult$Exclude")
+	RegisterValueType(reflect.TypeOf(tree.GoRetract{}), "org.openrewrite.golang.marker.GoResolutionResult$Retract")
+	RegisterValueType(reflect.TypeOf(tree.GoResolvedDependency{}), "org.openrewrite.golang.marker.GoResolutionResult$ResolvedDependency")
+
+	// JavaType types
+	RegisterValueType(reflect.TypeOf((*tree.JavaTypeClass)(nil)), "org.openrewrite.java.tree.JavaType$Class")
+	RegisterValueType(reflect.TypeOf((*tree.JavaTypeShallowClass)(nil)), "org.openrewrite.java.tree.JavaType$ShallowClass")
+	RegisterValueType(reflect.TypeOf((*tree.JavaTypeParameterized)(nil)), "org.openrewrite.java.tree.JavaType$Parameterized")
+	RegisterValueType(reflect.TypeOf((*tree.JavaTypeGenericTypeVariable)(nil)), "org.openrewrite.java.tree.JavaType$GenericTypeVariable")
+	RegisterValueType(reflect.TypeOf((*tree.JavaTypeArray)(nil)), "org.openrewrite.java.tree.JavaType$Array")
+	RegisterValueType(reflect.TypeOf((*tree.JavaTypePrimitive)(nil)), "org.openrewrite.java.tree.JavaType$Primitive")
+	RegisterValueType(reflect.TypeOf((*tree.JavaTypeMethod)(nil)), "org.openrewrite.java.tree.JavaType$Method")
+	RegisterValueType(reflect.TypeOf((*tree.JavaTypeVariable)(nil)), "org.openrewrite.java.tree.JavaType$Variable")
+	RegisterValueType(reflect.TypeOf((*tree.JavaTypeAnnotation)(nil)), "org.openrewrite.java.tree.JavaType$Annotation")
+	RegisterValueType(reflect.TypeOf((*tree.JavaTypeMultiCatch)(nil)), "org.openrewrite.java.tree.JavaType$MultiCatch")
+	RegisterValueType(reflect.TypeOf((*tree.JavaTypeIntersection)(nil)), "org.openrewrite.java.tree.JavaType$Intersection")
+	RegisterValueType(reflect.TypeOf((*tree.JavaTypeUnknown)(nil)), "org.openrewrite.java.tree.JavaType$Unknown")
+
+	// Register factories for creating instances during deserialization.
+	// Each J node gets a fresh random ID at construction time. The receiver
+	// overwrites this with the wire ID via PreVisit/WithID, so this value is
+	// transient. The point: if anything ever bypasses that override path,
+	// the failure mode is a private bogus-but-unique ID rather than uuid.Nil
+	// (which would collide across trees and cross-contaminate Java-side caches).
+	RegisterFactory("org.openrewrite.golang.tree.Go$CompilationUnit", func() any { return &tree.CompilationUnit{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$GoStatement", func() any { return &tree.GoStmt{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$Defer", func() any { return &tree.Defer{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$Send", func() any { return &tree.Send{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$Goto", func() any { return &tree.Goto{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$Fallthrough", func() any { return &tree.Fallthrough{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$Composite", func() any { return &tree.Composite{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$KeyValue", func() any { return &tree.KeyValue{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$SliceExpr", func() any { return &tree.Slice{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$MapType", func() any { return &tree.MapType{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$PointerType", func() any { return &tree.PointerType{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$Channel", func() any { return &tree.Channel{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$FuncType", func() any { return &tree.FuncType{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$StructType", func() any { return &tree.StructType{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$InterfaceType", func() any { return &tree.InterfaceType{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$TypeList", func() any { return &tree.TypeList{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$TypeDecl", func() any { return &tree.TypeDecl{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$MultiAssignment", func() any { return &tree.MultiAssignment{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$CommClause", func() any { return &tree.CommClause{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$IndexList", func() any { return &tree.IndexList{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$StatementExpression", func() any { return &tree.StatementExpression{ID: uuid.New()} })
+
+	RegisterFactory("org.openrewrite.java.tree.J$Identifier", func() any { return &tree.Identifier{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Literal", func() any { return &tree.Literal{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Binary", func() any { return &tree.Binary{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Block", func() any { return &tree.Block{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Return", func() any { return &tree.Return{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$If", func() any { return &tree.If{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$If$Else", func() any { return &tree.Else{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Assignment", func() any { return &tree.Assignment{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$AssignmentOperation", func() any { return &tree.AssignmentOperation{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$MethodDeclaration", func() any { return &tree.MethodDeclaration{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$ForLoop", func() any { return &tree.ForLoop{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$ForLoop$Control", func() any { return &tree.ForControl{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$ForEachLoop", func() any { return &tree.ForEachLoop{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$ForEachLoop$Control", func() any { return &tree.ForEachControl{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Switch", func() any { return &tree.Switch{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Case", func() any { return &tree.Case{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Break", func() any { return &tree.Break{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Continue", func() any { return &tree.Continue{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Label", func() any { return &tree.Label{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Empty", func() any { return &tree.Empty{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Annotation", func() any { return &tree.Annotation{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Unary", func() any { return &tree.Unary{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$FieldAccess", func() any { return &tree.FieldAccess{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$MethodInvocation", func() any { return &tree.MethodInvocation{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$VariableDeclarations", func() any { return &tree.VariableDeclarations{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable", func() any { return &tree.VariableDeclarator{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$ArrayType", func() any { return &tree.ArrayType{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$ArrayAccess", func() any { return &tree.ArrayAccess{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$ParameterizedType", func() any { return &tree.ParameterizedType{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$ArrayDimension", func() any { return &tree.ArrayDimension{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Parentheses", func() any { return &tree.Parentheses{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$TypeCast", func() any { return &tree.TypeCast{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$ControlParentheses", func() any { return &tree.ControlParentheses{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.java.tree.J$Import", func() any { return &tree.Import{ID: uuid.New()} })
+
+	// ParseError
+	RegisterFactory("org.openrewrite.tree.ParseError", func() any { return &tree.ParseError{Ident: uuid.New()} })
+	RegisterFactory("org.openrewrite.ParseExceptionResult", func() any { return tree.ParseExceptionResult{} })
+
+	// SourceFile-level types that implement RpcCodec
+	RegisterFactory("org.openrewrite.Checksum", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.Checksum"} })
+	RegisterFactory("org.openrewrite.FileAttributes", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.FileAttributes"} })
+
+	// Java-side markers that may appear when recipes modify trees or during LST writing.
+	// These markers do NOT implement RpcCodec and are serialized as raw values.
+	RegisterFactory("org.openrewrite.marker.RecipesThatMadeChanges", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.RecipesThatMadeChanges"} })
+	RegisterFactory("org.openrewrite.marker.LstProvenance", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.LstProvenance"} })
+	RegisterFactory("org.openrewrite.marker.BuildMetadata", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.BuildMetadata"} })
+	RegisterFactory("org.openrewrite.marker.GitTreeEntry", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.GitTreeEntry"} })
+	RegisterFactory("org.openrewrite.marker.BuildTool", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.BuildTool"} })
+	RegisterFactory("org.openrewrite.marker.BuildToolFailure", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.BuildToolFailure"} })
+	RegisterFactory("org.openrewrite.marker.Generated", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.Generated"} })
+	RegisterFactory("org.openrewrite.marker.DeserializationError", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.DeserializationError"} })
+	// SearchResult: IS an RpcCodec, sends 2 sub-fields (id, description)
+	RegisterFactory("org.openrewrite.marker.SearchResult", func() any { return tree.SearchResult{} })
+	// GroupedImport: IS an RpcCodec, sends 2 sub-fields (id, before whitespace)
+	RegisterFactory("org.openrewrite.golang.marker.GroupedImport", func() any { return tree.GroupedImport{} })
+	// ImportBlock: IS an RpcCodec, sends 5 sub-fields (id, closePrevious, before, grouped, groupedBefore)
+	RegisterFactory("org.openrewrite.golang.marker.ImportBlock", func() any { return tree.ImportBlock{} })
+	// Go-specific markers: all are RpcCodec
+	RegisterFactory("org.openrewrite.golang.marker.ShortVarDecl", func() any { return tree.ShortVarDecl{} })
+	RegisterFactory("org.openrewrite.golang.marker.VarKeyword", func() any { return tree.VarKeyword{} })
+	RegisterFactory("org.openrewrite.golang.marker.ConstDecl", func() any { return tree.ConstDecl{} })
+	RegisterFactory("org.openrewrite.golang.marker.GroupedSpec", func() any { return tree.GroupedSpec{} })
+	RegisterFactory("org.openrewrite.golang.marker.InterfaceMethod", func() any { return tree.InterfaceMethod{} })
+	RegisterFactory("org.openrewrite.golang.marker.SelectStmt", func() any { return tree.SelectStmt{} })
+	RegisterFactory("org.openrewrite.golang.marker.TypeSwitchGuard", func() any { return tree.TypeSwitchGuard{} })
+	RegisterFactory("org.openrewrite.golang.marker.StructTag", func() any { return tree.StructTag{} })
+	RegisterFactory("org.openrewrite.golang.marker.TrailingComma", func() any { return tree.TrailingComma{} })
+	// Semicolon: RpcCodec on the Java side; sends only `id`. Replaces the
+	// previous GenericMarker fallback for the same Java FQN.
+	RegisterFactory("org.openrewrite.java.marker.Semicolon", func() any { return tree.Semicolon{} })
+	// GoProject + GoResolutionResult are RpcCodec on the Java side; codec
+	// dispatch lives in space_rpc.go's sendMarkerCodecFields / receiveMarkersCodec.
+	RegisterFactory("org.openrewrite.golang.marker.GoProject", func() any { return tree.GoProject{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult", func() any { return tree.GoResolutionResult{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$Require", func() any { return tree.GoRequire{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$Replace", func() any { return tree.GoReplace{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$Exclude", func() any { return tree.GoExclude{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$Retract", func() any { return tree.GoRetract{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$ResolvedDependency", func() any { return tree.GoResolvedDependency{} })
+
+	RegisterFactory("org.openrewrite.java.tree.Space", func() any { return tree.Space{} })
+	RegisterFactory("org.openrewrite.marker.Markers", func() any { return tree.Markers{} })
+	RegisterFactory("org.openrewrite.java.tree.TextComment", func() any { return tree.Comment{} })
+
+	// Padding types — needed when Java sends ADD messages for new padding
+	// wrappers during bidirectional tree transfer (e.g., after a recipe
+	// recreates a statement list element). Uses RightPadded[tree.J] etc.
+	// as the broadest type that the padding accessors can handle.
+	RegisterFactory("org.openrewrite.java.tree.JRightPadded", func() any { return tree.RightPadded[tree.J]{} })
+	RegisterFactory("org.openrewrite.java.tree.JLeftPadded", func() any { return tree.LeftPadded[tree.J]{} })
+	RegisterFactory("org.openrewrite.java.tree.JContainer", func() any { return tree.Container[tree.J]{} })
+
+
+	RegisterFactory("org.openrewrite.java.tree.JavaType$Class", func() any { return &tree.JavaTypeClass{} })
+	RegisterFactory("org.openrewrite.java.tree.JavaType$ShallowClass", func() any { return &tree.JavaTypeShallowClass{} })
+	RegisterFactory("org.openrewrite.java.tree.JavaType$Parameterized", func() any { return &tree.JavaTypeParameterized{} })
+	RegisterFactory("org.openrewrite.java.tree.JavaType$GenericTypeVariable", func() any { return &tree.JavaTypeGenericTypeVariable{} })
+	RegisterFactory("org.openrewrite.java.tree.JavaType$Array", func() any { return &tree.JavaTypeArray{} })
+	RegisterFactory("org.openrewrite.java.tree.JavaType$Primitive", func() any { return &tree.JavaTypePrimitive{} })
+	RegisterFactory("org.openrewrite.java.tree.JavaType$Method", func() any { return &tree.JavaTypeMethod{} })
+	RegisterFactory("org.openrewrite.java.tree.JavaType$Variable", func() any { return &tree.JavaTypeVariable{} })
+	RegisterFactory("org.openrewrite.java.tree.JavaType$Annotation", func() any { return &tree.JavaTypeAnnotation{} })
+	RegisterFactory("org.openrewrite.java.tree.JavaType$MultiCatch", func() any { return &tree.JavaTypeMultiCatch{} })
+	RegisterFactory("org.openrewrite.java.tree.JavaType$Intersection", func() any { return &tree.JavaTypeIntersection{} })
+	RegisterFactory("org.openrewrite.java.tree.JavaType$Unknown", func() any { return &tree.JavaTypeUnknown{} })
+}
+
+// getValueTypeForPadding returns the Java class name for padding types.
+// Go generic types have no reflect.Name(), so we match by string representation.
+func getValueTypeForPadding(v any) *string {
+	ts := reflect.TypeOf(v).String()
+	if strings.Contains(ts, "RightPadded[") {
+		vt := "org.openrewrite.java.tree.JRightPadded"
+		return &vt
+	}
+	if strings.Contains(ts, "LeftPadded[") {
+		vt := "org.openrewrite.java.tree.JLeftPadded"
+		return &vt
+	}
+	if strings.Contains(ts, "Container[") {
+		vt := "org.openrewrite.java.tree.JContainer"
+		return &vt
+	}
+	return nil
+}

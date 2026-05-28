@@ -479,13 +479,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                     }
 
                     List<Expression> arguments = mi.getArguments();
-                    mi = JavaTemplate.builder("#{any(java.lang.String)}.formatted(#{any()})")
-                      .build()
-                      .apply(
-                        updateCursor(mi),
-                        mi.getCoordinates().replace(),
-                        arguments.toArray()
-                      );
+                    mi = JavaTemplate.apply("#{any(java.lang.String)}.formatted(#{any()})", updateCursor(mi), mi.getCoordinates().replace(), arguments.toArray());
 
                     return maybeAutoFormat(mi, mi.withArguments(
                       ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), ctx);

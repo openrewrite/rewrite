@@ -350,7 +350,8 @@ public class ChangePropertyKey extends Recipe {
             }
 
             if (entries.size() == 1) {
-                entries = ListUtils.map(entries, e -> e.withPrefix(""));
+                String firstEntryPrefix = m.getEntries().get(0).getPrefix();
+                entries = ListUtils.map(entries, e -> e.withPrefix(firstEntryPrefix));
             }
 
             if (changed) {

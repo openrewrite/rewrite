@@ -1330,7 +1330,13 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withImplements(@Nullable List<TypeTree> implementings) {
-            return getPadding().withImplements(JContainer.withElementsNullable(this.implementings, implementings));
+            JContainer<TypeTree> updated = JContainer.withElementsNullable(this.implementings, implementings);
+            if (updated != null && this.implementings == null) {
+                List<TypeTree> normalized = ListUtils.mapFirst(updated.getElements(), first ->
+                        first.getPrefix().isEmpty() ? first.withPrefix(Space.SINGLE_SPACE) : first);
+                updated = JContainer.withElements(updated, normalized).withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withImplements(updated);
         }
 
         @Nullable
@@ -1341,7 +1347,13 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withPermits(@Nullable List<TypeTree> permitting) {
-            return getPadding().withPermits(JContainer.withElementsNullable(this.permitting, permitting));
+            JContainer<TypeTree> updated = JContainer.withElementsNullable(this.permitting, permitting);
+            if (updated != null && this.permitting == null) {
+                List<TypeTree> normalized = ListUtils.mapFirst(updated.getElements(), first ->
+                        first.getPrefix().isEmpty() ? first.withPrefix(Space.SINGLE_SPACE) : first);
+                updated = JContainer.withElements(updated, normalized).withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withPermits(updated);
         }
 
         @With
@@ -4010,7 +4022,13 @@ public interface J extends Tree {
         }
 
         public MethodDeclaration withThrows(@Nullable List<NameTree> throwz) {
-            return getPadding().withThrows(JContainer.withElementsNullable(this.throwz, throwz));
+            JContainer<NameTree> updated = JContainer.withElementsNullable(this.throwz, throwz);
+            if (updated != null && this.throwz == null) {
+                List<NameTree> normalized = ListUtils.mapFirst(updated.getElements(), first ->
+                        first.getPrefix().isEmpty() ? first.withPrefix(Space.SINGLE_SPACE) : first);
+                updated = JContainer.withElements(updated, normalized).withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withThrows(updated);
         }
 
         /**
@@ -5653,7 +5671,11 @@ public interface J extends Tree {
         }
 
         public Try withResources(@Nullable List<Resource> resources) {
-            return getPadding().withResources(JContainer.withElementsNullable(this.resources, resources));
+            JContainer<Resource> updated = JContainer.withElementsNullable(this.resources, resources);
+            if (updated != null && this.resources == null) {
+                updated = updated.withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withResources(updated);
         }
 
         @With
@@ -5884,7 +5906,13 @@ public interface J extends Tree {
         }
 
         public TypeParameter withBounds(@Nullable List<TypeTree> bounds) {
-            return getPadding().withBounds(JContainer.withElementsNullable(this.bounds, bounds));
+            JContainer<TypeTree> updated = JContainer.withElementsNullable(this.bounds, bounds);
+            if (updated != null && this.bounds == null) {
+                List<TypeTree> normalized = ListUtils.mapFirst(updated.getElements(), first ->
+                        first.getPrefix().isEmpty() ? first.withPrefix(Space.SINGLE_SPACE) : first);
+                updated = JContainer.withElements(updated, normalized).withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withBounds(updated);
         }
 
         @Override
@@ -5918,6 +5946,62 @@ public interface J extends Tree {
             public TypeParameter withBounds(@Nullable JContainer<TypeTree> bounds) {
                 return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.name, bounds);
             }
+        }
+    }
+
+    /**
+     * A type bound on a type parameter, such as {@code <: Comparable} (upper) or
+     * {@code >: Null} (lower) in Scala, or {@code extends Number} in Java.
+     * <p>
+     * Implements {@link TypeTree} so it can be used as an element in
+     * {@link TypeParameter}'s existing {@code JContainer<TypeTree> bounds} without
+     * a breaking change. Old LSTs that have bare {@link TypeTree} elements in bounds
+     * are implicitly upper bounds.
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    final class TypeBound implements J, TypeTree {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+
+        Markers markers;
+
+        Kind kind;
+
+        /**
+         * The constraining type, e.g. {@code Number} in {@code extends Number}.
+         */
+        TypeTree boundedType;
+
+        public enum Kind {
+            /**
+             * Upper type bound. Java {@code extends}, Scala {@code <:}, Kotlin {@code :}.
+             */
+            Upper,
+            /**
+             * Lower type bound. Scala {@code >:}.
+             */
+            Lower
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return boundedType.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public TypeBound withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            // Visited as part of TypeParameter bounds traversal
+            return this;
         }
     }
 

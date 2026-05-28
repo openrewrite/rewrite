@@ -27,6 +27,9 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Xml visitDocument(Xml.Document document, PrintOutputCapture<P> p) {
+        if (document.isCharsetBomMarked()) {
+            p.append('\uFEFF');
+        }
         beforeSyntax(document, p);
         document = (Xml.Document) super.visitDocument(document, p);
         afterSyntax(document, p);

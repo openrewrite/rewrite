@@ -135,6 +135,52 @@ class EnumTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/7554")
+    @Test
+    void enumConstantWithMethodCallArgument() {
+        rewriteRun(
+          java(
+            """
+              enum Action {
+                  COPY_TO(label("Copy to")),
+                  COPY_MORE(label("Copy"));
+
+                  private final String text;
+
+                  Action(String text) {
+                      this.text = text;
+                  }
+
+                  static String label(String s) {
+                      return s;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7554")
+    @Test
+    void enumConstantWithStringConcatArgument() {
+        rewriteRun(
+          java(
+            """
+              enum Action {
+                  COPY_TO("Copy to"),
+                  COPY_MORE("Copy" + "...");
+
+                  private final String text;
+
+                  Action(String text) {
+                      this.text = text;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void enumWithoutParameters() {
         rewriteRun(
@@ -226,6 +272,22 @@ class EnumTest implements RewriteTest {
                 assertFalse(colorEnumType.getMembers().get(0).hasFlags(Flag.Enum)); // GREEN
                 assertTrue(colorEnumType.getMembers().get(1).hasFlags(Flag.Enum)); // BLUE
                 assertTrue(colorEnumType.getMembers().get(2).hasFlags(Flag.Enum)); // RED
+            })
+          )
+        );
+    }
+
+    @Test
+    void enumWhitespaceAttachedToEnumValueSet() {
+        rewriteRun(
+          java(
+            "enum Color { RED, GREEN, BLUE }",
+            spec -> spec.afterRecipe(cu -> {
+                J.EnumValueSet enumValueSet = (J.EnumValueSet) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.EnumValue firstValue = enumValueSet.getEnums().get(0);
+
+                assertEquals(" ", enumValueSet.getPrefix().getWhitespace());
+                assertEquals("", firstValue.getPrefix().getWhitespace());
             })
           )
         );

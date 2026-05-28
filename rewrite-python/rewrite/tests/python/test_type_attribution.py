@@ -1240,6 +1240,143 @@ class TestCyclicTypeResolution:
         assert result is JavaType.Primitive.Int
 
 
+class TestParamSpecAndConcatenate:
+    """Unit tests for the ty-types 0.0.31 `paramSpecName` / `concatenatePrefix` fields.
+
+    Use mock descriptors so the logic is exercised without the ty-types CLI.
+    End-to-end tests against real source live in
+    TestParamSpecAndConcatenateIntegration below.
+    """
+
+    def test_paramspec_pair_collapses_to_single_entry(self):
+        """The synthetic `*args` + `**kwargs` pair is folded into one entry
+        whose name is the ParamSpec's name and whose type is Unknown."""
+        mapping = PythonTypeMapping("", file_path=None)
+        params = [
+            {'name': 'args', 'kind': 'variadic', 'paramSpecName': 'P'},
+            {'name': 'kwargs', 'kind': 'keywordVariadic', 'paramSpecName': 'P'},
+        ]
+        names, types = mapping._process_method_params(params)
+        assert names == ['P']
+        assert len(types) == 1
+        assert isinstance(types[0], JavaType.Unknown)
+
+    def test_concatenate_prefix_is_treated_as_positional(self):
+        """A param flagged `concatenatePrefix: True` is emitted as-is;
+        the trailing ParamSpec pair still collapses behind it."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[7] = {'kind': 'instance', 'className': 'int'}
+        params = [
+            {'name': '', 'kind': 'positionalOnly', 'typeId': 7,
+             'concatenatePrefix': True},
+            {'name': 'args', 'kind': 'variadic', 'paramSpecName': 'P'},
+            {'name': 'kwargs', 'kind': 'keywordVariadic', 'paramSpecName': 'P'},
+        ]
+        names, types = mapping._process_method_params(params)
+        assert names == ['', 'P']
+        assert types[0] is JavaType.Primitive.Int
+        assert isinstance(types[1], JavaType.Unknown)
+
+    def test_plain_params_unchanged(self):
+        """Regression: descriptors without the new fields still produce
+        one entry per parameter with the declared type."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'instance', 'className': 'int'}
+        mapping._type_registry[2] = {'kind': 'instance', 'className': 'int'}
+        params = [
+            {'name': 'a', 'typeId': 1},
+            {'name': 'b', 'typeId': 2},
+        ]
+        names, types = mapping._process_method_params(params)
+        assert names == ['a', 'b']
+        assert types == [JavaType.Primitive.Int, JavaType.Primitive.Int]
+
+    def test_self_and_cls_still_filtered(self):
+        """Filtering of self/cls still works when new fields are present."""
+        mapping = PythonTypeMapping("", file_path=None)
+        params = [
+            {'name': 'self'},
+            {'name': 'args', 'kind': 'variadic', 'paramSpecName': 'P'},
+            {'name': 'kwargs', 'kind': 'keywordVariadic', 'paramSpecName': 'P'},
+        ]
+        names, _ = mapping._process_method_params(params)
+        assert names == ['P']
+
+
+@requires_ty_types_cli
+class TestParamSpecAndConcatenateIntegration:
+    """End-to-end tests exercising ty-types 0.0.31 ParamSpec/Concatenate output."""
+
+    def test_callable_paramspec_collapses_in_invocation(self):
+        """`cb()` where `cb: Callable[P, R]` yields a method type with a
+        single collapsed `P` parameter rather than two variadic entries."""
+        source = '''from typing import Callable, ParamSpec, TypeVar
+P = ParamSpec('P')
+R = TypeVar('R')
+
+def run(cb: Callable[P, R]) -> R:
+    return cb()
+
+run(lambda: 42)
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            cb_call = tree.body[3].body[0].value  # cb() inside run
+            result = mapping.method_invocation_type(cb_call)
+            assert result is not None
+            assert result._parameter_names == ['P']
+            assert result._parameter_types is not None
+            assert len(result._parameter_types) == 1
+            assert isinstance(result._parameter_types[0], JavaType.Unknown)
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_concatenate_keeps_prefix_and_collapses_tail(self):
+        """`cb(1)` where `cb: Callable[Concatenate[int, P], R]` yields a
+        method type with the leading `int` plus a single collapsed `P`."""
+        source = '''from typing import Callable, Concatenate, ParamSpec, TypeVar
+P = ParamSpec('P')
+R = TypeVar('R')
+
+def run(cb: Callable[Concatenate[int, P], R]) -> R:
+    return cb(1)
+
+run(lambda x: x)
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            cb_call = tree.body[3].body[0].value  # cb(1) inside run
+            result = mapping.method_invocation_type(cb_call)
+            assert result is not None
+            assert result._parameter_names is not None
+            assert len(result._parameter_names) == 2
+            assert result._parameter_names[-1] == 'P'
+            assert result._parameter_types is not None
+            assert result._parameter_types[0] == JavaType.Primitive.Int
+            assert isinstance(result._parameter_types[1], JavaType.Unknown)
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_plain_function_method_type_unchanged(self):
+        """Regression: a function with no ParamSpec/Concatenate produces the
+        same (name, type) pairs it did before the 0.0.31 field additions."""
+        source = '''def add(a: int, b: int) -> int:
+    return a + b
+
+add(1, 2)
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[1].value
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._parameter_names == ['a', 'b']
+            assert result._parameter_types == [
+                JavaType.Primitive.Int, JavaType.Primitive.Int]
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
 @requires_ty_types_cli
 class TestClassKind:
     """Tests for JavaType.Class.Kind inference from ty-types data."""
@@ -1846,3 +1983,82 @@ TypeVar
             assert 'typing' in result._fully_qualified_name
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
+
+
+class TestDeclarationDeclaringType:
+    """Tests for declaring type on function declarations."""
+
+    def test_declaration_declaring_type_no_ty_types(self):
+        """Without ty-types, declaring type remains None."""
+        source = 'def greet(name: str) -> str:\n    return name\n'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+        func_node = tree.body[0]
+        result = mapping.method_declaration_type(func_node)
+        assert result is not None
+        assert result._declaring_type is None
+
+    @requires_ty_types_cli
+    def test_declaration_declaring_type_with_ty_types(self):
+        """With ty-types, a function declaration should get a declaring type from the descriptor."""
+        source = 'def greet(name: str) -> str:\n    return name\n'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            func_node = tree.body[0]
+            result = mapping.method_declaration_type(func_node)
+            assert result is not None
+            assert isinstance(result, JavaType.Method)
+            assert result._declaring_type is not None, \
+                "Declaration should have a declaring type, not None"
+            assert isinstance(result._declaring_type, JavaType.Class)
+            assert result._declaring_type._fully_qualified_name != "<unknown>"
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
+class TestCyclicTypeResolution:
+    """Tests that FQN-deduplicated types don't produce self-referential supertypes.
+
+    Python's namedtuple pattern ``class Pair(namedtuple('Pair', ...))`` creates
+    two types with the same FQN. The type mapping deduplicates by FQN, which can
+    cause the single JavaType.Class object to have itself as its own supertype.
+    """
+
+    def test_namedtuple_subclass_no_self_supertype(self):
+        """A class extending a namedtuple with the same name must not have
+        itself as its own supertype.
+
+        This is the pattern from importlib_metadata._collections.Pair that
+        caused StackOverflowError in TypeUtils.isAssignableTo() on Moderne.
+        """
+        source = 'x = 1'
+        mapping = PythonTypeMapping(source)
+
+        # Simulate what ty-types produces for:
+        #   class Pair(collections.namedtuple('Pair', 'name value')): ...
+        # Two classLiteral descriptors with the same FQN but different type_ids.
+        # type_id 1: the namedtuple-generated Pair (no supertypes of its own here)
+        # type_id 2: the class Pair, whose supertype is type_id 1
+        mapping._type_registry[1] = {
+            'kind': 'classLiteral',
+            'className': 'Pair',
+            'moduleName': 'mymodule',
+            'supertypes': [],
+        }
+        mapping._type_registry[2] = {
+            'kind': 'classLiteral',
+            'className': 'Pair',
+            'moduleName': 'mymodule',
+            'supertypes': [1],
+        }
+
+        type_pair = mapping._resolve_type(2)
+
+        assert type_pair is not None
+        assert isinstance(type_pair, JavaType.FullyQualified)
+        assert type_pair.fully_qualified_name == 'mymodule.Pair'
+
+        # The supertype must NOT be itself
+        supertype = getattr(type_pair, '_supertype', None)
+        assert supertype is not type_pair, \
+            "Pair has itself as its own supertype — would cause StackOverflowError in Java"

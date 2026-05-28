@@ -127,10 +127,13 @@ public class PropertyPlaceholderHelper {
                 if (visitedPlaceholders == null) {
                     visitedPlaceholders = new HashSet<>(4);
                 }
-                if (visitedPlaceholders.add(originalPlaceholder)) {
-                    placeholder = parseStringValue(placeholder, placeholderResolver, visitedPlaceholders);
+                if (!visitedPlaceholders.add(originalPlaceholder)) {
+                    // Circular reference detected - leave this placeholder unresolved
+                    startIndex = result.indexOf(placeholderPrefix, endIndex + placeholderSuffix.length());
+                    continue;
                 }
                 // Recursive invocation, parsing placeholders contained in the placeholder key.
+                placeholder = parseStringValue(placeholder, placeholderResolver, visitedPlaceholders);
                 // Now obtain the value for the fully resolved key...
                 String propVal = placeholderResolver.apply(placeholder);
                 if (propVal == null && valueSeparator != null) {

@@ -144,8 +144,8 @@ class CreateYamlFileTest implements RewriteTest {
           bar:
             z: y
           """;
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext(e -> e.printStackTrace());
-        MockHttpSender httpSender = new MockHttpSender(() ->
+        var ctx = new InMemoryExecutionContext(e -> e.printStackTrace());
+        var httpSender = new MockHttpSender(() ->
           new ByteArrayInputStream(yamlContent.getBytes()));
         HttpSenderExecutionContextView.view(ctx)
           .setHttpSender(httpSender)

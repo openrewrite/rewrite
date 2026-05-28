@@ -260,7 +260,13 @@ class AddImport(PythonVisitor):
                 break  # Stop after we've passed the import section
 
         # Insert the new import at the padding level
-        if insert_idx == 0 and padded_stmts:
+        if not padded_stmts:
+            # Empty file (e.g., a prior remove-import emptied the statement
+            # list). The new import becomes the sole statement with empty
+            # prefix; any trailing newline lives in cu.eof.
+            new_padded = JRightPadded(new_import.replace(prefix=Space.EMPTY), Space.EMPTY, Markers.EMPTY)
+            padded_stmts.append(new_padded)
+        elif insert_idx == 0:
             first = padded_stmts[0]
             first_prefix = first.element.prefix
             if first_prefix.whitespace and first_prefix.whitespace.startswith('\n'):

@@ -17,6 +17,8 @@ package org.openrewrite.javascript;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.LockFileRegeneration;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.test.SourceSpec;
@@ -37,6 +39,18 @@ public class Assertions {
     }
 
     public static SourceSpecs npm(Path relativeTo, SourceSpecs... sources) {
+        return nodePackageManager(relativeTo, PackageManager.Npm, sources);
+    }
+
+    public static SourceSpecs yarnBerry(Path relativeTo, SourceSpecs... sources) {
+        return nodePackageManager(relativeTo, PackageManager.YarnBerry, sources);
+    }
+
+    public static SourceSpecs pnpm(Path relativeTo, SourceSpecs... sources) {
+        return nodePackageManager(relativeTo, PackageManager.Pnpm, sources);
+    }
+
+    public static SourceSpecs nodePackageManager(Path relativeTo, PackageManager pm, SourceSpecs... sources) {
         String packageJsonContent = null;
 
         // First pass: find package.json content and write it to relativeTo
@@ -57,13 +71,14 @@ public class Assertions {
             }
         }
 
-        // Second pass: get or create cached workspace and symlink node_modules and package-lock.json
+        // Second pass: get or create cached workspace and symlink node_modules and the lockfile
         if (packageJsonContent != null) {
-            Path workspaceDir = DependencyWorkspace.getOrCreateWorkspace(packageJsonContent);
+            Path workspaceDir = DependencyWorkspace.getOrCreateWorkspace(packageJsonContent, pm);
+            String lockFileName = lockFileName(pm);
             Path nodeModulesSource = workspaceDir.resolve("node_modules");
             Path nodeModulesTarget = relativeTo.resolve("node_modules");
-            Path lockFileSource = workspaceDir.resolve("package-lock.json");
-            Path lockFileTarget = relativeTo.resolve("package-lock.json");
+            Path lockFileSource = workspaceDir.resolve(lockFileName);
+            Path lockFileTarget = relativeTo.resolve(lockFileName);
 
             try {
                 if (Files.exists(nodeModulesSource) && !Files.exists(nodeModulesTarget)) {
@@ -72,12 +87,30 @@ public class Assertions {
                 if (Files.exists(lockFileSource) && !Files.exists(lockFileTarget)) {
                     Files.createSymbolicLink(lockFileTarget, lockFileSource);
                 }
+                // Yarn berry needs .yarnrc.yml (nodeLinker: node-modules) next to the
+                // package.json so any tool re-invoking yarn in this dir honors the
+                // same linker as the cached workspace.
+                if (pm == PackageManager.YarnBerry) {
+                    Path yarnrcSource = workspaceDir.resolve(".yarnrc.yml");
+                    Path yarnrcTarget = relativeTo.resolve(".yarnrc.yml");
+                    if (Files.exists(yarnrcSource) && !Files.exists(yarnrcTarget)) {
+                        Files.createSymbolicLink(yarnrcTarget, yarnrcSource);
+                    }
+                }
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to create symlink for node_modules", e);
             }
         }
 
         return SourceSpecs.dir(relativeTo.toString(), sources);
+    }
+
+    private static String lockFileName(PackageManager pm) {
+        LockFileRegeneration regen = LockFileRegeneration.forPackageManager(pm);
+        if (regen == null) {
+            throw new IllegalArgumentException("Unsupported package manager: " + pm);
+        }
+        return regen.getLockFile();
     }
 
     public static SourceSpecs packageJson(@Language("json5") @Nullable String before) {

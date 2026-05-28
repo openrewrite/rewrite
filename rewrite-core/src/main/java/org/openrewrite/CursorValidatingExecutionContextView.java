@@ -59,7 +59,7 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
                 PANIC.equals(key) ||
                 ExecutionContext.CURRENT_CYCLE.equals(key) ||
                 ExecutionContext.CURRENT_RECIPE.equals(key) ||
-                ExecutionContext.DATA_TABLES.equals(key) ||
+                DataTableExecutionContextView.DATA_TABLE_STORE.equals(key) ||
                 WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT.equals(key) ||
                 ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT.equals(key) ||
                 key.startsWith("org.openrewrite.maven") // MavenExecutionContextView stores metrics

@@ -38,10 +38,8 @@ import static java.util.stream.Collectors.joining;
 public class FindDeprecatedMethods extends Recipe {
     private static final AnnotationMatcher DEPRECATED_MATCHER = new AnnotationMatcher("@java.lang.Deprecated");
 
-    transient MethodCalls deprecatedMethodCalls = new MethodCalls(this);
-
     @Option(displayName = "Method pattern",
-            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
+            description = MethodMatcher.METHOD_PATTERN_INVOCATIONS_DESCRIPTION,
             example = "java.util.List add(..)",
             required = false)
     @Nullable
@@ -52,6 +50,12 @@ public class FindDeprecatedMethods extends Recipe {
             required = false)
     @Nullable
     Boolean ignoreDeprecatedScopes;
+
+    transient MethodCalls deprecatedMethodCalls = new MethodCalls(this);
+
+    private String dataTableInstanceName() {
+        return methodPattern != null ? "Deprecated method calls matching `" + methodPattern + "`" : "Deprecated method calls";
+    }
 
     String displayName = "Find uses of deprecated methods";
 

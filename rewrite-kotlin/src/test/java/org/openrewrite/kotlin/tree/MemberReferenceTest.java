@@ -15,12 +15,17 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class MemberReferenceTest implements RewriteTest {
@@ -142,8 +147,51 @@ class MemberReferenceTest implements RewriteTest {
         );
     }
 
+    @Test
+    void callableReferenceToBuildListAdd() {
+        // Inside `buildList { ... }`, the receiver is `MutableList<E>` where E is
+        // a type variable being inferred. A callable reference to its `add` method
+        // exposes a `ConeTypeVariableType` parameter — which the type signature
+        // builder must handle (rather than throwing UnsupportedOperationException).
+        //
+        // We additionally assert that the recovered parameter type is the original
+        // `E` type parameter (a `GenericTypeVariable`), confirming the
+        // `ConeTypeParameterLookupTag` recovery path is taken — not the
+        // `Generic{?}` wildcard fallback.
+        AtomicBoolean asserted = new AtomicBoolean();
+        rewriteRun(
+          kotlin(
+            """
+              fun build() = buildList {
+                  listOf(1, 2, 3).forEach(::add)
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.MemberReference visitMemberReference(J.MemberReference ref, Integer p) {
+                        JavaType.Method methodType = ref.getMethodType();
+                        assertThat(methodType).isNotNull();
+                        assertThat(methodType.getName()).isEqualTo("add");
+                        assertThat(methodType.getParameterTypes()).hasSize(1);
+                        JavaType paramType = methodType.getParameterTypes().get(0);
+                        assertThat(paramType)
+                          .as("Parameter type should be the recovered type parameter, not a wildcard")
+                          .isInstanceOf(JavaType.GenericTypeVariable.class);
+                        assertThat(((JavaType.GenericTypeVariable) paramType).getName())
+                          .as("Recovered type parameter name should be 'E' (from MutableList<E>)")
+                          .isEqualTo("E");
+                        asserted.set(true);
+                        return super.visitMemberReference(ref, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted).as("MemberReference for ::add should be present").isTrue();
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/386")
-    @Disabled("K2 produces J.Unknown for unresolved callable references (::unresolved)")
     @Test
     void firCallableReferenceAccess() {
         rewriteRun(

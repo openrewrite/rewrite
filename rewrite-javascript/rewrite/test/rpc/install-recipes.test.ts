@@ -233,8 +233,7 @@ describe("InstallRecipes", () => {
             }, {unsafeCleanup: true});
         }, 60000);
 
-        // Skipped: published @openrewrite/rewrite has vitest runtime dep; fix: https://github.com/openrewrite/rewrite/pull/6957
-        test.skip("installs @openrewrite/recipes-nodejs from npm", async () => {
+        test("installs @openrewrite/recipes-nodejs from npm", async () => {
             await withDir(async (dir) => {
                 // given
                 const installDir = path.join(dir.path, "recipes");
@@ -257,8 +256,7 @@ describe("InstallRecipes", () => {
             }, {unsafeCleanup: true});
         }, 120000);
 
-        // Skipped: published @openrewrite/rewrite has vitest runtime dep; fix: https://github.com/openrewrite/rewrite/pull/6957
-        test.skip("upgrades @openrewrite/recipes-nodejs from 0.36.0 to a later version", async () => {
+        test("upgrades @openrewrite/recipes-nodejs from 0.36.0 to a later version", async () => {
             await withDir(async (dir) => {
                 // given
                 const installDir = path.join(dir.path, "recipes");

@@ -19,7 +19,8 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 25
+          java-version: |
+            25
 
       - name: Update versions
         run: ./gradlew :rewrite-gradle:syncWrapperScripts

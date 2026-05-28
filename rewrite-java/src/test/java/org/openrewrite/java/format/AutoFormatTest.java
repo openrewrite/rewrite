@@ -31,7 +31,6 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -977,8 +976,8 @@ class AutoFormatTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings({"StringBufferReplaceableByString", "SimplifyStreamApiCallChains", "RedundantIfStatement"})
     @Nested
+    @SuppressWarnings({"StringBufferReplaceableByString", "SimplifyStreamApiCallChains", "RedundantIfStatement"})
     class MethodChains {
 
         @Test
@@ -2043,8 +2042,8 @@ class AutoFormatTest implements RewriteTest {
             );
         }
 
-        @SuppressWarnings("TrailingWhitespacesInTextBlock")
         @Issue("https://www.jetbrains.com/help/idea/2025.1/code-style-java.html?#chained-method-calls")
+        @SuppressWarnings("TrailingWhitespacesInTextBlock")
         @Test
         void alwaysWrapBuilderMethods() {
             rewriteRun(
@@ -2928,8 +2927,8 @@ class AutoFormatTest implements RewriteTest {
         }
     }
 
-    @SuppressWarnings({"Convert2MethodRef", "CodeBlock2Expr"})
     @Nested
+    @SuppressWarnings({"Convert2MethodRef", "CodeBlock2Expr"})
     class MethodInvocationArguments {
 
         @Test
@@ -3657,7 +3656,7 @@ class AutoFormatTest implements RewriteTest {
                 .styles(singletonList(
                   new NamedStyles(
                     Tree.randomId(), "checkstyle", "Checkstyle", "Checkstyle.", emptySet(),
-                    Arrays.asList(styles)
+                    List.of(styles)
                   ))));
         }
 

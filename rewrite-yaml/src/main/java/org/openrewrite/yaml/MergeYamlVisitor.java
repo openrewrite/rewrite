@@ -234,15 +234,37 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
 
                     // Get comment from next element in same mapping block
+                    boolean foundDirectSibling = false;
                     for (int i = 0; i < entries.size() - 1; i++) {
                         if (entries.get(i).getValue().equals(getCursor().getValue())) {
                             comment = substringOfBeforeFirstLineBreak(entries.get(i + 1).getPrefix());
+                            foundDirectSibling = true;
                             break;
                         }
                     }
                     // OR retrieve it for last item from next element (could potentially be much higher in the tree).
                     if (comment == null && hasLineBreak(entries.get(entries.size() - 1).getPrefix())) {
                         comment = substringOfBeforeFirstLineBreak(entries.get(entries.size() - 1).getPrefix());
+                    }
+
+                    // If the current mapping is not a direct child of the found parent mapping,
+                    // fall back to the Document.End prefix. This handles the case where the mapping
+                    // being merged is deeply nested (e.g., inside a sequence entry) and the inline
+                    // comment is stored on the Document.End node.
+                    if (!foundDirectSibling && !isNotEmpty(comment)) {
+                        Cursor docCursor = c.dropParentUntil(it -> ROOT_VALUE.equals(it) || it instanceof Yaml.Document);
+                        if (docCursor.getValue() instanceof Yaml.Document) {
+                            Yaml.Document doc = docCursor.getValue();
+                            if (!preserveDocumentSeparator(doc)) {
+                                String endPrefix = doc.getEnd().getPrefix();
+                                // Only use Document.End prefix if it contains a comment;
+                                // plain trailing whitespace should not be copied as a comment
+                                if (endPrefix != null && endPrefix.contains("#")) {
+                                    comment = endPrefix;
+                                    c = docCursor;
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -293,9 +315,16 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
             }
 
-            String existingEntryPrefix = s1.getEntries().get(0).getPrefix();
-            String currentIndent = existingEntryPrefix.substring(existingEntryPrefix.lastIndexOf('\n'));
-            List<Yaml.Sequence.Entry> newEntries = ListUtils.map(incomingEntries, it -> it.withPrefix(currentIndent));
+            boolean isFlowStyle = s1.getOpeningBracketPrefix() != null;
+            List<Yaml.Sequence.Entry> newEntries;
+            if (isFlowStyle) {
+                newEntries = ListUtils.map(incomingEntries, it ->
+                        it.withPrefix("").withBlock(it.getBlock().withPrefix(" ")).withTrailingCommaPrefix(null));
+            } else {
+                String existingEntryPrefix = s1.getEntries().get(0).getPrefix();
+                String newEntryPrefix = existingEntryPrefix.substring(existingEntryPrefix.lastIndexOf('\n'));
+                newEntries = ListUtils.map(incomingEntries, it -> it.withPrefix(newEntryPrefix));
+            }
             List<Yaml.Sequence.Entry> mutatedEntries = concatAll(s1.getEntries(), newEntries, it -> {
                 if (it.getBlock() instanceof Yaml.Scalar) {
                     return ((Yaml.Scalar) it.getBlock()).getValue();
@@ -305,6 +334,15 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
                 return "";
             }).ls;
+
+            // For flow-style sequences, ensure commas are correct: add a trailing comma
+            // on the entry before the first new entry, and remove any trailing comma from the last entry
+            if (isFlowStyle && !newEntries.isEmpty() && mutatedEntries.size() > s1.getEntries().size()) {
+                int lastExistingIdx = s1.getEntries().size() - 1;
+                mutatedEntries.set(lastExistingIdx, mutatedEntries.get(lastExistingIdx).withTrailingCommaPrefix(""));
+                int lastIdx = mutatedEntries.size() - 1;
+                mutatedEntries.set(lastIdx, mutatedEntries.get(lastIdx).withTrailingCommaPrefix(null));
+            }
 
             return s1.withEntries(mutatedEntries);
         }

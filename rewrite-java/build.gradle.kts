@@ -67,7 +67,7 @@ dependencies {
     testRuntimeOnly(project(":rewrite-java-21"))
     testImplementation("com.tngtech.archunit:archunit:1.0.1")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.0.1")
-    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
+    testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testImplementation("io.moderne:jsonrpc:latest.integration")
 
     // For use in ClassGraphTypeMappingTest
@@ -100,4 +100,8 @@ tasks.named<ShadowJar>("shadowJar").configure {
     dependsOn(checkstyle)
     configurations = listOf(checkstyle)
     relocate("com.puppycrawl.tools.checkstyle", "org.openrewrite.tools.checkstyle")
+    // Avoid leaking the bundled checkstyle's META-INF/maven/com.puppycrawl.tools/checkstyle/
+    // metadata, which would otherwise cause tools that read pom.properties to misidentify
+    // this jar as com.puppycrawl.tools:checkstyle.
+    exclude("META-INF/maven/**")
 }

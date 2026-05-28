@@ -19,6 +19,7 @@ import lombok.Value;
 import org.openrewrite.rpc.request.RpcRequest;
 
 import java.nio.file.Path;
+import java.util.Map;
 
 /**
  * RPC request to parse a .sln or .csproj via MSBuildWorkspace.
@@ -36,4 +37,9 @@ class ParseSolution implements RpcRequest {
      * Repository root directory for computing relative source paths.
      */
     Path rootDir;
+
+    /**
+     * Options to pass to the C# side, such as whether to require print-equals-input validation.
+     */
+    Map<String, Object> options;
 }

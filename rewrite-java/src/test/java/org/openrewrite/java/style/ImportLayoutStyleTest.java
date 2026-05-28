@@ -90,12 +90,12 @@ class ImportLayoutStyleTest implements RewriteTest {
         mapper.readValue(mapper.writeValueAsBytes(style), DeclarativeNamedStyles.class);
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4196")
+    @Test
     void addImportInPresenceOfDuplicateOtherImport() {
-        ImportLayoutStyle style = new ImportLayoutStyle(
+        var style = new ImportLayoutStyle(
           Integer.MAX_VALUE, Integer.MAX_VALUE, null, null);
-        JRightPadded<J.Import> import1 = new JRightPadded<>(
+        var import1 = new JRightPadded<J.Import>(
           new J.Import(
             randomId(),
             Space.EMPTY,
@@ -105,7 +105,7 @@ class ImportLayoutStyleTest implements RewriteTest {
             null),
           Space.EMPTY,
           Markers.EMPTY);
-        JRightPadded<J.Import> import2 = new JRightPadded<>(
+        var import2 = new JRightPadded<J.Import>(
           new J.Import(
             randomId(),
             Space.EMPTY,
@@ -115,7 +115,7 @@ class ImportLayoutStyleTest implements RewriteTest {
             null),
           Space.EMPTY,
           Markers.EMPTY);
-        J.Import importToAdd = new J.Import(
+        var importToAdd = new J.Import(
           randomId(),
           Space.EMPTY,
           Markers.EMPTY,
@@ -127,12 +127,12 @@ class ImportLayoutStyleTest implements RewriteTest {
             import1, import1, new JRightPadded<>(importToAdd, Space.EMPTY, Markers.EMPTY));
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4241")
+    @Test
     void addImportWithNewLineInUnsortedImportList() {
-        ImportLayoutStyle style = new ImportLayoutStyle(
+        var style = new ImportLayoutStyle(
           Integer.MAX_VALUE, Integer.MAX_VALUE, emptyList(), emptyList());
-        JRightPadded<J.Import> import0 = new JRightPadded<>(
+        var import0 = new JRightPadded<J.Import>(
           new J.Import(
             randomId(),
             Space.EMPTY,
@@ -142,7 +142,7 @@ class ImportLayoutStyleTest implements RewriteTest {
             null),
           Space.EMPTY,
           Markers.EMPTY);
-        JRightPadded<J.Import> import1 = new JRightPadded<>(
+        var import1 = new JRightPadded<J.Import>(
           new J.Import(
             randomId(),
             Space.EMPTY,
@@ -152,7 +152,7 @@ class ImportLayoutStyleTest implements RewriteTest {
             null),
           Space.EMPTY,
           Markers.EMPTY);
-        JRightPadded<J.Import> import3 = new JRightPadded<>(
+        var import3 = new JRightPadded<J.Import>(
           new J.Import(
             randomId(),
             Space.EMPTY,
@@ -162,7 +162,7 @@ class ImportLayoutStyleTest implements RewriteTest {
             null),
           Space.EMPTY,
           Markers.EMPTY);
-        J.Import importToAdd = new J.Import(
+        var importToAdd = new J.Import(
           randomId(),
           Space.EMPTY,
           Markers.EMPTY,
@@ -198,11 +198,11 @@ class ImportLayoutStyleTest implements RewriteTest {
           .nameCountToUseStarImport(999)
           .build();
 
-        NamedStyles autodetected = new NamedStyles(
+        var autodetected = new NamedStyles(
           Tree.randomId(), "org.openrewrite.java.style.Autodetect", "Autodetect", "Autodetect", emptySet(),
           singletonList(autodetectedLayout)
         );
-        NamedStyles checkstyleStyles = new NamedStyles(
+        var checkstyleStyles = new NamedStyles(
           Tree.randomId(), "org.openrewrite.java.Checkstyle", "Checkstyle", "Checkstyle", emptySet(),
           singletonList(checkstyleLayout)
         );

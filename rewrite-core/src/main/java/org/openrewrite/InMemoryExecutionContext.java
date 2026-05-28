@@ -100,11 +100,8 @@ public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
     @Override
     public InMemoryExecutionContext clone() {
         InMemoryExecutionContext clone = new InMemoryExecutionContext();
-
         clone.messages = new ConcurrentHashMap<>(getMessages());
-        //noinspection DataFlowIssue
-        clone.messages.computeIfPresent(DATA_TABLES, (key, dt) ->
-                new ConcurrentHashMap<>(((Map<?, ?>) dt)));
+        // DataTableStore is shared (thread-safe) — no need to deep-copy
         return clone;
     }
 }

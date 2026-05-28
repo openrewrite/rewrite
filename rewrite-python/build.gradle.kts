@@ -3,7 +3,8 @@
 import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
 import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import nl.javadude.gradle.plugins.license.LicenseExtension
-import java.time.LocalDateTime
+import java.time.Instant
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 plugins {
@@ -13,10 +14,17 @@ plugins {
     id("publishing")
 }
 
+normalization {
+    runtimeClasspath {
+        ignore("META-INF/rewrite-python-version.txt")
+    }
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
     api(project(":rewrite-toml"))
+    implementation(project(":rewrite-json"))
 
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
@@ -119,6 +127,7 @@ testing {
             dependencies {
                 implementation(project())
                 implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-test"))
                 implementation("org.assertj:assertj-core:latest.release")
                 implementation("org.junit.platform:junit-platform-suite-api")
@@ -165,12 +174,14 @@ val pytestTest by tasks.registering(Exec::class) {
     dependsOn(pythonInstall)
 
     workingDir = pythonDir
-    commandLine(pythonExe.absolutePath, "-m", "pytest", "tests/", "-v",
+    // Use relative path for python executable to avoid absolute paths in cache key
+    val relativePythonExe = if (isWindows) ".venv/Scripts/python.exe" else ".venv/bin/python"
+    commandLine(relativePythonExe, "-m", "pytest", "tests/", "-v",
         "--junitxml=build/test-results/pytest/junit.xml")
 
-    inputs.dir(pythonDir.resolve("src"))
+    inputs.files(fileTree(pythonDir.resolve("src")) { exclude("**/__pycache__/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.dir(pythonDir.resolve("tests"))
+    inputs.files(fileTree(pythonDir.resolve("tests")) { exclude("**/__pycache__/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.file(pythonDir.resolve("pyproject.toml"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -215,12 +226,24 @@ tasks.withType<Test> {
 // Releases use clean version: 8.71.0
 // Read from version.txt on disk if it exists (second Gradle invocation), so the published pip
 // package version matches what was baked into the JAR by the first invocation.
+fun gitCommitTimestamp(): String {
+    val process = ProcessBuilder("git", "log", "-1", "--format=%ct")
+        .directory(rootProject.projectDir)
+        .redirectErrorStream(true)
+        .start()
+    val timestamp = process.inputStream.bufferedReader().readText().trim()
+    process.waitFor()
+    return Instant.ofEpochSecond(timestamp.toLong())
+        .atZone(ZoneOffset.UTC)
+        .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+}
+
 val pythonVersionTxt = file("src/main/resources/META-INF/rewrite-python-version.txt")
 val pythonVersion: String = if (System.getenv("CI") != null) {
     pythonVersionTxt.takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
         ?: project.version.toString().replace(
             "-SNAPSHOT",
-            ".dev${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+            ".dev${gitCommitTimestamp()}"
         )
 } else {
     project.version.toString().replace("-SNAPSHOT", ".dev0")
@@ -340,6 +363,7 @@ val pythonPublish by tasks.registering(Exec::class) {
     commandLine(
         pythonExe.absolutePath, "-m", "twine", "upload",
         "--config-file", ".pypirc",
+        "--skip-existing",
         "dist/*"
     )
 
@@ -365,6 +389,13 @@ val generateTestClasspath by tasks.registering {
     val outputFile = pythonDir.resolve("test-classpath.txt")
     outputs.file(outputFile)
 
+    inputs.files(configurations["runtimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(configurations["testRuntimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(tasks.named("compileJava").map { it.outputs.files })
+    inputs.files(tasks.named("processResources").map { it.outputs.files })
+
     // Depend on jar tasks to ensure jars exist
     dependsOn(tasks.named("testClasses"))
     dependsOn(tasks.named("jar"))
@@ -380,8 +411,6 @@ val generateTestClasspath by tasks.registering {
          .joinToString(File.pathSeparator) { it.absolutePath }
         outputFile.writeText(classpath)
         logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
-
-
     }
 }
 
@@ -407,4 +436,3 @@ val printTestClasspath by tasks.registering {
 extensions.configure<LicenseExtension> {
     exclude("**/rewrite-python-version.txt")
 }
-

@@ -23,10 +23,12 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
@@ -177,27 +179,46 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 ParseProjectResponse.Item item = response.get(index);
                 index++;
 
-                SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
-                // for status update messages
-                Parser.Input input = Parser.Input.fromFile(sourceFile.getSourcePath());
-                parsingListener.startedParsing(input);
+                SourceFile sourceFile;
                 try {
+                    sourceFile = getObject(item.getId(), item.getSourceFileType());
+                    parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
                     if (sourceFile instanceof JS.CompilationUnit) {
                         validator.visit(sourceFile, 0);
                     }
                 } catch (Exception e) {
-                    sourceFile = new ParseError(
-                            sourceFile.getId(),
-                            new Markers(Tree.randomId(), singletonList(
-                                    ParseExceptionResult.build(JavaScriptParser.class, e, e.getMessage()))),
-                            sourceFile.getSourcePath(),
-                            null,
-                            null,
-                            false,
-                            null,
-                            input.getSource(ctx).readFully(),
-                            null
-                    );
+                    // A single file's RPC deserialization or validation failed. Convert it to a
+                    // ParseError pointing at the offending file and keep the stream going.
+                    //
+                    // `item.sourcePath` may be null when talking to an older TypeScript peer that
+                    // doesn't populate it yet — fall back to the RPC object id so we still produce
+                    // a usable ParseError rather than crashing the whole stream with an NPE.
+                    String relativePath = item.getSourcePath() != null ? item.getSourcePath() : item.getId();
+                    Path sourcePath = Paths.get(relativePath);
+                    Path absoluteSourcePath = projectPath.resolve(sourcePath);
+                    try {
+                        sourceFile = ParseError.build(
+                                JavaScriptParser.builder().build(),
+                                Parser.Input.fromFile(absoluteSourcePath),
+                                projectPath,
+                                ctx,
+                                e);
+                    } catch (Exception readFailure) {
+                        // If the file can't be read (e.g. fallback path from id doesn't exist on
+                        // disk), still emit a ParseError so the stream can continue. Without the
+                        // source text the error is less useful but at least it doesn't abort.
+                        sourceFile = new ParseError(
+                                Tree.randomId(),
+                                new Markers(Tree.randomId(), singletonList(
+                                        ParseExceptionResult.build(JavaScriptParser.class, e, null))),
+                                sourcePath,
+                                null,
+                                null,
+                                false,
+                                null,
+                                "",
+                                null);
+                    }
                 }
                 action.accept(sourceFile);
                 return true;
@@ -231,7 +252,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private List<RecipeBundleResolver> resolvers = Collections.emptyList();
         private final Map<String, String> environment = new HashMap<>();
-        private Path npxPath = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");
+        private static final Path DEFAULT_NPX_PATH = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");
+        private Supplier<@Nullable Path> npxPathSupplier = () -> DEFAULT_NPX_PATH;
         private @Nullable Path log;
         private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;
@@ -268,7 +290,20 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             if (Files.notExists(npxPath) || Files.isDirectory(npxPath)) {
                 throw new IllegalArgumentException("Invalid npx executable " + npxPath.toAbsolutePath().normalize());
             }
-            this.npxPath = npxPath;
+            return npxPath(() -> npxPath);
+        }
+
+        /**
+         * Supplies the path to the `npx` executable. The supplier is invoked at most
+         * once, when the RPC is first started. Returning {@code null} uses the built-in
+         * default (same as not configuring the path at all). Exceptions thrown by the
+         * supplier propagate out of the RPC-start call.
+         *
+         * @param npxPathSupplier Supplier for the path to the `npx` executable
+         * @return This builder
+         */
+        public Builder npxPath(Supplier<@Nullable Path> npxPathSupplier) {
+            this.npxPathSupplier = npxPathSupplier;
             return this;
         }
 
@@ -344,6 +379,13 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         @Override
         public JavaScriptRewriteRpc get() {
+            Path npxPath = npxPathSupplier.get();
+            if (npxPath == null) {
+                npxPath = DEFAULT_NPX_PATH;
+            }
+
+            DynamicDispatchRpcCodec.requireCodecFor(Json.Document.class.getName());
+
             Stream<@Nullable String> cmd;
 
             if (inspectBrk != null) {
@@ -357,6 +399,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         "--enable-source-maps",
                         "--inspect-brk=" + inspectBrk,
                         serverJs.toAbsolutePath().normalize().toString(),
+                        metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         traceRpcMessages ? "--trace-rpc-messages" : null,
                         recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
@@ -382,6 +425,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             if (workingDirectory != null) {
                 process.setWorkingDirectory(workingDirectory);
             }
+            process.setStderrRedirect(log);
 
             process.environment().putAll(environment);
             // caller-provided options, if any, are taking precedence over the options baked above

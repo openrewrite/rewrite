@@ -16,7 +16,9 @@
 package org.openrewrite.yaml.style;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.search.FindIndentYamlVisitor;
@@ -25,13 +27,17 @@ import org.openrewrite.yaml.tree.Yaml;
 public class Autodetect {
     public static IndentsStyle tabsAndIndents(Yaml yaml, IndentsStyle orElse) {
         FindIndentYamlVisitor<Integer> findIndent = new FindIndentYamlVisitor<>();
+        FindSequenceIndentStyleVisitor<Integer> findSeqIndent = new FindSequenceIndentStyleVisitor<>();
 
         //noinspection ConstantConditions
         findIndent.visit(yaml, 0);
+        //noinspection ConstantConditions
+        findSeqIndent.visit(yaml, 0);
 
-        return findIndent.nonZeroIndents() > 0 ?
-                new IndentsStyle(findIndent.getMostCommonIndent()) :
-                orElse;
+        if (findIndent.nonZeroIndents() > 0) {
+            return new IndentsStyle(findIndent.getMostCommonIndent(), findSeqIndent.isIndentedSequences());
+        }
+        return orElse;
     }
 
     public static GeneralFormatStyle generalFormat(Yaml yaml) {
@@ -41,6 +47,56 @@ public class Autodetect {
         findLineFormat.visit(yaml, 0);
 
         return new GeneralFormatStyle(!findLineFormat.isIndentedWithLFNewLines());
+    }
+
+    /**
+     * Detects whether sequences use indented style (dash indented from parent key)
+     * or same-column style (dash at same column as parent key).
+     */
+    private static class FindSequenceIndentStyleVisitor<P> extends YamlIsoVisitor<P> {
+        private int indentedCount;
+        private int sameColumnCount;
+
+        /**
+         * Returns {@code true} if the document uses indented sequence style (or has no sequences to detect).
+         */
+        public boolean isIndentedSequences() {
+            return sameColumnCount <= indentedCount;
+        }
+
+        @Override
+        public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
+            String prefix = entry.getPrefix();
+            if (StringUtils.hasLineBreak(prefix)) {
+                int entryIndent = findIndent(prefix);
+
+                // Find the parent mapping entry indent
+                Cursor parentMappingEntry = getCursor().dropParentUntil(
+                        c -> c instanceof Yaml.Mapping.Entry || c instanceof Yaml.Document);
+                if (parentMappingEntry.getValue() instanceof Yaml.Mapping.Entry) {
+                    Yaml.Mapping.Entry parentEntry = parentMappingEntry.getValue();
+                    int parentIndent = StringUtils.hasLineBreak(parentEntry.getPrefix()) ?
+                            findIndent(parentEntry.getPrefix()) : 0;
+                    if (entryIndent == parentIndent) {
+                        sameColumnCount++;
+                    } else if (entryIndent > parentIndent) {
+                        indentedCount++;
+                    }
+                }
+            }
+            return super.visitSequenceEntry(entry, p);
+        }
+
+        private static int findIndent(String prefix) {
+            int size = 0;
+            for (char c : prefix.toCharArray()) {
+                size++;
+                if (c == '\n' || c == '\r') {
+                    size = 0;
+                }
+            }
+            return size;
+        }
     }
 
     private static class FindLineFormatYamlVisitor<P> extends YamlIsoVisitor<P> {

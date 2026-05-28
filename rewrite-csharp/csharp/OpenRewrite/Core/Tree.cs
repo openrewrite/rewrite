@@ -22,6 +22,8 @@ public interface Tree
 {
     Guid Id { get; }
 
+    Markers Markers { get; }
+
     Tree WithId(Guid id);
 }
 

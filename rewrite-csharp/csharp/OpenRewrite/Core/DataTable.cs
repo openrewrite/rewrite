@@ -19,20 +19,15 @@ namespace OpenRewrite.Core;
 
 /// <summary>
 /// A data table for collecting structured data during recipe execution.
-/// Recipes create instances of this class and call <see cref="InsertRow"/>
-/// to emit rows that are stored by the configured <see cref="IDataTableStore"/>.
 /// </summary>
-/// <remarks>
-/// Column order is determined by the declaration order of properties on <typeparamref name="TRow"/>
-/// annotated with <see cref="ColumnAttribute"/>. This relies on the current .NET runtime behavior
-/// of <see cref="Type.GetProperties(BindingFlags)"/> returning properties in declaration order,
-/// which matches Python's <c>__dataclass_fields__</c> and JS's decorator registration order.
-/// </remarks>
 public class DataTable<TRow> where TRow : notnull
 {
     public const string DataTableStoreKey = "org.openrewrite.dataTables.store";
 
     private readonly DataTableDescriptor _descriptor;
+    private string? _group;
+    private string? _instanceName;
+
 
     public DataTable(string name, string displayName, string description)
     {
@@ -43,9 +38,23 @@ public class DataTable<TRow> where TRow : notnull
 
     public DataTableDescriptor Descriptor => _descriptor;
 
+    public string? Group
+    {
+        get => _group;
+        set => _group = value;
+    }
+
+    /// <summary>
+    /// The instance name. Defaults to the display name from the descriptor.
+    /// </summary>
+    public string InstanceName
+    {
+        get => _instanceName ?? _descriptor.DisplayName;
+        set => _instanceName = value;
+    }
+
     /// <summary>
     /// Insert a row into this data table via the store in the execution context.
-    /// If no store exists, an <see cref="InMemoryDataTableStore"/> is created as default.
     /// </summary>
     public void InsertRow(ExecutionContext ctx, TRow row)
     {

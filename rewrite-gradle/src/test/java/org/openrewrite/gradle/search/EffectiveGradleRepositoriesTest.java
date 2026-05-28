@@ -16,12 +16,16 @@
 package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
+import static org.openrewrite.gradle.search.EffectiveRepositoryAssertions.expectedWithUrls;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.maven.search.EffectiveMavenRepositoriesTable.Row;
 
@@ -47,20 +51,22 @@ class EffectiveGradleRepositoriesTest implements RewriteTest {
                   maven { url 'https://repo.spring.io/milestone' }
               }
               """,
-            """
-              /*~~(https://repo.spring.io/milestone)~~>*/plugins {
+            spec -> spec.after(actual -> expectedWithUrls(actual, List.of("https://repo.spring.io/milestone"), """
+              plugins {
                   id 'java'
               }
 
               repositories {
                   maven { url 'https://repo.spring.io/milestone' }
               }
-              """
+              """))
           )
         );
     }
 
     @Test
+    @DisabledIfEnvironmentVariable(named = "REWRITE_GRADLE_MIRROR_URL", matches = ".+",
+            disabledReason = "An injected mirror adds a repository, defeating the empty-repositories scenario.")
     void emptyRepositories() {
         rewriteRun(
           buildGradle(
@@ -87,9 +93,9 @@ class EffectiveGradleRepositoriesTest implements RewriteTest {
                   mavenCentral()
               }
               """,
-            """
-              /*~~(https://repo.spring.io/milestone
-              https://repo.maven.apache.org/maven2/)~~>*/plugins {
+            spec -> spec.after(actual -> expectedWithUrls(actual,
+              List.of("https://repo.spring.io/milestone", "https://repo.maven.apache.org/maven2/"), """
+              plugins {
                   id 'java'
               }
 
@@ -97,7 +103,7 @@ class EffectiveGradleRepositoriesTest implements RewriteTest {
                   maven { url 'https://repo.spring.io/milestone' }
                   mavenCentral()
               }
-              """
+              """))
           )
         );
     }
@@ -115,15 +121,15 @@ class EffectiveGradleRepositoriesTest implements RewriteTest {
                   maven { url = uri("https://repo.spring.io/milestone") }
               }
               """,
-            """
-              /*~~(https://repo.spring.io/milestone)~~>*/plugins {
+            spec -> spec.after(actual -> expectedWithUrls(actual, List.of("https://repo.spring.io/milestone"), """
+              plugins {
                   id("java")
               }
 
               repositories {
                   maven { url = uri("https://repo.spring.io/milestone") }
               }
-              """
+              """))
           )
         );
     }
@@ -146,11 +152,11 @@ class EffectiveGradleRepositoriesTest implements RewriteTest {
                   id 'java'
               }
               """,
-            """
-              /*~~(https://repo.spring.io/milestone)~~>*/plugins {
+            spec -> spec.after(actual -> expectedWithUrls(actual, List.of("https://repo.spring.io/milestone"), """
+              plugins {
                   id 'java'
               }
-              """
+              """))
           )
         );
     }
@@ -173,11 +179,11 @@ class EffectiveGradleRepositoriesTest implements RewriteTest {
                   id("java")
               }
               """,
-            """
-              /*~~(https://repo.spring.io/milestone)~~>*/plugins {
+            spec -> spec.after(actual -> expectedWithUrls(actual, List.of("https://repo.spring.io/milestone"), """
+              plugins {
                   id("java")
               }
-              """
+              """))
           )
         );
     }
@@ -187,12 +193,14 @@ class EffectiveGradleRepositoriesTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(new EffectiveGradleRepositories(false))
-            .dataTable(Row.class, rows -> assertThat(rows).containsExactlyInAnyOrder(
-              new Row("build.gradle", "https://repo.spring.io/milestone"),
-              new Row("build.gradle", "https://repo.maven.apache.org/maven2/"),
-              new Row("module/build.gradle", "https://repo.spring.io/milestone"),
-              new Row("module/build.gradle", "https://repo.maven.apache.org/maven2/")
-            )),
+            .dataTable(Row.class, rows -> {
+                assertThat(rows).contains(
+                  new Row("build.gradle", "https://repo.spring.io/milestone"),
+                  new Row("build.gradle", "https://repo.maven.apache.org/maven2/"),
+                  new Row("module/build.gradle", "https://repo.spring.io/milestone"),
+                  new Row("module/build.gradle", "https://repo.maven.apache.org/maven2/")
+                );
+            }),
           settingsGradle(
             """
               pluginManagement {

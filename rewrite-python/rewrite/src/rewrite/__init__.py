@@ -9,7 +9,13 @@ except ImportError:
 
 from .category import CategoryDescriptor, LOWEST_PRECEDENCE, DEFAULT_PRECEDENCE, HIGHEST_PRECEDENCE
 from .decorators import categorize, get_recipe_category
-from .discovery import discover_recipes, discover_decorated_recipes_in_module
+from .discovery import (
+    discover_recipes,
+    discover_decorated_recipes_in_module,
+    RecipeAttribution,
+    RecipeName,
+    NormalizedDistName,
+)
 from .execution import ExecutionContext, DelegatingExecutionContext, InMemoryExecutionContext, \
     RecipeRunException, LargeSourceSet, InMemoryLargeSourceSet, Result
 from .marketplace import RecipeMarketplace, Python
@@ -18,6 +24,7 @@ from .markers import *
 from .parser import *
 from .result import *
 from .style import *
+from .preconditions import Check, CompositePrecondition, Preconditions, RecipeCheck, RecipeRef
 from .tree import Checksum, FileAttributes, SourceFile, Tree, PrintOutputCapture, PrinterFactory
 from .utils import random_id, list_find, list_map, list_map_last
 from .visitor import Cursor, TreeVisitor
@@ -57,6 +64,13 @@ __all__ = [
     'OptionDescriptor',
     'RecipeDescriptor',
 
+    # Preconditions
+    'Check',
+    'CompositePrecondition',
+    'Preconditions',
+    'RecipeCheck',
+    'RecipeRef',
+
     # Categories and Marketplace
     'CategoryDescriptor',
     'LOWEST_PRECEDENCE',
@@ -68,6 +82,9 @@ __all__ = [
     'get_recipe_category',
     'discover_recipes',
     'discover_decorated_recipes_in_module',
+    'RecipeAttribution',
+    'RecipeName',
+    'NormalizedDistName',
     'activate',
 
     # Markers

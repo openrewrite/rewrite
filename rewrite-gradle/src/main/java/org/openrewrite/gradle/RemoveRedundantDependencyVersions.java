@@ -438,7 +438,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     private @Nullable String getSpringBootVersionFromPlugin() {
                         GradleDependencyConfiguration gdc = gp.getBuildscript().getConfiguration("classpath");
                         if (gdc != null) {
-                            for (ResolvedDependency dependency : gdc.getDirectResolved()) {
+                            for (ResolvedDependency dependency : gdc.getDirectResolvedShallow()) {
                                 if ("org.springframework.boot.gradle.plugin".equals(dependency.getArtifactId())) {
                                     return dependency.getVersion();
                                 }

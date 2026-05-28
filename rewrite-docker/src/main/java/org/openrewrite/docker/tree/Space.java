@@ -184,6 +184,33 @@ public class Space {
                         prefix.append(c);
                     }
                     break;
+                case '\\':
+                case '`':
+                    if (inComment) {
+                        comment.append(c);
+                    } else {
+                        // Check if this is a line continuation (\ or ` followed by optional spaces/tabs and newline)
+                        int j = i + 1;
+                        while (j < toIndex && (formatting.charAt(j) == ' ' || formatting.charAt(j) == '\t')) {
+                            j++;
+                        }
+                        if (j < toIndex && (formatting.charAt(j) == '\n' || formatting.charAt(j) == '\r')) {
+                            // Line continuation - append entire sequence as whitespace
+                            for (int k = i; k <= j; k++) {
+                                prefix.append(formatting.charAt(k));
+                            }
+                            // Handle \r\n
+                            if (formatting.charAt(j) == '\r' && j + 1 < toIndex && formatting.charAt(j + 1) == '\n') {
+                                prefix.append('\n');
+                                j++;
+                            }
+                            i = j; // loop will increment i
+                        } else {
+                            // Not a line continuation, just a regular character
+                            prefix.append(c);
+                        }
+                    }
+                    break;
                 default:
                     if (inComment) {
                         comment.append(c);

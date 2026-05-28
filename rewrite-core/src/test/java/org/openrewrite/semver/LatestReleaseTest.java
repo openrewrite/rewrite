@@ -38,8 +38,11 @@ class LatestReleaseTest {
         assertThat(latestRelease.isValid("1.0", "1.1")).isTrue();
         assertThat(latestRelease.isValid("1.0", "1")).isTrue();
         assertThat(latestRelease.isValid("1.0", "1.1.1.1.1")).isTrue();
+        assertThat(latestRelease.isValid("1.0", "1.1.1.1.1.1")).isTrue();
+        assertThat(latestRelease.isValid("1.0", "1.1.1.1.1.1.1")).isTrue();
 
         assertThat(latestRelease.isValid("1.0", "1.1.1.1.1-SNAPSHOT")).isFalse();
+        assertThat(latestRelease.isValid("1.0", "1.1.1.1.1.1-SNAPSHOT")).isFalse();
         assertThat(latestRelease.isValid("1.0", "1.1.0-SNAPSHOT")).isFalse();
         assertThat(latestRelease.isValid("1.0", "1.1.a")).isFalse();
         assertThat(latestRelease.isValid("1.0", "1.1.1.1.a")).isFalse();
@@ -93,6 +96,13 @@ class LatestReleaseTest {
         assertThat(latestRelease.compare("1.0", "1.1.1", "1.1.1.1")).isLessThan(0);
         assertThat(latestRelease.compare("1.0", "1.1", "1.1.1")).isLessThan(0);
         assertThat(latestRelease.compare("1.0", "1", "1.1")).isLessThan(0);
+
+        // Different counts crossing the 5-group boundary
+        assertThat(latestRelease.compare(null, "1.2.3.4.5", "1.2.3.4.5.1")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.1", "1.2.3.4.5")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3", "1.2.3.4.5.6")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6", "1.2.3")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6", "1.2.3.4.5.6.0.0")).isZero();
     }
 
     @Test
@@ -199,6 +209,22 @@ class LatestReleaseTest {
         assertThat(normalizeVersion("29.0")).isEqualTo("29.0.0");
         assertThat(normalizeVersion("29.0-jre")).isEqualTo("29.0.0-jre");
         assertThat(normalizeVersion("29-jre")).isEqualTo("29.0.0-jre");
+    }
+
+    @Test
+    void versionsWithMoreThanFiveParts() {
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6", "1.2.3.4.5.7")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.7", "1.2.3.4.5.6")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.3", "1.2.3.4.5.3")).isZero();
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6.7", "1.2.3.4.5.6.8")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6", "1.2.3.4.5")).isGreaterThan(0);
+    }
+
+    @Test
+    void versionsWithMoreThanFivePartsAndQualifiers() {
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6-RC1", "1.2.3.4.5.6")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6", "1.2.3.4.5.6-RC1")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6-alpha", "1.2.3.4.5.6-beta")).isLessThan(0);
     }
 
     @Test

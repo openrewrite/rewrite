@@ -22,10 +22,9 @@ namespace OpenRewrite.Java;
 /// The base interface for all Java-family LST elements.
 /// C# LST elements extend J where the syntax is isomorphic.
 /// </summary>
-public interface J : Tree
+public partial interface J : Tree
 {
     Space Prefix { get; }
-    Markers Markers { get; }
 }
 
 /// <summary>
@@ -33,6 +32,7 @@ public interface J : Tree
 /// </summary>
 public interface Expression : J
 {
+    JavaType? Type { get; }
 }
 
 /// <summary>
@@ -175,7 +175,7 @@ public sealed class Literal(
     object? value,
     string? valueSource,
     IList<Literal.UnicodeEscape>? unicodeEscapes,
-    JavaType.Primitive? type
+    JavaType? type
 ) : J, Expression, IEquatable<Literal>
 {
     public Guid Id { get; } = id;
@@ -184,7 +184,7 @@ public sealed class Literal(
     public object? Value { get; } = value;
     public string? ValueSource { get; } = valueSource;
     public IList<Literal.UnicodeEscape>? UnicodeEscapes { get; } = unicodeEscapes;
-    public JavaType.Primitive? Type { get; } = type;
+    public JavaType? Type { get; } = type;
 
     public Literal WithId(Guid id) =>
         id == Id ? this : new(id, Prefix, Markers, Value, ValueSource, UnicodeEscapes, Type);
@@ -198,7 +198,7 @@ public sealed class Literal(
         string.Equals(valueSource, ValueSource, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Value, valueSource, UnicodeEscapes, Type);
     public Literal WithUnicodeEscapes(IList<Literal.UnicodeEscape>? unicodeEscapes) =>
         ReferenceEquals(unicodeEscapes, UnicodeEscapes) ? this : new(Id, Prefix, Markers, Value, ValueSource, unicodeEscapes, Type);
-    public Literal WithType(JavaType.Primitive? type) =>
+    public Literal WithType(JavaType? type) =>
         ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Value, ValueSource, UnicodeEscapes, type);
 
     public record UnicodeEscape(int ValueSourceIndex, string CodePoint);
@@ -208,34 +208,6 @@ public sealed class Literal(
 
     public bool Equals(Literal? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as Literal);
-    public override int GetHashCode() => Id.GetHashCode();
-}
-
-/// <summary>
-/// An expression used as a statement.
-/// </summary>
-public sealed class ExpressionStatement(
-    Guid id,
-    Expression expression
-) : J, Statement, IEquatable<ExpressionStatement>
-{
-    public Guid Id { get; } = id;
-    public Expression Expression { get; } = expression;
-
-    public ExpressionStatement WithId(Guid id) =>
-        id == Id ? this : new(id, Expression);
-    public ExpressionStatement WithExpression(Expression expression) =>
-        ReferenceEquals(expression, Expression) ? this : new(Id, expression);
-
-    // ExpressionStatement delegates prefix/markers to its expression
-    public Space Prefix => Expression.Prefix;
-    public Markers Markers => Expression.Markers;
-
-
-    Tree Tree.WithId(Guid id) => WithId(id);
-
-    public bool Equals(ExpressionStatement? other) => other is not null && Id == other.Id;
-    public override bool Equals(object? obj) => Equals(obj as ExpressionStatement);
     public override int GetHashCode() => Id.GetHashCode();
 }
 
@@ -400,6 +372,8 @@ public sealed class ControlParentheses<T>(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Tree);
     public ControlParentheses<T> WithTree(JRightPadded<T> tree) =>
         ReferenceEquals(tree, Tree) ? this : new(Id, Prefix, Markers, tree);
+
+    public JavaType? Type => Tree.Element is Expression expr ? expr.Type : null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -875,6 +849,8 @@ public sealed class Empty(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers);
     public Empty WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers);
+
+    public JavaType? Type => null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1592,6 +1568,8 @@ public sealed class MethodInvocation(
     public MethodInvocation WithMethodType(JavaType.Method? methodType) =>
         ReferenceEquals(methodType, MethodType) ? this : new(Id, Prefix, Markers, Select, Name, TypeParameters, Arguments, methodType);
 
+    public JavaType? Type => MethodType?.ReturnType;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(MethodInvocation? other) => other is not null && Id == other.Id;
@@ -1746,11 +1724,23 @@ public sealed class TypeCast(
     public TypeCast WithExpression(Expression expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, Clazz, expression);
 
+    public JavaType? Type => Clazz.Type;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(TypeCast? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as TypeCast);
     public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// Non-generic interface for <see cref="Parentheses{T}"/>, allowing type-checks
+/// and unwrapping without knowing the generic type parameter.
+/// </summary>
+public interface Parentheses : Expression
+{
+    /// <summary>The inner expression, unwrapped from parentheses.</summary>
+    J InnerTree { get; }
 }
 
 /// <summary>
@@ -1761,7 +1751,7 @@ public sealed class Parentheses<T>(
     Space prefix,
     Markers markers,
     JRightPadded<T> tree
-) : J, Expression, IEquatable<Parentheses<T>> where T : J
+) : J, Parentheses, IEquatable<Parentheses<T>> where T : J
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
@@ -1776,6 +1766,10 @@ public sealed class Parentheses<T>(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Tree);
     public Parentheses<T> WithTree(JRightPadded<T> tree) =>
         ReferenceEquals(tree, Tree) ? this : new(Id, Prefix, Markers, tree);
+
+    public J InnerTree => Tree.Element;
+
+    public JavaType? Type => Tree.Element is Expression expr ? expr.Type : null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1909,6 +1903,8 @@ public sealed class Primitive(
     public Primitive WithKind(JavaType.PrimitiveKind kind) =>
         kind == Kind ? this : new(Id, Prefix, Markers, kind);
 
+    public JavaType? Type => JavaType.Primitive.Of(Kind);
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(Primitive? other) => other is not null && Id == other.Id;
@@ -2015,6 +2011,8 @@ public sealed class Annotation(
     public Annotation WithArguments(JContainer<Expression>? arguments) =>
         ReferenceEquals(arguments, Arguments) ? this : new(Id, Prefix, Markers, AnnotationType, arguments);
 
+    public JavaType? Type => AnnotationType.Type;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(Annotation? other) => other is not null && Id == other.Id;
@@ -2027,6 +2025,7 @@ public sealed class Annotation(
 /// </summary>
 public interface NameTree : J
 {
+    JavaType? Type { get; }
 }
 
 /// <summary>
@@ -2319,6 +2318,8 @@ public sealed class NewClass(
         ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Enclosing, New, Clazz, Arguments, body, ConstructorType);
     public NewClass WithConstructorType(JavaType.Method? constructorType) =>
         ReferenceEquals(constructorType, ConstructorType) ? this : new(Id, Prefix, Markers, Enclosing, New, Clazz, Arguments, Body, constructorType);
+
+    public JavaType? Type => ConstructorType?.ReturnType;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 

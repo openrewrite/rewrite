@@ -75,7 +75,7 @@ HEREDOC_START : '<<' '-'? [A-Z_][A-Z0-9_]* {
 
 // Line continuation - HIDDEN in main mode
 // Supports both backslash (Linux) and backtick (Windows with # escape=`)
-LINE_CONTINUATION : ('\\' | '`') [ \t]* NEWLINE_CHAR -> channel(HIDDEN);
+LINE_CONTINUATION : ('\\' | '`') [ \t]* '\r'? '\n' -> channel(HIDDEN);
 
 // JSON array delimiters (for exec form) - no mode switching, handled in parser
 LBRACKET : '[' { atLineStart = false; };
@@ -88,7 +88,14 @@ EQUALS     : '=' { if (!afterHealthcheck) atLineStart = false; };
 // Flag with optional value: --name or --name=value
 // Captures the entire flag as a single token, stopping at whitespace
 // This avoids the greedy flagValue+ parsing issue while keeping shell commands working
-FLAG : '--' [a-zA-Z] [a-zA-Z0-9_-]* ('=' ~[ \t\r\n]+)? { if (!afterHealthcheck) atLineStart = false; };
+// Flag values can contain quoted strings (which may include spaces)
+FLAG : '--' [a-z] [a-z0-9_-]* ('=' FLAG_VALUE_PART+)? { if (!afterHealthcheck) atLineStart = false; };
+fragment FLAG_VALUE_PART
+    : '"' ( '\\' ~[\r\n] | ~["\\\r\n] )* '"'   // Double-quoted string (with escapes)
+    | '\'' ~['\r\n]* '\''                        // Single-quoted string (literal)
+    | ~[ \t\r\n"'\\]                             // Unquoted character
+    | '\\' ~[\r\n]                               // Escaped character
+    ;
 
 // Standalone -- (double dash without flag name) - used in shell commands
 DASH_DASH  : '--' { if (!afterHealthcheck) atLineStart = false; };
@@ -134,6 +141,10 @@ fragment COMMAND_SUBST_INNER : COMMAND_SUBST | ~[()];
 // Content cannot span newlines (backtick command substitution doesn't support that)
 BACKTICK_SUBST : '`' ~[ \t\r\n`] ~[`\r\n]* '`' { atLineStart = false; };
 
+// Lone dollar sign that doesn't match ENV_VAR, SPECIAL_VAR, or COMMAND_SUBST
+// This handles cases like $'hello' (bash ANSI-C quoting) where $ precedes a quote
+DOLLAR : '$' { atLineStart = false; };
+
 // Unquoted text (arguments, file paths, etc.)
 // This should be after more specific tokens
 // Note: comma is NOT excluded here - it's only special in JSON arrays
@@ -167,7 +178,7 @@ fragment NEWLINE_CHAR : [\r\n];
 mode HEREDOC_PREAMBLE;
 
 // Line continuation in preamble - stay in HEREDOC_PREAMBLE mode
-HP_LINE_CONTINUATION : ('\\' | '`') [ \t]* '\n' -> channel(HIDDEN);
+HP_LINE_CONTINUATION : ('\\' | '`') [ \t]* '\r'? '\n' -> channel(HIDDEN);
 
 // Newline without continuation - transition to HEREDOC mode for body content
 HP_NEWLINE : '\n' -> type(NEWLINE), mode(HEREDOC);

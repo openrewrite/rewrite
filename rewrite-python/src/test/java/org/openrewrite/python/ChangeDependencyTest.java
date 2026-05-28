@@ -18,7 +18,7 @@ package org.openrewrite.python;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.python.Assertions.pyproject;
+import static org.openrewrite.python.Assertions.*;
 
 class ChangeDependencyTest implements RewriteTest {
 
@@ -167,6 +167,109 @@ class ChangeDependencyTest implements RewriteTest {
               test = [
                   "pytest-ng>=7.0",
               ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamePackageInRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("requests", "httpx", null)),
+          requirementsTxt(
+            "requests>=2.28.0\nclick>=8.0",
+            "httpx>=2.28.0\nclick>=8.0"
+          )
+        );
+    }
+
+    @Test
+    void renameWithNewVersionInRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("requests", "httpx", ">=0.24.0")),
+          requirementsTxt(
+            "requests>=2.28.0\nclick>=8.0",
+            "httpx>=0.24.0\nclick>=8.0"
+          )
+        );
+    }
+
+    @Test
+    void skipWhenNotFoundInRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("flask", "quart", null)),
+          requirementsTxt("requests>=2.28.0")
+        );
+    }
+
+    @Test
+    void renamePackageInPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("requests", "httpx", ">=0.24.0")),
+          pipfile(
+            """
+              [packages]
+              requests = ">=2.28.0"
+              click = ">=8.0"
+              """,
+            """
+              [packages]
+              httpx = ">=0.24.0"
+              click = ">=8.0"
+              """
+          )
+        );
+    }
+
+    @Test
+    void renameQuotedKeyInPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("urllib3", "httpx", ">=0.24.0")),
+          pipfile(
+            """
+              [packages]
+              "urllib3" = "*"
+              """,
+            """
+              [packages]
+              httpx = ">=0.24.0"
+              """
+          )
+        );
+    }
+
+    @Test
+    void chainAddThenUpgradeAcrossRecipes() {
+        // The second recipe must see what the first recipe added, in the same cycle.
+        // Without that within-cycle propagation, UpgradeDependencyVersion would not
+        // see httpx (added by AddDependency) and the chain would not converge.
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.Chain
+              displayName: chain
+              description: Cross-recipe state-carryover smoke test.
+              recipeList:
+                - org.openrewrite.python.AddDependency:
+                    packageName: httpx
+                    version: ">=0.27"
+                - org.openrewrite.python.UpgradeDependencyVersion:
+                    packageName: httpx
+                    newVersion: ">=0.28"
+              """,
+            "com.example.Chain"
+          ),
+          pipfile(
+            """
+              [packages]
+              requests = "*"
+              """,
+            """
+              [packages]
+              requests = "*"
+              httpx = ">=0.28"
               """
           )
         );

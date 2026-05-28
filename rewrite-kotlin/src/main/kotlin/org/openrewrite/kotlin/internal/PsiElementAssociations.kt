@@ -89,9 +89,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             private fun visitType(firType: ConeTypeProjection, psiType: KtTypeReference,
                                   data: MutableMap<PsiElement, MutableList<FirInfo>>) {
                 if (firType is ConeClassLikeType) {
-                    if (firType.classId != null) {
-                        mapParents(firType.classId!!, PsiTreeUtil.findChildOfType(psiType, KtUserType::class.java), data)
-                    }
+                    mapParents(firType.classId, PsiTreeUtil.findChildOfType(psiType, KtUserType::class.java), data)
                     for (s in firType.attributes) {
                         if (s is CustomAnnotationTypeAttribute && s.annotations.isNotEmpty()) {
                             for (ann in s.annotations) {
@@ -288,10 +286,10 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         val directFirInfos = allFirInfos.filter { filter.invoke(it.fir) }
         return if (directFirInfos.isNotEmpty())
             // It might be more reliable to have explicit mappings in case something changes.
-            return when {
+            when {
                 directFirInfos.size == 1 -> directFirInfos[0].fir
                 else -> {
-                    return when (p) {
+                    when (p) {
                         is KtConstantExpression -> {
                             directFirInfos.firstOrNull { it.fir is FirLiteralExpression }?.fir
                         }
@@ -326,7 +324,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 }
             }
         else if (allFirInfos.isNotEmpty()) {
-            return when {
+            when {
                 allFirInfos.size == 1 -> allFirInfos[0].fir
                 // There isn't a RealPsiElement associated to the KT, so, we find the associated FIR element.
                 p is KtArrayAccessExpression -> allFirInfos.firstOrNull { it.fir is FirResolvedNamedReference && (it.fir.name.asString() == "get" || it.fir.name.asString() == "set") }?.fir
@@ -358,7 +356,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         val fir = primary(psi) ?: return null
         return when (fir) {
             is FirResolvedQualifier -> ExpressionType.QUALIFIER
-            is FirArrayLiteral -> ExpressionType.METHOD_INVOCATION
+            is FirCollectionLiteral -> ExpressionType.METHOD_INVOCATION
             is FirFunctionCall -> {
                 if (fir.calleeReference is FirErrorNamedReference)
                     return null
@@ -373,8 +371,8 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             }
             is FirSafeCallExpression -> {
                 val selector = fir.selector
-                return when (selector) {
-                    is FirFunctionCall -> when (selector.calleeReference?.resolved?.resolvedSymbol) {
+                when (selector) {
+                    is FirFunctionCall -> when (selector.calleeReference.resolved?.resolvedSymbol) {
                         is FirConstructorSymbol -> ExpressionType.CONSTRUCTOR
                         is FirNamedFunctionSymbol -> ExpressionType.METHOD_INVOCATION
                         else -> null

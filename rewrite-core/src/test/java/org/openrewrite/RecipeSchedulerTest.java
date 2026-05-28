@@ -111,9 +111,9 @@ class RecipeSchedulerTest implements RewriteTest {
 
     @Test
     void suppliedWorkingDirectoryRoot(@TempDir Path path) {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        var ctx = new InMemoryExecutionContext();
         WorkingDirectoryExecutionContextView.view(ctx).setRoot(path);
-        AtomicInteger cycle = new AtomicInteger(0);
+        var cycle = new AtomicInteger(0);
         rewriteRun(
           spec -> spec.executionContext(ctx).recipe(toRecipe(() -> new TreeVisitor<>() {
               @Override
@@ -139,7 +139,7 @@ class RecipeSchedulerTest implements RewriteTest {
 
     @Test
     void managedWorkingDirectoryWithRecipe(@TempDir Path path) {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        var ctx = new InMemoryExecutionContext();
         WorkingDirectoryExecutionContextView.view(ctx).setRoot(path);
         rewriteRun(
           spec -> spec.executionContext(ctx).recipe(new RecipeWritingToFile(0)),
@@ -150,9 +150,9 @@ class RecipeSchedulerTest implements RewriteTest {
 
     @Test
     void managedWorkingDirectoryWithMultipleRecipes(@TempDir Path path) {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        var ctx = new InMemoryExecutionContext();
         WorkingDirectoryExecutionContextView.view(ctx).setRoot(path);
-        DeclarativeRecipe recipe = new DeclarativeRecipe(
+        var recipe = new DeclarativeRecipe(
           "root",
           "Root recipe",
           "Root recipe.",
@@ -176,7 +176,7 @@ class RecipeSchedulerTest implements RewriteTest {
     void verifyCycleInvariantsDuringMultipleCycles() {
         List<Integer> cyclesFromFactory = new java.util.ArrayList<>();
         List<Integer> cyclesFromContext = new java.util.ArrayList<>();
-        AtomicInteger visitCount = new AtomicInteger(0);
+        var visitCount = new AtomicInteger(0);
 
         RecipeScheduler trackingScheduler = new RecipeScheduler() {
             @Override
@@ -205,7 +205,7 @@ class RecipeSchedulerTest implements RewriteTest {
             }
         }).withCausesAnotherCycle(true);
 
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        var ctx = new InMemoryExecutionContext();
         List<SourceFile> sources = List.of(PlainText.builder().text("v").sourcePath(Path.of("test.txt")).build());
         trackingScheduler.scheduleRun(multiCycleRecipe, new InMemoryLargeSourceSet(sources), ctx, 5, 1);
 
@@ -252,7 +252,7 @@ class RecipeSchedulerTest implements RewriteTest {
             }
         });
 
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        var ctx = new InMemoryExecutionContext();
         List<SourceFile> sources = List.of(
                 PlainText.builder().text("a").sourcePath(Path.of("a.txt")).build(),
                 PlainText.builder().text("b").sourcePath(Path.of("b.txt")).build()
@@ -292,7 +292,7 @@ class RecipeSchedulerTest implements RewriteTest {
 
         Recipe generatingRecipe = new GeneratingRecipe();
 
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        var ctx = new InMemoryExecutionContext();
         List<SourceFile> sources = List.of(PlainText.builder().text("existing").sourcePath(Path.of("existing.txt")).build());
         trackingScheduler.scheduleRun(generatingRecipe, new InMemoryLargeSourceSet(sources), ctx, 3, 1);
 

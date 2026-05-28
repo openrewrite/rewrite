@@ -19,10 +19,17 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.cache.LocalMavenArtifactCache;
+import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Stream;
@@ -44,6 +51,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_REPOSITORIES = "org.openrewrite.maven.repos";
     private static final String MAVEN_PINNED_SNAPSHOT_VERSIONS = "org.openrewrite.maven.pinnedSnapshotVersions";
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
+    private static final String MAVEN_ARTIFACT_CACHE = "org.openrewrite.maven.artifactCache";
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
     private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
 
@@ -133,6 +141,53 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     public MavenPomCache getPomCache() {
         return (MavenPomCache) getMessages().computeIfAbsent(MAVEN_POM_CACHE, k -> new InMemoryMavenPomCache());
+    }
+
+    public MavenExecutionContextView setArtifactCache(MavenArtifactCache artifactCache) {
+        putMessage(MAVEN_ARTIFACT_CACHE, artifactCache);
+        return this;
+    }
+
+    /**
+     * Get a shared {@link MavenArtifactCache} for this execution context, lazily initializing one
+     * on first access. Defaults to a {@link LocalMavenArtifactCache} at
+     * {@code ~/.rewrite/cache/artifacts}, falling back to a single JVM-lifetime temp directory
+     * if the user home directory is not writable.
+     * <p>
+     * Callers that want to override this (for example, to point at a shared on-disk cache backed
+     * by a persistent volume) can do so via {@link #setArtifactCache(MavenArtifactCache)} before
+     * any recipe visitor resolves artifacts.
+     */
+    public MavenArtifactCache getArtifactCache() {
+        return (MavenArtifactCache) getMessages().computeIfAbsent(MAVEN_ARTIFACT_CACHE, k -> defaultArtifactCache());
+    }
+
+    private static MavenArtifactCache defaultArtifactCache() {
+        try {
+            Path cacheDir = Paths.get(System.getProperty("user.home"), ".rewrite", "cache", "artifacts");
+            Files.createDirectories(cacheDir);
+            return new LocalMavenArtifactCache(cacheDir);
+        } catch (Exception e) {
+            return TempArtifactCacheHolder.INSTANCE;
+        }
+    }
+
+    /**
+     * Holds a single JVM-lifetime temp-directory artifact cache, used as a fallback when
+     * {@code ~/.rewrite/cache/artifacts} cannot be created.
+     */
+    private static final class TempArtifactCacheHolder {
+        static final MavenArtifactCache INSTANCE;
+
+        static {
+            try {
+                Path tempDir = Files.createTempDirectory("rewrite-artifact-cache");
+                tempDir.toFile().deleteOnExit();
+                INSTANCE = new LocalMavenArtifactCache(tempDir);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
     }
 
     public MavenExecutionContextView setLocalRepository(MavenRepository localRepository) {

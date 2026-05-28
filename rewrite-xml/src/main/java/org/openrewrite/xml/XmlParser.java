@@ -70,6 +70,10 @@ public class XmlParser implements Parser {
             "vbproj",
             "fsproj",
             "props",
+            "targets",
+            "slnx",
+            "ruleset",
+            "dotsettings",
             // JasperReports files
             "jrxml"
             ));
@@ -117,12 +121,16 @@ public class XmlParser implements Parser {
         String p = path.toString();
         int dot = p.lastIndexOf('.');
         if (0 < dot && dot < (p.length() - 1)) {
-            if (ACCEPTED_FILE_EXTENSIONS.contains(p.substring(dot + 1))) {
+            if (ACCEPTED_FILE_EXTENSIONS.contains(p.substring(dot + 1).toLowerCase())) {
                 return true;
             }
         }
-        return path.endsWith("nuget.config") ||
-                path.endsWith("packages.config");
+        String fileName = path.getFileName().toString().toLowerCase();
+        return fileName.equals("nuget.config") ||
+                fileName.equals("packages.config") ||
+                // .NET Framework app/web config and their XDT transform variants
+                // (e.g. Web.Release.config, App.Debug.config)
+                ((fileName.startsWith("app.") || fileName.startsWith("web.")) && fileName.endsWith(".config"));
     }
 
     @Override

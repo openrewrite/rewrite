@@ -66,6 +66,9 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
                         eof.getLastWhitespace().chars().filter(c -> c == '\n').count() != 1) {
                         List<Comment> comments = eof.getComments();
                         if (comments.isEmpty()) {
+                            if (isEffectivelyEmpty(cu)) {
+                                return cu;
+                            }
                             return cu.withEof(Space.format(lineEnding));
                         } else {
                             return cu.withEof(cu.getEof().withComments(ListUtils.mapLast(comments, it -> it.withSuffix(lineEnding))));
@@ -74,6 +77,15 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
                     return cu;
                 }
                 return (J) tree;
+            }
+
+            private boolean isEffectivelyEmpty(JavaSourceFile cu) {
+                return cu.getPackageDeclaration() == null &&
+                       cu.getImports().isEmpty() &&
+                       cu.getClasses().isEmpty() &&
+                       cu.getPrefix().getComments().isEmpty() &&
+                       cu.getPrefix().getWhitespace().isEmpty() &&
+                       cu.getEof().getWhitespace().isEmpty();
             }
         };
     }

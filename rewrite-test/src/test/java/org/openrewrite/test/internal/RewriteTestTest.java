@@ -24,6 +24,8 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
@@ -34,14 +36,15 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.SourceSpecs.text;
 
-@SuppressWarnings("UnnecessarySemicolon")
 class RewriteTestTest implements RewriteTest {
 
     @Test
@@ -144,6 +147,22 @@ class RewriteTestTest implements RewriteTest {
           spec -> spec.recipe(new ScannerEdit()),
           text("foo")
         ));
+    }
+
+    @Test
+    void typeValidationAppliedToNewSourceFiles() {
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipe(new GeneratesCompilationUnitMissingTypes()),
+            java(null, """
+              public class A {
+                  void foo() {
+                  }
+              }
+              """,
+              s -> s.path("A.java"))
+          )
+        );
     }
 
     @Test
@@ -410,16 +429,48 @@ class GeneratesExistingFile extends ScanningRecipe<AtomicBoolean> {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
+@Value
 class RecipeWithNoOptions extends Recipe {
     String displayName = "Recipe with no options";
     String description = "Has no configurable options at all.";
 }
 
-@Value
-@NullMarked
 @EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class GeneratesCompilationUnitMissingTypes extends ScanningRecipe<AtomicBoolean> {
+
+    String displayName = "Generates a compilation unit missing type information";
+
+    String description = "A recipe that generates a J.CompilationUnit with class and method declarations that have null types.";
+
+    @Override
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean(false);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicBoolean acc, ExecutionContext ctx) {
+        return JavaParser.fromJavaVersion().build()
+          .parse("public class A {\n    void foo() {\n    }\n}\n")
+          .map(cu -> (J.CompilationUnit) cu)
+          .map(cu -> cu.withClasses(cu.getClasses().stream()
+            .map(c -> c.withType(null))
+            .collect(Collectors.toList())))
+          .map(cu -> (SourceFile) cu.withSourcePath(Path.of("A.java")))
+          .collect(Collectors.toList());
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
 class RecipeWithRequiredOptionValidateNoBlank extends Recipe {
     String displayName = "Recipe with required option";
     String description = "Has a single required parameter.";
@@ -435,9 +486,9 @@ class RecipeWithRequiredOptionValidateNoBlank extends Recipe {
     }
 }
 
-@Value
-@NullMarked
 @EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
 class RecipeWithOptionalOrValidation extends Recipe {
     String displayName = "Recipe with optional OR validation";
     String description = "Has two optional parameters where at least one must be set.";

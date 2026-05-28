@@ -77,23 +77,48 @@ class TestDataTable:
         )
         ctx = InMemoryExecutionContext()
 
-        # Initially no store
         assert ctx.get_message(DATA_TABLE_STORE) is None
 
-        # Insert a row
         table.insert_row(ctx, SampleRow("src/foo.py", "hello"))
 
-        # Now there should be a store
         store = ctx.get_message(DATA_TABLE_STORE)
         assert store is not None
         assert isinstance(store, InMemoryDataTableStore)
+
+    def test_instance_name_defaults_to_display_name(self):
+        table = DataTable[SampleRow](
+            "org.openrewrite.test.TestTable",
+            "Test Table",
+            "A test data table.",
+            SampleRow,
+        )
+        assert table.instance_name == "Test Table"
+
+    def test_instance_name_can_be_set(self):
+        table = DataTable[SampleRow](
+            "org.openrewrite.test.TestTable",
+            "Test Table",
+            "A test data table.",
+            SampleRow,
+        )
+        table.instance_name = "Custom Name"
+        assert table.instance_name == "Custom Name"
+
+    def test_group_is_none_by_default(self):
+        table = DataTable[SampleRow](
+            "org.openrewrite.test.TestTable",
+            "Test Table",
+            "A test data table.",
+            SampleRow,
+        )
+        assert table.group is None
 
 
 class TestInMemoryDataTableStore:
     """Tests for InMemoryDataTableStore."""
 
-    def test_stores_rows_when_accepting(self):
-        """Test that rows are stored when accept_rows is True."""
+    def test_stores_rows(self):
+        """Test that rows are always stored."""
         store = InMemoryDataTableStore()
         table = DataTable[SampleRow](
             "org.openrewrite.test.TestTable",
@@ -103,24 +128,19 @@ class TestInMemoryDataTableStore:
         )
         ctx = InMemoryExecutionContext()
 
-        # By default, accept_rows is False
-        store.insert_row(table, ctx, SampleRow("src/foo.py", "hello"))
-        assert len(store.rows) == 0
-
-        # Enable accepting rows
-        store.accept_rows(True)
         store.insert_row(table, ctx, SampleRow("src/foo.py", "hello"))
         store.insert_row(table, ctx, SampleRow("src/bar.py", "world"))
 
-        assert "org.openrewrite.test.TestTable" in store.rows
-        assert len(store.rows["org.openrewrite.test.TestTable"]) == 2
+        rows = list(store.get_rows(table.name, None))
+        assert len(rows) == 2
+        assert len(store.get_data_tables()) == 1
 
 
 class TestCsvDataTableStore:
     """Tests for CsvDataTableStore."""
 
-    def test_writes_csv_with_header(self):
-        """Test that CSV files are written with header and data rows."""
+    def test_writes_csv_with_comments_and_header(self):
+        """Test that CSV files are written with metadata comments, header and data rows."""
         with tempfile.TemporaryDirectory() as tmpdir:
             store = CsvDataTableStore(tmpdir)
             table = DataTable[SampleRow](
@@ -131,21 +151,24 @@ class TestCsvDataTableStore:
             )
             ctx = InMemoryExecutionContext()
 
-            store.accept_rows(True)
             store.insert_row(table, ctx, SampleRow("src/foo.py", "hello"))
             store.insert_row(table, ctx, SampleRow("src/bar.py", "world"))
 
-            csv_path = os.path.join(tmpdir, "org.openrewrite.test.TestTable.csv")
+            file_key = store._file_key(table)
+            csv_path = os.path.join(tmpdir, file_key + ".csv")
             assert os.path.exists(csv_path)
 
             with open(csv_path, "r") as f:
                 content = f.read()
 
             lines = content.strip().split("\n")
-            assert len(lines) == 3  # header + 2 data rows
-            assert lines[0] == "Source Path,Text"
-            assert lines[1] == "src/foo.py,hello"
-            assert lines[2] == "src/bar.py,world"
+            # 3 comment lines + 1 header + 2 data rows
+            assert lines[0].startswith("# @name ")
+            assert lines[1].startswith("# @instanceName ")
+            assert lines[2].startswith("# @group")
+            assert lines[3] == "Source Path,Text"
+            assert lines[4] == "src/foo.py,hello"
+            assert lines[5] == "src/bar.py,world"
 
     def test_escapes_special_characters(self):
         """Test that special characters are properly escaped in CSV."""
@@ -159,38 +182,16 @@ class TestCsvDataTableStore:
             )
             ctx = InMemoryExecutionContext()
 
-            store.accept_rows(True)
-            # Test comma, quote, and newline escaping
             store.insert_row(table, ctx, SampleRow("src/foo.py", "hello, world"))
             store.insert_row(table, ctx, SampleRow("src/bar.py", 'say "hi"'))
-            store.insert_row(table, ctx, SampleRow("src/baz.py", "line1\nline2"))
 
-            csv_path = os.path.join(tmpdir, "org.openrewrite.test.TestTable.csv")
+            file_key = store._file_key(table)
+            csv_path = os.path.join(tmpdir, file_key + ".csv")
             with open(csv_path, "r") as f:
                 content = f.read()
 
-            lines = content.strip().split("\n")
-            # Note: newlines in values will cause extra lines
             assert 'src/foo.py,"hello, world"' in content
             assert 'src/bar.py,"say ""hi"""' in content
-
-    def test_does_not_write_when_not_accepting(self):
-        """Test that no rows are written when accept_rows is False."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            store = CsvDataTableStore(tmpdir)
-            table = DataTable[SampleRow](
-                "org.openrewrite.test.TestTable",
-                "Test Table",
-                "A test data table.",
-                SampleRow,
-            )
-            ctx = InMemoryExecutionContext()
-
-            # Don't enable accepting rows
-            store.insert_row(table, ctx, SampleRow("src/foo.py", "hello"))
-
-            csv_path = os.path.join(tmpdir, "org.openrewrite.test.TestTable.csv")
-            assert not os.path.exists(csv_path)
 
     def test_tracks_row_counts(self):
         """Test that row counts are tracked correctly."""
@@ -204,9 +205,9 @@ class TestCsvDataTableStore:
             )
             ctx = InMemoryExecutionContext()
 
-            store.accept_rows(True)
             store.insert_row(table, ctx, SampleRow("src/foo.py", "hello"))
             store.insert_row(table, ctx, SampleRow("src/bar.py", "world"))
 
-            assert store.row_counts["org.openrewrite.test.TestTable"] == 2
-            assert "org.openrewrite.test.TestTable" in store.table_names
+            file_key = store._file_key(table)
+            assert store.row_counts[file_key] == 2
+            assert file_key in store.table_names

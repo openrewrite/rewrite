@@ -93,6 +93,16 @@ public interface JsonPathParserListener extends ParseTreeListener {
 	 */
 	void exitFilterExpression(JsonPathParser.FilterExpressionContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link JsonPathParser#negationExpression}.
+	 * @param ctx the parse tree
+	 */
+	void enterNegationExpression(JsonPathParser.NegationExpressionContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link JsonPathParser#negationExpression}.
+	 * @param ctx the parse tree
+	 */
+	void exitNegationExpression(JsonPathParser.NegationExpressionContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link JsonPathParser#binaryExpression}.
 	 * @param ctx the parse tree
 	 */

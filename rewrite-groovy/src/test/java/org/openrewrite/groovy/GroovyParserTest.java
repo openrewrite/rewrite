@@ -337,4 +337,81 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multilineString() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""
+                  foo
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringInterpolation() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""
+                  ${foo}
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringInterpolationFollowedByTripleQuote() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""${foo}\"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringDollarVariable() {
+        rewriteRun(
+          groovy(
+            """
+              def foo = "x"
+              String name = \"""
+                  $foo bar
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringWithEmbeddedQuotes() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""
+                  "quoted" and ${foo}
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringWithEscapedDollar() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""
+                  \\$literal then ${foo}
+              \"""
+              """
+          )
+        );
+    }
+
 }

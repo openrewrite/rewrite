@@ -52,13 +52,13 @@ class JavaRewriteRpcTest implements RewriteTest {
 
     @BeforeEach
     void before() throws IOException {
-        PipedOutputStream serverOut = new PipedOutputStream();
-        PipedOutputStream clientOut = new PipedOutputStream();
-        PipedInputStream serverIn = new PipedInputStream(clientOut);
-        PipedInputStream clientIn = new PipedInputStream(serverOut);
+        var serverOut = new PipedOutputStream();
+        var clientOut = new PipedOutputStream();
+        var serverIn = new PipedInputStream(clientOut);
+        var clientIn = new PipedInputStream(serverOut);
 
-        JsonMessageFormatter clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
-        JsonMessageFormatter serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+        var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+        var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
         client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), env.toMarketplace(runtimeClasspath()));
         server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), env.toMarketplace(runtimeClasspath()))

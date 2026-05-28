@@ -550,6 +550,42 @@ public class JsonPathMatcher {
         }
 
         @Override
+        public @Nullable Object visitNegationExpression(JsonPathParser.NegationExpressionContext ctx) {
+            Object originalScope = scope;
+
+            // When scope contains multiple elements, iterate and collect
+            // elements where the inner expression does NOT match.
+            List<?> elements = null;
+            if (originalScope instanceof List) {
+                elements = (List<?>) originalScope;
+            }
+
+            if (elements != null) {
+                List<Object> results = new ArrayList<>();
+                for (Object element : elements) {
+                    scope = element;
+                    Object result = ctx.filterExpression() != null ?
+                            visit(ctx.filterExpression()) :
+                            visitUnaryExpression(ctx.unaryExpression());
+                    boolean matched = result != null && (!(result instanceof List) || !((List<?>) result).isEmpty());
+                    if (!matched) {
+                        results.add(element);
+                    }
+                }
+                scope = originalScope;
+                return getResultFromList(results);
+            }
+
+            // Non-list scope: simple boolean flip
+            Object result = ctx.filterExpression() != null ?
+                    visit(ctx.filterExpression()) :
+                    visitUnaryExpression(ctx.unaryExpression());
+            boolean matched = result != null && (!(result instanceof List) || !((List<?>) result).isEmpty());
+            scope = originalScope;
+            return matched ? null : originalScope;
+        }
+
+        @Override
         public @Nullable Object visitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx) {
             Object lhs = ctx.children.get(0);
             Object rhs = ctx.children.get(2);
@@ -634,6 +670,9 @@ public class JsonPathMatcher {
 
             } else if (ctx instanceof JsonPathParser.LiteralExpressionContext) {
                 ctx = visitLiteralExpression((JsonPathParser.LiteralExpressionContext) ctx);
+
+            } else if (ctx instanceof JsonPathParser.NegationExpressionContext) {
+                ctx = visitNegationExpression((JsonPathParser.NegationExpressionContext) ctx);
             }
             return ctx;
         }

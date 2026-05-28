@@ -44,6 +44,10 @@
       "types": "./dist/test/index.d.ts",
       "default": "./dist/test/index.js"
     },
+    "./test/java-rpc": {
+      "types": "./dist/test/java-rpc.d.ts",
+      "default": "./dist/test/java-rpc.js"
+    },
     "./yaml": {
       "types": "./dist/yaml/index.d.ts",
       "default": "./dist/yaml/index.js"
@@ -83,9 +87,11 @@
     "@types/tmp": "^0.2.6",
     "benchmark": "^2.1.4",
     "bun": "^1.3.5",
+    "prettier": "^3.7.4",
     "vitest": "^4.0.18"
   },
   "optionalDependencies": {
+    "@pyroscope/nodejs": "^0.4.0",
     "prettier": "^3.7.4"
   },
   "bin": {

@@ -35,6 +35,7 @@ import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -51,6 +52,18 @@ import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 @SuppressWarnings("unused")
 public interface RewriteTest extends SourceSpecs {
+    /**
+     * Registry of customizers applied to the {@link ExecutionContext} produced by
+     * {@link #defaultExecutionContext(SourceSpec[])}. Test framework integrations
+     * (e.g. a JUnit Jupiter {@code BeforeAllCallback}) can register a customizer
+     * once at startup without {@code rewrite-test} taking a dependency on the
+     * framework.
+     * <p>
+     * The map is keyed by the integration's class so {@code putIfAbsent(MyExt.class, MyExt::load)}
+     * is naturally idempotent — callers do not need their own one-shot guard.
+     */
+    Map<Class<?>, Consumer<ExecutionContext>> defaultExecutionContextCustomizers = new ConcurrentHashMap<>();
+
     static AdHocRecipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
         return new AdHocRecipe(null, null, null, visitor, null, null);
     }
@@ -470,6 +483,7 @@ public interface RewriteTest extends SourceSpecs {
                                 sourceSpec.after.apply(actual) :
                                 trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
                         assertThat(actual).as("Unexpected result in \"" + result.getAfter().getSourcePath() + "\"").isEqualTo(expected);
+                        sourceSpec.validateSource.accept(result.getAfter(), TypeValidation.after(testMethodSpec, testClassSpec));
                         continue nextSourceSpec;
                     }
                 }
@@ -496,6 +510,7 @@ public interface RewriteTest extends SourceSpecs {
                         expectedNewResults.add(result);
                         //noinspection unchecked
                         ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                        sourceSpec.validateSource.accept(result.getAfter(), TypeValidation.after(testMethodSpec, testClassSpec));
                         if (sourceSpec.sourcePath != null) {
                             assertThat(result.getAfter().getSourcePath())
                                     .isEqualTo(sourceSpec.dir.resolve(sourceSpec.sourcePath));
@@ -560,7 +575,15 @@ public interface RewriteTest extends SourceSpecs {
                             boolean isRemote = result.getAfter() instanceof Remote;
                             if (!isRemote && Objects.equals(result.getBefore().getSourcePath(), result.getAfter().getSourcePath()) &&
                                 Objects.equals(before, actualAfter)) {
-                                fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");
+                                // Marker-only change (e.g. updated JavaSourceSet classpath) — no visible diff.
+                                // Still call afterRecipe so marker assertions work, then skip.
+                                allResults.remove(result);
+                                try {
+                                    //noinspection unchecked
+                                    ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                                } catch (ClassCastException ignored) {
+                                }
+                                continue nextSourceFile;
                             }
 
                             assert result.getBefore() != null;
@@ -686,6 +709,9 @@ public interface RewriteTest extends SourceSpecs {
             }
             fail("Failed to parse sources or run recipe", t);
         });
+        for (Consumer<ExecutionContext> customizer : defaultExecutionContextCustomizers.values()) {
+            customizer.accept(ctx);
+        }
         return ParsingExecutionContextView.view(ctx).setCharset(StandardCharsets.UTF_8);
     }
 

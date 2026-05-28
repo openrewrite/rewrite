@@ -15,17 +15,23 @@
  */
 import {withDir} from "tmp-promise";
 import * as fsp from "fs/promises";
+import * as fs from "fs";
 import * as path from "path";
 import {
+    BaseProjectUpdateInfo,
+    createDependencyRecipeAccumulator,
     detectPackageManager,
     getAllLockFileNames,
     getLockFileDetectionConfig,
     getLockFileFormat,
     getLockFileName,
     isYarnBerryLockFile,
+    PackageJsonParser,
     PackageManager,
-    runWorkspaceInstallInTempDir
+    runWorkspaceInstallInTempDir,
+    updateNodeResolutionMarker
 } from "../../src/javascript";
+import {Json} from "../../src/json";
 
 describe("detectPackageManager", () => {
 
@@ -324,4 +330,79 @@ describe("runWorkspaceInstallInTempDir", () => {
         expect(result.lockFileContent).toBeDefined();
         expect(result.lockFileContent).toContain("is-number");
     }, 120000);
+});
+
+describe("updateNodeResolutionMarker", () => {
+
+    test("returns same doc reference when accumulator has no updates", async () => {
+        // given a parsed package.json with a NodeResolutionResult marker
+        await withDir(async (dir) => {
+            const packageJsonContent = JSON.stringify({
+                name: "test-project",
+                version: "1.0.0",
+                dependencies: {
+                    "react": "^18.2.0"
+                }
+            }, null, 2);
+            fs.writeFileSync(path.join(dir.path, "package.json"), packageJsonContent);
+
+            const parser = new PackageJsonParser({relativeTo: dir.path});
+            const docs: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(dir.path, "package.json"))) {
+                docs.push(result as Json.Document);
+            }
+            const doc = docs[0];
+
+            // when calling updateNodeResolutionMarker with an accumulator that has
+            // no entries for this project (no package.json or lock file changes)
+            const acc = createDependencyRecipeAccumulator<BaseProjectUpdateInfo>();
+            const updateInfo = {
+                packageJsonPath: "package.json",
+                packageManager: PackageManager.Npm,
+                originalPackageJson: packageJsonContent
+            };
+
+            const result = await updateNodeResolutionMarker(doc, updateInfo, acc);
+
+            // then the same doc reference is returned (no-op marker update)
+            expect(result).toBe(doc);
+        }, {unsafeCleanup: true});
+    });
+
+    test("returns same doc reference when updated content is structurally identical", async () => {
+        // given a parsed package.json with a NodeResolutionResult marker
+        await withDir(async (dir) => {
+            const packageJsonContent = JSON.stringify({
+                name: "test-project",
+                version: "1.0.0",
+                dependencies: {
+                    "react": "^18.2.0"
+                }
+            }, null, 2);
+            fs.writeFileSync(path.join(dir.path, "package.json"), packageJsonContent);
+
+            const parser = new PackageJsonParser({relativeTo: dir.path});
+            const docs: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(dir.path, "package.json"))) {
+                docs.push(result as Json.Document);
+            }
+            const doc = docs[0];
+
+            // when calling updateNodeResolutionMarker with an accumulator whose
+            // updatedPackageJsons contains content identical to the original
+            const acc = createDependencyRecipeAccumulator<BaseProjectUpdateInfo>();
+            acc.updatedPackageJsons.set("package.json", packageJsonContent);
+            const updateInfo = {
+                packageJsonPath: "package.json",
+                packageManager: PackageManager.Npm,
+                originalPackageJson: packageJsonContent
+            };
+
+            const result = await updateNodeResolutionMarker(doc, updateInfo, acc);
+
+            // then the same doc reference is returned (structurally equal marker)
+            expect(result).toBe(doc);
+        }, {unsafeCleanup: true});
+    });
+
 });

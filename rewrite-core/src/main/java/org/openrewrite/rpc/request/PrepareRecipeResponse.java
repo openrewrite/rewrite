@@ -39,9 +39,42 @@ public class PrepareRecipeResponse {
 
     List<Precondition> scanPreconditions;
 
+    /**
+     * When non-null, the remote declares that this recipe delegates entirely
+     * to a Java recipe. The host should load the recipe locally via the
+     * marketplace instead of wrapping it in an RpcRecipe.
+     */
+    @Nullable
+    DelegatesTo delegatesTo;
+
+    @Value
+    public static class DelegatesTo {
+        String recipeName;
+        Map<String, Object> options;
+    }
+
+    /**
+     * Either a leaf (a single visitor identified by {@code visitorName} +
+     * {@code visitorOptions}) or a composite of nested preconditions joined
+     * by {@code op} ({@code "or"}, {@code "and"}, {@code "not"}). When
+     * {@code op} is null the entry is a leaf and the visitor fields are
+     * required; when {@code op} is set, {@code operands} carries the children
+     * and the visitor fields are ignored. The composite form mirrors Java's
+     * {@link org.openrewrite.Preconditions#or}/{@code and}/{@code not} so
+     * remote languages can express the same gate shapes the Java side does.
+     */
     @Value
     public static class Precondition {
+        @Nullable
         String visitorName;
+
+        @Nullable
         Map<String, Object> visitorOptions;
+
+        @Nullable
+        String op;
+
+        @Nullable
+        List<Precondition> operands;
     }
 }

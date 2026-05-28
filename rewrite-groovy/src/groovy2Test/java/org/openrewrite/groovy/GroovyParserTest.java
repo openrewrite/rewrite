@@ -26,7 +26,7 @@ class GroovyParserTest implements RewriteTest {
     @Test
     void groovyRuntimeIsVersion2() throws Exception {
         Class<?> groovySystem = Class.forName("groovy.lang.GroovySystem");
-        String version = (String) groovySystem.getMethod("getVersion").invoke(null);
+        var version = (String) groovySystem.getMethod("getVersion").invoke(null);
         assertThat(version).startsWith("2.");
     }
 

@@ -17,8 +17,10 @@ package org.openrewrite.groovy.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
+import org.openrewrite.groovy.marker.AsStyleTypeCast;
 import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.style.*;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
@@ -36,6 +38,19 @@ public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<
 
     public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, WrappingAndBracesStyle wrappingAndBracesStyle, @Nullable Tree stopAfter) {
         super(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, wrappingAndBracesStyle, stopAfter);
+    }
+
+    @Override
+    public J.TypeCast visitTypeCast(J.TypeCast typeCast, P p) {
+        if (typeCast.getMarkers().findFirst(AsStyleTypeCast.class).isPresent()) {
+            // For Groovy as-style casts (e.g., "expr as Type"), the space before the "as" keyword
+            // is stored in ControlParentheses -> JRightPadded.after. The Java SpacesVisitor would
+            // strip this space because it treats it as within-parentheses padding for Java-style
+            // casts. Skip Java's SpacesVisitor processing entirely for as-style casts to preserve
+            // the required whitespace around the "as" keyword.
+            return typeCast;
+        }
+        return super.visitTypeCast(typeCast, p);
     }
 
     @Override

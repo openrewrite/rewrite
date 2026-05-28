@@ -25,6 +25,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.*;
@@ -326,14 +327,36 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 }
 
                 if (isInBatch) {
-                    // Batch path: accumulate visitor names instead of executing
-                    RpcRecipe rpcRecipe = (RpcRecipe) recipe;
-                    batch.items.add(new BatchVisit.BatchVisitItem(rpcRecipe.getEditVisitor(), null));
-                    batch.recipeStacks.add(recipeStack);
-                    if (batch.originalBeforeBatch == null) {
-                        batch.originalBeforeBatch = src;
+                    // Batch path: accumulate visitor names instead of executing.
+                    // Only batch if the remote actually has a codec for this source file type;
+                    // otherwise the BatchVisit RPC fails on the remote side and the resulting
+                    // exception gets attached to the source as a Markup$Error, falsely marking
+                    // the file as modified.
+                    if (currentRpc.getLanguages().contains(src.getClass().getName())) {
+                        RpcRecipe rpcRecipe = (RpcRecipe) recipe;
+                        // Evaluate the precondition locally before batching. The non-batch
+                        // path runs the precondition via getVisitor()'s Preconditions.check
+                        // wrapper; the batch path bypasses that wrapper because it dispatches
+                        // editVisitor names directly. Without this gate, every batched recipe
+                        // would visit every file regardless of preconditions, defeating the
+                        // optimization.
+                        TreeVisitor<?, ExecutionContext> precondition = rpcRecipe.getEditPreconditionVisitor();
+                        boolean preconditionPasses = true;
+                        if (precondition != null) {
+                            //noinspection unchecked
+                            TreeVisitor<Tree, ExecutionContext> typed =
+                                    (TreeVisitor<Tree, ExecutionContext>) precondition;
+                            preconditionPasses = typed.visit(src, ctx, rootCursor) != src;
+                        }
+                        if (preconditionPasses) {
+                            batch.items.add(new BatchVisit.BatchVisitItem(rpcRecipe.getEditVisitor(), null));
+                            batch.recipeStacks.add(recipeStack);
+                            if (batch.originalBeforeBatch == null) {
+                                batch.originalBeforeBatch = src;
+                            }
+                            batch.rpc = currentRpc;
+                        }
                     }
-                    batch.rpc = currentRpc;
 
                     // If this is the last recipe in the batch, flush now
                     if (nextRpc != currentRpc) {
@@ -406,7 +429,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             response = rpc.batchVisit(originalBefore, ctx, rootCursor, batch.items);
         } catch (Throwable t) {
             if (!batch.recipeStacks.isEmpty()) {
-                handleError(batch.recipeStacks.get(0).peek(), originalBefore, originalBefore, t);
+                SourceFile beforeError = source;
+                if (!(t instanceof RecipeRunException)) {
+                    source = Markup.error(source, t);
+                }
+                source = handleError(batch.recipeStacks.get(0).peek(), originalBefore, source, t);
+                if (source != null && source != beforeError) {
+                    source = addRecipesThatMadeChanges(batch.recipeStacks.get(0), source);
+                }
             }
             batch.clear();
             return source;
@@ -460,9 +490,11 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             Map<String, List<SearchResults.Row>> searchResultsByRecipe =
                     collectAllBatchSearchResults(originalBefore, fetched, attributionMap);
 
-            for (Stack<Recipe> stack : batch.recipeStacks) {
-                recordBatchSourceFileResultFast(originalBefore, fetched, stack,
-                        searchResultsByRecipe, ctx);
+            for (int i = 0; i < batch.recipeStacks.size(); i++) {
+                if (response.getResults().get(i).isModified()) {
+                    recordBatchSourceFileResultFast(originalBefore, fetched, batch.recipeStacks.get(i),
+                            searchResultsByRecipe, ctx);
+                }
             }
             if (!originalBefore.getMarkers().findFirst(Generated.class).isPresent()) {
                 recipeRunStats.recordSourceFileChanged(originalBefore, fetched);
@@ -709,8 +741,13 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         ctx.getOnError().accept(t);
 
         if (t instanceof RecipeRunException && after != null) {
-            RecipeRunException vt = (RecipeRunException) t;
-            after = (SourceFile) new FindRecipeRunException(vt).visitNonNull(after, 0);
+            try {
+                RecipeRunException vt = (RecipeRunException) t;
+                after = (SourceFile) new FindRecipeRunException(vt).visitNonNull(after, 0);
+            } catch (Throwable ignored) {
+                // Tree is too broken for node-level marker — fall back to marking the whole file
+                after = Markup.error(after, t);
+            }
         }
 
         // Use the original source file to record the error, not the one that may have been modified by the visitor.

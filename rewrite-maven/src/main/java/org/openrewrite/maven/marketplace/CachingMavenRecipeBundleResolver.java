@@ -25,15 +25,36 @@ import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Deduplicates {@link MavenRecipeBundleResolver} instances per package coordinate so that
+ * repeated {@link #resolve(RecipeBundle)} calls for the same package share one reader
+ * (and therefore one {@link org.openrewrite.marketplace.RecipeClassLoader}).
+ * <p>
+ * <strong>Lifetime of handed-out readers.</strong> The readers (and the
+ * {@link org.openrewrite.marketplace.RecipeClassLoader}s they own) returned by
+ * {@link #resolve(RecipeBundle)} are intended to outlive this resolver. Once a {@link Recipe}
+ * has been prepared from a reader, the JVM's class cache contains classes defined by that
+ * classloader, and any later {@code getResourceAsStream}/inner-class load against those
+ * classes requires the classloader's {@code URLClassPath} jar handles to remain open.
+ * <p>
+ * For that reason {@link #close()} only clears the deduplication cache. It does <em>not</em>
+ * close the cached inner {@link MavenRecipeBundleResolver}s -- doing so would close their
+ * readers, which would close the underlying {@code URLClassLoader}s while consumers still
+ * hold references. The visible failure mode is inner-class {@code NoClassDefFoundError} and
+ * silently-null {@code getResourceAsStream} returns on a classloader that {@code ==} identity
+ * confirms is still alive (see
+ * <a href="https://github.com/moderneinc/customer-requests/issues/2346">customer-requests#2346</a>).
+ * <p>
+ * Consumers that need deterministic cleanup must close the {@link RecipeBundleReader}s they
+ * retain (or rely on JVM exit for one-shot processes).
+ */
 @RequiredArgsConstructor
 public class CachingMavenRecipeBundleResolver implements RecipeBundleResolver {
     private final ExecutionContext ctx;
     private final MavenArtifactDownloader downloader;
     private final RecipeClassLoaderFactory classLoaderFactory;
-    private final Map<String, ResolverEntry> resolverCache = new HashMap<>();
+    private final Map<String, MavenRecipeBundleResolver> resolverCache = new HashMap<>();
 
     @Override
     public String getEcosystem() {
@@ -42,11 +63,7 @@ public class CachingMavenRecipeBundleResolver implements RecipeBundleResolver {
 
     @Override
     public RecipeBundleReader resolve(RecipeBundle bundle) {
-        try (RecipeBundleResolver resolver = resolverFor(bundle)) {
-            return resolver.resolve(bundle);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        return resolverFor(bundle).resolve(bundle);
     }
 
     private String resolverKey(RecipeBundle bundle) {
@@ -54,61 +71,24 @@ public class CachingMavenRecipeBundleResolver implements RecipeBundleResolver {
     }
 
     public synchronized RecipeBundleResolver resolverFor(RecipeBundle bundle) {
-        String key = resolverKey(bundle);
-        ResolverEntry entry = resolverCache.get(key);
-        if (entry != null && !entry.evicted) {
-            if (Objects.equals(entry.bundle.getVersion(), bundle.getVersion())) {
-                return entry.createProxyResolver();
-            }
-
-            entry.markEvicted();
-        }
-
-        entry = new ResolverEntry(bundle, new MavenRecipeBundleResolver(ctx, downloader, classLoaderFactory));
-        resolverCache.put(key, entry);
-        return entry.createProxyResolver();
+        // Deduplicate by package coordinate only. A version comparison here used to evict
+        // the cached entry whenever a caller passed a fresh RecipeBundle still on the
+        // requested version (e.g., "0.5.9-SNAPSHOT") while the cached entry had been
+        // mutated to the dated snapshot ("0.5.9-20260512.123000") by the first resolve.
+        // That eviction destructively closed the prior reader's classloader -- which was
+        // still in use by Recipe instances cached upstream. We accept that a second
+        // resolve with a different version returns the first resolver's reader; callers
+        // that need version pinning resolve into separate resolverKey()s (different
+        // packageNames) already.
+        return resolverCache.computeIfAbsent(resolverKey(bundle),
+                k -> new MavenRecipeBundleResolver(ctx, downloader, classLoaderFactory));
     }
 
-    @RequiredArgsConstructor
-    private static class ResolverEntry {
-        private final RecipeBundle bundle;
-        private final RecipeBundleResolver resolver;
-        private final AtomicInteger leases = new AtomicInteger();
-        private boolean evicted;
-
-        private synchronized void markEvicted() {
-            evicted = true;
-            if (leases.get() == 0) {
-                try {
-                    resolver.close();
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        }
-
-        RecipeBundleResolver createProxyResolver() {
-            leases.incrementAndGet();
-            return new RecipeBundleResolver() {
-                @Override
-                public String getEcosystem() {
-                    return resolver.getEcosystem();
-                }
-
-                @Override
-                public RecipeBundleReader resolve(RecipeBundle bundle) {
-                    return resolver.resolve(bundle);
-                }
-
-                @Override
-                public void close() throws Exception {
-                    synchronized (ResolverEntry.this) {
-                        if (leases.decrementAndGet() == 0 && evicted) {
-                            resolver.close();
-                        }
-                    }
-                }
-            };
-        }
+    @Override
+    public void close() {
+        // Intentionally a no-op. Cached resolvers own readers/classloaders that may be
+        // retained externally and must outlive this resolver. See the class-level javadoc.
+        // Consumers responsible for deterministic cleanup must close their retained
+        // RecipeBundleReader instances directly.
     }
 }

@@ -28,6 +28,7 @@ from rewrite.java.visitor import JavaVisitor
 from rewrite.python.support_types import Py
 from rewrite.tree import SourceFile
 from rewrite.utils import list_map
+from rewrite.visitor import TreeVisitor
 
 if TYPE_CHECKING:
     from rewrite.python.tree import (
@@ -665,4 +666,59 @@ class PythonVisitor(JavaVisitor[P]):
             expression=self.visit_and_cast(yield_from.expression, Expression, p)
         )
         return yield_from
+
+
+class _TreeVisitorAsPythonVisitor(PythonVisitor):
+    """Adapts a generic ``TreeVisitor`` as a ``PythonVisitor``.
+
+    Returned by :meth:`TreeVisitor.adapt` when a Py LST node's ``accept``
+    is called with a non-Python visitor. The wrapper is-a ``PythonVisitor``
+    (and therefore also a ``JavaVisitor``) so language-specific dispatch
+    finds the default child-traversal implementations; ``pre_visit`` /
+    ``post_visit`` / ``default_value`` / ``is_acceptable`` plus
+    ``_cursor`` / ``_visit_count`` / ``_after_visit`` are forwarded to the
+    wrapped visitor so user-defined logic still runs against the right state.
+    """
+
+    def __init__(self, wrapped: TreeVisitor):
+        self._wrapped = wrapped
+
+    @property
+    def _cursor(self):
+        return self._wrapped._cursor
+
+    @_cursor.setter
+    def _cursor(self, value):
+        self._wrapped._cursor = value
+
+    @property
+    def _visit_count(self):
+        return self._wrapped._visit_count
+
+    @_visit_count.setter
+    def _visit_count(self, value):
+        self._wrapped._visit_count = value
+
+    @property
+    def _after_visit(self):
+        return self._wrapped._after_visit
+
+    @_after_visit.setter
+    def _after_visit(self, value):
+        self._wrapped._after_visit = value
+
+    def pre_visit(self, tree, p):
+        return self._wrapped.pre_visit(tree, p)
+
+    def post_visit(self, tree, p):
+        return self._wrapped.post_visit(tree, p)
+
+    def default_value(self, tree, p):
+        return self._wrapped.default_value(tree, p)
+
+    def is_acceptable(self, source_file, p):
+        return self._wrapped.is_acceptable(source_file, p)
+
+
+TreeVisitor.register_adapter(PythonVisitor, _TreeVisitorAsPythonVisitor)
 

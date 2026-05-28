@@ -55,7 +55,8 @@ public class PrepareRecipe implements RpcRequest {
                     // of the edit visitor in this Java RPC process. Same for the scan precondition visitor below.
                     emptyList(),
                     recipe instanceof ScanningRecipe ? "scan:" + instanceId : null,
-                    emptyList()
+                    emptyList(),
+                    null
             );
         }
     }

@@ -21,9 +21,13 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.java.marker.JavaProject;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.table.DependenciesDeclared;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.Validated;
@@ -31,6 +35,8 @@ import org.openrewrite.Validated;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindDependency extends Recipe {
+    transient DependenciesDeclared dependenciesDeclared = new DependenciesDeclared(this);
+
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate identifying its publisher.",
             example = "com.google.guava")
@@ -71,7 +77,9 @@ public class FindDependency extends Recipe {
         return String.format("`%s:%s%s`", groupId, artifactId, maybeVersionSuffix);
     }
 
-    String description = "Finds dependencies declared in gradle build files. See the [reference](https://docs.gradle.org/current/userguide/java_library_plugin.html#sec:java_library_configurations_graph) on Gradle configurations or the diagram below for a description of what configuration to use. " +
+    String description = "Finds dependencies declared in gradle build files. " +
+                "Each match is also recorded as a row in the `DependenciesDeclared` data table. " +
+                "See the [reference](https://docs.gradle.org/current/userguide/java_library_plugin.html#sec:java_library_configurations_graph) on Gradle configurations or the diagram below for a description of what configuration to use. " +
                 "A project's compile and runtime classpath is based on these configurations.\n\n<img alt=\"Gradle compile classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-main.png\" width=\"200px\"/>\n" +
                 "A project's test classpath is based on these configurations.\n\n<img alt=\"Gradle test classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-test.png\" width=\"200px\"/>.";
 
@@ -81,7 +89,30 @@ public class FindDependency extends Recipe {
                 .groupId(groupId)
                 .artifactId(artifactId)
                 .configuration(configuration)
-                .asVisitor(gd -> versionIsValid(version, versionPattern, gd) ? SearchResult.found(gd.getTree()) : gd.getTree());
+                .asVisitor((gd, ctx) -> {
+                    if (!versionIsValid(version, versionPattern, gd)) {
+                        return gd.getTree();
+                    }
+                    SourceFile sourceFile = gd.getCursor().firstEnclosing(SourceFile.class);
+                    String projectName = sourceFile == null ? "" : sourceFile.getMarkers()
+                            .findFirst(JavaProject.class)
+                            .map(JavaProject::getProjectName)
+                            .orElse("");
+                    String sourceSetName = sourceFile == null ? "main" : sourceFile.getMarkers()
+                            .findFirst(JavaSourceSet.class)
+                            .map(JavaSourceSet::getName)
+                            .orElse("main");
+                    dependenciesDeclared.insertRow(ctx, new DependenciesDeclared.Row(
+                            projectName,
+                            sourceSetName,
+                            gd.getGroupId(),
+                            gd.getArtifactId(),
+                            gd.getVersion(),
+                            null,
+                            gd.getConfigurationName()
+                    ));
+                    return SearchResult.found(gd.getTree());
+                });
     }
 
     private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String versionPattern,

@@ -345,9 +345,14 @@ public class YamlParser implements org.openrewrite.Parser {
                                 scalarValue = scalarValue.replace(entry.getKey(), entry.getValue());
                             }
                         }
-                        // Then check for variable UUIDs (these are exact matches)
-                        if (variableByUuid.containsKey(scalarValue)) {
-                            scalarValue = variableByUuid.get(scalarValue);
+                        // Then restore any variable/asterisk placeholder UUIDs. The UUID may be
+                        // the entire scalar value (e.g. `key: @var@`) or embedded within a longer
+                        // scalar (e.g. markdown bold text inside a block scalar that happened to
+                        // match the asterisk placeholder regex).
+                        for (Map.Entry<String, String> entry : variableByUuid.entrySet()) {
+                            if (scalarValue.contains(entry.getKey())) {
+                                scalarValue = scalarValue.replace(entry.getKey(), entry.getValue());
+                            }
                         }
 
                         Yaml.Scalar.Style style;
@@ -823,6 +828,13 @@ public class YamlParser implements org.openrewrite.Parser {
                 key = (Yaml.Scalar) block;
             } else if (key == null && block instanceof Yaml.Alias) {
                 key = (Yaml.Alias) block;
+            } else if (key == null) {
+                // Complex YAML key (mapping or sequence used as key).
+                // The YamlKey interface only supports Scalar and Alias, so convert
+                // the complex key to a placeholder Scalar. This won't round-trip
+                // and will become a ParseError, but prevents NPE/ClassCastException.
+                key = new Yaml.Scalar(randomId(), block.getPrefix(), Markers.EMPTY,
+                        Yaml.Scalar.Style.PLAIN, null, null, "");
             } else {
                 String keySuffix = block.getPrefix();
                 int colonIndex = commentAwareIndexOf(':', keySuffix);

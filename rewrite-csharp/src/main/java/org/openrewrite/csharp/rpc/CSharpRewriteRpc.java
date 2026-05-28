@@ -21,7 +21,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
@@ -123,6 +122,10 @@ public class CSharpRewriteRpc extends RewriteRpc {
     public Stream<SourceFile> parseSolution(Path path, Path rootDir, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
+        Map<String, Object> options = new HashMap<>();
+        options.put(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+                ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true));
+
         return StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
             private @Nullable ParseSolutionResponse response;
@@ -131,15 +134,15 @@ public class CSharpRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting C# solution parsing: " + path);
-                    response = send("ParseSolution", new ParseSolution(path, rootDir), ParseSolutionResponse.class);
-                    parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
+                    response = send("ParseSolution", new ParseSolution(path, rootDir, options), ParseSolutionResponse.class);
+                    parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.getItems().size()));
                 }
 
-                if (index >= response.size()) {
+                if (index >= response.getItems().size()) {
                     return false;
                 }
 
-                ParseSolutionResponse.Item item = response.get(index);
+                ParseSolutionResponse.Item item = response.getItems().get(index);
                 index++;
 
                 SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
@@ -156,11 +159,13 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
             @Override
             public long estimateSize() {
-                return response == null ? Long.MAX_VALUE : response.size() - index;
+                return response == null ? Long.MAX_VALUE : response.getItems().size() - index;
             }
 
             @Override
             public int characteristics() {
+                // Don't report SIZED until response is available, as estimateSize()
+                // returns Long.MAX_VALUE before the RPC call completes
                 return response == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
             }
         }, false);
@@ -174,12 +179,13 @@ public class CSharpRewriteRpc extends RewriteRpc {
     public static class Builder implements Supplier<CSharpRewriteRpc> {
         private static final String TOOL_COMMAND = "rewrite-csharp";
         private static final String NUGET_PACKAGE_ID = "OpenRewrite.CSharp.Tool";
-        private static final String REWRITE_SOURCE_PATH_ENV = "REWRITE_SOURCE_PATH";
+
 
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private List<RecipeBundleResolver> resolvers = new ArrayList<>();
         private final Map<String, String> environment = new HashMap<>();
-        private Path dotnetPath = Paths.get("dotnet");
+        private static final Path DEFAULT_DOTNET_PATH = Paths.get("dotnet");
+        private Supplier<@Nullable Path> dotnetPathSupplier = () -> DEFAULT_DOTNET_PATH;
         private @Nullable Path csharpServerEntry;
         private @Nullable Path log;
         private Duration timeout = Duration.ofSeconds(60);
@@ -209,7 +215,20 @@ public class CSharpRewriteRpc extends RewriteRpc {
          * @return This builder
          */
         public Builder dotnetPath(Path dotnetPath) {
-            this.dotnetPath = dotnetPath;
+            return dotnetPath(() -> dotnetPath);
+        }
+
+        /**
+         * Supplies the path to the dotnet executable. The supplier is invoked at most
+         * once, when the RPC is first started. Returning {@code null} uses the built-in
+         * default (same as not configuring the path at all). Exceptions thrown by the
+         * supplier propagate out of the RPC-start call.
+         *
+         * @param dotnetPathSupplier Supplier for the path to the dotnet executable
+         * @return This builder
+         */
+        public Builder dotnetPath(Supplier<@Nullable Path> dotnetPathSupplier) {
+            this.dotnetPathSupplier = dotnetPathSupplier;
             return this;
         }
 
@@ -217,7 +236,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
          * Explicit entry point for the C# RPC server, primarily for tests.
          * When set, the server is launched via {@code dotnet run --project <path>}
          * (for {@code .csproj}) or {@code dotnet <path>} (for DLLs), bypassing
-         * both {@code REWRITE_SOURCE_PATH} and global tool auto-install.
+         * global tool auto-install.
          */
         public Builder csharpServerEntry(Path csharpServerEntry) {
             this.csharpServerEntry = csharpServerEntry;
@@ -275,12 +294,17 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
         @Override
         public CSharpRewriteRpc get() {
+            Path dotnetPath = dotnetPathSupplier.get();
+            if (dotnetPath == null) {
+                dotnetPath = DEFAULT_DOTNET_PATH;
+            }
+
             Stream<@Nullable String> cmd;
 
             if (csharpServerEntry != null) {
                 // Explicit override (used by tests)
                 if (csharpServerEntry.toString().endsWith(".csproj")) {
-                    cmd = buildCsprojCommand(csharpServerEntry);
+                    cmd = buildCsprojCommand(dotnetPath, csharpServerEntry);
                 } else {
                     cmd = Stream.of(
                             dotnetPath.toString(),
@@ -290,23 +314,11 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     );
                 }
             } else {
-                // If REWRITE_SOURCE_PATH is set, launch from source via dotnet run
-                String rewriteSourcePath = System.getenv(REWRITE_SOURCE_PATH_ENV);
-                if (rewriteSourcePath != null && !rewriteSourcePath.isEmpty()) {
-                    Path csproj = Paths.get(rewriteSourcePath)
-                            .resolve("rewrite-csharp/csharp/OpenRewrite.Tool/OpenRewrite.Tool.csproj");
-                    if (!Files.exists(csproj)) {
-                        throw new IllegalStateException(
-                                REWRITE_SOURCE_PATH_ENV + " is set to " + rewriteSourcePath +
-                                " but " + csproj + " does not exist");
-                    }
-                    cmd = buildCsprojCommand(csproj);
-                } else {
-                    // Run via dotnet tool exec with the pinned version from the build
-                    String version = StringUtils.readFully(
-                            CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
-                    cmd = buildToolExecCommand(version);
-                }
+                // Install and run the tool from a persistent tool-path, bypassing
+                // dotnet tool exec which has auth issues with private feeds (dotnet/sdk#51375)
+                String version = StringUtils.readFully(
+                        CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
+                cmd = buildToolPathCommand(dotnetPath, version);
             }
 
             return startProcess(cmd);
@@ -319,6 +331,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
             if (workingDirectory != null) {
                 process.setWorkingDirectory(workingDirectory);
             }
+            process.setStderrRedirect(log);
 
             process.environment().putAll(environment);
 
@@ -347,7 +360,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
             }
         }
 
-        private Stream<@Nullable String> buildCsprojCommand(Path csproj) {
+        private Stream<@Nullable String> buildCsprojCommand(Path dotnetPath, Path csproj) {
             return Stream.of(
                     dotnetPath.toString(),
                     "run",
@@ -358,17 +371,74 @@ public class CSharpRewriteRpc extends RewriteRpc {
             );
         }
 
-        private Stream<@Nullable String> buildToolExecCommand(String version) {
+        /**
+         * Ensures the tool is installed at a persistent tool-path and returns a command
+         * to run it directly. This bypasses {@code dotnet tool exec} entirely, working
+         * around https://github.com/dotnet/sdk/issues/51375 where {@code dotnet tool exec}
+         * fails to authenticate against private NuGet feeds.
+         * <p>
+         * Uses {@code dotnet tool install --tool-path} which handles authentication
+         * correctly. The tool-path is version-specific so multiple versions can coexist
+         * without file-lock conflicts during parallel execution.
+         */
+        private Stream<@Nullable String> buildToolPathCommand(Path dotnetPath, String version) {
+            Path toolPath = Paths.get(System.getProperty("user.home"),
+                    ".dotnet", "rewrite-tools", version);
+            Path toolExecutable = toolPath.resolve(TOOL_COMMAND);
+
+            if (!Files.isRegularFile(toolExecutable)) {
+                installTool(dotnetPath, version, toolPath);
+            }
+
             return Stream.of(
-                    dotnetPath.toString(),
-                    "tool", "exec",
-                    NUGET_PACKAGE_ID + "@" + version,
-                    "-y",
-                    "--allow-roll-forward",
-                    "--",
+                    toolExecutable.toAbsolutePath().normalize().toString(),
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null
             );
+        }
+
+        private void installTool(Path dotnetPath, String version, Path toolPath) {
+            try {
+                Files.createDirectories(toolPath);
+
+                List<String> installCmd = new ArrayList<>(Arrays.asList(
+                        dotnetPath.toString(),
+                        "tool", "install",
+                        NUGET_PACKAGE_ID,
+                        "--version", version,
+                        "--tool-path", toolPath.toString(),
+                        "--ignore-failed-sources"
+                ));
+
+                // When the tool package exists in the NuGet global cache (e.g. from publishToMavenLocal),
+                // add it as a source so the install can resolve it without remote feeds
+                Path globalCachePath = Paths.get(System.getProperty("user.home"),
+                        ".nuget", "packages", NUGET_PACKAGE_ID.toLowerCase(), version);
+                if (Files.isDirectory(globalCachePath)) {
+                    installCmd.addAll(Arrays.asList("--add-source", globalCachePath.toString()));
+                }
+
+                ProcessBuilder pb = new ProcessBuilder(installCmd);
+                if (workingDirectory != null) {
+                    pb.directory(workingDirectory.toFile());
+                }
+                pb.environment().putAll(environment);
+                pb.redirectErrorStream(true);
+                Process process = pb.start();
+                String output = StringUtils.readFully(process.getInputStream());
+                int exitCode = process.waitFor();
+
+                if (exitCode != 0) {
+                    throw new RuntimeException(
+                            "Failed to install " + NUGET_PACKAGE_ID + "@" + version +
+                            " to " + toolPath + " (exit code " + exitCode + "): " + output);
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to install " + NUGET_PACKAGE_ID + "@" + version, e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted while installing " + NUGET_PACKAGE_ID + "@" + version, e);
+            }
         }
     }
 }

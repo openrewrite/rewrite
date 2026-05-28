@@ -28,7 +28,7 @@ import static org.openrewrite.rpc.RpcObjectData.State.*;
 
 public class RpcSendQueue {
     private final int batchSize;
-    private final List<RpcObjectData> batch;
+    private List<RpcObjectData> batch;
     private final Consumer<List<RpcObjectData>> drain;
     private final IdentityHashMap<Object, Integer> refs;
     private final @Nullable String sourceFileType;
@@ -55,13 +55,21 @@ public class RpcSendQueue {
 
     /**
      * Called whenever the batch size is reached or at the end of the tree.
+     * <p>
+     * The batch is handed to {@code drain} directly — no defensive copy. This is
+     * safe because (1) all {@code put}/{@code flush} calls happen on a single
+     * traversal thread, so reassignment of {@code batch} can't race with {@code put},
+     * and (2) the drain consumer (a capacity-1 {@code BlockingQueue.put}) blocks
+     * until the consumer takes the list, so by the time {@code drain.accept} returns
+     * there's no in-flight reader of the just-handed-off list either.
      */
     public void flush() {
         if (batch.isEmpty()) {
             return;
         }
-        drain.accept(new ArrayList<>(batch));
-        batch.clear();
+        List<RpcObjectData> sending = batch;
+        batch = new ArrayList<>(batchSize);
+        drain.accept(sending);
     }
 
     public <T, U> void getAndSend(T parent, Function<T, @Nullable U> value) {
@@ -150,7 +158,7 @@ public class RpcSendQueue {
     }
 
     private <T> Map<Object, Integer> putListPositions(List<T> after, @Nullable List<T> before, Function<? super T, ?> id) {
-        Map<Object, Integer> beforeIdx = new IdentityHashMap<>();
+        Map<Object, Integer> beforeIdx = new HashMap<>();
         if (before != null) {
             for (int i = 0; i < before.size(); i++) {
                 beforeIdx.put(id.apply(before.get(i)), i);

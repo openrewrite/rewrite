@@ -23,7 +23,7 @@ namespace OpenRewrite.CSharp;
 /// The base interface for C#-specific LST elements.
 /// Most C# syntax maps to J elements; Cs is for C#-specific constructs.
 /// </summary>
-public interface Cs : J
+public partial interface Cs : J
 {
 }
 
@@ -31,6 +31,33 @@ public interface Pattern : Expression, Cs { }
 public interface VariableDesignation : Expression, Cs { }
 public interface SwitchLabel : Expression { }
 // AllowsConstraint and TypeParameterConstraint interfaces DELETED — constraint types implement Expression directly
+
+/// <summary>
+/// An expression used as a statement.
+/// </summary>
+public sealed class ExpressionStatement(
+    Guid id,
+    Expression expression
+) : Cs, Statement, IEquatable<ExpressionStatement>
+{
+    public Guid Id { get; } = id;
+    public Expression Expression { get; } = expression;
+
+    public ExpressionStatement WithId(Guid id) =>
+        id == Id ? this : new(id, Expression);
+    public ExpressionStatement WithExpression(Expression expression) =>
+        ReferenceEquals(expression, Expression) ? this : new(Id, expression);
+
+    // ExpressionStatement delegates prefix/markers to its expression
+    public Space Prefix => Expression.Prefix;
+    public Markers Markers => Expression.Markers;
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ExpressionStatement? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ExpressionStatement);
+    public override int GetHashCode() => Id.GetHashCode();
+}
 
 /// <summary>
 /// A C# using directive.
@@ -202,6 +229,9 @@ public sealed class AccessorDeclaration(
     public IList<Modifier> Modifiers { get; } = modifiers;
     public JLeftPadded<AccessorKind> Kind { get; } = kind;
     public Block? Body { get; } = body;
+    // For auto-implemented accessors (e.g. "get ;"), Element is a J.Empty whose Prefix
+    // carries any whitespace between the keyword and the trailing ';'. For "get => x;" the
+    // Element is the body expression and Before is the space before '=>'.
     public JLeftPadded<Expression>? ExpressionBody { get; } = expressionBody;
 
     public AccessorDeclaration WithId(Guid id) =>
@@ -237,7 +267,7 @@ public sealed class AttributeList(
     Markers markers,
     JRightPadded<Identifier>? target,
     IList<JRightPadded<Annotation>> attributes
-) : Cs, Statement, IEquatable<AttributeList>
+) : Cs, IEquatable<AttributeList>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
@@ -496,6 +526,27 @@ public sealed class PatternCombinator(Guid id)
 }
 
 /// <summary>
+/// Marker on a <see cref="ClassDeclaration"/> TypeParameters container indicating
+/// the type parameters are synthetic (no angle brackets in source). Created when
+/// constraint clauses exist but no type parameter list (e.g., interface C where T : U;).
+/// </summary>
+public sealed class ImplicitTypeParameters(Guid id) : Marker, IRpcCodec<ImplicitTypeParameters>, IEquatable<ImplicitTypeParameters>
+{
+    public Guid Id { get; } = id;
+
+    public ImplicitTypeParameters WithId(Guid id) =>
+        id == Id ? this : new(id);
+
+    public void RpcSend(ImplicitTypeParameters after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public ImplicitTypeParameters RpcReceive(ImplicitTypeParameters before, RpcReceiveQueue q) =>
+        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
+
+    public bool Equals(ImplicitTypeParameters? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ImplicitTypeParameters);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
 /// Marker on a <see cref="ConstrainedTypeParameter"/> that records the source-order index
 /// of its <c>where</c> clause, so the printer can output constraints in source order
 /// rather than type-parameter declaration order.
@@ -588,6 +639,8 @@ public sealed class NamedExpression(
     public NamedExpression WithExpression(Expression expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, Name, expression);
 
+    public JavaType? Type => Expression.Type;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(NamedExpression? other) => other is not null && Id == other.Id;
@@ -638,6 +691,8 @@ public sealed class RefExpression(
     public RefExpression WithExpression(Expression expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, Kind, expression);
 
+    public JavaType? Type => Expression.Type;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(RefExpression? other) => other is not null && Id == other.Id;
@@ -675,6 +730,8 @@ public sealed class DeclarationExpression(
         ReferenceEquals(typeExpression, TypeExpression) ? this : new(Id, Prefix, Markers, typeExpression, Variables);
     public DeclarationExpression WithVariables(Expression variables) =>
         ReferenceEquals(variables, Variables) ? this : new(Id, Prefix, Markers, TypeExpression, variables);
+
+    public JavaType? Type => Variables.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -725,6 +782,8 @@ public sealed class CsLambda(
     public CsLambda WithLambdaExpression(Lambda lambdaExpression) =>
         ReferenceEquals(lambdaExpression, LambdaExpression) ? this : new(Id, Prefix, Markers, AttributeLists, Modifiers, ReturnType, lambdaExpression);
 
+    public JavaType? Type => LambdaExpression.Type;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(CsLambda? other) => other is not null && Id == other.Id;
@@ -766,6 +825,8 @@ public sealed class RelationalPattern(
     public RelationalPattern WithValue(Expression value) =>
         ReferenceEquals(value, Value) ? this : new(Id, Prefix, Markers, Operator, value);
 
+    JavaType? Expression.Type => null;
+
     public enum Type
     {
         LessThan,
@@ -795,14 +856,15 @@ public sealed class IsPattern(
     Space prefix,
     Markers markers,
     Expression expression,
-    JLeftPadded<Pattern> pattern
+    JLeftPadded<Expression> pattern
 ) : Cs, Expression, IEquatable<IsPattern>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public Expression Expression { get; } = expression;
-    public JLeftPadded<Pattern> Pattern { get; } = pattern;
+    // Widened from Pattern to Expression so parenthesized patterns (J.Parentheses<Expression>) fit too.
+    public JLeftPadded<Expression> Pattern { get; } = pattern;
 
     public IsPattern WithId(Guid id) =>
         id == Id ? this : new(id, Prefix, Markers, Expression, Pattern);
@@ -812,8 +874,10 @@ public sealed class IsPattern(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Pattern);
     public IsPattern WithExpression(Expression expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Pattern);
-    public IsPattern WithPattern(JLeftPadded<Pattern> pattern) =>
+    public IsPattern WithPattern(JLeftPadded<Expression> pattern) =>
         ReferenceEquals(pattern, Pattern) ? this : new(Id, Prefix, Markers, Expression, pattern);
+
+    public JavaType? Type => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -846,6 +910,8 @@ public sealed class StatementExpression(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Statement);
     public StatementExpression WithStatement(Statement statement) =>
         ReferenceEquals(statement, Statement) ? this : new(Id, Prefix, Markers, statement);
+
+    public JavaType? Type => null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1059,6 +1125,8 @@ public sealed class PropertyPattern(
         ReferenceEquals(subpatterns, Subpatterns) ? this : new(Id, Prefix, Markers, TypeQualifier, subpatterns, Designation);
     public PropertyPattern WithDesignation(Identifier? designation) =>
         ReferenceEquals(designation, Designation) ? this : new(Id, Prefix, Markers, TypeQualifier, Subpatterns, designation);
+
+    public JavaType? Type => TypeQualifier?.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1308,7 +1376,8 @@ public sealed class NullableDirective(
     NullableSetting setting,
     NullableTarget? target,
     string hashSpacing = "",
-    string trailingComment = ""
+    string trailingComment = "",
+    string keywordSpacing = " "
 ) : Cs, Statement, IEquatable<NullableDirective>
 {
     public Guid Id { get; } = id;
@@ -1318,21 +1387,25 @@ public sealed class NullableDirective(
     public NullableTarget? Target { get; } = target;
     public string HashSpacing { get; } = hashSpacing;
     public string TrailingComment { get; } = trailingComment;
+    // Whitespace between the "nullable" keyword and the setting keyword (e.g. "  " in "#nullable  enable").
+    public string KeywordSpacing { get; } = keywordSpacing;
 
     public NullableDirective WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Setting, Target, HashSpacing, TrailingComment);
+        id == Id ? this : new(id, Prefix, Markers, Setting, Target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Setting, Target, HashSpacing, TrailingComment);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Setting, Target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Setting, Target, HashSpacing, TrailingComment);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Setting, Target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithSetting(NullableSetting setting) =>
-        setting == Setting ? this : new(Id, Prefix, Markers, setting, Target, HashSpacing, TrailingComment);
+        setting == Setting ? this : new(Id, Prefix, Markers, setting, Target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithTarget(NullableTarget? target) =>
-        target == Target ? this : new(Id, Prefix, Markers, Setting, target, HashSpacing, TrailingComment);
+        target == Target ? this : new(Id, Prefix, Markers, Setting, target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithHashSpacing(string hashSpacing) =>
-        string.Equals(hashSpacing, HashSpacing, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, hashSpacing, TrailingComment);
+        string.Equals(hashSpacing, HashSpacing, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, hashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithTrailingComment(string trailingComment) =>
-        string.Equals(trailingComment, TrailingComment, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, HashSpacing, trailingComment);
+        string.Equals(trailingComment, TrailingComment, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, HashSpacing, trailingComment, KeywordSpacing);
+    public NullableDirective WithKeywordSpacing(string keywordSpacing) =>
+        string.Equals(keywordSpacing, KeywordSpacing, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, HashSpacing, TrailingComment, keywordSpacing);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1588,6 +1661,9 @@ public sealed class CompilationUnit(
     bool charsetBomMarked,
     Checksum? checksum,
     Core.FileAttributes? fileAttributes,
+    IList<JRightPadded<Statement>> externs,
+    IList<JRightPadded<Statement>> usings,
+    IList<AttributeList> attributeLists,
     IList<JRightPadded<Statement>> members,
     Space eof
 ) : Cs, SourceFile, IEquatable<CompilationUnit>
@@ -1600,29 +1676,38 @@ public sealed class CompilationUnit(
     public bool CharsetBomMarked { get; } = charsetBomMarked;
     public Checksum? Checksum { get; } = checksum;
     public Core.FileAttributes? FileAttributes { get; } = fileAttributes;
+    public IList<JRightPadded<Statement>> Externs { get; } = externs;
+    public IList<JRightPadded<Statement>> Usings { get; } = usings;
+    public IList<AttributeList> AttributeLists { get; } = attributeLists;
     public IList<JRightPadded<Statement>> Members { get; } = members;
     public Space Eof { get; } = eof;
 
     public CompilationUnit WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
+        id == Id ? this : new(id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithSourcePath(string sourcePath) =>
-        string.Equals(sourcePath, SourcePath, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, sourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
+        string.Equals(sourcePath, SourcePath, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, sourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithCharset(string charset) =>
-        string.Equals(charset, Charset, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, SourcePath, charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
+        string.Equals(charset, Charset, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, SourcePath, charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithCharsetBomMarked(bool charsetBomMarked) =>
-        charsetBomMarked == CharsetBomMarked ? this : new(Id, Prefix, Markers, SourcePath, Charset, charsetBomMarked, Checksum, FileAttributes, Members, Eof);
+        charsetBomMarked == CharsetBomMarked ? this : new(Id, Prefix, Markers, SourcePath, Charset, charsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithChecksum(Checksum? checksum) =>
-        ReferenceEquals(checksum, Checksum) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, checksum, FileAttributes, Members, Eof);
+        ReferenceEquals(checksum, Checksum) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithFileAttributes(Core.FileAttributes? fileAttributes) =>
-        ReferenceEquals(fileAttributes, FileAttributes) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, fileAttributes, Members, Eof);
+        ReferenceEquals(fileAttributes, FileAttributes) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, fileAttributes, Externs, Usings, AttributeLists, Members, Eof);
+    public CompilationUnit WithExterns(IList<JRightPadded<Statement>> externs) =>
+        ReferenceEquals(externs, Externs) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, externs, Usings, AttributeLists, Members, Eof);
+    public CompilationUnit WithUsings(IList<JRightPadded<Statement>> usings) =>
+        ReferenceEquals(usings, Usings) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, usings, AttributeLists, Members, Eof);
+    public CompilationUnit WithAttributeLists(IList<AttributeList> attributeLists) =>
+        ReferenceEquals(attributeLists, AttributeLists) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, attributeLists, Members, Eof);
     public CompilationUnit WithMembers(IList<JRightPadded<Statement>> members) =>
-        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, members, Eof);
+        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, members, Eof);
     public CompilationUnit WithEof(Space eof) =>
-        ReferenceEquals(eof, Eof) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, eof);
+        ReferenceEquals(eof, Eof) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, eof);
 
     Tree Tree.WithId(Guid id) => WithId(id);
     SourceFile SourceFile.WithSourcePath(string sourcePath) => WithSourcePath(sourcePath);
@@ -1668,6 +1753,8 @@ public sealed class InterpolatedString(
         string.Equals(endDelimiter, EndDelimiter, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Delimiter, endDelimiter, Parts);
     public InterpolatedString WithParts(IList<J> parts) =>
         ReferenceEquals(parts, Parts) ? this : new(Id, Prefix, Markers, Delimiter, EndDelimiter, parts);
+
+    public JavaType? Type => JavaType.Primitive.Of(JavaType.PrimitiveKind.String);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1816,6 +1903,8 @@ public sealed class NamespaceDeclaration(
     Space prefix,
     Markers markers,
     JRightPadded<Expression> name,
+    IList<JRightPadded<Statement>> externs,
+    IList<JRightPadded<Statement>> usings,
     IList<JRightPadded<Statement>> members,
     Space end
 ) : Cs, Statement, IEquatable<NamespaceDeclaration>
@@ -1824,21 +1913,27 @@ public sealed class NamespaceDeclaration(
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public JRightPadded<Expression> Name { get; } = name;
+    public IList<JRightPadded<Statement>> Externs { get; } = externs;
+    public IList<JRightPadded<Statement>> Usings { get; } = usings;
     public IList<JRightPadded<Statement>> Members { get; } = members;
     public Space End { get; } = end;
 
     public NamespaceDeclaration WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Name, Members, End);
+        id == Id ? this : new(id, Prefix, Markers, Name, Externs, Usings, Members, End);
     public NamespaceDeclaration WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Name, Members, End);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Name, Externs, Usings, Members, End);
     public NamespaceDeclaration WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name, Members, End);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name, Externs, Usings, Members, End);
     public NamespaceDeclaration WithName(JRightPadded<Expression> name) =>
-        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, name, Members, End);
+        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, name, Externs, Usings, Members, End);
+    public NamespaceDeclaration WithExterns(IList<JRightPadded<Statement>> externs) =>
+        ReferenceEquals(externs, Externs) ? this : new(Id, Prefix, Markers, Name, externs, Usings, Members, End);
+    public NamespaceDeclaration WithUsings(IList<JRightPadded<Statement>> usings) =>
+        ReferenceEquals(usings, Usings) ? this : new(Id, Prefix, Markers, Name, Externs, usings, Members, End);
     public NamespaceDeclaration WithMembers(IList<JRightPadded<Statement>> members) =>
-        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, Name, members, End);
+        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, Name, Externs, Usings, members, End);
     public NamespaceDeclaration WithEnd(Space end) =>
-        ReferenceEquals(end, End) ? this : new(Id, Prefix, Markers, Name, Members, end);
+        ReferenceEquals(end, End) ? this : new(Id, Prefix, Markers, Name, Externs, Usings, Members, end);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1985,7 +2080,7 @@ public sealed class NullSafeExpression(
 
     public Expression Expression => ExpressionPadded.Element;
 
-    public JavaType? Type => null;
+    public JavaType? Type => Expression.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2021,6 +2116,8 @@ public sealed class TupleExpression(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Arguments);
     public TupleExpression WithArguments(JContainer<Expression> arguments) =>
         ReferenceEquals(arguments, Arguments) ? this : new(Id, Prefix, Markers, arguments);
+
+    public JavaType? Type => null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2148,6 +2245,8 @@ public sealed class ArrayRankSpecifier(
     public ArrayRankSpecifier WithSizes(JContainer<Expression> sizes) =>
         ReferenceEquals(sizes, Sizes) ? this : new(Id, Prefix, Markers, sizes);
 
+    public JavaType? Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(ArrayRankSpecifier? other) => other is not null && Id == other.Id;
@@ -2236,6 +2335,8 @@ public sealed class StackAllocExpression(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression);
     public StackAllocExpression WithExpression(NewArray expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression);
+
+    public JavaType? Type => Expression.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2540,6 +2641,8 @@ public sealed class AllowsConstraintClause(
     public AllowsConstraintClause WithExpressions(JContainer<Expression> expressions) =>
         ReferenceEquals(expressions, Expressions) ? this : new(Id, Prefix, Markers, expressions);
 
+    public JavaType? Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(AllowsConstraintClause? other) => other is not null && Id == other.Id;
@@ -2565,6 +2668,8 @@ public sealed class RefStructConstraint(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers);
     public RefStructConstraint WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers);
+
+    public JavaType? Type => null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2601,6 +2706,9 @@ public sealed class ClassOrStructConstraint(
         nullable == Nullable ? this : new(Id, Prefix, Markers, Kind, nullable);
 
     public enum TypeKind { Class, Struct }
+
+    JavaType? Expression.Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(ClassOrStructConstraint? other) => other is not null && Id == other.Id;
@@ -2627,6 +2735,8 @@ public sealed class ConstructorConstraint(
     public ConstructorConstraint WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers);
 
+    public JavaType? Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(ConstructorConstraint? other) => other is not null && Id == other.Id;
@@ -2652,6 +2762,8 @@ public sealed class DefaultConstraint(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers);
     public DefaultConstraint WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers);
+
+    public JavaType? Type => null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2682,6 +2794,8 @@ public sealed class SingleVariableDesignation(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name);
     public SingleVariableDesignation WithName(Identifier name) =>
         ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, name);
+
+    public JavaType? Type => Name.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2742,6 +2856,8 @@ public sealed class DiscardVariableDesignation(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Discard);
     public DiscardVariableDesignation WithDiscard(Identifier discard) =>
         ReferenceEquals(discard, Discard) ? this : new(Id, Prefix, Markers, discard);
+
+    public JavaType? Type => Discard.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2846,6 +2962,8 @@ public sealed class ImplicitElementAccess(
     public ImplicitElementAccess WithArgumentList(JContainer<Expression> argumentList) =>
         ReferenceEquals(argumentList, ArgumentList) ? this : new(Id, Prefix, Markers, argumentList);
 
+    public JavaType? Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(ImplicitElementAccess? other) => other is not null && Id == other.Id;
@@ -2873,6 +2991,8 @@ public sealed class ConstantPattern(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Value);
     public ConstantPattern WithValue(Expression value) =>
         ReferenceEquals(value, Value) ? this : new(Id, Prefix, Markers, value);
+
+    public JavaType? Type => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2934,6 +3054,8 @@ public sealed class ListPattern(
     public ListPattern WithDesignation(VariableDesignation? designation) =>
         ReferenceEquals(designation, Designation) ? this : new(Id, Prefix, Markers, Patterns, designation);
 
+    public JavaType? Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(ListPattern? other) => other is not null && Id == other.Id;
@@ -2957,6 +3079,8 @@ public sealed class SlicePattern(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers);
     public SlicePattern WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers);
+
+    public JavaType? Type => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -3065,6 +3189,8 @@ public sealed class CheckedExpression(
     public CheckedExpression WithExpressionValue(ControlParentheses<Expression> expressionValue) =>
         ReferenceEquals(expressionValue, ExpressionValue) ? this : new(Id, Prefix, Markers, CheckedOrUncheckedKeyword, expressionValue);
 
+    public JavaType? Type => ExpressionValue.Type;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(CheckedExpression? other) => other is not null && Id == other.Id;
@@ -3130,6 +3256,8 @@ public sealed class RangeExpression(
         ReferenceEquals(start, Start) ? this : new(Id, Prefix, Markers, start, End);
     public RangeExpression WithEnd(Expression? end) =>
         ReferenceEquals(end, End) ? this : new(Id, Prefix, Markers, Start, end);
+
+    public JavaType? Type => null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -3246,6 +3374,7 @@ public sealed class ConversionOperatorDeclaration(
     Markers markers,
     IList<Modifier> modifiers,
     JLeftPadded<ConversionOperatorDeclaration.ExplicitImplicit> kind,
+    JRightPadded<TypeTree>? interfaceSpecifier,
     JLeftPadded<TypeTree> returnType,
     JContainer<Statement> parameters,
     JLeftPadded<Expression>? expressionBody,
@@ -3257,29 +3386,33 @@ public sealed class ConversionOperatorDeclaration(
     public Markers Markers { get; } = markers;
     public IList<Modifier> Modifiers { get; } = modifiers;
     public JLeftPadded<ConversionOperatorDeclaration.ExplicitImplicit> Kind { get; } = kind;
+    /// <summary>The explicit interface type (e.g., N.I), right-padded with the space before the dot. Null when no explicit interface.</summary>
+    public JRightPadded<TypeTree>? InterfaceSpecifier { get; } = interfaceSpecifier;
     public JLeftPadded<TypeTree> ReturnType { get; } = returnType;
     public JContainer<Statement> Parameters { get; } = parameters;
     public JLeftPadded<Expression>? ExpressionBody { get; } = expressionBody;
     public Block? Body { get; } = body;
 
     public ConversionOperatorDeclaration WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Modifiers, Kind, ReturnType, Parameters, ExpressionBody, Body);
+        id == Id ? this : new(id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Modifiers, Kind, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Modifiers, Kind, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithModifiers(IList<Modifier> modifiers) =>
-        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, modifiers, Kind, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithKind(JLeftPadded<ConversionOperatorDeclaration.ExplicitImplicit> kind) =>
-        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, Modifiers, kind, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, Modifiers, kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+    public ConversionOperatorDeclaration WithInterfaceSpecifier(JRightPadded<TypeTree>? interfaceSpecifier) =>
+        ReferenceEquals(interfaceSpecifier, InterfaceSpecifier) ? this : new(Id, Prefix, Markers, Modifiers, Kind, interfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithReturnType(JLeftPadded<TypeTree> returnType) =>
-        ReferenceEquals(returnType, ReturnType) ? this : new(Id, Prefix, Markers, Modifiers, Kind, returnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(returnType, ReturnType) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, returnType, Parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithParameters(JContainer<Statement> parameters) =>
-        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, Modifiers, Kind, ReturnType, parameters, ExpressionBody, Body);
+        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithExpressionBody(JLeftPadded<Expression>? expressionBody) =>
-        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, Modifiers, Kind, ReturnType, Parameters, expressionBody, Body);
+        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, expressionBody, Body);
     public ConversionOperatorDeclaration WithBody(Block? body) =>
-        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Modifiers, Kind, ReturnType, Parameters, ExpressionBody, body);
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, body);
 
     public enum ExplicitImplicit { Implicit, Explicit }
     Tree Tree.WithId(Guid id) => WithId(id);
@@ -3492,6 +3625,8 @@ public sealed class EnumMemberDeclaration(
     public EnumMemberDeclaration WithInitializer(JLeftPadded<Expression>? initializer) =>
         ReferenceEquals(initializer, Initializer) ? this : new(Id, Prefix, Markers, AttributeLists, Name, initializer);
 
+    public JavaType? Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(EnumMemberDeclaration? other) => other is not null && Id == other.Id;
@@ -3525,6 +3660,8 @@ public sealed class AliasQualifiedName(
         ReferenceEquals(alias, Alias) ? this : new(Id, Prefix, Markers, alias, Name);
     public AliasQualifiedName WithName(Expression name) =>
         ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, Alias, name);
+
+    public JavaType? Type => Name.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -3795,6 +3932,117 @@ public sealed class FunctionPointerType(
 
     public bool Equals(FunctionPointerType? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as FunctionPointerType);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// A base type reference with constructor arguments, e.g., Base(x, y) in class Derived(int x) : Base(x, y) { }.
+/// Wraps a TypeTree for the base type and a JContainer for the argument list.
+/// </summary>
+public sealed class TypeWithArguments(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    TypeTree typeExpression,
+    JContainer<Expression> arguments
+) : Cs, TypeTree, Expression, IEquatable<TypeWithArguments>
+{
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public TypeTree TypeExpression { get; } = typeExpression;
+    public JContainer<Expression> Arguments { get; } = arguments;
+
+    public JavaType? Type => TypeExpression.Type;
+
+    public TypeWithArguments WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, TypeExpression, Arguments);
+    public TypeWithArguments WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, TypeExpression, Arguments);
+    public TypeWithArguments WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, TypeExpression, Arguments);
+    public TypeWithArguments WithTypeExpression(TypeTree typeExpression) =>
+        ReferenceEquals(typeExpression, TypeExpression) ? this : new(Id, Prefix, Markers, typeExpression, Arguments);
+    public TypeWithArguments WithArguments(JContainer<Expression> arguments) =>
+        ReferenceEquals(arguments, Arguments) ? this : new(Id, Prefix, Markers, TypeExpression, arguments);
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(TypeWithArguments? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as TypeWithArguments);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// Wraps a J.MethodDeclaration that has an explicit interface specifier (e.g., void IFoo.Bar()).
+/// The interface specifier is stored separately since J.MethodDeclaration.Name is Identifier only.
+/// </summary>
+public sealed class ExplicitInterfaceMember(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JRightPadded<TypeTree> interfaceSpecifier,
+    MethodDeclaration methodDeclaration
+) : Cs, Statement, IEquatable<ExplicitInterfaceMember>
+{
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    /// <summary>The interface type (e.g., IFoo), right-padded with the space before the dot.</summary>
+    public JRightPadded<TypeTree> InterfaceSpecifier { get; } = interfaceSpecifier;
+    public MethodDeclaration MethodDeclaration { get; } = methodDeclaration;
+
+    public ExplicitInterfaceMember WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, InterfaceSpecifier, MethodDeclaration);
+    public ExplicitInterfaceMember WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, InterfaceSpecifier, MethodDeclaration);
+    public ExplicitInterfaceMember WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, InterfaceSpecifier, MethodDeclaration);
+    public ExplicitInterfaceMember WithInterfaceSpecifier(JRightPadded<TypeTree> interfaceSpecifier) =>
+        ReferenceEquals(interfaceSpecifier, InterfaceSpecifier) ? this : new(Id, Prefix, Markers, interfaceSpecifier, MethodDeclaration);
+    public ExplicitInterfaceMember WithMethodDeclaration(MethodDeclaration methodDeclaration) =>
+        ReferenceEquals(methodDeclaration, MethodDeclaration) ? this : new(Id, Prefix, Markers, InterfaceSpecifier, methodDeclaration);
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ExplicitInterfaceMember? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ExplicitInterfaceMember);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// C# <c>when (expr)</c> clause on a <see cref="Try.Catch"/>.
+/// Stored as the initializer of the catch parameter's <see cref="VariableDeclarations.NamedVariable"/>.
+/// Printing is handled by the C# printer which emits <c>when(expr)</c> after the
+/// catch parameter's closing parenthesis.
+/// </summary>
+public sealed class WhenClause(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    ControlParentheses<Expression> condition
+) : Cs, Expression, IEquatable<WhenClause>
+{
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public ControlParentheses<Expression> Condition { get; } = condition;
+
+    public JavaType? Type => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean);
+
+    public WhenClause WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Condition);
+    public WhenClause WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Condition);
+    public WhenClause WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Condition);
+    public WhenClause WithCondition(ControlParentheses<Expression> condition) =>
+        ReferenceEquals(condition, Condition) ? this : new(Id, Prefix, Markers, condition);
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(WhenClause? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as WhenClause);
     public override int GetHashCode() => Id.GetHashCode();
 }
 

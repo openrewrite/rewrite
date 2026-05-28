@@ -475,6 +475,26 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
                 return true;
             }
+            // Pattern: tasks.wrapper { ... } (property-style access on TaskContainer)
+            if ("wrapper".equals(m.getSimpleName()) && m.getSelect() instanceof J.Identifier &&
+                    "tasks".equals(((J.Identifier) m.getSelect()).getSimpleName())) {
+                return true;
+            }
+            // Pattern: tasks.withType(Wrapper) { ... } or tasks.withType<Wrapper> { ... }
+            if ("withType".equals(m.getSimpleName()) && m.getSelect() instanceof J.Identifier &&
+                    "tasks".equals(((J.Identifier) m.getSelect()).getSimpleName())) {
+                List<Expression> args = m.getArguments();
+                // Groovy: tasks.withType(Wrapper) { ... }
+                if (!args.isEmpty() && args.get(0) instanceof J.Identifier &&
+                        "Wrapper".equals(((J.Identifier) args.get(0)).getSimpleName())) {
+                    return true;
+                }
+                // Kotlin: tasks.withType<Wrapper> { ... } (type param, single lambda arg)
+                if (m.getTypeParameters() != null && !m.getTypeParameters().isEmpty()) {
+                    return m.getTypeParameters().stream()
+                            .anyMatch(tp -> tp instanceof J.Identifier && "Wrapper".equals(((J.Identifier) tp).getSimpleName()));
+                }
+            }
             return false;
         }
 

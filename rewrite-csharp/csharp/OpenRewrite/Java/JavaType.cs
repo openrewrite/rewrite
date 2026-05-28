@@ -28,6 +28,15 @@ public abstract class JavaType
     /// </summary>
     public sealed class Primitive : JavaType
     {
+        // Shared instances for referential deduplication across the tree.
+        // The RPC layer uses AsRef + identity tracking, so reusing instances
+        // avoids sending duplicate type data for every node that shares a type.
+        private static readonly Primitive[] Instances = Enum.GetValues<PrimitiveKind>()
+            .Select(k => new Primitive(k))
+            .ToArray();
+
+        public static Primitive Of(PrimitiveKind kind) => Instances[(int)kind];
+
         public PrimitiveKind Kind { get; }
 
         public Primitive(PrimitiveKind kind)
@@ -122,6 +131,52 @@ public abstract class JavaType
             Members = members;
             Methods = methods;
             return this;
+        }
+    }
+
+    /// <summary>
+    /// A lightweight class type that only carries the fully qualified name, kind, flags,
+    /// and owning class. All other fields (type parameters, supertype, annotations,
+    /// interfaces, members, methods) are discarded.
+    /// Matches Java's JavaType.ShallowClass.
+    /// </summary>
+    public class ShallowClass : Class
+    {
+        public ShallowClass() { }
+
+        public ShallowClass(long flagsBitMap, FullyQualifiedKind classKind, string fullyQualifiedName,
+            FullyQualified? owningClass)
+            : base(flagsBitMap, classKind, fullyQualifiedName, null, null, owningClass, null, null, null, null)
+        {
+        }
+
+        public static ShallowClass Build(string fullyQualifiedName)
+        {
+            ShallowClass? owningClass = null;
+
+            int firstClassNameIndex = 0;
+            int lastDelimiter = 0;
+            char prev = ' ';
+            for (int i = 0; i < fullyQualifiedName.Length; i++)
+            {
+                char c = fullyQualifiedName[i];
+                if (firstClassNameIndex == 0 && (prev == '.' || prev == '$') && char.IsUpper(c))
+                {
+                    firstClassNameIndex = i;
+                }
+                else if (c == '.' || c == '$')
+                {
+                    lastDelimiter = i;
+                }
+                prev = c;
+            }
+
+            if (lastDelimiter > firstClassNameIndex)
+            {
+                owningClass = Build(fullyQualifiedName[..lastDelimiter]);
+            }
+
+            return new ShallowClass(1, FullyQualifiedKind.Class, fullyQualifiedName, owningClass);
         }
     }
 
@@ -301,6 +356,7 @@ public abstract class JavaType
     public class Annotation : FullyQualified
     {
         public FullyQualified? AnnotationType { get; set; }
+        public IList<ElementValue>? Values { get; set; }
 
         public Annotation() { }
 
@@ -309,10 +365,61 @@ public abstract class JavaType
             AnnotationType = type;
         }
 
-        public Annotation UnsafeSet(FullyQualified? type)
+        public Annotation(FullyQualified? type, IList<ElementValue>? values)
         {
             AnnotationType = type;
+            Values = values;
+        }
+
+        public Annotation UnsafeSet(FullyQualified? type, IList<ElementValue>? values)
+        {
+            AnnotationType = type;
+            Values = values;
             return this;
+        }
+
+        /// <summary>
+        /// An annotation element value (one of <see cref="SingleElementValue"/> or
+        /// <see cref="ArrayElementValue"/>).
+        /// </summary>
+        public abstract class ElementValue
+        {
+            public JavaType? Element { get; set; }
+        }
+
+        public class SingleElementValue : ElementValue
+        {
+            /// <summary>
+            /// String, bool, sbyte, short, int, long, float, double, or char value.
+            /// Class literals and enum constants flow through <see cref="ReferenceValue"/>.
+            /// </summary>
+            public object? ConstantValue { get; set; }
+
+            public JavaType? ReferenceValue { get; set; }
+
+            public SingleElementValue() { }
+
+            public SingleElementValue(JavaType? element, object? constantValue, JavaType? referenceValue)
+            {
+                Element = element;
+                ConstantValue = constantValue;
+                ReferenceValue = referenceValue;
+            }
+        }
+
+        public class ArrayElementValue : ElementValue
+        {
+            public IList<object?>? ConstantValues { get; set; }
+            public IList<JavaType>? ReferenceValues { get; set; }
+
+            public ArrayElementValue() { }
+
+            public ArrayElementValue(JavaType? element, IList<object?>? constantValues, IList<JavaType>? referenceValues)
+            {
+                Element = element;
+                ConstantValues = constantValues;
+                ReferenceValues = referenceValues;
+            }
         }
     }
 

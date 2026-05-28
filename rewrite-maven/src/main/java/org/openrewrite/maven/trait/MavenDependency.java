@@ -63,9 +63,22 @@ public class MavenDependency implements Trait<Xml.Tag> {
         String finalVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
 
         // in the case of "latest.patch", a new version can only be derived if the
-        // current version is a semantic version
-        if (versionComparator instanceof LatestPatch && !versionComparator.isValid(finalVersion, finalVersion)) {
+        // current version is a semantic version. The metadata pattern is intentionally
+        // omitted here — it filters candidate target versions, not the source version
+        // (e.g. upgrading 1.2.3 to 1.2.3+backpatch.001 is valid even though the source
+        // doesn't carry the metadata suffix).
+        if (versionComparator instanceof LatestPatch && !new LatestPatch(null).isValid(finalVersion, finalVersion)) {
             return null;
+        }
+
+        // For exact version, check upfront whether the target version is actually an
+        // upgrade from the current version before downloading metadata
+        if (versionComparator instanceof ExactVersion) {
+            String exactVersion = ((ExactVersion) versionComparator).getVersion();
+            if (exactVersion.equals(finalVersion) ||
+                versionComparator.compare(finalVersion, finalVersion, exactVersion) > 0) {
+                return null;
+            }
         }
 
         try {
@@ -105,7 +118,9 @@ public class MavenDependency implements Trait<Xml.Tag> {
                         Pom pom = new MavenPomDownloader(emptyMap(), ctx,
                                 mrr.getMavenSettings(), mrr.getActiveProfiles()).download(new GroupArtifactVersion(groupId, artifactId, ((ExactVersion) versionComparator).getVersion()),
                                 null, null, mrr.getPom().getRepositories());
-                        if (pom.getGav().getVersion().equals(exactVersion)) {
+                        if (pom.getGav().getVersion().equals(exactVersion) &&
+                            !exactVersion.equals(finalVersion) &&
+                            versionComparator.compare(finalVersion, finalVersion, exactVersion) <= 0) {
                             return exactVersion;
                         }
                     } catch (MavenDownloadingException e) {

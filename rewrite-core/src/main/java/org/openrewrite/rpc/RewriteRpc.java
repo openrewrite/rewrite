@@ -43,8 +43,6 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -108,15 +106,49 @@ public class RewriteRpc {
     }
 
     /**
+     * Mutable resolver list so it can be updated after construction
+     * (e.g. when the RPC process is started eagerly before all resolvers are built).
+     */
+    private final List<RecipeBundleResolver> resolvers = new ArrayList<>();
+
+    /**
+     * Parsers available for handling Parse requests from remote peers.
+     */
+    private final List<Parser> parsers = new ArrayList<>();
+
+    private final RecipeMarketplace marketplace;
+
+    /**
+     * Replace the resolver list. Useful when the RPC process is started before all
+     * resolvers are built (e.g. the NuGet resolver starts the C# RPC during
+     * buildResolvers, but Maven resolvers are added to the list afterward).
+     */
+    public void setResolvers(List<RecipeBundleResolver> resolvers) {
+        this.resolvers.clear();
+        this.resolvers.addAll(resolvers);
+    }
+
+    /**
+     * Set the parsers available for handling Parse requests from remote peers.
+     */
+    public void setParsers(List<Parser> parsers) {
+        this.parsers.clear();
+        this.parsers.addAll(parsers);
+    }
+
+    /**
      * Creates a new RPC interface that can be used to communicate with a remote.
      *
      * @param marketplace The marketplace of recipes that this peer makes available.
      *                    Even if this peer is the host process, configuring this
      *                    marketplace allows the remote peer to discover what recipes
      *                    the host process has available for its use in composite recipes.
+     * @param resolvers   The initial set of recipe bundle resolvers.
      */
     public RewriteRpc(JsonRpc jsonRpc, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers) {
         this.jsonRpc = jsonRpc;
+        this.marketplace = marketplace;
+        this.resolvers.addAll(resolvers);
 
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
                 this::getObject, this::getCursor));
@@ -129,7 +161,7 @@ public class RewriteRpc {
         jsonRpc.rpc("GetMarketplace", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
-                return GetMarketplaceResponse.fromMarketplace(marketplace, resolvers);
+                return GetMarketplaceResponse.fromMarketplace(marketplace, RewriteRpc.this.resolvers);
             }
         });
         jsonRpc.rpc("TraceGetObject", new JsonRpcMethod<TraceGetObject>() {
@@ -142,11 +174,29 @@ public class RewriteRpc {
         jsonRpc.rpc("GetLanguages", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
+                // Advertise every SourceFile type Java has a receiver for so that
+                // remote peers know they can hand any of these off to Java for
+                // visiting. Each entry is gated by ifOnClasspath so the actual
+                // set narrows to whichever rewrite-* modules are loaded in this
+                // process.
                 return Stream.of(
                         ifOnClasspath("org.openrewrite.text.PlainText"),
                         ifOnClasspath("org.openrewrite.json.tree.Json$Document"),
+                        ifOnClasspath("org.openrewrite.yaml.tree.Yaml$Documents"),
+                        ifOnClasspath("org.openrewrite.xml.tree.Xml$Document"),
+                        ifOnClasspath("org.openrewrite.hcl.tree.Hcl$ConfigFile"),
+                        ifOnClasspath("org.openrewrite.properties.tree.Properties$File"),
+                        ifOnClasspath("org.openrewrite.toml.tree.Toml$Document"),
+                        ifOnClasspath("org.openrewrite.protobuf.tree.Proto$Document"),
+                        ifOnClasspath("org.openrewrite.docker.tree.Docker$File"),
                         ifOnClasspath("org.openrewrite.java.tree.J$CompilationUnit"),
-                        ifOnClasspath("org.openrewrite.javascript.tree.JS$CompilationUnit")
+                        ifOnClasspath("org.openrewrite.javascript.tree.JS$CompilationUnit"),
+                        ifOnClasspath("org.openrewrite.kotlin.tree.K$CompilationUnit"),
+                        ifOnClasspath("org.openrewrite.groovy.tree.G$CompilationUnit"),
+                        ifOnClasspath("org.openrewrite.csharp.tree.Cs$CompilationUnit"),
+                        ifOnClasspath("org.openrewrite.python.tree.Py$CompilationUnit"),
+                        ifOnClasspath("org.openrewrite.golang.tree.Go$CompilationUnit"),
+                        ifOnClasspath("org.openrewrite.scala.tree.S$CompilationUnit")
                 ).filter(Objects::nonNull).toArray(String[]::new);
             }
 
@@ -162,11 +212,12 @@ public class RewriteRpc {
         jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, (id, opts) -> {
             RecipeListing listing = marketplace.findRecipe(id);
             if (listing != null) {
-                return listing.prepare(resolvers, opts);
+                return listing.prepare(RewriteRpc.this.resolvers, opts);
             }
             // Fall back to loading by class name if not found in marketplace
             return new RecipeLoader(null).load(id, opts);
         }));
+        jsonRpc.rpc("Parse", new Parse.Handler(localObjects, () -> parsers));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
         jsonRpc.rpc("Reset", new JsonRpcMethod<Void>() {
             @Override
@@ -244,8 +295,11 @@ public class RewriteRpc {
 
         String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
                 .getClass().getName();
-        VisitResponse response = send("Visit", new Visit(visitorName, sourceFileType, null,
+        Supplier<VisitResponse> doSend = () -> send("Visit", new Visit(visitorName, sourceFileType, null,
                 tree.getId().toString(), pId, cursorIds), VisitResponse.class);
+        VisitResponse response = p instanceof ExecutionContext
+                ? RewriteRpcExecutionContextView.view((ExecutionContext) p).withInFlightSlot(doSend)
+                : doSend.get();
         return response.isModified() ?
                 getObject(tree.getId().toString(), sourceFileType) :
                 tree;
@@ -261,14 +315,18 @@ public class RewriteRpc {
 
         String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
                 .getClass().getName();
-        return send("BatchVisit", new BatchVisit(sourceFileType, treeId, pId, cursorIds, visitors),
+        Supplier<BatchVisitResponse> doSend = () -> send("BatchVisit",
+                new BatchVisit(sourceFileType, treeId, pId, cursorIds, visitors),
                 BatchVisitResponse.class);
+        return p instanceof ExecutionContext
+                ? RewriteRpcExecutionContextView.view((ExecutionContext) p).withInFlightSlot(doSend)
+                : doSend.get();
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
         String ctxId = maybeUnwrapExecutionContext(ctx);
-        GenerateResponse response = send("Generate", new Generate(remoteRecipeId, ctxId),
-                GenerateResponse.class);
+        GenerateResponse response = RewriteRpcExecutionContextView.view(ctx).withInFlightSlot(() ->
+                send("Generate", new Generate(remoteRecipeId, ctxId), GenerateResponse.class));
         if (!response.getIds().isEmpty()) {
             List<SourceFile> generated = new ArrayList<>(response.getIds().size());
             for (int i = 0; i < response.getIds().size(); i++) {
@@ -313,12 +371,23 @@ public class RewriteRpc {
         return remoteLanguages;
     }
 
-    public RpcRecipe prepareRecipe(String id) {
+    public Recipe prepareRecipe(String id) {
         return prepareRecipe(id, emptyMap());
     }
 
-    public RpcRecipe prepareRecipe(String id, Map<String, Object> options) {
+    public Recipe prepareRecipe(String id, Map<String, Object> options) {
         PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
+
+        if (r.getDelegatesTo() != null) {
+            PrepareRecipeResponse.DelegatesTo d = r.getDelegatesTo();
+            RecipeListing listing = marketplace.findRecipe(d.getRecipeName());
+            if (listing == null) {
+                throw new IllegalStateException(
+                        "Remote declared delegatesTo " + d.getRecipeName() +
+                        " but no recipe found in marketplace.");
+            }
+            return listing.prepare(resolvers, d.getOptions());
+        }
 
         // FIXME do this validation on the server side instead
         for (OptionDescriptor option : r.getDescriptor().getOptions()) {
@@ -338,8 +407,7 @@ public class RewriteRpc {
 
         List<TreeVisitor<?, ExecutionContext>> visitors = new ArrayList<>(preconditions.size());
         for (PrepareRecipeResponse.Precondition p : preconditions) {
-            visitors.add(preparedRecipes.instantiateVisitor(
-                    p.getVisitorName(), p.getVisitorOptions()));
+            visitors.add(buildPreconditionVisitor(p));
         }
 
         return new TreeVisitor<Tree, ExecutionContext>() {
@@ -360,16 +428,51 @@ public class RewriteRpc {
         };
     }
 
+    @SuppressWarnings("unchecked")
+    private TreeVisitor<?, ExecutionContext> buildPreconditionVisitor(PrepareRecipeResponse.Precondition p) {
+        String op = p.getOp();
+        if (op == null) {
+            return preparedRecipes.instantiateVisitor(p.getVisitorName(), p.getVisitorOptions());
+        }
+        List<PrepareRecipeResponse.Precondition> operands = p.getOperands();
+        if (operands == null || operands.isEmpty()) {
+            throw new IllegalStateException("Composite precondition op=" + op + " requires non-empty operands");
+        }
+        TreeVisitor<?, ExecutionContext>[] children = new TreeVisitor[operands.size()];
+        for (int i = 0; i < operands.size(); i++) {
+            children[i] = buildPreconditionVisitor(operands.get(i));
+        }
+        switch (op) {
+            case "or":
+                return Preconditions.or(children);
+            case "and":
+                return Preconditions.and(children);
+            case "not":
+                if (children.length != 1) {
+                    throw new IllegalStateException("Composite precondition op=not requires exactly one operand, got " + children.length);
+                }
+                return Preconditions.not(children[0]);
+            default:
+                throw new IllegalStateException("Unknown composite precondition op=" + op);
+        }
+    }
+
     public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo,
                                     Parser parser, String sourceFileType, ExecutionContext ctx) {
+        return parse(inputs, relativeTo, parser, sourceFileType, ctx, null);
+    }
+
+    public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo,
+                                    Parser parser, String sourceFileType, ExecutionContext ctx,
+                                    @Nullable Map<String, String> options) {
         List<Parser.Input> inputList = new ArrayList<>();
         List<Parse.Input> mappedInputs = new ArrayList<>();
         for (Parser.Input input : inputs) {
             inputList.add(input);
             if (input.isSynthetic() || !Files.isRegularFile(input.getPath())) {
-                mappedInputs.add(new Parse.StringInput(input.getSource(ctx).readFully(), input.getPath()));
+                mappedInputs.add(new Parse.Input(input.getSource(ctx).readFully(), input.getPath()));
             } else {
-                mappedInputs.add(new Parse.PathInput(input.getPath()));
+                mappedInputs.add(new Parse.Input(null, input.getPath()));
             }
         }
 
@@ -388,7 +491,8 @@ public class RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (ids == null) {
                     // FIXME handle `TimeoutException` gracefully
-                    ids = send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+                    ids = RewriteRpcExecutionContextView.view(ctx).withInFlightSlot(() ->
+                            send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null, options), ParseResponse.class));
                     assert ids.size() == inputList.size();
                 }
 
@@ -534,19 +638,27 @@ public class RewriteRpc {
             // Send the request and get the future
             CompletableFuture<JsonRpcSuccess> future = jsonRpc.send(JsonRpcRequest.newRequest(method, body));
 
-            // Poll for completion while checking if process is alive
+            // future.get(timeout) from a FJP worker triggers ManagedBlocker compensation,
+            // which spawns helper threads that can leak per-thread RewriteRpc state.
+            // Poll non-blockingly + Thread.sleep so FJP doesn't compensate.
             long totalTimeoutMs = timeout.toMillis();
-            long checkIntervalMs = 500; // Check every 500ms
+            long pollIntervalMs = 1;
+            long livenessIntervalMs = 500;
             long elapsedMs = 0;
-
+            long lastLivenessMs = 0;
             while (elapsedMs < totalTimeoutMs) {
-                try {
-                    // Try to get the result with a short timeout
-                    return future.get(checkIntervalMs, TimeUnit.MILLISECONDS).getResult(responseType);
-                } catch (TimeoutException e) {
+                JsonRpcSuccess result = future.getNow(null);
+                if (result != null) {
+                    return result.getResult(responseType);
+                }
+                if (future.isCompletedExceptionally()) {
+                    return future.get().getResult(responseType);
+                }
+                Thread.sleep(pollIntervalMs);
+                elapsedMs += pollIntervalMs;
+                if (elapsedMs - lastLivenessMs >= livenessIntervalMs) {
                     checkLiveness();
-                    elapsedMs += checkIntervalMs;
-                    // Continue waiting if process is still alive and we haven't hit total timeout
+                    lastLivenessMs = elapsedMs;
                 }
             }
 

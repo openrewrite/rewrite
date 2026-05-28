@@ -17,6 +17,7 @@ package org.openrewrite.xml.format;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.style.TabsAndIndentsStyle;
 
@@ -47,6 +48,32 @@ class TabsAndIndentsTest implements RewriteTest {
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>quarkus-bootstrap-bom</artifactId>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4234")
+    @Test
+    void continuationIndentsWithinDOCTYPE() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new TabsAndIndentsVisitor<>(
+            TabsAndIndentsStyle.DEFAULT.withIndentSize(2).withContinuationIndentSize(5)
+          ))),
+          xml(
+            """
+              <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+                "https://checkstyle.org/dtds/configuration_1_3.dtd">
+              <project>
+              </project>
+              """,
+            """
+              <!DOCTYPE module PUBLIC
+                   "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+                   "https://checkstyle.org/dtds/configuration_1_3.dtd">
+              <project>
               </project>
               """
           )

@@ -40,7 +40,9 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.marketplace.MavenRecipeBundleResolver;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
+import org.openrewrite.Parser;
 import org.openrewrite.rpc.RewriteRpc;
+import org.openrewrite.xml.XmlParser;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -198,6 +200,16 @@ public class JavaRewriteRpc {
 
         // Create the RPC server with the marketplace and resolvers
         RewriteRpc server = new RewriteRpc(jsonRpc, marketplace, resolvers);
+
+        // FIXME replace reflective parser discovery with ServiceLoader-based
+        //  discovery (e.g. make Parser.Builder a service interface) so that any
+        //  parser on the classpath is automatically available for RPC Parse requests.
+        //
+        // Register parsers for handling Parse requests.
+        // .csproj files are parsed natively on the C# side (XmlParser + MSBuildProject marker).
+        List<Parser> parsers = new ArrayList<>();
+        parsers.add(new XmlParser());
+        server.setParsers(parsers);
 
         if (logStream != null) {
             server.log(logStream);

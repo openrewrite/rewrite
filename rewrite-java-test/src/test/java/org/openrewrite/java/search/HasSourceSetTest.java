@@ -76,7 +76,7 @@ class HasSourceSetTest implements RewriteTest {
     }
 
     @Test
-    void testResourcesNotMatchedByMain() {
+    void resourcesNotMatchedByMain() {
         rewriteRun(
           spec -> spec.recipe(new HasSourceSet("main")),
           srcTestResources(
@@ -89,7 +89,7 @@ class HasSourceSetTest implements RewriteTest {
     }
 
     @Test
-    void testResources() {
+    void resources() {
         rewriteRun(
           spec -> spec.recipe(new HasSourceSet("test")),
           srcTestResources(
