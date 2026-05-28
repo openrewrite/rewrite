@@ -204,29 +204,30 @@ public class Environment {
             }
         }
 
-        Map<String, Recipe> nameToRecipe = new HashMap<>();
-        for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
-            for (Recipe listedRecipe : dependencyResourceLoader.listRecipes()) {
-                nameToRecipe.putIfAbsent(listedRecipe.getName(), listedRecipe);
-            }
-        }
-        for (Recipe dependency : nameToRecipe.values()) {
-            if (dependency instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) dependency).initialize(nameToRecipe::get);
-            }
-        }
-
         if (includeExamples && recipeExamples.containsKey(recipe.getName())) {
             recipe.setExamples(recipeExamples.get(recipe.getName()));
         }
 
         if (recipe instanceof DeclarativeRecipe) {
+            Map<String, Recipe> nameToRecipe = new HashMap<>();
             Function<String, @Nullable Recipe> loadFunction = new Function<String, Recipe>() {
                 @Override
                 public @Nullable Recipe apply(String key) {
                     Recipe cached = nameToRecipe.get(key);
                     if (cached != null) {
                         return cached;
+                    }
+
+                    // Dependencies first to preserve "deps win on name conflicts" priority.
+                    for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
+                        Recipe r = dependencyResourceLoader.loadRecipe(key, details);
+                        if (r != null) {
+                            nameToRecipe.put(key, r);
+                            if (r instanceof DeclarativeRecipe) {
+                                ((DeclarativeRecipe) r).initialize(this);
+                            }
+                            return r;
+                        }
                     }
 
                     for (ResourceLoader resourceLoader : resourceLoaders) {
