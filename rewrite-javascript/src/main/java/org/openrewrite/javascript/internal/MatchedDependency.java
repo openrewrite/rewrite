@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.openrewrite.javascript.internal;
 
-export * from "./async-callback-in-sync-array-method";
-export * from "./auto-format";
-export * from "./order-imports";
-export * from "./change-import";
-export * from "./dependencies";
+import lombok.Value;
+
+/** A dependency match for `UpgradeDependencyVersion`: where it lives + its current version. */
+@Value
+public class MatchedDependency {
+    String packageName;
+    String dependencyScope;
+    String currentVersion;
+}

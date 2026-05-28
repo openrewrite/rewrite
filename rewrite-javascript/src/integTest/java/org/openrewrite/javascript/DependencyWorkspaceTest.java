@@ -15,10 +15,13 @@
  */
 package org.openrewrite.javascript;
 
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.Recipe;
+import org.openrewrite.javascript.internal.PackageManagerExecutor;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Files;
@@ -218,6 +221,42 @@ class DependencyWorkspaceTest implements RewriteTest {
         assertThat(Files.exists(workspace)).isTrue();
         assertThat(Files.exists(workspace.resolve("node_modules"))).isTrue();
         assertThat(Files.exists(workspace.resolve("package.json"))).isTrue();
+    }
+
+    @Test
+    void createsYarnBerryWorkspaceWithYarnLock() {
+        Assumptions.assumeTrue(PackageManagerExecutor.YARN.find() != null,
+                "yarn not installed");
+        String packageJson = "{\n" +
+                "  \"name\": \"workspace-yarn-berry-test\",\n" +
+                "  \"packageManager\": \"yarn@4.0.2\",\n" +
+                "  \"dependencies\": { \"lodash\": \"^4.17.21\" }\n" +
+                "}\n";
+        Path workspace = DependencyWorkspace.getOrCreateWorkspace(packageJson, PackageManager.YarnBerry);
+
+        assertThat(workspace).isNotNull();
+        assertThat(Files.exists(workspace.resolve("package.json"))).isTrue();
+        assertThat(Files.exists(workspace.resolve("yarn.lock"))).isTrue();
+        assertThat(Files.exists(workspace.resolve(".yarnrc.yml"))).isTrue();
+    }
+
+    @Test
+    void cachesPerPackageManagerSeparately() {
+        Assumptions.assumeTrue(PackageManagerExecutor.NPM.find() != null,
+                "npm not installed");
+        Assumptions.assumeTrue(PackageManagerExecutor.PNPM.find() != null,
+                "pnpm not installed");
+        String packageJson = "{\n" +
+                "  \"name\": \"workspace-cache-pm-test\",\n" +
+                "  \"dependencies\": { \"lodash\": \"^4.17.21\" }\n" +
+                "}\n";
+        // Same content, different PMs → different workspaces.
+        Path npmWorkspace = DependencyWorkspace.getOrCreateWorkspace(packageJson, PackageManager.Npm);
+        Path pnpmWorkspace = DependencyWorkspace.getOrCreateWorkspace(packageJson, PackageManager.Pnpm);
+
+        assertThat(npmWorkspace).isNotEqualTo(pnpmWorkspace);
+        assertThat(Files.exists(npmWorkspace.resolve("package-lock.json"))).isTrue();
+        assertThat(Files.exists(pnpmWorkspace.resolve("pnpm-lock.yaml"))).isTrue();
     }
 
     private static class NoOpRecipe extends Recipe {
