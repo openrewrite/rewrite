@@ -39,6 +39,9 @@ dependencies {
     testImplementation(project(":rewrite-yaml"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
     testRuntimeOnly(project(":rewrite-java-21"))
+    // For `:rewrite-javascript:generateTestClasspath` — bundles org.openrewrite.maven.rpc.JavaRewriteRpc,
+    // the main class spawned by JavaRpcTestServer in test/rpc/.
+    testRuntimeOnly(project(":rewrite-maven"))
 }
 
 tasks.withType<Javadoc>().configureEach {
@@ -119,6 +122,10 @@ val npmInstall = tasks.named("npmInstall")
 
 val npmTest = tasks.register<NpmTask>("npmTest") {
     dependsOn(npmInstall)
+    // RPC integration tests under test/rpc/ need the classpath of org.openrewrite.maven.rpc.JavaRewriteRpc.
+    // Generating it before npmTest means devs running `./gradlew :rewrite-javascript:test` get the RPC
+    // tests for free — devs running `npx vitest` directly still need to run :generateTestClasspath once.
+    dependsOn(tasks.named("generateTestClasspath"))
     inputs.files(fileTree("rewrite/node_modules") { exclude(".vite-temp/**", ".vite/**", ".cache/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite") {
@@ -129,6 +136,8 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/test"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(tasks.named("generateTestClasspath").map { it.outputs.files })
+        .withNormalizer(ClasspathNormalizer::class)
     outputs.files("rewrite/build/test-results/vitest/junit.xml")
     outputs.cacheIf { true }
 
@@ -236,6 +245,42 @@ testing {
 // `next`), and the duplicate-publish guard. The dedicated workflow filename is also what the
 // package's npm Trusted Publisher (OIDC) record matches against. CI/release workflows still
 // publish to Sonatype, PyPI, NuGet as before.
+
+// ============================================
+// JavaScript Test Support Tasks
+// ============================================
+
+// Task to generate classpath file for Java RPC server testing (consumed by TS tests
+// in rewrite-javascript/rewrite/test/rpc/ that spawn org.openrewrite.maven.rpc.JavaRewriteRpc).
+val generateTestClasspath by tasks.registering {
+    group = "javascript"
+    description = "Generate classpath file for Java RPC server (used by TypeScript tests)"
+
+    val outputFile = projectDir.resolve("rewrite/test-classpath.txt")
+    outputs.file(outputFile)
+
+    inputs.files(configurations["runtimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(configurations["testRuntimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(tasks.named("compileJava").map { it.outputs.files })
+    inputs.files(tasks.named("processResources").map { it.outputs.files })
+
+    dependsOn(tasks.named("testClasses"))
+    dependsOn(tasks.named("jar"))
+
+    doLast {
+        val classpath = (
+            configurations.getByName("runtimeClasspath").files +
+            configurations.getByName("testRuntimeClasspath").files +
+            tasks.named("compileJava").get().outputs.files +
+            tasks.named("processResources").get().outputs.files
+        ).distinctBy { it.absolutePath }
+         .joinToString(File.pathSeparator) { it.absolutePath }
+        outputFile.writeText(classpath)
+        logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
+    }
+}
 
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")

@@ -123,4 +123,82 @@ class ClasspathScanningLoaderTest {
                 .contains(AbstractRecipeFixtures.ConcreteRecipe.class.getName())
                 .doesNotContain(AbstractRecipeFixtures.AbstractlyMarkedRecipe.class.getName());
     }
+
+    @Test
+    void singleImperativeRecipeActivationDoesNotScan() {
+        ClasspathScanningLoader loader = new ClasspathScanningLoader(
+                new Properties(),
+                new String[]{AbstractRecipeFixtures.class.getPackageName()});
+        Environment env = new Environment(List.of(loader));
+
+        Recipe recipe = env.activateRecipes(AbstractRecipeFixtures.ConcreteRecipe.class.getName());
+
+        assertThat(recipe.getName()).isEqualTo(AbstractRecipeFixtures.ConcreteRecipe.class.getName());
+        // Neither the class hierarchy walk nor the YAML enumeration should have run.
+        assertThat(loader.classScanTriggered()).isFalse();
+        assertThat(loader.yamlListingTriggered()).isFalse();
+    }
+
+    @Test
+    void singleDeclarativeRecipeActivationDoesNotScanClasses(@TempDir Path tempDir) throws Exception {
+        Path resourcesDir = tempDir.resolve("resources");
+        Path metaInf = resourcesDir.resolve("META-INF/rewrite");
+        Files.createDirectories(metaInf);
+        Files.writeString(metaInf.resolve("recipe.yml"),
+                """
+                type: specs.openrewrite.org/v1beta/recipe
+                name: com.example.DeclarativeRecipe
+                displayName: Declarative
+                description: A declarative recipe.
+                recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: hello
+                """);
+        ClassLoader cl = new URLClassLoader(new URL[]{resourcesDir.toUri().toURL()}, Recipe.class.getClassLoader());
+        ClasspathScanningLoader loader = new ClasspathScanningLoader(
+                resourcesDir, new Properties(), List.of(), cl);
+        Environment env = new Environment(List.of(loader));
+
+        Recipe recipe = env.activateRecipes("com.example.DeclarativeRecipe");
+
+        assertThat(recipe.getName()).isEqualTo("com.example.DeclarativeRecipe");
+        // YAML listing necessarily happened (the recipe is declarative), but the
+        // class hierarchy walk should still be deferred.
+        assertThat(loader.classScanTriggered()).isFalse();
+        assertThat(loader.yamlListingTriggered()).isTrue();
+    }
+
+    @Test
+    void singleDeclarativeRecipeActivationDrainsOnlyUntilFirstMatch(@TempDir Path tempDir) throws Exception {
+        Path resourcesDir = tempDir.resolve("resources");
+        Path metaInf = resourcesDir.resolve("META-INF/rewrite");
+        Files.createDirectories(metaInf);
+        // Three YAML files, each defining the same recipe (with the same body). The
+        // progressive scan only needs to parse one of them to satisfy the lookup —
+        // it should not drain the remaining loaders regardless of file walk order.
+        String yaml = """
+                type: specs.openrewrite.org/v1beta/recipe
+                name: com.example.SharedRecipe
+                displayName: Shared
+                description: Shared recipe.
+                recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: shared
+                """;
+        Files.writeString(metaInf.resolve("aaa.yml"), yaml);
+        Files.writeString(metaInf.resolve("mmm.yml"), yaml);
+        Files.writeString(metaInf.resolve("zzz.yml"), yaml);
+        ClassLoader cl = new URLClassLoader(new URL[]{resourcesDir.toUri().toURL()}, Recipe.class.getClassLoader());
+        ClasspathScanningLoader loader = new ClasspathScanningLoader(
+                resourcesDir, new Properties(), List.of(), cl);
+        Environment env = new Environment(List.of(loader));
+
+        Recipe recipe = env.activateRecipes("com.example.SharedRecipe");
+
+        assertThat(recipe.getName()).isEqualTo("com.example.SharedRecipe");
+        assertThat(loader.yamlLoadersListed()).isEqualTo(3);
+        // Exactly one loader was drained — the short-circuit stopped iterating once
+        // the recipe turned up in the shared map.
+        assertThat(loader.yamlLoadersDrained()).isEqualTo(1);
+    }
 }
