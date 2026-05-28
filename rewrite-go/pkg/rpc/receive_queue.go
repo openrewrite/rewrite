@@ -105,6 +105,14 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		// Intentional fall-through to CHANGE
 		fallthrough
 	case Change:
+		// If the receiver has no baseline `before` but the sender provided a
+		// concrete type, materialize a fresh instance so the codec/onChange
+		// can populate its sub-fields. Without this, callers that pass
+		// before=nil drop every sub-field message of a CHANGE-typed object,
+		// silently desyncing the wire.
+		if isNilValue(before) && msg.ValueType != nil {
+			before = newObj(*msg.ValueType)
+		}
 		var after any
 		if onChange != nil {
 			after = onChange(before)
