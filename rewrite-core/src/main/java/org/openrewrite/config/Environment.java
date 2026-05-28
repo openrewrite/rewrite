@@ -38,7 +38,6 @@ import static java.util.Comparator.comparingInt;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
-import static org.openrewrite.config.ResourceLoader.RecipeDetail.EXAMPLES;
 
 public class Environment {
     private final Collection<? extends ResourceLoader> resourceLoaders;
@@ -130,7 +129,7 @@ public class Environment {
         if (activeRecipes.isEmpty()) {
             recipes = emptyList();
         } else if (activeRecipes.size() == 1) {
-            Recipe recipe = loadRecipe(activeRecipes.iterator().next(), EXAMPLES);
+            Recipe recipe = loadRecipe(activeRecipes.iterator().next());
             if (recipe != null) {
                 return recipe;
             }
