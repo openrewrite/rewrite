@@ -1838,18 +1838,20 @@ class ScalaTreeVisitor(
   }
   
   private def visitNewClassWithArgs(newTree: Trees.New[?], app: Trees.Apply[?]): J = {
-    // The Apply node has the full span including "new", use its prefix
-    val prefix = extractPrefix(app.span)
-    
-    // Extract space between "new" and the type
-    // First, consume "new" keyword
-    val newPos = positionOfNext("new")
-    if (newPos >= 0 && newPos == cursor) {
-      cursor += 3 // Move past "new"
-    }
-    
-    // Extract space between "new" and type
+    // For curried constructor calls `new Foo(a)(b)`, the inner `Apply(Select(New(Foo), <init>), List(a))`
+    // has a span starting at `Foo` rather than `new`. Locate the `new` keyword explicitly so we don't
+    // swallow it as the NewClass prefix.
     val typeStart = Math.max(0, newTree.tpt.span.start - offsetAdjustment)
+    val newPos = positionOfNext("new")
+    val prefix = if (newPos >= cursor && newPos < typeStart) {
+      val spaceBeforeNew = if (newPos > cursor) Space.format(source, cursor, newPos) else Space.EMPTY
+      cursor = newPos + 3 // Move past "new"
+      spaceBeforeNew
+    } else {
+      extractPrefix(app.span)
+    }
+
+    // Extract space between "new" and type
     val typeSpace = if (cursor < typeStart && typeStart <= source.length) {
       val spaceStr = source.substring(cursor, typeStart)
       cursor = typeStart
