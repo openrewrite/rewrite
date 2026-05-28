@@ -38,6 +38,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.addTypesToSourceSet;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.markSourceSetDirty;
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.java.Assertions.srcMainJava;
 import static org.openrewrite.java.Assertions.withSourceTypesOnClasspath;
 import static org.openrewrite.properties.Assertions.properties;
@@ -712,6 +714,52 @@ class ChangePackageTest implements RewriteTest {
                     private String otherField;
                 }
                 """
+            )
+          )
+        );
+    }
+
+    @Test
+    void changePackageExpandsStarImportWhenSourceSetIsDirty() {
+        // Classpath shows no ambiguity — only the validation API is on the classpath — but the
+        // source set has been marked dirty by an earlier in-run dependency mutation. The recipe
+        // must not rely on the stale classpath and should fall back to the safe path: expand the star.
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        List<Path> classpath = JavaParser.dependenciesFromResources(ctx,
+          "validation-api", "jakarta.validation-api");
+        markSourceSetDirty(ctx, "demo");
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("javax.validation.constraints", "jakarta.validation.constraints", true))
+                  .parser(JavaParser.fromJavaVersion().classpathFromResources(ctx,
+                    "validation-api"))
+                  .executionContext(ctx)
+                  .beforeRecipe(addTypesToSourceSet("main", emptyList(), classpath)),
+          mavenProject("demo",
+            srcMainJava(
+              java(
+                """
+                  package xyz;
+
+                  import javax.validation.constraints.*;
+                  import org.hibernate.validator.constraints.*;
+
+                  class A {
+                      @NotNull
+                      private String someField;
+                  }
+                  """,
+                """
+                  package xyz;
+
+                  import jakarta.validation.constraints.NotNull;
+                  import org.hibernate.validator.constraints.*;
+
+                  class A {
+                      @NotNull
+                      private String someField;
+                  }
+                  """
+              )
             )
           )
         );

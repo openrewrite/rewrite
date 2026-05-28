@@ -98,6 +98,7 @@ public class RemoveDependency extends Recipe {
                     sourceFile = (JavaSourceFile) super.visit(sourceFile, ctx);
                     if (sourceFile != tree) {
                         sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(updateGradleModel(gradleProject)));
+                        JavaSourceSet.markDirty(ctx, sourceFile);
                     }
                     return sourceFile;
                 }

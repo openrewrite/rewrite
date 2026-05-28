@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,28 +15,15 @@
  */
 package org.openrewrite.java.marker;
 
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-import org.jspecify.annotations.Nullable;
+import org.openrewrite.marker.Marker;
 
-import java.util.UUID;
-
-@Value
-@With
-public class JavaProject implements ProjectIdentity {
-    @EqualsAndHashCode.Exclude
-    UUID id;
-
-    String projectName;
-
-    @Nullable
-    Publication publication;
-
-    @Data
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    public static class Publication {
-        String groupId;
-        String artifactId;
-        String version;
-    }
+/**
+ * A marker that identifies the project a source file belongs to. Implemented by markers attached
+ * at parse time, such as {@link JavaProject} (rewrite-java) and {@code GradleProject}
+ * (rewrite-gradle). Lets code that only needs the project name look it up uniformly via
+ * {@code getMarkers().findFirst(ProjectIdentity.class)} without coupling to a specific marker
+ * type.
+ */
+public interface ProjectIdentity extends Marker {
+    String getProjectName();
 }

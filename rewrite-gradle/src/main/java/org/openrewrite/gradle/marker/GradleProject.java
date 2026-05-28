@@ -23,7 +23,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
-import org.openrewrite.marker.Marker;
+import org.openrewrite.java.marker.ProjectIdentity;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.tree.*;
 
@@ -46,7 +46,18 @@ import static org.openrewrite.gradle.marker.GradleDependencyConfiguration.update
 @Value
 @AllArgsConstructor(onConstructor_ = {@JsonCreator})
 @Builder
-public class GradleProject implements Marker, Serializable {
+public class GradleProject implements ProjectIdentity, Serializable {
+
+    /**
+     * Project identity convergence with {@link org.openrewrite.java.marker.JavaProject}: returns
+     * the Gradle subproject {@link #getName() name}, matching the {@code projectName} the Gradle
+     * plugin attaches to Java source files in the same subproject.
+     */
+    @Override
+    public String getProjectName() {
+        return name;
+    }
+
 
     @With
     @Builder.Default
