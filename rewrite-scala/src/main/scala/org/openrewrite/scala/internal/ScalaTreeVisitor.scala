@@ -6455,6 +6455,7 @@ class ScalaTreeVisitor(
       returnTypeExpression,
       new J.MethodDeclaration.IdentifierWithAnnotations(name, Collections.emptyList()),
       parameters,
+      Collections.emptyList(), // dimensionsAfterName
       null, // throws
       finalBody,
       null, // defaultValue

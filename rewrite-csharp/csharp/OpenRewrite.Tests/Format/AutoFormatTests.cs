@@ -879,6 +879,7 @@ public class AutoFormatTests : RewriteTest
             null, null,
             new Identifier(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, [], "Foo", null, null),
             new JContainer<Statement>(Space.Empty, [], Markers.Empty),
+            [], // dimensionsAfterName
             null, body,
             new JLeftPadded<Expression>(Space.SingleSpace,
                 new MethodInvocation(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, null,
@@ -965,6 +966,7 @@ file class AddConstructorWithMaybeAutoFormatRecipe : OpenRewrite.Core.Recipe
                 null, null,
                 new Identifier(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, [], className, null, null),
                 new JContainer<Statement>(Space.Empty, [], Markers.Empty),
+                [], // dimensionsAfterName
                 null, body,
                 new JLeftPadded<Expression>(Space.SingleSpace,
                     new MethodInvocation(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, null,
