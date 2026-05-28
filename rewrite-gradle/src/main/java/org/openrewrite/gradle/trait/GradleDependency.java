@@ -1375,6 +1375,28 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }
         }
 
+        // Sync rich version constraints inside any trailing `version { ... }` closure
+        // so that calls like `strictly(...)`, `require(...)`, `prefer(...)` reference the new version.
+        J.MethodInvocation withSyncedConstraints = (J.MethodInvocation) new JavaVisitor<Integer>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, Integer i) {
+                J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, i);
+                String name = mi.getSimpleName();
+                if (("strictly".equals(name) || "require".equals(name) || "prefer".equals(name)) &&
+                        withinBlock(getCursor(), "version")) {
+                    return mi.withArguments(ListUtils.map(mi.getArguments(), arg ->
+                            arg instanceof J.Literal ?
+                                    ChangeStringLiteral.withStringValue((J.Literal) arg, newVersion) :
+                                    arg));
+                }
+                return mi;
+            }
+        }.visitNonNull(updated, 0);
+
+        if (withSyncedConstraints != updated) {
+            updated = withSyncedConstraints;
+        }
+
         return updated == m ? this : new GradleDependency(new Cursor(cursor.getParent(), updated), resolvedDependency);
     }
 
