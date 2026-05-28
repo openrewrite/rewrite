@@ -16,9 +16,11 @@
 import {describeJavaRpc, testJavaRpc} from "../../src/test/java-rpc";
 import {RecipeSpec} from "../../src/test";
 import {text} from "../../src/text";
+import {prepareJavaRecipe} from "../../src/rpc";
 
 describeJavaRpc("Java recipe via RPC", () => {
-    testJavaRpc("prepareRecipe returns a descriptor", async ({javaRpc}) => {
+    // Direct API — exercises the underlying JavaRpcTestServer.rpc accessor.
+    testJavaRpc("javaRpc.rpc.prepareRecipe returns a descriptor", async ({javaRpc}) => {
         const recipe = await javaRpc.rpc.prepareRecipe(
             "org.openrewrite.text.FindAndReplace",
             {find: "Hello", replace: "Goodbye"},
@@ -28,9 +30,12 @@ describeJavaRpc("Java recipe via RPC", () => {
         expect(recipe.editVisitor).toBeDefined();
     });
 
-    testJavaRpc("FindAndReplace edits a parsed plain-text source", async ({javaRpc}) => {
+    // Recipe-author API — `prepareJavaRecipe()` resolves the active RewriteRpc
+    // via the global accessor, which the fixture wires up for us. This is the
+    // surface a TS recipe would import to delegate to a Java recipe.
+    testJavaRpc("prepareJavaRecipe edits a parsed plain-text source", async ({javaRpc: _javaRpc}) => {
         const spec = new RecipeSpec();
-        spec.recipe = await javaRpc.rpc.prepareRecipe(
+        spec.recipe = await prepareJavaRecipe(
             "org.openrewrite.text.FindAndReplace",
             {find: "Hello", replace: "Goodbye"},
         );
