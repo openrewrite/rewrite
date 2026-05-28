@@ -42,6 +42,17 @@ npm run testhelper -- test/javascript/recipes/order-imports.test.ts
 
 Available npm scripts: `prebuild`, `build`, `postbuild`, `typecheck`, `dev`, `test`, `testhelper`, `build:fixtures`, `ci:test`, `start`.
 
+### Java RPC Integration Tests
+
+Tests under `test/rpc/` that exercise real Java recipes spawn `org.openrewrite.maven.rpc.JavaRewriteRpc` via `JavaRpcTestServer` (see `src/rpc/java-rpc-client.ts`). They need a classpath file generated from the Java side:
+
+```bash
+# From repo root
+./gradlew :rewrite-javascript:generateTestClasspath
+```
+
+This writes `rewrite-javascript/rewrite/test-classpath.txt` (gitignored). Alternatively set `REWRITE_JAVASCRIPT_CLASSPATH` to override. Tests in `test/rpc/java-recipe-via-rpc.test.ts` skip cleanly with a one-line warning when neither is configured.
+
 ## Directory Structure
 
 ```
