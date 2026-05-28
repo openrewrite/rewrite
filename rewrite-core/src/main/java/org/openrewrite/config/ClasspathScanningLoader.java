@@ -590,13 +590,23 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     /**
-     * Drain every remaining YAML loader and compute recipe descriptors. Descriptors
-     * require the complete recipe set to resolve cross-loader references, so the
-     * descriptor pass runs after all loaders are drained.
+     * Drain every remaining YAML loader so the shared maps are fully populated. Recipe
+     * descriptor extraction is intentionally separate — see {@link #extractYamlRecipeDescriptors()}.
      */
     private void drainAllYamlLoaders() {
         while (drainNextYamlLoader()) {
         }
+    }
+
+    /**
+     * Compute recipe descriptors for every drained YAML loader. Must be called after
+     * both the class scan and the full YAML drain, because the descriptor pass
+     * resolves cross-loader references through {@code recipes} — and that map only
+     * contains imperative entries once the class scan has run. Calling this before
+     * the class scan would yield declarative descriptors with empty recipeLists for
+     * any imperative sub-recipe.
+     */
+    private void extractYamlRecipeDescriptors() {
         if (!recipeDescriptorsExtracted) {
             recipeDescriptorsExtracted = true;
             for (YamlResourceLoader loader : yamlResourceLoaders) {
@@ -689,6 +699,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
         ensureScanned();
+        extractYamlRecipeDescriptors();
         return recipeDescriptors;
     }
 
