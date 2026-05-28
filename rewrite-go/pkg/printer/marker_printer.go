@@ -116,7 +116,10 @@ func (searchOnlyMarkerPrinter) AfterSyntax(marker tree.Marker, wrapper CommentWr
 type fencedMarkerPrinter struct{}
 
 func (fencedMarkerPrinter) BeforePrefix(marker tree.Marker, wrapper CommentWrapper) string {
-	return fmt.Sprintf("{{%s}}", marker.ID())
+	if isFenceable(marker) {
+		return fmt.Sprintf("{{%s}}", marker.ID())
+	}
+	return ""
 }
 
 func (fencedMarkerPrinter) BeforeSyntax(marker tree.Marker, wrapper CommentWrapper) string {
@@ -124,7 +127,18 @@ func (fencedMarkerPrinter) BeforeSyntax(marker tree.Marker, wrapper CommentWrapp
 }
 
 func (fencedMarkerPrinter) AfterSyntax(marker tree.Marker, wrapper CommentWrapper) string {
-	return fmt.Sprintf("{{%s}}", marker.ID())
+	if isFenceable(marker) {
+		return fmt.Sprintf("{{%s}}", marker.ID())
+	}
+	return ""
+}
+
+func isFenceable(marker tree.Marker) bool {
+	switch marker.(type) {
+	case tree.SearchResult, tree.Markup:
+		return true
+	}
+	return false
 }
 
 // --- sanitizedMarkerPrinter ---
