@@ -1808,7 +1808,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 			// Skip common non-source directories. vendor/ is handled by
 			// the (3-tier) ProjectImporter for symbol resolution; we
 			// don't want to parse vendored code as project sources.
-			if base == "vendor" || base == "node_modules" || base == ".git" || base == "testdata" {
+			if base == "vendor" || base == "node_modules" || base == ".git" || base == "testdata" || base == ".moderne" {
 				return filepath.SkipDir
 			}
 			for _, excl := range req.Exclusions {
