@@ -59,7 +59,13 @@ func (r *JavaReceiver) PreVisit(t tree.Tree, p any) tree.Tree {
 		return t
 	}
 	q := p.(*ReceiveQueue)
-	q.Receive(j.GetID().String(), nil)
+	if result := q.Receive(j.GetID().String(), nil); result != nil {
+		if idStr, ok := result.(string); ok && idStr != "" {
+			if id, err := uuid.Parse(idStr); err == nil {
+				t = j.WithID(id)
+			}
+		}
+	}
 	if result := q.Receive(j.GetPrefix(), func(v any) any {
 		return receiveSpace(v.(tree.Space), q)
 	}); result != nil {

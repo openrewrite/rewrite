@@ -196,6 +196,13 @@ func (r *GoReceiver) VisitGoto(g *tree.Goto, p any) tree.J {
 	return g
 }
 
+// VisitFallthrough mirrors GolangReceiver.visitFallthrough — the node has no
+// payload beyond the framework-handled id/prefix/markers, so this override
+// is intentionally a no-op. Present for sender/receiver symmetry.
+func (r *GoReceiver) VisitFallthrough(f *tree.Fallthrough, p any) tree.J {
+	return f
+}
+
 func (r *GoReceiver) VisitComposite(comp *tree.Composite, p any) tree.J {
 	q := p.(*ReceiveQueue)
 	c := *comp // shallow copy to avoid mutating remoteObjects baseline

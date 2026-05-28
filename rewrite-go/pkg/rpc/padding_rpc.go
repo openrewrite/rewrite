@@ -493,6 +493,19 @@ func leftPaddedFromElement(before tree.Space, elem any, markers tree.Markers) an
 	if sp, ok := elem.(tree.Space); ok {
 		return tree.LeftPadded[tree.Space]{Before: before, Element: sp, Markers: markers}
 	}
+	// Pre-typed operator enums (NO_CHANGE path passes the existing typed value through)
+	if op, ok := elem.(tree.BinaryOperator); ok {
+		return tree.LeftPadded[tree.BinaryOperator]{Before: before, Element: op, Markers: markers}
+	}
+	if op, ok := elem.(tree.UnaryOperator); ok {
+		return tree.LeftPadded[tree.UnaryOperator]{Before: before, Element: op, Markers: markers}
+	}
+	if op, ok := elem.(tree.AssignmentOperator); ok {
+		return tree.LeftPadded[tree.AssignmentOperator]{Before: before, Element: op, Markers: markers}
+	}
+	if op, ok := elem.(tree.AssignOp); ok {
+		return tree.LeftPadded[tree.AssignOp]{Before: before, Element: op, Markers: markers}
+	}
 	// Interface types — prefer Expression over Statement
 	if expr, ok := elem.(tree.Expression); ok {
 		return tree.LeftPadded[tree.Expression]{Before: before, Element: expr, Markers: markers}

@@ -1838,18 +1838,20 @@ class ScalaTreeVisitor(
   }
   
   private def visitNewClassWithArgs(newTree: Trees.New[?], app: Trees.Apply[?]): J = {
-    // The Apply node has the full span including "new", use its prefix
-    val prefix = extractPrefix(app.span)
-    
-    // Extract space between "new" and the type
-    // First, consume "new" keyword
-    val newPos = positionOfNext("new")
-    if (newPos >= 0 && newPos == cursor) {
-      cursor += 3 // Move past "new"
-    }
-    
-    // Extract space between "new" and type
+    // For curried constructor calls `new Foo(a)(b)`, the inner `Apply(Select(New(Foo), <init>), List(a))`
+    // has a span starting at `Foo` rather than `new`. Locate the `new` keyword explicitly so we don't
+    // swallow it as the NewClass prefix.
     val typeStart = Math.max(0, newTree.tpt.span.start - offsetAdjustment)
+    val newPos = positionOfNext("new")
+    val prefix = if (newPos >= cursor && newPos < typeStart) {
+      val spaceBeforeNew = if (newPos > cursor) Space.format(source, cursor, newPos) else Space.EMPTY
+      cursor = newPos + 3 // Move past "new"
+      spaceBeforeNew
+    } else {
+      extractPrefix(app.span)
+    }
+
+    // Extract space between "new" and type
     val typeSpace = if (cursor < typeStart && typeStart <= source.length) {
       val spaceStr = source.substring(cursor, typeStart)
       cursor = typeStart
@@ -1957,7 +1959,18 @@ class ScalaTreeVisitor(
           } else Space.EMPTY
 
           args.add(new JRightPadded[Expression](exprWithPrefix, afterSpace, Markers.EMPTY))
-        case j: J => args.add(JRightPadded.build(new S.StatementExpression(Tree.randomId(), j).asInstanceOf[Expression]))
+        case j: J =>
+          // Scala statement-as-expression (e.g. if/else, match, block, try) wrapped so it
+          // can sit in an argument list. Apply argPrefix and trailing space the same way
+          // the Expression branch does so leading newlines and comments aren't lost.
+          val stmtExpr: Expression = new S.StatementExpression(Tree.randomId(), j).withPrefix(argPrefix)
+          val afterSpace = if (i == app.args.size - 1) {
+            val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+            val closePos = positionOfNext(")", Math.max(cursor, argEnd))
+            if (closePos > argEnd) Space.format(source, argEnd, closePos)
+            else Space.EMPTY
+          } else Space.EMPTY
+          args.add(new JRightPadded[Expression](stmtExpr, afterSpace, Markers.EMPTY))
         case _ => return visitUnknown(app)
       }
     }
@@ -2451,8 +2464,9 @@ class ScalaTreeVisitor(
     }
 
     if (tree.span.exists) {
-      val adjustedEnd = Math.max(0, tree.span.end - offsetAdjustment)
-      updateCursor(adjustedEnd)
+      // updateCursor takes a raw (un-adjusted) span position and applies
+      // offsetAdjustment itself; don't pre-subtract here.
+      updateCursor(tree.span.end)
     }
 
     qualid
@@ -4515,11 +4529,20 @@ class ScalaTreeVisitor(
 
     // Now find and advance past '{'
     var hasBraces = false
-    if (blockStart < source.length && source.charAt(blockStart) == '{') {
+    // A `{` at blockStart belongs to this Block only when the Block actually wraps
+    // braced syntax. When dotty synthesises a Block to wrap a single-expression
+    // function body (e.g. the body of `spec => { ... }: Step`), the wrapper Block's
+    // span starts at the inner expression's `{`, but the brace belongs to that inner
+    // expression — not to the wrapper. Detect this case and treat the wrapper as
+    // braceless so the inner expression's braces aren't printed twice.
+    val isSyntheticWrapper = block.stats.isEmpty && !block.expr.isEmpty &&
+      block.expr.span.exists &&
+      Math.max(0, block.expr.span.start - offsetAdjustment) <= blockStart
+    if (!isSyntheticWrapper && blockStart < source.length && source.charAt(blockStart) == '{') {
       // Brace at block span start
       cursor = blockStart + 1
       hasBraces = true
-    } else if (savedCursorBeforePrefix < blockStart) {
+    } else if (!isSyntheticWrapper && savedCursorBeforePrefix < blockStart) {
       // Check if there's a brace BEFORE the block span (e.g., while/for body)
       val beforeSpan = source.substring(savedCursorBeforePrefix, blockStart)
       val braceIdx = positionOfNextIn(beforeSpan, "{", 0)
@@ -7558,20 +7581,30 @@ class ScalaTreeVisitor(
 
   private def visitMacroTree(mac: untpd.MacroTree): S.Macro = {
     // Scala 3 inline/macro expressions: ${ ... }, '{ ... }, or 'name
-    val prefix = extractPrefix(mac.span)
     val startAdj = Math.max(0, mac.span.start - offsetAdjustment)
     val firstChar = if (startAdj < source.length) source.charAt(startAdj) else ' '
     val secondChar = if (startAdj + 1 < source.length) source.charAt(startAdj + 1) else ' '
     val kind: S.Macro.Kind =
       if (firstChar == '$' && secondChar == '{') S.Macro.Kind.Splice
       else if (firstChar == '\'' && secondChar == '{') S.Macro.Kind.QuoteBlock
-      else S.Macro.Kind.QuoteIdent
+      else if (firstChar == '\'') S.Macro.Kind.QuoteIdent
+      else S.Macro.Kind.Scala2Macro
+    val macroKeywordStart =
+      if (kind == S.Macro.Kind.Scala2Macro) source.lastIndexOf("macro", Math.max(0, startAdj - 1)) else -1
+    val prefix =
+      if (kind == S.Macro.Kind.Scala2Macro && macroKeywordStart >= cursor) {
+        Space.format(source, cursor, macroKeywordStart)
+      } else {
+        extractPrefix(mac.span)
+      }
 
     // Advance past the prefix tokens: `${`, `'{`, or `'`
-    cursor = startAdj + (kind match {
-      case S.Macro.Kind.Splice | S.Macro.Kind.QuoteBlock => 2
-      case S.Macro.Kind.QuoteIdent => 1
-    })
+    cursor = kind match {
+      case S.Macro.Kind.Splice | S.Macro.Kind.QuoteBlock => startAdj + 2
+      case S.Macro.Kind.QuoteIdent => startAdj + 1
+      case S.Macro.Kind.Scala2Macro if macroKeywordStart >= 0 => macroKeywordStart + "macro".length
+      case S.Macro.Kind.Scala2Macro => startAdj
+    }
 
     val expr: Expression = visitTree(mac.expr) match {
       case e: Expression => e

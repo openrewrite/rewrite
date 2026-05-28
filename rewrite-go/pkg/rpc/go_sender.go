@@ -134,6 +134,13 @@ func (s *GoSender) VisitGoto(g *tree.Goto, p any) tree.J {
 	return g
 }
 
+// VisitFallthrough mirrors GolangSender.visitFallthrough — the node has no
+// payload beyond the framework-handled id/prefix/markers, so this override
+// is intentionally a no-op. Present for sender/receiver symmetry.
+func (s *GoSender) VisitFallthrough(f *tree.Fallthrough, p any) tree.J {
+	return f
+}
+
 func (s *GoSender) VisitComposite(c *tree.Composite, p any) tree.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(c, func(v any) any { return v.(*tree.Composite).TypeExpr },

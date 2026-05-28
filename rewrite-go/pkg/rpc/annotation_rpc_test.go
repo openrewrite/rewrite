@@ -50,6 +50,18 @@ func roundTripNode(t *testing.T, before tree.Tree, seed tree.Tree) any {
 	return NewGoReceiver().Visit(seed, recvQ)
 }
 
+func TestJavaReceiverPreVisitAppliesWireID(t *testing.T) {
+	id := uuid.MustParse("12345678-1111-2222-3333-123456789abc")
+	got := roundTripNode(t,
+		&tree.Identifier{ID: id, Name: "x"},
+		&tree.Identifier{},
+	).(*tree.Identifier)
+
+	if got.ID != id {
+		t.Errorf("ID: got %s, want %s", got.ID, id)
+	}
+}
+
 func TestAnnotationRpcRoundTrip_BasicTag(t *testing.T) {
 	// Mirror of the `json:"name"` shape the parser will eventually emit
 	// for struct field tags.

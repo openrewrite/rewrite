@@ -282,7 +282,7 @@ public class ChangeType extends Recipe {
                 // If the new type is covered by a star import and another star import
                 // provides a type with the same simple name, add an explicit import
                 if (fullyQualifiedTarget != null) {
-                    j = maybeAddExplicitImportForAmbiguity((JavaSourceFile) j, fullyQualifiedTarget);
+                    j = maybeAddExplicitImportForAmbiguity((JavaSourceFile) j, fullyQualifiedTarget, ctx);
                 }
             }
 
@@ -608,7 +608,7 @@ public class ChangeType extends Recipe {
          * When the new type is provided by a star import and another star import provides
          * a type with the same simple name, add an explicit import to disambiguate.
          */
-        private JavaSourceFile maybeAddExplicitImportForAmbiguity(JavaSourceFile sf, JavaType.FullyQualified newType) {
+        private JavaSourceFile maybeAddExplicitImportForAmbiguity(JavaSourceFile sf, JavaType.FullyQualified newType, ExecutionContext ctx) {
             String newPkg = newType.getPackageName();
             String simpleName = newType.getClassName();
 
@@ -635,15 +635,22 @@ public class ChangeType extends Recipe {
             }
 
             // Check if any other star-imported package has a type with the same simple name
-            Optional<JavaSourceSet> sourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
-            if (!sourceSet.isPresent()) {
-                return sf;
-            }
-            boolean ambiguous = false;
-            for (String pkg : otherStarPackages) {
-                if (JavaSourceSetCompat.findClasspathType(sourceSet.get(), pkg + "." + simpleName).isPresent()) {
-                    ambiguous = true;
-                    break;
+            boolean ambiguous;
+            if (JavaSourceSet.isDirty(ctx, sf)) {
+                // An earlier dependency mutation in this run means the classpath cannot be trusted to
+                // prove non-ambiguity; fall back to the safe path and add the explicit import.
+                ambiguous = true;
+            } else {
+                Optional<JavaSourceSet> sourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
+                if (!sourceSet.isPresent()) {
+                    return sf;
+                }
+                ambiguous = false;
+                for (String pkg : otherStarPackages) {
+                    if (JavaSourceSetCompat.findClasspathType(sourceSet.get(), pkg + "." + simpleName).isPresent()) {
+                        ambiguous = true;
+                        break;
+                    }
                 }
             }
 

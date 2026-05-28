@@ -2344,9 +2344,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         }
         else if (node.SemicolonToken != default)
         {
-            // Auto-implemented accessor - consume the semicolon
-            SkipTo(node.SemicolonToken.SpanStart);
-            SkipToken(node.SemicolonToken);
+            // Auto-implemented accessor (e.g. "get;" or "get ;"). Roslyn has no node for the
+            // implicit body; we model it as J.Empty so the whitespace between the keyword and
+            // the trailing ';' has a home. ExpressionBody.Element being Empty is the signal to
+            // the printer to emit ';' without '=>'.
+            var emptyPrefix = ExtractSpaceBefore(node.SemicolonToken);
+            _cursor = node.SemicolonToken.Span.End;
+            expressionBody = new JLeftPadded<Expression>(
+                Space.Empty,
+                new Empty(Guid.NewGuid(), emptyPrefix, Markers.Empty));
         }
 
         return new AccessorDeclaration(
@@ -6549,25 +6555,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             // x?.b.c - member access chain (without further ?.)
             var segment = ParseConditionalAccessSegment(targetExpr, operatorSpace, whenMemberAccess);
-            return segment switch
-            {
-                FieldAccess fa => fa.WithPrefix(prefix),
-                MethodInvocation mi => mi.WithPrefix(prefix),
-                ArrayAccess aa => aa.WithPrefix(prefix),
-                _ => segment
-            };
+            return ApplyConditionalAccessPrefix(segment, prefix);
         }
         else if (node.WhenNotNull is ElementAccessExpressionSyntax elementAccess)
         {
             // x?.Items[0] - member access followed by indexer in null-conditional chain
             var segment = ParseConditionalAccessSegment(targetExpr, operatorSpace, elementAccess);
-            return segment switch
-            {
-                FieldAccess fa => fa.WithPrefix(prefix),
-                MethodInvocation mi => mi.WithPrefix(prefix),
-                ArrayAccess aa => aa.WithPrefix(prefix),
-                _ => segment
-            };
+            return ApplyConditionalAccessPrefix(segment, prefix);
         }
         else if (node.WhenNotNull is ConditionalAccessExpressionSyntax innerConditional)
         {
@@ -6652,15 +6646,23 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // For all other WhenNotNull patterns, delegate to the general segment parser
         {
             var segment = ParseConditionalAccessSegment(targetExpr, operatorSpace, node.WhenNotNull);
-            return segment switch
-            {
-                FieldAccess fa => fa.WithPrefix(prefix),
-                MethodInvocation mi => mi.WithPrefix(prefix),
-                ArrayAccess aa => aa.WithPrefix(prefix),
-                _ => segment
-            };
+            return ApplyConditionalAccessPrefix(segment, prefix);
         }
     }
+
+    // Re-applies the outer ConditionalAccessExpression's prefix to the segment returned by
+    // ParseConditionalAccessSegment. The segment was built with Space.Empty prefix because
+    // the actual leading whitespace lives on the outer ConditionalAccessExpression.
+    private static Expression ApplyConditionalAccessPrefix(Expression segment, Space prefix) => segment switch
+    {
+        FieldAccess fa => fa.WithPrefix(prefix),
+        MethodInvocation mi => mi.WithPrefix(prefix),
+        ArrayAccess aa => aa.WithPrefix(prefix),
+        Assignment a => a.WithPrefix(prefix),
+        AssignmentOperation aop => aop.WithPrefix(prefix),
+        CsUnary cu => cu.WithPrefix(prefix),
+        _ => segment
+    };
 
     /// <summary>
     /// Helper method to parse a null-conditional element access (x?[0]).
@@ -6916,13 +6918,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             // Terminal chain like ?.b.c at end
             var segment = ParseConditionalAccessSegment(target, operatorSpace, terminalMemberAccess);
-            return segment switch
-            {
-                FieldAccess fa => fa.WithPrefix(prefix),
-                MethodInvocation mi => mi.WithPrefix(prefix),
-                ArrayAccess aa => aa.WithPrefix(prefix),
-                _ => segment
-            };
+            return ApplyConditionalAccessPrefix(segment, prefix);
         }
         else if (whenNotNull is ConditionalAccessExpressionSyntax innerConditional)
         {
@@ -7000,13 +6996,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // delegate to the general segment parser
         {
             var segment = ParseConditionalAccessSegment(target, operatorSpace, whenNotNull);
-            return segment switch
-            {
-                FieldAccess fa => fa.WithPrefix(prefix),
-                MethodInvocation mi => mi.WithPrefix(prefix),
-                ArrayAccess aa => aa.WithPrefix(prefix),
-                _ => segment
-            };
+            return ApplyConditionalAccessPrefix(segment, prefix);
         }
     }
 

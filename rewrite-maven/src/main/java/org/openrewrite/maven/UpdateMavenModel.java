@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
@@ -146,10 +147,35 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             }
             MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
                     projectPoms);
+            markDirtyForAmbiguityRecipes(ctx, document, updated);
             return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
                     (original, ignored) -> updated));
         } catch (MavenDownloadingExceptions e) {
             return e.warn(document);
+        }
+    }
+
+    /**
+     * Record that this pom's project — and every aggregated child module's project — has had its
+     * resolved dependency set rewritten. Ambiguity-sensitive consumer recipes
+     * ({@code OrderImports}, {@code ChangePackage}, {@code ChangeType}) read this registry and fall
+     * back to the safe path when their {@code JavaSourceSet} classpath snapshot may be stale.
+     */
+    private void markDirtyForAmbiguityRecipes(ExecutionContext ctx, Xml.Document document, MavenResolutionResult updated) {
+        JavaSourceSet.markDirty(ctx, document);
+        markModulesRecursive(ctx, updated);
+    }
+
+    private static void markModulesRecursive(ExecutionContext ctx, MavenResolutionResult result) {
+        for (MavenResolutionResult module : result.getModules()) {
+            String moduleName = module.getPom().getRequested().getName();
+            if (moduleName == null || moduleName.isEmpty()) {
+                moduleName = module.getPom().getArtifactId();
+            }
+            if (moduleName != null && !moduleName.isEmpty()) {
+                JavaSourceSet.markDirty(ctx, moduleName);
+            }
+            markModulesRecursive(ctx, module);
         }
     }
 

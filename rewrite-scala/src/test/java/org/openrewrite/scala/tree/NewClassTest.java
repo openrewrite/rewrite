@@ -144,6 +144,24 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    void newClassWithArgumentsAndMixin() {
+        rewriteRun(
+          scala(
+            """
+            class Service(conf: String, client: String)
+            trait Logging
+            object Test {
+              val service = new Service(
+                "conf",
+                "client") with Logging {
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void newClassWithMultiLineArguments() {
         rewriteRun(
           scala(
@@ -242,6 +260,21 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    void newClassFirstArgIsIfElseOnNewLine() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val x = new Foo(
+                if (cond) 1 else 2,
+                3)
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void significantCharactersInComments() {
         // visitNewClassWithArgs — close paren in line comment
         rewriteRun(
@@ -259,6 +292,29 @@ class NewClassTest implements RewriteTest {
             """
             class Foo(a: Int, b: Int)
             val f = new Foo(1 /* ) */, 2)
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedNewClass() {
+        rewriteRun(
+          scala(
+            """
+            val x = new Foo(a)(b)
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedNewClassAsDefBody() {
+        rewriteRun(
+          scala(
+            """
+            def make: Foo =
+              new Foo(0)(f)
             """
           )
         );

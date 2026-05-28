@@ -279,10 +279,10 @@ public class ChangePackage extends Recipe {
                 }
 
                 // Expand changed star imports that would create ambiguity with other star imports
-                sf = maybeExpandStarImport(sf, newPackageName, oldPackageName);
+                sf = maybeExpandStarImport(sf, newPackageName, oldPackageName, ctx);
                 if (changingTo != null && !changingTo.equals(newPackageName)) {
                     String oldSubPkg = oldPackageName + changingTo.substring(newPackageName.length());
-                    sf = maybeExpandStarImport(sf, changingTo, oldSubPkg);
+                    sf = maybeExpandStarImport(sf, changingTo, oldSubPkg, ctx);
                 }
                 if (Boolean.TRUE.equals(recursive)) {
                     for (J.Import anImport : sf.getImports()) {
@@ -290,7 +290,7 @@ public class ChangePackage extends Recipe {
                             String pkg = anImport.getPackageName();
                             if (pkg.startsWith(newPackageName + ".")) {
                                 String oldPkg = oldPackageName + pkg.substring(newPackageName.length());
-                                sf = maybeExpandStarImport(sf, pkg, oldPkg);
+                                sf = maybeExpandStarImport(sf, pkg, oldPkg, ctx);
                             }
                         }
                     }
@@ -310,7 +310,7 @@ public class ChangePackage extends Recipe {
          * @param changedPackage the new package name (after rename)
          * @param originalPackage the old package name (before rename), used to find types on classpath
          */
-        private JavaSourceFile maybeExpandStarImport(JavaSourceFile sf, String changedPackage, String originalPackage) {
+        private JavaSourceFile maybeExpandStarImport(JavaSourceFile sf, String changedPackage, String originalPackage, ExecutionContext ctx) {
             J.Import changedStarImport = null;
             Set<String> otherStarPackages = new LinkedHashSet<>();
             for (J.Import anImport : sf.getImports()) {
@@ -328,7 +328,7 @@ public class ChangePackage extends Recipe {
                 return sf;
             }
 
-            if (!hasAmbiguity(sf, changedPackage, originalPackage, otherStarPackages)) {
+            if (!hasAmbiguity(sf, changedPackage, originalPackage, otherStarPackages, ctx)) {
                 return sf;
             }
 
@@ -373,7 +373,12 @@ public class ChangePackage extends Recipe {
          * Checks both the new package name and the original package name, since the
          * classpath may still have types under the old package name.
          */
-        private boolean hasAmbiguity(JavaSourceFile sf, String changedPackage, String originalPackage, Set<String> otherStarPackages) {
+        private boolean hasAmbiguity(JavaSourceFile sf, String changedPackage, String originalPackage, Set<String> otherStarPackages, ExecutionContext ctx) {
+            if (JavaSourceSet.isDirty(ctx, sf)) {
+                // An earlier dependency mutation in this run means the classpath cannot be trusted to
+                // prove non-ambiguity; fall back to the safe path and expand the star.
+                return true;
+            }
             Optional<JavaSourceSet> sourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
             if (!sourceSet.isPresent()) {
                 return false;

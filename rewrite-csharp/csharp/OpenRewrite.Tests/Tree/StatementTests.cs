@@ -52,6 +52,49 @@ public class ReturnTests : RewriteTest
     }
 }
 
+public class ConditionalAccessAssignmentReproTests : RewriteTest
+{
+    [Fact]
+    public void NullConditionalPropertyAssignmentPreservesLeadingNewline()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    public string? Color;
+                    public string Bar() {
+                        var rgb = Color;
+                        rgb?.Length = 0;
+                        return rgb;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void NullConditionalEventUnsubscribePreservesLeadingNewline()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using System;
+                class Foo {
+                    public event EventHandler? Changed;
+                    public void Dispose() {
+                        Console.WriteLine("disposing");
+
+                        Changed -= OnChanged;
+                    }
+                    void OnChanged(object? s, EventArgs e) {}
+                }
+                """
+            )
+        );
+    }
+}
+
 public class IfTests : RewriteTest
 {
     [Fact]
