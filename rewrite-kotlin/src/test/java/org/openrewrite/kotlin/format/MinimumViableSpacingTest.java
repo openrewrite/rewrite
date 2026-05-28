@@ -328,6 +328,27 @@ class MinimumViableSpacingTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2450")
+    @Test
+    void spaceBetweenParameterAnnotationAndName() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann
+
+              class A {
+                  fun foo(@Ann param: Int) {
+                  }
+              }
+              """,
+            """
+              annotation class Ann
+              class A{fun foo(@Ann param:Int){}}
+              """
+          )
+        );
+    }
+
     @Test
     void classConstructor() {
         rewriteRun(
