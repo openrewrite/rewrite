@@ -107,8 +107,8 @@ func (p *GoPrinter) VisitCompilationUnit(cu *tree.CompilationUnit, param any) tr
 		p.visitSpace(rp.After, out)
 	}
 
-	p.visitSpace(cu.EOF, out)
 	p.afterSyntax(cu.Markers, out)
+	p.visitSpace(cu.EOF, out)
 	return cu
 }
 
