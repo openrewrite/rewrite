@@ -19,6 +19,8 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.DataTableDescriptor;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RecipeMarketplaceReaderTest {
@@ -286,6 +288,23 @@ class RecipeMarketplaceReaderTest {
         int zebraIndex = header.indexOf("zebra");
 
         assertThat(authorIndex).isLessThan(zebraIndex);
+    }
+
+    @Test
+    void writerSortsRecipeRowsAlphabetically() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,category2,ecosystem,packageName
+          org.example.Zeta,Search,Java,maven,org.example:rewrite-java
+          org.example.Alpha,Search,Maven,maven,org.example:rewrite-maven
+          org.example.Beta,Cleanup,Java,maven,org.example:rewrite-java
+          """);
+        String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        List<String> recipeRows = writtenCsv.lines()
+          .skip(1)
+          .toList();
+
+        assertThat(recipeRows).isSorted();
     }
 
     @Test
