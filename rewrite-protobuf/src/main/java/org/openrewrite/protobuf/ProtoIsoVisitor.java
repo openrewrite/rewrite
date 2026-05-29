@@ -65,6 +65,11 @@ public class ProtoIsoVisitor<P> extends ProtoVisitor<P> {
     }
 
     @Override
+    public Proto.Group visitGroup(Proto.Group group, P p) {
+        return (Proto.Group) super.visitGroup(group, p);
+    }
+
+    @Override
     public Proto.Identifier visitIdentifier(Proto.Identifier identifier, P p) {
         return (Proto.Identifier) super.visitIdentifier(identifier, p);
     }
