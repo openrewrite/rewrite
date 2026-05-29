@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.marker;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ClassInfoList;
@@ -47,6 +49,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
+@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public class JavaSourceSet implements SourceSet {
     @EqualsAndHashCode.Include
     UUID id;
