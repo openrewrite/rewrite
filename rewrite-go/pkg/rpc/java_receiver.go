@@ -178,16 +178,7 @@ func (r *JavaReceiver) VisitAnnotation(ann *java.Annotation, p any) java.J {
 	c := *ann // shallow copy to avoid mutating remoteObjects baseline
 	ann = &c
 	ann.AnnotationType = receiveValue(q, ann.AnnotationType, func(e java.Expression) any { return r.Visit(e, q) })
-	var beforeArgs any
-	if ann.Arguments != nil {
-		beforeArgs = *ann.Arguments
-	}
-	if result := q.Receive(beforeArgs, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
-		container := result.(java.Container[java.Expression])
-		ann.Arguments = &container
-	} else {
-		ann.Arguments = nil
-	}
+	ann.Arguments = receivePointerContainer[java.Expression](r, q, ann.Arguments)
 	return ann
 }
 
@@ -233,9 +224,7 @@ func (r *JavaReceiver) VisitMethodInvocation(mi *java.MethodInvocation, p any) j
 	// name
 	mi.Name = receiveValue(q, mi.Name, func(e *java.Identifier) any { return r.Visit(e, q) })
 	// arguments
-	if result := q.Receive(mi.Arguments, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
-		mi.Arguments = result.(java.Container[java.Expression])
-	}
+	mi.Arguments = receiveContainer[java.Expression](r, q, mi.Arguments)
 	// methodType
 	mt := r.receiveType(mi.MethodType, q)
 	if mt != nil {
@@ -298,9 +287,7 @@ func (r *JavaReceiver) VisitMethodDeclaration(md *java.MethodDeclaration, p any)
 	// name
 	md.Name = receiveValue(q, md.Name, func(e *java.Identifier) any { return r.Visit(e, q) })
 	// parameters
-	if result := q.Receive(md.Parameters, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
-		md.Parameters = result.(java.Container[java.Statement])
-	}
+	md.Parameters = receiveContainer[java.Statement](r, q, md.Parameters)
 	// dimensionsAfterName (empty for Go — no C-style array method returns)
 	q.ReceiveList(nil, nil)
 	// throws
@@ -350,19 +337,8 @@ func (r *JavaReceiver) VisitTypeParameter(tp *java.TypeParameter, p any) java.J 
 	q.ReceiveList(nil, nil)
 	// name
 	tp.Name = receiveValue(q, tp.Name, func(e java.Expression) any { return r.Visit(e, q) })
-	// bounds (container; nil when the parameter shares a sibling's constraint).
-	// Pass the value Container baseline (not the *Container) so the padding
-	// accessors recognize it.
-	var boundsBefore any
-	if tp.Bounds != nil {
-		boundsBefore = *tp.Bounds
-	}
-	if result := q.Receive(boundsBefore, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
-		container := result.(java.Container[java.Expression])
-		tp.Bounds = &container
-	} else {
-		tp.Bounds = nil
-	}
+	// bounds (container; nil when the parameter shares a sibling's constraint)
+	tp.Bounds = receivePointerContainer[java.Expression](r, q, tp.Bounds)
 	return tp
 }
 
@@ -651,9 +627,7 @@ func (r *JavaReceiver) VisitCase(cs *java.Case, p any) java.J {
 	c := *cs // shallow copy to avoid mutating remoteObjects baseline
 	cs = &c
 	q.Receive(nil, nil) // type enum
-	if result := q.Receive(cs.Expressions, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
-		cs.Expressions = result.(java.Container[java.Expression])
-	}
+	cs.Expressions = receiveContainer[java.Expression](r, q, cs.Expressions)
 	// statements - Java sends Container<RightPadded<Statement>>, extract to Go's []RightPadded[Statement]
 	if result := q.Receive(nil, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
 		cont := result.(java.Container[java.Statement])
@@ -709,10 +683,7 @@ func (r *JavaReceiver) VisitParameterizedType(pt *java.ParameterizedType, p any)
 	c := *pt
 	pt = &c
 	pt.Clazz = receiveValue(q, pt.Clazz, func(e java.Expression) any { return r.Visit(e, q) })
-	if result := q.Receive(pt.TypeParameters, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
-		container := result.(java.Container[java.Expression])
-		pt.TypeParameters = &container
-	}
+	pt.TypeParameters = receivePointerContainer[java.Expression](r, q, pt.TypeParameters)
 	pt.Type = r.receiveType(pt.Type, q)
 	return pt
 }
