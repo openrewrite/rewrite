@@ -333,27 +333,14 @@ public class YamlParser implements org.openrewrite.Parser {
                                 scalarValue = reader.readStringFromBuffer(valueStart + 1, event.getEndMark().getIndex() - 1);
                                 break;
                         }
-                        // First restore any Helm template UUIDs
-                        for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
-                            if (scalarValue.contains(entry.getKey())) {
-                                scalarValue = scalarValue.replace(entry.getKey(), entry.getValue());
-                            }
-                        }
-                        // Then restore any single-brace template UUIDs
-                        for (Map.Entry<String, String> entry : singleBraceTemplateByUuid.entrySet()) {
-                            if (scalarValue.contains(entry.getKey())) {
-                                scalarValue = scalarValue.replace(entry.getKey(), entry.getValue());
-                            }
-                        }
-                        // Then restore any variable/asterisk placeholder UUIDs. The UUID may be
+                        // Restore Helm/single-brace/variable placeholder UUIDs. A UUID may be
                         // the entire scalar value (e.g. `key: @var@`) or embedded within a longer
                         // scalar (e.g. markdown bold text inside a block scalar that happened to
-                        // match the asterisk placeholder regex).
-                        for (Map.Entry<String, String> entry : variableByUuid.entrySet()) {
-                            if (scalarValue.contains(entry.getKey())) {
-                                scalarValue = scalarValue.replace(entry.getKey(), entry.getValue());
-                            }
-                        }
+                        // match the asterisk placeholder regex). A restored value may itself
+                        // embed another UUID (e.g. an asterisk placeholder wrapping a Helm
+                        // expression like `**${{ ... }}**`), so this resolves to a fixpoint.
+                        scalarValue = restorePlaceholders(scalarValue, helmTemplateByUuid,
+                                singleBraceTemplateByUuid, variableByUuid);
 
                         Yaml.Scalar.Style style;
                         switch (scalar.getScalarStyle()) {
@@ -522,27 +509,8 @@ public class YamlParser implements org.openrewrite.Parser {
                     if (StringUtils.isBlank(text)) {
                         return text;
                     }
-                    String result = text;
-                    for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
-                        // Check comment-wrapped form first (standalone Helm lines converted to #uuid)
-                        String commentKey = "#" + entry.getKey();
-                        if (result.contains(commentKey)) {
-                            result = result.replace(commentKey, entry.getValue());
-                        } else if (result.contains(entry.getKey())) {
-                            result = result.replace(entry.getKey(), entry.getValue());
-                        }
-                    }
-                    for (Map.Entry<String, String> entry : singleBraceTemplateByUuid.entrySet()) {
-                        if (result.contains(entry.getKey())) {
-                            result = result.replace(entry.getKey(), entry.getValue());
-                        }
-                    }
-                    for (Map.Entry<String, String> entry : variableByUuid.entrySet()) {
-                        if (result.contains(entry.getKey())) {
-                            result = result.replace(entry.getKey(), entry.getValue());
-                        }
-                    }
-                    return result;
+                    return restorePlaceholders(text, helmTemplateByUuid,
+                            singleBraceTemplateByUuid, variableByUuid);
                 }
 
                 @Override
@@ -741,29 +709,75 @@ public class YamlParser implements org.openrewrite.Parser {
         return lineEnd;
     }
 
+    /**
+     * Restore template/variable UUID placeholders to their original text. The Helm
+     * placeholder may appear in its comment-wrapped form ({@code #uuid}, produced for
+     * standalone control-flow lines) or bare. Because a restored value can itself embed
+     * another UUID (e.g. an asterisk placeholder capturing {@code **${{ ... }}**}, whose
+     * value contains a Helm UUID), the replacements are repeated until they reach a
+     * fixpoint.
+     */
+    private static String restorePlaceholders(
+            String text,
+            Map<String, String> helmTemplateByUuid,
+            Map<String, String> singleBraceTemplateByUuid,
+            Map<String, String> variableByUuid) {
+        String result = text;
+        String previous;
+        do {
+            previous = result;
+            for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
+                // Check comment-wrapped form first (standalone Helm lines converted to #uuid)
+                String commentKey = "#" + entry.getKey();
+                if (result.contains(commentKey)) {
+                    result = result.replace(commentKey, entry.getValue());
+                } else if (result.contains(entry.getKey())) {
+                    result = result.replace(entry.getKey(), entry.getValue());
+                }
+            }
+            for (Map.Entry<String, String> entry : singleBraceTemplateByUuid.entrySet()) {
+                if (result.contains(entry.getKey())) {
+                    result = result.replace(entry.getKey(), entry.getValue());
+                }
+            }
+            for (Map.Entry<String, String> entry : variableByUuid.entrySet()) {
+                if (result.contains(entry.getKey())) {
+                    result = result.replace(entry.getKey(), entry.getValue());
+                }
+            }
+        } while (!result.equals(previous));
+        return result;
+    }
+
     private static boolean isBlockScalarIndicator(String trimmedLine) {
-        // A block scalar indicator line ends with | or > (optionally followed by
-        // chomp/indent modifiers like +, -, or a digit) after a colon
-        int colonIndex = trimmedLine.indexOf(':');
-        if (colonIndex == -1) {
-            return false;
+        // A block scalar header is | or > (optionally followed by chomp/indent
+        // modifiers like +, -, or a digit). It can appear as a mapping value
+        // ("key: |"), as a sequence entry value ("- >-"), or bare at the start of
+        // a document. Strip any leading sequence-entry dashes, then any mapping key,
+        // to isolate the value portion.
+        String value = trimmedLine;
+        while (value.equals("-") || value.startsWith("- ")) {
+            value = value.length() == 1 ? "" : value.substring(2).trim();
         }
-        String afterColon = trimmedLine.substring(colonIndex + 1).trim();
+        int colonIndex = value.indexOf(':');
+        if (colonIndex != -1) {
+            value = value.substring(colonIndex + 1).trim();
+        }
         // Strip trailing comment
-        int commentIndex = afterColon.indexOf(" #");
+        int commentIndex = value.indexOf(" #");
         if (commentIndex != -1) {
-            afterColon = afterColon.substring(0, commentIndex).trim();
+            value = value.substring(0, commentIndex).trim();
         }
-        if (afterColon.isEmpty()) {
+        if (value.isEmpty()) {
             return false;
         }
-        char first = afterColon.charAt(0);
+        char first = value.charAt(0);
         if (first != '|' && first != '>') {
             return false;
         }
         // Check that remaining chars (if any) are valid block scalar modifiers
-        for (int j = 1; j < afterColon.length(); j++) {
-            char c = afterColon.charAt(j);
+        for (int j = 1; j < value.length(); j++) {
+            char c = value.charAt(j);
             if (c != '+' && c != '-' && !Character.isDigit(c)) {
                 return false;
             }

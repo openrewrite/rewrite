@@ -150,6 +150,10 @@ func setPrefix(j java.J, prefix java.Space) java.J {
 		return n.WithPrefix(prefix)
 	case *golang.TypeList:
 		return n.WithPrefix(prefix)
+	case *golang.Union:
+		return n.WithPrefix(prefix)
+	case *golang.UnderlyingType:
+		return n.WithPrefix(prefix)
 	case *golang.TypeDecl:
 		return n.WithPrefix(prefix)
 	case *golang.MultiAssignment:

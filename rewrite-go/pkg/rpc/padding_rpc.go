@@ -128,7 +128,7 @@ func receiveRightPadded(r Receiver, q *ReceiveQueue, before any) any {
 
 // receiveLeftPaddedParts deserializes the three wire fields of a JLeftPadded —
 // before-space, element, markers — shared by receiveLeftPadded (type-inferred) and
-// receiveLeftPaddedTyped (type-directed).
+// receiveLeftPaddedEnum (type-directed).
 func receiveLeftPaddedParts(r Receiver, q *ReceiveQueue, before any) (java.Space, any, java.Markers) {
 	beforeSpace := q.Receive(leftPaddedBefore(before), func(v any) any {
 		return receiveSpace(v.(java.Space), q)
@@ -149,7 +149,7 @@ func receiveLeftPaddedParts(r Receiver, q *ReceiveQueue, before any) (java.Space
 }
 
 // receiveLeftPadded deserializes a LeftPadded element, inferring its type from the
-// payload. Operator fields must use receiveLeftPaddedTyped instead (see its doc).
+// payload. Operator fields must use receiveLeftPaddedEnum instead (see its doc).
 func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
 	beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, before)
 	return leftPaddedFromElement(beforeSpace, elem, markers)

@@ -273,3 +273,27 @@ func (n *TypeList) WithID(id uuid.UUID) java.J {
 }
 func (n *TypeList) GetPrefix() java.Space    { return n.Prefix }
 func (n *TypeList) GetMarkers() java.Markers { return n.Markers }
+
+func (n *Union) GetID() uuid.UUID { return n.ID }
+func (n *Union) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *Union) GetPrefix() java.Space    { return n.Prefix }
+func (n *Union) GetMarkers() java.Markers { return n.Markers }
+
+func (n *UnderlyingType) GetID() uuid.UUID { return n.ID }
+func (n *UnderlyingType) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *UnderlyingType) GetPrefix() java.Space    { return n.Prefix }
+func (n *UnderlyingType) GetMarkers() java.Markers { return n.Markers }

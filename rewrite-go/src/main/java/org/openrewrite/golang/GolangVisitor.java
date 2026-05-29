@@ -219,6 +219,23 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return t;
     }
 
+    public J visitUnion(Go.Union union, P p) {
+        Go.Union u = union;
+        u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.getPadding().withTypes(ListUtils.map(u.getPadding().getTypes(),
+                t -> visitRightPadded(t, JRightPadded.Location.LANGUAGE_EXTENSION, p)));
+        return u;
+    }
+
+    public J visitUnderlyingType(Go.UnderlyingType underlyingType, P p) {
+        Go.UnderlyingType ut = underlyingType;
+        ut = ut.withPrefix(visitSpace(ut.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        ut = ut.withMarkers(visitMarkers(ut.getMarkers(), p));
+        ut = ut.withElement((Expression) visitAndCast(ut.getElement(), p));
+        return ut;
+    }
+
     public J visitTypeDecl(Go.TypeDecl typeDecl, P p) {
         Go.TypeDecl t = typeDecl;
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

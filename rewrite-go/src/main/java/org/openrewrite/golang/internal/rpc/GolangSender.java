@@ -166,6 +166,18 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitUnion(Go.Union union, RpcSendQueue q) {
+        q.getAndSendList(union, u -> u.getPadding().getTypes(), t -> t.getElement().getId(), t -> visitRightPadded(t, q));
+        return union;
+    }
+
+    @Override
+    public J visitUnderlyingType(Go.UnderlyingType underlyingType, RpcSendQueue q) {
+        q.getAndSend(underlyingType, Go.UnderlyingType::getElement, el -> visit(el, q));
+        return underlyingType;
+    }
+
+    @Override
     public J visitTypeDecl(Go.TypeDecl typeDecl, RpcSendQueue q) {
         q.getAndSendList(typeDecl, Go.TypeDecl::getLeadingAnnotations, Tree::getId, a -> visit(a, q));
         q.getAndSend(typeDecl, Go.TypeDecl::getName, el -> visit(el, q));
