@@ -5656,9 +5656,6 @@ class ScalaTreeVisitor(
     val savedCursor = cursor
     val prefix = extractPrefix(at.span)
 
-    // Save original cursor position
-    val originalCursor = cursor
-
     // Visit the base type (e.g., List, Map, Option)
     val clazz = visitTree(at.tpt) match {
       case nt: NameTree => nt
@@ -5712,8 +5709,8 @@ class ScalaTreeVisitor(
         val afterSpace = if (isLast) {
           // Space before closing bracket
           val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
-          if (argEnd < closeBracketIdx + originalCursor) {
-            val spaceStr = this.source.substring(argEnd, closeBracketIdx + originalCursor)
+          if (argEnd < closeBracketAbs) {
+            val spaceStr = this.source.substring(argEnd, closeBracketAbs)
             Space.format(spaceStr)
           } else {
             Space.EMPTY
@@ -5724,7 +5721,7 @@ class ScalaTreeVisitor(
           val nextArgStart = if (i + 1 < at.args.size) {
             Math.max(0, at.args(i + 1).span.start - offsetAdjustment)
           } else {
-            closeBracketIdx + originalCursor
+            closeBracketAbs
           }
           
           if (argEnd < nextArgStart && argEnd < this.source.length && nextArgStart <= this.source.length) {
