@@ -1385,6 +1385,141 @@ public interface Go extends J {
     }
 
     // ---------------------------------------------------------------
+    // Union (~int | ~int8 type-set constraint)
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class Union implements Go, Expression, TypeTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        List<JRightPadded<Expression>> types;
+
+        public List<Expression> getTypes() {
+            return JRightPadded.getElements(types);
+        }
+
+        public Go.Union withTypes(List<Expression> types) {
+            return getPadding().withTypes(JRightPadded.withElements(this.types, types));
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return null;
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            //noinspection unchecked
+            return (T) this;
+        }
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitUnion(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.Union t;
+
+            public List<JRightPadded<Expression>> getTypes() {
+                return t.types;
+            }
+
+            public Go.Union withTypes(List<JRightPadded<Expression>> types) {
+                return t.types == types ? t : new Go.Union(t.padding, t.id, t.prefix, t.markers, types);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // UnderlyingType (~T approximation element)
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class UnderlyingType implements Go, Expression, TypeTree {
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression element;
+
+        @Override
+        public @Nullable JavaType getType() {
+            return element == null ? null : element.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public UnderlyingType withType(@Nullable JavaType type) {
+            return element == null ? this : withElement(element.withType(type));
+        }
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitUnderlyingType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    // ---------------------------------------------------------------
     // TypeDecl (type Foo struct{...})
     // ---------------------------------------------------------------
 

@@ -318,6 +318,12 @@ func (c *patternComparator) matchProperties(pattern, candidate tree.J) bool {
 	case *tree.TypeList:
 		cand := candidate.(*tree.TypeList)
 		return c.matchStatementContainer(p.Types, cand.Types)
+	case *tree.Union:
+		cand := candidate.(*tree.Union)
+		return c.matchExpressionRightPaddedList(p.Types, cand.Types)
+	case *tree.UnderlyingType:
+		cand := candidate.(*tree.UnderlyingType)
+		return c.matchOptionalExpression(p.Element, cand.Element)
 	case *tree.TypeDecl:
 		cand := candidate.(*tree.TypeDecl)
 		if !c.matchNode(p.Name, cand.Name) {

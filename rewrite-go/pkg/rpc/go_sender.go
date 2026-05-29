@@ -250,6 +250,29 @@ func (s *GoSender) VisitTypeList(tl *tree.TypeList, p any) tree.J {
 	return tl
 }
 
+func (s *GoSender) VisitUnion(u *tree.Union, p any) tree.J {
+	q := p.(*SendQueue)
+	q.GetAndSendList(u,
+		func(v any) []any {
+			types := v.(*tree.Union).Types
+			result := make([]any, len(types))
+			for i, t := range types {
+				result[i] = t
+			}
+			return result
+		},
+		func(v any) any { return containerElementID(v) },
+		func(v any) { sendRightPadded(s, v, q) })
+	return u
+}
+
+func (s *GoSender) VisitUnderlyingType(ut *tree.UnderlyingType, p any) tree.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(ut, func(v any) any { return v.(*tree.UnderlyingType).Element },
+		func(v any) { s.Visit(v.(tree.Tree), q) })
+	return ut
+}
+
 func (s *GoSender) VisitTypeDecl(td *tree.TypeDecl, p any) tree.J {
 	q := p.(*SendQueue)
 	// leadingAnnotations (`//go:` directives modeled as J.Annotation)

@@ -328,6 +328,13 @@ func getLeadingPrefix(j tree.J) tree.Space {
 		return n.Prefix
 	case *tree.TypeList:
 		return n.Prefix
+	case *tree.Union:
+		if len(n.Types) > 0 {
+			return getLeadingPrefix(n.Types[0].Element)
+		}
+		return n.Prefix
+	case *tree.UnderlyingType:
+		return n.Prefix
 	case *tree.TypeDecl:
 		return n.Prefix
 	case *tree.MultiAssignment:

@@ -948,6 +948,29 @@ func (p *GoPrinter) VisitFuncType(ft *tree.FuncType, param any) tree.J {
 	return ft
 }
 
+func (p *GoPrinter) VisitUnion(u *tree.Union, param any) tree.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(u.Prefix, u.Markers, out)
+	for i, rp := range u.Types {
+		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
+		if i < len(u.Types)-1 {
+			out.Append("|")
+		}
+	}
+	p.afterSyntax(u.Markers, out)
+	return u
+}
+
+func (p *GoPrinter) VisitUnderlyingType(ut *tree.UnderlyingType, param any) tree.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ut.Prefix, ut.Markers, out)
+	out.Append("~")
+	p.Visit(ut.Element, out)
+	p.afterSyntax(ut.Markers, out)
+	return ut
+}
+
 func (p *GoPrinter) VisitTypeList(tl *tree.TypeList, param any) tree.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(tl.Prefix, tl.Markers, out)

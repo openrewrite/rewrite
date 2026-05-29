@@ -207,6 +207,10 @@ func (v *GoVisitor) Visit(t tree.Tree, p any) tree.Tree {
 		return v.self().VisitFuncType(n, p)
 	case *tree.TypeList:
 		return v.self().VisitTypeList(n, p)
+	case *tree.Union:
+		return v.self().VisitUnion(n, p)
+	case *tree.UnderlyingType:
+		return v.self().VisitUnderlyingType(n, p)
 	case *tree.TypeDecl:
 		return v.self().VisitTypeDecl(n, p)
 	case *tree.StructType:
@@ -285,6 +289,8 @@ type VisitorI interface {
 	VisitChannel(ch *tree.Channel, p any) tree.J
 	VisitFuncType(ft *tree.FuncType, p any) tree.J
 	VisitTypeList(tl *tree.TypeList, p any) tree.J
+	VisitUnion(u *tree.Union, p any) tree.J
+	VisitUnderlyingType(ut *tree.UnderlyingType, p any) tree.J
 	VisitTypeDecl(td *tree.TypeDecl, p any) tree.J
 	VisitStructType(st *tree.StructType, p any) tree.J
 	VisitInterfaceType(it *tree.InterfaceType, p any) tree.J
@@ -741,6 +747,20 @@ func (v *GoVisitor) VisitTypeList(tl *tree.TypeList, p any) tree.J {
 	tl = tl.WithPrefix(v.self().VisitSpace(tl.Prefix, p))
 	tl = tl.WithMarkers(v.visitMarkers(tl.Markers, p))
 	return tl
+}
+
+func (v *GoVisitor) VisitUnion(u *tree.Union, p any) tree.J {
+	u = u.WithPrefix(v.self().VisitSpace(u.Prefix, p))
+	u = u.WithMarkers(v.visitMarkers(u.Markers, p))
+	u.Types = visitRightPaddedExpressionList(v, u.Types, p)
+	return u
+}
+
+func (v *GoVisitor) VisitUnderlyingType(ut *tree.UnderlyingType, p any) tree.J {
+	ut = ut.WithPrefix(v.self().VisitSpace(ut.Prefix, p))
+	ut = ut.WithMarkers(v.visitMarkers(ut.Markers, p))
+	ut.Element = visitExpression(v, ut.Element, p)
+	return ut
 }
 
 func (v *GoVisitor) VisitTypeDecl(td *tree.TypeDecl, p any) tree.J {

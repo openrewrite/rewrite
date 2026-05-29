@@ -283,6 +283,59 @@ class GolangParserIntegTest implements RewriteTest {
     }
 
     @Test
+    void typeSetUnionConstraintWithApproximation() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Signed interface {
+                                \t~int | ~int8 | ~int16 | ~int32 | ~int64
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void standaloneApproximationConstraint() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type MyInt interface {
+                                \t~int
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void unionOfNamedConstraints() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Signed interface {
+                                \t~int | ~int64
+                                }
+
+                                type Unsigned interface {
+                                \t~uint | ~uint64
+                                }
+
+                                type Integer interface {
+                                \tSigned | Unsigned
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
     void mapType() {
         rewriteRun(
                 go(

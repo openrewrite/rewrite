@@ -149,6 +149,10 @@ func setPrefix(j tree.J, prefix tree.Space) tree.J {
 		return n.WithPrefix(prefix)
 	case *tree.TypeList:
 		return n.WithPrefix(prefix)
+	case *tree.Union:
+		return n.WithPrefix(prefix)
+	case *tree.UnderlyingType:
+		return n.WithPrefix(prefix)
 	case *tree.TypeDecl:
 		return n.WithPrefix(prefix)
 	case *tree.MultiAssignment:

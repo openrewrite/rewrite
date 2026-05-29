@@ -452,6 +452,65 @@ func (n *TypeList) WithMarkers(markers Markers) *TypeList {
 	return &c
 }
 
+// Union represents a type-set union in a generic constraint, e.g. the
+// `~int | ~int8 | ~int16` in `interface { ~int | ~int8 | ~int16 }`.
+// Each element is a type term (a plain type name or an UnderlyingType).
+// The `|` separators are printed between elements; the space before each
+// `|` is the preceding element's After, the space after each `|` is the
+// next element's Prefix. Mirrors org.openrewrite.golang.tree.Go$Union
+// (modeled after JS.Union).
+type Union struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Types   []RightPadded[Expression]
+}
+
+func (*Union) isTree()       {}
+func (*Union) isJ()          {}
+func (*Union) isExpression() {}
+
+func (n *Union) WithPrefix(prefix Space) *Union {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Union) WithMarkers(markers Markers) *Union {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// UnderlyingType represents an approximation element `~T` in a generic
+// type constraint: the set of all types whose underlying type is `T`.
+// Go's grammar names this production `UnderlyingType = "~" Type`. The
+// `~` is printed immediately after Prefix; Element is the underlying
+// type (its own Prefix carries any space between `~` and the type).
+// Mirrors org.openrewrite.golang.tree.Go$UnderlyingType.
+type UnderlyingType struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Element Expression
+}
+
+func (*UnderlyingType) isTree()       {}
+func (*UnderlyingType) isJ()          {}
+func (*UnderlyingType) isExpression() {}
+
+func (n *UnderlyingType) WithPrefix(prefix Space) *UnderlyingType {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *UnderlyingType) WithMarkers(markers Markers) *UnderlyingType {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 // TypeDecl represents a `type Name Type` declaration.
 // Covers: `type Foo struct{...}`, `type Foo interface{...}`, `type Foo int`, `type Foo = Bar`.
 // For grouped declarations `type ( ... )`, Specs is non-nil and Name/Definition are unused.

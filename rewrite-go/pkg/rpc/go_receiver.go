@@ -363,6 +363,35 @@ func (r *GoReceiver) VisitTypeList(tl *tree.TypeList, p any) tree.J {
 	return tl
 }
 
+func (r *GoReceiver) VisitUnion(u *tree.Union, p any) tree.J {
+	q := p.(*ReceiveQueue)
+	c := *u // shallow copy to avoid mutating remoteObjects baseline
+	u = &c
+	beforeTypes := make([]any, len(u.Types))
+	for i, t := range u.Types {
+		beforeTypes[i] = t
+	}
+	afterTypes := q.ReceiveList(beforeTypes, func(v any) any { return receiveRightPadded(r, q, v) })
+	if afterTypes != nil {
+		u.Types = make([]tree.RightPadded[tree.Expression], len(afterTypes))
+		for i, t := range afterTypes {
+			u.Types[i] = coerceToExpressionRP(t)
+		}
+	}
+	return u
+}
+
+func (r *GoReceiver) VisitUnderlyingType(ut *tree.UnderlyingType, p any) tree.J {
+	q := p.(*ReceiveQueue)
+	c := *ut // shallow copy to avoid mutating remoteObjects baseline
+	ut = &c
+	result := q.Receive(ut.Element, func(v any) any { return r.Visit(v.(tree.Tree), q) })
+	if result != nil {
+		ut.Element = result.(tree.Expression)
+	}
+	return ut
+}
+
 func (r *GoReceiver) VisitTypeDecl(td *tree.TypeDecl, p any) tree.J {
 	q := p.(*ReceiveQueue)
 	c := *td // shallow copy to avoid mutating remoteObjects baseline

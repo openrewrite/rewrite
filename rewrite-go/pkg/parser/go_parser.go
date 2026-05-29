@@ -2043,8 +2043,58 @@ func (ctx *parseContext) mapTypeExpr(expr ast.Expr) tree.Expression {
 		return ctx.mapParameterizedType(e)
 	case *ast.IndexListExpr:
 		return ctx.mapParameterizedTypeMulti(e)
+	case *ast.BinaryExpr:
+		// A `|` in a type position is a type-set union constraint
+		// (e.g. `~int | ~int8`), not a bitwise-or value expression.
+		if e.Op == token.OR {
+			return ctx.mapUnionType(e)
+		}
+		return ctx.mapExpr(expr)
+	case *ast.UnaryExpr:
+		// `~T` is an approximation element; `~` only ever appears in a
+		// type-constraint position in Go.
+		if e.Op == token.TILDE {
+			return ctx.mapUnderlyingType(e)
+		}
+		return ctx.mapExpr(expr)
 	default:
 		return ctx.mapExpr(expr)
+	}
+}
+
+// mapUnionType maps a type-set union constraint such as `~int | ~int8 | ~int16`
+// to a tree.Union. Go parses `a | b | c` as a left-associative tree
+// `((a | b) | c)`; this flattens it into source-ordered terms, recording
+// the space before each `|` as the preceding term's After.
+func (ctx *parseContext) mapUnionType(expr *ast.BinaryExpr) *tree.Union {
+	var terms []tree.RightPadded[tree.Expression]
+	ctx.appendUnionTerms(expr, &terms)
+	return &tree.Union{ID: uuid.New(), Types: terms}
+}
+
+func (ctx *parseContext) appendUnionTerms(expr ast.Expr, terms *[]tree.RightPadded[tree.Expression]) {
+	if be, ok := expr.(*ast.BinaryExpr); ok && be.Op == token.OR {
+		ctx.appendUnionTerms(be.X, terms)
+		// Space before this `|` belongs to the preceding term's After.
+		opPrefix := ctx.prefix(be.OpPos)
+		ctx.skip(1) // "|"
+		(*terms)[len(*terms)-1].After = opPrefix
+		*terms = append(*terms, tree.RightPadded[tree.Expression]{Element: ctx.mapTypeExpr(be.Y)})
+		return
+	}
+	*terms = append(*terms, tree.RightPadded[tree.Expression]{Element: ctx.mapTypeExpr(expr)})
+}
+
+// mapUnderlyingType maps an approximation element `~T` to a
+// tree.UnderlyingType. The space before `~` is the node's Prefix; any
+// space between `~` and the type is carried by the element's own Prefix.
+func (ctx *parseContext) mapUnderlyingType(expr *ast.UnaryExpr) *tree.UnderlyingType {
+	prefix := ctx.prefix(expr.OpPos)
+	ctx.skip(1) // "~"
+	return &tree.UnderlyingType{
+		ID:      uuid.New(),
+		Prefix:  prefix,
+		Element: ctx.mapTypeExpr(expr.X),
 	}
 }
 

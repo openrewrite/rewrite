@@ -651,6 +651,30 @@ func (n *TypeList) WithID(id uuid.UUID) J {
 func (n *TypeList) GetPrefix() Space    { return n.Prefix }
 func (n *TypeList) GetMarkers() Markers { return n.Markers }
 
+func (n *Union) GetID() uuid.UUID { return n.ID }
+func (n *Union) WithID(id uuid.UUID) J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *Union) GetPrefix() Space    { return n.Prefix }
+func (n *Union) GetMarkers() Markers { return n.Markers }
+
+func (n *UnderlyingType) GetID() uuid.UUID { return n.ID }
+func (n *UnderlyingType) WithID(id uuid.UUID) J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *UnderlyingType) GetPrefix() Space    { return n.Prefix }
+func (n *UnderlyingType) GetMarkers() Markers { return n.Markers }
+
 func (n *Unary) GetID() uuid.UUID { return n.ID }
 func (n *Unary) WithID(id uuid.UUID) J {
 	if n.ID == id {
