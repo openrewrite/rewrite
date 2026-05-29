@@ -381,6 +381,25 @@ class GolangParserIntegTest implements RewriteTest {
     }
 
     @Test
+    void typeSetUnionWithCompositeOperands() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type ByteSeq interface {
+                                \t~[]byte | ~string
+                                }
+
+                                type IntPtr interface {
+                                \t*int | *int64
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
     void mapType() {
         rewriteRun(
                 go(

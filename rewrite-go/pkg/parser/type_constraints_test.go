@@ -128,3 +128,68 @@ func TestUnionOfNamedConstraints(t *testing.T) {
 	}
 	assertRoundTrip(t, src)
 }
+
+// Approximation over a composite (slice) type: `~[]byte`. The underlying
+// type must itself be a rich TypeTree (J.ArrayType), not J.Unknown.
+func TestApproximationOverSliceType(t *testing.T) {
+	src := "package main\n\ntype ByteSeq interface {\n\t~[]byte | ~string\n}\n"
+	typeExpr := interfaceBodyTypeExpr(t, src)
+
+	union, ok := typeExpr.(*tree.Union)
+	if !ok {
+		t.Fatalf("expected TypeExpr to be *tree.Union, got %T", typeExpr)
+	}
+	if len(union.Types) != 2 {
+		t.Fatalf("expected 2 union terms, got %d", len(union.Types))
+	}
+	first, ok := union.Types[0].Element.(*tree.UnderlyingType)
+	if !ok {
+		t.Fatalf("term 0: expected *tree.UnderlyingType, got %T", union.Types[0].Element)
+	}
+	if _, ok := first.Element.(*tree.ArrayType); !ok {
+		t.Fatalf("term 0: expected underlying *tree.ArrayType (slice), got %T", first.Element)
+	}
+	assertRoundTrip(t, src)
+}
+
+// Union of pointer types: `*int | *int64`. Each term is a rich
+// Go.PointerType (a TypeTree), not J.Unary/J.Unknown.
+func TestUnionOfPointerTypes(t *testing.T) {
+	src := "package main\n\ntype IntPtr interface {\n\t*int | *int64\n}\n"
+	typeExpr := interfaceBodyTypeExpr(t, src)
+
+	union, ok := typeExpr.(*tree.Union)
+	if !ok {
+		t.Fatalf("expected TypeExpr to be *tree.Union, got %T", typeExpr)
+	}
+	if len(union.Types) != 2 {
+		t.Fatalf("expected 2 union terms, got %d", len(union.Types))
+	}
+	for i, term := range union.Types {
+		if _, ok := term.Element.(*tree.PointerType); !ok {
+			t.Fatalf("term %d: expected *tree.PointerType, got %T", i, term.Element)
+		}
+	}
+	assertRoundTrip(t, src)
+}
+
+// Union of qualified names: `constraints.Signed | constraints.Float`.
+// Each term is a rich J.FieldAccess (a TypeTree).
+func TestUnionOfQualifiedNames(t *testing.T) {
+	src := "package main\n\nimport \"golang.org/x/exp/constraints\"\n\ntype Num interface {\n\tconstraints.Signed | constraints.Float\n}\n"
+	typeExpr := interfaceBodyTypeExpr(t, src)
+
+	union, ok := typeExpr.(*tree.Union)
+	if !ok {
+		t.Fatalf("expected TypeExpr to be *tree.Union, got %T", typeExpr)
+	}
+	if len(union.Types) != 2 {
+		t.Fatalf("expected 2 union terms, got %d", len(union.Types))
+	}
+	for i, term := range union.Types {
+		if _, ok := term.Element.(*tree.FieldAccess); !ok {
+			t.Fatalf("term %d: expected *tree.FieldAccess, got %T", i, term.Element)
+		}
+	}
+	assertRoundTrip(t, src)
+}
