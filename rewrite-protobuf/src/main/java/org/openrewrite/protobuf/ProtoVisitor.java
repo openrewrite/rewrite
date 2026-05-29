@@ -95,6 +95,17 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
         return f.getPadding().withOptions(visitContainer(f.getPadding().getOptions(), p));
     }
 
+    public Proto visitGroup(Proto.Group group, P p) {
+        Proto.Group g = group;
+        g = g.withPrefix(visitSpace(g.getPrefix(), p));
+        g = g.withMarkers(visitMarkers(g.getMarkers(), p));
+        g = g.withLabel((Proto.Keyword) visit(g.getLabel(), p));
+        g = g.withGroup((Proto.Keyword) visit(g.getGroup(), p));
+        g = g.getPadding().withName(visitRightPadded(g.getPadding().getName(), p));
+        g = g.withNumber((Proto.Constant) visit(g.getNumber(), p));
+        return g.withBody((Proto.Block) visit(g.getBody(), p));
+    }
+
     public Proto visitFullIdentifier(Proto.FullIdentifier fullIdentifier, P p) {
         Proto.FullIdentifier i = fullIdentifier;
         i = i.withPrefix(visitSpace(i.getPrefix(), p));
