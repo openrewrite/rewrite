@@ -269,8 +269,9 @@ func (s *JavaSender) VisitMethodDeclaration(md *java.MethodDeclaration, p any) j
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	// modifiers (empty for Go)
 	q.GetAndSendList(md, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
-	// typeParameters (nil for Go)
-	q.GetAndSend(md, func(_ any) any { return nil }, nil)
+	// typeParameters (`[T any]` declaration-site generics; nil for non-generic funcs)
+	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).TypeParameters },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// returnTypeExpression
 	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).ReturnType },
 		func(v any) { s.Visit(v.(java.Tree), q) })
@@ -295,6 +296,47 @@ func (s *JavaSender) VisitMethodDeclaration(md *java.MethodDeclaration, p any) j
 	q.GetAndSend(md, func(v any) any { return AsRef(v.(*java.MethodDeclaration).MethodType) },
 		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return md
+}
+
+func (s *JavaSender) VisitTypeParameters(tps *java.TypeParameters, p any) java.J {
+	q := p.(*SendQueue)
+	// annotations (empty for Go)
+	q.GetAndSendList(tps, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	// typeParameters (list of right-padded J$TypeParameter)
+	q.GetAndSendList(tps,
+		func(v any) []any {
+			elems := v.(*java.TypeParameters).TypeParameters
+			result := make([]any, len(elems))
+			for i, e := range elems {
+				result[i] = e
+			}
+			return result
+		},
+		func(v any) any { return containerElementID(v) },
+		func(v any) { sendRightPadded(s, v, q) })
+	return tps
+}
+
+func (s *JavaSender) VisitTypeParameter(tp *java.TypeParameter, p any) java.J {
+	q := p.(*SendQueue)
+	// annotations (empty for Go)
+	q.GetAndSendList(tp, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	// modifiers (empty for Go)
+	q.GetAndSendList(tp, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	// name
+	q.GetAndSend(tp, func(v any) any { return v.(*java.TypeParameter).Name },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	// bounds (container; nil when the parameter shares a sibling's constraint).
+	// Send the value Container, not the *Container, since the padding
+	// accessors only recognize value Container types.
+	q.GetAndSend(tp, func(v any) any {
+		b := v.(*java.TypeParameter).Bounds
+		if b == nil {
+			return nil
+		}
+		return *b
+	}, func(v any) { sendContainer(s, v, q) })
+	return tp
 }
 
 func (s *JavaSender) VisitForLoop(f *java.ForLoop, p any) java.J {

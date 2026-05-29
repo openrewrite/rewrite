@@ -550,6 +550,7 @@ type MethodDeclaration struct {
 	LeadingAnnotations []*Annotation         // `//go:noinline` / `//go:nosplit` etc. on funcs
 	Receiver           *Container[Statement] // nil for free functions; `(r *Type)` receiver
 	Name               *Identifier
+	TypeParameters     *TypeParameters      // nil for non-generic functions; `[T any]` declaration-site type params
 	Parameters         Container[Statement] // parameter list in parentheses
 	ReturnType         Expression           // nil for void functions; single type or *TypeList for multiple
 	Body               *Block               // nil for forward declarations
@@ -588,6 +589,70 @@ func (n *MethodDeclaration) WithName(name *Identifier) *MethodDeclaration {
 func (n *MethodDeclaration) WithBody(body *Block) *MethodDeclaration {
 	c := *n
 	c.Body = body
+	return &c
+}
+
+func (n *MethodDeclaration) WithTypeParameters(tps *TypeParameters) *MethodDeclaration {
+	c := *n
+	c.TypeParameters = tps
+	return &c
+}
+
+// TypeParameters represents a declaration-site type parameter list, e.g. Go
+// `[T any, U comparable]` (Java `<T, U>`). Maps to
+// org.openrewrite.java.tree.J$TypeParameters.
+type TypeParameters struct {
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Annotations []*Annotation
+	// Elements are *TypeParameter. Typed as RightPadded[J] so the RPC padding
+	// machinery (which reconstructs J-only nodes as RightPadded[J]) round-trips
+	// them without bespoke type-switch cases.
+	TypeParameters []RightPadded[J]
+}
+
+func (*TypeParameters) IsTree() {}
+func (*TypeParameters) IsJ()    {}
+
+func (n *TypeParameters) WithPrefix(prefix Space) *TypeParameters {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *TypeParameters) WithMarkers(markers Markers) *TypeParameters {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// TypeParameter represents a single declaration-site type parameter, e.g. Go
+// `T any` (Java `T extends Foo`). The constraint (Go) / bound (Java) lives in
+// Bounds as a single-element container; it is nil when the parameter shares a
+// later sibling's constraint, as in `[T, U any]`. Maps to
+// org.openrewrite.java.tree.J$TypeParameter.
+type TypeParameter struct {
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Annotations []*Annotation
+	Name        Expression
+	Bounds      *Container[Expression]
+}
+
+func (*TypeParameter) IsTree() {}
+func (*TypeParameter) IsJ()    {}
+
+func (n *TypeParameter) WithPrefix(prefix Space) *TypeParameter {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *TypeParameter) WithMarkers(markers Markers) *TypeParameter {
+	c := *n
+	c.Markers = markers
 	return &c
 }
 

@@ -624,6 +624,7 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) *java.MethodDeclaration
 	}
 
 	name := ctx.mapIdent(decl.Name)
+	typeParams := ctx.mapTypeParams(decl.Type.TypeParams)
 	params := ctx.mapFieldListAsParams(decl.Type.Params)
 	returnType := ctx.mapReturnType(decl.Type.Results)
 
@@ -638,6 +639,7 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) *java.MethodDeclaration
 		LeadingAnnotations: leadingAnns,
 		Receiver:           receiver,
 		Name:               name,
+		TypeParameters:     typeParams,
 		Parameters:         params,
 		ReturnType:         returnType,
 		Body:               body,
@@ -651,6 +653,63 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) *java.MethodDeclaration
 	}
 
 	return md
+}
+
+// mapTypeParams maps a declaration-site type parameter list `[...]` (Go 1.18+
+// generics) to a J.TypeParameters. Returns nil when there are no type
+// parameters. Go groups names sharing a constraint into one field, e.g.
+// `[T, U any]`; each name becomes its own J.TypeParameter and only the last
+// name in a group carries the shared constraint as its single bound.
+func (ctx *parseContext) mapTypeParams(fl *ast.FieldList) *java.TypeParameters {
+	if fl == nil || len(fl.List) == 0 {
+		return nil
+	}
+	before := ctx.prefix(fl.Opening)
+	ctx.skip(1) // "["
+
+	type unit struct {
+		name     *ast.Ident
+		field    *ast.Field
+		hasBound bool
+	}
+	var units []unit
+	for _, field := range fl.List {
+		for j := range field.Names {
+			units = append(units, unit{name: field.Names[j], field: field, hasBound: j == len(field.Names)-1})
+		}
+	}
+
+	var elements []java.RightPadded[java.J]
+	for i, u := range units {
+		tp := &java.TypeParameter{ID: uuid.New(), Name: ctx.mapIdent(u.name)}
+		if u.hasBound {
+			constraint := ctx.mapTypeExpr(u.field.Type)
+			tp.Bounds = &java.Container[java.Expression]{
+				Elements: []java.RightPadded[java.Expression]{{Element: constraint}},
+			}
+		}
+		var after java.Space
+		if i < len(units)-1 {
+			commaOffset := ctx.findNext(',')
+			if commaOffset >= 0 {
+				after = ctx.prefix(ctx.file.Pos(commaOffset))
+				ctx.skip(1) // ","
+			}
+		}
+		elements = append(elements, java.RightPadded[java.J]{Element: tp, After: after})
+	}
+
+	closePrefix := ctx.prefix(fl.Closing)
+	ctx.skip(1) // "]"
+	if len(elements) > 0 {
+		elements[len(elements)-1].After = closePrefix
+	}
+
+	return &java.TypeParameters{
+		ID:             uuid.New(),
+		Prefix:         before,
+		TypeParameters: elements,
+	}
 }
 
 // mapReturnType maps function return types.

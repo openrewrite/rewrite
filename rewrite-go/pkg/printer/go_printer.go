@@ -232,6 +232,9 @@ func (p *GoPrinter) VisitMethodDeclaration(md *java.MethodDeclaration, param any
 	if md.Name.Name != "" {
 		p.Visit(md.Name, out)
 	}
+	if md.TypeParameters != nil {
+		p.Visit(md.TypeParameters, out)
+	}
 	p.printParamList(md.Parameters, out)
 	if md.ReturnType != nil {
 		p.Visit(md.ReturnType, out)
@@ -241,6 +244,40 @@ func (p *GoPrinter) VisitMethodDeclaration(md *java.MethodDeclaration, param any
 	}
 	p.afterSyntax(md.Markers, out)
 	return md
+}
+
+func (p *GoPrinter) VisitTypeParameters(tps *java.TypeParameters, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(tps.Prefix, tps.Markers, out)
+	out.Append("[")
+	for i, rp := range tps.TypeParameters {
+		p.Visit(rp.Element, out)
+		p.visitSpace(rp.After, out)
+		if i < len(tps.TypeParameters)-1 {
+			out.Append(",")
+		}
+	}
+	out.Append("]")
+	p.afterSyntax(tps.Markers, out)
+	return tps
+}
+
+func (p *GoPrinter) VisitTypeParameter(tp *java.TypeParameter, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(tp.Prefix, tp.Markers, out)
+	p.Visit(tp.Name, out)
+	if tp.Bounds != nil {
+		p.visitSpace(tp.Bounds.Before, out)
+		for i, rp := range tp.Bounds.Elements {
+			p.Visit(rp.Element, out)
+			p.visitSpace(rp.After, out)
+			if i < len(tp.Bounds.Elements)-1 {
+				out.Append(",")
+			}
+		}
+	}
+	p.afterSyntax(tp.Markers, out)
+	return tp
 }
 
 func (p *GoPrinter) printParamList(params java.Container[java.Statement], out *PrintOutputCapture) {
