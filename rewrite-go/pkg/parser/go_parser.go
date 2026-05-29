@@ -592,6 +592,7 @@ func (ctx *parseContext) mapTypeDecl(decl *ast.GenDecl) java.Statement {
 // mapTypeSpec maps a single type spec: `type Name Type` or `type Name = Type`.
 func (ctx *parseContext) mapTypeSpec(spec *ast.TypeSpec, prefix java.Space) *golang.TypeDecl {
 	name := ctx.mapIdent(spec.Name)
+	typeParams := ctx.mapTypeParams(spec.TypeParams)
 
 	var assign *java.LeftPadded[java.Space]
 	if spec.Assign.IsValid() {
@@ -604,11 +605,12 @@ func (ctx *parseContext) mapTypeSpec(spec *ast.TypeSpec, prefix java.Space) *gol
 	def := ctx.mapTypeExpr(spec.Type)
 
 	return &golang.TypeDecl{
-		ID:         uuid.New(),
-		Prefix:     prefix,
-		Name:       name,
-		Assign:     assign,
-		Definition: def,
+		ID:             uuid.New(),
+		Prefix:         prefix,
+		Name:           name,
+		TypeParameters: typeParams,
+		Assign:         assign,
+		Definition:     def,
 	}
 }
 

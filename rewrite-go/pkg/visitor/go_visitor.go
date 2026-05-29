@@ -789,6 +789,9 @@ func (v *GoVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 		}
 		td = td.WithLeadingAnnotations(anns)
 	}
+	if td.TypeParameters != nil {
+		td = td.WithTypeParameters(visitAndCast[*java.TypeParameters](v, td.TypeParameters, p))
+	}
 	return td
 }
 

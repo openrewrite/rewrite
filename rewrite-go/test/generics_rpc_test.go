@@ -73,3 +73,31 @@ func TestGenericFuncTypeParametersSurviveRpc(t *testing.T) {
 		}
 	}
 }
+
+func TestGenericTypeDeclTypeParametersSurviveRpc(t *testing.T) {
+	for _, src := range []string{
+		"package main\n\ntype Pair[T any] struct {\n\tFirst  T\n\tSecond T\n}\n",
+		"package main\n\ntype Container[T any] interface {\n\tGet() T\n}\n",
+		"package main\n\ntype MyList[T any] []T\n",
+		"package main\n\ntype V[T any] = []T\n",
+		"package main\n\ntype Map[K comparable, V any] map[K]V\n",
+	} {
+		// given
+		cu, err := parser.NewGoParser().Parse("x.go", src)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+
+		// when
+		got := rpcRoundTrip(t, cu)
+
+		// then
+		td := got.Statements[0].Element.(*golang.TypeDecl)
+		if td.TypeParameters == nil {
+			t.Fatalf("type parameters lost over RPC for %q", src)
+		}
+		if printed := printer.Print(got); printed != src {
+			t.Errorf("RPC round-trip mismatch\nexpected:\n%s\nactual:\n%s", src, printed)
+		}
+	}
+}

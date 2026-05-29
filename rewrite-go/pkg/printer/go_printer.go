@@ -1091,8 +1091,11 @@ func (p *GoPrinter) VisitTypeDecl(td *golang.TypeDecl, param any) java.J {
 		}
 		out.Append(")")
 	} else {
-		// Single: type Name Type
+		// Single: type Name[TypeParams] Type
 		p.Visit(td.Name, out)
+		if td.TypeParameters != nil {
+			p.Visit(td.TypeParameters, out)
+		}
 		if td.Assign != nil {
 			p.visitSpace(td.Assign.Before, out)
 			out.Append("=")
