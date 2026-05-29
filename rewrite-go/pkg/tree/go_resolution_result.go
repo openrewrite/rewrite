@@ -97,12 +97,23 @@ type GoResolvedDependency struct {
 }
 
 // NewGoResolutionResult creates a GoResolutionResult marker with a fresh UUID.
+//
+// The directive slices are initialized to empty (non-nil) values. Go has no
+// way to declare a slice non-nullable at the type level, so this constructor is
+// the single chokepoint that guarantees it: a nil slice would be serialized by
+// the RPC send codec as a null list, which the Java receive side stores as a
+// null field and the Moderne reflective binary LST serializer then NPEs on.
 func NewGoResolutionResult(modulePath, goVersion, toolchain, path string) GoResolutionResult {
 	return GoResolutionResult{
-		Ident:      uuid.New(),
-		ModulePath: modulePath,
-		GoVersion:  goVersion,
-		Toolchain:  toolchain,
-		Path:       path,
+		Ident:                uuid.New(),
+		ModulePath:           modulePath,
+		GoVersion:            goVersion,
+		Toolchain:            toolchain,
+		Path:                 path,
+		Requires:             []GoRequire{},
+		Replaces:             []GoReplace{},
+		Excludes:             []GoExclude{},
+		Retracts:             []GoRetract{},
+		ResolvedDependencies: []GoResolvedDependency{},
 	}
 }
