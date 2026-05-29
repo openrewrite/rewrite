@@ -2928,4 +2928,162 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void upgradesStrictlyVersionConstraintInClosure() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation('com.google.guava:guava:29.0-jre') {
+                      version { strictly('29.0-jre') }
+                  }
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation('com.google.guava:guava:30.1.1-jre') {
+                      version { strictly('30.1.1-jre') }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesRequireAndPreferVersionConstraintsInClosure() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation('com.google.guava:guava:29.0-jre') {
+                      version {
+                          require('29.0-jre')
+                          prefer('29.0-jre')
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation('com.google.guava:guava:30.1.1-jre') {
+                      version {
+                          require('30.1.1-jre')
+                          prefer('30.1.1-jre')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesStrictlyVersionConstraintInClosureWithMultiComponentNotation() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation(group: 'com.google.guava', name: 'guava', version: '29.0-jre') {
+                      version { strictly('29.0-jre') }
+                  }
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation(group: 'com.google.guava', name: 'guava', version: '30.1.1-jre') {
+                      version { strictly('30.1.1-jre') }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesStrictlyVersionConstraintInKotlinClosure() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation("com.google.guava:guava:29.0-jre") {
+                      version { strictly("29.0-jre") }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation("com.google.guava:guava:30.1.1-jre") {
+                      version { strictly("30.1.1-jre") }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotTouchConstraintsOnUnrelatedDependencies() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation('com.google.guava:guava:29.0-jre')
+                  implementation('org.openrewrite:rewrite-core:8.0.0') {
+                      version { strictly('8.0.0') }
+                  }
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation('com.google.guava:guava:30.1.1-jre')
+                  implementation('org.openrewrite:rewrite-core:8.0.0') {
+                      version { strictly('8.0.0') }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
