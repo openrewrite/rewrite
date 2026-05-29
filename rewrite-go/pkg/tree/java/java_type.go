@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package tree
+package java
 
 import "fmt"
 
@@ -31,20 +31,20 @@ type FullyQualified interface {
 
 // Java class name constants for RPC deserialization.
 const (
-	JavaTypeClassKind              = "org.openrewrite.java.tree.JavaType$Class"
-	JavaTypeShallowClassKind       = "org.openrewrite.java.tree.JavaType$ShallowClass"
-	JavaTypeParameterizedKind      = "org.openrewrite.java.tree.JavaType$Parameterized"
-	JavaTypeGenericTypeVariableKind = "org.openrewrite.java.tree.JavaType$GenericTypeVariable"
-	JavaTypeArrayKind              = "org.openrewrite.java.tree.JavaType$Array"
-	JavaTypePrimitiveKind          = "org.openrewrite.java.tree.JavaType$Primitive"
-	JavaTypeMethodKind             = "org.openrewrite.java.tree.JavaType$Method"
-	JavaTypeVariableKind           = "org.openrewrite.java.tree.JavaType$Variable"
-	JavaTypeAnnotationKind         = "org.openrewrite.java.tree.JavaType$Annotation"
+	JavaTypeClassKind                        = "org.openrewrite.java.tree.JavaType$Class"
+	JavaTypeShallowClassKind                 = "org.openrewrite.java.tree.JavaType$ShallowClass"
+	JavaTypeParameterizedKind                = "org.openrewrite.java.tree.JavaType$Parameterized"
+	JavaTypeGenericTypeVariableKind          = "org.openrewrite.java.tree.JavaType$GenericTypeVariable"
+	JavaTypeArrayKind                        = "org.openrewrite.java.tree.JavaType$Array"
+	JavaTypePrimitiveKind                    = "org.openrewrite.java.tree.JavaType$Primitive"
+	JavaTypeMethodKind                       = "org.openrewrite.java.tree.JavaType$Method"
+	JavaTypeVariableKind                     = "org.openrewrite.java.tree.JavaType$Variable"
+	JavaTypeAnnotationKind                   = "org.openrewrite.java.tree.JavaType$Annotation"
 	JavaTypeAnnotationSingleElementValueKind = "org.openrewrite.java.tree.JavaType$Annotation$SingleElementValue"
 	JavaTypeAnnotationArrayElementValueKind  = "org.openrewrite.java.tree.JavaType$Annotation$ArrayElementValue"
-	JavaTypeMultiCatchKind         = "org.openrewrite.java.tree.JavaType$MultiCatch"
-	JavaTypeIntersectionKind       = "org.openrewrite.java.tree.JavaType$Intersection"
-	JavaTypeUnknownKind            = "org.openrewrite.java.tree.JavaType$Unknown"
+	JavaTypeMultiCatchKind                   = "org.openrewrite.java.tree.JavaType$MultiCatch"
+	JavaTypeIntersectionKind                 = "org.openrewrite.java.tree.JavaType$Intersection"
+	JavaTypeUnknownKind                      = "org.openrewrite.java.tree.JavaType$Unknown"
 )
 
 // JavaTypePrimitive represents a primitive type like int, boolean, etc.

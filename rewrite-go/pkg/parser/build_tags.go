@@ -161,8 +161,8 @@ func matchTag(buildCtx build.Context, tag string) bool {
 // uses to identify GOOS/GOARCH filename suffixes. Limited to the
 // recognized values so unrelated underscore-separated stems
 // (`server_handler.go`) don't trigger filtering.
-func knownOS(s string) bool { _, ok := knownOSes[s]; return ok }
-func knownArch(s string) bool { _, ok := knownArches[s]; return ok }
+func knownOS(s string) bool     { _, ok := knownOSes[s]; return ok }
+func knownArch(s string) bool   { _, ok := knownArches[s]; return ok }
 func knownUnixOS(s string) bool { _, ok := unixOSes[s]; return ok }
 
 // knownOSes lists every Go-recognized GOOS value as of Go 1.22. New

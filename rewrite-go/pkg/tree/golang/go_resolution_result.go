@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package tree
+package golang
 
 import "github.com/google/uuid"
 

@@ -21,7 +21,7 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
 // TestParsePackageResolvesCrossFileSymbols directly exercises ParsePackage
@@ -55,7 +55,7 @@ func TestGoProjectMultiFilePackageResolves(t *testing.T) {
 
 		func main() { helper() }
 	`).WithPath("main.go")
-	mainSrc.AfterRecipe = func(t *testing.T, cu *tree.CompilationUnit) {
+	mainSrc.AfterRecipe = func(t *testing.T, cu *golang.CompilationUnit) {
 		t.Helper()
 		ids := collectIdentTypes(cu)
 		if ids["helper"] == nil {
@@ -82,4 +82,3 @@ func TestGoProjectMultiFilePackageResolves(t *testing.T) {
 		),
 	)
 }
-

@@ -236,7 +236,7 @@ func (inst *Installer) loadRecipes(modulePath, activatePkg string, registry *rec
 
 // helperOutput is the JSON format output by the helper program.
 type helperOutput struct {
-	Descriptor RecipeDescriptorJSON    `json:"descriptor"`
+	Descriptor RecipeDescriptorJSON     `json:"descriptor"`
 	Categories []CategoryDescriptorJSON `json:"categories"`
 }
 
@@ -252,7 +252,6 @@ type CategoryDescriptorJSON struct {
 	DisplayName string `json:"displayName"`
 	Description string `json:"description"`
 }
-
 
 // helperTemplate is the Go source template for the recipe discovery helper program.
 var helperTemplate = template.Must(template.New("helper").Parse(`package main

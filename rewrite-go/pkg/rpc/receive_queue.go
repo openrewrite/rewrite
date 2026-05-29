@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 var defaultReceiver = NewGoReceiver()
@@ -86,7 +86,7 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 			// sender shipped a codec-less marker as `{ADD, valueType, value=map}`
 			// (matches what every other language's send queue does). Without
 			// this, the marker's fields would be silently dropped.
-			if gm, ok := before.(tree.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
+			if gm, ok := before.(java.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
 				if dataMap, ok := msg.Value.(map[string]any); ok {
 					gm.Data = dataMap
 					if idStr, ok := dataMap["id"].(string); ok {
@@ -117,7 +117,7 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		if onChange != nil {
 			after = onChange(before)
 		} else if !isNilValue(before) && getValueType(before) != nil {
-			if t, ok := before.(tree.Tree); ok {
+			if t, ok := before.(java.Tree); ok {
 				after = defaultReceiver.Visit(t, q)
 			} else {
 				after = before
@@ -221,7 +221,7 @@ func newObj(javaClassName string) any {
 	}
 	// Unknown marker types — create a GenericMarker with JavaType preserved.
 	if strings.Contains(javaClassName, "marker") || strings.Contains(javaClassName, "Marker") {
-		return tree.GenericMarker{JavaType: javaClassName}
+		return java.GenericMarker{JavaType: javaClassName}
 	}
 	panic(fmt.Sprintf("no factory registered for type: %s", javaClassName))
 }

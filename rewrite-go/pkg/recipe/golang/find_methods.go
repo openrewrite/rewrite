@@ -26,8 +26,10 @@ type FindMethods struct {
 }
 
 func (r *FindMethods) Name() string        { return "org.openrewrite.golang.search.FindMethods" }
-func (r *FindMethods) DisplayName() string  { return "Find methods" }
-func (r *FindMethods) Description() string  { return "Find all method invocations matching a method pattern." }
+func (r *FindMethods) DisplayName() string { return "Find methods" }
+func (r *FindMethods) Description() string {
+	return "Find all method invocations matching a method pattern."
+}
 func (r *FindMethods) JavaRecipeName() string { return "org.openrewrite.java.search.FindMethods" }
 func (r *FindMethods) JavaOptions() map[string]any {
 	return map[string]any{

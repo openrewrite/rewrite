@@ -22,7 +22,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -54,17 +55,17 @@ type AnnotationService struct{}
 //
 // Supported decl types: VariableDeclarations, MethodDeclaration,
 // TypeDecl. For other node types, returns nil.
-func (s *AnnotationService) AllAnnotations(c *visitor.Cursor) []*tree.Annotation {
+func (s *AnnotationService) AllAnnotations(c *visitor.Cursor) []*java.Annotation {
 	if c == nil {
 		return nil
 	}
 	for cur := c; cur != nil; cur = cur.Parent() {
 		switch n := cur.Value().(type) {
-		case *tree.VariableDeclarations:
+		case *java.VariableDeclarations:
 			return n.LeadingAnnotations
-		case *tree.MethodDeclaration:
+		case *java.MethodDeclaration:
 			return n.LeadingAnnotations
-		case *tree.TypeDecl:
+		case *golang.TypeDecl:
 			return n.LeadingAnnotations
 		}
 	}
@@ -89,7 +90,7 @@ func NewAnnotationMatcher(pattern string) AnnotationMatcher {
 // the pattern. Returns false if the annotation has no resolvable name
 // (defensive — every annotation we emit has a Identifier or
 // FieldAccess as its AnnotationType).
-func (m AnnotationMatcher) Matches(ann *tree.Annotation) bool {
+func (m AnnotationMatcher) Matches(ann *java.Annotation) bool {
 	if ann == nil {
 		return false
 	}
@@ -108,11 +109,11 @@ func (m AnnotationMatcher) Matches(ann *tree.Annotation) bool {
 
 // annotationName extracts the annotation's type-name. For Identifier
 // returns its Name; for FieldAccess (qualified) returns "Target.Name".
-func annotationName(ann *tree.Annotation) string {
+func annotationName(ann *java.Annotation) string {
 	switch t := ann.AnnotationType.(type) {
-	case *tree.Identifier:
+	case *java.Identifier:
 		return t.Name
-	case *tree.FieldAccess:
+	case *java.FieldAccess:
 		// Walk the FieldAccess chain — uncommon for Go annotations but
 		// included for cross-language symmetry with Java FQNs.
 		var b strings.Builder
@@ -122,11 +123,11 @@ func annotationName(ann *tree.Annotation) string {
 	return ""
 }
 
-func appendFieldAccessName(b *strings.Builder, fa *tree.FieldAccess) {
+func appendFieldAccessName(b *strings.Builder, fa *java.FieldAccess) {
 	switch t := fa.Target.(type) {
-	case *tree.Identifier:
+	case *java.Identifier:
 		b.WriteString(t.Name)
-	case *tree.FieldAccess:
+	case *java.FieldAccess:
 		appendFieldAccessName(b, t)
 	}
 	if fa.Name.Element != nil {
@@ -155,7 +156,7 @@ func (s *AnnotationService) Matches(c *visitor.Cursor, matcher AnnotationMatcher
 //	svc.IsAnnotatedWith(field, "json")          // exact key match on a struct field
 //	svc.IsAnnotatedWith(funcDecl, "go:noinline") // exact directive match
 //	svc.IsAnnotatedWith(funcDecl, "go:*")        // any //go: directive
-func (s *AnnotationService) IsAnnotatedWith(t tree.Tree, pattern string) bool {
+func (s *AnnotationService) IsAnnotatedWith(t java.Tree, pattern string) bool {
 	matcher := NewAnnotationMatcher(pattern)
 	for _, a := range annotationsOn(t) {
 		if matcher.Matches(a) {
@@ -167,9 +168,9 @@ func (s *AnnotationService) IsAnnotatedWith(t tree.Tree, pattern string) bool {
 
 // FindAnnotations returns all annotations on the given decl that match
 // the pattern.
-func (s *AnnotationService) FindAnnotations(t tree.Tree, pattern string) []*tree.Annotation {
+func (s *AnnotationService) FindAnnotations(t java.Tree, pattern string) []*java.Annotation {
 	matcher := NewAnnotationMatcher(pattern)
-	var out []*tree.Annotation
+	var out []*java.Annotation
 	for _, a := range annotationsOn(t) {
 		if matcher.Matches(a) {
 			out = append(out, a)
@@ -181,13 +182,13 @@ func (s *AnnotationService) FindAnnotations(t tree.Tree, pattern string) []*tree
 // annotationsOn returns LeadingAnnotations directly from a decl node,
 // without cursor traversal. Used by the IsAnnotatedWith / FindAnnotations
 // surface, which take the decl node directly rather than a cursor.
-func annotationsOn(t tree.Tree) []*tree.Annotation {
+func annotationsOn(t java.Tree) []*java.Annotation {
 	switch n := t.(type) {
-	case *tree.VariableDeclarations:
+	case *java.VariableDeclarations:
 		return n.LeadingAnnotations
-	case *tree.MethodDeclaration:
+	case *java.MethodDeclaration:
 		return n.LeadingAnnotations
-	case *tree.TypeDecl:
+	case *golang.TypeDecl:
 		return n.LeadingAnnotations
 	}
 	return nil
@@ -205,7 +206,7 @@ func annotationsOn(t tree.Tree) []*tree.Annotation {
 // For struct field tags, recipes typically construct the annotation
 // manually and append directly rather than using this visitor — tags
 // have no leading-newline convention.
-func (s *AnnotationService) AddAnnotationVisitor(matcher func(tree.Tree) bool, ann *tree.Annotation) recipe.TreeVisitor {
+func (s *AnnotationService) AddAnnotationVisitor(matcher func(java.Tree) bool, ann *java.Annotation) recipe.TreeVisitor {
 	return visitor.Init(&addAnnotationVisitor{match: matcher, ann: ann})
 }
 
@@ -218,33 +219,33 @@ func (s *AnnotationService) RemoveAnnotationVisitor(pattern string) recipe.TreeV
 
 type addAnnotationVisitor struct {
 	visitor.GoVisitor
-	match func(tree.Tree) bool
-	ann   *tree.Annotation
+	match func(java.Tree) bool
+	ann   *java.Annotation
 }
 
-func (v *addAnnotationVisitor) VisitMethodDeclaration(md *tree.MethodDeclaration, p any) tree.J {
-	md = v.GoVisitor.VisitMethodDeclaration(md, p).(*tree.MethodDeclaration)
+func (v *addAnnotationVisitor) VisitMethodDeclaration(md *java.MethodDeclaration, p any) java.J {
+	md = v.GoVisitor.VisitMethodDeclaration(md, p).(*java.MethodDeclaration)
 	if v.match(md) {
 		clone := positionDirectiveAnnotation(v.ann, &md.Prefix, len(md.LeadingAnnotations) == 0)
-		md = md.WithLeadingAnnotations(append(append([]*tree.Annotation{}, md.LeadingAnnotations...), clone))
+		md = md.WithLeadingAnnotations(append(append([]*java.Annotation{}, md.LeadingAnnotations...), clone))
 	}
 	return md
 }
 
-func (v *addAnnotationVisitor) VisitTypeDecl(td *tree.TypeDecl, p any) tree.J {
-	td = v.GoVisitor.VisitTypeDecl(td, p).(*tree.TypeDecl)
+func (v *addAnnotationVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
+	td = v.GoVisitor.VisitTypeDecl(td, p).(*golang.TypeDecl)
 	if v.match(td) {
 		clone := positionDirectiveAnnotation(v.ann, &td.Prefix, len(td.LeadingAnnotations) == 0)
-		td = td.WithLeadingAnnotations(append(append([]*tree.Annotation{}, td.LeadingAnnotations...), clone))
+		td = td.WithLeadingAnnotations(append(append([]*java.Annotation{}, td.LeadingAnnotations...), clone))
 	}
 	return td
 }
 
-func (v *addAnnotationVisitor) VisitVariableDeclarations(vd *tree.VariableDeclarations, p any) tree.J {
-	vd = v.GoVisitor.VisitVariableDeclarations(vd, p).(*tree.VariableDeclarations)
+func (v *addAnnotationVisitor) VisitVariableDeclarations(vd *java.VariableDeclarations, p any) java.J {
+	vd = v.GoVisitor.VisitVariableDeclarations(vd, p).(*java.VariableDeclarations)
 	if v.match(vd) {
 		clone := positionDirectiveAnnotation(v.ann, &vd.Prefix, len(vd.LeadingAnnotations) == 0)
-		vd = vd.WithLeadingAnnotations(append(append([]*tree.Annotation{}, vd.LeadingAnnotations...), clone))
+		vd = vd.WithLeadingAnnotations(append(append([]*java.Annotation{}, vd.LeadingAnnotations...), clone))
 	}
 	return vd
 }
@@ -258,13 +259,13 @@ func (v *addAnnotationVisitor) VisitVariableDeclarations(vd *tree.VariableDeclar
 // keyword). For non-first annotations, the decl's Prefix is left
 // alone and the new annotation gets a `\n` prefix so it stacks below
 // existing directives.
-func positionDirectiveAnnotation(template *tree.Annotation, declPrefix *tree.Space, isFirst bool) *tree.Annotation {
+func positionDirectiveAnnotation(template *java.Annotation, declPrefix *java.Space, isFirst bool) *java.Annotation {
 	clone := cloneAnnotation(template)
 	if isFirst {
 		clone.Prefix = *declPrefix
-		*declPrefix = tree.Space{Whitespace: "\n"}
+		*declPrefix = java.Space{Whitespace: "\n"}
 	} else {
-		clone.Prefix = tree.Space{Whitespace: "\n"}
+		clone.Prefix = java.Space{Whitespace: "\n"}
 	}
 	return clone
 }
@@ -274,26 +275,26 @@ type removeAnnotationVisitor struct {
 	matcher AnnotationMatcher
 }
 
-func (v *removeAnnotationVisitor) VisitMethodDeclaration(md *tree.MethodDeclaration, p any) tree.J {
-	md = v.GoVisitor.VisitMethodDeclaration(md, p).(*tree.MethodDeclaration)
+func (v *removeAnnotationVisitor) VisitMethodDeclaration(md *java.MethodDeclaration, p any) java.J {
+	md = v.GoVisitor.VisitMethodDeclaration(md, p).(*java.MethodDeclaration)
 	return md.WithLeadingAnnotations(filterAnnotations(md.LeadingAnnotations, v.matcher))
 }
 
-func (v *removeAnnotationVisitor) VisitTypeDecl(td *tree.TypeDecl, p any) tree.J {
-	td = v.GoVisitor.VisitTypeDecl(td, p).(*tree.TypeDecl)
+func (v *removeAnnotationVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
+	td = v.GoVisitor.VisitTypeDecl(td, p).(*golang.TypeDecl)
 	return td.WithLeadingAnnotations(filterAnnotations(td.LeadingAnnotations, v.matcher))
 }
 
-func (v *removeAnnotationVisitor) VisitVariableDeclarations(vd *tree.VariableDeclarations, p any) tree.J {
-	vd = v.GoVisitor.VisitVariableDeclarations(vd, p).(*tree.VariableDeclarations)
+func (v *removeAnnotationVisitor) VisitVariableDeclarations(vd *java.VariableDeclarations, p any) java.J {
+	vd = v.GoVisitor.VisitVariableDeclarations(vd, p).(*java.VariableDeclarations)
 	return vd.WithLeadingAnnotations(filterAnnotations(vd.LeadingAnnotations, v.matcher))
 }
 
-func filterAnnotations(in []*tree.Annotation, m AnnotationMatcher) []*tree.Annotation {
+func filterAnnotations(in []*java.Annotation, m AnnotationMatcher) []*java.Annotation {
 	if len(in) == 0 {
 		return in
 	}
-	out := make([]*tree.Annotation, 0, len(in))
+	out := make([]*java.Annotation, 0, len(in))
 	for _, a := range in {
 		if !m.Matches(a) {
 			out = append(out, a)
@@ -308,23 +309,23 @@ func filterAnnotations(in []*tree.Annotation, m AnnotationMatcher) []*tree.Annot
 // cloneAnnotation produces a fresh Annotation with new UUIDs for the
 // outer node and its inner Identifier/Literal so the same template
 // can be applied to multiple decls without ID collisions.
-func cloneAnnotation(ann *tree.Annotation) *tree.Annotation {
+func cloneAnnotation(ann *java.Annotation) *java.Annotation {
 	if ann == nil {
 		return nil
 	}
 	c := *ann
 	c.ID = uuid.New()
-	if id, ok := ann.AnnotationType.(*tree.Identifier); ok {
+	if id, ok := ann.AnnotationType.(*java.Identifier); ok {
 		idClone := *id
 		idClone.ID = uuid.New()
 		c.AnnotationType = &idClone
 	}
 	if ann.Arguments != nil {
 		args := *ann.Arguments
-		newElems := make([]tree.RightPadded[tree.Expression], len(args.Elements))
+		newElems := make([]java.RightPadded[java.Expression], len(args.Elements))
 		for i, rp := range args.Elements {
 			rp2 := rp
-			if lit, ok := rp.Element.(*tree.Literal); ok {
+			if lit, ok := rp.Element.(*java.Literal); ok {
 				litClone := *lit
 				litClone.ID = uuid.New()
 				rp2.Element = &litClone

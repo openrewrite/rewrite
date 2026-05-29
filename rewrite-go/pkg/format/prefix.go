@@ -19,7 +19,7 @@ package format
 import (
 	"reflect"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // getPrefix returns the `Prefix` field of any tree node that carries
@@ -29,34 +29,34 @@ import (
 //
 // Returns the zero Space when the node has no Prefix field (which is
 // vanishingly rare — every J-conformant type carries one).
-func getPrefix(t tree.Tree) tree.Space {
+func getPrefix(t java.Tree) java.Space {
 	if t == nil {
-		return tree.Space{}
+		return java.Space{}
 	}
 	rv := reflect.ValueOf(t)
 	if rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
-			return tree.Space{}
+			return java.Space{}
 		}
 		rv = rv.Elem()
 	}
 	if rv.Kind() != reflect.Struct {
-		return tree.Space{}
+		return java.Space{}
 	}
 	f := rv.FieldByName("Prefix")
 	if !f.IsValid() {
-		return tree.Space{}
+		return java.Space{}
 	}
-	if s, ok := f.Interface().(tree.Space); ok {
+	if s, ok := f.Interface().(java.Space); ok {
 		return s
 	}
-	return tree.Space{}
+	return java.Space{}
 }
 
 // withPrefix calls the node's `WithPrefix(Space) <T>` method to produce
 // a copy with the given prefix. Returns the original node if it has no
 // such method (defensive — every J-conformant type ships one).
-func withPrefix[T tree.Tree](t T, prefix tree.Space) T {
+func withPrefix[T java.Tree](t T, prefix java.Space) T {
 	rv := reflect.ValueOf(t)
 	m := rv.MethodByName("WithPrefix")
 	if !m.IsValid() {

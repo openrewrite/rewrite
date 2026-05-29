@@ -22,7 +22,8 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang/internal"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -70,8 +71,8 @@ type renamePackageVisitor struct {
 	cfg *RenamePackage
 }
 
-func (v *renamePackageVisitor) VisitCompilationUnit(cu *tree.CompilationUnit, p any) tree.J {
-	cu = v.GoVisitor.VisitCompilationUnit(cu, p).(*tree.CompilationUnit)
+func (v *renamePackageVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	cu = v.GoVisitor.VisitCompilationUnit(cu, p).(*golang.CompilationUnit)
 	if v.cfg.OldPackagePath == "" || v.cfg.NewPackagePath == "" {
 		return cu
 	}
@@ -96,7 +97,7 @@ func (v *renamePackageVisitor) VisitCompilationUnit(cu *tree.CompilationUnit, p 
 	// alone. Aliased / blank / dot imports are rewritten the same way.
 	if cu.Imports != nil {
 		imps := *cu.Imports
-		out := make([]tree.RightPadded[*tree.Import], len(imps.Elements))
+		out := make([]java.RightPadded[*java.Import], len(imps.Elements))
 		for i, rp := range imps.Elements {
 			imp := rp.Element
 			oldPath := internal.ImportPath(imp)
@@ -128,7 +129,7 @@ func (v *renamePackageVisitor) VisitCompilationUnit(cu *tree.CompilationUnit, p 
 // reused across unrelated directories). Tests that exercise this path
 // must wrap their sources in `GoProject(...)` with a `GoMod(...)`
 // sibling so the marker is propagated.
-func (v *renamePackageVisitor) fileBelongsTo(cu *tree.CompilationUnit, candidatePath string) bool {
+func (v *renamePackageVisitor) fileBelongsTo(cu *golang.CompilationUnit, candidatePath string) bool {
 	modulePath := internal.FindModulePath(cu)
 	if modulePath == "" {
 		return false
@@ -157,12 +158,12 @@ func rewritePath(p, oldPath, newPath string) string {
 // withImportPath returns a copy of imp with its Qualid Literal source +
 // value updated to the new import path. Preserves Prefix and Markers
 // so the printer keeps the surrounding whitespace.
-func withImportPath(imp *tree.Import, newPath string) *tree.Import {
+func withImportPath(imp *java.Import, newPath string) *java.Import {
 	if imp == nil {
 		return imp
 	}
 	c := *imp
-	if lit, ok := imp.Qualid.(*tree.Literal); ok {
+	if lit, ok := imp.Qualid.(*java.Literal); ok {
 		ln := *lit
 		ln.Value = `"` + newPath + `"`
 		ln.Source = `"` + newPath + `"`

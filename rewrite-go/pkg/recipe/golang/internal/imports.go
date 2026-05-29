@@ -26,7 +26,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -51,11 +52,11 @@ const (
 // The Go parser stores the raw quoted source in Literal.Value (and
 // .Source) — `"fmt"` not `fmt` — so this helper always strips the
 // surrounding quote pair before returning.
-func ImportPath(imp *tree.Import) string {
+func ImportPath(imp *java.Import) string {
 	if imp == nil {
 		return ""
 	}
-	lit, ok := imp.Qualid.(*tree.Literal)
+	lit, ok := imp.Qualid.(*java.Literal)
 	if !ok || lit == nil {
 		return ""
 	}
@@ -71,7 +72,7 @@ func ImportPath(imp *tree.Import) string {
 // AliasName returns the alias used by an Import: a custom identifier for
 // `import alias "path"`, "_" for blank imports, "." for dot imports, or
 // "" when the import uses the default (last segment of the path).
-func AliasName(imp *tree.Import) string {
+func AliasName(imp *java.Import) string {
 	if imp == nil || imp.Alias == nil {
 		return ""
 	}
@@ -83,7 +84,7 @@ func AliasName(imp *tree.Import) string {
 
 // FindImport returns the first import in cu whose path equals importPath.
 // Returns nil if no match.
-func FindImport(cu *tree.CompilationUnit, importPath string) *tree.Import {
+func FindImport(cu *golang.CompilationUnit, importPath string) *java.Import {
 	if cu == nil || cu.Imports == nil {
 		return nil
 	}
@@ -100,7 +101,7 @@ func FindImport(cu *tree.CompilationUnit, importPath string) *tree.Import {
 //   - alias == nil: any non-blank, non-dot form counts as a hit
 //   - alias != nil: requires an exact alias match (use "_" for blank,
 //     "." for dot)
-func HasImport(cu *tree.CompilationUnit, importPath string, alias *string) bool {
+func HasImport(cu *golang.CompilationUnit, importPath string, alias *string) bool {
 	if cu == nil || cu.Imports == nil {
 		return false
 	}
@@ -175,7 +176,7 @@ func IsLocal(importPath, modulePath string) bool {
 //
 // Aliases and dot imports are handled uniformly — the package's import
 // path is what we track, regardless of how the user named it.
-func ReferencedPackages(cu *tree.CompilationUnit) map[string]bool {
+func ReferencedPackages(cu *golang.CompilationUnit) map[string]bool {
 	refs := map[string]bool{}
 	if cu == nil {
 		return refs
@@ -190,9 +191,9 @@ type referencedPackagesVisitor struct {
 	refs map[string]bool
 }
 
-func (v *referencedPackagesVisitor) VisitIdentifier(ident *tree.Identifier, p any) tree.J {
+func (v *referencedPackagesVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
 	if ident.Type != nil {
-		if fq, ok := ident.Type.(tree.FullyQualified); ok {
+		if fq, ok := ident.Type.(java.FullyQualified); ok {
 			if path := pkgPathOf(fq.GetFullyQualifiedName()); path != "" {
 				v.refs[path] = true
 			}
@@ -201,7 +202,7 @@ func (v *referencedPackagesVisitor) VisitIdentifier(ident *tree.Identifier, p an
 	return ident
 }
 
-func (v *referencedPackagesVisitor) VisitMethodInvocation(mi *tree.MethodInvocation, p any) tree.J {
+func (v *referencedPackagesVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
 	if mi.MethodType != nil && mi.MethodType.DeclaringType != nil {
 		if path := pkgPathOf(mi.MethodType.DeclaringType.GetFullyQualifiedName()); path != "" {
 			v.refs[path] = true
@@ -257,21 +258,21 @@ func pkgPathOf(fqn string) string {
 // and the Qualid Literal carries a leading space (printed as the space
 // between `import` and the path string). The first Statement's existing
 // Prefix supplies the trailing blank line before `func`.
-func AddToBlock(cu *tree.CompilationUnit, imp *tree.Import, modulePath string) *tree.CompilationUnit {
+func AddToBlock(cu *golang.CompilationUnit, imp *java.Import, modulePath string) *golang.CompilationUnit {
 	if cu == nil {
 		return cu
 	}
 	c := *cu
 	if c.Imports == nil {
-		c.Imports = &tree.Container[*tree.Import]{
-			Before: tree.Space{Whitespace: "\n\n"},
+		c.Imports = &java.Container[*java.Import]{
+			Before: java.Space{Whitespace: "\n\n"},
 		}
 		// Wire the leading-space convention onto the new import: the
 		// space between `import` and the path lives on the Qualid
 		// literal's Prefix.
-		if lit, ok := imp.Qualid.(*tree.Literal); ok {
+		if lit, ok := imp.Qualid.(*java.Literal); ok {
 			cloned := *lit
-			cloned.Prefix = tree.Space{Whitespace: " "}
+			cloned.Prefix = java.Space{Whitespace: " "}
 			imp.Qualid = &cloned
 		}
 	}
@@ -280,7 +281,7 @@ func AddToBlock(cu *tree.CompilationUnit, imp *tree.Import, modulePath string) *
 	// Adding a second import to an ungrouped single-import file
 	// promotes it to the grouped `import (...)` form — that's the
 	// only legal Go syntax for multiple imports in one block.
-	if len(imps.Elements) == 1 && tree.FindMarker[tree.GroupedImport](imps.Markers) == nil {
+	if len(imps.Elements) == 1 && java.FindMarker[golang.GroupedImport](imps.Markers) == nil {
 		promoteToGrouped(&imps)
 	}
 
@@ -293,10 +294,10 @@ func AddToBlock(cu *tree.CompilationUnit, imp *tree.Import, modulePath string) *
 // grouped `import (...)` form. Adds the GroupedImport marker and
 // rewrites the existing element's Prefix / After so the printer emits
 // it indented inside parens.
-func promoteToGrouped(imps *tree.Container[*tree.Import]) {
-	imps.Markers = tree.AddMarker(imps.Markers, tree.GroupedImport{
+func promoteToGrouped(imps *java.Container[*java.Import]) {
+	imps.Markers = java.AddMarker(imps.Markers, golang.GroupedImport{
 		Ident:  uuid.New(),
-		Before: tree.Space{Whitespace: " "}, // space between `import` and `(`
+		Before: java.Space{Whitespace: " "}, // space between `import` and `(`
 	})
 	if len(imps.Elements) == 0 {
 		return
@@ -307,15 +308,15 @@ func promoteToGrouped(imps *tree.Container[*tree.Import]) {
 	rp := &imps.Elements[0]
 	if rp.Element != nil {
 		imp := *rp.Element
-		imp.Prefix = tree.Space{Whitespace: "\n\t"}
-		if lit, ok := imp.Qualid.(*tree.Literal); ok {
+		imp.Prefix = java.Space{Whitespace: "\n\t"}
+		if lit, ok := imp.Qualid.(*java.Literal); ok {
 			cloned := *lit
-			cloned.Prefix = tree.EmptySpace
+			cloned.Prefix = java.EmptySpace
 			imp.Qualid = &cloned
 		}
 		rp.Element = &imp
 	}
-	rp.After = tree.Space{Whitespace: "\n"} // newline before `)`
+	rp.After = java.Space{Whitespace: "\n"} // newline before `)`
 }
 
 // RemoveFromBlock returns a copy of cu with imp deleted from the imports
@@ -326,15 +327,15 @@ func promoteToGrouped(imps *tree.Container[*tree.Import]) {
 // `RightPadded.After` field, which contains the newline before the next
 // element or the closing `)`) is donated to the new last element so the
 // block keeps its closing-paren-on-its-own-line shape.
-func RemoveFromBlock(cu *tree.CompilationUnit, imp *tree.Import) *tree.CompilationUnit {
+func RemoveFromBlock(cu *golang.CompilationUnit, imp *java.Import) *golang.CompilationUnit {
 	if cu == nil || cu.Imports == nil || imp == nil {
 		return cu
 	}
 	c := *cu
 	imps := *c.Imports
-	removedLastAfter := tree.Space{}
+	removedLastAfter := java.Space{}
 	removedWasLast := false
-	out := make([]tree.RightPadded[*tree.Import], 0, len(imps.Elements))
+	out := make([]java.RightPadded[*java.Import], 0, len(imps.Elements))
 	for i, rp := range imps.Elements {
 		if rp.Element != nil && rp.Element.ID == imp.ID {
 			if i == len(imps.Elements)-1 {
@@ -367,7 +368,7 @@ func RemoveFromBlock(cu *tree.CompilationUnit, imp *tree.Import) *tree.Compilati
 // `\n\t` indent inside an `import (...)` block) so the printer renders
 // it on its own line. When inserting into an empty block (no siblings),
 // a sensible default is used.
-func insertGrouped(elements []tree.RightPadded[*tree.Import], imp *tree.Import, modulePath string) []tree.RightPadded[*tree.Import] {
+func insertGrouped(elements []java.RightPadded[*java.Import], imp *java.Import, modulePath string) []java.RightPadded[*java.Import] {
 	target := GroupOf(ImportPath(imp), modulePath)
 	insertAt := len(elements)
 	for i, rp := range elements {
@@ -381,7 +382,7 @@ func insertGrouped(elements []tree.RightPadded[*tree.Import], imp *tree.Import, 
 		// Borrow the surrounding indent. If we're inserting in front,
 		// take the first sibling's prefix; otherwise the previous
 		// sibling's. Both reliably end with `\n\t` in a grouped block.
-		var donor *tree.Import
+		var donor *java.Import
 		if insertAt < len(elements) {
 			donor = elements[insertAt].Element
 		} else {
@@ -391,8 +392,8 @@ func insertGrouped(elements []tree.RightPadded[*tree.Import], imp *tree.Import, 
 			imp.Prefix = donor.Prefix
 		}
 	}
-	wrapped := tree.RightPadded[*tree.Import]{Element: imp}
-	out := make([]tree.RightPadded[*tree.Import], 0, len(elements)+1)
+	wrapped := java.RightPadded[*java.Import]{Element: imp}
+	out := make([]java.RightPadded[*java.Import], 0, len(elements)+1)
 	out = append(out, elements[:insertAt]...)
 	out = append(out, wrapped)
 	out = append(out, elements[insertAt:]...)
@@ -406,7 +407,7 @@ func insertGrouped(elements []tree.RightPadded[*tree.Import], imp *tree.Import, 
 		prev := &out[len(out)-2]
 		newTail := &out[len(out)-1]
 		newTail.After = prev.After
-		prev.After = tree.Space{}
+		prev.After = java.Space{}
 	}
 	return out
 }
@@ -414,15 +415,15 @@ func insertGrouped(elements []tree.RightPadded[*tree.Import], imp *tree.Import, 
 // NewImport builds an Import LST node for `import [alias] "path"`. Pass
 // alias=nil for a regular import, "_" for a blank import, "." for a dot
 // import, or any identifier name for an aliased import.
-func NewImport(path string, alias *string) *tree.Import {
-	imp := &tree.Import{
+func NewImport(path string, alias *string) *java.Import {
+	imp := &java.Import{
 		ID:     uuid.New(),
-		Qualid: &tree.Literal{ID: uuid.New(), Source: `"` + path + `"`, Value: path, Kind: tree.StringLiteral},
+		Qualid: &java.Literal{ID: uuid.New(), Source: `"` + path + `"`, Value: path, Kind: java.StringLiteral},
 	}
 	if alias != nil {
-		imp.Alias = &tree.LeftPadded[*tree.Identifier]{
-			Before: tree.Space{Whitespace: " "},
-			Element: &tree.Identifier{
+		imp.Alias = &java.LeftPadded[*java.Identifier]{
+			Before: java.Space{Whitespace: " "},
+			Element: &java.Identifier{
 				ID:   uuid.New(),
 				Name: *alias,
 			},
@@ -445,7 +446,7 @@ func NewImport(path string, alias *string) *tree.Import {
 //     This re-balances After so all but the new tail use the original
 //     between-element spacing and the new tail uses the original close-paren
 //     spacing.
-func SortByGroup(elements []tree.RightPadded[*tree.Import], modulePath string) []tree.RightPadded[*tree.Import] {
+func SortByGroup(elements []java.RightPadded[*java.Import], modulePath string) []java.RightPadded[*java.Import] {
 	if len(elements) <= 1 {
 		return elements
 	}
@@ -455,7 +456,7 @@ func SortByGroup(elements []tree.RightPadded[*tree.Import], modulePath string) [
 	// Re-derive the per-line indent prefix from the first non-blank-line
 	// element so the blank-line separator below can prepend a single \n
 	// to it. The smallest existing prefix that ends in \n + indent wins.
-	indentPrefix := tree.Space{Whitespace: "\n\t"}
+	indentPrefix := java.Space{Whitespace: "\n\t"}
 	for _, rp := range elements {
 		if rp.Element == nil {
 			continue
@@ -468,14 +469,14 @@ func SortByGroup(elements []tree.RightPadded[*tree.Import], modulePath string) [
 			canonical = canonical[1:]
 		}
 		if strings.HasPrefix(canonical, "\n") {
-			indentPrefix = tree.Space{Whitespace: canonical}
+			indentPrefix = java.Space{Whitespace: canonical}
 			break
 		}
 	}
 
 	type bucket struct {
 		group ImportGroup
-		items []tree.RightPadded[*tree.Import]
+		items []java.RightPadded[*java.Import]
 	}
 	buckets := []bucket{
 		{group: Stdlib},
@@ -493,8 +494,8 @@ func SortByGroup(elements []tree.RightPadded[*tree.Import], modulePath string) [
 		})
 	}
 
-	out := make([]tree.RightPadded[*tree.Import], 0, len(elements))
-	groupSeparatorPrefix := tree.Space{Whitespace: "\n" + indentPrefix.Whitespace}
+	out := make([]java.RightPadded[*java.Import], 0, len(elements))
+	groupSeparatorPrefix := java.Space{Whitespace: "\n" + indentPrefix.Whitespace}
 	for _, b := range buckets {
 		if len(b.items) == 0 {
 			continue
@@ -529,12 +530,12 @@ func SortByGroup(elements []tree.RightPadded[*tree.Import], modulePath string) [
 // from the cu (or its sibling go.mod, if attached). Returns "" when no
 // marker is present (which is fine — IsLocal handles empty modulePath
 // by reporting false uniformly).
-func FindModulePath(cu *tree.CompilationUnit) string {
+func FindModulePath(cu *golang.CompilationUnit) string {
 	if cu == nil {
 		return ""
 	}
 	for _, m := range cu.Markers.Entries {
-		if mrr, ok := m.(tree.GoResolutionResult); ok {
+		if mrr, ok := m.(golang.GoResolutionResult); ok {
 			return mrr.ModulePath
 		}
 	}

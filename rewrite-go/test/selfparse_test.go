@@ -56,7 +56,7 @@ func TestSelfParseGoVisitor(t *testing.T) {
 }
 
 func TestSelfParseJTree(t *testing.T) {
-	data, err := os.ReadFile("../pkg/tree/j.go")
+	data, err := os.ReadFile("../pkg/tree/java/j.go")
 	if err != nil {
 		t.Fatalf("failed to read file: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestSelfParseJTree(t *testing.T) {
 }
 
 func TestSelfParseGoTree(t *testing.T) {
-	data, err := os.ReadFile("../pkg/tree/go.go")
+	data, err := os.ReadFile("../pkg/tree/golang/go.go")
 	if err != nil {
 		t.Fatalf("failed to read file: %v", err)
 	}

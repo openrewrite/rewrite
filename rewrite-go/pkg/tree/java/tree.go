@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package tree
+package java
 
 import "github.com/google/uuid"
 
 // Tree is the root interface for all LST nodes.
-type Tree interface{ isTree() }
+type Tree interface{ IsTree() }
 
 // J is the interface for all Java-like AST nodes that carry a prefix
 // space. Mirrors org.openrewrite.java.tree.J — `getId`, `getPrefix`,
@@ -43,7 +43,7 @@ type Tree interface{ isTree() }
 // tree?" check.
 type J interface {
 	Tree
-	isJ()
+	IsJ()
 	GetID() uuid.UUID
 	WithID(uuid.UUID) J
 	GetPrefix() Space
@@ -53,17 +53,17 @@ type J interface {
 // Expression is a J node that evaluates to a value.
 type Expression interface {
 	J
-	isExpression()
+	IsExpression()
 }
 
 // Statement is a J node that can appear at statement level.
 type Statement interface {
 	J
-	isStatement()
+	IsStatement()
 }
 
 // SourceFile is a J node representing an entire source file.
 type SourceFile interface {
 	J
-	isSourceFile()
+	IsSourceFile()
 }

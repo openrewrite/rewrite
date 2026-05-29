@@ -20,18 +20,18 @@ import (
 	"testing"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
+	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 )
 
 func TestNamingService_RegisteredOnInit(t *testing.T) {
-	svc := recipe.Service[*golang.NamingService](nil)
+	svc := recipe.Service[*recipes.NamingService](nil)
 	if svc == nil {
 		t.Fatal("recipe.Service returned nil for *golang.NamingService")
 	}
 }
 
 func TestNamingService_ToPascalCase(t *testing.T) {
-	svc := &golang.NamingService{}
+	svc := &recipes.NamingService{}
 	cases := []struct{ in, want string }{
 		{"fooBar", "FooBar"},
 		{"foo", "Foo"},
@@ -48,7 +48,7 @@ func TestNamingService_ToPascalCase(t *testing.T) {
 }
 
 func TestNamingService_ToCamelCase(t *testing.T) {
-	svc := &golang.NamingService{}
+	svc := &recipes.NamingService{}
 	cases := []struct{ in, want string }{
 		{"FooBar", "fooBar"},
 		{"Foo", "foo"},
@@ -64,7 +64,7 @@ func TestNamingService_ToCamelCase(t *testing.T) {
 }
 
 func TestNamingService_IsExported(t *testing.T) {
-	svc := &golang.NamingService{}
+	svc := &recipes.NamingService{}
 	cases := []struct {
 		in   string
 		want bool
@@ -84,7 +84,7 @@ func TestNamingService_IsExported(t *testing.T) {
 }
 
 func TestNamingService_IsValidIdentifier(t *testing.T) {
-	svc := &golang.NamingService{}
+	svc := &recipes.NamingService{}
 	cases := []struct {
 		in   string
 		want bool
@@ -105,7 +105,7 @@ func TestNamingService_IsValidIdentifier(t *testing.T) {
 }
 
 func TestNamingService_IsPredeclared(t *testing.T) {
-	svc := &golang.NamingService{}
+	svc := &recipes.NamingService{}
 	for _, name := range []string{"int", "string", "true", "false", "nil", "iota", "len", "make", "new", "any", "comparable", "min", "max", "clear", "error"} {
 		if !svc.IsPredeclared(name) {
 			t.Errorf("IsPredeclared(%q) = false, want true", name)

@@ -20,14 +20,14 @@ import (
 	"reflect"
 
 	"github.com/google/uuid"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // extractID returns the ID of any AST node, polymorphically via the J
 // interface. Used as a list-element ID extractor in
 // `q.GetAndSendList(...)`. Non-J values return uuid.Nil.
 func extractID(v any) any {
-	if j, ok := v.(tree.J); ok {
+	if j, ok := v.(java.J); ok {
 		return j.GetID()
 	}
 	return uuid.Nil
@@ -46,7 +46,7 @@ func extractID(v any) any {
 // Used only by JavaReceiver.PreVisit. Returns t unchanged if the type
 // doesn't implement WithPrefix (defensive — every J-conformant type
 // does).
-func withPrefixViaReflection(t tree.Tree, prefix tree.Space) tree.Tree {
+func withPrefixViaReflection(t java.Tree, prefix java.Space) java.Tree {
 	rv := reflect.ValueOf(t)
 	m := rv.MethodByName("WithPrefix")
 	if !m.IsValid() {
@@ -56,14 +56,14 @@ func withPrefixViaReflection(t tree.Tree, prefix tree.Space) tree.Tree {
 	if len(results) == 0 {
 		return t
 	}
-	if r, ok := results[0].Interface().(tree.Tree); ok {
+	if r, ok := results[0].Interface().(java.Tree); ok {
 		return r
 	}
 	return t
 }
 
 // withMarkersViaReflection is the WithMarkers counterpart.
-func withMarkersViaReflection(t tree.Tree, markers tree.Markers) tree.Tree {
+func withMarkersViaReflection(t java.Tree, markers java.Markers) java.Tree {
 	rv := reflect.ValueOf(t)
 	m := rv.MethodByName("WithMarkers")
 	if !m.IsValid() {
@@ -73,7 +73,7 @@ func withMarkersViaReflection(t tree.Tree, markers tree.Markers) tree.Tree {
 	if len(results) == 0 {
 		return t
 	}
-	if r, ok := results[0].Interface().(tree.Tree); ok {
+	if r, ok := results[0].Interface().(java.Tree); ok {
 		return r
 	}
 	return t

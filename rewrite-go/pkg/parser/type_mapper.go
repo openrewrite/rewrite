@@ -21,27 +21,27 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // typeMapper converts go/types.Type to OpenRewrite JavaType equivalents.
 // It caches results to avoid creating duplicate type objects.
 type typeMapper struct {
-	cache map[types.Type]tree.JavaType
+	cache map[types.Type]java.JavaType
 	// namedCache deduplicates by *types.Named pointer, preventing infinite recursion
 	// when types reference each other.
-	namedCache map[*types.Named]*tree.JavaTypeClass
+	namedCache map[*types.Named]*java.JavaTypeClass
 }
 
 func newTypeMapper() *typeMapper {
 	return &typeMapper{
-		cache:      make(map[types.Type]tree.JavaType),
-		namedCache: make(map[*types.Named]*tree.JavaTypeClass),
+		cache:      make(map[types.Type]java.JavaType),
+		namedCache: make(map[*types.Named]*java.JavaTypeClass),
 	}
 }
 
 // mapType converts a go/types.Type to a tree.JavaType.
-func (m *typeMapper) mapType(t types.Type) tree.JavaType {
+func (m *typeMapper) mapType(t types.Type) java.JavaType {
 	if t == nil {
 		return nil
 	}
@@ -56,7 +56,7 @@ func (m *typeMapper) mapType(t types.Type) tree.JavaType {
 	return result
 }
 
-func (m *typeMapper) doMapType(t types.Type) tree.JavaType {
+func (m *typeMapper) doMapType(t types.Type) java.JavaType {
 	switch v := t.(type) {
 	case *types.Basic:
 		return m.mapBasic(v)
@@ -66,9 +66,9 @@ func (m *typeMapper) doMapType(t types.Type) tree.JavaType {
 		// Go pointers are transparent for refactoring — unwrap to pointee type
 		return m.mapType(v.Elem())
 	case *types.Slice:
-		return &tree.JavaTypeArray{ElemType: m.mapType(v.Elem())}
+		return &java.JavaTypeArray{ElemType: m.mapType(v.Elem())}
 	case *types.Array:
-		return &tree.JavaTypeArray{ElemType: m.mapType(v.Elem())}
+		return &java.JavaTypeArray{ElemType: m.mapType(v.Elem())}
 	case *types.Map:
 		return m.mapMapType(v)
 	case *types.Chan:
@@ -80,59 +80,59 @@ func (m *typeMapper) doMapType(t types.Type) tree.JavaType {
 	case *types.Struct:
 		return m.mapStruct(v, "")
 	case *types.TypeParam:
-		return &tree.JavaTypeGenericTypeVariable{
+		return &java.JavaTypeGenericTypeVariable{
 			Name:     v.Obj().Name(),
 			Variance: "INVARIANT",
 		}
 	case *types.Tuple:
 		// Tuples are decomposed by callers; should not appear here directly
-		return tree.UnknownType
+		return java.UnknownType
 	case *types.Union:
 		// Union types from type constraints
-		var bounds []tree.JavaType
+		var bounds []java.JavaType
 		for i := 0; i < v.Len(); i++ {
 			bounds = append(bounds, m.mapType(v.Term(i).Type()))
 		}
-		return &tree.JavaTypeIntersection{Bounds: bounds}
+		return &java.JavaTypeIntersection{Bounds: bounds}
 	default:
-		return tree.UnknownType
+		return java.UnknownType
 	}
 }
 
 // mapBasic maps Go basic types to JavaTypePrimitive.
-func (m *typeMapper) mapBasic(b *types.Basic) tree.JavaType {
+func (m *typeMapper) mapBasic(b *types.Basic) java.JavaType {
 	// Handle aliases by name first (Byte=Uint8, Rune=Int32 share constant values)
 	switch b.Name() {
 	case "byte":
-		return &tree.JavaTypePrimitive{Keyword: "byte"}
+		return &java.JavaTypePrimitive{Keyword: "byte"}
 	case "rune":
-		return &tree.JavaTypePrimitive{Keyword: "char"}
+		return &java.JavaTypePrimitive{Keyword: "char"}
 	}
 
 	switch b.Kind() {
 	case types.Bool, types.UntypedBool:
-		return &tree.JavaTypePrimitive{Keyword: "boolean"}
+		return &java.JavaTypePrimitive{Keyword: "boolean"}
 	case types.Int, types.Int8, types.Int16, types.Int32, types.Int64,
 		types.Uint, types.Uint8, types.Uint16, types.Uint32, types.Uint64,
 		types.Uintptr, types.UntypedInt:
-		return &tree.JavaTypePrimitive{Keyword: "int"}
+		return &java.JavaTypePrimitive{Keyword: "int"}
 	case types.Float32, types.Float64, types.UntypedFloat:
-		return &tree.JavaTypePrimitive{Keyword: "double"}
+		return &java.JavaTypePrimitive{Keyword: "double"}
 	case types.Complex64, types.Complex128, types.UntypedComplex:
-		return &tree.JavaTypePrimitive{Keyword: "double"}
+		return &java.JavaTypePrimitive{Keyword: "double"}
 	case types.String, types.UntypedString:
-		return &tree.JavaTypePrimitive{Keyword: "String"}
+		return &java.JavaTypePrimitive{Keyword: "String"}
 	case types.UntypedRune:
-		return &tree.JavaTypePrimitive{Keyword: "char"}
+		return &java.JavaTypePrimitive{Keyword: "char"}
 	case types.UntypedNil:
-		return &tree.JavaTypePrimitive{Keyword: "void"}
+		return &java.JavaTypePrimitive{Keyword: "void"}
 	default:
-		return tree.UnknownType
+		return java.UnknownType
 	}
 }
 
 // mapNamed maps a named type (struct, interface, etc.) to JavaTypeClass.
-func (m *typeMapper) mapNamed(named *types.Named) *tree.JavaTypeClass {
+func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
 	// Check for already-created class (handles circular references)
 	if cached, ok := m.namedCache[named]; ok {
 		return cached
@@ -141,7 +141,7 @@ func (m *typeMapper) mapNamed(named *types.Named) *tree.JavaTypeClass {
 	obj := named.Obj()
 	fqn := fullyQualifiedName(obj)
 
-	cls := &tree.JavaTypeClass{
+	cls := &java.JavaTypeClass{
 		FullyQualifiedName: fqn,
 		FlagsBitMap:        flagsForObject(obj),
 	}
@@ -190,8 +190,8 @@ func (m *typeMapper) mapNamed(named *types.Named) *tree.JavaTypeClass {
 }
 
 // mapSignature maps a function signature to JavaTypeMethod.
-func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringType *tree.JavaTypeClass) *tree.JavaTypeMethod {
-	mt := &tree.JavaTypeMethod{
+func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringType *java.JavaTypeClass) *java.JavaTypeMethod {
+	mt := &java.JavaTypeMethod{
 		Name:        name,
 		FlagsBitMap: flagsForExported(name),
 	}
@@ -202,16 +202,16 @@ func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringTy
 	// Return type
 	results := sig.Results()
 	if results.Len() == 0 {
-		mt.ReturnType = &tree.JavaTypePrimitive{Keyword: "void"}
+		mt.ReturnType = &java.JavaTypePrimitive{Keyword: "void"}
 	} else if results.Len() == 1 {
 		mt.ReturnType = m.mapType(results.At(0).Type())
 	} else {
-		tupleParams := make([]tree.JavaType, 0, results.Len())
+		tupleParams := make([]java.JavaType, 0, results.Len())
 		for i := 0; i < results.Len(); i++ {
 			tupleParams = append(tupleParams, m.mapType(results.At(i).Type()))
 		}
-		mt.ReturnType = &tree.JavaTypeParameterized{
-			Type: &tree.JavaTypeClass{
+		mt.ReturnType = &java.JavaTypeParameterized{
+			Type: &java.JavaTypeClass{
 				FullyQualifiedName: "go.tuple",
 				Kind:               "Class",
 			},
@@ -231,8 +231,8 @@ func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringTy
 }
 
 // mapInterface maps an anonymous interface type.
-func (m *typeMapper) mapInterface(iface *types.Interface, fqn string) *tree.JavaTypeClass {
-	cls := &tree.JavaTypeClass{
+func (m *typeMapper) mapInterface(iface *types.Interface, fqn string) *java.JavaTypeClass {
+	cls := &java.JavaTypeClass{
 		FullyQualifiedName: fqn,
 		Kind:               "Interface",
 	}
@@ -241,8 +241,8 @@ func (m *typeMapper) mapInterface(iface *types.Interface, fqn string) *tree.Java
 }
 
 // mapStruct maps an anonymous struct type.
-func (m *typeMapper) mapStruct(s *types.Struct, fqn string) *tree.JavaTypeClass {
-	cls := &tree.JavaTypeClass{
+func (m *typeMapper) mapStruct(s *types.Struct, fqn string) *java.JavaTypeClass {
+	cls := &java.JavaTypeClass{
 		FullyQualifiedName: fqn,
 		Kind:               "Class",
 	}
@@ -251,13 +251,13 @@ func (m *typeMapper) mapStruct(s *types.Struct, fqn string) *tree.JavaTypeClass 
 }
 
 // mapMapType maps a Go map type to a parameterized class.
-func (m *typeMapper) mapMapType(mt *types.Map) tree.JavaType {
-	return &tree.JavaTypeParameterized{
-		Type: &tree.JavaTypeClass{
+func (m *typeMapper) mapMapType(mt *types.Map) java.JavaType {
+	return &java.JavaTypeParameterized{
+		Type: &java.JavaTypeClass{
 			FullyQualifiedName: "map",
 			Kind:               "Class",
 		},
-		TypeParameters: []tree.JavaType{
+		TypeParameters: []java.JavaType{
 			m.mapType(mt.Key()),
 			m.mapType(mt.Elem()),
 		},
@@ -265,7 +265,7 @@ func (m *typeMapper) mapMapType(mt *types.Map) tree.JavaType {
 }
 
 // mapChanType maps a Go channel type to a parameterized class.
-func (m *typeMapper) mapChanType(ch *types.Chan) tree.JavaType {
+func (m *typeMapper) mapChanType(ch *types.Chan) java.JavaType {
 	var fqn string
 	switch ch.Dir() {
 	case types.SendRecv:
@@ -275,21 +275,21 @@ func (m *typeMapper) mapChanType(ch *types.Chan) tree.JavaType {
 	case types.RecvOnly:
 		fqn = "<-chan"
 	}
-	return &tree.JavaTypeParameterized{
-		Type: &tree.JavaTypeClass{
+	return &java.JavaTypeParameterized{
+		Type: &java.JavaTypeClass{
 			FullyQualifiedName: fqn,
 			Kind:               "Class",
 		},
-		TypeParameters: []tree.JavaType{m.mapType(ch.Elem())},
+		TypeParameters: []java.JavaType{m.mapType(ch.Elem())},
 	}
 }
 
 // structMembers extracts fields from a struct as JavaTypeVariable.
-func (m *typeMapper) structMembers(s *types.Struct) []*tree.JavaTypeVariable {
-	var members []*tree.JavaTypeVariable
+func (m *typeMapper) structMembers(s *types.Struct) []*java.JavaTypeVariable {
+	var members []*java.JavaTypeVariable
 	for i := 0; i < s.NumFields(); i++ {
 		f := s.Field(i)
-		members = append(members, &tree.JavaTypeVariable{
+		members = append(members, &java.JavaTypeVariable{
 			Name:        f.Name(),
 			Type:        m.mapType(f.Type()),
 			Annotations: nil,
@@ -299,8 +299,8 @@ func (m *typeMapper) structMembers(s *types.Struct) []*tree.JavaTypeVariable {
 }
 
 // interfaceMethods extracts methods from an interface as JavaTypeMethod.
-func (m *typeMapper) interfaceMethods(iface *types.Interface) []*tree.JavaTypeMethod {
-	var methods []*tree.JavaTypeMethod
+func (m *typeMapper) interfaceMethods(iface *types.Interface) []*java.JavaTypeMethod {
+	var methods []*java.JavaTypeMethod
 	for i := 0; i < iface.NumMethods(); i++ {
 		method := iface.Method(i)
 		sig := method.Type().(*types.Signature)
@@ -336,7 +336,7 @@ func flagsForExported(name string) int64 {
 }
 
 // mapObject maps a types.Object (from Defs/Uses) to a JavaType for identifiers.
-func (m *typeMapper) mapObject(obj types.Object) tree.JavaType {
+func (m *typeMapper) mapObject(obj types.Object) java.JavaType {
 	if obj == nil {
 		return nil
 	}
@@ -358,7 +358,7 @@ func (m *typeMapper) mapObject(obj types.Object) tree.JavaType {
 		// Map package aliases to "Class" with the import path as the FQN;
 		// recipes can recognize package references by the FQN containing
 		// path separators (e.g. "github.com/x/y").
-		return &tree.JavaTypeClass{
+		return &java.JavaTypeClass{
 			Kind:               "Class",
 			FullyQualifiedName: imported.Path(),
 		}
@@ -367,14 +367,14 @@ func (m *typeMapper) mapObject(obj types.Object) tree.JavaType {
 }
 
 // mapObjectToVariable maps a types.Object to a JavaTypeVariable (for field-like identifiers).
-func (m *typeMapper) mapObjectToVariable(obj types.Object) *tree.JavaTypeVariable {
+func (m *typeMapper) mapObjectToVariable(obj types.Object) *java.JavaTypeVariable {
 	if obj == nil {
 		return nil
 	}
 	switch o := obj.(type) {
 	case *types.Var:
 		ownerType := m.ownerType(o)
-		return &tree.JavaTypeVariable{
+		return &java.JavaTypeVariable{
 			Name:  o.Name(),
 			Owner: ownerType,
 			Type:  m.mapType(o.Type()),
@@ -385,7 +385,7 @@ func (m *typeMapper) mapObjectToVariable(obj types.Object) *tree.JavaTypeVariabl
 }
 
 // ownerType returns the JavaType of the object's owner (declaring type).
-func (m *typeMapper) ownerType(v *types.Var) tree.JavaType {
+func (m *typeMapper) ownerType(v *types.Var) java.JavaType {
 	if !v.IsField() {
 		return nil
 	}
@@ -396,13 +396,13 @@ func (m *typeMapper) ownerType(v *types.Var) tree.JavaType {
 }
 
 // mapMethodObject maps a types.Func to a JavaTypeMethod.
-func (m *typeMapper) mapMethodObject(fn *types.Func) *tree.JavaTypeMethod {
+func (m *typeMapper) mapMethodObject(fn *types.Func) *java.JavaTypeMethod {
 	if fn == nil {
 		return nil
 	}
 	sig := fn.Type().(*types.Signature)
 
-	var declaringType *tree.JavaTypeClass
+	var declaringType *java.JavaTypeClass
 	recv := sig.Recv()
 	if recv != nil {
 		// Method receiver — the declaring type is the receiver's type
@@ -418,7 +418,7 @@ func (m *typeMapper) mapMethodObject(fn *types.Func) *tree.JavaTypeMethod {
 		// Package-level function
 		pkg := fn.Pkg()
 		if pkg != nil {
-			declaringType = &tree.JavaTypeClass{
+			declaringType = &java.JavaTypeClass{
 				FullyQualifiedName: pkg.Path(),
 				Kind:               "Class",
 			}
@@ -429,7 +429,7 @@ func (m *typeMapper) mapMethodObject(fn *types.Func) *tree.JavaTypeMethod {
 }
 
 // mapSelection maps a types.Selection (field or method selection via ".") to a JavaType.
-func (m *typeMapper) mapSelection(sel *types.Selection) tree.JavaType {
+func (m *typeMapper) mapSelection(sel *types.Selection) java.JavaType {
 	if sel == nil {
 		return nil
 	}
@@ -437,7 +437,7 @@ func (m *typeMapper) mapSelection(sel *types.Selection) tree.JavaType {
 }
 
 // mapSelectionToMethod maps a method selection to a JavaTypeMethod.
-func (m *typeMapper) mapSelectionToMethod(sel *types.Selection) *tree.JavaTypeMethod {
+func (m *typeMapper) mapSelectionToMethod(sel *types.Selection) *java.JavaTypeMethod {
 	if sel == nil || sel.Kind() != types.MethodVal {
 		return nil
 	}

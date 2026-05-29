@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -40,16 +40,16 @@ type beforeSpec struct {
 }
 
 type templateRecipeConfig struct {
-	name        string
-	displayName string
-	description string
-	tags        []string
-	befores     []beforeSpec
-	afterCode   string
+	name         string
+	displayName  string
+	description  string
+	tags         []string
+	befores      []beforeSpec
+	afterCode    string
 	afterImports []string
-	afterKind   *ScaffoldKind
-	captures    []*Capture
-	kind        *ScaffoldKind // global override
+	afterKind    *ScaffoldKind
+	captures     []*Capture
+	kind         *ScaffoldKind // global override
 }
 
 // RecipeName sets the fully qualified recipe name.
@@ -234,13 +234,13 @@ func newTemplateRecipeVisitor(befores []*GoPattern, after *GoTemplate) *template
 	return v
 }
 
-func (v *templateRecipeVisitor) Visit(t tree.Tree, p any) tree.Tree {
+func (v *templateRecipeVisitor) Visit(t java.Tree, p any) java.Tree {
 	result := v.GoVisitor.Visit(t, p)
 	if result == nil {
 		return nil
 	}
 
-	j, ok := result.(tree.J)
+	j, ok := result.(java.J)
 	if !ok {
 		return result
 	}
@@ -268,14 +268,14 @@ type builtTemplateRecipe struct {
 	editor      recipe.TreeVisitor
 }
 
-func (r *builtTemplateRecipe) Name() string        { return r.name }
-func (r *builtTemplateRecipe) DisplayName() string  { return r.displayName }
-func (r *builtTemplateRecipe) Description() string  { return r.description }
-func (r *builtTemplateRecipe) Tags() []string       { return r.tags }
+func (r *builtTemplateRecipe) Name() string                                { return r.name }
+func (r *builtTemplateRecipe) DisplayName() string                         { return r.displayName }
+func (r *builtTemplateRecipe) Description() string                         { return r.description }
+func (r *builtTemplateRecipe) Tags() []string                              { return r.tags }
 func (r *builtTemplateRecipe) EstimatedEffortPerOccurrence() time.Duration { return 5 * time.Minute }
-func (r *builtTemplateRecipe) Editor() recipe.TreeVisitor  { return r.editor }
-func (r *builtTemplateRecipe) RecipeList() []recipe.Recipe  { return nil }
-func (r *builtTemplateRecipe) Options() []recipe.OptionDescriptor { return nil }
+func (r *builtTemplateRecipe) Editor() recipe.TreeVisitor                  { return r.editor }
+func (r *builtTemplateRecipe) RecipeList() []recipe.Recipe                 { return nil }
+func (r *builtTemplateRecipe) Options() []recipe.OptionDescriptor          { return nil }
 func (r *builtTemplateRecipe) DataTables() []recipe.DataTableDescriptor    { return nil }
 func (r *builtTemplateRecipe) Maintainers() []recipe.Maintainer            { return nil }
 func (r *builtTemplateRecipe) Contributors() []recipe.Contributor          { return nil }

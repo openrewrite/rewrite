@@ -22,7 +22,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -33,17 +33,17 @@ import (
 
 // newJSONTagAnnotation builds an Annotation that represents a single
 // struct-tag pair `json:"name"` for the test fixtures below.
-func newJSONTagAnnotation(key, value string) *tree.Annotation {
-	return &tree.Annotation{
+func newJSONTagAnnotation(key, value string) *java.Annotation {
+	return &java.Annotation{
 		ID:             uuid.New(),
-		AnnotationType: &tree.Identifier{ID: uuid.New(), Name: key},
-		Arguments: &tree.Container[tree.Expression]{
-			Elements: []tree.RightPadded[tree.Expression]{
-				{Element: &tree.Literal{
+		AnnotationType: &java.Identifier{ID: uuid.New(), Name: key},
+		Arguments: &java.Container[java.Expression]{
+			Elements: []java.RightPadded[java.Expression]{
+				{Element: &java.Literal{
 					ID:     uuid.New(),
 					Source: `"` + value + `"`,
 					Value:  value,
-					Kind:   tree.StringLiteral,
+					Kind:   java.StringLiteral,
 				}},
 			},
 		},
@@ -62,9 +62,9 @@ func TestAnnotation_PrintsBasicTagShape(t *testing.T) {
 func TestAnnotation_PrintsWithoutArguments(t *testing.T) {
 	// An Annotation with nil Arguments should print just the type
 	// expression (mirrors Java's bare `@Override`-style annotation).
-	ann := &tree.Annotation{
+	ann := &java.Annotation{
 		ID:             uuid.New(),
-		AnnotationType: &tree.Identifier{ID: uuid.New(), Name: "go:noinline"},
+		AnnotationType: &java.Identifier{ID: uuid.New(), Name: "go:noinline"},
 	}
 	out := printer.Print(ann)
 	want := `go:noinline`
@@ -77,7 +77,7 @@ func TestAnnotation_PrintsPrefixWhitespace(t *testing.T) {
 	// The leading space (between the previous syntax and the annotation)
 	// lives on the Annotation's Prefix.
 	ann := newJSONTagAnnotation("validate", "required")
-	ann.Prefix = tree.Space{Whitespace: " "}
+	ann.Prefix = java.Space{Whitespace: " "}
 	out := printer.Print(ann)
 	want := ` validate:"required"`
 	if out != want {
@@ -89,14 +89,14 @@ func TestAnnotation_VisitorRoundtripIdentity(t *testing.T) {
 	// A no-op visitor over an Annotation should produce a tree whose
 	// printed form is identical to the input's.
 	ann := newJSONTagAnnotation("json", "user_id")
-	ann.Prefix = tree.Space{Whitespace: " "}
+	ann.Prefix = java.Space{Whitespace: " "}
 
 	v := visitor.Init(&visitor.GoVisitor{})
 	out := v.Visit(ann, nil)
 	if out == nil {
 		t.Fatal("visitor returned nil")
 	}
-	got := printer.Print(out.(tree.Tree))
+	got := printer.Print(out.(java.Tree))
 	want := ` json:"user_id"`
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
@@ -108,7 +108,7 @@ func TestAnnotation_VisitorReachesAnnotationType(t *testing.T) {
 	// confirms the visitor recurses into the type child.
 	ann := newJSONTagAnnotation("json", "x")
 	v := visitor.Init(&renamingVisitor{from: "json", to: "yaml"})
-	out := v.Visit(ann, nil).(*tree.Annotation)
+	out := v.Visit(ann, nil).(*java.Annotation)
 
 	got := printer.Print(out)
 	want := `yaml:"x"`
@@ -122,7 +122,7 @@ func TestAnnotation_VisitorReachesArguments(t *testing.T) {
 	// confirms the visitor recurses into the arguments container.
 	ann := newJSONTagAnnotation("json", "x")
 	v := visitor.Init(&literalRewriter{want: "x", repl: "y"})
-	out := v.Visit(ann, nil).(*tree.Annotation)
+	out := v.Visit(ann, nil).(*java.Annotation)
 
 	got := printer.Print(out)
 	want := `json:"y"`
@@ -136,8 +136,8 @@ type renamingVisitor struct {
 	from, to string
 }
 
-func (v *renamingVisitor) VisitIdentifier(id *tree.Identifier, p any) tree.J {
-	id = v.GoVisitor.VisitIdentifier(id, p).(*tree.Identifier)
+func (v *renamingVisitor) VisitIdentifier(id *java.Identifier, p any) java.J {
+	id = v.GoVisitor.VisitIdentifier(id, p).(*java.Identifier)
 	if id.Name == v.from {
 		c := *id
 		c.Name = v.to
@@ -151,8 +151,8 @@ type literalRewriter struct {
 	want, repl string
 }
 
-func (v *literalRewriter) VisitLiteral(lit *tree.Literal, p any) tree.J {
-	lit = v.GoVisitor.VisitLiteral(lit, p).(*tree.Literal)
+func (v *literalRewriter) VisitLiteral(lit *java.Literal, p any) java.J {
+	lit = v.GoVisitor.VisitLiteral(lit, p).(*java.Literal)
 	if s, ok := lit.Value.(string); ok && s == v.want {
 		c := *lit
 		c.Value = v.repl

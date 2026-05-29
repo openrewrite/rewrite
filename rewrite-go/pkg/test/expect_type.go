@@ -19,7 +19,7 @@ package test
 import (
 	"testing"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -30,7 +30,7 @@ import (
 //
 // Fails the test if no matching identifier is found, if its Type is nil,
 // or if the type does not implement tree.FullyQualified.
-func ExpectType(t *testing.T, root tree.Tree, name string, expectedFQN string) {
+func ExpectType(t *testing.T, root java.Tree, name string, expectedFQN string) {
 	t.Helper()
 	c := visitor.Init(&identifierTypeCollector{name: name})
 	c.Visit(root, nil)
@@ -40,7 +40,7 @@ func ExpectType(t *testing.T, root tree.Tree, name string, expectedFQN string) {
 	if c.typ == nil {
 		t.Fatalf("ExpectType(%q): identifier has nil Type", name)
 	}
-	fq, ok := c.typ.(tree.FullyQualified)
+	fq, ok := c.typ.(java.FullyQualified)
 	if !ok {
 		t.Fatalf("ExpectType(%q): identifier Type is %T, want FullyQualified", name, c.typ)
 	}
@@ -52,7 +52,7 @@ func ExpectType(t *testing.T, root tree.Tree, name string, expectedFQN string) {
 // ExpectPrimitiveType asserts that the first identifier named `name` has a
 // JavaTypePrimitive whose Keyword matches expectedKeyword (e.g. "int",
 // "String", "bool"). Mirrors ExpectType for primitive type attribution.
-func ExpectPrimitiveType(t *testing.T, root tree.Tree, name string, expectedKeyword string) {
+func ExpectPrimitiveType(t *testing.T, root java.Tree, name string, expectedKeyword string) {
 	t.Helper()
 	c := visitor.Init(&identifierTypeCollector{name: name})
 	c.Visit(root, nil)
@@ -62,7 +62,7 @@ func ExpectPrimitiveType(t *testing.T, root tree.Tree, name string, expectedKeyw
 	if c.typ == nil {
 		t.Fatalf("ExpectPrimitiveType(%q): identifier has nil Type", name)
 	}
-	prim, ok := c.typ.(*tree.JavaTypePrimitive)
+	prim, ok := c.typ.(*java.JavaTypePrimitive)
 	if !ok {
 		t.Fatalf("ExpectPrimitiveType(%q): identifier Type is %T, want *JavaTypePrimitive", name, c.typ)
 	}
@@ -80,7 +80,7 @@ func ExpectPrimitiveType(t *testing.T, root tree.Tree, name string, expectedKeyw
 // of the owning package (e.g. "fmt" for fmt.Println). For methods declared
 // in the file under test, it is the package's full path
 // (e.g. "main.Point" for a method on Point in package main).
-func ExpectMethodType(t *testing.T, root tree.Tree, name string, expectedDeclaringFQN string) {
+func ExpectMethodType(t *testing.T, root java.Tree, name string, expectedDeclaringFQN string) {
 	t.Helper()
 	c := visitor.Init(&methodTypeCollector{name: name})
 	c.Visit(root, nil)
@@ -102,10 +102,10 @@ type identifierTypeCollector struct {
 	visitor.GoVisitor
 	name  string
 	found bool
-	typ   tree.JavaType
+	typ   java.JavaType
 }
 
-func (v *identifierTypeCollector) VisitIdentifier(ident *tree.Identifier, p any) tree.J {
+func (v *identifierTypeCollector) VisitIdentifier(ident *java.Identifier, p any) java.J {
 	if !v.found && ident.Name == v.name {
 		v.found = true
 		v.typ = ident.Type
@@ -117,10 +117,10 @@ type methodTypeCollector struct {
 	visitor.GoVisitor
 	name       string
 	found      bool
-	methodType *tree.JavaTypeMethod
+	methodType *java.JavaTypeMethod
 }
 
-func (v *methodTypeCollector) VisitMethodInvocation(mi *tree.MethodInvocation, p any) tree.J {
+func (v *methodTypeCollector) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
 	if !v.found && mi.Name != nil && mi.Name.Name == v.name {
 		v.found = true
 		v.methodType = mi.MethodType
@@ -128,7 +128,7 @@ func (v *methodTypeCollector) VisitMethodInvocation(mi *tree.MethodInvocation, p
 	return v.GoVisitor.VisitMethodInvocation(mi, p)
 }
 
-func (v *methodTypeCollector) VisitMethodDeclaration(md *tree.MethodDeclaration, p any) tree.J {
+func (v *methodTypeCollector) VisitMethodDeclaration(md *java.MethodDeclaration, p any) java.J {
 	if !v.found && md.Name != nil && md.Name.Name == v.name {
 		v.found = true
 		v.methodType = md.MethodType
