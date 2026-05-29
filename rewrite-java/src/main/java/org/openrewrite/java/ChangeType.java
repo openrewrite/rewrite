@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -56,6 +57,18 @@ public class ChangeType extends Recipe {
     @Nullable
     Boolean ignoreDefinition;
 
+    @Option(displayName = "Ecosystem",
+            description = "Restrict the type change to source files of a given ecosystem: `jvm` (Java, Kotlin, " +
+                    "Groovy), `python`, or `javascript`. Python and JavaScript reuse the Java LST model (their " +
+                    "compilation units implement `JavaSourceFile`), so without this filter a change targeting one " +
+                    "ecosystem still scans the others' source files unnecessarily. Reference-based files (such as " +
+                    "XML and properties) are always processed because they may carry type references. When `null` " +
+                    "(the default), the change is applied to all source files.",
+            valid = {"jvm", "python", "javascript"},
+            required = false)
+    @Nullable
+    String ecosystem;
+
     String displayName = "Change type";
 
     @Override
@@ -82,6 +95,46 @@ public class ChangeType extends Recipe {
 
     String description = "Change a given type to another.";
 
+    public ChangeType(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
+        this(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition, null);
+    }
+
+    @JsonCreator
+    public ChangeType(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition, @Nullable String ecosystem) {
+        this.oldFullyQualifiedTypeName = oldFullyQualifiedTypeName;
+        this.newFullyQualifiedTypeName = newFullyQualifiedTypeName;
+        this.ignoreDefinition = ignoreDefinition;
+        this.ecosystem = ecosystem;
+    }
+
+    private boolean skipForEcosystem(JavaSourceFile cu) {
+        if (ecosystem == null || ecosystem.isEmpty()) {
+            return false;
+        }
+        String impl = cu.getClass().getName();
+        String fileEcosystem;
+        if (impl.startsWith("org.openrewrite.python.")) {
+            fileEcosystem = "python";
+        } else if (impl.startsWith("org.openrewrite.javascript.")) {
+            fileEcosystem = "javascript";
+        } else {
+            // java, kotlin, groovy, scala, ...
+            fileEcosystem = "jvm";
+        }
+        return !normalizeEcosystem(ecosystem).equals(fileEcosystem);
+    }
+
+    private static String normalizeEcosystem(String ecosystem) {
+        switch (ecosystem.toLowerCase()) {
+            case "js":
+                return "javascript";
+            case "py":
+                return "python";
+            default:
+                return ecosystem.toLowerCase();
+        }
+    }
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TreeVisitor<?, ExecutionContext> condition = new TreeVisitor<Tree, ExecutionContext>() {
@@ -90,6 +143,9 @@ public class ChangeType extends Recipe {
                 stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
+                    if (skipForEcosystem(cu)) {
+                        return tree;
+                    }
                     if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
                     }

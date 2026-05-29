@@ -57,6 +57,24 @@ class ChangeTypeIntegTest implements RewriteTest {
         );
     }
 
+    @Test
+    void skippedWhenEcosystemIsJvm() {
+        // Python compilation units implement JavaSourceFile, so ChangeType would otherwise traverse them.
+        // Scoping the change to the "jvm" ecosystem must skip Python source files entirely (leaving them
+        // unchanged and avoiding the cost of scanning them).
+        rewriteRun(
+          spec -> spec
+            .typeValidationOptions(TypeValidation.none())
+            .recipe(new ChangeType("str", "String", false, "jvm")),
+          python(
+            """
+              result = "hello".upper()
+              """
+            // unchanged: skipped because this is a Python (non-JVM) source file
+          )
+        );
+    }
+
     // Note: ChangeType on module references (like os.path -> pathlib) requires
     // additional work to handle Python's module import structure properly.
     // Currently ChangeType works on type attribution but may not work on

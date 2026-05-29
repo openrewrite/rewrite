@@ -2648,6 +2648,29 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void appliesToJavaFilesWhenEcosystemIsJvm() {
+        // A Java source file is in the "jvm" ecosystem, so a jvm-scoped change still applies.
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.lang.Integer", "java.lang.Long", true, "jvm")),
+          java(
+            "public class ThinkPositive { private Integer fred = 1;}",
+            "public class ThinkPositive { private Long fred = 1;}"
+          )
+        );
+    }
+
+    @Test
+    void skipsJavaFilesWhenEcosystemIsNonJvm() {
+        // Scoping to a non-JVM ecosystem must skip JVM (Java) source files entirely.
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.lang.Integer", "java.lang.Long", true, "python")),
+          java(
+            "public class ThinkPositive { private Integer fred = 1;}"
+          )
+        );
+    }
+
+    @Test
     void changeTypeAddsExplicitImportWhenStarImportsWouldBeAmbiguous() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("a.Ambiguous", "b.Ambiguous", true))
