@@ -22,14 +22,15 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // TestWhitespaceValidationService_RegisteredOnInit verifies that
 // importing pkg/recipe/golang registers the service.
 func TestWhitespaceValidationService_RegisteredOnInit(t *testing.T) {
-	svc := recipe.Service[*golang.WhitespaceValidationService](nil)
+	svc := recipe.Service[*recipes.WhitespaceValidationService](nil)
 	if svc == nil {
 		t.Fatal("recipe.Service returned nil for *golang.WhitespaceValidationService")
 	}
@@ -44,7 +45,7 @@ func TestWhitespaceValidationService_CleanTree(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	svc := &golang.WhitespaceValidationService{}
+	svc := &recipes.WhitespaceValidationService{}
 	if errs := svc.Validate(cu); len(errs) != 0 {
 		t.Fatalf("expected clean tree to validate, got %d errs:\n%s", len(errs), strings.Join(errs, "\n"))
 	}
@@ -57,10 +58,10 @@ func TestWhitespaceValidationService_CleanTree(t *testing.T) {
 // containing a Space whose Whitespace contains source text that should
 // have been parsed into a node. Verifies the validator flags it.
 func TestWhitespaceValidationService_DetectsCorruption(t *testing.T) {
-	cu := &tree.CompilationUnit{
-		Prefix: tree.Space{Whitespace: "package main"}, // non-whitespace stowed away
+	cu := &golang.CompilationUnit{
+		Prefix: java.Space{Whitespace: "package main"}, // non-whitespace stowed away
 	}
-	svc := &golang.WhitespaceValidationService{}
+	svc := &recipes.WhitespaceValidationService{}
 	errs := svc.Validate(cu)
 	if len(errs) == 0 {
 		t.Fatal("expected validator to flag non-whitespace in Space.Whitespace")
@@ -77,12 +78,12 @@ func TestWhitespaceValidationService_DetectsCorruption(t *testing.T) {
 // whose Text doesn't begin with `//` or `/*` — the printer would emit
 // it raw, so the validator must catch it.
 func TestWhitespaceValidationService_DetectsBadComment(t *testing.T) {
-	cu := &tree.CompilationUnit{
-		Prefix: tree.Space{
-			Comments: []tree.Comment{{Text: "this is not a comment", Suffix: "\n"}},
+	cu := &golang.CompilationUnit{
+		Prefix: java.Space{
+			Comments: []java.Comment{{Text: "this is not a comment", Suffix: "\n"}},
 		},
 	}
-	svc := &golang.WhitespaceValidationService{}
+	svc := &recipes.WhitespaceValidationService{}
 	errs := svc.Validate(cu)
 	if len(errs) == 0 {
 		t.Fatal("expected validator to flag a non-comment Text")

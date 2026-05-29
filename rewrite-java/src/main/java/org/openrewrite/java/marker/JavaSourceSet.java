@@ -23,6 +23,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.PathUtils;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -139,6 +140,69 @@ public class JavaSourceSet implements SourceSet {
             return ((ClasspathIndex) classpath).typesInPackage(packageName);
         }
         return classpath.stream().filter(fq -> packageName.equals(fq.getPackageName()));
+    }
+
+    /**
+     * Registry of project names whose dependencies have been mutated by an earlier recipe in
+     * the current run, leaving their {@link #getClasspath() classpath} potentially stale. The
+     * {@code org.openrewrite.maven.*} prefix is required by
+     * {@link org.openrewrite.CursorValidatingExecutionContextView}'s allowlist for cross-recipe
+     * ExecutionContext mutation; the registry itself is not Maven-specific.
+     */
+    private static final String DIRTY_CTX_KEY = "org.openrewrite.maven.dirtyJavaProjects";
+
+    /**
+     * @return the set of project names that have been marked dirty in the current recipe run,
+     * or {@code null} when no project has been marked dirty. Returned set is the internal
+     * registry; callers must not mutate it.
+     */
+    public static @Nullable Set<String> dirtyProjects(ExecutionContext ctx) {
+        return ctx.getMessage(DIRTY_CTX_KEY);
+    }
+
+    /**
+     * Whether a source file's classpath may be stale because a dependency-mutating recipe ran
+     * earlier in this recipe run. When {@code sourceFile} carries a {@link ProjectIdentity}
+     * marker the check is project-scoped; otherwise it falls back to "any project in the run is
+     * dirty" so ambiguity-sensitive decisions still take the safe path conservatively.
+     * <p>
+     * This is a static accessor (not an instance method) so that callers which can't find a
+     * {@link JavaSourceSet} on the source file can still consult the registry — the dirty signal
+     * is project-scoped, not source-set-scoped.
+     */
+    public static boolean isDirty(ExecutionContext ctx, @Nullable SourceFile sourceFile) {
+        Set<String> dirty = ctx.getMessage(DIRTY_CTX_KEY);
+        if (dirty == null || dirty.isEmpty()) {
+            return false;
+        }
+        if (sourceFile == null) {
+            return true;
+        }
+        return sourceFile.getMarkers().findFirst(ProjectIdentity.class)
+                .map(p -> dirty.contains(p.getProjectName()))
+                .orElse(true);
+    }
+
+    /**
+     * Producer-side: mark {@code projectName} as having had its classpath invalidated by a
+     * dependency mutation earlier in this recipe run. Ambiguity-sensitive consumer recipes read
+     * the registry via {@link #isDirty(ExecutionContext, SourceFile)} and take the safe path
+     * when the project is dirty.
+     */
+    public static void markDirty(ExecutionContext ctx, String projectName) {
+        ctx.putMessageInSet(DIRTY_CTX_KEY, projectName);
+    }
+
+    /**
+     * Producer-side: mark the project identified by {@code sourceFile}'s {@link ProjectIdentity}
+     * marker as dirty. No-op when {@code sourceFile} is {@code null} or has no project marker.
+     */
+    public static void markDirty(ExecutionContext ctx, @Nullable SourceFile sourceFile) {
+        if (sourceFile == null) {
+            return;
+        }
+        sourceFile.getMarkers().findFirst(ProjectIdentity.class)
+                .ifPresent(p -> markDirty(ctx, p.getProjectName()));
     }
 
     /**

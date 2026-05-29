@@ -55,9 +55,29 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     private final Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
 
+    private final List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
+    // Index of the next YAML loader to drain into the shared maps via progressive scan.
+    // Each loader is parsed at most once; subsequent loadRecipe calls hit the shared
+    // recipes map directly for any already-scanned name.
+    private int yamlScanIndex;
+    // Recipe descriptors require cross-loader recipe references to resolve, so they
+    // can only be computed after every YAML loader has been drained. This flag
+    // guards against duplicate descriptor extraction.
+    private boolean recipeDescriptorsExtracted;
+
     private final ClassLoader classLoader;
     private final RecipeLoader recipeLoader;
-    private @Nullable Runnable performScan;
+
+    // Scanning is split into independently triggerable phases so single-recipe
+    // activation pays only for what it needs:
+    //  - performClassScan: walks class bytecode to find Recipe subclasses and
+    //    instantiate them (most expensive — ~1 s for a large bundle).
+    //  - performYamlListing: enumerates META-INF/rewrite/*.yml and constructs
+    //    one YamlResourceLoader per file (cheap; no YAML parsing yet).
+    // YAML parsing happens progressively in loadRecipe — one file at a time —
+    // until either the requested recipe is found or all loaders are drained.
+    private @Nullable Runnable performClassScan;
+    private @Nullable Runnable performYamlListing;
 
     /**
      * Construct a ClasspathScanningLoader that scans the runtime classpath of the current java process for recipes,
@@ -73,7 +93,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
         for (String pkg : acceptPackages) {
             packagePrefixes.add(pkg.replace('.', '/'));
         }
-        this.performScan = () -> {
+        this.performClassScan = () -> {
             Map<String, String> superclassMap = buildSuperclassMapFromClassLoader(classLoader);
             if (!packagePrefixes.isEmpty()) {
                 superclassMap.keySet().removeIf(name -> {
@@ -87,9 +107,8 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 });
             }
             configureRecipesAndStyles(superclassMap, classLoader);
-            List<YamlResource> yaml = listYamlResourcesFromClassLoader(classLoader);
-            scanYaml(yaml, properties, emptyList(), null);
         };
+        this.performYamlListing = () -> listYamlLoaders(listYamlResourcesFromClassLoader(classLoader), properties, emptyList(), null);
     }
 
     /**
@@ -101,10 +120,8 @@ public class ClasspathScanningLoader implements ResourceLoader {
     public ClasspathScanningLoader(@Nullable Properties properties, ClassLoader classLoader) {
         this.classLoader = classLoader;
         this.recipeLoader = new RecipeLoader(classLoader);
-        this.performScan = () -> {
-            configureRecipesAndStyles(buildSuperclassMapFromClassLoader(classLoader), classLoader);
-            scanYaml(listYamlResourcesFromClassLoader(classLoader), properties, emptyList(), classLoader);
-        };
+        this.performClassScan = () -> configureRecipesAndStyles(buildSuperclassMapFromClassLoader(classLoader), classLoader);
+        this.performYamlListing = () -> listYamlLoaders(listYamlResourcesFromClassLoader(classLoader), properties, emptyList(), classLoader);
     }
 
     /**
@@ -124,10 +141,8 @@ public class ClasspathScanningLoader implements ResourceLoader {
         this.classLoader = classLoader;
         this.recipeLoader = new RecipeLoader(classLoader);
 
-        this.performScan = () -> {
-            configureRecipesAndStyles(sharedSuperclassMap.scan(jar), classLoader);
-            scanYaml(listYamlResourcesFromPath(jar), properties, dependencyResourceLoaders, classLoader);
-        };
+        this.performClassScan = () -> configureRecipesAndStyles(sharedSuperclassMap.scan(jar), classLoader);
+        this.performYamlListing = () -> listYamlLoaders(listYamlResourcesFromPath(jar), properties, dependencyResourceLoaders, classLoader);
     }
 
     /**
@@ -524,31 +539,79 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     /**
+     * Convenience used by the {@code onlyYaml} factories that bypass the lazy scan
+     * machinery. Lists every YAML loader and drains them all into the shared maps.
+     * <p>
      * This must be called _after_ configureRecipesAndStyles or the descriptors of declarative recipes will be missing
      * any non-declarative recipes they depend on that would be discovered by class scanning.
      */
     private void scanYaml(List<YamlResource> yamlResources, @Nullable Properties properties,
                           Collection<? extends ResourceLoader> dependencyResourceLoaders,
                           @Nullable ClassLoader classLoader) {
-        List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
+        listYamlLoaders(yamlResources, properties, dependencyResourceLoaders, classLoader);
+        drainAllYamlLoaders();
+    }
+
+    /**
+     * Enumerate the YAML files and construct one {@link YamlResourceLoader} per
+     * file. The loader constructor only consumes the YAML input stream into a
+     * byte buffer; no YAML parsing happens here, so this remains cheap even for
+     * bundles with hundreds of files.
+     */
+    private void listYamlLoaders(List<YamlResource> yamlResources, @Nullable Properties properties,
+                                 Collection<? extends ResourceLoader> dependencyResourceLoaders,
+                                 @Nullable ClassLoader classLoader) {
         for (YamlResource resource : yamlResources) {
             try (InputStream input = resource.inputStreamSupplier.get()) {
                 yamlResourceLoaders.add(new YamlResourceLoader(input, resource.uri, properties, classLoader, dependencyResourceLoaders));
             } catch (IOException ignored) {
             }
         }
-        // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
-        // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
-        for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
-            for (Recipe recipe : resourceLoader.listRecipes()) {
-                recipes.put(recipe.getName(), recipe);
-            }
-            categoryDescriptors.addAll(resourceLoader.listCategoryDescriptors());
-            styles.addAll(resourceLoader.listStyles());
-            recipeExamples.putAll(resourceLoader.listRecipeExamples());
+    }
+
+    /**
+     * Drain the next unscanned YAML loader into the shared maps. Each loader is
+     * parsed at most once across the lifetime of this instance.
+     *
+     * @return true if a loader was drained; false if every loader has already been processed.
+     */
+    private boolean drainNextYamlLoader() {
+        if (yamlScanIndex >= yamlResourceLoaders.size()) {
+            return false;
         }
-        for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
-            recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes.values(), recipeExamples));
+        YamlResourceLoader loader = yamlResourceLoaders.get(yamlScanIndex++);
+        for (Recipe recipe : loader.listRecipes()) {
+            recipes.put(recipe.getName(), recipe);
+        }
+        categoryDescriptors.addAll(loader.listCategoryDescriptors());
+        styles.addAll(loader.listStyles());
+        recipeExamples.putAll(loader.listRecipeExamples());
+        return true;
+    }
+
+    /**
+     * Drain every remaining YAML loader so the shared maps are fully populated. Recipe
+     * descriptor extraction is intentionally separate — see {@link #extractYamlRecipeDescriptors()}.
+     */
+    private void drainAllYamlLoaders() {
+        while (drainNextYamlLoader()) {
+        }
+    }
+
+    /**
+     * Compute recipe descriptors for every drained YAML loader. Must be called after
+     * both the class scan and the full YAML drain, because the descriptor pass
+     * resolves cross-loader references through {@code recipes} — and that map only
+     * contains imperative entries once the class scan has run. Calling this before
+     * the class scan would yield declarative descriptors with empty recipeLists for
+     * any imperative sub-recipe.
+     */
+    private void extractYamlRecipeDescriptors() {
+        if (!recipeDescriptorsExtracted) {
+            recipeDescriptorsExtracted = true;
+            for (YamlResourceLoader loader : yamlResourceLoaders) {
+                recipeDescriptors.addAll(loader.listRecipeDescriptors(recipes.values(), recipeExamples));
+            }
         }
     }
 
@@ -556,15 +619,31 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     @Override
     public @Nullable Recipe loadRecipe(String recipeName, RecipeDetail... details) {
-        if (performScan != null) {
+        // Imperative fast path: try to load by FQCN directly. This succeeds for any
+        // imperative recipe whose name matches its class, without triggering any scan.
+        if (performClassScan != null) {
             try {
                 return recipeLoader.load(recipeName, null);
             } catch (NoClassDefFoundError | IllegalArgumentException ignored) {
                 // it's probably declarative
             }
         }
-        ensureScanned();
-        return recipes.get(recipeName);
+        // Progressive YAML scan: parse YAML files one at a time until the recipe
+        // turns up in the shared map or every loader has been drained. Subsequent
+        // lookups for already-scanned names hit the map directly without parsing
+        // any additional files.
+        Recipe recipe = recipes.get(recipeName);
+        if (recipe != null) {
+            return recipe;
+        }
+        ensureYamlListed();
+        while (drainNextYamlLoader()) {
+            recipe = recipes.get(recipeName);
+            if (recipe != null) {
+                return recipe;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -573,35 +652,75 @@ public class ClasspathScanningLoader implements ResourceLoader {
         return recipes.values();
     }
 
-    private void ensureScanned() {
-        if (performScan != null) {
-            Runnable scan = performScan;
-            performScan = null;
+    private void ensureClassesScanned() {
+        if (performClassScan != null) {
+            Runnable scan = performClassScan;
+            performClassScan = null;
             scan.run();
         }
+    }
+
+    private void ensureYamlListed() {
+        if (performYamlListing != null) {
+            Runnable listing = performYamlListing;
+            performYamlListing = null;
+            listing.run();
+        }
+    }
+
+    private void ensureYamlScanned() {
+        ensureYamlListed();
+        drainAllYamlLoaders();
+    }
+
+    private void ensureScanned() {
+        ensureClassesScanned();
+        ensureYamlScanned();
+    }
+
+    // ---- Package-private introspection for tests ----
+
+    boolean classScanTriggered() {
+        return performClassScan == null;
+    }
+
+    boolean yamlListingTriggered() {
+        return performYamlListing == null;
+    }
+
+    int yamlLoadersDrained() {
+        return yamlScanIndex;
+    }
+
+    int yamlLoadersListed() {
+        return yamlResourceLoaders.size();
     }
 
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
         ensureScanned();
+        extractYamlRecipeDescriptors();
         return recipeDescriptors;
     }
 
     @Override
     public Collection<CategoryDescriptor> listCategoryDescriptors() {
-        ensureScanned();
+        // Categories come from YAML only; no need to walk class bytecode.
+        ensureYamlScanned();
         return categoryDescriptors;
     }
 
     @Override
     public Collection<NamedStyles> listStyles() {
+        // Styles can come from either imperative classes or YAML, so both phases are needed.
         ensureScanned();
         return styles;
     }
 
     @Override
     public Map<String, List<RecipeExample>> listRecipeExamples() {
-        ensureScanned();
+        // Examples are a YAML-only concept; the class scan does not populate this map.
+        ensureYamlScanned();
         return recipeExamples;
     }
 

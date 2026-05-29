@@ -712,6 +712,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             nameAnnotations: await mapAsync(method.nameAnnotations, a => this.visitDefined<J.Annotation>(a, p)),
             name: await this.visitDefined(method.name, p),
             parameters: await this.visitContainer(method.parameters, p),
+            dimensionsAfterName: await mapAsync(method.dimensionsAfterName, dim => this.visitLeftPadded(dim, p)),
             throws: method.throws && await this.visitContainer(method.throws, p),
             body: method.body && await this.visitDefined(method.body, p) as J.Block,
             defaultValue: await this.visitOptionalLeftPadded(method.defaultValue, p),

@@ -171,10 +171,23 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitUnion(Go.Union union, RpcReceiveQueue q) {
+        return union
+                .getPadding().withTypes(q.receiveList(union.getPadding().getTypes(), t -> visitRightPadded(t, q)));
+    }
+
+    @Override
+    public J visitUnderlyingType(Go.UnderlyingType underlyingType, RpcReceiveQueue q) {
+        return underlyingType
+                .withElement(q.receive(underlyingType.getElement(), expr -> (Expression) visitNonNull(expr, q)));
+    }
+
+    @Override
     public J visitTypeDecl(Go.TypeDecl typeDecl, RpcReceiveQueue q) {
         return typeDecl
                 .withLeadingAnnotations(q.receiveList(typeDecl.getLeadingAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
                 .withName(q.receive(typeDecl.getName(), el -> (J.Identifier) visitNonNull(el, q)))
+                .withTypeParameters(q.receive(typeDecl.getTypeParameters(), el -> (J.TypeParameters) visitNonNull(el, q)))
                 .getPadding().withAssign(q.receive(typeDecl.getPadding().getAssign(), el -> visitLeftPadded(el, q)))
                 .withDefinition(q.receive(typeDecl.getDefinition(), el -> (Expression) visitNonNull(el, q)))
                 .getPadding().withSpecs(q.receive(typeDecl.getPadding().getSpecs(), el -> visitContainer(el, q)));

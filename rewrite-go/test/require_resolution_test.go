@@ -21,7 +21,7 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
 func TestProjectImporterStubsRequiredModule(t *testing.T) {
@@ -80,7 +80,7 @@ func TestGoProjectThirdPartyImportResolves(t *testing.T) {
 
 		func main() { _ = y.Hello() }
 	`).WithPath("main.go")
-	mainSrc.AfterRecipe = func(t *testing.T, cu *tree.CompilationUnit) {
+	mainSrc.AfterRecipe = func(t *testing.T, cu *golang.CompilationUnit) {
 		t.Helper()
 		// `y` references the imported package; with the stub in place the
 		// identifier should now have a non-nil Type. Without require-driven

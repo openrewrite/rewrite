@@ -949,6 +949,7 @@ class Py2ParserVisitor:
             [],    # name_annotations
             name_ident,
             params_container,
+            [],    # dimensions_after_name
             None,  # throws
             body,
             None,  # default_value

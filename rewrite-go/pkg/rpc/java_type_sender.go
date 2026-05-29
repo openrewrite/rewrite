@@ -19,7 +19,7 @@ package rpc
 import (
 	"fmt"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -38,18 +38,18 @@ func NewJavaTypeSender() *JavaTypeSender {
 }
 
 // VisitAnnotation matches JavaTypeSender.visitAnnotation
-func (s *JavaTypeSender) VisitAnnotation(a *tree.JavaTypeAnnotation, p any) tree.JavaType {
+func (s *JavaTypeSender) VisitAnnotation(a *java.JavaTypeAnnotation, p any) java.JavaType {
 	q := p.(*SendQueue)
-	q.GetAndSend(a, func(v any) any { return AsRef(v.(*tree.JavaTypeAnnotation).Type) },
-		func(v any) { s.Visit(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(a, func(v any) any { return AsRef(v.(*java.JavaTypeAnnotation).Type) },
+		func(v any) { s.Visit(GetValueNonNull(v).(java.JavaType), q) })
 	q.GetAndSendListAsRef(a,
-		func(v any) []any { return elementValueSlice(v.(*tree.JavaTypeAnnotation).Values) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaTypeAnnotationElementValue).GetElement()) },
-		func(v any) { s.visitAnnotationElementValue(v.(tree.JavaTypeAnnotationElementValue), q) })
+		func(v any) []any { return elementValueSlice(v.(*java.JavaTypeAnnotation).Values) },
+		func(v any) any { return java.TypeSignature(v.(java.JavaTypeAnnotationElementValue).GetElement()) },
+		func(v any) { s.visitAnnotationElementValue(v.(java.JavaTypeAnnotationElementValue), q) })
 	return a
 }
 
-func elementValueSlice(in []tree.JavaTypeAnnotationElementValue) []any {
+func elementValueSlice(in []java.JavaTypeAnnotationElementValue) []any {
 	if in == nil {
 		return nil
 	}
@@ -60,17 +60,17 @@ func elementValueSlice(in []tree.JavaTypeAnnotationElementValue) []any {
 	return out
 }
 
-func (s *JavaTypeSender) visitAnnotationElementValue(v tree.JavaTypeAnnotationElementValue, q *SendQueue) {
+func (s *JavaTypeSender) visitAnnotationElementValue(v java.JavaTypeAnnotationElementValue, q *SendQueue) {
 	q.GetAndSend(v,
-		func(x any) any { return AsRef(x.(tree.JavaTypeAnnotationElementValue).GetElement()) },
-		func(t any) { s.Visit(GetValueNonNull(t).(tree.JavaType), q) })
+		func(x any) any { return AsRef(x.(java.JavaTypeAnnotationElementValue).GetElement()) },
+		func(t any) { s.Visit(GetValueNonNull(t).(java.JavaType), q) })
 	switch ev := v.(type) {
-	case *tree.JavaTypeAnnotationArrayElementValue:
+	case *java.JavaTypeAnnotationArrayElementValue:
 		// Constant values are sent as raw JSON-native values; numeric subtype
 		// (int/long/float/double) and char/string distinctions are not preserved.
 		q.GetAndSendList(ev,
 			func(x any) []any {
-				return x.(*tree.JavaTypeAnnotationArrayElementValue).ConstantValues
+				return x.(*java.JavaTypeAnnotationArrayElementValue).ConstantValues
 			},
 			func(x any) any {
 				if x == nil {
@@ -81,46 +81,46 @@ func (s *JavaTypeSender) visitAnnotationElementValue(v tree.JavaTypeAnnotationEl
 			nil)
 		q.GetAndSendListAsRef(ev,
 			func(x any) []any {
-				return javaTypeSlice(x.(*tree.JavaTypeAnnotationArrayElementValue).ReferenceValues)
+				return javaTypeSlice(x.(*java.JavaTypeAnnotationArrayElementValue).ReferenceValues)
 			},
-			func(x any) any { return tree.TypeSignature(x.(tree.JavaType)) },
-			func(t any) { s.Visit(t.(tree.JavaType), q) })
-	case *tree.JavaTypeAnnotationSingleElementValue:
+			func(x any) any { return java.TypeSignature(x.(java.JavaType)) },
+			func(t any) { s.Visit(t.(java.JavaType), q) })
+	case *java.JavaTypeAnnotationSingleElementValue:
 		q.GetAndSend(ev,
 			func(x any) any {
-				return x.(*tree.JavaTypeAnnotationSingleElementValue).ConstantValue
+				return x.(*java.JavaTypeAnnotationSingleElementValue).ConstantValue
 			},
 			nil)
 		q.GetAndSend(ev,
-			func(x any) any { return AsRef(x.(*tree.JavaTypeAnnotationSingleElementValue).ReferenceValue) },
-			func(t any) { s.Visit(GetValueNonNull(t).(tree.JavaType), q) })
+			func(x any) any { return AsRef(x.(*java.JavaTypeAnnotationSingleElementValue).ReferenceValue) },
+			func(t any) { s.Visit(GetValueNonNull(t).(java.JavaType), q) })
 	}
 }
 
 // VisitMultiCatch matches JavaTypeSender.visitMultiCatch
-func (s *JavaTypeSender) VisitMultiCatch(mc *tree.JavaTypeMultiCatch, p any) tree.JavaType {
+func (s *JavaTypeSender) VisitMultiCatch(mc *java.JavaTypeMultiCatch, p any) java.JavaType {
 	q := p.(*SendQueue)
 	q.GetAndSendListAsRef(mc,
-		func(v any) []any { return javaTypeSlice(v.(*tree.JavaTypeMultiCatch).ThrowableTypes) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+		func(v any) []any { return javaTypeSlice(v.(*java.JavaTypeMultiCatch).ThrowableTypes) },
+		func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+		func(v any) { s.Visit(v.(java.JavaType), q) })
 	return mc
 }
 
 // VisitIntersection matches JavaTypeSender.visitIntersection
-func (s *JavaTypeSender) VisitIntersection(is *tree.JavaTypeIntersection, p any) tree.JavaType {
+func (s *JavaTypeSender) VisitIntersection(is *java.JavaTypeIntersection, p any) java.JavaType {
 	q := p.(*SendQueue)
 	q.GetAndSendListAsRef(is,
-		func(v any) []any { return javaTypeSlice(v.(*tree.JavaTypeIntersection).Bounds) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+		func(v any) []any { return javaTypeSlice(v.(*java.JavaTypeIntersection).Bounds) },
+		func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+		func(v any) { s.Visit(v.(java.JavaType), q) })
 	return is
 }
 
 // VisitClass matches JavaTypeSender.visitClass field order exactly:
 // flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype, owningClass,
 // annotations, interfaces, members, methods
-func (s *JavaTypeSender) VisitClass(c *tree.JavaTypeClass, p any) tree.JavaType {
+func (s *JavaTypeSender) VisitClass(c *java.JavaTypeClass, p any) java.JavaType {
 	s.visitClassFields(c, p.(*SendQueue))
 	return c
 }
@@ -128,7 +128,7 @@ func (s *JavaTypeSender) VisitClass(c *tree.JavaTypeClass, p any) tree.JavaType 
 // VisitShallowClass walks the same field set as VisitClass — Java's
 // ShallowClass extends Class and uses the same wire shape; only the
 // outgoing valueType discriminator differs (handled by valueTypeMap).
-func (s *JavaTypeSender) VisitShallowClass(sc *tree.JavaTypeShallowClass, p any) tree.JavaType {
+func (s *JavaTypeSender) VisitShallowClass(sc *java.JavaTypeShallowClass, p any) java.JavaType {
 	s.visitClassFields(sc, p.(*SendQueue))
 	return sc
 }
@@ -136,11 +136,11 @@ func (s *JavaTypeSender) VisitShallowClass(sc *tree.JavaTypeShallowClass, p any)
 // toClassFields normalizes a Class-or-ShallowClass any to the embedded
 // *JavaTypeClass that holds the actual fields. Returns nil for any other
 // shape so callers can no-op on type-mismatched `before` states.
-func toClassFields(v any) *tree.JavaTypeClass {
+func toClassFields(v any) *java.JavaTypeClass {
 	switch c := v.(type) {
-	case *tree.JavaTypeClass:
+	case *java.JavaTypeClass:
 		return c
-	case *tree.JavaTypeShallowClass:
+	case *java.JavaTypeShallowClass:
 		return &c.JavaTypeClass
 	}
 	return nil
@@ -157,129 +157,129 @@ func (s *JavaTypeSender) visitClassFields(parent any, q *SendQueue) {
 	q.GetAndSend(parent, func(v any) any { return toClassFields(v).FullyQualifiedName }, nil)
 	q.GetAndSendListAsRef(parent,
 		func(v any) []any { return javaTypeSlice(toClassFields(v).TypeParameters) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+		func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+		func(v any) { s.Visit(v.(java.JavaType), q) })
 	q.GetAndSend(parent, func(v any) any { return AsRef(toClassFields(v).Supertype) },
-		func(v any) { s.Visit(GetValueNonNull(v).(tree.JavaType), q) })
+		func(v any) { s.Visit(GetValueNonNull(v).(java.JavaType), q) })
 	q.GetAndSend(parent, func(v any) any { return AsRef(toClassFields(v).OwningClass) },
-		func(v any) { s.Visit(GetValueNonNull(v).(tree.JavaType), q) })
+		func(v any) { s.Visit(GetValueNonNull(v).(java.JavaType), q) })
 	q.GetAndSendListAsRef(parent,
 		func(v any) []any { return classSlice(toClassFields(v).Annotations) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+		func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+		func(v any) { s.Visit(v.(java.JavaType), q) })
 	q.GetAndSendListAsRef(parent,
 		func(v any) []any { return classSlice(toClassFields(v).Interfaces) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+		func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+		func(v any) { s.Visit(v.(java.JavaType), q) })
 	q.GetAndSendListAsRef(parent,
 		func(v any) []any { return variableSlice(toClassFields(v).Members) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+		func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+		func(v any) { s.Visit(v.(java.JavaType), q) })
 	q.GetAndSendListAsRef(parent,
 		func(v any) []any { return methodSlice(toClassFields(v).Methods) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+		func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+		func(v any) { s.Visit(v.(java.JavaType), q) })
 }
 
 // VisitParameterized matches JavaTypeSender.visitParameterized
-func (s *JavaTypeSender) VisitParameterized(pt *tree.JavaTypeParameterized, p any) tree.JavaType {
+func (s *JavaTypeSender) VisitParameterized(pt *java.JavaTypeParameterized, p any) java.JavaType {
 	q := p.(*SendQueue)
-	q.GetAndSend(pt, func(v any) any { return AsRef(v.(*tree.JavaTypeParameterized).Type) },
-		func(v any) { s.Visit(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(pt, func(v any) any { return AsRef(v.(*java.JavaTypeParameterized).Type) },
+		func(v any) { s.Visit(GetValueNonNull(v).(java.JavaType), q) })
 	q.GetAndSendListAsRef(pt,
-		func(v any) []any { return javaTypeSlice(v.(*tree.JavaTypeParameterized).TypeParameters) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+		func(v any) []any { return javaTypeSlice(v.(*java.JavaTypeParameterized).TypeParameters) },
+		func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+		func(v any) { s.Visit(v.(java.JavaType), q) })
 	return pt
 }
 
 // VisitGenericTypeVariable matches JavaTypeSender.visitGenericTypeVariable
-func (s *JavaTypeSender) VisitGenericTypeVariable(g *tree.JavaTypeGenericTypeVariable, p any) tree.JavaType {
+func (s *JavaTypeSender) VisitGenericTypeVariable(g *java.JavaTypeGenericTypeVariable, p any) java.JavaType {
 	q := p.(*SendQueue)
-	q.GetAndSend(g, func(v any) any { return v.(*tree.JavaTypeGenericTypeVariable).Name }, nil)
-	q.GetAndSend(g, func(v any) any { return v.(*tree.JavaTypeGenericTypeVariable).Variance }, nil)
+	q.GetAndSend(g, func(v any) any { return v.(*java.JavaTypeGenericTypeVariable).Name }, nil)
+	q.GetAndSend(g, func(v any) any { return v.(*java.JavaTypeGenericTypeVariable).Variance }, nil)
 	q.GetAndSendListAsRef(g,
-		func(v any) []any { return javaTypeSlice(v.(*tree.JavaTypeGenericTypeVariable).Bounds) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+		func(v any) []any { return javaTypeSlice(v.(*java.JavaTypeGenericTypeVariable).Bounds) },
+		func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+		func(v any) { s.Visit(v.(java.JavaType), q) })
 	return g
 }
 
 // VisitArray matches JavaTypeSender.visitArray
-func (s *JavaTypeSender) VisitArray(a *tree.JavaTypeArray, p any) tree.JavaType {
+func (s *JavaTypeSender) VisitArray(a *java.JavaTypeArray, p any) java.JavaType {
 	q := p.(*SendQueue)
-	q.GetAndSend(a, func(v any) any { return AsRef(v.(*tree.JavaTypeArray).ElemType) },
-		func(v any) { s.Visit(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(a, func(v any) any { return AsRef(v.(*java.JavaTypeArray).ElemType) },
+		func(v any) { s.Visit(GetValueNonNull(v).(java.JavaType), q) })
 	q.GetAndSendListAsRef(a,
-		func(v any) []any { return classSlice(v.(*tree.JavaTypeArray).Annotations) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+		func(v any) []any { return classSlice(v.(*java.JavaTypeArray).Annotations) },
+		func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+		func(v any) { s.Visit(v.(java.JavaType), q) })
 	return a
 }
 
 // VisitPrimitive matches JavaTypeSender.visitPrimitive
-func (s *JavaTypeSender) VisitPrimitive(pr *tree.JavaTypePrimitive, p any) tree.JavaType {
+func (s *JavaTypeSender) VisitPrimitive(pr *java.JavaTypePrimitive, p any) java.JavaType {
 	q := p.(*SendQueue)
-	q.GetAndSend(pr, func(v any) any { return v.(*tree.JavaTypePrimitive).Keyword }, nil)
+	q.GetAndSend(pr, func(v any) any { return v.(*java.JavaTypePrimitive).Keyword }, nil)
 	return pr
 }
 
 // VisitMethod matches JavaTypeSender.visitMethod field order exactly:
 // declaringType, name, flagsBitMap, returnType, parameterNames, parameterTypes,
 // thrownExceptions, annotations, defaultValue, declaredFormalTypeNames
-func (s *JavaTypeSender) VisitMethod(m *tree.JavaTypeMethod, p any) tree.JavaType {
+func (s *JavaTypeSender) VisitMethod(m *java.JavaTypeMethod, p any) java.JavaType {
 	q := p.(*SendQueue)
-	q.GetAndSend(m, func(v any) any { return AsRef(v.(*tree.JavaTypeMethod).DeclaringType) },
-		func(v any) { s.Visit(GetValueNonNull(v).(tree.JavaType), q) })
-	q.GetAndSend(m, func(v any) any { return v.(*tree.JavaTypeMethod).Name }, nil)
-	q.GetAndSend(m, func(v any) any { return v.(*tree.JavaTypeMethod).FlagsBitMap }, nil)
-	q.GetAndSend(m, func(v any) any { return AsRef(v.(*tree.JavaTypeMethod).ReturnType) },
-		func(v any) { s.Visit(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(m, func(v any) any { return AsRef(v.(*java.JavaTypeMethod).DeclaringType) },
+		func(v any) { s.Visit(GetValueNonNull(v).(java.JavaType), q) })
+	q.GetAndSend(m, func(v any) any { return v.(*java.JavaTypeMethod).Name }, nil)
+	q.GetAndSend(m, func(v any) any { return v.(*java.JavaTypeMethod).FlagsBitMap }, nil)
+	q.GetAndSend(m, func(v any) any { return AsRef(v.(*java.JavaTypeMethod).ReturnType) },
+		func(v any) { s.Visit(GetValueNonNull(v).(java.JavaType), q) })
 	q.GetAndSendList(m,
-		func(v any) []any { return stringSlice(v.(*tree.JavaTypeMethod).ParameterNames) },
+		func(v any) []any { return stringSlice(v.(*java.JavaTypeMethod).ParameterNames) },
 		func(v any) any { return v },
 		nil)
 	q.GetAndSendListAsRef(m,
-		func(v any) []any { return javaTypeSlice(v.(*tree.JavaTypeMethod).ParameterTypes) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+		func(v any) []any { return javaTypeSlice(v.(*java.JavaTypeMethod).ParameterTypes) },
+		func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+		func(v any) { s.Visit(v.(java.JavaType), q) })
 	q.GetAndSendListAsRef(m,
-		func(v any) []any { return javaTypeSlice(v.(*tree.JavaTypeMethod).ThrownExceptions) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+		func(v any) []any { return javaTypeSlice(v.(*java.JavaTypeMethod).ThrownExceptions) },
+		func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+		func(v any) { s.Visit(v.(java.JavaType), q) })
 	q.GetAndSendListAsRef(m,
-		func(v any) []any { return classSlice(v.(*tree.JavaTypeMethod).Annotations) },
-		func(v any) any { return tree.TypeSignature(v.(tree.JavaType)) },
-		func(v any) { s.Visit(v.(tree.JavaType), q) })
+		func(v any) []any { return classSlice(v.(*java.JavaTypeMethod).Annotations) },
+		func(v any) any { return java.TypeSignature(v.(java.JavaType)) },
+		func(v any) { s.Visit(v.(java.JavaType), q) })
 	q.GetAndSendList(m,
-		func(v any) []any { return stringSlice(v.(*tree.JavaTypeMethod).DefaultValue) },
+		func(v any) []any { return stringSlice(v.(*java.JavaTypeMethod).DefaultValue) },
 		func(v any) any { return v },
 		nil)
 	q.GetAndSendList(m,
-		func(v any) []any { return stringSlice(v.(*tree.JavaTypeMethod).DeclaredFormalTypeNames) },
+		func(v any) []any { return stringSlice(v.(*java.JavaTypeMethod).DeclaredFormalTypeNames) },
 		func(v any) any { return v },
 		nil)
 	return m
 }
 
 // VisitVariable matches JavaTypeSender.visitVariable
-func (s *JavaTypeSender) VisitVariable(v *tree.JavaTypeVariable, p any) tree.JavaType {
+func (s *JavaTypeSender) VisitVariable(v *java.JavaTypeVariable, p any) java.JavaType {
 	q := p.(*SendQueue)
-	q.GetAndSend(v, func(x any) any { return x.(*tree.JavaTypeVariable).Name }, nil)
-	q.GetAndSend(v, func(x any) any { return AsRef(x.(*tree.JavaTypeVariable).Owner) },
-		func(x any) { s.Visit(GetValueNonNull(x).(tree.JavaType), q) })
-	q.GetAndSend(v, func(x any) any { return AsRef(x.(*tree.JavaTypeVariable).Type) },
-		func(x any) { s.Visit(GetValueNonNull(x).(tree.JavaType), q) })
+	q.GetAndSend(v, func(x any) any { return x.(*java.JavaTypeVariable).Name }, nil)
+	q.GetAndSend(v, func(x any) any { return AsRef(x.(*java.JavaTypeVariable).Owner) },
+		func(x any) { s.Visit(GetValueNonNull(x).(java.JavaType), q) })
+	q.GetAndSend(v, func(x any) any { return AsRef(x.(*java.JavaTypeVariable).Type) },
+		func(x any) { s.Visit(GetValueNonNull(x).(java.JavaType), q) })
 	q.GetAndSendListAsRef(v,
-		func(x any) []any { return classSlice(x.(*tree.JavaTypeVariable).Annotations) },
-		func(x any) any { return tree.TypeSignature(x.(tree.JavaType)) },
-		func(x any) { s.Visit(x.(tree.JavaType), q) })
+		func(x any) []any { return classSlice(x.(*java.JavaTypeVariable).Annotations) },
+		func(x any) any { return java.TypeSignature(x.(java.JavaType)) },
+		func(x any) { s.Visit(x.(java.JavaType), q) })
 	return v
 }
 
 // Helper functions to convert typed slices to []any
 
-func javaTypeSlice(types []tree.JavaType) []any {
+func javaTypeSlice(types []java.JavaType) []any {
 	if types == nil {
 		return nil
 	}
@@ -290,7 +290,7 @@ func javaTypeSlice(types []tree.JavaType) []any {
 	return result
 }
 
-func classSlice(classes []tree.FullyQualified) []any {
+func classSlice(classes []java.FullyQualified) []any {
 	if classes == nil {
 		return nil
 	}
@@ -301,7 +301,7 @@ func classSlice(classes []tree.FullyQualified) []any {
 	return result
 }
 
-func variableSlice(vars []*tree.JavaTypeVariable) []any {
+func variableSlice(vars []*java.JavaTypeVariable) []any {
 	if vars == nil {
 		return nil
 	}
@@ -312,7 +312,7 @@ func variableSlice(vars []*tree.JavaTypeVariable) []any {
 	return result
 }
 
-func methodSlice(methods []*tree.JavaTypeMethod) []any {
+func methodSlice(methods []*java.JavaTypeMethod) []any {
 	if methods == nil {
 		return nil
 	}

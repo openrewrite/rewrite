@@ -29,6 +29,7 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
+import java.util.stream.Stream;
 
 import static java.util.Collections.synchronizedMap;
 
@@ -447,18 +448,18 @@ public class DependencyWorkspace {
     }
 
     private static void cleanupDirectory(Path dir) {
-        try {
-            if (Files.exists(dir)) {
-                Files.walk(dir)
-                        .sorted(Comparator.reverseOrder())
-                        .forEach(path -> {
-                            try {
-                                Files.delete(path);
-                            } catch (IOException e) {
-                                // Ignore
-                            }
-                        });
-            }
+        if (!Files.exists(dir)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(dir)) {
+            walk.sorted(Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            // Ignore
+                        }
+                    });
         } catch (IOException e) {
             // Ignore cleanup errors
         }
@@ -469,13 +470,11 @@ public class DependencyWorkspace {
     }
 
     private static void initializeCacheFromDisk() {
-        try {
-            if (!Files.exists(WORKSPACE_BASE)) {
-                return;
-            }
-
-            Files.list(WORKSPACE_BASE)
-                    .filter(Files::isDirectory)
+        if (!Files.exists(WORKSPACE_BASE)) {
+            return;
+        }
+        try (Stream<Path> entries = Files.list(WORKSPACE_BASE)) {
+            entries.filter(Files::isDirectory)
                     .filter(dir -> !dir.getFileName().toString().contains(".tmp-"))
                     .filter(dir -> {
                         String name = dir.getFileName().toString();

@@ -296,4 +296,27 @@ class NewClassTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void curriedNewClass() {
+        rewriteRun(
+          scala(
+            """
+            val x = new Foo(a)(b)
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedNewClassAsDefBody() {
+        rewriteRun(
+          scala(
+            """
+            def make: Foo =
+              new Foo(0)(f)
+            """
+          )
+        );
+    }
 }

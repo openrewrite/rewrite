@@ -18,7 +18,7 @@ package rpc
 
 import (
 	"github.com/google/uuid"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -27,7 +27,7 @@ import (
 // dispatch — mirrors rewrite-java's JavaSender, which extends
 // JavaVisitor<RpcSendQueue>.
 type Sender interface {
-	Visit(t tree.Tree, p any) tree.Tree
+	Visit(t java.Tree, p any) java.Tree
 }
 
 // JavaSender serializes J (shared Java-like) AST nodes via the visitor
@@ -53,27 +53,27 @@ type JavaSender struct {
 // Field access goes through the polymorphic J-interface methods
 // (GetID / GetPrefix / GetMarkers), mirroring rewrite-java's
 // JavaVisitor.preVisit pattern.
-func (s *JavaSender) PreVisit(t tree.Tree, p any) tree.Tree {
-	j, ok := t.(tree.J)
+func (s *JavaSender) PreVisit(t java.Tree, p any) java.Tree {
+	j, ok := t.(java.J)
 	if !ok {
 		return t
 	}
 	q := p.(*SendQueue)
-	q.GetAndSend(t, func(v any) any { return v.(tree.J).GetID().String() }, nil)
-	q.GetAndSend(t, func(v any) any { return v.(tree.J).GetPrefix() },
-		func(v any) { sendSpace(v.(tree.Space), q) })
-	q.GetAndSend(t, func(v any) any { return v.(tree.J).GetMarkers() },
-		func(v any) { SendMarkersCodec(v.(tree.Markers), q) })
+	q.GetAndSend(t, func(v any) any { return v.(java.J).GetID().String() }, nil)
+	q.GetAndSend(t, func(v any) any { return v.(java.J).GetPrefix() },
+		func(v any) { sendSpace(v.(java.Space), q) })
+	q.GetAndSend(t, func(v any) any { return v.(java.J).GetMarkers() },
+		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 	_ = j
 	return t
 }
 
 // visitType sends a JavaType through the type sender with null/Unknown handling.
-func (s *JavaSender) visitType(t tree.JavaType, q *SendQueue) {
+func (s *JavaSender) visitType(t java.JavaType, q *SendQueue) {
 	if isNilValue(t) {
 		return
 	}
-	if _, ok := t.(*tree.JavaTypeUnknown); ok {
+	if _, ok := t.(*java.JavaTypeUnknown); ok {
 		return
 	}
 	s.typeSender.Visit(t, q)
@@ -81,12 +81,12 @@ func (s *JavaSender) visitType(t tree.JavaType, q *SendQueue) {
 
 // --- J nodes ---
 
-func (s *JavaSender) VisitIdentifier(id *tree.Identifier, p any) tree.J {
+func (s *JavaSender) VisitIdentifier(id *java.Identifier, p any) java.J {
 	q := p.(*SendQueue)
 	// annotations (list)
 	q.GetAndSendList(id,
 		func(v any) []any {
-			annots := v.(*tree.Identifier).Annotations
+			annots := v.(*java.Identifier).Annotations
 			if annots == nil {
 				return nil
 			}
@@ -97,56 +97,56 @@ func (s *JavaSender) VisitIdentifier(id *tree.Identifier, p any) tree.J {
 			return result
 		},
 		func(v any) any { return extractID(v) },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// simpleName
-	q.GetAndSend(id, func(v any) any { return v.(*tree.Identifier).Name }, nil)
+	q.GetAndSend(id, func(v any) any { return v.(*java.Identifier).Name }, nil)
 	// type (as ref)
-	q.GetAndSend(id, func(v any) any { return AsRef(v.(*tree.Identifier).Type) },
-		func(v any) { s.visitType(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(id, func(v any) any { return AsRef(v.(*java.Identifier).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	// fieldType (as ref)
-	q.GetAndSend(id, func(v any) any { return AsRef(v.(*tree.Identifier).FieldType) },
-		func(v any) { s.visitType(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(id, func(v any) any { return AsRef(v.(*java.Identifier).FieldType) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return id
 }
 
-func (s *JavaSender) VisitLiteral(lit *tree.Literal, p any) tree.J {
+func (s *JavaSender) VisitLiteral(lit *java.Literal, p any) java.J {
 	q := p.(*SendQueue)
 	// value
-	q.GetAndSend(lit, func(v any) any { return v.(*tree.Literal).Value }, nil)
+	q.GetAndSend(lit, func(v any) any { return v.(*java.Literal).Value }, nil)
 	// valueSource (source text)
-	q.GetAndSend(lit, func(v any) any { return v.(*tree.Literal).Source }, nil)
+	q.GetAndSend(lit, func(v any) any { return v.(*java.Literal).Source }, nil)
 	// unicodeEscapes (empty for Go)
 	q.GetAndSendList(lit, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
 	// type (as ref)
-	q.GetAndSend(lit, func(v any) any { return AsRef(v.(*tree.Literal).Type) },
-		func(v any) { s.visitType(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(lit, func(v any) any { return AsRef(v.(*java.Literal).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return lit
 }
 
-func (s *JavaSender) VisitBinary(b *tree.Binary, p any) tree.J {
+func (s *JavaSender) VisitBinary(b *java.Binary, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(b, func(v any) any { return v.(*tree.Binary).Left },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(b, func(v any) any { return v.(*java.Binary).Left },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(b, func(v any) any {
-		op := v.(*tree.Binary).Operator
-		return tree.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
+		op := v.(*java.Binary).Operator
+		return java.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
 	}, func(v any) { sendLeftPadded(s, v, q) })
-	q.GetAndSend(b, func(v any) any { return v.(*tree.Binary).Right },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(b, func(v any) any { return AsRef(v.(*tree.Binary).Type) },
-		func(v any) { s.visitType(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(b, func(v any) any { return v.(*java.Binary).Right },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(b, func(v any) any { return AsRef(v.(*java.Binary).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return b
 }
 
-func (s *JavaSender) VisitBlock(b *tree.Block, p any) tree.J {
+func (s *JavaSender) VisitBlock(b *java.Block, p any) java.J {
 	q := p.(*SendQueue)
 	// static (right-padded bool) - Java's JRightPadded<Boolean> with element=false
 	// Send manually since Go doesn't have RightPadded[bool]
-	sendRightPaddedBool(false, tree.EmptySpace, tree.Markers{}, q)
+	sendRightPaddedBool(false, java.EmptySpace, java.Markers{}, q)
 	// statements
 	q.GetAndSendList(b,
 		func(v any) []any {
-			stmts := v.(*tree.Block).Statements
+			stmts := v.(*java.Block).Statements
 			result := make([]any, len(stmts))
 			for i, stmt := range stmts {
 				result[i] = stmt
@@ -156,109 +156,109 @@ func (s *JavaSender) VisitBlock(b *tree.Block, p any) tree.J {
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
 	// end space
-	q.GetAndSend(b, func(v any) any { return v.(*tree.Block).End },
-		func(v any) { sendSpace(v.(tree.Space), q) })
+	q.GetAndSend(b, func(v any) any { return v.(*java.Block).End },
+		func(v any) { sendSpace(v.(java.Space), q) })
 	return b
 }
 
-func (s *JavaSender) VisitReturn(r *tree.Return, p any) tree.J {
+func (s *JavaSender) VisitReturn(r *java.Return, p any) java.J {
 	q := p.(*SendQueue)
 	// Java's J.Return has a single expression; Go has multiple
 	// The first expression maps to J.Return.expression
 	q.GetAndSend(r, func(v any) any {
-		exprs := v.(*tree.Return).Expressions
+		exprs := v.(*java.Return).Expressions
 		if len(exprs) > 0 {
 			return exprs[0].Element
 		}
 		return nil
-	}, func(v any) { s.Visit(v.(tree.Tree), q) })
+	}, func(v any) { s.Visit(v.(java.Tree), q) })
 	return r
 }
 
-func (s *JavaSender) VisitIf(i *tree.If, p any) tree.J {
+func (s *JavaSender) VisitIf(i *java.If, p any) java.J {
 	q := p.(*SendQueue)
 	// ifCondition - reuse cached ControlParentheses if available, otherwise create new
 	q.GetAndSend(i, func(v any) any {
-		ifNode := v.(*tree.If)
+		ifNode := v.(*java.If)
 		if ifNode.ConditionCP != nil {
 			cp := *ifNode.ConditionCP
-			cp.Tree = tree.RightPadded[tree.Expression]{Element: ifNode.Condition, After: cp.Tree.After}
+			cp.Tree = java.RightPadded[java.Expression]{Element: ifNode.Condition, After: cp.Tree.After}
 			return &cp
 		}
-		return &tree.ControlParentheses{
+		return &java.ControlParentheses{
 			ID:      uuid.New(),
-			Markers: tree.Markers{ID: uuid.New()},
-			Tree:    tree.RightPadded[tree.Expression]{Element: ifNode.Condition, After: tree.EmptySpace},
+			Markers: java.Markers{ID: uuid.New()},
+			Tree:    java.RightPadded[java.Expression]{Element: ifNode.Condition, After: java.EmptySpace},
 		}
-	}, func(v any) { s.Visit(v.(tree.Tree), q) })
+	}, func(v any) { s.Visit(v.(java.Tree), q) })
 	// thenPart (right-padded)
 	q.GetAndSend(i, func(v any) any {
-		return tree.RightPadded[tree.Statement]{
-			Element: v.(*tree.If).Then,
-			After:   tree.EmptySpace,
+		return java.RightPadded[java.Statement]{
+			Element: v.(*java.If).Then,
+			After:   java.EmptySpace,
 		}
 	}, func(v any) { sendRightPadded(s, v, q) })
 	// elsePart - wrap in Else node for Java's J.If.Else model
 	q.GetAndSend(i, func(v any) any {
-		ep := v.(*tree.If).ElsePart
+		ep := v.(*java.If).ElsePart
 		if ep == nil {
 			return nil
 		}
-		return &tree.Else{
+		return &java.Else{
 			ID:      uuid.New(),
 			Prefix:  ep.After,
-			Markers: tree.Markers{ID: uuid.New()},
-			Body:    tree.RightPadded[tree.Statement]{Element: ep.Element.(tree.Statement), After: tree.EmptySpace},
+			Markers: java.Markers{ID: uuid.New()},
+			Body:    java.RightPadded[java.Statement]{Element: ep.Element.(java.Statement), After: java.EmptySpace},
 		}
-	}, func(v any) { s.Visit(v.(tree.Tree), q) })
+	}, func(v any) { s.Visit(v.(java.Tree), q) })
 	return i
 }
 
-func (s *JavaSender) VisitElse(el *tree.Else, p any) tree.J {
+func (s *JavaSender) VisitElse(el *java.Else, p any) java.J {
 	q := p.(*SendQueue)
 	// body (right-padded Statement)
-	q.GetAndSend(el, func(v any) any { return v.(*tree.Else).Body },
+	q.GetAndSend(el, func(v any) any { return v.(*java.Else).Body },
 		func(v any) { sendRightPadded(s, v, q) })
 	return el
 }
 
-func (s *JavaSender) VisitAssignment(a *tree.Assignment, p any) tree.J {
+func (s *JavaSender) VisitAssignment(a *java.Assignment, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(a, func(v any) any { return v.(*tree.Assignment).Variable },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(a, func(v any) any { return v.(*tree.Assignment).Value },
+	q.GetAndSend(a, func(v any) any { return v.(*java.Assignment).Variable },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(a, func(v any) any { return v.(*java.Assignment).Value },
 		func(v any) { sendLeftPadded(s, v, q) })
-	q.GetAndSend(a, func(v any) any { return AsRef(v.(*tree.Assignment).Type) },
-		func(v any) { s.visitType(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(a, func(v any) any { return AsRef(v.(*java.Assignment).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return a
 }
 
-func (s *JavaSender) VisitAssignmentOperation(a *tree.AssignmentOperation, p any) tree.J {
+func (s *JavaSender) VisitAssignmentOperation(a *java.AssignmentOperation, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(a, func(v any) any { return v.(*tree.AssignmentOperation).Variable },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(a, func(v any) any { return v.(*java.AssignmentOperation).Variable },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(a, func(v any) any {
-		op := v.(*tree.AssignmentOperation).Operator
-		return tree.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
+		op := v.(*java.AssignmentOperation).Operator
+		return java.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
 	}, func(v any) { sendLeftPadded(s, v, q) })
-	q.GetAndSend(a, func(v any) any { return v.(*tree.AssignmentOperation).Assignment },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(a, func(v any) any { return AsRef(v.(*tree.AssignmentOperation).Type) },
-		func(v any) { s.visitType(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(a, func(v any) any { return v.(*java.AssignmentOperation).Assignment },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(a, func(v any) any { return AsRef(v.(*java.AssignmentOperation).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return a
 }
 
-func (s *JavaSender) VisitMethodDeclaration(md *tree.MethodDeclaration, p any) tree.J {
+func (s *JavaSender) VisitMethodDeclaration(md *java.MethodDeclaration, p any) java.J {
 	q := p.(*SendQueue)
 	// Go's MethodDeclaration maps to parts of Java's MethodDeclaration
 	// Java sends: leadingAnnotations, modifiers, typeParameters, returnTypeExpression,
-	//   name annotations, name, parameters, throws, body, defaultValue, methodType
+	//   name annotations, name, parameters, dimensionsAfterName, throws, body, defaultValue, methodType
 	// Go: receiver, name, parameters, returnType, body, methodType
 
 	// leadingAnnotations (`//go:` directives modeled as J.Annotation)
 	q.GetAndSendList(md,
 		func(v any) []any {
-			anns := v.(*tree.MethodDeclaration).LeadingAnnotations
+			anns := v.(*java.MethodDeclaration).LeadingAnnotations
 			result := make([]any, len(anns))
 			for i, a := range anns {
 				result[i] = a
@@ -266,53 +266,97 @@ func (s *JavaSender) VisitMethodDeclaration(md *tree.MethodDeclaration, p any) t
 			return result
 		},
 		func(v any) any { return extractID(v) },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// modifiers (empty for Go)
 	q.GetAndSendList(md, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
-	// typeParameters (nil for Go)
-	q.GetAndSend(md, func(_ any) any { return nil }, nil)
+	// typeParameters (`[T any]` declaration-site generics; nil for non-generic funcs)
+	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).TypeParameters },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// returnTypeExpression
-	q.GetAndSend(md, func(v any) any { return v.(*tree.MethodDeclaration).ReturnType },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).ReturnType },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// name annotations (empty)
 	q.GetAndSendList(md, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
 	// name
-	q.GetAndSend(md, func(v any) any { return v.(*tree.MethodDeclaration).Name },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).Name },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// parameters (container)
-	q.GetAndSend(md, func(v any) any { return v.(*tree.MethodDeclaration).Parameters },
+	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).Parameters },
 		func(v any) { sendContainer(s, v, q) })
+	// dimensionsAfterName (empty for Go — no C-style array method returns)
+	q.GetAndSendList(md, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
 	// throws (nil for Go)
 	q.GetAndSend(md, func(_ any) any { return nil }, nil)
 	// body
-	q.GetAndSend(md, func(v any) any { return v.(*tree.MethodDeclaration).Body },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).Body },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// defaultValue (nil for Go)
 	q.GetAndSend(md, func(_ any) any { return nil }, nil)
 	// methodType (as ref)
-	q.GetAndSend(md, func(v any) any { return AsRef(v.(*tree.MethodDeclaration).MethodType) },
-		func(v any) { s.visitType(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(md, func(v any) any { return AsRef(v.(*java.MethodDeclaration).MethodType) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return md
 }
 
-func (s *JavaSender) VisitForLoop(f *tree.ForLoop, p any) tree.J {
+func (s *JavaSender) VisitTypeParameters(tps *java.TypeParameters, p any) java.J {
+	q := p.(*SendQueue)
+	// annotations (empty for Go)
+	q.GetAndSendList(tps, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	// typeParameters (list of right-padded J$TypeParameter)
+	q.GetAndSendList(tps,
+		func(v any) []any {
+			elems := v.(*java.TypeParameters).TypeParameters
+			result := make([]any, len(elems))
+			for i, e := range elems {
+				result[i] = e
+			}
+			return result
+		},
+		func(v any) any { return containerElementID(v) },
+		func(v any) { sendRightPadded(s, v, q) })
+	return tps
+}
+
+func (s *JavaSender) VisitTypeParameter(tp *java.TypeParameter, p any) java.J {
+	q := p.(*SendQueue)
+	// annotations (empty for Go)
+	q.GetAndSendList(tp, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	// modifiers (empty for Go)
+	q.GetAndSendList(tp, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	// name
+	q.GetAndSend(tp, func(v any) any { return v.(*java.TypeParameter).Name },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	// bounds (container; nil when the parameter shares a sibling's constraint).
+	// Send the value Container, not the *Container, since the padding
+	// accessors only recognize value Container types.
+	q.GetAndSend(tp, func(v any) any {
+		b := v.(*java.TypeParameter).Bounds
+		if b == nil {
+			return nil
+		}
+		return *b
+	}, func(v any) { sendContainer(s, v, q) })
+	return tp
+}
+
+func (s *JavaSender) VisitForLoop(f *java.ForLoop, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(f, func(v any) any {
-		ctrl := v.(*tree.ForLoop).Control
+		ctrl := v.(*java.ForLoop).Control
 		return &ctrl
-	}, func(v any) { s.Visit(v.(tree.Tree), q) })
+	}, func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(f, func(v any) any {
-		return tree.RightPadded[tree.Statement]{Element: v.(*tree.ForLoop).Body, After: tree.EmptySpace}
+		return java.RightPadded[java.Statement]{Element: v.(*java.ForLoop).Body, After: java.EmptySpace}
 	}, func(v any) { sendRightPadded(s, v, q) })
 	return f
 }
 
-func (s *JavaSender) VisitForControl(fc *tree.ForControl, p any) tree.J {
+func (s *JavaSender) VisitForControl(fc *java.ForControl, p any) java.J {
 	q := p.(*SendQueue)
 	// init (list of right-padded)
 	q.GetAndSendList(fc,
 		func(v any) []any {
-			init := v.(*tree.ForControl).Init
+			init := v.(*java.ForControl).Init
 			if init == nil {
 				return nil
 			}
@@ -322,14 +366,16 @@ func (s *JavaSender) VisitForControl(fc *tree.ForControl, p any) tree.J {
 		func(v any) { sendRightPadded(s, v, q) })
 	// condition (right-padded) — dereference pointer
 	q.GetAndSend(fc, func(v any) any {
-		cond := v.(*tree.ForControl).Condition
-		if cond == nil { return nil }
+		cond := v.(*java.ForControl).Condition
+		if cond == nil {
+			return nil
+		}
 		return *cond
 	}, func(v any) { sendRightPadded(s, v, q) })
 	// update (list of right-padded)
 	q.GetAndSendList(fc,
 		func(v any) []any {
-			update := v.(*tree.ForControl).Update
+			update := v.(*java.ForControl).Update
 			if update == nil {
 				return nil
 			}
@@ -340,78 +386,82 @@ func (s *JavaSender) VisitForControl(fc *tree.ForControl, p any) tree.J {
 	return fc
 }
 
-func (s *JavaSender) VisitForEachLoop(f *tree.ForEachLoop, p any) tree.J {
+func (s *JavaSender) VisitForEachLoop(f *java.ForEachLoop, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(f, func(v any) any {
-		ctrl := v.(*tree.ForEachLoop).Control
+		ctrl := v.(*java.ForEachLoop).Control
 		return &ctrl
-	}, func(v any) { s.Visit(v.(tree.Tree), q) })
+	}, func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(f, func(v any) any {
-		return tree.RightPadded[tree.Statement]{Element: v.(*tree.ForEachLoop).Body, After: tree.EmptySpace}
+		return java.RightPadded[java.Statement]{Element: v.(*java.ForEachLoop).Body, After: java.EmptySpace}
 	}, func(v any) { sendRightPadded(s, v, q) })
 	return f
 }
 
-func (s *JavaSender) VisitForEachControl(fc *tree.ForEachControl, p any) tree.J {
+func (s *JavaSender) VisitForEachControl(fc *java.ForEachControl, p any) java.J {
 	q := p.(*SendQueue)
 	// Go sends: key (right-padded), value (right-padded), operator (left-padded string), iterable
 	// Java GolangReceiver override reads this format
 	q.GetAndSend(fc, func(v any) any {
-		k := v.(*tree.ForEachControl).Key
-		if k == nil { return nil }
+		k := v.(*java.ForEachControl).Key
+		if k == nil {
+			return nil
+		}
 		return *k
 	}, func(v any) { sendRightPadded(s, v, q) })
 	q.GetAndSend(fc, func(v any) any {
-		val := v.(*tree.ForEachControl).Value
-		if val == nil { return nil }
+		val := v.(*java.ForEachControl).Value
+		if val == nil {
+			return nil
+		}
 		return *val
 	}, func(v any) { sendRightPadded(s, v, q) })
 	q.GetAndSend(fc, func(v any) any {
-		op := v.(*tree.ForEachControl).Operator
-		return tree.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
+		op := v.(*java.ForEachControl).Operator
+		return java.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
 	}, func(v any) { sendLeftPadded(s, v, q) })
-	q.GetAndSend(fc, func(v any) any { return v.(*tree.ForEachControl).Iterable },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(fc, func(v any) any { return v.(*java.ForEachControl).Iterable },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return fc
 }
 
-func (s *JavaSender) VisitSwitch(sw *tree.Switch, p any) tree.J {
+func (s *JavaSender) VisitSwitch(sw *java.Switch, p any) java.J {
 	q := p.(*SendQueue)
 	// selector - wrap tag in ControlParentheses for Java's J.Switch model
 	q.GetAndSend(sw, func(v any) any {
-		tag := v.(*tree.Switch).Tag
-		var inner tree.Expression
+		tag := v.(*java.Switch).Tag
+		var inner java.Expression
 		if tag != nil {
 			inner = tag.Element
 		} else {
 			// Tagless switch: use Empty as the expression
-			inner = &tree.Empty{ID: uuid.New()}
+			inner = &java.Empty{ID: uuid.New()}
 		}
-		return &tree.ControlParentheses{
+		return &java.ControlParentheses{
 			ID:      uuid.New(),
-			Markers: tree.Markers{ID: uuid.New()},
-			Tree:    tree.RightPadded[tree.Expression]{Element: inner, After: tree.EmptySpace},
+			Markers: java.Markers{ID: uuid.New()},
+			Tree:    java.RightPadded[java.Expression]{Element: inner, After: java.EmptySpace},
 		}
-	}, func(v any) { s.Visit(v.(tree.Tree), q) })
+	}, func(v any) { s.Visit(v.(java.Tree), q) })
 	// cases (Block)
-	q.GetAndSend(sw, func(v any) any { return v.(*tree.Switch).Body },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(sw, func(v any) any { return v.(*java.Switch).Body },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return sw
 }
 
-func (s *JavaSender) VisitCase(c *tree.Case, p any) tree.J {
+func (s *JavaSender) VisitCase(c *java.Case, p any) java.J {
 	q := p.(*SendQueue)
 	// type (enum value)
 	q.GetAndSend(c, func(_ any) any { return "Statement" }, nil)
 	// caseLabels (container)
-	q.GetAndSend(c, func(v any) any { return v.(*tree.Case).Expressions },
+	q.GetAndSend(c, func(v any) any { return v.(*java.Case).Expressions },
 		func(v any) { sendContainer(s, v, q) })
 	// statements (container)
 	q.GetAndSend(c, func(v any) any {
-		body := v.(*tree.Case).Body
-		result := make([]tree.RightPadded[tree.Statement], len(body))
+		body := v.(*java.Case).Body
+		result := make([]java.RightPadded[java.Statement], len(body))
 		copy(result, body)
-		return tree.Container[tree.Statement]{Elements: result}
+		return java.Container[java.Statement]{Elements: result}
 	}, func(v any) { sendContainer(s, v, q) })
 	// body (right-padded, nil for Go-style case)
 	q.GetAndSend(c, func(_ any) any { return nil }, nil)
@@ -420,37 +470,37 @@ func (s *JavaSender) VisitCase(c *tree.Case, p any) tree.J {
 	return c
 }
 
-func (s *JavaSender) VisitBreak(b *tree.Break, p any) tree.J {
+func (s *JavaSender) VisitBreak(b *java.Break, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(b, func(v any) any { return v.(*tree.Break).Label },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(b, func(v any) any { return v.(*java.Break).Label },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return b
 }
 
-func (s *JavaSender) VisitContinue(c *tree.Continue, p any) tree.J {
+func (s *JavaSender) VisitContinue(c *java.Continue, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(c, func(v any) any { return v.(*tree.Continue).Label },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(c, func(v any) any { return v.(*java.Continue).Label },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return c
 }
 
-func (s *JavaSender) VisitLabel(l *tree.Label, p any) tree.J {
+func (s *JavaSender) VisitLabel(l *java.Label, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(l, func(v any) any { return v.(*tree.Label).Name },
+	q.GetAndSend(l, func(v any) any { return v.(*java.Label).Name },
 		func(v any) { sendRightPadded(s, v, q) })
-	q.GetAndSend(l, func(v any) any { return v.(*tree.Label).Statement },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(l, func(v any) any { return v.(*java.Label).Statement },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return l
 }
 
 // sendAnnotation matches JavaSender.visitAnnotation field order:
 // annotationType, then nullable arguments container.
-func (s *JavaSender) VisitAnnotation(ann *tree.Annotation, p any) tree.J {
+func (s *JavaSender) VisitAnnotation(ann *java.Annotation, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(ann, func(v any) any { return v.(*tree.Annotation).AnnotationType },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(ann, func(v any) any { return v.(*java.Annotation).AnnotationType },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(ann, func(v any) any {
-		args := v.(*tree.Annotation).Arguments
+		args := v.(*java.Annotation).Arguments
 		if args == nil {
 			return nil
 		}
@@ -459,59 +509,61 @@ func (s *JavaSender) VisitAnnotation(ann *tree.Annotation, p any) tree.J {
 	return ann
 }
 
-func (s *JavaSender) VisitUnary(u *tree.Unary, p any) tree.J {
+func (s *JavaSender) VisitUnary(u *java.Unary, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(u, func(v any) any {
-		op := v.(*tree.Unary).Operator
-		return tree.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
+		op := v.(*java.Unary).Operator
+		return java.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
 	}, func(v any) { sendLeftPadded(s, v, q) })
-	q.GetAndSend(u, func(v any) any { return v.(*tree.Unary).Operand },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(u, func(v any) any { return AsRef(v.(*tree.Unary).Type) },
-		func(v any) { s.visitType(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(u, func(v any) any { return v.(*java.Unary).Operand },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(u, func(v any) any { return AsRef(v.(*java.Unary).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return u
 }
 
-func (s *JavaSender) VisitFieldAccess(fa *tree.FieldAccess, p any) tree.J {
+func (s *JavaSender) VisitFieldAccess(fa *java.FieldAccess, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(fa, func(v any) any { return v.(*tree.FieldAccess).Target },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(fa, func(v any) any { return v.(*tree.FieldAccess).Name },
+	q.GetAndSend(fa, func(v any) any { return v.(*java.FieldAccess).Target },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(fa, func(v any) any { return v.(*java.FieldAccess).Name },
 		func(v any) { sendLeftPadded(s, v, q) })
-	q.GetAndSend(fa, func(v any) any { return AsRef(v.(*tree.FieldAccess).Type) },
-		func(v any) { s.visitType(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(fa, func(v any) any { return AsRef(v.(*java.FieldAccess).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return fa
 }
 
-func (s *JavaSender) VisitMethodInvocation(mi *tree.MethodInvocation, p any) tree.J {
+func (s *JavaSender) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
 	q := p.(*SendQueue)
 	// select (right-padded, nullable) — dereference pointer
 	q.GetAndSend(mi, func(v any) any {
-		sel := v.(*tree.MethodInvocation).Select
-		if sel == nil { return nil }
+		sel := v.(*java.MethodInvocation).Select
+		if sel == nil {
+			return nil
+		}
 		return *sel
 	}, func(v any) { sendRightPadded(s, v, q) })
 	// typeParameters (nil for Go)
 	q.GetAndSend(mi, func(_ any) any { return nil }, nil)
 	// name
-	q.GetAndSend(mi, func(v any) any { return v.(*tree.MethodInvocation).Name },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(mi, func(v any) any { return v.(*java.MethodInvocation).Name },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// arguments (container)
-	q.GetAndSend(mi, func(v any) any { return v.(*tree.MethodInvocation).Arguments },
+	q.GetAndSend(mi, func(v any) any { return v.(*java.MethodInvocation).Arguments },
 		func(v any) { sendContainer(s, v, q) })
 	// methodType (as ref)
-	q.GetAndSend(mi, func(v any) any { return AsRef(v.(*tree.MethodInvocation).MethodType) },
-		func(v any) { s.visitType(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(mi, func(v any) any { return AsRef(v.(*java.MethodInvocation).MethodType) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return mi
 }
 
-func (s *JavaSender) VisitVariableDeclarations(vd *tree.VariableDeclarations, p any) tree.J {
+func (s *JavaSender) VisitVariableDeclarations(vd *java.VariableDeclarations, p any) java.J {
 	q := p.(*SendQueue)
 	// leadingAnnotations (struct field tags + `//go:` directives,
 	// modeled as J.Annotation per the Java contract)
 	q.GetAndSendList(vd,
 		func(v any) []any {
-			anns := v.(*tree.VariableDeclarations).LeadingAnnotations
+			anns := v.(*java.VariableDeclarations).LeadingAnnotations
 			result := make([]any, len(anns))
 			for i, a := range anns {
 				result[i] = a
@@ -519,24 +571,24 @@ func (s *JavaSender) VisitVariableDeclarations(vd *tree.VariableDeclarations, p 
 			return result
 		},
 		func(v any) any { return extractID(v) },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// modifiers (empty -- Go has no modifiers)
 	q.GetAndSendList(vd, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// typeExpression
-	q.GetAndSend(vd, func(v any) any { return v.(*tree.VariableDeclarations).TypeExpr },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(vd, func(v any) any { return v.(*java.VariableDeclarations).TypeExpr },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// varargs
 	q.GetAndSend(vd, func(v any) any {
-		va := v.(*tree.VariableDeclarations).Varargs
+		va := v.(*java.VariableDeclarations).Varargs
 		if va != nil {
 			return *va
 		}
 		return nil
-	}, func(v any) { sendSpace(v.(tree.Space), q) })
+	}, func(v any) { sendSpace(v.(java.Space), q) })
 	// variables (list of right-padded NamedVariable)
 	q.GetAndSendList(vd,
 		func(v any) []any {
-			vars := v.(*tree.VariableDeclarations).Variables
+			vars := v.(*java.VariableDeclarations).Variables
 			result := make([]any, len(vars))
 			for i, d := range vars {
 				result[i] = d
@@ -548,18 +600,20 @@ func (s *JavaSender) VisitVariableDeclarations(vd *tree.VariableDeclarations, p 
 	return vd
 }
 
-func (s *JavaSender) VisitVariableDeclarator(vd *tree.VariableDeclarator, p any) tree.J {
+func (s *JavaSender) VisitVariableDeclarator(vd *java.VariableDeclarator, p any) java.J {
 	q := p.(*SendQueue)
 	// Java's NamedVariable: declarator (Identifier), dimensionsAfterName, initializer, variableType
 	// Go: Name, Initializer
-	q.GetAndSend(vd, func(v any) any { return v.(*tree.VariableDeclarator).Name },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(vd, func(v any) any { return v.(*java.VariableDeclarator).Name },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// dimensionsAfterName (empty for Go)
 	q.GetAndSendList(vd, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
 	// initializer (left-padded, nullable) — dereference pointer
 	q.GetAndSend(vd, func(v any) any {
-		init := v.(*tree.VariableDeclarator).Initializer
-		if init == nil { return nil }
+		init := v.(*java.VariableDeclarator).Initializer
+		if init == nil {
+			return nil
+		}
 		return *init
 	}, func(v any) { sendLeftPadded(s, v, q) })
 	// variableType (as ref) - not yet on Go VariableDeclarator
@@ -567,85 +621,94 @@ func (s *JavaSender) VisitVariableDeclarator(vd *tree.VariableDeclarator, p any)
 	return vd
 }
 
-func (s *JavaSender) VisitArrayType(at *tree.ArrayType, p any) tree.J {
+func (s *JavaSender) VisitArrayType(at *java.ArrayType, p any) java.J {
 	q := p.(*SendQueue)
 	// elementType
-	q.GetAndSend(at, func(v any) any { return v.(*tree.ArrayType).ElementType },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(at, func(v any) any { return v.(*java.ArrayType).ElementType },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// annotations (empty for Go)
 	q.GetAndSendList(at, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
 	// dimension (left-padded)
-	q.GetAndSend(at, func(v any) any { return v.(*tree.ArrayType).Dimension },
+	q.GetAndSend(at, func(v any) any { return v.(*java.ArrayType).Dimension },
 		func(v any) { sendLeftPadded(s, v, q) })
 	// type
-	q.GetAndSend(at, func(v any) any { return v.(*tree.ArrayType).Type }, nil)
+	q.GetAndSend(at, func(v any) any { return v.(*java.ArrayType).Type }, nil)
 	return at
 }
 
-func (s *JavaSender) VisitArrayAccess(aa *tree.ArrayAccess, p any) tree.J {
+func (s *JavaSender) VisitArrayAccess(aa *java.ArrayAccess, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(aa, func(v any) any { return v.(*tree.ArrayAccess).Indexed },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(aa, func(v any) any { return v.(*tree.ArrayAccess).Dimension },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(aa, func(v any) any { return v.(*java.ArrayAccess).Indexed },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(aa, func(v any) any { return v.(*java.ArrayAccess).Dimension },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return aa
 }
 
-func (s *JavaSender) VisitParameterizedType(pt *tree.ParameterizedType, p any) tree.J {
+func (s *JavaSender) VisitParameterizedType(pt *java.ParameterizedType, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(pt, func(v any) any { return v.(*tree.ParameterizedType).Clazz },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(pt, func(v any) any { return v.(*tree.ParameterizedType).TypeParameters },
-		func(v any) { sendContainer(s, v, q) })
-	q.GetAndSend(pt, func(v any) any { return AsRef(v.(*tree.ParameterizedType).Type) },
-		func(v any) { s.visitType(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSend(pt, func(v any) any { return v.(*java.ParameterizedType).Clazz },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	// TypeParameters is a *Container; dereference so sendContainer (containerElements
+	// et al.) sees a value Container rather than the pointer (which sends as empty).
+	q.GetAndSend(pt, func(v any) any {
+		tp := v.(*java.ParameterizedType).TypeParameters
+		if tp == nil {
+			return nil
+		}
+		return *tp
+	}, func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(pt, func(v any) any { return AsRef(v.(*java.ParameterizedType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return pt
 }
 
-func (s *JavaSender) VisitArrayDimension(ad *tree.ArrayDimension, p any) tree.J {
+func (s *JavaSender) VisitArrayDimension(ad *java.ArrayDimension, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(ad, func(v any) any { return ad.Index },
 		func(v any) { sendRightPadded(s, v, q) })
 	return ad
 }
 
-func (s *JavaSender) VisitParentheses(parens *tree.Parentheses, p any) tree.J {
+func (s *JavaSender) VisitParentheses(parens *java.Parentheses, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(parens, func(v any) any { return v.(*tree.Parentheses).Tree },
+	q.GetAndSend(parens, func(v any) any { return v.(*java.Parentheses).Tree },
 		func(v any) { sendRightPadded(s, v, q) })
 	return parens
 }
 
-func (s *JavaSender) VisitTypeCast(tc *tree.TypeCast, p any) tree.J {
+func (s *JavaSender) VisitTypeCast(tc *java.TypeCast, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(tc, func(v any) any { return v.(*tree.TypeCast).Clazz },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(tc, func(v any) any { return v.(*tree.TypeCast).Expr },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(tc, func(v any) any { return v.(*java.TypeCast).Clazz },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(tc, func(v any) any { return v.(*java.TypeCast).Expr },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return tc
 }
 
-func (s *JavaSender) VisitControlParentheses(cp *tree.ControlParentheses, p any) tree.J {
+func (s *JavaSender) VisitControlParentheses(cp *java.ControlParentheses, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(cp, func(v any) any { return v.(*tree.ControlParentheses).Tree },
+	q.GetAndSend(cp, func(v any) any { return v.(*java.ControlParentheses).Tree },
 		func(v any) { sendRightPadded(s, v, q) })
 	return cp
 }
 
-func (s *JavaSender) VisitImport(imp *tree.Import, p any) tree.J {
+func (s *JavaSender) VisitImport(imp *java.Import, p any) java.J {
 	q := p.(*SendQueue)
 	// Java Import: static (left-padded), qualid, alias (left-padded)
 	// Static is always false for Go
 	q.GetAndSend(imp, func(_ any) any {
-		return tree.LeftPadded[bool]{Before: tree.EmptySpace, Element: false}
+		return java.LeftPadded[bool]{Before: java.EmptySpace, Element: false}
 	}, func(v any) { sendLeftPadded(s, v, q) })
 	// qualid
-	q.GetAndSend(imp, func(v any) any { return v.(*tree.Import).Qualid },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(imp, func(v any) any { return v.(*java.Import).Qualid },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// alias — dereference pointer
 	q.GetAndSend(imp, func(v any) any {
-		a := v.(*tree.Import).Alias
-		if a == nil { return nil }
+		a := v.(*java.Import).Alias
+		if a == nil {
+			return nil
+		}
 		return *a
 	}, func(v any) { sendLeftPadded(s, v, q) })
 	return imp

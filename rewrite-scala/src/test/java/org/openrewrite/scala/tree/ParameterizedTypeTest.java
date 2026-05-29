@@ -123,6 +123,26 @@ class ParameterizedTypeTest implements RewriteTest {
     }
 
     @Test
+    void boundedTypeParameterWithContextBound() {
+        rewriteRun(
+          scala(
+            """
+            trait Actor
+            trait ClassTag[T]
+            trait Lower
+            trait Upper
+
+            class ActorRefProvider[T <: Actor: ClassTag]
+            class UpperBound[T <: Upper: ClassTag]
+            class LowerBound[T >: Lower: ClassTag]
+            class LowerAndUpperBound[T >: Lower <: Upper: ClassTag]
+            class MultipleContextBounds[T <: Upper: ClassTag: Ordering]
+            """
+          )
+        );
+    }
+
+    @Test
     void varianceAnnotations() {
         rewriteRun(
           scala(

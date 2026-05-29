@@ -267,6 +267,18 @@ public class Assertions {
     }
 
     /**
+     * Register a project in {@code ctx} as dirty, simulating the state after a
+     * dependency-mutating recipe modified that project's dependencies earlier in the recipe run.
+     * Tests must subsequently pass {@code ctx} to {@link org.openrewrite.test.RecipeSpec#executionContext(ExecutionContext)}
+     * so that consumer recipes (e.g. {@code OrderImports}, {@code ChangePackage}, {@code ChangeType})
+     * read the registry from the same context. The {@code projectName} should match the
+     * {@link #project(SourceSpec, String)} marker attached to the source files under test.
+     */
+    public static void markSourceSetDirty(ExecutionContext ctx, String projectName) {
+        JavaSourceSet.markDirty(ctx, projectName);
+    }
+
+    /**
      * Enrich each source file's JavaSourceSet marker with types declared in other source files,
      * so that classpath-based ambiguity detection works in tests where types come from source
      * files rather than JARs.

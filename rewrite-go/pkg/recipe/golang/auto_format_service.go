@@ -19,7 +19,7 @@ package golang
 import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/format"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // AutoFormatService exposes gofmt-style normalization as composable
@@ -44,35 +44,35 @@ type AutoFormatService struct{}
 // AutoFormatVisitor returns a visitor that applies the full gofmt-style
 // pipeline. Composes via DoAfterVisit so individual passes can be
 // inspected or replaced independently if needed.
-func (s *AutoFormatService) AutoFormatVisitor(stopAfter tree.Tree) recipe.TreeVisitor {
+func (s *AutoFormatService) AutoFormatVisitor(stopAfter java.Tree) recipe.TreeVisitor {
 	return format.NewAutoFormatVisitor(stopAfter)
 }
 
 // TabsAndIndentsVisitor returns just the indent-fix pass. Use when a
 // recipe has spliced a subtree that needs re-indenting but already has
 // correct internal spacing.
-func (s *AutoFormatService) TabsAndIndentsVisitor(stopAfter tree.Tree) recipe.TreeVisitor {
+func (s *AutoFormatService) TabsAndIndentsVisitor(stopAfter java.Tree) recipe.TreeVisitor {
 	return format.NewTabsAndIndentsVisitor(stopAfter)
 }
 
 // BlankLinesVisitor returns just the blank-line collapse pass. Use to
 // clean up after a delete-and-replace edit that left stray blank lines
 // inside a block.
-func (s *AutoFormatService) BlankLinesVisitor(stopAfter tree.Tree) recipe.TreeVisitor {
+func (s *AutoFormatService) BlankLinesVisitor(stopAfter java.Tree) recipe.TreeVisitor {
 	return format.NewBlankLinesVisitor(stopAfter)
 }
 
 // SpacesVisitor returns just the intra-line spacing pass. Use after a
 // recipe has built up a binary/assignment node from raw parts and the
 // operator surrounds need normalizing to a single space.
-func (s *AutoFormatService) SpacesVisitor(stopAfter tree.Tree) recipe.TreeVisitor {
+func (s *AutoFormatService) SpacesVisitor(stopAfter java.Tree) recipe.TreeVisitor {
 	return format.NewSpacesVisitor(stopAfter)
 }
 
 // RemoveTrailingWhitespaceVisitor returns just the trailing-whitespace
 // strip pass. Useful as a standalone cleanup over a tree the rest of
 // the pipeline shouldn't touch.
-func (s *AutoFormatService) RemoveTrailingWhitespaceVisitor(stopAfter tree.Tree) recipe.TreeVisitor {
+func (s *AutoFormatService) RemoveTrailingWhitespaceVisitor(stopAfter java.Tree) recipe.TreeVisitor {
 	return format.NewRemoveTrailingWhitespaceVisitor(stopAfter)
 }
 

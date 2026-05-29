@@ -24,7 +24,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -36,7 +36,9 @@ type findFoo struct {
 
 func (r *findFoo) Name() string        { return "org.openrewrite.golang.test.FindFoo" }
 func (r *findFoo) DisplayName() string { return "Find foo identifiers" }
-func (r *findFoo) Description() string { return "Marks all identifiers named `foo` with a search result." }
+func (r *findFoo) Description() string {
+	return "Marks all identifiers named `foo` with a search result."
+}
 
 func (r *findFoo) Editor() recipe.TreeVisitor {
 	return visitor.Init(&findFooVisitor{})
@@ -46,10 +48,10 @@ type findFooVisitor struct {
 	visitor.GoVisitor
 }
 
-func (v *findFooVisitor) VisitIdentifier(ident *tree.Identifier, p any) tree.J {
-	ident = v.GoVisitor.VisitIdentifier(ident, p).(*tree.Identifier)
+func (v *findFooVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
+	ident = v.GoVisitor.VisitIdentifier(ident, p).(*java.Identifier)
 	if ident.Name == "foo" {
-		ident = ident.WithMarkers(tree.FoundSearchResult(ident.Markers, "found foo"))
+		ident = ident.WithMarkers(java.FoundSearchResult(ident.Markers, "found foo"))
 	}
 	return ident
 }
@@ -72,8 +74,8 @@ type renameFooToBarVisitor struct {
 	visitor.GoVisitor
 }
 
-func (v *renameFooToBarVisitor) VisitIdentifier(ident *tree.Identifier, p any) tree.J {
-	ident = v.GoVisitor.VisitIdentifier(ident, p).(*tree.Identifier)
+func (v *renameFooToBarVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
+	ident = v.GoVisitor.VisitIdentifier(ident, p).(*java.Identifier)
 	if ident.Name == "foo" {
 		ident = ident.WithName("bar")
 	}

@@ -17,7 +17,8 @@
 package format
 
 import (
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // transformLeftmostPrefix walks the leftmost-spine of t and applies f
@@ -35,112 +36,112 @@ import (
 // block-start strip, Spaces' "single space after `:=`" with a Binary
 // operand) reach for it through this helper instead of guessing where
 // the parser put it.
-func transformLeftmostPrefix(t tree.Tree, f func(tree.Space) tree.Space) tree.Tree {
+func transformLeftmostPrefix(t java.Tree, f func(java.Space) java.Space) java.Tree {
 	if t == nil {
 		return nil
 	}
 	switch n := t.(type) {
-	case *tree.Binary:
+	case *java.Binary:
 		if n.Left == nil {
 			break
 		}
-		if updated, ok := transformLeftmostPrefix(n.Left, f).(tree.Expression); ok {
+		if updated, ok := transformLeftmostPrefix(n.Left, f).(java.Expression); ok {
 			c := *n
 			c.Left = updated
 			return &c
 		}
-	case *tree.Assignment:
+	case *java.Assignment:
 		if n.Variable == nil {
 			break
 		}
-		if updated, ok := transformLeftmostPrefix(n.Variable, f).(tree.Expression); ok {
+		if updated, ok := transformLeftmostPrefix(n.Variable, f).(java.Expression); ok {
 			c := *n
 			c.Variable = updated
 			return &c
 		}
-	case *tree.AssignmentOperation:
+	case *java.AssignmentOperation:
 		if n.Variable == nil {
 			break
 		}
-		if updated, ok := transformLeftmostPrefix(n.Variable, f).(tree.Expression); ok {
+		if updated, ok := transformLeftmostPrefix(n.Variable, f).(java.Expression); ok {
 			c := *n
 			c.Variable = updated
 			return &c
 		}
-	case *tree.FieldAccess:
+	case *java.FieldAccess:
 		if n.Target == nil {
 			break
 		}
-		if updated, ok := transformLeftmostPrefix(n.Target, f).(tree.Expression); ok {
+		if updated, ok := transformLeftmostPrefix(n.Target, f).(java.Expression); ok {
 			c := *n
 			c.Target = updated
 			return &c
 		}
-	case *tree.MethodInvocation:
+	case *java.MethodInvocation:
 		c := *n
 		if n.Select != nil && n.Select.Element != nil {
-			if updated, ok := transformLeftmostPrefix(n.Select.Element, f).(tree.Expression); ok {
+			if updated, ok := transformLeftmostPrefix(n.Select.Element, f).(java.Expression); ok {
 				sp := *n.Select
 				sp.Element = updated
 				c.Select = &sp
 				return &c
 			}
 		} else if n.Name != nil {
-			if updated, ok := transformLeftmostPrefix(n.Name, f).(*tree.Identifier); ok {
+			if updated, ok := transformLeftmostPrefix(n.Name, f).(*java.Identifier); ok {
 				c.Name = updated
 				return &c
 			}
 		}
-	case *tree.ArrayAccess:
+	case *java.ArrayAccess:
 		if n.Indexed == nil {
 			break
 		}
-		if updated, ok := transformLeftmostPrefix(n.Indexed, f).(tree.Expression); ok {
+		if updated, ok := transformLeftmostPrefix(n.Indexed, f).(java.Expression); ok {
 			c := *n
 			c.Indexed = updated
 			return &c
 		}
-	case *tree.StatementExpression:
+	case *golang.StatementExpression:
 		if n.Statement == nil {
 			break
 		}
-		if updated, ok := transformLeftmostPrefix(n.Statement, f).(tree.Statement); ok {
+		if updated, ok := transformLeftmostPrefix(n.Statement, f).(java.Statement); ok {
 			c := *n
 			c.Statement = updated
 			return &c
 		}
-	case *tree.Composite:
+	case *golang.Composite:
 		if n.TypeExpr == nil {
 			break
 		}
-		if updated, ok := transformLeftmostPrefix(n.TypeExpr, f).(tree.Expression); ok {
+		if updated, ok := transformLeftmostPrefix(n.TypeExpr, f).(java.Expression); ok {
 			c := *n
 			c.TypeExpr = updated
 			return &c
 		}
-	case *tree.ParameterizedType:
+	case *java.ParameterizedType:
 		if n.Clazz == nil {
 			break
 		}
-		if updated, ok := transformLeftmostPrefix(n.Clazz, f).(tree.Expression); ok {
+		if updated, ok := transformLeftmostPrefix(n.Clazz, f).(java.Expression); ok {
 			c := *n
 			c.Clazz = updated
 			return &c
 		}
-	case *tree.IndexList:
+	case *golang.IndexList:
 		if n.Target == nil {
 			break
 		}
-		if updated, ok := transformLeftmostPrefix(n.Target, f).(tree.Expression); ok {
+		if updated, ok := transformLeftmostPrefix(n.Target, f).(java.Expression); ok {
 			c := *n
 			c.Target = updated
 			return &c
 		}
-	case *tree.Slice:
+	case *golang.Slice:
 		if n.Indexed == nil {
 			break
 		}
-		if updated, ok := transformLeftmostPrefix(n.Indexed, f).(tree.Expression); ok {
+		if updated, ok := transformLeftmostPrefix(n.Indexed, f).(java.Expression); ok {
 			c := *n
 			c.Indexed = updated
 			return &c
@@ -157,6 +158,6 @@ func transformLeftmostPrefix(t tree.Tree, f func(tree.Space) tree.Space) tree.Tr
 
 // setLeftmostPrefix is the "set" form of transformLeftmostPrefix: it
 // replaces the leftmost leaf's Prefix with prefix unconditionally.
-func setLeftmostPrefix(t tree.Tree, prefix tree.Space) tree.Tree {
-	return transformLeftmostPrefix(t, func(_ tree.Space) tree.Space { return prefix })
+func setLeftmostPrefix(t java.Tree, prefix java.Space) java.Tree {
+	return transformLeftmostPrefix(t, func(_ java.Space) java.Space { return prefix })
 }

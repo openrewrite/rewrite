@@ -1,0 +1,2 @@
+ecosystem,packageName,name,displayName,description,recipeCount,category1,category2
+maven,org.openrewrite:rewrite-scala,org.openrewrite.scala.format.AutoFormat,Format Scala code,Format Scala code using a standard comprehensive set of Scala formatting recipes.,1,Format,Scala

@@ -19,7 +19,8 @@ package template
 import (
 	"sync"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -32,13 +33,13 @@ type GoTemplate struct {
 	kind     ScaffoldKind
 
 	once     sync.Once
-	cached   tree.J
+	cached   java.J
 	parseErr error
 }
 
 // Apply produces a new AST node by parsing the template and substituting
 // captured values from the MatchResult.
-func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) tree.J {
+func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) java.J {
 	templateTree, err := t.getTree()
 	if err != nil || templateTree == nil {
 		return nil
@@ -60,7 +61,7 @@ func (t *GoTemplate) Apply(cursor *visitor.Cursor, values *MatchResult) tree.J {
 }
 
 // getTree lazily parses the template and caches the result.
-func (t *GoTemplate) getTree() (tree.J, error) {
+func (t *GoTemplate) getTree() (java.J, error) {
 	t.once.Do(func() {
 		t.cached, t.parseErr = parseScaffold(t.code, t.captures, t.imports, t.kind)
 	})
@@ -130,13 +131,13 @@ type RewriteVisitor struct {
 }
 
 // Visit overrides the default Visit to attempt pattern matching on every node.
-func (v *RewriteVisitor) Visit(t tree.Tree, p any) tree.Tree {
+func (v *RewriteVisitor) Visit(t java.Tree, p any) java.Tree {
 	result := v.GoVisitor.Visit(t, p)
 	if result == nil {
 		return nil
 	}
 
-	j, ok := result.(tree.J)
+	j, ok := result.(java.J)
 	if !ok {
 		return result
 	}
@@ -159,75 +160,75 @@ func (v *RewriteVisitor) Visit(t tree.Tree, p any) tree.Tree {
 // mirroring getLeadingPrefix. This ensures compound nodes like
 // MethodInvocation (where the prefix lives on Select, not the root)
 // get the right whitespace.
-func setLeadingPrefix(j tree.J, prefix tree.Space) tree.J {
+func setLeadingPrefix(j java.J, prefix java.Space) java.J {
 	switch n := j.(type) {
-	case *tree.Identifier:
+	case *java.Identifier:
 		return n.WithPrefix(prefix)
-	case *tree.Literal:
+	case *java.Literal:
 		return n.WithPrefix(prefix)
-	case *tree.Empty:
+	case *java.Empty:
 		return n.WithPrefix(prefix)
-	case *tree.Binary:
-		return n.WithLeft(setLeadingPrefix(n.Left, prefix).(tree.Expression))
-	case *tree.Unary:
+	case *java.Binary:
+		return n.WithLeft(setLeadingPrefix(n.Left, prefix).(java.Expression))
+	case *java.Unary:
 		return n.WithPrefix(prefix)
-	case *tree.FieldAccess:
-		return n.WithTarget(setLeadingPrefix(n.Target, prefix).(tree.Expression))
-	case *tree.MethodInvocation:
+	case *java.FieldAccess:
+		return n.WithTarget(setLeadingPrefix(n.Target, prefix).(java.Expression))
+	case *java.MethodInvocation:
 		if n.Select != nil {
 			sel := *n.Select
-			sel.Element = setLeadingPrefix(sel.Element, prefix).(tree.Expression)
-			return &tree.MethodInvocation{
+			sel.Element = setLeadingPrefix(sel.Element, prefix).(java.Expression)
+			return &java.MethodInvocation{
 				ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
 				Select: &sel, Name: n.Name, Arguments: n.Arguments, MethodType: n.MethodType,
 			}
 		}
 		return n.WithName(n.Name.WithPrefix(prefix))
-	case *tree.Assignment:
-		return n.WithVariable(setLeadingPrefix(n.Variable, prefix).(tree.Expression))
-	case *tree.AssignmentOperation:
-		return n.WithVariable(setLeadingPrefix(n.Variable, prefix).(tree.Expression))
-	case *tree.Parentheses:
+	case *java.Assignment:
+		return n.WithVariable(setLeadingPrefix(n.Variable, prefix).(java.Expression))
+	case *java.AssignmentOperation:
+		return n.WithVariable(setLeadingPrefix(n.Variable, prefix).(java.Expression))
+	case *java.Parentheses:
 		return n.WithPrefix(prefix)
-	case *tree.TypeCast:
+	case *java.TypeCast:
 		return n.WithPrefix(prefix)
-	case *tree.ArrayAccess:
-		return &tree.ArrayAccess{
+	case *java.ArrayAccess:
+		return &java.ArrayAccess{
 			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Indexed: setLeadingPrefix(n.Indexed, prefix).(tree.Expression),
+			Indexed:   setLeadingPrefix(n.Indexed, prefix).(java.Expression),
 			Dimension: n.Dimension, Type: n.Type,
 		}
-	case *tree.Composite:
+	case *golang.Composite:
 		if n.TypeExpr != nil {
-			return &tree.Composite{
+			return &golang.Composite{
 				ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-				TypeExpr: setLeadingPrefix(n.TypeExpr, prefix).(tree.Expression),
+				TypeExpr: setLeadingPrefix(n.TypeExpr, prefix).(java.Expression),
 				Elements: n.Elements,
 			}
 		}
 		return n.WithPrefix(prefix)
-	case *tree.Slice:
-		return &tree.Slice{
+	case *golang.Slice:
+		return &golang.Slice{
 			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Indexed: setLeadingPrefix(n.Indexed, prefix).(tree.Expression),
+			Indexed:     setLeadingPrefix(n.Indexed, prefix).(java.Expression),
 			OpenBracket: n.OpenBracket, Low: n.Low, High: n.High, Max: n.Max, CloseBracket: n.CloseBracket,
 		}
-	case *tree.IndexList:
-		return &tree.IndexList{
+	case *golang.IndexList:
+		return &golang.IndexList{
 			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Target: setLeadingPrefix(n.Target, prefix).(tree.Expression),
+			Target:  setLeadingPrefix(n.Target, prefix).(java.Expression),
 			Indices: n.Indices,
 		}
-	case *tree.Send:
-		return &tree.Send{
+	case *golang.Send:
+		return &golang.Send{
 			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Channel: setLeadingPrefix(n.Channel, prefix).(tree.Expression),
-			Arrow: n.Arrow,
+			Channel: setLeadingPrefix(n.Channel, prefix).(java.Expression),
+			Arrow:   n.Arrow,
 		}
-	case *tree.KeyValue:
-		return &tree.KeyValue{
+	case *golang.KeyValue:
+		return &golang.KeyValue{
 			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Key: setLeadingPrefix(n.Key, prefix).(tree.Expression),
+			Key:   setLeadingPrefix(n.Key, prefix).(java.Expression),
 			Value: n.Value,
 		}
 	default:
@@ -239,111 +240,118 @@ func setLeadingPrefix(j tree.J, prefix tree.Space) tree.J {
 // by walking to its leftmost leaf token. This is needed because in the
 // Go LST, compound nodes (Binary, Unary, etc.) may have empty prefixes
 // with the actual leading whitespace on the first child.
-func getLeadingPrefix(j tree.J) tree.Space {
+func getLeadingPrefix(j java.J) java.Space {
 	switch n := j.(type) {
-	case *tree.Identifier:
+	case *java.Identifier:
 		return n.Prefix
-	case *tree.Literal:
+	case *java.Literal:
 		return n.Prefix
-	case *tree.Empty:
+	case *java.Empty:
 		return n.Prefix
-	case *tree.Binary:
+	case *java.Binary:
 		// The leading prefix is on the left operand.
 		return getLeadingPrefix(n.Left)
-	case *tree.Unary:
+	case *java.Unary:
 		return n.Prefix
-	case *tree.FieldAccess:
+	case *java.FieldAccess:
 		return getLeadingPrefix(n.Target)
-	case *tree.MethodInvocation:
+	case *java.MethodInvocation:
 		if n.Select != nil {
 			return getLeadingPrefix(n.Select.Element)
 		}
 		return getLeadingPrefix(n.Name)
-	case *tree.Assignment:
+	case *java.Assignment:
 		return getLeadingPrefix(n.Variable)
-	case *tree.AssignmentOperation:
+	case *java.AssignmentOperation:
 		return getLeadingPrefix(n.Variable)
-	case *tree.Block:
+	case *java.Block:
 		return n.Prefix
-	case *tree.Return:
+	case *java.Return:
 		return n.Prefix
-	case *tree.If:
+	case *java.If:
 		return n.Prefix
-	case *tree.MethodDeclaration:
+	case *java.MethodDeclaration:
 		return n.Prefix
-	case *tree.VariableDeclarations:
+	case *java.VariableDeclarations:
 		return n.Prefix
-	case *tree.Parentheses:
+	case *java.Parentheses:
 		return n.Prefix
-	case *tree.TypeCast:
+	case *java.TypeCast:
 		return getLeadingPrefix(n.Expr)
-	case *tree.ControlParentheses:
+	case *java.ControlParentheses:
 		return n.Prefix
-	case *tree.ArrayAccess:
+	case *java.ArrayAccess:
 		return getLeadingPrefix(n.Indexed)
-	case *tree.ArrayType:
+	case *java.ArrayType:
 		return n.Prefix
-	case *tree.ForLoop:
+	case *java.ForLoop:
 		return n.Prefix
-	case *tree.ForEachLoop:
+	case *java.ForEachLoop:
 		return n.Prefix
-	case *tree.Switch:
+	case *java.Switch:
 		return n.Prefix
-	case *tree.Case:
+	case *java.Case:
 		return n.Prefix
-	case *tree.Break:
+	case *java.Break:
 		return n.Prefix
-	case *tree.Continue:
+	case *java.Continue:
 		return n.Prefix
-	case *tree.Label:
+	case *java.Label:
 		return n.Prefix
-	case *tree.GoStmt:
+	case *golang.GoStmt:
 		return n.Prefix
-	case *tree.Defer:
+	case *golang.Defer:
 		return n.Prefix
-	case *tree.Send:
+	case *golang.Send:
 		return getLeadingPrefix(n.Channel)
-	case *tree.Goto:
+	case *golang.Goto:
 		return n.Prefix
-	case *tree.Fallthrough:
+	case *golang.Fallthrough:
 		return n.Prefix
-	case *tree.Composite:
+	case *golang.Composite:
 		if n.TypeExpr != nil {
 			return getLeadingPrefix(n.TypeExpr)
 		}
 		return n.Prefix
-	case *tree.KeyValue:
+	case *golang.KeyValue:
 		return getLeadingPrefix(n.Key)
-	case *tree.Slice:
+	case *golang.Slice:
 		return getLeadingPrefix(n.Indexed)
-	case *tree.MapType:
+	case *golang.MapType:
 		return n.Prefix
-	case *tree.Channel:
+	case *golang.Channel:
 		return n.Prefix
-	case *tree.FuncType:
+	case *golang.FuncType:
 		return n.Prefix
-	case *tree.StructType:
+	case *golang.StructType:
 		return n.Prefix
-	case *tree.InterfaceType:
+	case *golang.InterfaceType:
 		return n.Prefix
-	case *tree.TypeList:
+	case *golang.TypeList:
 		return n.Prefix
-	case *tree.TypeDecl:
+	case *golang.Union:
+		if len(n.Types) > 0 {
+			return getLeadingPrefix(n.Types[0].Element)
+		}
 		return n.Prefix
-	case *tree.MultiAssignment:
+	case *golang.UnderlyingType:
+		return n.Prefix
+	case *golang.TypeDecl:
+		return n.Prefix
+	case *golang.MultiAssignment:
 		if len(n.Variables) > 0 {
 			return getLeadingPrefix(n.Variables[0].Element)
 		}
 		return n.Prefix
-	case *tree.CommClause:
+	case *golang.CommClause:
 		return n.Prefix
-	case *tree.IndexList:
+	case *golang.IndexList:
 		return getLeadingPrefix(n.Target)
-	case *tree.Import:
+	case *java.Import:
 		return n.Prefix
-	case *tree.CompilationUnit:
+	case *golang.CompilationUnit:
 		return n.Prefix
 	default:
-		return tree.Space{}
+		return java.Space{}
 	}
 }

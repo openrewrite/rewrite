@@ -30,6 +30,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.RandomizeIdVisitor;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
@@ -107,6 +108,9 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 }
             }
 
+            if (cu != tree) {
+                JavaSourceSet.markDirty(ctx, cu);
+            }
             return cu;
         }
         return j;
@@ -291,7 +295,9 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
         } catch (MavenDownloadingException | MavenDownloadingExceptions | IllegalArgumentException e) {
             return Markup.warn(buildScript, e);
         }
-        return buildScript.withMarkers(buildScript.getMarkers().setByType(gp));
+        JavaSourceFile result = buildScript.withMarkers(buildScript.getMarkers().setByType(gp));
+        JavaSourceSet.markDirty(ctx, result);
+        return result;
     }
 
     enum DependencyStyle {

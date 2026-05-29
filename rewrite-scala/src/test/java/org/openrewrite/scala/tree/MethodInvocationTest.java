@@ -444,6 +444,13 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parenthesizedInfixExprWithBlockArg() {
+        rewriteRun(
+          scala("(foo bar baz) { x => x }")
+        );
+    }
+
     @Nested
     class VarargSplat implements RewriteTest {
 

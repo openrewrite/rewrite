@@ -2684,6 +2684,16 @@ class MethodDeclaration(Statement, TypedTree):
         return self._parameters.elements
 
 
+    _dimensions_after_name: List[JLeftPadded[Space]]
+
+    @property
+    def dimensions_after_name(self) -> List[JLeftPadded[Space]]:
+        return self._dimensions_after_name
+
+    def with_dimensions_after_name(self, dimensions_after_name: List[JLeftPadded[Space]]) -> MethodDeclaration:
+        return self if dimensions_after_name is self._dimensions_after_name else replace(self, _dimensions_after_name=dimensions_after_name)
+
+
     _throws: Optional[JContainer[NameTree]]
 
     @property

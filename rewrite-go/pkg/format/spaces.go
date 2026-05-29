@@ -19,7 +19,7 @@ package format
 import (
 	"strings"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -43,13 +43,13 @@ type SpacesVisitor struct {
 
 // NewSpacesVisitor returns a visitor configured with the given
 // stopAfter bound. Pass nil to format the entire visited tree.
-func NewSpacesVisitor(stopAfter tree.Tree) *SpacesVisitor {
+func NewSpacesVisitor(stopAfter java.Tree) *SpacesVisitor {
 	return visitor.Init(&SpacesVisitor{
 		stopAfterTracker: stopAfterTracker{stopAfter: stopAfter},
 	})
 }
 
-func (v *SpacesVisitor) Visit(t tree.Tree, p any) tree.Tree {
+func (v *SpacesVisitor) Visit(t java.Tree, p any) java.Tree {
 	if v.shouldHalt() {
 		return t
 	}
@@ -58,29 +58,29 @@ func (v *SpacesVisitor) Visit(t tree.Tree, p any) tree.Tree {
 	return out
 }
 
-func (v *SpacesVisitor) VisitBinary(bin *tree.Binary, p any) tree.J {
-	bin = v.GoVisitor.VisitBinary(bin, p).(*tree.Binary)
+func (v *SpacesVisitor) VisitBinary(bin *java.Binary, p any) java.J {
+	bin = v.GoVisitor.VisitBinary(bin, p).(*java.Binary)
 	bin.Operator.Before = ensureSingleSpace(bin.Operator.Before)
 	bin = bin.WithRight(ensureLeadingSingleSpace(bin.Right))
 	return bin
 }
 
-func (v *SpacesVisitor) VisitAssignment(a *tree.Assignment, p any) tree.J {
-	a = v.GoVisitor.VisitAssignment(a, p).(*tree.Assignment)
+func (v *SpacesVisitor) VisitAssignment(a *java.Assignment, p any) java.J {
+	a = v.GoVisitor.VisitAssignment(a, p).(*java.Assignment)
 	a.Value.Before = ensureSingleSpace(a.Value.Before)
 	a.Value.Element = ensureLeadingSingleSpace(a.Value.Element)
 	return a
 }
 
-func (v *SpacesVisitor) VisitAssignmentOperation(ao *tree.AssignmentOperation, p any) tree.J {
-	ao = v.GoVisitor.VisitAssignmentOperation(ao, p).(*tree.AssignmentOperation)
+func (v *SpacesVisitor) VisitAssignmentOperation(ao *java.AssignmentOperation, p any) java.J {
+	ao = v.GoVisitor.VisitAssignmentOperation(ao, p).(*java.AssignmentOperation)
 	ao.Operator.Before = ensureSingleSpace(ao.Operator.Before)
 	ao.Assignment = ensureLeadingSingleSpace(ao.Assignment)
 	return ao
 }
 
-func (v *SpacesVisitor) VisitUnary(u *tree.Unary, p any) tree.J {
-	u = v.GoVisitor.VisitUnary(u, p).(*tree.Unary)
+func (v *SpacesVisitor) VisitUnary(u *java.Unary, p any) java.J {
+	u = v.GoVisitor.VisitUnary(u, p).(*java.Unary)
 	u.Operand = clearExpressionLeadingSpace(u.Operand)
 	return u
 }
@@ -88,7 +88,7 @@ func (v *SpacesVisitor) VisitUnary(u *tree.Unary, p any) tree.J {
 // ensureSingleSpace returns the space unchanged if it contains a
 // newline (deliberate multi-line layout), otherwise normalizes any
 // 0-or-many-spaces to exactly one space.
-func ensureSingleSpace(s tree.Space) tree.Space {
+func ensureSingleSpace(s java.Space) java.Space {
 	if strings.Contains(s.Whitespace, "\n") {
 		return s
 	}
@@ -105,18 +105,18 @@ func ensureSingleSpace(s tree.Space) tree.Space {
 // whitespace lives directly on the expression (Identifier, Literal,
 // Unary, Parentheses) or on a deeper leftmost descendant (Binary's
 // Left, FieldAccess's Target, etc.).
-func ensureLeadingSingleSpace(e tree.Expression) tree.Expression {
+func ensureLeadingSingleSpace(e java.Expression) java.Expression {
 	if e == nil {
 		return e
 	}
 	out := transformLeftmostPrefix(e, ensureSingleSpace)
-	if r, ok := out.(tree.Expression); ok {
+	if r, ok := out.(java.Expression); ok {
 		return r
 	}
 	return e
 }
 
-func clearExpressionLeadingSpace(e tree.Expression) tree.Expression {
+func clearExpressionLeadingSpace(e java.Expression) java.Expression {
 	if e == nil {
 		return e
 	}

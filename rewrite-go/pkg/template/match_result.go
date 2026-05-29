@@ -16,11 +16,11 @@
 
 package template
 
-import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 
 // MatchResult holds the captured AST nodes from a successful pattern match.
 type MatchResult struct {
-	bindings map[string]any // single: tree.J, variadic: []tree.J
+	bindings map[string]any // single: java.J, variadic: []java.J
 }
 
 // NewMatchResult creates a MatchResult from binding pairs.
@@ -29,12 +29,12 @@ func NewMatchResult() *MatchResult {
 }
 
 // bind stores a single captured value.
-func (m *MatchResult) bind(name string, value tree.J) {
+func (m *MatchResult) bind(name string, value java.J) {
 	m.bindings[name] = value
 }
 
 // bindList stores a variadic captured list.
-func (m *MatchResult) bindList(name string, values []tree.J) {
+func (m *MatchResult) bindList(name string, values []java.J) {
 	m.bindings[name] = values
 }
 
@@ -45,34 +45,34 @@ func (m *MatchResult) Has(name string) bool {
 }
 
 // Get returns the single captured node for the given name, or nil if not bound.
-func (m *MatchResult) Get(name string) tree.J {
+func (m *MatchResult) Get(name string) java.J {
 	v, ok := m.bindings[name]
 	if !ok {
 		return nil
 	}
-	if j, ok := v.(tree.J); ok {
+	if j, ok := v.(java.J); ok {
 		return j
 	}
 	return nil
 }
 
 // GetList returns the variadic captured nodes for the given name.
-func (m *MatchResult) GetList(name string) []tree.J {
+func (m *MatchResult) GetList(name string) []java.J {
 	v, ok := m.bindings[name]
 	if !ok {
 		return nil
 	}
-	if list, ok := v.([]tree.J); ok {
+	if list, ok := v.([]java.J); ok {
 		return list
 	}
 	// If a single value was bound, wrap it in a slice.
-	if j, ok := v.(tree.J); ok {
-		return []tree.J{j}
+	if j, ok := v.(java.J); ok {
+		return []java.J{j}
 	}
 	return nil
 }
 
 // GetCapture returns the captured node for the given Capture, or nil.
-func (m *MatchResult) GetCapture(c *Capture) tree.J {
+func (m *MatchResult) GetCapture(c *Capture) java.J {
 	return m.Get(c.Name())
 }

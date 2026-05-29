@@ -18,10 +18,15 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
+import org.openrewrite.java.ChangePackage;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.*;
@@ -3537,6 +3542,149 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             )
           )
         );
+    }
+
+    @Test
+    void marksProjectDirtyAfterChangingDependencyCoordinates() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.0.1",
+            null,
+            false,
+            false
+          )).executionContext(ctx),
+          mavenProject("project",
+            srcMainJava(
+              java("class A {}")
+            ),
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>2.0.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+
+        Set<String> dirty = JavaSourceSet.dirtyProjects(ctx);
+        assertThat(dirty)
+            .as("Dependency mutation should mark the project dirty so downstream ambiguity-sensitive recipes take the safe path")
+            .isNotNull()
+            .contains("project");
+    }
+
+
+    @Test
+    void composedWithChangePackageUpdatesImports() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeDependencyGroupIdAndArtifactId(
+              "javax.activation",
+              "javax.activation-api",
+              "jakarta.activation",
+              "jakarta.activation-api",
+              "2.0.1",
+              null,
+              false,
+              false
+            ),
+            new ChangePackage("javax.activation", "jakarta.activation", true)
+          ).executionContext(ctx),
+          mavenProject("project",
+            srcMainJava(
+              java(
+                """
+                  import javax.activation.DataHandler;
+                  import javax.activation.MimeType;
+
+                  class A {
+                      DataHandler handler;
+                      MimeType type;
+                  }
+                  """,
+                """
+                  import jakarta.activation.DataHandler;
+                  import jakarta.activation.MimeType;
+
+                  class A {
+                      DataHandler handler;
+                      MimeType type;
+                  }
+                  """
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>2.0.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+
+        Set<String> dirty = JavaSourceSet.dirtyProjects(ctx);
+        assertThat(dirty)
+            .as("Composed run should leave the project marked dirty for any downstream ambiguity-sensitive recipe")
+            .isNotNull()
+            .contains("project");
     }
 
     @Test

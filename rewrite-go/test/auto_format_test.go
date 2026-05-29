@@ -23,8 +23,8 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -42,14 +42,14 @@ func applyVisitor(t *testing.T, src string, v recipe.TreeVisitor) string {
 		t.Fatal("visit returned nil")
 	}
 
-	final := visitor.DrainAfterVisits(v, result.(tree.Tree), nil)
+	final := visitor.DrainAfterVisits(v, result.(java.Tree), nil)
 	return printer.Print(final)
 }
 
 // ---- Service registry ----
 
 func TestAutoFormatService_RegisteredOnInit(t *testing.T) {
-	svc := recipe.Service[*golang.AutoFormatService](nil)
+	svc := recipe.Service[*recipes.AutoFormatService](nil)
 	if svc == nil {
 		t.Fatal("expected AutoFormatService to be registered, got nil")
 	}

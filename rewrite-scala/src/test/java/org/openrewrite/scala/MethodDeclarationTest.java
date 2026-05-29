@@ -200,6 +200,21 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void scala2MacroImplementation() {
+        rewriteRun(
+            scala(
+                """
+                import scala.language.experimental.macros
+
+                class C {
+                  def q: T = macro macroimpl.M.f
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void methodWithTypeParameters() {
         rewriteRun(
             scala(

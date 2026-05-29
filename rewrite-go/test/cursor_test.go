@@ -21,7 +21,8 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -30,7 +31,7 @@ func TestCursorBuildChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	chain := visitor.BuildChain([]tree.Tree{cu})
+	chain := visitor.BuildChain([]java.Tree{cu})
 	if chain == nil || chain.Value() != cu || chain.Parent() != nil {
 		t.Fatalf("expected single-element chain rooted at cu; got parent=%v value=%v", chain.Parent(), chain.Value())
 	}
@@ -54,7 +55,7 @@ func TestVisitorCursorState(t *testing.T) {
 	v := &cursorObservingVisitor{}
 	visitor.Init(v)
 
-	outer := visitor.BuildChain([]tree.Tree{cu})
+	outer := visitor.BuildChain([]java.Tree{cu})
 	v.SetCursor(outer)
 	if v.Cursor() != outer {
 		t.Fatalf("Cursor() should return what SetCursor seeded")
@@ -75,7 +76,7 @@ type cursorObservingVisitor struct {
 	cuCursor   *visitor.Cursor
 }
 
-func (v *cursorObservingVisitor) VisitCompilationUnit(cu *tree.CompilationUnit, p any) tree.J {
+func (v *cursorObservingVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
 	v.observedCU = true
 	v.cuCursor = v.Cursor()
 	return cu

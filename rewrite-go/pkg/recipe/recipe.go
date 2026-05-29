@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // TreeVisitor can visit and transform a tree node. Visitors that need
@@ -28,7 +28,7 @@ import (
 // embedding visitor.GoVisitor and calling its Cursor() accessor — to
 // match the Java OpenRewrite visitor pattern.
 type TreeVisitor interface {
-	Visit(t tree.Tree, p any) tree.Tree
+	Visit(t java.Tree, p any) java.Tree
 }
 
 // Recipe defines a source code transformation.

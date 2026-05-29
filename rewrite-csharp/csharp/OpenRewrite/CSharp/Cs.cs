@@ -229,6 +229,9 @@ public sealed class AccessorDeclaration(
     public IList<Modifier> Modifiers { get; } = modifiers;
     public JLeftPadded<AccessorKind> Kind { get; } = kind;
     public Block? Body { get; } = body;
+    // For auto-implemented accessors (e.g. "get ;"), Element is a J.Empty whose Prefix
+    // carries any whitespace between the keyword and the trailing ';'. For "get => x;" the
+    // Element is the body expression and Before is the space before '=>'.
     public JLeftPadded<Expression>? ExpressionBody { get; } = expressionBody;
 
     public AccessorDeclaration WithId(Guid id) =>

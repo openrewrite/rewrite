@@ -19,7 +19,7 @@ package rpc
 import (
 	"reflect"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 var defaultSender = NewGoSender()
@@ -205,7 +205,7 @@ func (q *SendQueue) add(after any, onChange func(any)) {
 	vt := getValueType(afterVal)
 	var val any
 	skipDoChange := false
-	if gm, ok := afterVal.(tree.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
+	if gm, ok := afterVal.(java.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
 		// No RpcCodec on either side for this marker — inline the marker's
 		// data as the ADD message's Value so the receiver can reconstruct
 		// the typed instance. Skip sub-field dispatch, which would otherwise
@@ -234,7 +234,7 @@ func (q *SendQueue) doChange(after, before any, onChange func(any)) {
 	if onChange != nil && !isNilValue(after) {
 		onChange(after)
 	} else if onChange == nil && !isNilValue(after) && getValueType(after) != nil {
-		if t, ok := after.(tree.Tree); ok {
+		if t, ok := after.(java.Tree); ok {
 			defaultSender.Visit(t, q)
 		}
 	}
@@ -316,7 +316,7 @@ func getValueType(v any) *string {
 		return &vt
 	}
 	// GenericMarker carries the original Java class name
-	if gm, ok := v.(tree.GenericMarker); ok && gm.JavaType != "" {
+	if gm, ok := v.(java.GenericMarker); ok && gm.JavaType != "" {
 		return &gm.JavaType
 	}
 	// Check padding types (Go generics have no reflect.Name())

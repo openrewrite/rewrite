@@ -17,7 +17,8 @@
 package template
 
 import (
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -34,7 +35,7 @@ func newSubstitutionVisitor(values *MatchResult) *substitutionVisitor {
 	return v
 }
 
-func (v *substitutionVisitor) VisitIdentifier(ident *tree.Identifier, p any) tree.J {
+func (v *substitutionVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
 	name, ok := FromPlaceholder(ident.Name)
 	if !ok {
 		return v.GoVisitor.VisitIdentifier(ident, p)
@@ -53,111 +54,115 @@ func (v *substitutionVisitor) VisitIdentifier(ident *tree.Identifier, p any) tre
 
 // substitute applies the substitution visitor to the template tree,
 // replacing all placeholder identifiers with captured values.
-func substitute(templateTree tree.J, values *MatchResult) tree.J {
+func substitute(templateTree java.J, values *MatchResult) java.J {
 	v := newSubstitutionVisitor(values)
 	result := v.Visit(templateTree, nil)
 	if result == nil {
 		return nil
 	}
-	return result.(tree.J)
+	return result.(java.J)
 }
 
 // setPrefix creates a copy of the node with the given prefix Space.
-func setPrefix(j tree.J, prefix tree.Space) tree.J {
+func setPrefix(j java.J, prefix java.Space) java.J {
 	switch n := j.(type) {
-	case *tree.Identifier:
+	case *java.Identifier:
 		return n.WithPrefix(prefix)
-	case *tree.Literal:
+	case *java.Literal:
 		return n.WithPrefix(prefix)
-	case *tree.Binary:
+	case *java.Binary:
 		return n.WithPrefix(prefix)
-	case *tree.Unary:
+	case *java.Unary:
 		return n.WithPrefix(prefix)
-	case *tree.FieldAccess:
+	case *java.FieldAccess:
 		return n.WithPrefix(prefix)
-	case *tree.MethodInvocation:
+	case *java.MethodInvocation:
 		return n.WithPrefix(prefix)
-	case *tree.Assignment:
+	case *java.Assignment:
 		return n.WithPrefix(prefix)
-	case *tree.AssignmentOperation:
+	case *java.AssignmentOperation:
 		return n.WithPrefix(prefix)
-	case *tree.Block:
+	case *java.Block:
 		return n.WithPrefix(prefix)
-	case *tree.Return:
+	case *java.Return:
 		return n.WithPrefix(prefix)
-	case *tree.If:
+	case *java.If:
 		return n.WithPrefix(prefix)
-	case *tree.MethodDeclaration:
+	case *java.MethodDeclaration:
 		return n.WithPrefix(prefix)
-	case *tree.VariableDeclarations:
+	case *java.VariableDeclarations:
 		return n.WithPrefix(prefix)
-	case *tree.VariableDeclarator:
+	case *java.VariableDeclarator:
 		return n.WithPrefix(prefix)
-	case *tree.Parentheses:
+	case *java.Parentheses:
 		return n.WithPrefix(prefix)
-	case *tree.TypeCast:
+	case *java.TypeCast:
 		return n.WithPrefix(prefix)
-	case *tree.ControlParentheses:
+	case *java.ControlParentheses:
 		return n.WithPrefix(prefix)
-	case *tree.ArrayAccess:
+	case *java.ArrayAccess:
 		return n.WithPrefix(prefix)
-	case *tree.ArrayType:
+	case *java.ArrayType:
 		return n.WithPrefix(prefix)
-	case *tree.ForLoop:
+	case *java.ForLoop:
 		return n.WithPrefix(prefix)
-	case *tree.ForEachLoop:
+	case *java.ForEachLoop:
 		return n.WithPrefix(prefix)
-	case *tree.Switch:
+	case *java.Switch:
 		return n.WithPrefix(prefix)
-	case *tree.Case:
+	case *java.Case:
 		return n.WithPrefix(prefix)
-	case *tree.Break:
+	case *java.Break:
 		return n.WithPrefix(prefix)
-	case *tree.Continue:
+	case *java.Continue:
 		return n.WithPrefix(prefix)
-	case *tree.Label:
+	case *java.Label:
 		return n.WithPrefix(prefix)
-	case *tree.Empty:
+	case *java.Empty:
 		return n.WithPrefix(prefix)
-	case *tree.Import:
+	case *java.Import:
 		return n.WithPrefix(prefix)
-	case *tree.GoStmt:
+	case *golang.GoStmt:
 		return n.WithPrefix(prefix)
-	case *tree.Defer:
+	case *golang.Defer:
 		return n.WithPrefix(prefix)
-	case *tree.Send:
+	case *golang.Send:
 		return n.WithPrefix(prefix)
-	case *tree.Goto:
+	case *golang.Goto:
 		return n.WithPrefix(prefix)
-	case *tree.Fallthrough:
+	case *golang.Fallthrough:
 		return n.WithPrefix(prefix)
-	case *tree.Composite:
+	case *golang.Composite:
 		return n.WithPrefix(prefix)
-	case *tree.KeyValue:
+	case *golang.KeyValue:
 		return n.WithPrefix(prefix)
-	case *tree.Slice:
+	case *golang.Slice:
 		return n.WithPrefix(prefix)
-	case *tree.MapType:
+	case *golang.MapType:
 		return n.WithPrefix(prefix)
-	case *tree.Channel:
+	case *golang.Channel:
 		return n.WithPrefix(prefix)
-	case *tree.FuncType:
+	case *golang.FuncType:
 		return n.WithPrefix(prefix)
-	case *tree.StructType:
+	case *golang.StructType:
 		return n.WithPrefix(prefix)
-	case *tree.InterfaceType:
+	case *golang.InterfaceType:
 		return n.WithPrefix(prefix)
-	case *tree.TypeList:
+	case *golang.TypeList:
 		return n.WithPrefix(prefix)
-	case *tree.TypeDecl:
+	case *golang.Union:
 		return n.WithPrefix(prefix)
-	case *tree.MultiAssignment:
+	case *golang.UnderlyingType:
 		return n.WithPrefix(prefix)
-	case *tree.CommClause:
+	case *golang.TypeDecl:
 		return n.WithPrefix(prefix)
-	case *tree.IndexList:
+	case *golang.MultiAssignment:
 		return n.WithPrefix(prefix)
-	case *tree.CompilationUnit:
+	case *golang.CommClause:
+		return n.WithPrefix(prefix)
+	case *golang.IndexList:
+		return n.WithPrefix(prefix)
+	case *golang.CompilationUnit:
 		return n.WithPrefix(prefix)
 	default:
 		return j

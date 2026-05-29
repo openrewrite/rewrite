@@ -17,7 +17,8 @@
 package rpc
 
 import (
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -46,11 +47,11 @@ func NewGoSender() *GoSender {
 // Visit overrides the framework dispatch to special-case ParseError —
 // it isn't a J node, has no Prefix/Markers, and uses its own codec.
 // All other tree types fall through to the framework's switch.
-func (s *GoSender) Visit(t tree.Tree, p any) tree.Tree {
+func (s *GoSender) Visit(t java.Tree, p any) java.Tree {
 	if t == nil {
 		return nil
 	}
-	if pe, ok := t.(*tree.ParseError); ok {
+	if pe, ok := t.(*java.ParseError); ok {
 		s.sendParseError(pe, p.(*SendQueue))
 		return pe
 	}
@@ -59,9 +60,9 @@ func (s *GoSender) Visit(t tree.Tree, p any) tree.Tree {
 
 // --- G nodes ---
 
-func (s *GoSender) VisitCompilationUnit(cu *tree.CompilationUnit, p any) tree.J {
+func (s *GoSender) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(cu, func(v any) any { return v.(*tree.CompilationUnit).SourcePath }, nil)
+	q.GetAndSend(cu, func(v any) any { return v.(*golang.CompilationUnit).SourcePath }, nil)
 	// charset - Go doesn't track this, send empty/default
 	q.GetAndSend(cu, func(_ any) any { return "UTF-8" }, nil)
 	// charsetBomMarked
@@ -72,7 +73,7 @@ func (s *GoSender) VisitCompilationUnit(cu *tree.CompilationUnit, p any) tree.J 
 	q.GetAndSend(cu, func(_ any) any { return nil }, nil)
 	// packageDecl (right-padded) — dereference pointer so sendRightPadded gets a value type
 	q.GetAndSend(cu, func(v any) any {
-		pd := v.(*tree.CompilationUnit).PackageDecl
+		pd := v.(*golang.CompilationUnit).PackageDecl
 		if pd == nil {
 			return nil
 		}
@@ -80,7 +81,7 @@ func (s *GoSender) VisitCompilationUnit(cu *tree.CompilationUnit, p any) tree.J 
 	}, func(v any) { sendRightPadded(s, v, q) })
 	// imports (container)
 	q.GetAndSend(cu, func(v any) any {
-		c := v.(*tree.CompilationUnit)
+		c := v.(*golang.CompilationUnit)
 		if c.Imports == nil {
 			return nil
 		}
@@ -89,7 +90,7 @@ func (s *GoSender) VisitCompilationUnit(cu *tree.CompilationUnit, p any) tree.J 
 	// statements (list of right-padded)
 	q.GetAndSendList(cu,
 		func(v any) []any {
-			stmts := v.(*tree.CompilationUnit).Statements
+			stmts := v.(*golang.CompilationUnit).Statements
 			result := make([]any, len(stmts))
 			for i, s := range stmts {
 				result[i] = s
@@ -99,156 +100,186 @@ func (s *GoSender) VisitCompilationUnit(cu *tree.CompilationUnit, p any) tree.J 
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
 	// EOF space
-	q.GetAndSend(cu, func(v any) any { return v.(*tree.CompilationUnit).EOF },
-		func(v any) { sendSpace(v.(tree.Space), q) })
+	q.GetAndSend(cu, func(v any) any { return v.(*golang.CompilationUnit).EOF },
+		func(v any) { sendSpace(v.(java.Space), q) })
 	return cu
 }
 
-func (s *GoSender) VisitGoStmt(gs *tree.GoStmt, p any) tree.J {
+func (s *GoSender) VisitGoStmt(gs *golang.GoStmt, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(gs, func(v any) any { return v.(*tree.GoStmt).Expr },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(gs, func(v any) any { return v.(*golang.GoStmt).Expr },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return gs
 }
 
-func (s *GoSender) VisitDefer(d *tree.Defer, p any) tree.J {
+func (s *GoSender) VisitDefer(d *golang.Defer, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(d, func(v any) any { return v.(*tree.Defer).Expr },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(d, func(v any) any { return v.(*golang.Defer).Expr },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return d
 }
 
-func (s *GoSender) VisitSend(sn *tree.Send, p any) tree.J {
+func (s *GoSender) VisitSend(sn *golang.Send, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(sn, func(v any) any { return v.(*tree.Send).Channel },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(sn, func(v any) any { return v.(*tree.Send).Arrow },
+	q.GetAndSend(sn, func(v any) any { return v.(*golang.Send).Channel },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(sn, func(v any) any { return v.(*golang.Send).Arrow },
 		func(v any) { sendLeftPadded(s, v, q) })
 	return sn
 }
 
-func (s *GoSender) VisitGoto(g *tree.Goto, p any) tree.J {
+func (s *GoSender) VisitGoto(g *golang.Goto, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(g, func(v any) any { return v.(*tree.Goto).Label },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(g, func(v any) any { return v.(*golang.Goto).Label },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return g
 }
 
-func (s *GoSender) VisitComposite(c *tree.Composite, p any) tree.J {
+// VisitFallthrough mirrors GolangSender.visitFallthrough — the node has no
+// payload beyond the framework-handled id/prefix/markers, so this override
+// is intentionally a no-op. Present for sender/receiver symmetry.
+func (s *GoSender) VisitFallthrough(f *golang.Fallthrough, p any) java.J {
+	return f
+}
+
+func (s *GoSender) VisitComposite(c *golang.Composite, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(c, func(v any) any { return v.(*tree.Composite).TypeExpr },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(c, func(v any) any { return v.(*tree.Composite).Elements },
+	q.GetAndSend(c, func(v any) any { return v.(*golang.Composite).TypeExpr },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(c, func(v any) any { return v.(*golang.Composite).Elements },
 		func(v any) { sendContainer(s, v, q) })
 	return c
 }
 
-func (s *GoSender) VisitKeyValue(kv *tree.KeyValue, p any) tree.J {
+func (s *GoSender) VisitKeyValue(kv *golang.KeyValue, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(kv, func(v any) any { return v.(*tree.KeyValue).Key },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(kv, func(v any) any { return v.(*tree.KeyValue).Value },
+	q.GetAndSend(kv, func(v any) any { return v.(*golang.KeyValue).Key },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(kv, func(v any) any { return v.(*golang.KeyValue).Value },
 		func(v any) { sendLeftPadded(s, v, q) })
 	return kv
 }
 
-func (s *GoSender) VisitSlice(sl *tree.Slice, p any) tree.J {
+func (s *GoSender) VisitSlice(sl *golang.Slice, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(sl, func(v any) any { return v.(*tree.Slice).Indexed },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(sl, func(v any) any { return v.(*tree.Slice).OpenBracket },
-		func(v any) { sendSpace(v.(tree.Space), q) })
-	q.GetAndSend(sl, func(v any) any { return v.(*tree.Slice).Low },
+	q.GetAndSend(sl, func(v any) any { return v.(*golang.Slice).Indexed },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(sl, func(v any) any { return v.(*golang.Slice).OpenBracket },
+		func(v any) { sendSpace(v.(java.Space), q) })
+	q.GetAndSend(sl, func(v any) any { return v.(*golang.Slice).Low },
 		func(v any) { sendRightPadded(s, v, q) })
-	q.GetAndSend(sl, func(v any) any { return v.(*tree.Slice).High },
+	q.GetAndSend(sl, func(v any) any { return v.(*golang.Slice).High },
 		func(v any) { sendRightPadded(s, v, q) })
-	q.GetAndSend(sl, func(v any) any { return v.(*tree.Slice).Max },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(sl, func(v any) any { return v.(*tree.Slice).CloseBracket },
-		func(v any) { sendSpace(v.(tree.Space), q) })
+	q.GetAndSend(sl, func(v any) any { return v.(*golang.Slice).Max },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(sl, func(v any) any { return v.(*golang.Slice).CloseBracket },
+		func(v any) { sendSpace(v.(java.Space), q) })
 	return sl
 }
 
-func (s *GoSender) VisitMapType(mt *tree.MapType, p any) tree.J {
+func (s *GoSender) VisitMapType(mt *golang.MapType, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(mt, func(v any) any { return v.(*tree.MapType).OpenBracket },
-		func(v any) { sendSpace(v.(tree.Space), q) })
-	q.GetAndSend(mt, func(v any) any { return v.(*tree.MapType).Key },
+	q.GetAndSend(mt, func(v any) any { return v.(*golang.MapType).OpenBracket },
+		func(v any) { sendSpace(v.(java.Space), q) })
+	q.GetAndSend(mt, func(v any) any { return v.(*golang.MapType).Key },
 		func(v any) { sendRightPadded(s, v, q) })
-	q.GetAndSend(mt, func(v any) any { return v.(*tree.MapType).Value },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(mt, func(v any) any { return v.(*golang.MapType).Value },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return mt
 }
 
-func (s *GoSender) VisitStatementExpression(se *tree.StatementExpression, p any) tree.J {
+func (s *GoSender) VisitStatementExpression(se *golang.StatementExpression, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(se, func(v any) any { return v.(*tree.StatementExpression).Statement },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(se, func(v any) any { return v.(*golang.StatementExpression).Statement },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return se
 }
 
-func (s *GoSender) VisitPointerType(pt *tree.PointerType, p any) tree.J {
+func (s *GoSender) VisitPointerType(pt *golang.PointerType, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(pt, func(v any) any { return v.(*tree.PointerType).Elem },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(pt, func(v any) any { return v.(*golang.PointerType).Elem },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return pt
 }
 
-func (s *GoSender) VisitChannel(ch *tree.Channel, p any) tree.J {
+func (s *GoSender) VisitChannel(ch *golang.Channel, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(ch, func(v any) any {
-		switch v.(*tree.Channel).Dir {
-		case tree.ChanBidi:
+		switch v.(*golang.Channel).Dir {
+		case golang.ChanBidi:
 			return "BIDI"
-		case tree.ChanSendOnly:
+		case golang.ChanSendOnly:
 			return "SEND_ONLY"
-		case tree.ChanRecvOnly:
+		case golang.ChanRecvOnly:
 			return "RECV_ONLY"
 		default:
 			return "BIDI"
 		}
 	}, nil)
-	q.GetAndSend(ch, func(v any) any { return v.(*tree.Channel).Value },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(ch, func(v any) any { return v.(*golang.Channel).Value },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return ch
 }
 
-func (s *GoSender) VisitFuncType(ft *tree.FuncType, p any) tree.J {
+func (s *GoSender) VisitFuncType(ft *golang.FuncType, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(ft, func(v any) any { return v.(*tree.FuncType).Parameters },
+	q.GetAndSend(ft, func(v any) any { return v.(*golang.FuncType).Parameters },
 		func(v any) { sendContainer(s, v, q) })
-	q.GetAndSend(ft, func(v any) any { return v.(*tree.FuncType).ReturnType },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(ft, func(v any) any { return v.(*golang.FuncType).ReturnType },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return ft
 }
 
-func (s *GoSender) VisitStructType(st *tree.StructType, p any) tree.J {
+func (s *GoSender) VisitStructType(st *golang.StructType, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(st, func(v any) any { return v.(*tree.StructType).Body },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(st, func(v any) any { return v.(*golang.StructType).Body },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return st
 }
 
-func (s *GoSender) VisitInterfaceType(it *tree.InterfaceType, p any) tree.J {
+func (s *GoSender) VisitInterfaceType(it *golang.InterfaceType, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(it, func(v any) any { return v.(*tree.InterfaceType).Body },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(it, func(v any) any { return v.(*golang.InterfaceType).Body },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return it
 }
 
-func (s *GoSender) VisitTypeList(tl *tree.TypeList, p any) tree.J {
+func (s *GoSender) VisitTypeList(tl *golang.TypeList, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(tl, func(v any) any { return v.(*tree.TypeList).Types },
+	q.GetAndSend(tl, func(v any) any { return v.(*golang.TypeList).Types },
 		func(v any) { sendContainer(s, v, q) })
 	return tl
 }
 
-func (s *GoSender) VisitTypeDecl(td *tree.TypeDecl, p any) tree.J {
+func (s *GoSender) VisitUnion(u *golang.Union, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSendList(u,
+		func(v any) []any {
+			types := v.(*golang.Union).Types
+			result := make([]any, len(types))
+			for i, t := range types {
+				result[i] = t
+			}
+			return result
+		},
+		func(v any) any { return containerElementID(v) },
+		func(v any) { sendRightPadded(s, v, q) })
+	return u
+}
+
+func (s *GoSender) VisitUnderlyingType(ut *golang.UnderlyingType, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(ut, func(v any) any { return v.(*golang.UnderlyingType).Element },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return ut
+}
+
+func (s *GoSender) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 	q := p.(*SendQueue)
 	// leadingAnnotations (`//go:` directives modeled as J.Annotation)
 	q.GetAndSendList(td,
 		func(v any) []any {
-			anns := v.(*tree.TypeDecl).LeadingAnnotations
+			anns := v.(*golang.TypeDecl).LeadingAnnotations
 			result := make([]any, len(anns))
 			for i, a := range anns {
 				result[i] = a
@@ -256,31 +287,38 @@ func (s *GoSender) VisitTypeDecl(td *tree.TypeDecl, p any) tree.J {
 			return result
 		},
 		func(v any) any { return extractID(v) },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(td, func(v any) any { return v.(*tree.TypeDecl).Name },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(td, func(v any) any { return v.(*golang.TypeDecl).Name },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	// typeParameters (`[T any]` declaration-site generics; nil for non-generic types)
+	q.GetAndSend(td, func(v any) any { return v.(*golang.TypeDecl).TypeParameters },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// Assign — dereference pointer so sendLeftPadded gets a value type
 	q.GetAndSend(td, func(v any) any {
-		a := v.(*tree.TypeDecl).Assign
-		if a == nil { return nil }
+		a := v.(*golang.TypeDecl).Assign
+		if a == nil {
+			return nil
+		}
 		return *a
 	}, func(v any) { sendLeftPadded(s, v, q) })
-	q.GetAndSend(td, func(v any) any { return v.(*tree.TypeDecl).Definition },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
+	q.GetAndSend(td, func(v any) any { return v.(*golang.TypeDecl).Definition },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// Specs — dereference pointer so sendContainer gets a value type
 	q.GetAndSend(td, func(v any) any {
-		sp := v.(*tree.TypeDecl).Specs
-		if sp == nil { return nil }
+		sp := v.(*golang.TypeDecl).Specs
+		if sp == nil {
+			return nil
+		}
 		return *sp
 	}, func(v any) { sendContainer(s, v, q) })
 	return td
 }
 
-func (s *GoSender) VisitMultiAssignment(ma *tree.MultiAssignment, p any) tree.J {
+func (s *GoSender) VisitMultiAssignment(ma *golang.MultiAssignment, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSendList(ma,
 		func(v any) []any {
-			vars := v.(*tree.MultiAssignment).Variables
+			vars := v.(*golang.MultiAssignment).Variables
 			result := make([]any, len(vars))
 			for i, e := range vars {
 				result[i] = e
@@ -289,11 +327,11 @@ func (s *GoSender) VisitMultiAssignment(ma *tree.MultiAssignment, p any) tree.J 
 		},
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
-	q.GetAndSend(ma, func(v any) any { return v.(*tree.MultiAssignment).Operator },
+	q.GetAndSend(ma, func(v any) any { return v.(*golang.MultiAssignment).Operator },
 		func(v any) { sendLeftPadded(s, v, q) })
 	q.GetAndSendList(ma,
 		func(v any) []any {
-			vals := v.(*tree.MultiAssignment).Values
+			vals := v.(*golang.MultiAssignment).Values
 			result := make([]any, len(vals))
 			for i, e := range vals {
 				result[i] = e
@@ -305,15 +343,15 @@ func (s *GoSender) VisitMultiAssignment(ma *tree.MultiAssignment, p any) tree.J 
 	return ma
 }
 
-func (s *GoSender) VisitCommClause(cc *tree.CommClause, p any) tree.J {
+func (s *GoSender) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(cc, func(v any) any { return v.(*tree.CommClause).Comm },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(cc, func(v any) any { return v.(*tree.CommClause).Colon },
-		func(v any) { sendSpace(v.(tree.Space), q) })
+	q.GetAndSend(cc, func(v any) any { return v.(*golang.CommClause).Comm },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(cc, func(v any) any { return v.(*golang.CommClause).Colon },
+		func(v any) { sendSpace(v.(java.Space), q) })
 	q.GetAndSendList(cc,
 		func(v any) []any {
-			body := v.(*tree.CommClause).Body
+			body := v.(*golang.CommClause).Body
 			result := make([]any, len(body))
 			for i, e := range body {
 				result[i] = e
@@ -331,24 +369,23 @@ func (s *GoSender) VisitCommClause(cc *tree.CommClause, p any) tree.J {
 // ParseError isn't a J node — no Prefix/Markers handling via PreVisit.
 // Special-cased at the top of Visit() instead of dispatched through
 // the framework switch.
-func (s *GoSender) sendParseError(pe *tree.ParseError, q *SendQueue) {
-	q.GetAndSend(pe, func(v any) any { return v.(*tree.ParseError).Ident.String() }, nil)
-	q.GetAndSend(pe, func(v any) any { return v.(*tree.ParseError).Markers },
-		func(v any) { SendMarkersCodec(v.(tree.Markers), q) })
-	q.GetAndSend(pe, func(v any) any { return v.(*tree.ParseError).SourcePath }, nil)
-	q.GetAndSend(pe, func(v any) any { return v.(*tree.ParseError).CharsetName }, nil)
-	q.GetAndSend(pe, func(v any) any { return v.(*tree.ParseError).CharsetBomMarked }, nil)
+func (s *GoSender) sendParseError(pe *java.ParseError, q *SendQueue) {
+	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).Ident.String() }, nil)
+	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).Markers },
+		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
+	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).SourcePath }, nil)
+	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).CharsetName }, nil)
+	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).CharsetBomMarked }, nil)
 	q.GetAndSend(pe, func(_ any) any { return nil }, nil) // checksum
 	q.GetAndSend(pe, func(_ any) any { return nil }, nil) // fileAttributes
-	q.GetAndSend(pe, func(v any) any { return v.(*tree.ParseError).Text }, nil)
+	q.GetAndSend(pe, func(v any) any { return v.(*java.ParseError).Text }, nil)
 }
 
-func (s *GoSender) VisitIndexList(il *tree.IndexList, p any) tree.J {
+func (s *GoSender) VisitIndexList(il *golang.IndexList, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(il, func(v any) any { return v.(*tree.IndexList).Target },
-		func(v any) { s.Visit(v.(tree.Tree), q) })
-	q.GetAndSend(il, func(v any) any { return v.(*tree.IndexList).Indices },
+	q.GetAndSend(il, func(v any) any { return v.(*golang.IndexList).Target },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(il, func(v any) any { return v.(*golang.IndexList).Indices },
 		func(v any) { sendContainer(s, v, q) })
 	return il
 }
-

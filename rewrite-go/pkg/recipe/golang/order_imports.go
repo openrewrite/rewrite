@@ -19,7 +19,8 @@ package golang
 import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang/internal"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -52,8 +53,8 @@ type orderImportsVisitor struct {
 	visitor.GoVisitor
 }
 
-func (v *orderImportsVisitor) VisitCompilationUnit(cu *tree.CompilationUnit, p any) tree.J {
-	cu = v.GoVisitor.VisitCompilationUnit(cu, p).(*tree.CompilationUnit)
+func (v *orderImportsVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	cu = v.GoVisitor.VisitCompilationUnit(cu, p).(*golang.CompilationUnit)
 	if cu.Imports == nil || len(cu.Imports.Elements) <= 1 {
 		return cu
 	}
@@ -69,7 +70,7 @@ func (v *orderImportsVisitor) VisitCompilationUnit(cu *tree.CompilationUnit, p a
 	return &c
 }
 
-func sameOrder(before, after []tree.RightPadded[*tree.Import]) bool {
+func sameOrder(before, after []java.RightPadded[*java.Import]) bool {
 	if len(before) != len(after) {
 		return false
 	}

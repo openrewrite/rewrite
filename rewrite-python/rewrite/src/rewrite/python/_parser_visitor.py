@@ -2213,6 +2213,7 @@ class ParserVisitor(ast.NodeVisitor):
             [],  # name_annotations
             name_identifier,
             params,
+            [],  # dimensions_after_name
             None,
             body,
             None,

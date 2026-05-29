@@ -21,7 +21,8 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // Step 2 of AnnotationService rollout: the parser splits struct field
@@ -30,23 +31,23 @@ import (
 // run, wrapping it in backticks. Roundtrip on gofmt'd input is exact
 // (Option 1 in the design discussion: lossy on inner-padding only).
 
-func parseStructAndFindField(t *testing.T, src, fieldName string) *tree.VariableDeclarations {
+func parseStructAndFindField(t *testing.T, src, fieldName string) *java.VariableDeclarations {
 	t.Helper()
 	cu, err := parser.NewGoParser().Parse("test.go", src)
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
 	for _, rp := range cu.Statements {
-		td, ok := rp.Element.(*tree.TypeDecl)
+		td, ok := rp.Element.(*golang.TypeDecl)
 		if !ok {
 			continue
 		}
-		st, ok := td.Definition.(*tree.StructType)
+		st, ok := td.Definition.(*golang.StructType)
 		if !ok || st.Body == nil {
 			continue
 		}
 		for _, fr := range st.Body.Statements {
-			vd, ok := fr.Element.(*tree.VariableDeclarations)
+			vd, ok := fr.Element.(*java.VariableDeclarations)
 			if !ok {
 				continue
 			}
@@ -69,13 +70,13 @@ func TestStructTag_SingleKeyParsesIntoOneAnnotation(t *testing.T) {
 		t.Fatalf("LeadingAnnotations: got %d, want 1", got)
 	}
 	ann := vd.LeadingAnnotations[0]
-	if id, ok := ann.AnnotationType.(*tree.Identifier); !ok || id.Name != "json" {
+	if id, ok := ann.AnnotationType.(*java.Identifier); !ok || id.Name != "json" {
 		t.Errorf("AnnotationType: got %+v, want Identifier{Name:\"json\"}", ann.AnnotationType)
 	}
 	if ann.Arguments == nil || len(ann.Arguments.Elements) != 1 {
 		t.Fatalf("Arguments: got %+v, want 1 element", ann.Arguments)
 	}
-	lit, ok := ann.Arguments.Elements[0].Element.(*tree.Literal)
+	lit, ok := ann.Arguments.Elements[0].Element.(*java.Literal)
 	if !ok {
 		t.Fatalf("Arguments[0]: got %T, want *Literal", ann.Arguments.Elements[0].Element)
 	}
@@ -96,18 +97,18 @@ func TestStructTag_MultipleKeysParseIntoMultipleAnnotations(t *testing.T) {
 	}
 
 	first := vd.LeadingAnnotations[0]
-	if id, ok := first.AnnotationType.(*tree.Identifier); !ok || id.Name != "json" {
+	if id, ok := first.AnnotationType.(*java.Identifier); !ok || id.Name != "json" {
 		t.Errorf("[0] AnnotationType: got %+v, want json", first.AnnotationType)
 	}
-	if lit := first.Arguments.Elements[0].Element.(*tree.Literal); lit.Source != `"email,omitempty"` {
+	if lit := first.Arguments.Elements[0].Element.(*java.Literal); lit.Source != `"email,omitempty"` {
 		t.Errorf("[0] Source: got %q, want %q", lit.Source, `"email,omitempty"`)
 	}
 
 	second := vd.LeadingAnnotations[1]
-	if id, ok := second.AnnotationType.(*tree.Identifier); !ok || id.Name != "db" {
+	if id, ok := second.AnnotationType.(*java.Identifier); !ok || id.Name != "db" {
 		t.Errorf("[1] AnnotationType: got %+v, want db", second.AnnotationType)
 	}
-	if lit := second.Arguments.Elements[0].Element.(*tree.Literal); lit.Source != `"email_address"` {
+	if lit := second.Arguments.Elements[0].Element.(*java.Literal); lit.Source != `"email_address"` {
 		t.Errorf("[1] Source: got %q, want %q", lit.Source, `"email_address"`)
 	}
 	// Inter-pair whitespace lives on the second annotation's Prefix.
@@ -121,7 +122,7 @@ func TestStructTag_NoMarkerLeftBehind(t *testing.T) {
 	vd := parseStructAndFindField(t, src, "Name")
 
 	for _, m := range vd.Markers.Entries {
-		if _, ok := m.(tree.StructTag); ok {
+		if _, ok := m.(golang.StructTag); ok {
 			t.Errorf("StructTag marker should no longer be emitted; LeadingAnnotations is the canonical pathway")
 		}
 	}
@@ -164,7 +165,7 @@ func TestStructTag_DashValueRoundtrip(t *testing.T) {
 		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
 	}
 	vd := parseStructAndFindField(t, src, "Field")
-	lit := vd.LeadingAnnotations[0].Arguments.Elements[0].Element.(*tree.Literal)
+	lit := vd.LeadingAnnotations[0].Arguments.Elements[0].Element.(*java.Literal)
 	if v, _ := lit.Value.(string); v != "-" {
 		t.Errorf("Value: got %v, want %q", lit.Value, "-")
 	}
@@ -179,7 +180,7 @@ func TestStructTag_NonStructDoesNotEmitAnnotations(t *testing.T) {
 		t.Fatalf("parse error: %v", err)
 	}
 	for _, rp := range cu.Statements {
-		if vd, ok := rp.Element.(*tree.VariableDeclarations); ok {
+		if vd, ok := rp.Element.(*java.VariableDeclarations); ok {
 			if len(vd.LeadingAnnotations) > 0 {
 				t.Errorf("top-level VariableDeclarations got %d LeadingAnnotations, want 0", len(vd.LeadingAnnotations))
 			}

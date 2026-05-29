@@ -1,3 +1,5 @@
+//go:build parityaudit
+
 /*
  * Copyright 2026 the original author or authors.
  *
@@ -13,8 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-//go:build parityaudit
 
 package printer_test
 
