@@ -126,13 +126,13 @@ func receiveRightPadded(r Receiver, q *ReceiveQueue, before any) any {
 	return rightPaddedFromElement(elem, after, m)
 }
 
-// receiveLeftPadded deserializes a LeftPadded element.
-func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
-	// Before space
+// receiveLeftPaddedParts deserializes the three wire fields of a JLeftPadded —
+// before-space, element, markers — shared by receiveLeftPadded (type-inferred) and
+// receiveLeftPaddedTyped (type-directed).
+func receiveLeftPaddedParts(r Receiver, q *ReceiveQueue, before any) (java.Space, any, java.Markers) {
 	beforeSpace := q.Receive(leftPaddedBefore(before), func(v any) any {
 		return receiveSpace(v.(java.Space), q)
 	})
-	// Element
 	elem := q.Receive(leftPaddedElement(before), func(v any) any {
 		if _, ok := v.(java.Space); ok {
 			return receiveSpace(v.(java.Space), q)
@@ -142,12 +142,60 @@ func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
 		}
 		return v
 	})
-	// Markers
 	markers := q.Receive(leftPaddedMarkers(before), func(v any) any {
 		return receiveMarkersCodec(q, v.(java.Markers))
 	})
+	return beforeSpace.(java.Space), elem, markers.(java.Markers)
+}
 
-	return updateLeftPadded(before, beforeSpace.(java.Space), elem, markers.(java.Markers))
+// receiveLeftPadded deserializes a LeftPadded element, inferring its type from the
+// payload. Operator fields must use receiveLeftPaddedTyped instead (see its doc).
+func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
+	beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, before)
+	return leftPaddedFromElement(beforeSpace, elem, markers)
+}
+
+// receiveLeftPaddedTyped deserializes a JLeftPadded into LeftPadded[T] using the
+// caller-supplied element type T, instead of inferring the type from the payload
+// (leftPaddedFromElement). Inference is unsafe for operator enums:
+// they travel the wire as their Java enum-constant name, and those names are
+// AMBIGUOUS — BinaryOperator.Add and AssignmentOperator.AddAssign both serialize to
+// "Addition". leftPaddedFromElement tries ParseBinaryOperator first, so every
+// compound-assignment operator (+=, |=, …) was mis-typed as LeftPadded[BinaryOperator]
+// and the AssignmentOperation call site's raw assertion panicked. Supplying T lets
+// coerceLeftPaddedTyped pick the right parser. Counterpart to receiveContainerTyped.
+func receiveLeftPaddedTyped[T any](r Receiver, q *ReceiveQueue, before any) java.LeftPadded[T] {
+	beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, before)
+	return coerceLeftPaddedTyped[T](beforeSpace, elem, markers)
+}
+
+// coerceLeftPaddedTyped builds a LeftPadded[T] from a received element. The element
+// may already be a T (NO_CHANGE pass-through, a visited J/Space, or a pre-typed enum)
+// or the wire form of an operator enum — its ambiguous Java enum-constant name as a
+// string. In the string case T selects the parser, so "Addition" resolves to
+// AddAssign for T=AssignmentOperator but Add for T=BinaryOperator.
+func coerceLeftPaddedTyped[T any](before java.Space, elem any, m java.Markers) java.LeftPadded[T] {
+	if e, ok := elem.(T); ok {
+		return java.LeftPadded[T]{Before: before, Element: e, Markers: m}
+	}
+	if s, ok := elem.(string); ok {
+		var zero T
+		var parsed any
+		switch any(zero).(type) {
+		case java.BinaryOperator:
+			parsed = java.ParseBinaryOperator(s)
+		case java.AssignmentOperator:
+			parsed = java.ParseAssignmentOperator(s)
+		case java.UnaryOperator:
+			parsed = java.ParseUnaryOperator(s)
+		case java.AssignOp:
+			parsed = java.ParseAssignOp(s)
+		}
+		if e, ok := parsed.(T); ok {
+			return java.LeftPadded[T]{Before: before, Element: e, Markers: m}
+		}
+	}
+	return java.LeftPadded[T]{Before: before, Markers: m}
 }
 
 // Accessor functions for generic padding types (using type switches for Go's type-parameterized structs)
@@ -408,13 +456,6 @@ func leftPaddedMarkers(lp any) any {
 	default:
 		return java.Markers{}
 	}
-}
-
-// updateLeftPadded creates a correctly-typed LeftPadded from the element.
-// Uses the element's concrete type to determine the generic type parameter,
-// since Go lacks generic covariance (LeftPadded[J] != LeftPadded[Expression]).
-func updateLeftPadded(lp any, before java.Space, elem any, markers java.Markers) any {
-	return leftPaddedFromElement(before, elem, markers)
 }
 
 // leftPaddedFromElement creates a LeftPadded with the correct generic type

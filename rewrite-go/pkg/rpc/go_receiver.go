@@ -113,8 +113,6 @@ func (r *GoReceiver) VisitCompilationUnit(cu *golang.CompilationUnit, p any) jav
 	}
 	if result := q.Receive(beforePkgDecl, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
 		rp := coerceRightPaddedTyped[*java.Identifier](result)
-		if rp.Element == nil {
-		}
 		cu.PackageDecl = &rp
 	} else {
 		cu.PackageDecl = nil

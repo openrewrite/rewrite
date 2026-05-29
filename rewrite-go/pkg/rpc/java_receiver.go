@@ -145,7 +145,7 @@ func (r *JavaReceiver) VisitBinary(b *java.Binary, p any) java.J {
 	if result != nil {
 		b.Left = result.(java.Expression)
 	}
-	if result := q.Receive(b.Operator, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
+	if result := q.Receive(b.Operator, func(v any) any { return receiveLeftPaddedTyped[java.BinaryOperator](r, q, v) }); result != nil {
 		b.Operator = result.(java.LeftPadded[java.BinaryOperator])
 	}
 	rightResult := q.Receive(b.Right, func(v any) any { return r.Visit(v.(java.Tree), q) })
@@ -209,7 +209,7 @@ func (r *JavaReceiver) VisitUnary(u *java.Unary, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *u // shallow copy to avoid mutating remoteObjects baseline
 	u = &c
-	if result := q.Receive(u.Operator, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
+	if result := q.Receive(u.Operator, func(v any) any { return receiveLeftPaddedTyped[java.UnaryOperator](r, q, v) }); result != nil {
 		u.Operator = result.(java.LeftPadded[java.UnaryOperator])
 	}
 	result := q.Receive(u.Operand, func(v any) any { return r.Visit(v.(java.Tree), q) })
@@ -294,7 +294,7 @@ func (r *JavaReceiver) VisitAssignmentOperation(a *java.AssignmentOperation, p a
 	if result != nil {
 		a.Variable = result.(java.Expression)
 	}
-	if result := q.Receive(a.Operator, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
+	if result := q.Receive(a.Operator, func(v any) any { return receiveLeftPaddedTyped[java.AssignmentOperator](r, q, v) }); result != nil {
 		a.Operator = result.(java.LeftPadded[java.AssignmentOperator])
 	}
 	assignResult := q.Receive(a.Assignment, func(v any) any { return r.Visit(v.(java.Tree), q) })
