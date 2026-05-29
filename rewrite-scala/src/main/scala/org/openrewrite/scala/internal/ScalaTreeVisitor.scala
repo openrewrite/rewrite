@@ -8586,6 +8586,53 @@ class ScalaTreeVisitor(
 
     // Extract the type parameter name
     val name = ident(nameStr, namePrefix)
+
+    def contextBoundName(cxBound: Trees.Tree[?]): String = {
+      def selectToName(t: Trees.Tree[?]): String = t match {
+        case id: Trees.Ident[?] => id.name.toString
+        case sel: Trees.Select[?] => selectToName(sel.qualifier) + "." + sel.name.toString
+        case _ => t.toString
+      }
+      cxBound match {
+        case cbt: untpd.ContextBoundTypeTree => selectToName(cbt.tycon)
+        case _ => cxBound.toString
+      }
+    }
+
+    def contextBoundStart(cxBound: Trees.Tree[?]): Int = cxBound match {
+      case cbt: untpd.ContextBoundTypeTree if cbt.tycon.span.exists =>
+        Math.max(0, cbt.tycon.span.start - offsetAdjustment)
+      case _ if cxBound.span.exists =>
+        Math.max(0, cxBound.span.start - offsetAdjustment)
+      case _ => indexOfNextNonWhitespace(cursor)
+    }
+
+    def appendContextBounds(
+      cxBoundsList: scala.collection.immutable.List[Trees.Tree[?]],
+      boundList: util.ArrayList[JRightPadded[TypeTree]],
+      cbEnd: Int
+    ): Space = {
+      var beforeFirstColon = Space.EMPTY
+      cxBoundsList.zipWithIndex.foreach { case (cxBound, idx) =>
+        val colonIdx = if (cursor < cbEnd) positionOfNext(":", cursor) else -1
+        if (idx == 0 && colonIdx > cursor && colonIdx < cbEnd) {
+          beforeFirstColon = Space.format(source, cursor, colonIdx)
+        }
+        if (colonIdx >= 0) cursor = colonIdx + 1
+
+        val boundStart = contextBoundStart(cxBound)
+        val boundPrefix = if (boundStart > cursor && boundStart <= source.length) {
+          Space.format(source, cursor, boundStart)
+        } else Space.EMPTY
+        val boundName = contextBoundName(cxBound)
+        val boundId: TypeTree = ident(boundName, boundPrefix)
+        boundList.add(JRightPadded.build(boundId))
+
+        if (cxBound.span.exists) updateCursor(cxBound.span.end)
+        else if (boundStart >= 0) cursor = Math.max(cursor, boundStart + boundName.length)
+      }
+      beforeFirstColon
+    }
     
     // Handle bounds from AST.
     // - TypeBoundsTree: upper/lower bounds like `<: Comparable` or `>: Null`
@@ -8600,8 +8647,8 @@ class ScalaTreeVisitor(
         val cxBoundsList: scala.collection.immutable.List[Trees.Tree[?]] = cb.cxBounds
         if (hasTypeBounds) {
           // Combined bounds like `>: Null : ClassTag`
-          // Model type bounds as TypeBound elements.
-          // TODO: Context bound part should desugar to implicit param.
+          // Model type bounds as TypeBound elements and context bounds as plain
+          // type trees so the printer can re-emit the `:` syntax.
           val boundList = new util.ArrayList[JRightPadded[TypeTree]]()
           if (!innerBounds.lo.isEmpty) {
             val loOpIdx = positionOfNext(">:", cursor)
@@ -8627,38 +8674,18 @@ class ScalaTreeVisitor(
               case _ => cursor = savedC
             }
           }
-          if (cb.span.exists) updateCursor(cb.span.end)
-          if (!boundList.isEmpty) JContainer.build(Space.EMPTY, boundList, Markers.EMPTY) else null
-        } else if (cxBoundsList.nonEmpty) {
-          // Capture the space between the type-param name and the first `:` so the printer
-          // can re-emit it. The JContainer.before is the space before `:` (see ScalaPrinter).
-          val cbEnd = if (cb.span.exists) Math.max(0, cb.span.end - offsetAdjustment) else source.length
-          val colonIdx = if (cursor < cbEnd) positionOfNext(":", cursor) else -1
-          val beforeColon: Space = if (colonIdx > cursor && colonIdx < cbEnd) {
-            Space.format(source, cursor, colonIdx)
-          } else Space.EMPTY
-          val boundList = new util.ArrayList[JRightPadded[TypeTree]]()
-          // For each context bound, extract the bound type name. Qualified names
-          // (`pkg.Zero`) are reconstructed from the Select chain — `sel.name.toString`
-          // alone drops the qualifier.
-          def selectToName(t: Trees.Tree[?]): String = t match {
-            case id: Trees.Ident[?] => id.name.toString
-            case sel: Trees.Select[?] => selectToName(sel.qualifier) + "." + sel.name.toString
-            case _ => t.toString
-          }
-          cxBoundsList.foreach { cxBound =>
-            val boundName = cxBound match {
-              case cbt: untpd.ContextBoundTypeTree => selectToName(cbt.tycon)
-              case _ => cxBound.toString
-            }
-            val boundId: TypeTree = ident(boundName, Space.format(" "))
-            boundList.add(JRightPadded.build(boundId))
-          }
-          // Advance cursor past the entire bounds expression in source
-          // The ContextBounds span should cover `: Ordering` text
-          if (cb.span.exists) {
+          var contextBoundBefore = Space.EMPTY
+          if (cxBoundsList.nonEmpty) {
+            val cbEnd = if (cb.span.exists) Math.max(0, cb.span.end - offsetAdjustment) else source.length
+            contextBoundBefore = appendContextBounds(cxBoundsList, boundList, cbEnd)
+          } else if (cb.span.exists) {
             updateCursor(cb.span.end)
           }
+          if (!boundList.isEmpty) JContainer.build(contextBoundBefore, boundList, Markers.EMPTY) else null
+        } else if (cxBoundsList.nonEmpty) {
+          val cbEnd = if (cb.span.exists) Math.max(0, cb.span.end - offsetAdjustment) else source.length
+          val boundList = new util.ArrayList[JRightPadded[TypeTree]]()
+          val beforeColon = appendContextBounds(cxBoundsList, boundList, cbEnd)
           // The JContainer.before space is printed BEFORE the `:` by the printer.
           JContainer.build(beforeColon, boundList, Markers.EMPTY)
         } else null
