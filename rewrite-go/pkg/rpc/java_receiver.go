@@ -196,7 +196,7 @@ func (r *JavaReceiver) VisitAnnotation(ann *java.Annotation, p any) java.J {
 	if ann.Arguments != nil {
 		beforeArgs = *ann.Arguments
 	}
-	if result := q.Receive(beforeArgs, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
+	if result := q.Receive(beforeArgs, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
 		container := result.(java.Container[java.Expression])
 		ann.Arguments = &container
 	} else {
@@ -258,7 +258,7 @@ func (r *JavaReceiver) VisitMethodInvocation(mi *java.MethodInvocation, p any) j
 		mi.Name = result.(*java.Identifier)
 	}
 	// arguments
-	if result := q.Receive(mi.Arguments, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
+	if result := q.Receive(mi.Arguments, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
 		mi.Arguments = result.(java.Container[java.Expression])
 	}
 	// methodType
@@ -340,7 +340,7 @@ func (r *JavaReceiver) VisitMethodDeclaration(md *java.MethodDeclaration, p any)
 		md.Name = nameResult.(*java.Identifier)
 	}
 	// parameters
-	if result := q.Receive(md.Parameters, func(v any) any { return receiveContainerAs(r, q, v, ContainerStatement) }); result != nil {
+	if result := q.Receive(md.Parameters, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
 		md.Parameters = result.(java.Container[java.Statement])
 	}
 	// dimensionsAfterName (empty for Go — no C-style array method returns)
@@ -670,12 +670,12 @@ func (r *JavaReceiver) VisitCase(cs *java.Case, p any) java.J {
 	c := *cs // shallow copy to avoid mutating remoteObjects baseline
 	cs = &c
 	q.Receive(nil, nil) // type enum
-	if result := q.Receive(cs.Expressions, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
-		cs.Expressions = coerceContainerExpression(result)
+	if result := q.Receive(cs.Expressions, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
+		cs.Expressions = result.(java.Container[java.Expression])
 	}
 	// statements - Java sends Container<RightPadded<Statement>>, extract to Go's []RightPadded[Statement]
-	if result := q.Receive(nil, func(v any) any { return receiveContainerAs(r, q, v, ContainerStatement) }); result != nil {
-		cont := coerceContainerStatement(result)
+	if result := q.Receive(nil, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
+		cont := result.(java.Container[java.Statement])
 		cs.Body = cont.Elements
 	}
 	q.Receive(nil, nil) // body
@@ -710,7 +710,7 @@ func (r *JavaReceiver) VisitLabel(l *java.Label, p any) java.J {
 	c := *l // shallow copy to avoid mutating remoteObjects baseline
 	l = &c
 	if result := q.Receive(l.Name, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
-		l.Name = coerceRightPaddedIdent(result)
+		l.Name = coerceRightPaddedTyped[*java.Identifier](result)
 	}
 	result := q.Receive(l.Statement, func(v any) any { return r.Visit(v.(java.Tree), q) })
 	if result != nil {
@@ -742,7 +742,7 @@ func (r *JavaReceiver) VisitParameterizedType(pt *java.ParameterizedType, p any)
 	if result := q.Receive(pt.Clazz, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
 		pt.Clazz = result.(java.Expression)
 	}
-	if result := q.Receive(pt.TypeParameters, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
+	if result := q.Receive(pt.TypeParameters, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
 		container := result.(java.Container[java.Expression])
 		pt.TypeParameters = &container
 	}
