@@ -185,67 +185,6 @@ func (r *JavaTypeReceiver) VisitVariable(v *java.JavaTypeVariable, p any) java.J
 	return v
 }
 
-// receiveScalar receives a simple value from the queue.
-func receiveScalar[T any](q *ReceiveQueue, before T) T {
-	result := q.Receive(before, nil)
-	if result == nil {
-		var zero T
-		return zero
-	}
-	// Handle numeric type conversions from JSON
-	return convertTo[T](result)
-}
-
-// receiveValue receives a field that needs a deserialization closure, returning the
-// typed value directly (the zero value — nil for pointer/interface T — on delete) so
-// call sites are a single branch-free assignment. This is the free-function analog of
-// the generic q.receive(before, onChange) in the Java/TS/Python receivers (Go forbids
-// type-parameterized methods).
-//
-// onChange receives the prior value already typed as T (receiveValue does the inbound
-// cast once) and returns the deserialized value; its result is narrowed back to T here,
-// so closure bodies need no casts, e.g.:
-//
-//	gs.Expr = receiveValue(q, gs.Expr, func(e java.Expression) any { return r.Visit(e, q) })
-//	b.End   = receiveValue(q, b.End,   func(s java.Space) any { return receiveSpace(s, q) })
-//
-// Semantics mirror Java's RpcReceiveQueue.receive: NO_CHANGE returns `before`, DELETE
-// returns the zero value (nil for the pointer/interface T of nullable fields — Java's
-// `return null`), ADD/CHANGE returns the deserialized value. q.Receive yields nil only
-// on DELETE or a nil `before`, so the zero return never produces a bogus empty value for
-// the mandatory value-typed fields (which are never deleted).
-func receiveValue[T any](q *ReceiveQueue, before T, onChange func(T) any) T {
-	result := q.Receive(before, func(v any) any { return onChange(v.(T)) })
-	if result == nil {
-		var zero T
-		return zero
-	}
-	return result.(T)
-}
-
-// convertTo converts a value to the desired type, handling JSON number conversions.
-func convertTo[T any](v any) T {
-	if t, ok := v.(T); ok {
-		return t
-	}
-	// Handle float64 -> int64 conversion (common with JSON)
-	var zero T
-	switch any(zero).(type) {
-	case int64:
-		switch n := v.(type) {
-		case float64:
-			return any(int64(n)).(T)
-		case int:
-			return any(int64(n)).(T)
-		}
-	case string:
-		if s, ok := v.(string); ok {
-			return any(s).(T)
-		}
-	}
-	return v.(T)
-}
-
 // receiveAsType receives a ref-tracked type from the queue.
 func receiveAsType[T java.JavaType](r *JavaTypeReceiver, q *ReceiveQueue, before T) T {
 	result := q.Receive(before, func(v any) any {
