@@ -19,6 +19,7 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Xml.Linq;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
@@ -676,26 +677,69 @@ public class RewriteRpcServer
             </Project>
             """);
 
-        // Add local NuGet feed as a package source if it exists, so that
-        // locally-published SDK snapshots are discovered alongside nuget.org
+        // For local cross-repo development, make the local NuGet feed additive to
+        // whatever config already lives in the project dir. A caller (e.g. the Moderne
+        // CLI) may have written its own nuget.config there — possibly an exclusive
+        // configured feed — so we must not clobber it: append only the local feed when
+        // a config is present, and create the standalone dev default (public + local
+        // feed) only when none exists. No-ops in production, where local-feed is absent.
         var localFeed = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".nuget", "local-feed");
         if (Directory.Exists(localFeed))
         {
             var nugetConfig = Path.Combine(_recipesProjectDir, "nuget.config");
-            File.WriteAllText(nugetConfig, $"""
+            var existing = File.Exists(nugetConfig) ? File.ReadAllText(nugetConfig) : null;
+            File.WriteAllText(nugetConfig, BuildRecipesNuGetConfig(existing, localFeed));
+        }
+
+        return csprojPath;
+    }
+
+    /// <summary>
+    /// Produces the recipe project's <c>nuget.config</c> with the local development
+    /// feed present. When <paramref name="existingConfigXml"/> is null/empty, creates a
+    /// standalone config with nuget.org + the local feed. Otherwise the caller already
+    /// wrote a config (possibly an exclusive configured feed): only the local feed is
+    /// appended to <c>&lt;packageSources&gt;</c>, preserving the caller's sources and any
+    /// <c>&lt;clear/&gt;</c>, and idempotently (no duplicate if already present).
+    /// </summary>
+    internal static string BuildRecipesNuGetConfig(string? existingConfigXml, string localFeedPath)
+    {
+        if (string.IsNullOrWhiteSpace(existingConfigXml))
+        {
+            return $"""
                 <?xml version="1.0" encoding="utf-8"?>
                 <configuration>
                   <packageSources>
                     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-                    <add key="local-feed" value="{localFeed}" />
+                    <add key="local-feed" value="{localFeedPath}" />
                   </packageSources>
                 </configuration>
-                """);
+                """;
         }
 
-        return csprojPath;
+        var doc = XDocument.Parse(existingConfigXml);
+        var configuration = doc.Element("configuration")
+                            ?? throw new InvalidOperationException("nuget.config is missing its <configuration> root");
+        var packageSources = configuration.Element("packageSources");
+        if (packageSources == null)
+        {
+            packageSources = new XElement("packageSources");
+            configuration.Add(packageSources);
+        }
+
+        bool alreadyPresent = packageSources.Elements("add").Any(e =>
+            string.Equals((string?)e.Attribute("value"), localFeedPath, StringComparison.OrdinalIgnoreCase));
+        if (!alreadyPresent)
+        {
+            packageSources.Add(new XElement("add",
+                new XAttribute("key", "local-feed"),
+                new XAttribute("value", localFeedPath)));
+        }
+
+        var declaration = doc.Declaration ?? new XDeclaration("1.0", "utf-8", null);
+        return declaration + Environment.NewLine + doc.Root!.ToString();
     }
 
     private static void RunDotnet(string arguments)
