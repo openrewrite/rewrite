@@ -67,23 +67,17 @@ public class RemoveEmptyXmlTags extends Recipe {
     @Nullable
     Boolean deleteFileIfEmpty;
 
+    String displayName = "Remove empty XML tags";
+
+    String description = "Repeatedly removes empty XML tags (optionally scoped by an XPath whitelist) until the tree is stable, " +
+                         "and optionally deletes the file when its root tag becomes empty. " +
+                         "Useful as a follow-up to recipes that strip individual tags and leave empty containers behind.";
+
     @JsonCreator
     public RemoveEmptyXmlTags(@Nullable List<String> xPaths, @Nullable String fileMatcher, @Nullable Boolean deleteFileIfEmpty) {
         this.xPaths = xPaths;
         this.fileMatcher = fileMatcher;
         this.deleteFileIfEmpty = deleteFileIfEmpty;
-    }
-
-    @Override
-    public String getDisplayName() {
-        return "Remove empty XML tags";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Repeatedly removes empty XML tags (optionally scoped by an XPath whitelist) until the tree is stable, " +
-               "and optionally deletes the file when its root tag becomes empty. " +
-               "Useful as a follow-up to recipes that strip individual tags and leave empty containers behind.";
     }
 
     @Override
