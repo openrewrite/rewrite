@@ -3895,14 +3895,12 @@ public interface J extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator})
     final class MethodDeclaration implements J, Statement, TypedTree {
 
-        @SuppressWarnings("unused")
         @Deprecated
         @ToBeRemoved(after = "2026-09-17")
-        @JsonCreator
-        static MethodDeclaration create(
+        public MethodDeclaration(
                 UUID id,
                 Space prefix,
                 Markers markers,
@@ -3912,15 +3910,12 @@ public interface J extends Tree {
                 @Nullable TypeTree returnTypeExpression,
                 IdentifierWithAnnotations name,
                 JContainer<Statement> parameters,
-                @Nullable List<JLeftPadded<Space>> dimensionsAfterName,
                 @Nullable JContainer<NameTree> throwz,
                 @Nullable Block body,
                 @Nullable JLeftPadded<Expression> defaultValue,
                 JavaType.@Nullable Method methodType) {
-            return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers,
-                    typeParameters, returnTypeExpression, name, parameters,
-                    dimensionsAfterName != null ? dimensionsAfterName : emptyList(),
-                    throwz, body, defaultValue, methodType);
+            this(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression,
+                    name, parameters, emptyList(), throwz, body, defaultValue, methodType);
         }
 
         @Nullable
