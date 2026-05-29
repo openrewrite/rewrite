@@ -118,19 +118,7 @@ func (r *GoReceiver) VisitCompilationUnit(cu *golang.CompilationUnit, p any) jav
 		cu.PackageDecl = nil
 	}
 	// imports (container)
-	var beforeImports any
-	if cu.Imports != nil {
-		beforeImports = *cu.Imports
-	}
-	if result := q.Receive(beforeImports, func(v any) any { return receiveContainerTyped[*java.Import](r, q, v) }); result != nil {
-		// Safe by construction: the onChange path returns Container[*Import] from
-		// receiveContainerTyped, and the NoChange path returns beforeImports, which
-		// is the field's own Container[*Import] value (or nil, handled by the else).
-		c := result.(java.Container[*java.Import])
-		cu.Imports = &c
-	} else {
-		cu.Imports = nil
-	}
+	cu.Imports = receivePointerContainer[*java.Import](r, q, cu.Imports)
 	// statements
 	beforeStmts := make([]any, len(cu.Statements))
 	for i, s := range cu.Statements {
@@ -195,9 +183,7 @@ func (r *GoReceiver) VisitComposite(comp *golang.Composite, p any) java.J {
 	c := *comp // shallow copy to avoid mutating remoteObjects baseline
 	comp = &c
 	comp.TypeExpr = receiveValue(q, comp.TypeExpr, func(e java.Expression) any { return r.Visit(e, q) })
-	if result := q.Receive(comp.Elements, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
-		comp.Elements = result.(java.Container[java.Expression])
-	}
+	comp.Elements = receiveContainer[java.Expression](r, q, comp.Elements)
 	return comp
 }
 
@@ -278,9 +264,7 @@ func (r *GoReceiver) VisitFuncType(ft *golang.FuncType, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *ft // shallow copy to avoid mutating remoteObjects baseline
 	ft = &c
-	if result := q.Receive(ft.Parameters, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
-		ft.Parameters = result.(java.Container[java.Statement])
-	}
+	ft.Parameters = receiveContainer[java.Statement](r, q, ft.Parameters)
 	ft.ReturnType = receiveValue(q, ft.ReturnType, func(e java.Expression) any { return r.Visit(e, q) })
 	return ft
 }
@@ -305,9 +289,7 @@ func (r *GoReceiver) VisitTypeList(tl *golang.TypeList, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *tl // shallow copy to avoid mutating remoteObjects baseline
 	tl = &c
-	if result := q.Receive(tl.Types, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
-		tl.Types = result.(java.Container[java.Statement])
-	}
+	tl.Types = receiveContainer[java.Statement](r, q, tl.Types)
 	return tl
 }
 
@@ -369,16 +351,7 @@ func (r *GoReceiver) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 		td.Assign = nil
 	}
 	td.Definition = receiveValue(q, td.Definition, func(e java.Expression) any { return r.Visit(e, q) })
-	var beforeSpecs any
-	if td.Specs != nil {
-		beforeSpecs = *td.Specs
-	}
-	if result := q.Receive(beforeSpecs, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
-		c := result.(java.Container[java.Statement])
-		td.Specs = &c
-	} else {
-		td.Specs = nil
-	}
+	td.Specs = receivePointerContainer[java.Statement](r, q, td.Specs)
 	return td
 }
 
@@ -443,8 +416,6 @@ func (r *GoReceiver) VisitIndexList(il *golang.IndexList, p any) java.J {
 	c := *il // shallow copy to avoid mutating remoteObjects baseline
 	il = &c
 	il.Target = receiveValue(q, il.Target, func(e java.Expression) any { return r.Visit(e, q) })
-	if result := q.Receive(il.Indices, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
-		il.Indices = result.(java.Container[java.Expression])
-	}
+	il.Indices = receiveContainer[java.Expression](r, q, il.Indices)
 	return il
 }

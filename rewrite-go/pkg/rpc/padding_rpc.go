@@ -595,3 +595,38 @@ func receiveContainerTyped[T any](r Receiver, q *ReceiveQueue, before any) java.
 	}
 	return java.Container[T]{Before: beforeSpace.(java.Space), Elements: elems, Markers: markers.(java.Markers)}
 }
+
+// receiveContainer receives a value-typed Container[T] field. NO_CHANGE returns the
+// before value (a Container[T], which the cast matches); ADD/CHANGE returns the typed
+// container from receiveContainerTyped; DELETE leaves the field unchanged (value-typed
+// container fields are never deleted).
+//
+// Unlike receiveValue, the onChange closure forwards `before` to receiveContainerTyped
+// as a bare `any` — it must NOT cast to Container[T] first. On the ADD path the wire's
+// erased "JContainer" type makes the queue materialize a Container[java.J] baseline
+// (newObj can't know the element type T); receiveContainerTyped tolerates that via
+// containerElements, but a `v.(Container[T])` cast would panic on it. This is the same
+// reason receivePointerContainer keeps the closure untyped.
+func receiveContainer[T any](r Receiver, q *ReceiveQueue, before java.Container[T]) java.Container[T] {
+	if result := q.Receive(before, func(v any) any { return receiveContainerTyped[T](r, q, v) }); result != nil {
+		return result.(java.Container[T])
+	}
+	return before
+}
+
+// receivePointerContainer receives a nullable *Container[T] field. The before-pointer is
+// dereferenced to a value baseline before q.Receive so the NO_CHANGE path returns an
+// assertable value Container[T] rather than the *Container[T] pointer (a raw value-cast
+// of which panics — the #7831 / pointer-vs-value bug class). DELETE (nil result) clears
+// the field; ADD/CHANGE rewraps the typed container as a pointer.
+func receivePointerContainer[T any](r Receiver, q *ReceiveQueue, before *java.Container[T]) *java.Container[T] {
+	var beforeVal any
+	if before != nil {
+		beforeVal = *before
+	}
+	if result := q.Receive(beforeVal, func(v any) any { return receiveContainerTyped[T](r, q, v) }); result != nil {
+		c := result.(java.Container[T])
+		return &c
+	}
+	return nil
+}

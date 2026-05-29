@@ -649,8 +649,15 @@ func (s *JavaSender) VisitParameterizedType(pt *java.ParameterizedType, p any) j
 	q := p.(*SendQueue)
 	q.GetAndSend(pt, func(v any) any { return v.(*java.ParameterizedType).Clazz },
 		func(v any) { s.Visit(v.(java.Tree), q) })
-	q.GetAndSend(pt, func(v any) any { return v.(*java.ParameterizedType).TypeParameters },
-		func(v any) { sendContainer(s, v, q) })
+	// TypeParameters is a *Container; dereference so sendContainer (containerElements
+	// et al.) sees a value Container rather than the pointer (which sends as empty).
+	q.GetAndSend(pt, func(v any) any {
+		tp := v.(*java.ParameterizedType).TypeParameters
+		if tp == nil {
+			return nil
+		}
+		return *tp
+	}, func(v any) { sendContainer(s, v, q) })
 	q.GetAndSend(pt, func(v any) any { return AsRef(v.(*java.ParameterizedType).Type) },
 		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return pt
