@@ -216,6 +216,37 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
                 .getPadding().withIndices(q.receive(indexList.getPadding().getIndices(), el -> visitContainer(el, q)));
     }
 
+    @Override
+    public J visitGoUnary(Go.Unary unary, RpcReceiveQueue q) {
+        return unary
+                .getPadding().withOperator(q.receive(unary.getPadding().getOperator(), o -> visitLeftPadded(o, q, toEnum(Go.Unary.Type.class))))
+                .withExpression(q.receive(unary.getExpression(), expr -> (Expression) visitNonNull(expr, q)));
+    }
+
+    @Override
+    public J visitGoBinary(Go.Binary binary, RpcReceiveQueue q) {
+        return binary
+                .withLeft(q.receive(binary.getLeft(), expr -> (Expression) visitNonNull(expr, q)))
+                .getPadding().withOperator(q.receive(binary.getPadding().getOperator(), o -> visitLeftPadded(o, q, toEnum(Go.Binary.Type.class))))
+                .withRight(q.receive(binary.getRight(), expr -> (Expression) visitNonNull(expr, q)));
+    }
+
+    @Override
+    public J visitGoAssignmentOperation(Go.AssignmentOperation assignOp, RpcReceiveQueue q) {
+        return assignOp
+                .withVariable(q.receive(assignOp.getVariable(), expr -> (Expression) visitNonNull(expr, q)))
+                .getPadding().withOperator(q.receive(assignOp.getPadding().getOperator(), o -> visitLeftPadded(o, q, toEnum(Go.AssignmentOperation.Type.class))))
+                .withAssignment(q.receive(assignOp.getAssignment(), expr -> (Expression) visitNonNull(expr, q)));
+    }
+
+    @Override
+    public J visitGoVariadic(Go.Variadic variadic, RpcReceiveQueue q) {
+        return variadic
+                .withElement(q.receive(variadic.getElement(), expr -> (Expression) visitNonNull(expr, q)))
+                .withDots(q.receive(variadic.getDots(), space -> visitSpace(space, q)))
+                .withPostfix(q.receive(variadic.isPostfix()));
+    }
+
     // Delegation methods to JavaReceiver for RPC-specific visit methods
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q) {
         return delegate.visitLeftPadded(left, q);

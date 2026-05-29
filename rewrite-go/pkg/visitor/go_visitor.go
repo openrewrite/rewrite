@@ -228,6 +228,14 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitMultiAssignment(n, p)
 	case *golang.CommClause:
 		return v.self().VisitCommClause(n, p)
+	case *golang.Unary:
+		return v.self().VisitGoUnary(n, p)
+	case *golang.Binary:
+		return v.self().VisitGoBinary(n, p)
+	case *golang.AssignmentOperation:
+		return v.self().VisitGoAssignmentOperation(n, p)
+	case *golang.Variadic:
+		return v.self().VisitGoVariadic(n, p)
 	default:
 		return t
 	}
@@ -305,6 +313,10 @@ type VisitorI interface {
 	VisitInterfaceType(it *golang.InterfaceType, p any) java.J
 	VisitMultiAssignment(ma *golang.MultiAssignment, p any) java.J
 	VisitCommClause(cc *golang.CommClause, p any) java.J
+	VisitGoUnary(u *golang.Unary, p any) java.J
+	VisitGoBinary(b *golang.Binary, p any) java.J
+	VisitGoAssignmentOperation(a *golang.AssignmentOperation, p any) java.J
+	VisitGoVariadic(v *golang.Variadic, p any) java.J
 	VisitSpace(space java.Space, p any) java.Space
 	VisitType(javaType java.JavaType, p any) java.JavaType
 }
@@ -635,6 +647,46 @@ func (v *GoVisitor) VisitGoto(g *golang.Goto, p any) java.J {
 	g = g.WithPrefix(v.self().VisitSpace(g.Prefix, p))
 	g = g.WithMarkers(v.visitMarkers(g.Markers, p))
 	return g
+}
+
+func (v *GoVisitor) VisitGoUnary(u *golang.Unary, p any) java.J {
+	u = u.WithPrefix(v.self().VisitSpace(u.Prefix, p))
+	u = u.WithMarkers(v.visitMarkers(u.Markers, p))
+	op := u.Operator
+	op.Before = v.self().VisitSpace(op.Before, p)
+	u.Operator = op
+	u.Expression = visitAndCast[java.Expression](v, u.Expression, p)
+	return u
+}
+
+func (v *GoVisitor) VisitGoBinary(b *golang.Binary, p any) java.J {
+	b = b.WithPrefix(v.self().VisitSpace(b.Prefix, p))
+	b = b.WithMarkers(v.visitMarkers(b.Markers, p))
+	b.Left = visitAndCast[java.Expression](v, b.Left, p)
+	op := b.Operator
+	op.Before = v.self().VisitSpace(op.Before, p)
+	b.Operator = op
+	b.Right = visitAndCast[java.Expression](v, b.Right, p)
+	return b
+}
+
+func (v *GoVisitor) VisitGoAssignmentOperation(a *golang.AssignmentOperation, p any) java.J {
+	a = a.WithPrefix(v.self().VisitSpace(a.Prefix, p))
+	a = a.WithMarkers(v.visitMarkers(a.Markers, p))
+	a.Variable = visitAndCast[java.Expression](v, a.Variable, p)
+	op := a.Operator
+	op.Before = v.self().VisitSpace(op.Before, p)
+	a.Operator = op
+	a.Assignment = visitAndCast[java.Expression](v, a.Assignment, p)
+	return a
+}
+
+func (v *GoVisitor) VisitGoVariadic(vr *golang.Variadic, p any) java.J {
+	vr = vr.WithPrefix(v.self().VisitSpace(vr.Prefix, p))
+	vr = vr.WithMarkers(v.visitMarkers(vr.Markers, p))
+	vr.Element = visitAndCast[java.Expression](v, vr.Element, p)
+	vr.Dots = v.self().VisitSpace(vr.Dots, p)
+	return vr
 }
 
 func (v *GoVisitor) VisitFallthrough(f *golang.Fallthrough, p any) java.J {

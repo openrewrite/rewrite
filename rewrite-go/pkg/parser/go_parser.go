@@ -815,9 +815,9 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[
 			// Unnamed parameter: just a type expression (e.g., `int` in `func(int)`)
 			typeExpr := ctx.mapTypeExpr(field.Type)
 			var varargs *java.Space
-			if u, ok := typeExpr.(*java.Unary); ok && u.Operator.Element == java.Spread {
-				varargs = &u.Prefix
-				typeExpr = u.Operand
+			if vrd, ok := typeExpr.(*golang.Variadic); ok && !vrd.Postfix {
+				varargs = &vrd.Prefix
+				typeExpr = vrd.Element
 			}
 			vd := &java.VariableDeclarations{
 				ID:       uuid.New(),
@@ -858,9 +858,9 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[
 
 			typeExpr := ctx.mapTypeExpr(field.Type)
 			var varargs *java.Space
-			if u, ok := typeExpr.(*java.Unary); ok && u.Operator.Element == java.Spread {
-				varargs = &u.Prefix
-				typeExpr = u.Operand
+			if vrd, ok := typeExpr.(*golang.Variadic); ok && !vrd.Postfix {
+				varargs = &vrd.Prefix
+				typeExpr = vrd.Element
 			}
 			vd := &java.VariableDeclarations{
 				ID:        uuid.New(),
@@ -1048,6 +1048,20 @@ func (ctx *parseContext) mapReturnStmt(stmt *ast.ReturnStmt) *java.Return {
 func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 	// Check for compound assignment operators (+=, -=, etc.) — always single LHS/RHS
 	if len(stmt.Lhs) == 1 && len(stmt.Rhs) == 1 {
+		// Go's `&^=` (bit-clear assign) has no J.AssignmentOperation.Type
+		// equivalent → golang.AssignmentOperation.
+		if stmt.Tok == token.AND_NOT_ASSIGN {
+			lhs := ctx.mapExpr(stmt.Lhs[0])
+			opPrefix := ctx.prefix(stmt.TokPos)
+			ctx.skip(len(stmt.Tok.String()))
+			rhs := ctx.mapExpr(stmt.Rhs[0])
+			return &golang.AssignmentOperation{
+				ID:         uuid.New(),
+				Variable:   lhs,
+				Operator:   java.LeftPadded[golang.AssignmentOperator]{Before: opPrefix, Element: golang.AssignAndNot},
+				Assignment: rhs,
+			}
+		}
 		if op, ok := mapAssignmentOp(stmt.Tok); ok {
 			lhs := ctx.mapExpr(stmt.Lhs[0])
 			opPrefix := ctx.prefix(stmt.TokPos)
@@ -1789,12 +1803,22 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 }
 
 // mapBinaryExpr maps a binary expression.
-func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) *java.Binary {
+func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) java.Expression {
 	left := ctx.mapExpr(expr.X)
 	opPrefix := ctx.prefix(expr.OpPos)
 	op := mapBinaryOp(expr.Op)
 	ctx.skip(len(expr.Op.String()))
 	right := ctx.mapExpr(expr.Y)
+
+	// Go's `&^` (bit clear) has no J.Binary.Type equivalent → golang.Binary.
+	if expr.Op == token.AND_NOT {
+		return &golang.Binary{
+			ID:       uuid.New(),
+			Left:     left,
+			Operator: java.LeftPadded[golang.BinaryOperator]{Before: opPrefix, Element: golang.BinAndNot},
+			Right:    right,
+		}
+	}
 
 	b := &java.Binary{
 		ID:       uuid.New(),
@@ -1843,10 +1867,11 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 		if expr.Ellipsis.IsValid() && i == len(expr.Args)-1 {
 			ellipsisPrefix := ctx.prefix(expr.Ellipsis)
 			ctx.skip(3) // "..."
-			mapped = &java.Unary{
-				ID:       uuid.New(),
-				Operator: java.LeftPadded[java.UnaryOperator]{Before: ellipsisPrefix, Element: java.SpreadPostfix},
-				Operand:  mapped,
+			mapped = &golang.Variadic{
+				ID:      uuid.New(),
+				Element: mapped,
+				Dots:    ellipsisPrefix,
+				Postfix: true,
 			}
 		}
 		after := java.EmptySpace
@@ -1960,6 +1985,33 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 	ctx.skip(len(expr.Op.String()))
 	operand := ctx.mapExpr(expr.X)
 
+	// Go-specific operators (&, *, <-) have no J.Unary.Type equivalent, so they
+	// map to golang.Unary; the rest stay as java.Unary so recipes can treat them
+	// uniformly with other languages.
+	switch expr.Op {
+	case token.MUL:
+		return &golang.Unary{
+			ID:         uuid.New(),
+			Prefix:     prefix,
+			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Indirection},
+			Expression: operand,
+		}
+	case token.AND:
+		return &golang.Unary{
+			ID:         uuid.New(),
+			Prefix:     prefix,
+			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.AddressOf},
+			Expression: operand,
+		}
+	case token.ARROW:
+		return &golang.Unary{
+			ID:         uuid.New(),
+			Prefix:     prefix,
+			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Receive},
+			Expression: operand,
+		}
+	}
+
 	var op java.UnaryOperator
 	switch expr.Op {
 	case token.SUB:
@@ -1968,12 +2020,6 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 		op = java.Not
 	case token.XOR:
 		op = java.BitwiseNot
-	case token.MUL:
-		op = java.Deref
-	case token.AND:
-		op = java.AddressOf
-	case token.ARROW:
-		op = java.Receive
 	case token.ADD:
 		op = java.Positive
 	case token.TILDE:
@@ -2067,17 +2113,18 @@ func (ctx *parseContext) mapParenExpr(expr *ast.ParenExpr) java.Expression {
 	}
 }
 
-// mapStarExpr maps a star expression (pointer type or dereference).
+// mapStarExpr maps a star expression in value context as a pointer dereference
+// (`*p`). Go's `*` has no J.Unary.Type equivalent, so it maps to golang.Unary.
 func (ctx *parseContext) mapStarExpr(expr *ast.StarExpr) java.Expression {
 	prefix := ctx.prefix(expr.Star)
 	ctx.skip(1) // "*"
 	operand := ctx.mapExpr(expr.X)
 
-	return &java.Unary{
-		ID:       uuid.New(),
-		Prefix:   prefix,
-		Operator: java.LeftPadded[java.UnaryOperator]{Element: java.Deref},
-		Operand:  operand,
+	return &golang.Unary{
+		ID:         uuid.New(),
+		Prefix:     prefix,
+		Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Indirection},
+		Expression: operand,
 	}
 }
 
@@ -2903,16 +2950,17 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 	return &java.Block{ID: uuid.New(), Prefix: blockPrefix, Statements: stmts, End: end}
 }
 
-// mapEllipsis maps `...T` in function parameters.
+// mapEllipsis maps `...T` in function parameters (prefix variadic form).
 func (ctx *parseContext) mapEllipsis(expr *ast.Ellipsis) java.Expression {
 	prefix := ctx.prefix(expr.Ellipsis)
 	ctx.skip(3) // "..."
 	elt := ctx.mapTypeExpr(expr.Elt)
-	return &java.Unary{
-		ID:       uuid.New(),
-		Prefix:   prefix,
-		Operator: java.LeftPadded[java.UnaryOperator]{Element: java.Spread},
-		Operand:  elt,
+	return &golang.Variadic{
+		ID:      uuid.New(),
+		Prefix:  prefix,
+		Element: elt,
+		Dots:    java.EmptySpace,
+		Postfix: false,
 	}
 }
 

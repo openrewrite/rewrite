@@ -674,6 +674,76 @@ func (p *GoPrinter) VisitUnary(unary *java.Unary, param any) java.J {
 	return unary
 }
 
+func goUnaryOperatorString(op golang.UnaryOperator) string {
+	switch op {
+	case golang.AddressOf:
+		return "&"
+	case golang.Indirection:
+		return "*"
+	case golang.Receive:
+		return "<-"
+	default:
+		return "?"
+	}
+}
+
+func (p *GoPrinter) VisitGoUnary(unary *golang.Unary, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(unary.Prefix, unary.Markers, out)
+	p.visitSpace(unary.Operator.Before, out)
+	out.Append(goUnaryOperatorString(unary.Operator.Element))
+	p.Visit(unary.Expression, out)
+	p.afterSyntax(unary.Markers, out)
+	return unary
+}
+
+func (p *GoPrinter) VisitGoBinary(binary *golang.Binary, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(binary.Prefix, binary.Markers, out)
+	p.Visit(binary.Left, out)
+	p.visitSpace(binary.Operator.Before, out)
+	if binary.Operator.Element == golang.BinAndNot {
+		out.Append("&^")
+	} else {
+		out.Append("?")
+	}
+	p.Visit(binary.Right, out)
+	p.afterSyntax(binary.Markers, out)
+	return binary
+}
+
+func (p *GoPrinter) VisitGoAssignmentOperation(ao *golang.AssignmentOperation, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ao.Prefix, ao.Markers, out)
+	p.Visit(ao.Variable, out)
+	p.visitSpace(ao.Operator.Before, out)
+	if ao.Operator.Element == golang.AssignAndNot {
+		out.Append("&^=")
+	} else {
+		out.Append("?=")
+	}
+	p.Visit(ao.Assignment, out)
+	p.afterSyntax(ao.Markers, out)
+	return ao
+}
+
+func (p *GoPrinter) VisitGoVariadic(v *golang.Variadic, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(v.Prefix, v.Markers, out)
+	if v.Postfix {
+		// `args...` — element, then the ellipsis.
+		p.Visit(v.Element, out)
+		p.visitSpace(v.Dots, out)
+		out.Append("...")
+	} else {
+		// `...T` — the ellipsis, then the element (its prefix is the gap).
+		out.Append("...")
+		p.Visit(v.Element, out)
+	}
+	p.afterSyntax(v.Markers, out)
+	return v
+}
+
 func (p *GoPrinter) VisitBreak(b *java.Break, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(b.Prefix, b.Markers, out)
@@ -1171,9 +1241,14 @@ func binaryOperatorString(op java.BinaryOperator) string {
 		return ">"
 	case java.GreaterThanOrEqual:
 		return ">="
-	case java.LogicalAnd:
+	case java.And, java.LogicalAnd:
+		// Go's `&&`. The wire round-trip canonicalizes to the Java enum name
+		// "And" (BinaryOperator.String()), which ParseBinaryOperator maps back
+		// to `And` rather than `LogicalAnd`; handle both so a parsed tree and a
+		// round-tripped tree print identically. Bitwise `&` is BitwiseAnd.
 		return "&&"
-	case java.LogicalOr:
+	case java.Or, java.LogicalOr:
+		// Go's `||`; see the `&&` note above. Bitwise `|` is BitwiseOr.
 		return "||"
 	case java.BitwiseAnd:
 		return "&"

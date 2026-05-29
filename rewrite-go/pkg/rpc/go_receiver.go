@@ -171,6 +171,45 @@ func (r *GoReceiver) VisitGoto(g *golang.Goto, p any) java.J {
 	return g
 }
 
+func (r *GoReceiver) VisitGoUnary(u *golang.Unary, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *u // shallow copy to avoid mutating remoteObjects baseline
+	u = &c
+	u.Operator = receiveLeftPaddedEnum(r, q, u.Operator, golang.ParseUnaryOperator)
+	u.Expression = receiveValue(q, u.Expression, func(e java.Expression) any { return r.Visit(e, q) })
+	return u
+}
+
+func (r *GoReceiver) VisitGoBinary(b *golang.Binary, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *b // shallow copy to avoid mutating remoteObjects baseline
+	b = &c
+	b.Left = receiveValue(q, b.Left, func(e java.Expression) any { return r.Visit(e, q) })
+	b.Operator = receiveLeftPaddedEnum(r, q, b.Operator, golang.ParseBinaryOperator)
+	b.Right = receiveValue(q, b.Right, func(e java.Expression) any { return r.Visit(e, q) })
+	return b
+}
+
+func (r *GoReceiver) VisitGoAssignmentOperation(a *golang.AssignmentOperation, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *a // shallow copy to avoid mutating remoteObjects baseline
+	a = &c
+	a.Variable = receiveValue(q, a.Variable, func(e java.Expression) any { return r.Visit(e, q) })
+	a.Operator = receiveLeftPaddedEnum(r, q, a.Operator, golang.ParseAssignmentOperator)
+	a.Assignment = receiveValue(q, a.Assignment, func(e java.Expression) any { return r.Visit(e, q) })
+	return a
+}
+
+func (r *GoReceiver) VisitGoVariadic(vr *golang.Variadic, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *vr // shallow copy to avoid mutating remoteObjects baseline
+	vr = &c
+	vr.Element = receiveValue(q, vr.Element, func(e java.Expression) any { return r.Visit(e, q) })
+	vr.Dots = receiveValue(q, vr.Dots, func(s java.Space) any { return receiveSpace(s, q) })
+	vr.Postfix = receiveScalar[bool](q, vr.Postfix)
+	return vr
+}
+
 // VisitFallthrough mirrors GolangReceiver.visitFallthrough — the node has no
 // payload beyond the framework-handled id/prefix/markers, so this override
 // is intentionally a no-op. Present for sender/receiver symmetry.

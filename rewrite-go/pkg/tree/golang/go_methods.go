@@ -202,6 +202,54 @@ func (n *PointerType) WithID(id uuid.UUID) java.J {
 func (n *PointerType) GetPrefix() java.Space    { return n.Prefix }
 func (n *PointerType) GetMarkers() java.Markers { return n.Markers }
 
+func (n *Unary) GetID() uuid.UUID { return n.ID }
+func (n *Unary) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *Unary) GetPrefix() java.Space    { return n.Prefix }
+func (n *Unary) GetMarkers() java.Markers { return n.Markers }
+
+func (n *Binary) GetID() uuid.UUID { return n.ID }
+func (n *Binary) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *Binary) GetPrefix() java.Space    { return n.Prefix }
+func (n *Binary) GetMarkers() java.Markers { return n.Markers }
+
+func (n *AssignmentOperation) GetID() uuid.UUID { return n.ID }
+func (n *AssignmentOperation) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *AssignmentOperation) GetPrefix() java.Space    { return n.Prefix }
+func (n *AssignmentOperation) GetMarkers() java.Markers { return n.Markers }
+
+func (n *Variadic) GetID() uuid.UUID { return n.ID }
+func (n *Variadic) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *Variadic) GetPrefix() java.Space    { return n.Prefix }
+func (n *Variadic) GetMarkers() java.Markers { return n.Markers }
+
 func (n *Send) GetID() uuid.UUID { return n.ID }
 func (n *Send) WithID(id uuid.UUID) java.J {
 	if n.ID == id {

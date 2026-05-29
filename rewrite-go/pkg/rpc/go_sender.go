@@ -135,6 +135,54 @@ func (s *GoSender) VisitGoto(g *golang.Goto, p any) java.J {
 	return g
 }
 
+func (s *GoSender) VisitGoUnary(u *golang.Unary, p any) java.J {
+	q := p.(*SendQueue)
+	// Send the operator as its faithful Java enum-constant name (Go.Unary.Type).
+	q.GetAndSend(u, func(v any) any {
+		op := v.(*golang.Unary).Operator
+		return java.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
+	}, func(v any) { sendLeftPadded(s, v, q) })
+	q.GetAndSend(u, func(v any) any { return v.(*golang.Unary).Expression },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return u
+}
+
+func (s *GoSender) VisitGoBinary(b *golang.Binary, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(b, func(v any) any { return v.(*golang.Binary).Left },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(b, func(v any) any {
+		op := v.(*golang.Binary).Operator
+		return java.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
+	}, func(v any) { sendLeftPadded(s, v, q) })
+	q.GetAndSend(b, func(v any) any { return v.(*golang.Binary).Right },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return b
+}
+
+func (s *GoSender) VisitGoAssignmentOperation(a *golang.AssignmentOperation, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(a, func(v any) any { return v.(*golang.AssignmentOperation).Variable },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(a, func(v any) any {
+		op := v.(*golang.AssignmentOperation).Operator
+		return java.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
+	}, func(v any) { sendLeftPadded(s, v, q) })
+	q.GetAndSend(a, func(v any) any { return v.(*golang.AssignmentOperation).Assignment },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return a
+}
+
+func (s *GoSender) VisitGoVariadic(vr *golang.Variadic, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(vr, func(v any) any { return v.(*golang.Variadic).Element },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	q.GetAndSend(vr, func(v any) any { return v.(*golang.Variadic).Dots },
+		func(v any) { sendSpace(v.(java.Space), q) })
+	q.GetAndSend(vr, func(v any) any { return v.(*golang.Variadic).Postfix }, nil)
+	return vr
+}
+
 // VisitFallthrough mirrors GolangSender.visitFallthrough — the node has no
 // payload beyond the framework-handled id/prefix/markers, so this override
 // is intentionally a no-op. Present for sender/receiver symmetry.
