@@ -512,6 +512,12 @@ func (v *GoVisitor) VisitVariableDeclarations(vd *java.VariableDeclarations, p a
 		vd.TypeExpr = visitExpression(v, vd.TypeExpr, p)
 	}
 	vd.Variables = visitRightPaddedList(v, vd.Variables, p)
+	if vd.Specs != nil {
+		specs := *vd.Specs
+		specs.Before = v.self().VisitSpace(specs.Before, p)
+		specs.Elements = visitRightPaddedList(v, specs.Elements, p)
+		vd.Specs = &specs
+	}
 	return vd
 }
 
@@ -809,8 +815,25 @@ func (v *GoVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 		}
 		td = td.WithLeadingAnnotations(anns)
 	}
+	if td.Name != nil {
+		td.Name = visitAndCast[*java.Identifier](v, td.Name, p)
+	}
 	if td.TypeParameters != nil {
 		td = td.WithTypeParameters(visitAndCast[*java.TypeParameters](v, td.TypeParameters, p))
+	}
+	if td.Assign != nil {
+		assign := *td.Assign
+		assign.Before = v.self().VisitSpace(assign.Before, p)
+		td.Assign = &assign
+	}
+	if td.Definition != nil {
+		td.Definition = visitExpression(v, td.Definition, p)
+	}
+	if td.Specs != nil {
+		specs := *td.Specs
+		specs.Before = v.self().VisitSpace(specs.Before, p)
+		specs.Elements = visitRightPaddedList(v, specs.Elements, p)
+		td.Specs = &specs
 	}
 	return td
 }
