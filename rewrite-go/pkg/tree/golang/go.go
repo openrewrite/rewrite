@@ -703,6 +703,210 @@ func (n *IndexList) WithMarkers(markers java.Markers) *IndexList {
 	return &c
 }
 
+// UnaryOperator is a Go-specific prefix unary operator that has no equivalent
+// in java.UnaryOperator / J.Unary.Type. Operators that DO map to J.Unary
+// (Negate, Not, BitwiseNot, Positive) stay as java.Unary.
+type UnaryOperator int
+
+const (
+	AddressOf   UnaryOperator = iota + 1 // &
+	Indirection                          // *
+	Receive                              // <-
+)
+
+// String returns the Java enum-constant name (Go.Unary.Type) for the wire.
+// Unlike java.UnaryOperator.String() these are faithful 1:1 mappings, so the
+// operator survives a Java round-trip without collapsing to "Not".
+func (op UnaryOperator) String() string {
+	switch op {
+	case AddressOf:
+		return "AddressOf"
+	case Indirection:
+		return "Indirection"
+	case Receive:
+		return "Receive"
+	default:
+		return "AddressOf"
+	}
+}
+
+// ParseUnaryOperator converts a Go.Unary.Type enum name back to the operator.
+func ParseUnaryOperator(s string) UnaryOperator {
+	switch s {
+	case "AddressOf":
+		return AddressOf
+	case "Indirection":
+		return Indirection
+	case "Receive":
+		return Receive
+	default:
+		return 0
+	}
+}
+
+// Unary represents a Go-specific prefix unary expression: `&x`, `*p`, `<-ch`.
+type Unary struct {
+	ID         uuid.UUID
+	Prefix     java.Space
+	Markers    java.Markers
+	Operator   java.LeftPadded[UnaryOperator] // Before = space before the operator token
+	Expression java.Expression
+}
+
+func (*Unary) IsTree()       {}
+func (*Unary) IsJ()          {}
+func (*Unary) IsExpression() {}
+func (*Unary) IsStatement()  {}
+
+func (n *Unary) WithPrefix(prefix java.Space) *Unary {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Unary) WithMarkers(markers java.Markers) *Unary {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// BinaryOperator is a Go-specific binary operator with no java.BinaryOperator
+// / J.Binary.Type equivalent. All other Go binary operators stay as java.Binary.
+type BinaryOperator int
+
+const (
+	BinAndNot BinaryOperator = iota + 1 // &^
+)
+
+// String returns the Java enum-constant name (Go.Binary.Type) for the wire.
+func (op BinaryOperator) String() string {
+	switch op {
+	case BinAndNot:
+		return "AndNot"
+	default:
+		return "AndNot"
+	}
+}
+
+// ParseBinaryOperator converts a Go.Binary.Type enum name back to the operator.
+func ParseBinaryOperator(s string) BinaryOperator {
+	switch s {
+	case "AndNot":
+		return BinAndNot
+	default:
+		return 0
+	}
+}
+
+// Binary represents a Go-specific binary expression: `a &^ b`.
+type Binary struct {
+	ID       uuid.UUID
+	Prefix   java.Space
+	Markers  java.Markers
+	Left     java.Expression
+	Operator java.LeftPadded[BinaryOperator] // Before = space before the operator token
+	Right    java.Expression
+}
+
+func (*Binary) IsTree()       {}
+func (*Binary) IsJ()          {}
+func (*Binary) IsExpression() {}
+
+func (n *Binary) WithPrefix(prefix java.Space) *Binary {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Binary) WithMarkers(markers java.Markers) *Binary {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// AssignmentOperator is a Go-specific compound-assignment operator with no
+// java.AssignmentOperator / J.AssignmentOperation.Type equivalent.
+type AssignmentOperator int
+
+const (
+	AssignAndNot AssignmentOperator = iota + 1 // &^=
+)
+
+// String returns the Java enum-constant name (Go.AssignmentOperation.Type).
+func (op AssignmentOperator) String() string {
+	switch op {
+	case AssignAndNot:
+		return "AndNot"
+	default:
+		return "AndNot"
+	}
+}
+
+// ParseAssignmentOperator converts a Go.AssignmentOperation.Type enum name back.
+func ParseAssignmentOperator(s string) AssignmentOperator {
+	switch s {
+	case "AndNot":
+		return AssignAndNot
+	default:
+		return 0
+	}
+}
+
+// AssignmentOperation represents a Go-specific compound assignment: `a &^= b`.
+type AssignmentOperation struct {
+	ID         uuid.UUID
+	Prefix     java.Space
+	Markers    java.Markers
+	Variable   java.Expression
+	Operator   java.LeftPadded[AssignmentOperator] // Before = space before the operator token
+	Assignment java.Expression
+}
+
+func (*AssignmentOperation) IsTree()       {}
+func (*AssignmentOperation) IsJ()          {}
+func (*AssignmentOperation) IsExpression() {}
+func (*AssignmentOperation) IsStatement()  {}
+
+func (n *AssignmentOperation) WithPrefix(prefix java.Space) *AssignmentOperation {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *AssignmentOperation) WithMarkers(markers java.Markers) *AssignmentOperation {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// Variadic represents Go's `...` ellipsis: the `...T` parameter type
+// (Postfix=false) and the `args...` call spread (Postfix=true). Dots is the
+// whitespace immediately before the `...` token in the postfix form.
+type Variadic struct {
+	ID      uuid.UUID
+	Prefix  java.Space
+	Markers java.Markers
+	Element java.Expression
+	Dots    java.Space
+	Postfix bool
+}
+
+func (*Variadic) IsTree()       {}
+func (*Variadic) IsJ()          {}
+func (*Variadic) IsExpression() {}
+
+func (n *Variadic) WithPrefix(prefix java.Space) *Variadic {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Variadic) WithMarkers(markers java.Markers) *Variadic {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 // SelectStmt is a marker on Switch indicating it's a `select` statement instead of `switch`.
 type SelectStmt struct {
 	Ident uuid.UUID

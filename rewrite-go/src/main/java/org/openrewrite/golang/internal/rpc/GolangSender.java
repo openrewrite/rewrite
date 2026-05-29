@@ -211,6 +211,37 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
         return indexList;
     }
 
+    @Override
+    public J visitGoUnary(Go.Unary unary, RpcSendQueue q) {
+        q.getAndSend(unary, u -> u.getPadding().getOperator(), op -> visitLeftPadded(op, q));
+        q.getAndSend(unary, Go.Unary::getExpression, el -> visit(el, q));
+        return unary;
+    }
+
+    @Override
+    public J visitGoBinary(Go.Binary binary, RpcSendQueue q) {
+        q.getAndSend(binary, Go.Binary::getLeft, el -> visit(el, q));
+        q.getAndSend(binary, b -> b.getPadding().getOperator(), op -> visitLeftPadded(op, q));
+        q.getAndSend(binary, Go.Binary::getRight, el -> visit(el, q));
+        return binary;
+    }
+
+    @Override
+    public J visitGoAssignmentOperation(Go.AssignmentOperation assignOp, RpcSendQueue q) {
+        q.getAndSend(assignOp, Go.AssignmentOperation::getVariable, el -> visit(el, q));
+        q.getAndSend(assignOp, a -> a.getPadding().getOperator(), op -> visitLeftPadded(op, q));
+        q.getAndSend(assignOp, Go.AssignmentOperation::getAssignment, el -> visit(el, q));
+        return assignOp;
+    }
+
+    @Override
+    public J visitGoVariadic(Go.Variadic variadic, RpcSendQueue q) {
+        q.getAndSend(variadic, Go.Variadic::getElement, el -> visit(el, q));
+        q.getAndSend(variadic, Go.Variadic::getDots, space -> visitSpace(space, q));
+        q.getAndSend(variadic, Go.Variadic::isPostfix);
+        return variadic;
+    }
+
     // Delegation methods to JavaSender for RPC-specific visit methods
     public <T> void visitLeftPadded(JLeftPadded<T> left, RpcSendQueue q) {
         delegate.visitLeftPadded(left, q);

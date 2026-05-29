@@ -281,4 +281,42 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         i = i.getPadding().withIndices(visitContainer(i.getPadding().getIndices(), JContainer.Location.LANGUAGE_EXTENSION, p));
         return i;
     }
+
+    public J visitGoUnary(Go.Unary unary, P p) {
+        Go.Unary u = unary;
+        u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.getPadding().withOperator(visitLeftPadded(u.getPadding().getOperator(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        u = u.withExpression((Expression) visitAndCast(u.getExpression(), p));
+        return u;
+    }
+
+    public J visitGoBinary(Go.Binary binary, P p) {
+        Go.Binary b = binary;
+        b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        b = b.withLeft((Expression) visitAndCast(b.getLeft(), p));
+        b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        b = b.withRight((Expression) visitAndCast(b.getRight(), p));
+        return b;
+    }
+
+    public J visitGoAssignmentOperation(Go.AssignmentOperation assignOp, P p) {
+        Go.AssignmentOperation a = assignOp;
+        a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.withVariable((Expression) visitAndCast(a.getVariable(), p));
+        a = a.getPadding().withOperator(visitLeftPadded(a.getPadding().getOperator(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        a = a.withAssignment((Expression) visitAndCast(a.getAssignment(), p));
+        return a;
+    }
+
+    public J visitGoVariadic(Go.Variadic variadic, P p) {
+        Go.Variadic v = variadic;
+        v = v.withPrefix(visitSpace(v.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        v = v.withMarkers(visitMarkers(v.getMarkers(), p));
+        v = v.withElement((Expression) visitAndCast(v.getElement(), p));
+        v = v.withDots(visitSpace(v.getDots(), Space.Location.LANGUAGE_EXTENSION, p));
+        return v;
+    }
 }
