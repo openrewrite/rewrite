@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -29,7 +29,7 @@ type deletingVisitor struct {
 	visitor.GoVisitor
 }
 
-func (v *deletingVisitor) VisitReturn(ret *tree.Return, p any) tree.J {
+func (v *deletingVisitor) VisitReturn(ret *java.Return, p any) java.J {
 	return nil // delete the return statement
 }
 
@@ -55,7 +55,7 @@ type importCountingVisitor struct {
 	count int
 }
 
-func (v *importCountingVisitor) VisitImport(imp *tree.Import, p any) tree.J {
+func (v *importCountingVisitor) VisitImport(imp *java.Import, p any) java.J {
 	v.count++
 	return imp
 }
@@ -81,7 +81,7 @@ type identCountingVisitor struct {
 	names []string
 }
 
-func (v *identCountingVisitor) VisitIdentifier(ident *tree.Identifier, p any) tree.J {
+func (v *identCountingVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
 	v.names = append(v.names, ident.Name)
 	return ident
 }

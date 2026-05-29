@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -34,13 +34,13 @@ type GoPattern struct {
 	kind     ScaffoldKind
 
 	once     sync.Once
-	cached   tree.J
+	cached   java.J
 	parseErr error
 }
 
 // Match attempts to match this pattern against the given candidate node.
 // Returns a MatchResult containing captured bindings on success, or nil on failure.
-func (p *GoPattern) Match(candidate tree.J, cursor *visitor.Cursor) *MatchResult {
+func (p *GoPattern) Match(candidate java.J, cursor *visitor.Cursor) *MatchResult {
 	patternTree, err := p.getTree()
 	if err != nil || patternTree == nil {
 		return nil
@@ -48,7 +48,7 @@ func (p *GoPattern) Match(candidate tree.J, cursor *visitor.Cursor) *MatchResult
 
 	// Fast reject: if the pattern root (when not a placeholder) has a different
 	// concrete type than the candidate, the match cannot succeed.
-	if ident, ok := patternTree.(*tree.Identifier); ok {
+	if ident, ok := patternTree.(*java.Identifier); ok {
 		if _, isPlaceholder := FromPlaceholder(ident.Name); isPlaceholder {
 			// Pattern is a bare placeholder — it matches anything.
 			result := NewMatchResult()
@@ -65,12 +65,12 @@ func (p *GoPattern) Match(candidate tree.J, cursor *visitor.Cursor) *MatchResult
 }
 
 // Matches returns true if this pattern matches the candidate.
-func (p *GoPattern) Matches(candidate tree.J, cursor *visitor.Cursor) bool {
+func (p *GoPattern) Matches(candidate java.J, cursor *visitor.Cursor) bool {
 	return p.Match(candidate, cursor) != nil
 }
 
 // getTree lazily parses the pattern and caches the result.
-func (p *GoPattern) getTree() (tree.J, error) {
+func (p *GoPattern) getTree() (java.J, error) {
 	p.once.Do(func() {
 		p.cached, p.parseErr = parseScaffold(p.code, p.captures, p.imports, p.kind)
 	})

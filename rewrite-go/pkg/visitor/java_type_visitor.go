@@ -16,7 +16,7 @@
 
 package visitor
 
-import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 
 // JavaTypeVisitor traverses and optionally transforms JavaType instances.
 // Mirrors org.openrewrite.java.JavaTypeVisitor in Java.
@@ -28,19 +28,19 @@ type JavaTypeVisitor struct {
 
 // JavaTypeVisitorI defines all overridable visit methods for JavaType.
 type JavaTypeVisitorI interface {
-	Visit(javaType tree.JavaType, p any) tree.JavaType
-	VisitAnnotation(annotation *tree.JavaTypeAnnotation, p any) tree.JavaType
-	VisitArray(array *tree.JavaTypeArray, p any) tree.JavaType
-	VisitClass(class_ *tree.JavaTypeClass, p any) tree.JavaType
-	VisitShallowClass(shallow *tree.JavaTypeShallowClass, p any) tree.JavaType
-	VisitGenericTypeVariable(generic *tree.JavaTypeGenericTypeVariable, p any) tree.JavaType
-	VisitIntersection(intersection *tree.JavaTypeIntersection, p any) tree.JavaType
-	VisitMethod(method *tree.JavaTypeMethod, p any) tree.JavaType
-	VisitMultiCatch(multiCatch *tree.JavaTypeMultiCatch, p any) tree.JavaType
-	VisitParameterized(parameterized *tree.JavaTypeParameterized, p any) tree.JavaType
-	VisitPrimitive(primitive *tree.JavaTypePrimitive, p any) tree.JavaType
-	VisitUnknown(unknown *tree.JavaTypeUnknown, p any) tree.JavaType
-	VisitVariable(variable *tree.JavaTypeVariable, p any) tree.JavaType
+	Visit(javaType java.JavaType, p any) java.JavaType
+	VisitAnnotation(annotation *java.JavaTypeAnnotation, p any) java.JavaType
+	VisitArray(array *java.JavaTypeArray, p any) java.JavaType
+	VisitClass(class_ *java.JavaTypeClass, p any) java.JavaType
+	VisitShallowClass(shallow *java.JavaTypeShallowClass, p any) java.JavaType
+	VisitGenericTypeVariable(generic *java.JavaTypeGenericTypeVariable, p any) java.JavaType
+	VisitIntersection(intersection *java.JavaTypeIntersection, p any) java.JavaType
+	VisitMethod(method *java.JavaTypeMethod, p any) java.JavaType
+	VisitMultiCatch(multiCatch *java.JavaTypeMultiCatch, p any) java.JavaType
+	VisitParameterized(parameterized *java.JavaTypeParameterized, p any) java.JavaType
+	VisitPrimitive(primitive *java.JavaTypePrimitive, p any) java.JavaType
+	VisitUnknown(unknown *java.JavaTypeUnknown, p any) java.JavaType
+	VisitVariable(variable *java.JavaTypeVariable, p any) java.JavaType
 }
 
 func (v *JavaTypeVisitor) self() JavaTypeVisitorI {
@@ -51,35 +51,35 @@ func (v *JavaTypeVisitor) self() JavaTypeVisitorI {
 }
 
 // Visit dispatches to the appropriate visit method based on concrete type.
-func (v *JavaTypeVisitor) Visit(javaType tree.JavaType, p any) tree.JavaType {
+func (v *JavaTypeVisitor) Visit(javaType java.JavaType, p any) java.JavaType {
 	if javaType == nil {
 		return nil
 	}
 
 	switch t := javaType.(type) {
-	case *tree.JavaTypeAnnotation:
+	case *java.JavaTypeAnnotation:
 		return v.self().VisitAnnotation(t, p)
-	case *tree.JavaTypeArray:
+	case *java.JavaTypeArray:
 		return v.self().VisitArray(t, p)
-	case *tree.JavaTypeShallowClass:
+	case *java.JavaTypeShallowClass:
 		return v.self().VisitShallowClass(t, p)
-	case *tree.JavaTypeClass:
+	case *java.JavaTypeClass:
 		return v.self().VisitClass(t, p)
-	case *tree.JavaTypeGenericTypeVariable:
+	case *java.JavaTypeGenericTypeVariable:
 		return v.self().VisitGenericTypeVariable(t, p)
-	case *tree.JavaTypeIntersection:
+	case *java.JavaTypeIntersection:
 		return v.self().VisitIntersection(t, p)
-	case *tree.JavaTypeMethod:
+	case *java.JavaTypeMethod:
 		return v.self().VisitMethod(t, p)
-	case *tree.JavaTypeMultiCatch:
+	case *java.JavaTypeMultiCatch:
 		return v.self().VisitMultiCatch(t, p)
-	case *tree.JavaTypeParameterized:
+	case *java.JavaTypeParameterized:
 		return v.self().VisitParameterized(t, p)
-	case *tree.JavaTypePrimitive:
+	case *java.JavaTypePrimitive:
 		return v.self().VisitPrimitive(t, p)
-	case *tree.JavaTypeUnknown:
+	case *java.JavaTypeUnknown:
 		return v.self().VisitUnknown(t, p)
-	case *tree.JavaTypeVariable:
+	case *java.JavaTypeVariable:
 		return v.self().VisitVariable(t, p)
 	default:
 		return javaType
@@ -87,11 +87,11 @@ func (v *JavaTypeVisitor) Visit(javaType tree.JavaType, p any) tree.JavaType {
 }
 
 // VisitList visits a list of JavaTypes.
-func (v *JavaTypeVisitor) VisitList(javaTypes []tree.JavaType, p any) []tree.JavaType {
+func (v *JavaTypeVisitor) VisitList(javaTypes []java.JavaType, p any) []java.JavaType {
 	if javaTypes == nil {
 		return nil
 	}
-	result := make([]tree.JavaType, len(javaTypes))
+	result := make([]java.JavaType, len(javaTypes))
 	for i, jt := range javaTypes {
 		result[i] = v.self().Visit(jt, p)
 	}
@@ -100,50 +100,50 @@ func (v *JavaTypeVisitor) VisitList(javaTypes []tree.JavaType, p any) []tree.Jav
 
 // Default implementations — return the type unchanged.
 
-func (v *JavaTypeVisitor) VisitAnnotation(annotation *tree.JavaTypeAnnotation, p any) tree.JavaType {
+func (v *JavaTypeVisitor) VisitAnnotation(annotation *java.JavaTypeAnnotation, p any) java.JavaType {
 	return annotation
 }
 
-func (v *JavaTypeVisitor) VisitArray(array *tree.JavaTypeArray, p any) tree.JavaType {
+func (v *JavaTypeVisitor) VisitArray(array *java.JavaTypeArray, p any) java.JavaType {
 	return array
 }
 
-func (v *JavaTypeVisitor) VisitClass(class_ *tree.JavaTypeClass, p any) tree.JavaType {
+func (v *JavaTypeVisitor) VisitClass(class_ *java.JavaTypeClass, p any) java.JavaType {
 	return class_
 }
 
-func (v *JavaTypeVisitor) VisitShallowClass(shallow *tree.JavaTypeShallowClass, p any) tree.JavaType {
+func (v *JavaTypeVisitor) VisitShallowClass(shallow *java.JavaTypeShallowClass, p any) java.JavaType {
 	return shallow
 }
 
-func (v *JavaTypeVisitor) VisitGenericTypeVariable(generic *tree.JavaTypeGenericTypeVariable, p any) tree.JavaType {
+func (v *JavaTypeVisitor) VisitGenericTypeVariable(generic *java.JavaTypeGenericTypeVariable, p any) java.JavaType {
 	return generic
 }
 
-func (v *JavaTypeVisitor) VisitIntersection(intersection *tree.JavaTypeIntersection, p any) tree.JavaType {
+func (v *JavaTypeVisitor) VisitIntersection(intersection *java.JavaTypeIntersection, p any) java.JavaType {
 	return intersection
 }
 
-func (v *JavaTypeVisitor) VisitMethod(method *tree.JavaTypeMethod, p any) tree.JavaType {
+func (v *JavaTypeVisitor) VisitMethod(method *java.JavaTypeMethod, p any) java.JavaType {
 	return method
 }
 
-func (v *JavaTypeVisitor) VisitMultiCatch(multiCatch *tree.JavaTypeMultiCatch, p any) tree.JavaType {
+func (v *JavaTypeVisitor) VisitMultiCatch(multiCatch *java.JavaTypeMultiCatch, p any) java.JavaType {
 	return multiCatch
 }
 
-func (v *JavaTypeVisitor) VisitParameterized(parameterized *tree.JavaTypeParameterized, p any) tree.JavaType {
+func (v *JavaTypeVisitor) VisitParameterized(parameterized *java.JavaTypeParameterized, p any) java.JavaType {
 	return parameterized
 }
 
-func (v *JavaTypeVisitor) VisitPrimitive(primitive *tree.JavaTypePrimitive, p any) tree.JavaType {
+func (v *JavaTypeVisitor) VisitPrimitive(primitive *java.JavaTypePrimitive, p any) java.JavaType {
 	return primitive
 }
 
-func (v *JavaTypeVisitor) VisitUnknown(unknown *tree.JavaTypeUnknown, p any) tree.JavaType {
+func (v *JavaTypeVisitor) VisitUnknown(unknown *java.JavaTypeUnknown, p any) java.JavaType {
 	return unknown
 }
 
-func (v *JavaTypeVisitor) VisitVariable(variable *tree.JavaTypeVariable, p any) tree.JavaType {
+func (v *JavaTypeVisitor) VisitVariable(variable *java.JavaTypeVariable, p any) java.JavaType {
 	return variable
 }

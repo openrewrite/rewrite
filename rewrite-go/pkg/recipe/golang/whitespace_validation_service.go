@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -44,7 +44,7 @@ type WhitespaceValidationService struct{}
 // Validate walks the tree rooted at root and returns one descriptive
 // error per offending Space / Comment. Returns nil when the tree is
 // well-formed.
-func (s *WhitespaceValidationService) Validate(root tree.Tree) []string {
+func (s *WhitespaceValidationService) Validate(root java.Tree) []string {
 	v := visitor.Init(&whitespaceValidator{})
 	v.Visit(root, nil)
 	return v.errs
@@ -52,7 +52,7 @@ func (s *WhitespaceValidationService) Validate(root tree.Tree) []string {
 
 // IsValid is the boolean shorthand. Recipes that just want to assert
 // "no parser corruption" can write `if !svc.IsValid(cu) { ... }`.
-func (s *WhitespaceValidationService) IsValid(root tree.Tree) bool {
+func (s *WhitespaceValidationService) IsValid(root java.Tree) bool {
 	return len(s.Validate(root)) == 0
 }
 
@@ -61,7 +61,7 @@ type whitespaceValidator struct {
 	errs []string
 }
 
-func (v *whitespaceValidator) VisitSpace(space tree.Space, p any) tree.Space {
+func (v *whitespaceValidator) VisitSpace(space java.Space, p any) java.Space {
 	if space.Whitespace != "" && !isWhitespaceOnly(space.Whitespace) {
 		v.errs = append(v.errs, fmt.Sprintf("Space.Whitespace contains non-whitespace: %q", truncateForError(space.Whitespace, 80)))
 	}

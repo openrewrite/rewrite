@@ -19,7 +19,7 @@ package test
 import (
 	"testing"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
+	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 )
 
@@ -29,7 +29,7 @@ func strPtr(s string) *string { return &s }
 // ---- AddImport ----
 
 func TestAddImport_NoOpWhenAlreadyImported(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.AddImport{PackagePath: "fmt"})
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "fmt"})
 	spec.RewriteRun(t,
 		Golang(`
 			package main
@@ -42,7 +42,7 @@ func TestAddImport_NoOpWhenAlreadyImported(t *testing.T) {
 }
 
 func TestAddImport_AddsToExistingBlock(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.AddImport{PackagePath: "strings"})
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "strings"})
 	before := `
 		package main
 
@@ -66,7 +66,7 @@ func TestAddImport_AddsToExistingBlock(t *testing.T) {
 }
 
 func TestAddImport_AddsToFileWithNoImports(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.AddImport{PackagePath: "fmt"})
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "fmt"})
 	before := `
 		package main
 
@@ -83,7 +83,7 @@ func TestAddImport_AddsToFileWithNoImports(t *testing.T) {
 }
 
 func TestAddImport_OnlyIfReferenced_NoOpWhenNotReferenced(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.AddImport{
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{
 		PackagePath:      "github.com/x/y",
 		OnlyIfReferenced: true,
 	})
@@ -100,7 +100,7 @@ func TestAddImport_AliasedFormDoesNotMatchRegular(t *testing.T) {
 	// `import yy "github.com/x/y"` is present; AddImport(github.com/x/y, alias=nil)
 	// should treat it as MISSING the regular form because the alias differs.
 	// (This mirrors the Java AddImport semantics for explicit alias asks.)
-	spec := NewRecipeSpec().WithRecipe(&golang.AddImport{
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{
 		PackagePath: "github.com/x/y",
 		Alias:       strPtr("yy"),
 	})
@@ -118,7 +118,7 @@ func TestAddImport_AliasedFormDoesNotMatchRegular(t *testing.T) {
 // ---- RemoveImport ----
 
 func TestRemoveImport_DeletesMatching(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.RemoveImport{PackagePath: "strings"})
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings"})
 	before := `
 		package main
 
@@ -142,7 +142,7 @@ func TestRemoveImport_DeletesMatching(t *testing.T) {
 }
 
 func TestRemoveImport_NoOpWhenAbsent(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.RemoveImport{PackagePath: "strings"})
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings"})
 	spec.RewriteRun(t,
 		Golang(`
 			package main
@@ -157,7 +157,7 @@ func TestRemoveImport_NoOpWhenAbsent(t *testing.T) {
 // ---- RemoveUnusedImports ----
 
 func TestRemoveUnusedImports_DropsUnreferenced(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.RemoveUnusedImports{})
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
 	before := `
 		package main
 
@@ -182,7 +182,7 @@ func TestRemoveUnusedImports_DropsUnreferenced(t *testing.T) {
 
 func TestRemoveUnusedImports_PreservesBlankImports(t *testing.T) {
 	// Blank imports stay — they exist for init() side-effects.
-	spec := NewRecipeSpec().WithRecipe(&golang.RemoveUnusedImports{})
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
 	spec.RewriteRun(t,
 		Golang(`
 			package main
@@ -198,7 +198,7 @@ func TestRemoveUnusedImports_PreservesBlankImports(t *testing.T) {
 }
 
 func TestRemoveUnusedImports_NoOpWhenAllUsed(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.RemoveUnusedImports{})
+	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
 	spec.RewriteRun(t,
 		Golang(`
 			package main
@@ -216,7 +216,7 @@ func TestRemoveUnusedImports_NoOpWhenAllUsed(t *testing.T) {
 // ---- OrderImports ----
 
 func TestOrderImports_IdempotentOnAlreadyOrdered(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.OrderImports{})
+	spec := NewRecipeSpec().WithRecipe(&recipes.OrderImports{})
 	spec.RewriteRun(t,
 		Golang(`
 			package main
@@ -236,7 +236,7 @@ func TestOrderImports_IdempotentOnAlreadyOrdered(t *testing.T) {
 }
 
 func TestOrderImports_ReorderJumbledBlock(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.OrderImports{})
+	spec := NewRecipeSpec().WithRecipe(&recipes.OrderImports{})
 	before := `
 		package main
 
@@ -272,7 +272,7 @@ func TestOrderImports_ReorderJumbledBlock(t *testing.T) {
 // reorder of "github.com/x/y" → tail, and within-stdlib reorder of
 // "strings" before "fmt".
 func TestOrderImports_AlphabeticalWithinGroupAndBlankLineBetween(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.OrderImports{})
+	spec := NewRecipeSpec().WithRecipe(&recipes.OrderImports{})
 	before := `
 		package main
 

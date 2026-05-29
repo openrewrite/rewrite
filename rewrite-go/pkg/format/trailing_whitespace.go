@@ -19,7 +19,7 @@ package format
 import (
 	"strings"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -36,13 +36,13 @@ type RemoveTrailingWhitespaceVisitor struct {
 
 // NewRemoveTrailingWhitespaceVisitor returns a visitor configured with
 // the given stopAfter bound. Pass nil to format the entire visited tree.
-func NewRemoveTrailingWhitespaceVisitor(stopAfter tree.Tree) *RemoveTrailingWhitespaceVisitor {
+func NewRemoveTrailingWhitespaceVisitor(stopAfter java.Tree) *RemoveTrailingWhitespaceVisitor {
 	return visitor.Init(&RemoveTrailingWhitespaceVisitor{
 		stopAfterTracker: stopAfterTracker{stopAfter: stopAfter},
 	})
 }
 
-func (v *RemoveTrailingWhitespaceVisitor) Visit(t tree.Tree, p any) tree.Tree {
+func (v *RemoveTrailingWhitespaceVisitor) Visit(t java.Tree, p any) java.Tree {
 	if v.shouldHalt() {
 		return t
 	}
@@ -51,7 +51,7 @@ func (v *RemoveTrailingWhitespaceVisitor) Visit(t tree.Tree, p any) tree.Tree {
 	return out
 }
 
-func (v *RemoveTrailingWhitespaceVisitor) VisitSpace(s tree.Space, p any) tree.Space {
+func (v *RemoveTrailingWhitespaceVisitor) VisitSpace(s java.Space, p any) java.Space {
 	if s.Whitespace == "" || !strings.ContainsAny(s.Whitespace, " \t") {
 		return s
 	}

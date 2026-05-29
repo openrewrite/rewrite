@@ -16,7 +16,7 @@
 
 package recipe
 
-import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 
 // ScanningRecipe extends Recipe with a two-phase scan-then-edit pattern.
 // The first phase collects data across all source files into an accumulator,
@@ -53,7 +53,7 @@ type ScanningRecipe interface {
 
 	// Generate creates new source files based on accumulated data.
 	// Returns nil if no new files are generated.
-	Generate(acc any, ctx *ExecutionContext) []tree.Tree
+	Generate(acc any, ctx *ExecutionContext) []java.Tree
 }
 
 // ScanningBase provides default implementations for optional ScanningRecipe methods.
@@ -64,4 +64,4 @@ type ScanningBase struct {
 
 func (ScanningBase) Scanner(acc any) TreeVisitor                         { return nil }
 func (ScanningBase) EditorWithData(acc any) TreeVisitor                  { return nil }
-func (ScanningBase) Generate(acc any, ctx *ExecutionContext) []tree.Tree { return nil }
+func (ScanningBase) Generate(acc any, ctx *ExecutionContext) []java.Tree { return nil }

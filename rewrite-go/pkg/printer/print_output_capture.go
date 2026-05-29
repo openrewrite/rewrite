@@ -19,7 +19,7 @@ package printer
 import (
 	"strings"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // PrintOutputCapture accumulates printed source code text.
@@ -47,7 +47,7 @@ func (p *PrintOutputCapture) String() string {
 }
 
 // BeforePrefix emits marker output before a node's prefix space.
-func (p *PrintOutputCapture) BeforePrefix(markers tree.Markers) {
+func (p *PrintOutputCapture) BeforePrefix(markers java.Markers) {
 	if p.markerPrinter == nil {
 		return
 	}
@@ -59,7 +59,7 @@ func (p *PrintOutputCapture) BeforePrefix(markers tree.Markers) {
 }
 
 // BeforeSyntax emits marker output after a node's prefix but before its syntax.
-func (p *PrintOutputCapture) BeforeSyntax(markers tree.Markers) {
+func (p *PrintOutputCapture) BeforeSyntax(markers java.Markers) {
 	if p.markerPrinter == nil {
 		return
 	}
@@ -71,7 +71,7 @@ func (p *PrintOutputCapture) BeforeSyntax(markers tree.Markers) {
 }
 
 // AfterSyntax emits marker output after a node's syntax.
-func (p *PrintOutputCapture) AfterSyntax(markers tree.Markers) {
+func (p *PrintOutputCapture) AfterSyntax(markers java.Markers) {
 	if p.markerPrinter == nil {
 		return
 	}

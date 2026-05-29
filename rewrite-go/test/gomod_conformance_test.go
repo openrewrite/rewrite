@@ -25,21 +25,21 @@ import (
 	"testing"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
 // conformanceShape is the canonical JSON form used by both Java and Go
 // conformance tests. Field names and ordering MUST stay in sync with the
 // Java GoModConformanceTest's matching record / class.
 type conformanceShape struct {
-	ModulePath           string                       `json:"modulePath"`
-	GoVersion            string                       `json:"goVersion"`
-	Toolchain            string                       `json:"toolchain"`
-	Requires             []conformanceRequire         `json:"requires"`
-	Replaces             []conformanceReplace         `json:"replaces"`
-	Excludes             []conformanceExclude         `json:"excludes"`
-	Retracts             []conformanceRetract         `json:"retracts"`
-	ResolvedDependencies []conformanceResolvedDep     `json:"resolvedDependencies"`
+	ModulePath           string                   `json:"modulePath"`
+	GoVersion            string                   `json:"goVersion"`
+	Toolchain            string                   `json:"toolchain"`
+	Requires             []conformanceRequire     `json:"requires"`
+	Replaces             []conformanceReplace     `json:"replaces"`
+	Excludes             []conformanceExclude     `json:"excludes"`
+	Retracts             []conformanceRetract     `json:"retracts"`
+	ResolvedDependencies []conformanceResolvedDep `json:"resolvedDependencies"`
 }
 
 type conformanceRequire struct {
@@ -72,7 +72,7 @@ type conformanceResolvedDep struct {
 	GoModHash  *string `json:"goModHash"`
 }
 
-func toConformance(mrr *tree.GoResolutionResult) conformanceShape {
+func toConformance(mrr *golang.GoResolutionResult) conformanceShape {
 	out := conformanceShape{
 		ModulePath:           mrr.ModulePath,
 		GoVersion:            mrr.GoVersion,

@@ -25,9 +25,9 @@ type FindTypes struct {
 	FullyQualifiedTypeName string
 }
 
-func (r *FindTypes) Name() string        { return "org.openrewrite.golang.search.FindTypes" }
-func (r *FindTypes) DisplayName() string  { return "Find types" }
-func (r *FindTypes) Description() string  { return "Find all references to a given type." }
+func (r *FindTypes) Name() string           { return "org.openrewrite.golang.search.FindTypes" }
+func (r *FindTypes) DisplayName() string    { return "Find types" }
+func (r *FindTypes) Description() string    { return "Find all references to a given type." }
 func (r *FindTypes) JavaRecipeName() string { return "org.openrewrite.java.search.FindTypes" }
 func (r *FindTypes) JavaOptions() map[string]any {
 	return map[string]any{

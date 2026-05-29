@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package tree
+package java
 
 import "github.com/google/uuid"
 
 // ParseError represents a source file that failed to parse.
 // Mirrors org.openrewrite.tree.ParseError on the Java side.
 type ParseError struct {
-	Ident          uuid.UUID
-	Markers        Markers
-	SourcePath     string
-	CharsetName    string
+	Ident            uuid.UUID
+	Markers          Markers
+	SourcePath       string
+	CharsetName      string
 	CharsetBomMarked bool
-	Text           string
+	Text             string
 }
 
 // ParseError isn't a J node (no Prefix, no acceptVisitor double-
@@ -36,7 +36,7 @@ type ParseError struct {
 // framework's switch has no case for ParseError; it falls through to
 // the default arm. RPC senders/receivers special-case it ahead of the
 // dispatch.
-func (*ParseError) isTree() {}
+func (*ParseError) IsTree() {}
 
 // NewParseError creates a ParseError from a source path, source text, and error.
 func NewParseError(sourcePath string, source string, err error) *ParseError {
@@ -51,12 +51,12 @@ func NewParseError(sourcePath string, source string, err error) *ParseError {
 		Entries: []Marker{marker},
 	}
 	return &ParseError{
-		Ident:          uuid.New(),
-		Markers:        markers,
-		SourcePath:     sourcePath,
-		CharsetName:    "UTF-8",
+		Ident:            uuid.New(),
+		Markers:          markers,
+		SourcePath:       sourcePath,
+		CharsetName:      "UTF-8",
 		CharsetBomMarked: false,
-		Text:           source,
+		Text:             source,
 	}
 }
 

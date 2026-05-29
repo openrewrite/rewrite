@@ -18,7 +18,7 @@ package golang
 
 import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -44,8 +44,8 @@ type renameXVisitor struct {
 	visitor.GoVisitor
 }
 
-func (v *renameXVisitor) VisitIdentifier(ident *tree.Identifier, p any) tree.J {
-	ident = v.GoVisitor.VisitIdentifier(ident, p).(*tree.Identifier)
+func (v *renameXVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
+	ident = v.GoVisitor.VisitIdentifier(ident, p).(*java.Identifier)
 	if ident.Name == "x" {
 		c := *ident
 		c.Name = "flag"

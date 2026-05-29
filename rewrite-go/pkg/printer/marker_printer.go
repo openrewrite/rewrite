@@ -19,7 +19,7 @@ package printer
 import (
 	"fmt"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // CommentWrapper wraps marker output in a language-appropriate comment syntax.
@@ -38,13 +38,13 @@ func GoCommentWrapper(output string) string {
 // are handled directly by the printer's visit methods.
 type MarkerPrinter interface {
 	// BeforePrefix returns text to emit before a node's prefix space.
-	BeforePrefix(marker tree.Marker, wrapper CommentWrapper) string
+	BeforePrefix(marker java.Marker, wrapper CommentWrapper) string
 
 	// BeforeSyntax returns text to emit after a node's prefix but before its syntax.
-	BeforeSyntax(marker tree.Marker, wrapper CommentWrapper) string
+	BeforeSyntax(marker java.Marker, wrapper CommentWrapper) string
 
 	// AfterSyntax returns text to emit after a node's syntax.
-	AfterSyntax(marker tree.Marker, wrapper CommentWrapper) string
+	AfterSyntax(marker java.Marker, wrapper CommentWrapper) string
 }
 
 // --- Predefined MarkerPrinter implementations ---
@@ -65,18 +65,18 @@ var SanitizedMarkerPrinter MarkerPrinter = sanitizedMarkerPrinter{}
 
 type defaultMarkerPrinter struct{}
 
-func (defaultMarkerPrinter) BeforePrefix(marker tree.Marker, wrapper CommentWrapper) string {
+func (defaultMarkerPrinter) BeforePrefix(marker java.Marker, wrapper CommentWrapper) string {
 	return ""
 }
 
-func (defaultMarkerPrinter) BeforeSyntax(marker tree.Marker, wrapper CommentWrapper) string {
+func (defaultMarkerPrinter) BeforeSyntax(marker java.Marker, wrapper CommentWrapper) string {
 	switch m := marker.(type) {
-	case tree.SearchResult:
+	case java.SearchResult:
 		if m.Description != "" {
 			return wrapper("(" + m.Description + ")")
 		}
 		return wrapper("")
-	case tree.Markup:
+	case java.Markup:
 		if m.Detail != "" {
 			return wrapper("(" + m.Message + ": " + m.Detail + ")")
 		}
@@ -85,7 +85,7 @@ func (defaultMarkerPrinter) BeforeSyntax(marker tree.Marker, wrapper CommentWrap
 	return ""
 }
 
-func (defaultMarkerPrinter) AfterSyntax(marker tree.Marker, wrapper CommentWrapper) string {
+func (defaultMarkerPrinter) AfterSyntax(marker java.Marker, wrapper CommentWrapper) string {
 	return ""
 }
 
@@ -93,12 +93,12 @@ func (defaultMarkerPrinter) AfterSyntax(marker tree.Marker, wrapper CommentWrapp
 
 type searchOnlyMarkerPrinter struct{}
 
-func (searchOnlyMarkerPrinter) BeforePrefix(marker tree.Marker, wrapper CommentWrapper) string {
+func (searchOnlyMarkerPrinter) BeforePrefix(marker java.Marker, wrapper CommentWrapper) string {
 	return ""
 }
 
-func (searchOnlyMarkerPrinter) BeforeSyntax(marker tree.Marker, wrapper CommentWrapper) string {
-	if m, ok := marker.(tree.SearchResult); ok {
+func (searchOnlyMarkerPrinter) BeforeSyntax(marker java.Marker, wrapper CommentWrapper) string {
+	if m, ok := marker.(java.SearchResult); ok {
 		if m.Description != "" {
 			return wrapper("(" + m.Description + ")")
 		}
@@ -107,7 +107,7 @@ func (searchOnlyMarkerPrinter) BeforeSyntax(marker tree.Marker, wrapper CommentW
 	return ""
 }
 
-func (searchOnlyMarkerPrinter) AfterSyntax(marker tree.Marker, wrapper CommentWrapper) string {
+func (searchOnlyMarkerPrinter) AfterSyntax(marker java.Marker, wrapper CommentWrapper) string {
 	return ""
 }
 
@@ -115,27 +115,27 @@ func (searchOnlyMarkerPrinter) AfterSyntax(marker tree.Marker, wrapper CommentWr
 
 type fencedMarkerPrinter struct{}
 
-func (fencedMarkerPrinter) BeforePrefix(marker tree.Marker, wrapper CommentWrapper) string {
+func (fencedMarkerPrinter) BeforePrefix(marker java.Marker, wrapper CommentWrapper) string {
 	if isFenceable(marker) {
 		return fmt.Sprintf("{{%s}}", marker.ID())
 	}
 	return ""
 }
 
-func (fencedMarkerPrinter) BeforeSyntax(marker tree.Marker, wrapper CommentWrapper) string {
+func (fencedMarkerPrinter) BeforeSyntax(marker java.Marker, wrapper CommentWrapper) string {
 	return ""
 }
 
-func (fencedMarkerPrinter) AfterSyntax(marker tree.Marker, wrapper CommentWrapper) string {
+func (fencedMarkerPrinter) AfterSyntax(marker java.Marker, wrapper CommentWrapper) string {
 	if isFenceable(marker) {
 		return fmt.Sprintf("{{%s}}", marker.ID())
 	}
 	return ""
 }
 
-func isFenceable(marker tree.Marker) bool {
+func isFenceable(marker java.Marker) bool {
 	switch marker.(type) {
-	case tree.SearchResult, tree.Markup:
+	case java.SearchResult, java.Markup:
 		return true
 	}
 	return false
@@ -145,14 +145,14 @@ func isFenceable(marker tree.Marker) bool {
 
 type sanitizedMarkerPrinter struct{}
 
-func (sanitizedMarkerPrinter) BeforePrefix(marker tree.Marker, wrapper CommentWrapper) string {
+func (sanitizedMarkerPrinter) BeforePrefix(marker java.Marker, wrapper CommentWrapper) string {
 	return ""
 }
 
-func (sanitizedMarkerPrinter) BeforeSyntax(marker tree.Marker, wrapper CommentWrapper) string {
+func (sanitizedMarkerPrinter) BeforeSyntax(marker java.Marker, wrapper CommentWrapper) string {
 	return ""
 }
 
-func (sanitizedMarkerPrinter) AfterSyntax(marker tree.Marker, wrapper CommentWrapper) string {
+func (sanitizedMarkerPrinter) AfterSyntax(marker java.Marker, wrapper CommentWrapper) string {
 	return ""
 }

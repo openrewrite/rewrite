@@ -21,19 +21,19 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // markBinaryVisitor attaches a SearchResult marker to every binary expression.
 type markBinaryVisitor struct {
 	visitor.GoVisitor
-	marker tree.SearchResult
+	marker java.SearchResult
 }
 
-func (v *markBinaryVisitor) VisitBinary(bin *tree.Binary, p any) tree.J {
-	bin = v.GoVisitor.VisitBinary(bin, p).(*tree.Binary)
-	bin = bin.WithMarkers(tree.AddMarker(bin.Markers, v.marker))
+func (v *markBinaryVisitor) VisitBinary(bin *java.Binary, p any) java.J {
+	bin = v.GoVisitor.VisitBinary(bin, p).(*java.Binary)
+	bin = bin.WithMarkers(java.AddMarker(bin.Markers, v.marker))
 	return bin
 }
 
@@ -42,7 +42,7 @@ func TestCollectSearchResultIDsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := tree.CollectSearchResultIDs(cu); len(got) != 0 {
+	if got := java.CollectSearchResultIDs(cu); len(got) != 0 {
 		t.Fatalf("expected no search results, got %v", got)
 	}
 }
@@ -52,12 +52,12 @@ func TestCollectSearchResultIDsAfterMark(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mark := tree.NewSearchResult("found a binary expr")
+	mark := java.NewSearchResult("found a binary expr")
 	v := &markBinaryVisitor{marker: mark}
 	visitor.Init(v)
 
-	result := v.Visit(cu, recipe.NewExecutionContext()).(tree.Tree)
-	ids := tree.CollectSearchResultIDs(result)
+	result := v.Visit(cu, recipe.NewExecutionContext()).(java.Tree)
+	ids := java.CollectSearchResultIDs(result)
 	if len(ids) != 1 {
 		t.Fatalf("expected exactly one search result id, got %d (%v)", len(ids), ids)
 	}
@@ -73,12 +73,12 @@ func TestCollectSearchResultIDsDedupes(t *testing.T) {
 	}
 	// Same marker (same UUID) attached to two binary expressions: collector
 	// should only return it once.
-	mark := tree.NewSearchResult("dup")
+	mark := java.NewSearchResult("dup")
 	v := &markBinaryVisitor{marker: mark}
 	visitor.Init(v)
 
-	result := v.Visit(cu, recipe.NewExecutionContext()).(tree.Tree)
-	ids := tree.CollectSearchResultIDs(result)
+	result := v.Visit(cu, recipe.NewExecutionContext()).(java.Tree)
+	ids := java.CollectSearchResultIDs(result)
 	if len(ids) != 1 {
 		t.Fatalf("expected dedup to produce 1 id, got %d (%v)", len(ids), ids)
 	}
