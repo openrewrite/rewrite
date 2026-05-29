@@ -168,16 +168,48 @@ keyType
   | STRING
   ;
 
+// Protobuf does not reserve its keywords: every keyword is also an identifier,
+// so any of them may be used as a field name (e.g. `optional string group = 8;`
+// or `optional bool optional = 5;`, both common in real-world .proto files). The
+// lexer tokenizes each keyword distinctly, so they are re-admitted as identifiers
+// here. See https://protobuf.com/docs/language-spec#identifiers-and-keywords.
 reservedWord
-  : MESSAGE
+  : BOOL
+  | BYTES
+  | DOUBLE
+  | ENUM
+  | EXTEND
+  | FIXED32
+  | FIXED64
+  | FLOAT
+  | GROUP
+  | IMPORT
+  | INT32
+  | INT64
+  | MAP
+  | MESSAGE
+  | ONEOF
   | OPTION
+  | OPTIONAL
   | PACKAGE
+  | PUBLIC
+  | REPEATED
+  | REQUIRED
+  | RESERVED
+  | RETURNS
+  | RPC
   | SERVICE
+  | SFIXED32
+  | SFIXED64
+  | SINT32
+  | SINT64
   | STREAM
   | STRING
   | SYNTAX
+  | TO
+  | UINT32
+  | UINT64
   | WEAK
-  | RPC
   ;
 
 /*
