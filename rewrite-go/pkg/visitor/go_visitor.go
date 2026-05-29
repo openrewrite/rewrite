@@ -152,10 +152,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitForLoop(n, p)
 	case *java.ForControl:
 		return v.self().VisitForControl(n, p)
-	case *java.ForEachLoop:
-		return v.self().VisitForEachLoop(n, p)
-	case *java.ForEachControl:
-		return v.self().VisitForEachControl(n, p)
+	case *golang.RangeLoop:
+		return v.self().VisitRangeLoop(n, p)
 	case *java.Break:
 		return v.self().VisitBreak(n, p)
 	case *java.Continue:
@@ -275,8 +273,7 @@ type VisitorI interface {
 	VisitCase(c *java.Case, p any) java.J
 	VisitForLoop(forLoop *java.ForLoop, p any) java.J
 	VisitForControl(control *java.ForControl, p any) java.J
-	VisitForEachLoop(forEach *java.ForEachLoop, p any) java.J
-	VisitForEachControl(control *java.ForEachControl, p any) java.J
+	VisitRangeLoop(loop *golang.RangeLoop, p any) java.J
 	VisitBreak(b *java.Break, p any) java.J
 	VisitContinue(c *java.Continue, p any) java.J
 	VisitLabel(l *java.Label, p any) java.J
@@ -594,17 +591,29 @@ func (v *GoVisitor) VisitForControl(control *java.ForControl, p any) java.J {
 	return control
 }
 
-func (v *GoVisitor) VisitForEachLoop(forEach *java.ForEachLoop, p any) java.J {
-	forEach = forEach.WithPrefix(v.self().VisitSpace(forEach.Prefix, p))
-	forEach = forEach.WithMarkers(v.visitMarkers(forEach.Markers, p))
-	forEach = forEach.WithBody(visitAndCast[*java.Block](v, forEach.Body, p))
-	return forEach
-}
-
-func (v *GoVisitor) VisitForEachControl(control *java.ForEachControl, p any) java.J {
-	control = control.WithPrefix(v.self().VisitSpace(control.Prefix, p))
-	control = control.WithMarkers(v.visitMarkers(control.Markers, p))
-	return control
+func (v *GoVisitor) VisitRangeLoop(loop *golang.RangeLoop, p any) java.J {
+	loop = loop.WithPrefix(v.self().VisitSpace(loop.Prefix, p))
+	loop = loop.WithMarkers(v.visitMarkers(loop.Markers, p))
+	if loop.Key != nil {
+		k := *loop.Key
+		k.Element = visitAndCast[java.Expression](v, k.Element, p)
+		k.After = v.self().VisitSpace(k.After, p)
+		loop.Key = &k
+	}
+	if loop.Value != nil {
+		val := *loop.Value
+		val.Element = visitAndCast[java.Expression](v, val.Element, p)
+		val.After = v.self().VisitSpace(val.After, p)
+		loop.Value = &val
+	}
+	op := loop.Operator
+	op.Before = v.self().VisitSpace(op.Before, p)
+	loop.Operator = op
+	loop.Iterable = visitAndCast[java.Expression](v, loop.Iterable, p)
+	body := loop.Body
+	body.Element = visitAndCast[java.Statement](v, body.Element, p)
+	loop.Body = body
+	return loop
 }
 
 func (v *GoVisitor) VisitBreak(b *java.Break, p any) java.J {

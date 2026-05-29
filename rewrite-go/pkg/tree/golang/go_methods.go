@@ -250,6 +250,18 @@ func (n *Variadic) WithID(id uuid.UUID) java.J {
 func (n *Variadic) GetPrefix() java.Space    { return n.Prefix }
 func (n *Variadic) GetMarkers() java.Markers { return n.Markers }
 
+func (n *RangeLoop) GetID() uuid.UUID { return n.ID }
+func (n *RangeLoop) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *RangeLoop) GetPrefix() java.Space    { return n.Prefix }
+func (n *RangeLoop) GetMarkers() java.Markers { return n.Markers }
+
 func (n *Send) GetID() uuid.UUID { return n.ID }
 func (n *Send) WithID(id uuid.UUID) java.J {
 	if n.ID == id {

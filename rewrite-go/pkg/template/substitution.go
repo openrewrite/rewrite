@@ -106,7 +106,7 @@ func setPrefix(j java.J, prefix java.Space) java.J {
 		return n.WithPrefix(prefix)
 	case *java.ForLoop:
 		return n.WithPrefix(prefix)
-	case *java.ForEachLoop:
+	case *golang.RangeLoop:
 		return n.WithPrefix(prefix)
 	case *java.Switch:
 		return n.WithPrefix(prefix)

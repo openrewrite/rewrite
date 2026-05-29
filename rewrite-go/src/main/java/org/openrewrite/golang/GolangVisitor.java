@@ -319,4 +319,20 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         v = v.withDots(visitSpace(v.getDots(), Space.Location.LANGUAGE_EXTENSION, p));
         return v;
     }
+
+    public J visitRangeLoop(Go.RangeLoop rangeLoop, P p) {
+        Go.RangeLoop l = rangeLoop;
+        l = l.withPrefix(visitSpace(l.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
+        if (l.getPadding().getKey() != null) {
+            l = l.getPadding().withKey(visitRightPadded(l.getPadding().getKey(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (l.getPadding().getValue() != null) {
+            l = l.getPadding().withValue(visitRightPadded(l.getPadding().getValue(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
+        }
+        l = l.getPadding().withOperator(visitLeftPadded(l.getPadding().getOperator(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        l = l.withIterable((Expression) visitAndCast(l.getIterable(), p));
+        l = l.getPadding().withBody(visitRightPadded(l.getPadding().getBody(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
+        return l;
+    }
 }

@@ -1546,10 +1546,10 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 }
 
 // mapRangeStmt maps a for-range statement.
-func (ctx *parseContext) mapRangeStmt(stmt *ast.RangeStmt) *java.ForEachLoop {
+func (ctx *parseContext) mapRangeStmt(stmt *ast.RangeStmt) *golang.RangeLoop {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("for"))
 
-	control := java.ForEachControl{ID: uuid.New()}
+	loop := &golang.RangeLoop{ID: uuid.New(), Prefix: prefix}
 
 	if stmt.Key != nil {
 		// Has key variable
@@ -1565,18 +1565,18 @@ func (ctx *parseContext) mapRangeStmt(stmt *ast.RangeStmt) *java.ForEachLoop {
 				ctx.skip(1) // ","
 			}
 			keyRP := java.RightPadded[java.Expression]{Element: key, After: keyAfter}
-			control.Key = &keyRP
+			loop.Key = &keyRP
 
 			value := ctx.mapExpr(stmt.Value)
 			// Value.After captures space before operator
 			opPrefix := ctx.prefix(stmt.TokPos)
 			valueRP := java.RightPadded[java.Expression]{Element: value, After: opPrefix}
-			control.Value = &valueRP
+			loop.Value = &valueRP
 		} else {
 			// for k := range expr {} — no value
 			opPrefix := ctx.prefix(stmt.TokPos)
 			keyRP := java.RightPadded[java.Expression]{Element: key, After: opPrefix}
-			control.Key = &keyRP
+			loop.Key = &keyRP
 		}
 
 		// Parse operator (:= or =)
@@ -1590,24 +1590,17 @@ func (ctx *parseContext) mapRangeStmt(stmt *ast.RangeStmt) *java.ForEachLoop {
 
 		// Space between operator and "range"
 		rangePrefix := ctx.prefix(stmt.Range)
-		control.Operator = java.LeftPadded[java.AssignOp]{Before: rangePrefix, Element: op}
+		loop.Operator = java.LeftPadded[java.AssignOp]{Before: rangePrefix, Element: op}
 	} else {
-		// for range expr {} — no variable
-		control.Prefix = ctx.prefix(stmt.Range)
+		// for range expr {} — no variable; the space before `range` lives in Operator.Before
+		loop.Operator = java.LeftPadded[java.AssignOp]{Before: ctx.prefix(stmt.Range)}
 	}
 	ctx.skip(len("range"))
 
-	iterable := ctx.mapExpr(stmt.X)
-	control.Iterable = iterable
+	loop.Iterable = ctx.mapExpr(stmt.X)
+	loop.Body = java.RightPadded[java.Statement]{Element: ctx.mapBlockStmt(stmt.Body), After: java.EmptySpace}
 
-	body := ctx.mapBlockStmt(stmt.Body)
-
-	return &java.ForEachLoop{
-		ID:      uuid.New(),
-		Prefix:  prefix,
-		Control: control,
-		Body:    body,
-	}
+	return loop
 }
 
 // mapIncDecStmt maps an increment/decrement statement (x++ or x--).

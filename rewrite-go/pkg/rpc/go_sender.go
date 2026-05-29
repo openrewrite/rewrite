@@ -183,6 +183,38 @@ func (s *GoSender) VisitGoVariadic(vr *golang.Variadic, p any) java.J {
 	return vr
 }
 
+func (s *GoSender) VisitRangeLoop(l *golang.RangeLoop, p any) java.J {
+	q := p.(*SendQueue)
+	// key (right-padded, nullable)
+	q.GetAndSend(l, func(v any) any {
+		k := v.(*golang.RangeLoop).Key
+		if k == nil {
+			return nil
+		}
+		return *k
+	}, func(v any) { sendRightPadded(s, v, q) })
+	// value (right-padded, nullable)
+	q.GetAndSend(l, func(v any) any {
+		val := v.(*golang.RangeLoop).Value
+		if val == nil {
+			return nil
+		}
+		return *val
+	}, func(v any) { sendRightPadded(s, v, q) })
+	// operator (left-padded AssignOp, sent as faithful enum-constant name)
+	q.GetAndSend(l, func(v any) any {
+		op := v.(*golang.RangeLoop).Operator
+		return java.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
+	}, func(v any) { sendLeftPadded(s, v, q) })
+	// iterable
+	q.GetAndSend(l, func(v any) any { return v.(*golang.RangeLoop).Iterable },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	// body (right-padded Statement)
+	q.GetAndSend(l, func(v any) any { return v.(*golang.RangeLoop).Body },
+		func(v any) { sendRightPadded(s, v, q) })
+	return l
+}
+
 // VisitFallthrough mirrors GolangSender.visitFallthrough — the node has no
 // payload beyond the framework-handled id/prefix/markers, so this override
 // is intentionally a no-op. Present for sender/receiver symmetry.

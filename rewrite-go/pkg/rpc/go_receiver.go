@@ -210,6 +210,43 @@ func (r *GoReceiver) VisitGoVariadic(vr *golang.Variadic, p any) java.J {
 	return vr
 }
 
+func (r *GoReceiver) VisitRangeLoop(l *golang.RangeLoop, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *l // shallow copy to avoid mutating remoteObjects baseline
+	l = &c
+	// key (right-padded, nullable)
+	var beforeKey any
+	if l.Key != nil {
+		beforeKey = *l.Key
+	}
+	if result := q.Receive(beforeKey, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		rp := coerceToExpressionRP(result)
+		l.Key = &rp
+	} else {
+		l.Key = nil
+	}
+	// value (right-padded, nullable)
+	var beforeValue any
+	if l.Value != nil {
+		beforeValue = *l.Value
+	}
+	if result := q.Receive(beforeValue, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		rp := coerceToExpressionRP(result)
+		l.Value = &rp
+	} else {
+		l.Value = nil
+	}
+	// operator (left-padded AssignOp enum)
+	l.Operator = receiveLeftPaddedEnum(r, q, l.Operator, parseAssignOpDefaulting)
+	// iterable
+	l.Iterable = receiveValue(q, l.Iterable, func(e java.Expression) any { return r.Visit(e, q) })
+	// body (right-padded Statement)
+	if result := q.Receive(l.Body, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		l.Body = coerceToStatementRP(result)
+	}
+	return l
+}
+
 // VisitFallthrough mirrors GolangReceiver.visitFallthrough — the node has no
 // payload beyond the framework-handled id/prefix/markers, so this override
 // is intentionally a no-op. Present for sender/receiver symmetry.

@@ -907,6 +907,36 @@ func (n *Variadic) WithMarkers(markers java.Markers) *Variadic {
 	return &c
 }
 
+// RangeLoop represents Go's `for ... range` loop: `for k, v := range expr { body }`.
+// Unlike Java's single-variable J.ForEachLoop.Control, Go binds a Key and an
+// optional Value (or none, for `for range expr`), joined by `:=` or `=`.
+type RangeLoop struct {
+	ID       uuid.UUID
+	Prefix   java.Space
+	Markers  java.Markers
+	Key      *java.RightPadded[java.Expression] // nil for `for range expr`; After = space after key (incl. comma)
+	Value    *java.RightPadded[java.Expression] // nil when no value; After = space before operator
+	Operator java.LeftPadded[java.AssignOp]     // `:=` or `=`; Before = space before `range`. Unused when Key is nil
+	Iterable java.Expression
+	Body     java.RightPadded[java.Statement] // the loop body block
+}
+
+func (*RangeLoop) IsTree()      {}
+func (*RangeLoop) IsJ()         {}
+func (*RangeLoop) IsStatement() {}
+
+func (n *RangeLoop) WithPrefix(prefix java.Space) *RangeLoop {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *RangeLoop) WithMarkers(markers java.Markers) *RangeLoop {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 // SelectStmt is a marker on Switch indicating it's a `select` statement instead of `switch`.
 type SelectStmt struct {
 	Ident uuid.UUID

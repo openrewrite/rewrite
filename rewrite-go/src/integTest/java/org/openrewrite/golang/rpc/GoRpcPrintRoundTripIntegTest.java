@@ -151,6 +151,48 @@ class GoRpcPrintRoundTripIntegTest {
     }
 
     @Test
+    void typeSwitch() {
+        assertPrintsUnchangedAfterReset(
+                "package main\n\nfunc f(v any) string {\n\tswitch v.(type) {\n\tcase int:\n\t\treturn \"int\"\n\tcase string:\n\t\treturn \"string\"\n\tdefault:\n\t\treturn \"other\"\n\t}\n}\n");
+    }
+
+    @Test
+    void selectStatement() {
+        assertPrintsUnchangedAfterReset(
+                "package main\n\nfunc f(c chan int) int {\n\tselect {\n\tcase v := <-c:\n\t\treturn v\n\tdefault:\n\t\treturn 0\n\t}\n}\n");
+    }
+
+    @Test
+    void multipleAssignment() {
+        assertPrintsUnchangedAfterReset(
+                "package main\n\nfunc f() {\n\tx, y := 1, 2\n\tx, y = y, x\n\t_ = x\n\t_ = y\n}\n");
+    }
+
+    @Test
+    void rangeKeyValue() {
+        assertPrintsUnchangedAfterReset(
+                "package main\n\nfunc total(items []int) int {\n\ts := 0\n\tfor i, v := range items {\n\t\ts += i + v\n\t}\n\treturn s\n}\n");
+    }
+
+    @Test
+    void rangeKeyOnly() {
+        assertPrintsUnchangedAfterReset(
+                "package main\n\nfunc count(items []int) int {\n\tn := 0\n\tfor i := range items {\n\t\tn += i\n\t}\n\treturn n\n}\n");
+    }
+
+    @Test
+    void rangeNoVariable() {
+        assertPrintsUnchangedAfterReset(
+                "package main\n\nfunc count(items []int) int {\n\tn := 0\n\tfor range items {\n\t\tn++\n\t}\n\treturn n\n}\n");
+    }
+
+    @Test
+    void rangeWithAssign() {
+        assertPrintsUnchangedAfterReset(
+                "package main\n\nfunc f(items []int) int {\n\tvar i, v int\n\tfor i, v = range items {\n\t\t_ = i\n\t\t_ = v\n\t}\n\treturn v\n}\n");
+    }
+
+    @Test
     void goBitClearBinary() {
         assertPrintsUnchangedAfterReset(
                 "package main\n" +
