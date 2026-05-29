@@ -169,6 +169,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     public J visitTypeDecl(Go.TypeDecl typeDecl, RpcSendQueue q) {
         q.getAndSendList(typeDecl, Go.TypeDecl::getLeadingAnnotations, Tree::getId, a -> visit(a, q));
         q.getAndSend(typeDecl, Go.TypeDecl::getName, el -> visit(el, q));
+        q.getAndSend(typeDecl, Go.TypeDecl::getTypeParameters, el -> visit(el, q));
         q.getAndSend(typeDecl, t -> t.getPadding().getAssign(), el -> visitLeftPadded(el, q));
         q.getAndSend(typeDecl, Go.TypeDecl::getDefinition, el -> visit(el, q));
         q.getAndSend(typeDecl, t -> t.getPadding().getSpecs(), el -> visitContainer(el, q));

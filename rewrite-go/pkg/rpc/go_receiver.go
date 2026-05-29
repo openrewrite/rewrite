@@ -388,6 +388,12 @@ func (r *GoReceiver) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 	if result != nil {
 		td.Name = result.(*java.Identifier)
 	}
+	// typeParameters
+	if tpResult := q.Receive(td.TypeParameters, func(v any) any { return r.Visit(v.(java.Tree), q) }); tpResult != nil {
+		td.TypeParameters = tpResult.(*java.TypeParameters)
+	} else {
+		td.TypeParameters = nil
+	}
 	var beforeAssign any
 	if td.Assign != nil {
 		beforeAssign = *td.Assign

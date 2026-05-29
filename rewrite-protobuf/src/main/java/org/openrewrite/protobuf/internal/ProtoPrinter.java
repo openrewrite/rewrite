@@ -132,6 +132,19 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public Proto visitGroup(Proto.Group group, PrintOutputCapture<P> p) {
+        beforeSyntax(group, p);
+        visit(group.getLabel(), p);
+        visit(group.getGroup(), p);
+        visitRightPadded(group.getPadding().getName(), p);
+        p.append('=');
+        visit(group.getNumber(), p);
+        visit(group.getBody(), p);
+        afterSyntax(group, p);
+        return group;
+    }
+
+    @Override
     public Proto visitIdentifier(Proto.Identifier identifier, PrintOutputCapture<P> p) {
         beforeSyntax(identifier, p);
         p.append(identifier.getName());

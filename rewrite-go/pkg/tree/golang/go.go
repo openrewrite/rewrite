@@ -465,6 +465,7 @@ type TypeDecl struct {
 	Markers            java.Markers
 	LeadingAnnotations []*java.Annotation // `//go:generate ...` etc.
 	Name               *java.Identifier
+	TypeParameters     *java.TypeParameters            // nil for non-generic types; `[T any]` declaration-site type params
 	Assign             *java.LeftPadded[java.Space]    // non-nil for `type Foo = Bar`; Before = space before `=`
 	Definition         java.Expression                 // the type expression (nil for grouped)
 	Specs              *java.Container[java.Statement] // non-nil for grouped `type ( ... )`; Before = space before `(`
@@ -489,6 +490,12 @@ func (n *TypeDecl) WithMarkers(markers java.Markers) *TypeDecl {
 func (n *TypeDecl) WithLeadingAnnotations(anns []*java.Annotation) *TypeDecl {
 	c := *n
 	c.LeadingAnnotations = anns
+	return &c
+}
+
+func (n *TypeDecl) WithTypeParameters(tps *java.TypeParameters) *TypeDecl {
+	c := *n
+	c.TypeParameters = tps
 	return &c
 }
 

@@ -188,6 +188,10 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitArrayAccess(n, p)
 	case *java.ParameterizedType:
 		return v.self().VisitParameterizedType(n, p)
+	case *java.TypeParameters:
+		return v.self().VisitTypeParameters(n, p)
+	case *java.TypeParameter:
+		return v.self().VisitTypeParameter(n, p)
 	case *golang.IndexList:
 		return v.self().VisitIndexList(n, p)
 	case *java.ArrayDimension:
@@ -277,6 +281,8 @@ type VisitorI interface {
 	VisitControlParentheses(cp *java.ControlParentheses, p any) java.J
 	VisitArrayAccess(aa *java.ArrayAccess, p any) java.J
 	VisitParameterizedType(pt *java.ParameterizedType, p any) java.J
+	VisitTypeParameters(tps *java.TypeParameters, p any) java.J
+	VisitTypeParameter(tp *java.TypeParameter, p any) java.J
 	VisitIndexList(il *golang.IndexList, p any) java.J
 	VisitArrayDimension(ad *java.ArrayDimension, p any) java.J
 	VisitComposite(c *golang.Composite, p any) java.J
@@ -424,10 +430,33 @@ func (v *GoVisitor) VisitMethodDeclaration(md *java.MethodDeclaration, p any) ja
 		md = md.WithLeadingAnnotations(anns)
 	}
 	md = md.WithName(visitAndCast[*java.Identifier](v, md.Name, p))
+	if md.TypeParameters != nil {
+		md = md.WithTypeParameters(visitAndCast[*java.TypeParameters](v, md.TypeParameters, p))
+	}
 	if md.Body != nil {
 		md = md.WithBody(visitAndCast[*java.Block](v, md.Body, p))
 	}
 	return md
+}
+
+func (v *GoVisitor) VisitTypeParameters(tps *java.TypeParameters, p any) java.J {
+	tps = tps.WithPrefix(v.self().VisitSpace(tps.Prefix, p))
+	tps = tps.WithMarkers(v.visitMarkers(tps.Markers, p))
+	tps.TypeParameters = visitRightPaddedList(v, tps.TypeParameters, p)
+	return tps
+}
+
+func (v *GoVisitor) VisitTypeParameter(tp *java.TypeParameter, p any) java.J {
+	tp = tp.WithPrefix(v.self().VisitSpace(tp.Prefix, p))
+	tp = tp.WithMarkers(v.visitMarkers(tp.Markers, p))
+	if tp.Name != nil {
+		tp.Name = visitExpression(v, tp.Name, p)
+	}
+	if tp.Bounds != nil {
+		tp.Bounds.Before = v.self().VisitSpace(tp.Bounds.Before, p)
+		tp.Bounds.Elements = visitRightPaddedList(v, tp.Bounds.Elements, p)
+	}
+	return tp
 }
 
 func (v *GoVisitor) VisitFieldAccess(fa *java.FieldAccess, p any) java.J {
@@ -759,6 +788,9 @@ func (v *GoVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 			anns = append(anns, visited.(*java.Annotation))
 		}
 		td = td.WithLeadingAnnotations(anns)
+	}
+	if td.TypeParameters != nil {
+		td = td.WithTypeParameters(visitAndCast[*java.TypeParameters](v, td.TypeParameters, p))
 	}
 	return td
 }
