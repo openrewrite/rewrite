@@ -193,3 +193,46 @@ func TestUnionOfQualifiedNames(t *testing.T) {
 	}
 	assertRoundTrip(t, src)
 }
+
+// Plain (non-tilde) union of primitive type names, mirroring
+// klauspost/compress .../le.go. Every term is a plain J.Identifier.
+func TestPlainUnionOfPrimitives(t *testing.T) {
+	src := "package main\n\ntype Indexer interface {\n\tint | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64\n}\n"
+	typeExpr := interfaceBodyTypeExpr(t, src)
+
+	union, ok := typeExpr.(*tree.Union)
+	if !ok {
+		t.Fatalf("expected TypeExpr to be *tree.Union, got %T", typeExpr)
+	}
+	if len(union.Types) != 10 {
+		t.Fatalf("expected 10 union terms, got %d", len(union.Types))
+	}
+	for i, term := range union.Types {
+		if _, ok := term.Element.(*tree.Identifier); !ok {
+			t.Fatalf("term %d: expected *tree.Identifier, got %T", i, term.Element)
+		}
+	}
+	assertRoundTrip(t, src)
+}
+
+// Mixed (non-tilde) union of a qualified name and a slice type,
+// mirroring golang-jwt/jwt .../token.go: `crypto.PublicKey | []uint8`.
+func TestUnionOfQualifiedNameAndSlice(t *testing.T) {
+	src := "package main\n\nimport \"crypto\"\n\ntype VerificationKey interface {\n\tcrypto.PublicKey | []uint8\n}\n"
+	typeExpr := interfaceBodyTypeExpr(t, src)
+
+	union, ok := typeExpr.(*tree.Union)
+	if !ok {
+		t.Fatalf("expected TypeExpr to be *tree.Union, got %T", typeExpr)
+	}
+	if len(union.Types) != 2 {
+		t.Fatalf("expected 2 union terms, got %d", len(union.Types))
+	}
+	if _, ok := union.Types[0].Element.(*tree.FieldAccess); !ok {
+		t.Fatalf("term 0: expected *tree.FieldAccess (qualified name), got %T", union.Types[0].Element)
+	}
+	if _, ok := union.Types[1].Element.(*tree.ArrayType); !ok {
+		t.Fatalf("term 1: expected *tree.ArrayType (slice), got %T", union.Types[1].Element)
+	}
+	assertRoundTrip(t, src)
+}

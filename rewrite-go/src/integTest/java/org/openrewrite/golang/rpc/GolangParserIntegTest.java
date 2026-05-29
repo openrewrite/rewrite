@@ -381,6 +381,41 @@ class GolangParserIntegTest implements RewriteTest {
     }
 
     @Test
+    void plainUnionWithoutApproximation() {
+        // Mirrors klauspost/compress .../le.go — a plain union of
+        // primitive type names with no `~`.
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Indexer interface {
+                                \tint | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void unionOfQualifiedNameAndSlice() {
+        // Mirrors golang-jwt/jwt .../token.go — `crypto.PublicKey | []uint8`.
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                import "crypto"
+
+                                type VerificationKey interface {
+                                \tcrypto.PublicKey | []uint8
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
     void typeSetUnionWithCompositeOperands() {
         rewriteRun(
                 go(
