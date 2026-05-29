@@ -343,6 +343,8 @@ func (r *JavaReceiver) VisitMethodDeclaration(md *tree.MethodDeclaration, p any)
 	if result := q.Receive(md.Parameters, func(v any) any { return receiveContainerAs(r, q, v, ContainerStatement) }); result != nil {
 		md.Parameters = result.(tree.Container[tree.Statement])
 	}
+	// dimensionsAfterName (empty for Go — no C-style array method returns)
+	q.ReceiveList(nil, nil)
 	// throws
 	q.Receive(nil, nil)
 	// body

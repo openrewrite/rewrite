@@ -252,7 +252,7 @@ func (s *JavaSender) VisitMethodDeclaration(md *tree.MethodDeclaration, p any) t
 	q := p.(*SendQueue)
 	// Go's MethodDeclaration maps to parts of Java's MethodDeclaration
 	// Java sends: leadingAnnotations, modifiers, typeParameters, returnTypeExpression,
-	//   name annotations, name, parameters, throws, body, defaultValue, methodType
+	//   name annotations, name, parameters, dimensionsAfterName, throws, body, defaultValue, methodType
 	// Go: receiver, name, parameters, returnType, body, methodType
 
 	// leadingAnnotations (`//go:` directives modeled as J.Annotation)
@@ -282,6 +282,8 @@ func (s *JavaSender) VisitMethodDeclaration(md *tree.MethodDeclaration, p any) t
 	// parameters (container)
 	q.GetAndSend(md, func(v any) any { return v.(*tree.MethodDeclaration).Parameters },
 		func(v any) { sendContainer(s, v, q) })
+	// dimensionsAfterName (empty for Go — no C-style array method returns)
+	q.GetAndSendList(md, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
 	// throws (nil for Go)
 	q.GetAndSend(md, func(_ any) any { return nil }, nil)
 	// body

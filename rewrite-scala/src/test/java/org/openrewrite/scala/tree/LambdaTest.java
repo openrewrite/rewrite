@@ -77,6 +77,19 @@ class LambdaTest implements RewriteTest {
     }
 
     @Test
+    void underscoreLambdaParameterWithParameterizedType() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val f = { (_: List[String]) => () }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void lambdaWithUnderscoreMethodCall() {
         rewriteRun(
             scala(

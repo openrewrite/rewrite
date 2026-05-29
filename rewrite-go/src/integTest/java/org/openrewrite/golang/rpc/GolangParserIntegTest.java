@@ -21,6 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.golang.tree.Go;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import org.openrewrite.test.TypeValidation;
@@ -28,6 +30,7 @@ import org.openrewrite.test.TypeValidation;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.golang.Assertions.expectMethodType;
 import static org.openrewrite.golang.Assertions.expectType;
@@ -131,6 +134,48 @@ class GolangParserIntegTest implements RewriteTest {
                                 }
                                 """,
                         spec -> spec.afterRecipe(cu -> expectType(cu, "p", "main.Point"))
+                )
+        );
+    }
+
+    /**
+     * Regression test for the {@code dimensionsAfterName} field added to
+     * {@code J.MethodDeclaration} in #6992. The Go RPC sender/receiver originally
+     * omitted this left-padded list (positioned between {@code parameters} and
+     * {@code throws}), desyncing the RPC stream by one field for every method
+     * declaration. The symptom was a {@code ClassCastException: J$Block cannot be
+     * cast to JContainer} in {@code JavaReceiver.visitMethodDeclaration}, which
+     * broke parsing of <em>any</em> Go source containing a function — not just
+     * C-style arrays (which don't exist in Go). This asserts a plain method
+     * declaration round-trips with its parameters and body intact.
+     */
+    @Test
+    void methodDeclarationRoundTrips() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                func add(a int, b int) int {
+                                \treturn a + b
+                                }
+                                """,
+                        spec -> spec.afterRecipe(cu -> {
+                            J.MethodDeclaration method = new JavaIsoVisitor<AtomicReference<J.MethodDeclaration>>() {
+                                @Override
+                                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration m, AtomicReference<J.MethodDeclaration> found) {
+                                    if ("add".equals(m.getSimpleName())) {
+                                        found.set(m);
+                                    }
+                                    return super.visitMethodDeclaration(m, found);
+                                }
+                            }.reduce(cu, new AtomicReference<J.MethodDeclaration>()).get();
+
+                            assertThat(method).as("method declaration 'add' should be present").isNotNull();
+                            assertThat(method.getParameters()).as("parameters should survive the round-trip").hasSize(2);
+                            assertThat(method.getBody()).as("body should be a J.Block, not a desynced field").isNotNull();
+                            assertThat(method.getReturnTypeExpression()).as("return type should survive the round-trip").isNotNull();
+                        })
                 )
         );
     }
