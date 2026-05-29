@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package tree
+package java
 
 import "github.com/google/uuid"
 
@@ -29,9 +29,9 @@ type Identifier struct {
 	FieldType   *JavaTypeVariable // the variable type when this identifier refers to a field (nullable)
 }
 
-func (*Identifier) isTree()       {}
-func (*Identifier) isJ()          {}
-func (*Identifier) isExpression() {}
+func (*Identifier) IsTree()       {}
+func (*Identifier) IsJ()          {}
+func (*Identifier) IsExpression() {}
 
 func (n *Identifier) WithPrefix(prefix Space) *Identifier {
 	c := *n
@@ -88,9 +88,9 @@ const (
 	NilLiteral
 )
 
-func (*Literal) isTree()       {}
-func (*Literal) isJ()          {}
-func (*Literal) isExpression() {}
+func (*Literal) IsTree()       {}
+func (*Literal) IsJ()          {}
+func (*Literal) IsExpression() {}
 
 func (n *Literal) WithPrefix(prefix Space) *Literal {
 	c := *n
@@ -247,9 +247,9 @@ type Binary struct {
 	Type     JavaType // the result type (nullable)
 }
 
-func (*Binary) isTree()       {}
-func (*Binary) isJ()          {}
-func (*Binary) isExpression() {}
+func (*Binary) IsTree()       {}
+func (*Binary) IsJ()          {}
+func (*Binary) IsExpression() {}
 
 func (n *Binary) WithPrefix(prefix Space) *Binary {
 	c := *n
@@ -284,9 +284,9 @@ type Block struct {
 	End        Space // whitespace before the closing brace
 }
 
-func (*Block) isTree()      {}
-func (*Block) isJ()         {}
-func (*Block) isStatement() {}
+func (*Block) IsTree()      {}
+func (*Block) IsJ()         {}
+func (*Block) IsStatement() {}
 
 func (n *Block) WithPrefix(prefix Space) *Block {
 	c := *n
@@ -320,9 +320,9 @@ type Return struct {
 	Expressions []RightPadded[Expression]
 }
 
-func (*Return) isTree()      {}
-func (*Return) isJ()         {}
-func (*Return) isStatement() {}
+func (*Return) IsTree()      {}
+func (*Return) IsJ()         {}
+func (*Return) IsStatement() {}
 
 func (n *Return) WithPrefix(prefix Space) *Return {
 	c := *n
@@ -349,9 +349,9 @@ type If struct {
 	ElsePart    *RightPadded[J] // nil if no else clause
 }
 
-func (*If) isTree()      {}
-func (*If) isJ()         {}
-func (*If) isStatement() {}
+func (*If) IsTree()      {}
+func (*If) IsJ()         {}
+func (*If) IsStatement() {}
 
 func (n *If) WithPrefix(prefix Space) *If {
 	c := *n
@@ -386,8 +386,8 @@ type Else struct {
 	Body    RightPadded[Statement]
 }
 
-func (*Else) isTree() {}
-func (*Else) isJ()    {}
+func (*Else) IsTree() {}
+func (*Else) IsJ()    {}
 
 func (n *Else) WithPrefix(prefix Space) *Else {
 	c := *n
@@ -411,10 +411,10 @@ type Assignment struct {
 	Type     JavaType // the result type (nullable)
 }
 
-func (*Assignment) isTree()       {}
-func (*Assignment) isJ()          {}
-func (*Assignment) isStatement()  {}
-func (*Assignment) isExpression() {}
+func (*Assignment) IsTree()       {}
+func (*Assignment) IsJ()          {}
+func (*Assignment) IsStatement()  {}
+func (*Assignment) IsExpression() {}
 
 func (n *Assignment) WithPrefix(prefix Space) *Assignment {
 	c := *n
@@ -449,16 +449,16 @@ type AssignmentOperator int
 
 const (
 	AddAssign    AssignmentOperator = iota + 1 // +=
-	SubAssign                              // -=
-	MulAssign                              // *=
-	DivAssign                              // /=
-	ModAssign                              // %=
-	AndAssign                              // &=
-	OrAssign                               // |=
-	XorAssign                              // ^=
-	ShlAssign                              // <<=
-	ShrAssign                              // >>=
-	AndNotAssign                           // &^= (Go-specific)
+	SubAssign                                  // -=
+	MulAssign                                  // *=
+	DivAssign                                  // /=
+	ModAssign                                  // %=
+	AndAssign                                  // &=
+	OrAssign                                   // |=
+	XorAssign                                  // ^=
+	ShlAssign                                  // <<=
+	ShrAssign                                  // >>=
+	AndNotAssign                               // &^= (Go-specific)
 )
 
 // String returns the Java enum name for this AssignmentOperator.
@@ -519,10 +519,10 @@ func ParseAssignmentOperator(s string) AssignmentOperator {
 	}
 }
 
-func (*AssignmentOperation) isTree()       {}
-func (*AssignmentOperation) isJ()          {}
-func (*AssignmentOperation) isStatement()  {}
-func (*AssignmentOperation) isExpression() {}
+func (*AssignmentOperation) IsTree()       {}
+func (*AssignmentOperation) IsJ()          {}
+func (*AssignmentOperation) IsStatement()  {}
+func (*AssignmentOperation) IsExpression() {}
 
 func (n *AssignmentOperation) WithPrefix(prefix Space) *AssignmentOperation {
 	c := *n
@@ -550,16 +550,17 @@ type MethodDeclaration struct {
 	LeadingAnnotations []*Annotation         // `//go:noinline` / `//go:nosplit` etc. on funcs
 	Receiver           *Container[Statement] // nil for free functions; `(r *Type)` receiver
 	Name               *Identifier
-	Parameters         Container[Statement]  // parameter list in parentheses
-	ReturnType         Expression            // nil for void functions; single type or *TypeList for multiple
-	Body               *Block                // nil for forward declarations
-	MethodType         *JavaTypeMethod       // the method type signature (nullable)
+	TypeParameters     *TypeParameters      // nil for non-generic functions; `[T any]` declaration-site type params
+	Parameters         Container[Statement] // parameter list in parentheses
+	ReturnType         Expression           // nil for void functions; single type or *TypeList for multiple
+	Body               *Block               // nil for forward declarations
+	MethodType         *JavaTypeMethod      // the method type signature (nullable)
 }
 
-func (*MethodDeclaration) isTree()       {}
-func (*MethodDeclaration) isJ()          {}
-func (*MethodDeclaration) isStatement()  {}
-func (*MethodDeclaration) isExpression() {} // for function literals
+func (*MethodDeclaration) IsTree()       {}
+func (*MethodDeclaration) IsJ()          {}
+func (*MethodDeclaration) IsStatement()  {}
+func (*MethodDeclaration) IsExpression() {} // for function literals
 
 func (n *MethodDeclaration) WithPrefix(prefix Space) *MethodDeclaration {
 	c := *n
@@ -591,6 +592,70 @@ func (n *MethodDeclaration) WithBody(body *Block) *MethodDeclaration {
 	return &c
 }
 
+func (n *MethodDeclaration) WithTypeParameters(tps *TypeParameters) *MethodDeclaration {
+	c := *n
+	c.TypeParameters = tps
+	return &c
+}
+
+// TypeParameters represents a declaration-site type parameter list, e.g. Go
+// `[T any, U comparable]` (Java `<T, U>`). Maps to
+// org.openrewrite.java.tree.J$TypeParameters.
+type TypeParameters struct {
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Annotations []*Annotation
+	// Elements are *TypeParameter. Typed as RightPadded[J] so the RPC padding
+	// machinery (which reconstructs J-only nodes as RightPadded[J]) round-trips
+	// them without bespoke type-switch cases.
+	TypeParameters []RightPadded[J]
+}
+
+func (*TypeParameters) IsTree() {}
+func (*TypeParameters) IsJ()    {}
+
+func (n *TypeParameters) WithPrefix(prefix Space) *TypeParameters {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *TypeParameters) WithMarkers(markers Markers) *TypeParameters {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// TypeParameter represents a single declaration-site type parameter, e.g. Go
+// `T any` (Java `T extends Foo`). The constraint (Go) / bound (Java) lives in
+// Bounds as a single-element container; it is nil when the parameter shares a
+// later sibling's constraint, as in `[T, U any]`. Maps to
+// org.openrewrite.java.tree.J$TypeParameter.
+type TypeParameter struct {
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Annotations []*Annotation
+	Name        Expression
+	Bounds      *Container[Expression]
+}
+
+func (*TypeParameter) IsTree() {}
+func (*TypeParameter) IsJ()    {}
+
+func (n *TypeParameter) WithPrefix(prefix Space) *TypeParameter {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *TypeParameter) WithMarkers(markers Markers) *TypeParameter {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 // ForLoop represents a classic for loop: `for init; cond; update { body }`
 // Also covers condition-only `for cond {}` and infinite `for {}`.
 type ForLoop struct {
@@ -601,9 +666,9 @@ type ForLoop struct {
 	Body    *Block
 }
 
-func (*ForLoop) isTree()      {}
-func (*ForLoop) isJ()         {}
-func (*ForLoop) isStatement() {}
+func (*ForLoop) IsTree()      {}
+func (*ForLoop) IsJ()         {}
+func (*ForLoop) IsStatement() {}
 
 func (n *ForLoop) WithPrefix(prefix Space) *ForLoop {
 	c := *n
@@ -637,8 +702,8 @@ type ForControl struct {
 	Update    *RightPadded[Statement]  // nil when no update clause
 }
 
-func (*ForControl) isTree() {}
-func (*ForControl) isJ()    {}
+func (*ForControl) IsTree() {}
+func (*ForControl) IsJ()    {}
 
 func (n *ForControl) WithPrefix(prefix Space) *ForControl {
 	c := *n
@@ -661,9 +726,9 @@ type ForEachLoop struct {
 	Body    *Block
 }
 
-func (*ForEachLoop) isTree()      {}
-func (*ForEachLoop) isJ()         {}
-func (*ForEachLoop) isStatement() {}
+func (*ForEachLoop) IsTree()      {}
+func (*ForEachLoop) IsJ()         {}
+func (*ForEachLoop) IsStatement() {}
 
 func (n *ForEachLoop) WithPrefix(prefix Space) *ForEachLoop {
 	c := *n
@@ -696,7 +761,7 @@ type ForEachControl struct {
 	Key      *RightPadded[Expression] // nil for `for range expr`; After = space after key (including comma)
 	Value    *RightPadded[Expression] // nil when no value; After = space before operator
 	Operator LeftPadded[AssignOp]     // `:=` or `=`; Before = space before operator. Unused when Key is nil
-	Iterable Expression              // expression after "range" keyword
+	Iterable Expression               // expression after "range" keyword
 }
 
 // AssignOp distinguishes := from = in assignment contexts.
@@ -704,7 +769,7 @@ type AssignOp int
 
 const (
 	AssignOpEquals AssignOp = iota + 1 // =
-	AssignOpDefine                 // :=
+	AssignOpDefine                     // :=
 )
 
 // String returns a string representation of AssignOp for RPC serialization.
@@ -733,8 +798,8 @@ func ParseAssignOp(s string) AssignOp {
 	}
 }
 
-func (*ForEachControl) isTree() {}
-func (*ForEachControl) isJ()    {}
+func (*ForEachControl) IsTree() {}
+func (*ForEachControl) IsJ()    {}
 
 func (n *ForEachControl) WithPrefix(prefix Space) *ForEachControl {
 	c := *n
@@ -758,9 +823,9 @@ type Switch struct {
 	Body    *Block                   // contains Case statements
 }
 
-func (*Switch) isTree()      {}
-func (*Switch) isJ()         {}
-func (*Switch) isStatement() {}
+func (*Switch) IsTree()      {}
+func (*Switch) IsJ()         {}
+func (*Switch) IsStatement() {}
 
 func (n *Switch) WithPrefix(prefix Space) *Switch {
 	c := *n
@@ -785,13 +850,13 @@ type Case struct {
 	ID          uuid.UUID
 	Prefix      Space
 	Markers     Markers
-	Expressions Container[Expression]      // empty for default case
-	Body        []RightPadded[Statement]   // statements after the colon
+	Expressions Container[Expression]    // empty for default case
+	Body        []RightPadded[Statement] // statements after the colon
 }
 
-func (*Case) isTree()      {}
-func (*Case) isJ()         {}
-func (*Case) isStatement() {}
+func (*Case) IsTree()      {}
+func (*Case) IsJ()         {}
+func (*Case) IsStatement() {}
 
 func (n *Case) WithPrefix(prefix Space) *Case {
 	c := *n
@@ -813,9 +878,9 @@ type Break struct {
 	Label   *Identifier // nil if no label
 }
 
-func (*Break) isTree()      {}
-func (*Break) isJ()         {}
-func (*Break) isStatement() {}
+func (*Break) IsTree()      {}
+func (*Break) IsJ()         {}
+func (*Break) IsStatement() {}
 
 func (n *Break) WithPrefix(prefix Space) *Break {
 	c := *n
@@ -837,9 +902,9 @@ type Continue struct {
 	Label   *Identifier // nil if no label
 }
 
-func (*Continue) isTree()      {}
-func (*Continue) isJ()         {}
-func (*Continue) isStatement() {}
+func (*Continue) IsTree()      {}
+func (*Continue) IsJ()         {}
+func (*Continue) IsStatement() {}
 
 func (n *Continue) WithPrefix(prefix Space) *Continue {
 	c := *n
@@ -862,9 +927,9 @@ type Label struct {
 	Statement Statement
 }
 
-func (*Label) isTree()      {}
-func (*Label) isJ()         {}
-func (*Label) isStatement() {}
+func (*Label) IsTree()      {}
+func (*Label) IsJ()         {}
+func (*Label) IsStatement() {}
 
 func (n *Label) WithPrefix(prefix Space) *Label {
 	c := *n
@@ -884,20 +949,20 @@ func (n *Label) WithMarkers(markers Markers) *Label {
 // Java has first-class `@Annotation(args)` syntax. Go has no `@`, but
 // has two analogous concepts that this type models uniformly:
 //
-//   1. Struct field tags. Each `key:"value"` pair in a struct field
-//      tag becomes one Annotation on the field's VariableDeclarations:
-//      AnnotationType = Identifier{Name: key},
-//      Arguments      = [Literal{Value: value}].
-//      The printer renders the run of struct-tag annotations on a
-//      VariableDeclarations whose parent is a StructType as a single
-//      backtick-wrapped tag.
+//  1. Struct field tags. Each `key:"value"` pair in a struct field
+//     tag becomes one Annotation on the field's VariableDeclarations:
+//     AnnotationType = Identifier{Name: key},
+//     Arguments      = [Literal{Value: value}].
+//     The printer renders the run of struct-tag annotations on a
+//     VariableDeclarations whose parent is a StructType as a single
+//     backtick-wrapped tag.
 //
-//   2. Source directives like `//go:noinline`, `//go:generate`,
-//      `//lint:ignore`. Each directive becomes one Annotation on the
-//      enclosing MethodDeclaration / TypeDecl / VariableDeclarations:
-//      AnnotationType = Identifier{Name: "go:noinline"},
-//      Arguments      = [Literal(args)] when the directive carries
-//                       text after the keyword, else nil.
+//  2. Source directives like `//go:noinline`, `//go:generate`,
+//     `//lint:ignore`. Each directive becomes one Annotation on the
+//     enclosing MethodDeclaration / TypeDecl / VariableDeclarations:
+//     AnnotationType = Identifier{Name: "go:noinline"},
+//     Arguments      = [Literal(args)] when the directive carries
+//     text after the keyword, else nil.
 //
 // In both cases, AnnotationType is an Expression (typically Identifier;
 // FieldAccess for qualified directives like `lint:ignore`).
@@ -908,13 +973,13 @@ type Annotation struct {
 	ID             uuid.UUID
 	Prefix         Space
 	Markers        Markers
-	AnnotationType Expression            // NameTree — Identifier or FieldAccess
+	AnnotationType Expression             // NameTree — Identifier or FieldAccess
 	Arguments      *Container[Expression] // nullable; tags always have one Literal
 }
 
-func (*Annotation) isTree()       {}
-func (*Annotation) isJ()          {}
-func (*Annotation) isExpression() {}
+func (*Annotation) IsTree()       {}
+func (*Annotation) IsJ()          {}
+func (*Annotation) IsExpression() {}
 
 func (n *Annotation) WithPrefix(prefix Space) *Annotation {
 	c := *n
@@ -947,10 +1012,10 @@ type Empty struct {
 	Markers Markers
 }
 
-func (*Empty) isTree()       {}
-func (*Empty) isJ()          {}
-func (*Empty) isStatement()  {}
-func (*Empty) isExpression() {}
+func (*Empty) IsTree()       {}
+func (*Empty) IsJ()          {}
+func (*Empty) IsStatement()  {}
+func (*Empty) IsExpression() {}
 
 func (n *Empty) WithPrefix(prefix Space) *Empty {
 	c := *n
@@ -972,17 +1037,17 @@ type UnaryOperator int
 
 const (
 	Negate        UnaryOperator = iota + 1 // -
-	Not                               // !
-	BitwiseNot                        // ^
-	Deref                             // *
-	AddressOf                         // &
-	Receive                           // <- (channel receive, Go-specific)
-	Positive                          // +
-	PostIncrement                     // ++ (postfix)
-	PostDecrement                     // -- (postfix)
-	Spread                            // ... (variadic prefix, param declaration)
-	SpreadPostfix                     // ... (variadic postfix, call site)
-	Tilde                             // ~ (approximate type constraint, Go-specific)
+	Not                                    // !
+	BitwiseNot                             // ^
+	Deref                                  // *
+	AddressOf                              // &
+	Receive                                // <- (channel receive, Go-specific)
+	Positive                               // +
+	PostIncrement                          // ++ (postfix)
+	PostDecrement                          // -- (postfix)
+	Spread                                 // ... (variadic prefix, param declaration)
+	SpreadPostfix                          // ... (variadic postfix, call site)
+	Tilde                                  // ~ (approximate type constraint, Go-specific)
 )
 
 // String returns the Java enum name for this UnaryOperator.
@@ -1053,10 +1118,10 @@ func ParseUnaryOperator(s string) UnaryOperator {
 	}
 }
 
-func (*Unary) isTree()       {}
-func (*Unary) isJ()          {}
-func (*Unary) isExpression() {}
-func (*Unary) isStatement()  {}
+func (*Unary) IsTree()       {}
+func (*Unary) IsJ()          {}
+func (*Unary) IsExpression() {}
+func (*Unary) IsStatement()  {}
 
 func (n *Unary) WithPrefix(prefix Space) *Unary {
 	c := *n
@@ -1086,9 +1151,9 @@ type FieldAccess struct {
 	Type    JavaType // the result type (nullable)
 }
 
-func (*FieldAccess) isTree()       {}
-func (*FieldAccess) isJ()          {}
-func (*FieldAccess) isExpression() {}
+func (*FieldAccess) IsTree()       {}
+func (*FieldAccess) IsJ()          {}
+func (*FieldAccess) IsExpression() {}
 
 func (n *FieldAccess) WithPrefix(prefix Space) *FieldAccess {
 	c := *n
@@ -1119,10 +1184,10 @@ type MethodInvocation struct {
 	MethodType *JavaTypeMethod // the method type being invoked (nullable)
 }
 
-func (*MethodInvocation) isTree()       {}
-func (*MethodInvocation) isJ()          {}
-func (*MethodInvocation) isExpression() {}
-func (*MethodInvocation) isStatement()  {}
+func (*MethodInvocation) IsTree()       {}
+func (*MethodInvocation) IsJ()          {}
+func (*MethodInvocation) IsExpression() {}
+func (*MethodInvocation) IsStatement()  {}
 
 func (n *MethodInvocation) WithPrefix(prefix Space) *MethodInvocation {
 	c := *n
@@ -1149,16 +1214,16 @@ type VariableDeclarations struct {
 	ID                 uuid.UUID
 	Prefix             Space
 	Markers            Markers
-	LeadingAnnotations []*Annotation                       // struct field tags (one per `key:"value"` pair) or `//go:` directives
-	TypeExpr           Expression                          // the declared type (nil if inferred)
-	Varargs            *Space                              // non-nil for variadic params (`...T`); holds prefix of `...`
-	Variables          []RightPadded[*VariableDeclarator]  // the declared variables
-	Specs              *Container[Statement]               // non-nil for grouped `var ( ... )`; Before = space before `(`
+	LeadingAnnotations []*Annotation                      // struct field tags (one per `key:"value"` pair) or `//go:` directives
+	TypeExpr           Expression                         // the declared type (nil if inferred)
+	Varargs            *Space                             // non-nil for variadic params (`...T`); holds prefix of `...`
+	Variables          []RightPadded[*VariableDeclarator] // the declared variables
+	Specs              *Container[Statement]              // non-nil for grouped `var ( ... )`; Before = space before `(`
 }
 
-func (*VariableDeclarations) isTree()      {}
-func (*VariableDeclarations) isJ()         {}
-func (*VariableDeclarations) isStatement() {}
+func (*VariableDeclarations) IsTree()      {}
+func (*VariableDeclarations) IsJ()         {}
+func (*VariableDeclarations) IsStatement() {}
 
 func (n *VariableDeclarations) WithPrefix(prefix Space) *VariableDeclarations {
 	c := *n
@@ -1187,8 +1252,8 @@ type VariableDeclarator struct {
 	Initializer *LeftPadded[Expression] // nil if no initializer
 }
 
-func (*VariableDeclarator) isTree() {}
-func (*VariableDeclarator) isJ()    {}
+func (*VariableDeclarator) IsTree() {}
+func (*VariableDeclarator) IsJ()    {}
 
 func (n *VariableDeclarator) WithPrefix(prefix Space) *VariableDeclarator {
 	c := *n
@@ -1219,9 +1284,9 @@ type ArrayType struct {
 	Type        JavaType          // the array type (nullable)
 }
 
-func (*ArrayType) isTree()       {}
-func (*ArrayType) isJ()          {}
-func (*ArrayType) isExpression() {}
+func (*ArrayType) IsTree()       {}
+func (*ArrayType) IsJ()          {}
+func (*ArrayType) IsExpression() {}
 
 func (n *ArrayType) WithPrefix(prefix Space) *ArrayType {
 	c := *n
@@ -1244,9 +1309,9 @@ type Parentheses struct {
 	Type    JavaType                // the result type (nullable)
 }
 
-func (*Parentheses) isTree()       {}
-func (*Parentheses) isJ()          {}
-func (*Parentheses) isExpression() {}
+func (*Parentheses) IsTree()       {}
+func (*Parentheses) IsJ()          {}
+func (*Parentheses) IsExpression() {}
 
 func (n *Parentheses) WithPrefix(prefix Space) *Parentheses {
 	c := *n
@@ -1270,9 +1335,9 @@ type TypeCast struct {
 	Type    JavaType            // the result type (nullable)
 }
 
-func (*TypeCast) isTree()       {}
-func (*TypeCast) isJ()          {}
-func (*TypeCast) isExpression() {}
+func (*TypeCast) IsTree()       {}
+func (*TypeCast) IsJ()          {}
+func (*TypeCast) IsExpression() {}
 
 func (n *TypeCast) WithPrefix(prefix Space) *TypeCast {
 	c := *n
@@ -1294,9 +1359,9 @@ type ControlParentheses struct {
 	Tree    RightPadded[Expression] // Element = inner, After = space before `)`
 }
 
-func (*ControlParentheses) isTree()       {}
-func (*ControlParentheses) isJ()          {}
-func (*ControlParentheses) isExpression() {}
+func (*ControlParentheses) IsTree()       {}
+func (*ControlParentheses) IsJ()          {}
+func (*ControlParentheses) IsExpression() {}
 
 func (n *ControlParentheses) WithPrefix(prefix Space) *ControlParentheses {
 	c := *n
@@ -1328,9 +1393,9 @@ type ArrayDimension struct {
 	Index   RightPadded[Expression] // Element = index expr, After = space before `]`
 }
 
-func (*ArrayAccess) isTree()       {}
-func (*ArrayAccess) isJ()          {}
-func (*ArrayAccess) isExpression() {}
+func (*ArrayAccess) IsTree()       {}
+func (*ArrayAccess) IsJ()          {}
+func (*ArrayAccess) IsExpression() {}
 
 func (n *ArrayAccess) WithPrefix(prefix Space) *ArrayAccess {
 	c := *n
@@ -1344,8 +1409,8 @@ func (n *ArrayAccess) WithMarkers(markers Markers) *ArrayAccess {
 	return &c
 }
 
-func (*ArrayDimension) isTree() {}
-func (*ArrayDimension) isJ()    {}
+func (*ArrayDimension) IsTree() {}
+func (*ArrayDimension) IsJ()    {}
 
 func (n *ArrayDimension) WithPrefix(prefix Space) *ArrayDimension {
 	c := *n
@@ -1364,14 +1429,14 @@ type ParameterizedType struct {
 	ID             uuid.UUID
 	Prefix         Space
 	Markers        Markers
-	Clazz          Expression            // the base type being parameterized
+	Clazz          Expression             // the base type being parameterized
 	TypeParameters *Container[Expression] // the type arguments (nullable)
-	Type           JavaType              // resolved type (nullable)
+	Type           JavaType               // resolved type (nullable)
 }
 
-func (*ParameterizedType) isTree()       {}
-func (*ParameterizedType) isJ()          {}
-func (*ParameterizedType) isExpression() {}
+func (*ParameterizedType) IsTree()       {}
+func (*ParameterizedType) IsJ()          {}
+func (*ParameterizedType) IsExpression() {}
 
 func (n *ParameterizedType) WithPrefix(prefix Space) *ParameterizedType {
 	c := *n
@@ -1390,12 +1455,12 @@ type Import struct {
 	ID      uuid.UUID
 	Prefix  Space
 	Markers Markers
-	Alias  *LeftPadded[*Identifier] // nil if no alias
-	Qualid Expression               // typically *Literal for Go imports
+	Alias   *LeftPadded[*Identifier] // nil if no alias
+	Qualid  Expression               // typically *Literal for Go imports
 }
 
-func (*Import) isTree() {}
-func (*Import) isJ()    {}
+func (*Import) IsTree() {}
+func (*Import) IsJ()    {}
 
 func (n *Import) WithPrefix(prefix Space) *Import {
 	c := *n

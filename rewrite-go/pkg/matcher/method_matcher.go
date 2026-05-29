@@ -20,7 +20,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // MethodMatcher matches method invocations against an AspectJ-style pattern.
@@ -47,7 +47,7 @@ type MethodMatcher struct {
 
 // argMatcher matches a single argument type.
 type argMatcher interface {
-	matches(t tree.JavaType) bool
+	matches(t java.JavaType) bool
 }
 
 // typeArgMatcher matches a specific type by FQN pattern.
@@ -56,7 +56,7 @@ type typeArgMatcher struct {
 	raw     string
 }
 
-func (m *typeArgMatcher) matches(t tree.JavaType) bool {
+func (m *typeArgMatcher) matches(t java.JavaType) bool {
 	fqn := GetFullyQualifiedName(t)
 	if fqn == "" {
 		// If type info is not available, match by raw name against common Go types.
@@ -68,7 +68,7 @@ func (m *typeArgMatcher) matches(t tree.JavaType) bool {
 // wildcardArgMatcher matches any type (the ".." wildcard).
 type wildcardArgMatcher struct{}
 
-func (m *wildcardArgMatcher) matches(t tree.JavaType) bool { return true }
+func (m *wildcardArgMatcher) matches(t java.JavaType) bool { return true }
 
 // NewMethodMatcher creates a MethodMatcher from the given pattern string.
 // Pattern format: "DeclaringType MethodName(ArgTypes)"
@@ -127,7 +127,7 @@ func NewMethodMatcher(pattern string) *MethodMatcher {
 }
 
 // Matches checks if the given MethodInvocation matches this pattern.
-func (m *MethodMatcher) Matches(mi *tree.MethodInvocation) bool {
+func (m *MethodMatcher) Matches(mi *java.MethodInvocation) bool {
 	// Match method name
 	if m.methodNamePattern != nil && !m.methodNamePattern.MatchString(mi.Name.Name) {
 		return false
@@ -173,7 +173,7 @@ func (m *MethodMatcher) Matches(mi *tree.MethodInvocation) bool {
 }
 
 // MatchesMethod checks if a JavaTypeMethod matches this pattern.
-func (m *MethodMatcher) MatchesMethod(mt *tree.JavaTypeMethod) bool {
+func (m *MethodMatcher) MatchesMethod(mt *java.JavaTypeMethod) bool {
 	if mt == nil {
 		return false
 	}
@@ -211,7 +211,7 @@ func (m *MethodMatcher) MatchesMethod(mt *tree.JavaTypeMethod) bool {
 
 // MatchesName checks only the declaring type and method name, ignoring arguments.
 // Useful as a fast pre-check before deeper matching.
-func (m *MethodMatcher) MatchesName(mi *tree.MethodInvocation) bool {
+func (m *MethodMatcher) MatchesName(mi *java.MethodInvocation) bool {
 	if m.methodNamePattern != nil && !m.methodNamePattern.MatchString(mi.Name.Name) {
 		return false
 	}
@@ -226,10 +226,10 @@ func (m *MethodMatcher) MatchesName(mi *tree.MethodInvocation) bool {
 }
 
 // realArgs filters out Empty sentinel nodes from an argument list.
-func realArgs(args []tree.RightPadded[tree.Expression]) []tree.Expression {
-	var result []tree.Expression
+func realArgs(args []java.RightPadded[java.Expression]) []java.Expression {
+	var result []java.Expression
 	for _, a := range args {
-		if _, isEmpty := a.Element.(*tree.Empty); !isEmpty {
+		if _, isEmpty := a.Element.(*java.Empty); !isEmpty {
 			result = append(result, a.Element)
 		}
 	}

@@ -27,8 +27,10 @@ type ChangeMethodName struct {
 }
 
 func (r *ChangeMethodName) Name() string        { return "org.openrewrite.golang.ChangeMethodName" }
-func (r *ChangeMethodName) DisplayName() string  { return "Change method name" }
-func (r *ChangeMethodName) Description() string  { return "Rename method invocations matching a method pattern." }
+func (r *ChangeMethodName) DisplayName() string { return "Change method name" }
+func (r *ChangeMethodName) Description() string {
+	return "Rename method invocations matching a method pattern."
+}
 func (r *ChangeMethodName) JavaRecipeName() string { return "org.openrewrite.java.ChangeMethodName" }
 func (r *ChangeMethodName) JavaOptions() map[string]any {
 	return map[string]any{

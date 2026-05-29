@@ -224,8 +224,8 @@ type myRecipe struct {
 }
 
 func (r *myRecipe) Name() string        { return "test.MyRecipe" }
-func (r *myRecipe) DisplayName() string  { return "My Recipe" }
-func (r *myRecipe) Description() string  { return "Test recipe" }
+func (r *myRecipe) DisplayName() string { return "My Recipe" }
+func (r *myRecipe) Description() string { return "Test recipe" }
 
 func TestTemplateRecipeStruct(t *testing.T) {
 	expr := Expr("expr")

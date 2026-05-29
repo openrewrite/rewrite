@@ -16,47 +16,47 @@
 
 package matcher
 
-import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 
 // GetFullyQualifiedName extracts the FQN from a JavaType.
 // Returns "" for nil, unknown, or types without a FQN.
-func GetFullyQualifiedName(t tree.JavaType) string {
+func GetFullyQualifiedName(t java.JavaType) string {
 	if t == nil {
 		return ""
 	}
 	switch v := t.(type) {
-	case *tree.JavaTypeClass:
+	case *java.JavaTypeClass:
 		return v.FullyQualifiedName
-	case *tree.JavaTypeParameterized:
+	case *java.JavaTypeParameterized:
 		if v.Type != nil {
 			return v.Type.GetFullyQualifiedName()
 		}
-	case *tree.JavaTypePrimitive:
+	case *java.JavaTypePrimitive:
 		return v.Keyword
-	case *tree.JavaTypeArray:
+	case *java.JavaTypeArray:
 		return GetFullyQualifiedName(v.ElemType) + "[]"
-	case tree.FullyQualified:
+	case java.FullyQualified:
 		return v.GetFullyQualifiedName()
 	}
 	return ""
 }
 
 // IsOfClassType checks if the type has the exact fully qualified name.
-func IsOfClassType(t tree.JavaType, fqn string) bool {
+func IsOfClassType(t java.JavaType, fqn string) bool {
 	return GetFullyQualifiedName(t) == fqn
 }
 
 // IsAssignableTo checks if the type is assignable to the target FQN.
 // For Go, this means the type IS the target, or the type implements
 // an interface with that FQN (structural typing).
-func IsAssignableTo(t tree.JavaType, fqn string) bool {
+func IsAssignableTo(t java.JavaType, fqn string) bool {
 	if t == nil {
 		return false
 	}
-	return isAssignableToFQN(t, fqn, make(map[tree.JavaType]bool))
+	return isAssignableToFQN(t, fqn, make(map[java.JavaType]bool))
 }
 
-func isAssignableToFQN(t tree.JavaType, fqn string, visited map[tree.JavaType]bool) bool {
+func isAssignableToFQN(t java.JavaType, fqn string, visited map[java.JavaType]bool) bool {
 	if visited[t] {
 		return false
 	}
@@ -67,7 +67,7 @@ func isAssignableToFQN(t tree.JavaType, fqn string, visited map[tree.JavaType]bo
 	}
 
 	switch v := t.(type) {
-	case *tree.JavaTypeClass:
+	case *java.JavaTypeClass:
 		// Check interfaces
 		for _, iface := range v.Interfaces {
 			if isAssignableToFQN(iface, fqn, visited) {
@@ -80,7 +80,7 @@ func isAssignableToFQN(t tree.JavaType, fqn string, visited map[tree.JavaType]bo
 				return true
 			}
 		}
-	case *tree.JavaTypeParameterized:
+	case *java.JavaTypeParameterized:
 		if v.Type != nil {
 			return isAssignableToFQN(v.Type, fqn, visited)
 		}
@@ -90,7 +90,7 @@ func isAssignableToFQN(t tree.JavaType, fqn string, visited map[tree.JavaType]bo
 
 // Implements checks if the type implements the given interface FQN.
 // Unlike IsAssignableTo, this returns false if the type IS the interface.
-func Implements(t tree.JavaType, interfaceFQN string) bool {
+func Implements(t java.JavaType, interfaceFQN string) bool {
 	if t == nil {
 		return false
 	}
@@ -102,27 +102,27 @@ func Implements(t tree.JavaType, interfaceFQN string) bool {
 }
 
 // IsError checks if the type is the Go built-in `error` interface.
-func IsError(t tree.JavaType) bool {
+func IsError(t java.JavaType) bool {
 	return IsOfClassType(t, "error")
 }
 
 // IsString checks if the type is the Go `string` type.
-func IsString(t tree.JavaType) bool {
+func IsString(t java.JavaType) bool {
 	if t == nil {
 		return false
 	}
-	if p, ok := t.(*tree.JavaTypePrimitive); ok {
+	if p, ok := t.(*java.JavaTypePrimitive); ok {
 		return p.Keyword == "String" || p.Keyword == "string"
 	}
 	return IsOfClassType(t, "string")
 }
 
 // IsNumeric checks if the type is a numeric type (int, float, etc.).
-func IsNumeric(t tree.JavaType) bool {
+func IsNumeric(t java.JavaType) bool {
 	if t == nil {
 		return false
 	}
-	if p, ok := t.(*tree.JavaTypePrimitive); ok {
+	if p, ok := t.(*java.JavaTypePrimitive); ok {
 		switch p.Keyword {
 		case "int", "long", "short", "byte", "float", "double", "char":
 			return true
@@ -139,8 +139,8 @@ func IsNumeric(t tree.JavaType) bool {
 }
 
 // IsBool checks if the type is the Go `bool` type.
-func IsBool(t tree.JavaType) bool {
-	if p, ok := t.(*tree.JavaTypePrimitive); ok {
+func IsBool(t java.JavaType) bool {
+	if p, ok := t.(*java.JavaTypePrimitive); ok {
 		return p.Keyword == "boolean" || p.Keyword == "bool"
 	}
 	return IsOfClassType(t, "bool")
@@ -150,17 +150,17 @@ func IsBool(t tree.JavaType) bool {
 // class. A JavaTypeShallowClass is unwrapped to its embedded JavaTypeClass
 // — callers that need to distinguish ShallowClass from Class should type
 // switch on the original JavaType, not on this accessor's result.
-func AsClass(t tree.JavaType) *tree.JavaTypeClass {
+func AsClass(t java.JavaType) *java.JavaTypeClass {
 	switch v := t.(type) {
-	case *tree.JavaTypeClass:
+	case *java.JavaTypeClass:
 		return v
-	case *tree.JavaTypeShallowClass:
+	case *java.JavaTypeShallowClass:
 		return &v.JavaTypeClass
-	case *tree.JavaTypeParameterized:
-		if c, ok := v.Type.(*tree.JavaTypeClass); ok {
+	case *java.JavaTypeParameterized:
+		if c, ok := v.Type.(*java.JavaTypeClass); ok {
 			return c
 		}
-		if sc, ok := v.Type.(*tree.JavaTypeShallowClass); ok {
+		if sc, ok := v.Type.(*java.JavaTypeShallowClass); ok {
 			return &sc.JavaTypeClass
 		}
 	}
@@ -168,50 +168,50 @@ func AsClass(t tree.JavaType) *tree.JavaTypeClass {
 }
 
 // AsMethod safely casts a JavaType to *JavaTypeMethod, returning nil if not a method.
-func AsMethod(t tree.JavaType) *tree.JavaTypeMethod {
-	if m, ok := t.(*tree.JavaTypeMethod); ok {
+func AsMethod(t java.JavaType) *java.JavaTypeMethod {
+	if m, ok := t.(*java.JavaTypeMethod); ok {
 		return m
 	}
 	return nil
 }
 
 // AsArray safely casts a JavaType to *JavaTypeArray, returning nil if not an array.
-func AsArray(t tree.JavaType) *tree.JavaTypeArray {
-	if a, ok := t.(*tree.JavaTypeArray); ok {
+func AsArray(t java.JavaType) *java.JavaTypeArray {
+	if a, ok := t.(*java.JavaTypeArray); ok {
 		return a
 	}
 	return nil
 }
 
 // TypeOfExpression extracts the JavaType from an expression node.
-func TypeOfExpression(expr tree.Expression) tree.JavaType {
+func TypeOfExpression(expr java.Expression) java.JavaType {
 	if expr == nil {
 		return nil
 	}
 	switch n := expr.(type) {
-	case *tree.Identifier:
+	case *java.Identifier:
 		return n.Type
-	case *tree.Literal:
+	case *java.Literal:
 		return n.Type
-	case *tree.Binary:
+	case *java.Binary:
 		return n.Type
-	case *tree.Unary:
+	case *java.Unary:
 		return n.Type
-	case *tree.FieldAccess:
+	case *java.FieldAccess:
 		return n.Type
-	case *tree.TypeCast:
+	case *java.TypeCast:
 		return n.Type
-	case *tree.ArrayAccess:
+	case *java.ArrayAccess:
 		return n.Type
-	case *tree.Parentheses:
+	case *java.Parentheses:
 		return n.Type
-	case *tree.MethodInvocation:
+	case *java.MethodInvocation:
 		if n.MethodType != nil {
 			return n.MethodType.ReturnType
 		}
-	case *tree.Assignment:
+	case *java.Assignment:
 		return n.Type
-	case *tree.AssignmentOperation:
+	case *java.AssignmentOperation:
 		return n.Type
 	}
 	return nil
@@ -220,13 +220,13 @@ func TypeOfExpression(expr tree.Expression) tree.JavaType {
 // DeclaringTypeFQN extracts the declaring type's FQN from a MethodInvocation.
 // For `fmt.Println(...)`, this returns "fmt" (the package path).
 // For `t.Sub(...)`, this returns the type of the receiver.
-func DeclaringTypeFQN(mi *tree.MethodInvocation) string {
+func DeclaringTypeFQN(mi *java.MethodInvocation) string {
 	if mi.MethodType != nil && mi.MethodType.DeclaringType != nil {
 		return mi.MethodType.DeclaringType.GetFullyQualifiedName()
 	}
 	// Fallback: infer from Select expression
 	if mi.Select != nil {
-		if ident, ok := mi.Select.Element.(*tree.Identifier); ok {
+		if ident, ok := mi.Select.Element.(*java.Identifier); ok {
 			// Package-qualified call: fmt.Println -> "fmt"
 			return ident.Name
 		}

@@ -892,6 +892,98 @@ public interface Proto extends Tree {
         }
     }
 
+    /**
+     * A proto2 group, e.g. {@code optional group OptionalGroup = 4 { ... }}. Groups are a deprecated
+     * proto2 feature that declare both a field and a nested message type in a single construct.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Group implements Proto {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        /**
+         * The {@code optional}, {@code required}, or {@code repeated} label.
+         */
+        @With
+        @Getter
+        Keyword label;
+
+        /**
+         * The {@code group} keyword.
+         */
+        @With
+        @Getter
+        Keyword group;
+
+        ProtoRightPadded<Identifier> name;
+
+        public Identifier getName() {
+            return name.getElement();
+        }
+
+        public Group withName(Identifier name) {
+            return getPadding().withName(this.name.withElement(name));
+        }
+
+        @With
+        @Getter
+        Constant number;
+
+        @With
+        @Getter
+        Block body;
+
+        @Override
+        public <P> Proto acceptProto(ProtoVisitor<P> v, P p) {
+            return v.visitGroup(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Group t;
+
+            public ProtoRightPadded<Identifier> getName() {
+                return t.name;
+            }
+
+            public Group withName(ProtoRightPadded<Identifier> name) {
+                return t.name == name ? t : new Group(t.id, t.prefix, t.markers, t.label, t.group, name, t.number, t.body);
+            }
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With

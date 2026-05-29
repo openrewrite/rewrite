@@ -165,8 +165,15 @@ github.com/c/d v2.0.0 h1:hashC=
 }
 
 func TestParseGoSumEmptyInput(t *testing.T) {
-	if got := parser.ParseGoSum(""); got != nil {
-		t.Errorf("want nil for empty input, got %+v", got)
+	// Empty input must yield a non-nil empty slice: callers assign the result
+	// directly to GoResolutionResult.ResolvedDependencies, and a nil slice
+	// would be serialized as a null list and break the LST write.
+	got := parser.ParseGoSum("")
+	if got == nil {
+		t.Error("want non-nil empty slice for empty input, got nil")
+	}
+	if len(got) != 0 {
+		t.Errorf("want empty slice for empty input, got %+v", got)
 	}
 }
 
@@ -210,5 +217,57 @@ func TestGoProjectMergesGoSumIntoGoModMarker(t *testing.T) {
 	}
 	if rd.ModuleHash == "" || rd.GoModHash == "" {
 		t.Errorf("expected both ModuleHash and GoModHash populated: %+v", rd)
+	}
+}
+
+// TestParseGoModDirectiveListsNeverNil guards the root cause of the Moderne CLI
+// Go build LST serialization failure: a go.mod that omits a directive must still
+// yield non-nil (empty) slices. The RPC send codec serializes a nil slice as a
+// null list, which the Java receive side stores as a null field, and the Moderne
+// reflective binary LST serializer then NPEs calling items.size() on it.
+func TestParseGoModDirectiveListsNeverNil(t *testing.T) {
+	mrr, err := parser.ParseGoMod("go.mod", "module example.com/foo\n\ngo 1.22\n")
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if mrr.Requires == nil {
+		t.Error("Requires is nil; want non-nil empty slice")
+	}
+	if mrr.Replaces == nil {
+		t.Error("Replaces is nil; want non-nil empty slice")
+	}
+	if mrr.Excludes == nil {
+		t.Error("Excludes is nil; want non-nil empty slice")
+	}
+	if mrr.Retracts == nil {
+		t.Error("Retracts is nil; want non-nil empty slice")
+	}
+	if mrr.ResolvedDependencies == nil {
+		t.Error("ResolvedDependencies is nil; want non-nil empty slice")
+	}
+}
+
+// TestParseGoModRequireButNoReplace covers the gin/cobra/zap failure shape: a
+// require block is present but replace/exclude/retract/resolved are absent and
+// must still be non-nil empty slices.
+func TestParseGoModRequireButNoReplace(t *testing.T) {
+	mrr, err := parser.ParseGoMod("go.mod", "module example.com/foo\n\ngo 1.22\n\nrequire github.com/x/y v1.2.3\n")
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if len(mrr.Requires) != 1 {
+		t.Fatalf("Requires len: want 1, got %d", len(mrr.Requires))
+	}
+	if mrr.Replaces == nil {
+		t.Error("Replaces is nil; want non-nil empty slice")
+	}
+	if mrr.Excludes == nil {
+		t.Error("Excludes is nil; want non-nil empty slice")
+	}
+	if mrr.Retracts == nil {
+		t.Error("Retracts is nil; want non-nil empty slice")
+	}
+	if mrr.ResolvedDependencies == nil {
+		t.Error("ResolvedDependencies is nil; want non-nil empty slice")
 	}
 }

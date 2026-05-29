@@ -20,12 +20,13 @@ import (
 	"testing"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // TestGoProjectTagsGoSiblingsButNotMod confirms the Go-side test harness
 // matches the Java-side Assertions.goProject(...) shape: a project wrapper
-// tags every .go sibling with a tree.GoProject marker, and the go.mod
+// tags every .go sibling with a golang.GoProject marker, and the go.mod
 // sibling round-trips verbatim (Go-side go.mod parsing is a follow-up).
 func TestGoProjectTagsGoSiblingsButNotMod(t *testing.T) {
 	goSrc := test.Golang(`
@@ -33,7 +34,7 @@ func TestGoProjectTagsGoSiblingsButNotMod(t *testing.T) {
 
 		func main() {}
 	`)
-	goSrc.AfterRecipe = func(t *testing.T, cu *tree.CompilationUnit) {
+	goSrc.AfterRecipe = func(t *testing.T, cu *golang.CompilationUnit) {
 		t.Helper()
 		project, ok := findGoProject(cu.Markers)
 		if !ok {
@@ -66,7 +67,7 @@ func TestGoProjectMixesWithBareGolangSpecs(t *testing.T) {
 
 		func main() {}
 	`)
-	wrapped.AfterRecipe = func(t *testing.T, cu *tree.CompilationUnit) {
+	wrapped.AfterRecipe = func(t *testing.T, cu *golang.CompilationUnit) {
 		t.Helper()
 		if _, ok := findGoProject(cu.Markers); !ok {
 			t.Fatal("wrapped source should carry GoProject marker")
@@ -78,7 +79,7 @@ func TestGoProjectMixesWithBareGolangSpecs(t *testing.T) {
 
 		func main() {}
 	`)
-	bare.AfterRecipe = func(t *testing.T, cu *tree.CompilationUnit) {
+	bare.AfterRecipe = func(t *testing.T, cu *golang.CompilationUnit) {
 		t.Helper()
 		if _, ok := findGoProject(cu.Markers); ok {
 			t.Fatal("bare source should NOT carry GoProject marker")
@@ -94,11 +95,11 @@ func TestGoProjectMixesWithBareGolangSpecs(t *testing.T) {
 
 // findGoProject is a small lookup helper that mirrors what real recipes
 // would do: scan a tree's Markers for a GoProject and return it.
-func findGoProject(m tree.Markers) (tree.GoProject, bool) {
+func findGoProject(m java.Markers) (golang.GoProject, bool) {
 	for _, e := range m.Entries {
-		if p, ok := e.(tree.GoProject); ok {
+		if p, ok := e.(golang.GoProject); ok {
 			return p, true
 		}
 	}
-	return tree.GoProject{}, false
+	return golang.GoProject{}, false
 }

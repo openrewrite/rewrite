@@ -19,21 +19,22 @@ package preconditions
 import (
 	"testing"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // newSourceFile returns a fresh CompilationUnit pointer to use as the
 // source-file sentinel. Each call returns a distinct identity so a
 // "marking" visitor can return a different value.
-func newSourceFile() tree.Tree {
-	return &tree.CompilationUnit{}
+func newSourceFile() java.Tree {
+	return &golang.CompilationUnit{}
 }
 
 // recordingVisitor is a TreeVisitor that returns the same tree, recording
 // each call. Simulates a precondition that does NOT match.
 type recordingVisitor struct{ calls int }
 
-func (r *recordingVisitor) Visit(t tree.Tree, _ any) tree.Tree {
+func (r *recordingVisitor) Visit(t java.Tree, _ any) java.Tree {
 	r.calls++
 	return t
 }
@@ -43,7 +44,7 @@ func (r *recordingVisitor) Visit(t tree.Tree, _ any) tree.Tree {
 // (e.g. by adding a SearchResult marker).
 type markingVisitor struct{ calls int }
 
-func (m *markingVisitor) Visit(t tree.Tree, _ any) tree.Tree {
+func (m *markingVisitor) Visit(t java.Tree, _ any) java.Tree {
 	m.calls++
 	return newSourceFile() // different identity from the input
 }

@@ -62,8 +62,12 @@ messageField
   : (OPTIONAL | REQUIRED | REPEATED) field
   ;
 
+group
+  : (OPTIONAL | REQUIRED | REPEATED) GROUP ident ASSIGN IntegerLiteral messageBody
+  ;
+
 messageBody
-  : LBRACE (messageField | enumDefinition | extend | message | optionDef | oneOf | mapField | reserved | emptyStatement)* RBRACE
+  : LBRACE (messageField | group | enumDefinition | extend | message | optionDef | oneOf | mapField | reserved | emptyStatement)* RBRACE
   ;
 
 extend

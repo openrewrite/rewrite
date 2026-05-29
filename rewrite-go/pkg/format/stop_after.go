@@ -19,17 +19,17 @@
 //
 //   - TabsAndIndentsVisitor    — re-indent post-newline whitespace
 //   - BlankLinesVisitor        — collapse runs of >1 blank line and trim
-//                                blank lines at block boundaries
+//     blank lines at block boundaries
 //   - SpacesVisitor            — token-level spacing fixes (binary operators,
-//                                commas, etc.)
+//     commas, etc.)
 //   - RemoveTrailingWhitespaceVisitor — strip trailing space/tab from
-//                                       line endings inside Whitespace
+//     line endings inside Whitespace
 //
 // AutoFormatVisitor composes the four into a fixed pipeline via
 // DoAfterVisit. Each is independently usable for recipes that only need
 // one pass.
 //
-// All visitors honor a `stopAfter tree.Tree` parameter: when non-nil,
+// All visitors honor a `stopAfter java.Tree` parameter: when non-nil,
 // traversal halts after the given node has been visited, leaving
 // downstream subtrees untouched. When nil, the entire visited subtree
 // is processed.
@@ -42,7 +42,7 @@
 package format
 
 import (
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // stopAfterTracker is embedded by every format visitor to share the
@@ -50,7 +50,7 @@ import (
 // fully visited, halted flips to true and subsequent Visit calls
 // short-circuit.
 type stopAfterTracker struct {
-	stopAfter tree.Tree
+	stopAfter java.Tree
 	halted    bool
 }
 
@@ -65,7 +65,7 @@ func (s *stopAfterTracker) shouldHalt() bool {
 // halted once the configured stopAfter node is encountered. Call this
 // at the END of each Visit method (after recursing into children) so
 // the stopAfter subtree is processed before halting kicks in.
-func (s *stopAfterTracker) noteVisited(t tree.Tree) {
+func (s *stopAfterTracker) noteVisited(t java.Tree) {
 	if s.halted || s.stopAfter == nil || t == nil {
 		return
 	}

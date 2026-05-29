@@ -190,9 +190,9 @@ func SanitizeScope(scope string) string {
 // One file per (recipe, dataTable, group) tuple, opened append-mode and
 // kept open for the store's lifetime.
 type CsvDataTableStore struct {
-	outputDir string
-	mu        sync.Mutex
-	files     map[string]*os.File
+	outputDir  string
+	mu         sync.Mutex
+	files      map[string]*os.File
 	dataTables map[string]DataTableLike
 }
 
