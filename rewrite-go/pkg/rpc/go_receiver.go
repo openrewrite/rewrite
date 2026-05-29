@@ -144,9 +144,7 @@ func (r *GoReceiver) VisitCompilationUnit(cu *golang.CompilationUnit, p any) jav
 		}
 	}
 	// EOF
-	if result := q.Receive(cu.EOF, func(v any) any { return receiveSpace(v.(java.Space), q) }); result != nil {
-		cu.EOF = result.(java.Space)
-	}
+	cu.EOF = receiveValue(q, cu.EOF, func(e java.Space) any { return receiveSpace(e, q) })
 	return cu
 }
 
@@ -154,10 +152,7 @@ func (r *GoReceiver) VisitGoStmt(gs *golang.GoStmt, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *gs // shallow copy to avoid mutating remoteObjects baseline
 	gs = &c
-	result := q.Receive(gs.Expr, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		gs.Expr = result.(java.Expression)
-	}
+	gs.Expr = receiveValue(q, gs.Expr, func(e java.Expression) any { return r.Visit(e, q) })
 	return gs
 }
 
@@ -165,10 +160,7 @@ func (r *GoReceiver) VisitDefer(d *golang.Defer, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *d // shallow copy to avoid mutating remoteObjects baseline
 	d = &c
-	result := q.Receive(d.Expr, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		d.Expr = result.(java.Expression)
-	}
+	d.Expr = receiveValue(q, d.Expr, func(e java.Expression) any { return r.Visit(e, q) })
 	return d
 }
 
@@ -176,10 +168,7 @@ func (r *GoReceiver) VisitSend(sn *golang.Send, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *sn // shallow copy to avoid mutating remoteObjects baseline
 	sn = &c
-	result := q.Receive(sn.Channel, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		sn.Channel = result.(java.Expression)
-	}
+	sn.Channel = receiveValue(q, sn.Channel, func(e java.Expression) any { return r.Visit(e, q) })
 	if result := q.Receive(sn.Arrow, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
 		sn.Arrow = result.(java.LeftPadded[java.Expression])
 	}
@@ -190,10 +179,7 @@ func (r *GoReceiver) VisitGoto(g *golang.Goto, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *g // shallow copy to avoid mutating remoteObjects baseline
 	g = &c
-	result := q.Receive(g.Label, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		g.Label = result.(*java.Identifier)
-	}
+	g.Label = receiveValue(q, g.Label, func(e *java.Identifier) any { return r.Visit(e, q) })
 	return g
 }
 
@@ -208,10 +194,7 @@ func (r *GoReceiver) VisitComposite(comp *golang.Composite, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *comp // shallow copy to avoid mutating remoteObjects baseline
 	comp = &c
-	result := q.Receive(comp.TypeExpr, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		comp.TypeExpr = result.(java.Expression)
-	}
+	comp.TypeExpr = receiveValue(q, comp.TypeExpr, func(e java.Expression) any { return r.Visit(e, q) })
 	if result := q.Receive(comp.Elements, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
 		comp.Elements = result.(java.Container[java.Expression])
 	}
@@ -222,10 +205,7 @@ func (r *GoReceiver) VisitKeyValue(kv *golang.KeyValue, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *kv // shallow copy to avoid mutating remoteObjects baseline
 	kv = &c
-	result := q.Receive(kv.Key, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		kv.Key = result.(java.Expression)
-	}
+	kv.Key = receiveValue(q, kv.Key, func(e java.Expression) any { return r.Visit(e, q) })
 	if result := q.Receive(kv.Value, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
 		kv.Value = result.(java.LeftPadded[java.Expression])
 	}
@@ -236,26 +216,16 @@ func (r *GoReceiver) VisitSlice(sl *golang.Slice, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *sl // shallow copy to avoid mutating remoteObjects baseline
 	sl = &c
-	result := q.Receive(sl.Indexed, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		sl.Indexed = result.(java.Expression)
-	}
-	if result := q.Receive(sl.OpenBracket, func(v any) any { return receiveSpace(v.(java.Space), q) }); result != nil {
-		sl.OpenBracket = result.(java.Space)
-	}
+	sl.Indexed = receiveValue(q, sl.Indexed, func(e java.Expression) any { return r.Visit(e, q) })
+	sl.OpenBracket = receiveValue(q, sl.OpenBracket, func(e java.Space) any { return receiveSpace(e, q) })
 	if result := q.Receive(sl.Low, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
 		sl.Low = coerceToExpressionRP(result)
 	}
 	if result := q.Receive(sl.High, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
 		sl.High = coerceToExpressionRP(result)
 	}
-	max := q.Receive(sl.Max, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if max != nil {
-		sl.Max = max.(java.Expression)
-	}
-	if result := q.Receive(sl.CloseBracket, func(v any) any { return receiveSpace(v.(java.Space), q) }); result != nil {
-		sl.CloseBracket = result.(java.Space)
-	}
+	sl.Max = receiveValue(q, sl.Max, func(e java.Expression) any { return r.Visit(e, q) })
+	sl.CloseBracket = receiveValue(q, sl.CloseBracket, func(e java.Space) any { return receiveSpace(e, q) })
 	return sl
 }
 
@@ -263,16 +233,11 @@ func (r *GoReceiver) VisitMapType(mt *golang.MapType, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *mt // shallow copy to avoid mutating remoteObjects baseline
 	mt = &c
-	if result := q.Receive(mt.OpenBracket, func(v any) any { return receiveSpace(v.(java.Space), q) }); result != nil {
-		mt.OpenBracket = result.(java.Space)
-	}
+	mt.OpenBracket = receiveValue(q, mt.OpenBracket, func(e java.Space) any { return receiveSpace(e, q) })
 	if result := q.Receive(mt.Key, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
 		mt.Key = coerceToExpressionRP(result)
 	}
-	result := q.Receive(mt.Value, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		mt.Value = result.(java.Expression)
-	}
+	mt.Value = receiveValue(q, mt.Value, func(e java.Expression) any { return r.Visit(e, q) })
 	return mt
 }
 
@@ -280,10 +245,7 @@ func (r *GoReceiver) VisitStatementExpression(se *golang.StatementExpression, p 
 	q := p.(*ReceiveQueue)
 	c := *se
 	se = &c
-	result := q.Receive(se.Statement, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		se.Statement = result.(java.Statement)
-	}
+	se.Statement = receiveValue(q, se.Statement, func(e java.Statement) any { return r.Visit(e, q) })
 	return se
 }
 
@@ -291,10 +253,7 @@ func (r *GoReceiver) VisitPointerType(pt *golang.PointerType, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *pt
 	pt = &c
-	result := q.Receive(pt.Elem, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		pt.Elem = result.(java.Expression)
-	}
+	pt.Elem = receiveValue(q, pt.Elem, func(e java.Expression) any { return r.Visit(e, q) })
 	return pt
 }
 
@@ -311,10 +270,7 @@ func (r *GoReceiver) VisitChannel(ch *golang.Channel, p any) java.J {
 	case "RECV_ONLY":
 		ch.Dir = golang.ChanRecvOnly
 	}
-	result := q.Receive(ch.Value, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		ch.Value = result.(java.Expression)
-	}
+	ch.Value = receiveValue(q, ch.Value, func(e java.Expression) any { return r.Visit(e, q) })
 	return ch
 }
 
@@ -325,10 +281,7 @@ func (r *GoReceiver) VisitFuncType(ft *golang.FuncType, p any) java.J {
 	if result := q.Receive(ft.Parameters, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
 		ft.Parameters = result.(java.Container[java.Statement])
 	}
-	result := q.Receive(ft.ReturnType, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		ft.ReturnType = result.(java.Expression)
-	}
+	ft.ReturnType = receiveValue(q, ft.ReturnType, func(e java.Expression) any { return r.Visit(e, q) })
 	return ft
 }
 
@@ -336,10 +289,7 @@ func (r *GoReceiver) VisitStructType(st *golang.StructType, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *st // shallow copy to avoid mutating remoteObjects baseline
 	st = &c
-	result := q.Receive(st.Body, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		st.Body = result.(*java.Block)
-	}
+	st.Body = receiveValue(q, st.Body, func(e *java.Block) any { return r.Visit(e, q) })
 	return st
 }
 
@@ -347,10 +297,7 @@ func (r *GoReceiver) VisitInterfaceType(it *golang.InterfaceType, p any) java.J 
 	q := p.(*ReceiveQueue)
 	c := *it // shallow copy to avoid mutating remoteObjects baseline
 	it = &c
-	result := q.Receive(it.Body, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		it.Body = result.(*java.Block)
-	}
+	it.Body = receiveValue(q, it.Body, func(e *java.Block) any { return r.Visit(e, q) })
 	return it
 }
 
@@ -386,10 +333,7 @@ func (r *GoReceiver) VisitUnderlyingType(ut *golang.UnderlyingType, p any) java.
 	q := p.(*ReceiveQueue)
 	c := *ut // shallow copy to avoid mutating remoteObjects baseline
 	ut = &c
-	result := q.Receive(ut.Element, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		ut.Element = result.(java.Expression)
-	}
+	ut.Element = receiveValue(q, ut.Element, func(e java.Expression) any { return r.Visit(e, q) })
 	return ut
 }
 
@@ -411,16 +355,9 @@ func (r *GoReceiver) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 			}
 		}
 	}
-	result := q.Receive(td.Name, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		td.Name = result.(*java.Identifier)
-	}
+	td.Name = receiveValue(q, td.Name, func(e *java.Identifier) any { return r.Visit(e, q) })
 	// typeParameters
-	if tpResult := q.Receive(td.TypeParameters, func(v any) any { return r.Visit(v.(java.Tree), q) }); tpResult != nil {
-		td.TypeParameters = tpResult.(*java.TypeParameters)
-	} else {
-		td.TypeParameters = nil
-	}
+	td.TypeParameters = receiveValue(q, td.TypeParameters, func(e *java.TypeParameters) any { return r.Visit(e, q) })
 	var beforeAssign any
 	if td.Assign != nil {
 		beforeAssign = *td.Assign
@@ -431,10 +368,7 @@ func (r *GoReceiver) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 	} else {
 		td.Assign = nil
 	}
-	defResult := q.Receive(td.Definition, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if defResult != nil {
-		td.Definition = defResult.(java.Expression)
-	}
+	td.Definition = receiveValue(q, td.Definition, func(e java.Expression) any { return r.Visit(e, q) })
 	var beforeSpecs any
 	if td.Specs != nil {
 		beforeSpecs = *td.Specs
@@ -487,13 +421,8 @@ func (r *GoReceiver) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *cc // shallow copy to avoid mutating remoteObjects baseline
 	cc = &c
-	result := q.Receive(cc.Comm, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		cc.Comm = result.(java.Statement)
-	}
-	if result := q.Receive(cc.Colon, func(v any) any { return receiveSpace(v.(java.Space), q) }); result != nil {
-		cc.Colon = result.(java.Space)
-	}
+	cc.Comm = receiveValue(q, cc.Comm, func(e java.Statement) any { return r.Visit(e, q) })
+	cc.Colon = receiveValue(q, cc.Colon, func(e java.Space) any { return receiveSpace(e, q) })
 	// Body
 	beforeBody := make([]any, len(cc.Body))
 	for i, s := range cc.Body {
@@ -513,10 +442,7 @@ func (r *GoReceiver) VisitIndexList(il *golang.IndexList, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *il // shallow copy to avoid mutating remoteObjects baseline
 	il = &c
-	result := q.Receive(il.Target, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		il.Target = result.(java.Expression)
-	}
+	il.Target = receiveValue(q, il.Target, func(e java.Expression) any { return r.Visit(e, q) })
 	if result := q.Receive(il.Indices, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
 		il.Indices = result.(java.Container[java.Expression])
 	}

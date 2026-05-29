@@ -141,15 +141,9 @@ func (r *JavaReceiver) VisitBinary(b *java.Binary, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *b // shallow copy to avoid mutating remoteObjects baseline
 	b = &c
-	result := q.Receive(b.Left, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		b.Left = result.(java.Expression)
-	}
+	b.Left = receiveValue(q, b.Left, func(e java.Expression) any { return r.Visit(e, q) })
 	b.Operator = receiveLeftPaddedEnum(r, q, b.Operator, java.ParseBinaryOperator)
-	rightResult := q.Receive(b.Right, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if rightResult != nil {
-		b.Right = rightResult.(java.Expression)
-	}
+	b.Right = receiveValue(q, b.Right, func(e java.Expression) any { return r.Visit(e, q) })
 	b.Type = r.receiveType(b.Type, q)
 	return b
 }
@@ -173,11 +167,7 @@ func (r *JavaReceiver) VisitBlock(b *java.Block, p any) java.J {
 		}
 	}
 	// end space
-	if result := q.Receive(b.End, func(v any) any {
-		return receiveSpace(v.(java.Space), q)
-	}); result != nil {
-		b.End = result.(java.Space)
-	}
+	b.End = receiveValue(q, b.End, func(e java.Space) any { return receiveSpace(e, q) })
 	return b
 }
 
@@ -187,9 +177,7 @@ func (r *JavaReceiver) VisitAnnotation(ann *java.Annotation, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *ann // shallow copy to avoid mutating remoteObjects baseline
 	ann = &c
-	if result := q.Receive(ann.AnnotationType, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
-		ann.AnnotationType = result.(java.Expression)
-	}
+	ann.AnnotationType = receiveValue(q, ann.AnnotationType, func(e java.Expression) any { return r.Visit(e, q) })
 	var beforeArgs any
 	if ann.Arguments != nil {
 		beforeArgs = *ann.Arguments
@@ -208,10 +196,7 @@ func (r *JavaReceiver) VisitUnary(u *java.Unary, p any) java.J {
 	c := *u // shallow copy to avoid mutating remoteObjects baseline
 	u = &c
 	u.Operator = receiveLeftPaddedEnum(r, q, u.Operator, java.ParseUnaryOperator)
-	result := q.Receive(u.Operand, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		u.Operand = result.(java.Expression)
-	}
+	u.Operand = receiveValue(q, u.Operand, func(e java.Expression) any { return r.Visit(e, q) })
 	u.Type = r.receiveType(u.Type, q)
 	return u
 }
@@ -220,10 +205,7 @@ func (r *JavaReceiver) VisitFieldAccess(fa *java.FieldAccess, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *fa // shallow copy to avoid mutating remoteObjects baseline
 	fa = &c
-	result := q.Receive(fa.Target, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		fa.Target = result.(java.Expression)
-	}
+	fa.Target = receiveValue(q, fa.Target, func(e java.Expression) any { return r.Visit(e, q) })
 	if result := q.Receive(fa.Name, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
 		fa.Name = coerceLeftPaddedIdent(result)
 	}
@@ -249,10 +231,7 @@ func (r *JavaReceiver) VisitMethodInvocation(mi *java.MethodInvocation, p any) j
 	// typeParameters (nil for Go)
 	q.Receive(nil, nil)
 	// name
-	result := q.Receive(mi.Name, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		mi.Name = result.(*java.Identifier)
-	}
+	mi.Name = receiveValue(q, mi.Name, func(e *java.Identifier) any { return r.Visit(e, q) })
 	// arguments
 	if result := q.Receive(mi.Arguments, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
 		mi.Arguments = result.(java.Container[java.Expression])
@@ -271,10 +250,7 @@ func (r *JavaReceiver) VisitAssignment(a *java.Assignment, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *a // shallow copy to avoid mutating remoteObjects baseline
 	a = &c
-	result := q.Receive(a.Variable, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		a.Variable = result.(java.Expression)
-	}
+	a.Variable = receiveValue(q, a.Variable, func(e java.Expression) any { return r.Visit(e, q) })
 	if result := q.Receive(a.Value, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
 		a.Value = result.(java.LeftPadded[java.Expression])
 	}
@@ -286,15 +262,9 @@ func (r *JavaReceiver) VisitAssignmentOperation(a *java.AssignmentOperation, p a
 	q := p.(*ReceiveQueue)
 	c := *a // shallow copy to avoid mutating remoteObjects baseline
 	a = &c
-	result := q.Receive(a.Variable, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		a.Variable = result.(java.Expression)
-	}
+	a.Variable = receiveValue(q, a.Variable, func(e java.Expression) any { return r.Visit(e, q) })
 	a.Operator = receiveLeftPaddedEnum(r, q, a.Operator, java.ParseAssignmentOperator)
-	assignResult := q.Receive(a.Assignment, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if assignResult != nil {
-		a.Assignment = assignResult.(java.Expression)
-	}
+	a.Assignment = receiveValue(q, a.Assignment, func(e java.Expression) any { return r.Visit(e, q) })
 	a.Type = r.receiveType(a.Type, q)
 	return a
 }
@@ -320,23 +290,13 @@ func (r *JavaReceiver) VisitMethodDeclaration(md *java.MethodDeclaration, p any)
 	// modifiers
 	q.ReceiveList(nil, nil)
 	// typeParameters
-	if tpResult := q.Receive(md.TypeParameters, func(v any) any { return r.Visit(v.(java.Tree), q) }); tpResult != nil {
-		md.TypeParameters = tpResult.(*java.TypeParameters)
-	} else {
-		md.TypeParameters = nil
-	}
+	md.TypeParameters = receiveValue(q, md.TypeParameters, func(e *java.TypeParameters) any { return r.Visit(e, q) })
 	// returnTypeExpression
-	result := q.Receive(md.ReturnType, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		md.ReturnType = result.(java.Expression)
-	}
+	md.ReturnType = receiveValue(q, md.ReturnType, func(e java.Expression) any { return r.Visit(e, q) })
 	// name annotations
 	q.ReceiveList(nil, nil)
 	// name
-	nameResult := q.Receive(md.Name, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if nameResult != nil {
-		md.Name = nameResult.(*java.Identifier)
-	}
+	md.Name = receiveValue(q, md.Name, func(e *java.Identifier) any { return r.Visit(e, q) })
 	// parameters
 	if result := q.Receive(md.Parameters, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
 		md.Parameters = result.(java.Container[java.Statement])
@@ -346,10 +306,7 @@ func (r *JavaReceiver) VisitMethodDeclaration(md *java.MethodDeclaration, p any)
 	// throws
 	q.Receive(nil, nil)
 	// body
-	bodyResult := q.Receive(md.Body, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if bodyResult != nil {
-		md.Body = bodyResult.(*java.Block)
-	}
+	md.Body = receiveValue(q, md.Body, func(e *java.Block) any { return r.Visit(e, q) })
 	// defaultValue
 	q.Receive(nil, nil)
 	// methodType
@@ -392,9 +349,7 @@ func (r *JavaReceiver) VisitTypeParameter(tp *java.TypeParameter, p any) java.J 
 	// modifiers
 	q.ReceiveList(nil, nil)
 	// name
-	if result := q.Receive(tp.Name, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
-		tp.Name = result.(java.Expression)
-	}
+	tp.Name = receiveValue(q, tp.Name, func(e java.Expression) any { return r.Visit(e, q) })
 	// bounds (container; nil when the parameter shares a sibling's constraint).
 	// Pass the value Container baseline (not the *Container) so the padding
 	// accessors recognize it.
@@ -432,17 +387,13 @@ func (r *JavaReceiver) VisitVariableDeclarations(vd *java.VariableDeclarations, 
 	// modifiers
 	q.ReceiveList(nil, nil)
 	// typeExpression
-	result := q.Receive(vd.TypeExpr, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		vd.TypeExpr = result.(java.Expression)
-	}
+	vd.TypeExpr = receiveValue(q, vd.TypeExpr, func(e java.Expression) any { return r.Visit(e, q) })
 	// varargs
 	var currentVarargs any
 	if vd.Varargs != nil {
 		currentVarargs = *vd.Varargs
 	}
-	varargsResult := q.Receive(currentVarargs, func(v any) any { return receiveSpace(v.(java.Space), q) })
-	if varargsResult != nil {
+	if varargsResult := q.Receive(currentVarargs, func(v any) any { return receiveSpace(v.(java.Space), q) }); varargsResult != nil {
 		sp := varargsResult.(java.Space)
 		vd.Varargs = &sp
 	}
@@ -466,10 +417,7 @@ func (r *JavaReceiver) VisitVariableDeclarator(vd *java.VariableDeclarator, p an
 	c := *vd // shallow copy to avoid mutating remoteObjects baseline
 	vd = &c
 	// declarator (name)
-	result := q.Receive(vd.Name, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		vd.Name = result.(*java.Identifier)
-	}
+	vd.Name = receiveValue(q, vd.Name, func(e *java.Identifier) any { return r.Visit(e, q) })
 	// dimensionsAfterName
 	q.ReceiveList(nil, nil)
 	// initializer
@@ -496,8 +444,7 @@ func (r *JavaReceiver) VisitReturn(ret *java.Return, p any) java.J {
 	if len(ret.Expressions) > 0 {
 		beforeExpr = ret.Expressions[0].Element
 	}
-	result := q.Receive(beforeExpr, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
+	if result := q.Receive(beforeExpr, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
 		expr := result.(java.Expression)
 		if len(ret.Expressions) > 0 {
 			ret.Expressions[0] = java.RightPadded[java.Expression]{
@@ -531,8 +478,7 @@ func (r *JavaReceiver) VisitIf(i *java.If, p any) java.J {
 			Tree:    java.RightPadded[java.Expression]{Element: i.Condition},
 		}
 	}
-	cpResult := q.Receive(beforeCP, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if cpResult != nil {
+	if cpResult := q.Receive(beforeCP, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
 		if cp, ok := cpResult.(*java.ControlParentheses); ok {
 			i.ConditionCP = cp
 			i.Condition = cp.Tree.Element
@@ -548,8 +494,7 @@ func (r *JavaReceiver) VisitIf(i *java.If, p any) java.J {
 		}
 	}
 	// elsePart - Java sends Else node, convert to RightPadded
-	elseResult := q.Receive(nil, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if elseResult != nil {
+	if elseResult := q.Receive(nil, func(v any) any { return r.Visit(v.(java.Tree), q) }); elseResult != nil {
 		el := elseResult.(*java.Else)
 		i.ElsePart = &java.RightPadded[java.J]{
 			Element: el.Body.Element,
@@ -576,8 +521,7 @@ func (r *JavaReceiver) VisitForLoop(f *java.ForLoop, p any) java.J {
 	c := *f // shallow copy to avoid mutating remoteObjects baseline
 	f = &c
 	ctrl := &f.Control
-	result := q.Receive(ctrl, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
+	if result := q.Receive(ctrl, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
 		f.Control = *result.(*java.ForControl)
 	}
 	// body - Java sends RightPadded<Statement> wrapping the Block
@@ -637,8 +581,7 @@ func (r *JavaReceiver) VisitForEachLoop(f *java.ForEachLoop, p any) java.J {
 	c := *f // shallow copy to avoid mutating remoteObjects baseline
 	f = &c
 	ctrl := &f.Control
-	result := q.Receive(ctrl, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
+	if result := q.Receive(ctrl, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
 		f.Control = *result.(*java.ForEachControl)
 	}
 	// body - Java sends RightPadded<Statement> wrapping the Block
@@ -680,10 +623,7 @@ func (r *JavaReceiver) VisitForEachControl(fc *java.ForEachControl, p any) java.
 	// operator (left-padded AssignOp enum)
 	fc.Operator = receiveLeftPaddedEnum(r, q, fc.Operator, parseAssignOpDefaulting)
 	// iterable
-	result := q.Receive(fc.Iterable, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		fc.Iterable = result.(java.Expression)
-	}
+	fc.Iterable = receiveValue(q, fc.Iterable, func(e java.Expression) any { return r.Visit(e, q) })
 	return fc
 }
 
@@ -692,8 +632,7 @@ func (r *JavaReceiver) VisitSwitch(sw *java.Switch, p any) java.J {
 	c := *sw // shallow copy to avoid mutating remoteObjects baseline
 	sw = &c
 	// selector - Java sends ControlParentheses, extract inner Expression for Tag
-	cpResult := q.Receive(nil, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if cpResult != nil {
+	if cpResult := q.Receive(nil, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
 		if cp, ok := cpResult.(*java.ControlParentheses); ok {
 			if _, isEmpty := cp.Tree.Element.(*java.Empty); !isEmpty {
 				sw.Tag = &java.RightPadded[java.Expression]{
@@ -703,10 +642,7 @@ func (r *JavaReceiver) VisitSwitch(sw *java.Switch, p any) java.J {
 			}
 		}
 	}
-	result := q.Receive(sw.Body, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		sw.Body = result.(*java.Block)
-	}
+	sw.Body = receiveValue(q, sw.Body, func(e *java.Block) any { return r.Visit(e, q) })
 	return sw
 }
 
@@ -732,10 +668,7 @@ func (r *JavaReceiver) VisitBreak(b *java.Break, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *b // shallow copy to avoid mutating remoteObjects baseline
 	b = &c
-	result := q.Receive(b.Label, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		b.Label = result.(*java.Identifier)
-	}
+	b.Label = receiveValue(q, b.Label, func(e *java.Identifier) any { return r.Visit(e, q) })
 	return b
 }
 
@@ -743,10 +676,7 @@ func (r *JavaReceiver) VisitContinue(cont *java.Continue, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *cont // shallow copy to avoid mutating remoteObjects baseline
 	cont = &c
-	result := q.Receive(cont.Label, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		cont.Label = result.(*java.Identifier)
-	}
+	cont.Label = receiveValue(q, cont.Label, func(e *java.Identifier) any { return r.Visit(e, q) })
 	return cont
 }
 
@@ -757,10 +687,7 @@ func (r *JavaReceiver) VisitLabel(l *java.Label, p any) java.J {
 	if result := q.Receive(l.Name, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
 		l.Name = coerceRightPaddedTyped[*java.Identifier](result)
 	}
-	result := q.Receive(l.Statement, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		l.Statement = result.(java.Statement)
-	}
+	l.Statement = receiveValue(q, l.Statement, func(e java.Statement) any { return r.Visit(e, q) })
 	return l
 }
 
@@ -768,10 +695,7 @@ func (r *JavaReceiver) VisitArrayType(at *java.ArrayType, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *at // shallow copy to avoid mutating remoteObjects baseline
 	at = &c
-	result := q.Receive(at.ElementType, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		at.ElementType = result.(java.Expression)
-	}
+	at.ElementType = receiveValue(q, at.ElementType, func(e java.Expression) any { return r.Visit(e, q) })
 	q.ReceiveList(nil, nil) // annotations
 	if result := q.Receive(at.Dimension, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
 		at.Dimension = result.(java.LeftPadded[java.Space])
@@ -784,9 +708,7 @@ func (r *JavaReceiver) VisitParameterizedType(pt *java.ParameterizedType, p any)
 	q := p.(*ReceiveQueue)
 	c := *pt
 	pt = &c
-	if result := q.Receive(pt.Clazz, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
-		pt.Clazz = result.(java.Expression)
-	}
+	pt.Clazz = receiveValue(q, pt.Clazz, func(e java.Expression) any { return r.Visit(e, q) })
 	if result := q.Receive(pt.TypeParameters, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
 		container := result.(java.Container[java.Expression])
 		pt.TypeParameters = &container
@@ -799,14 +721,8 @@ func (r *JavaReceiver) VisitArrayAccess(aa *java.ArrayAccess, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *aa // shallow copy to avoid mutating remoteObjects baseline
 	aa = &c
-	result := q.Receive(aa.Indexed, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		aa.Indexed = result.(java.Expression)
-	}
-	dimResult := q.Receive(aa.Dimension, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if dimResult != nil {
-		aa.Dimension = dimResult.(*java.ArrayDimension)
-	}
+	aa.Indexed = receiveValue(q, aa.Indexed, func(e java.Expression) any { return r.Visit(e, q) })
+	aa.Dimension = receiveValue(q, aa.Dimension, func(e *java.ArrayDimension) any { return r.Visit(e, q) })
 	return aa
 }
 
@@ -834,14 +750,8 @@ func (r *JavaReceiver) VisitTypeCast(tc *java.TypeCast, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *tc // shallow copy to avoid mutating remoteObjects baseline
 	tc = &c
-	result := q.Receive(tc.Clazz, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		tc.Clazz = result.(*java.ControlParentheses)
-	}
-	exprResult := q.Receive(tc.Expr, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if exprResult != nil {
-		tc.Expr = exprResult.(java.Expression)
-	}
+	tc.Clazz = receiveValue(q, tc.Clazz, func(e *java.ControlParentheses) any { return r.Visit(e, q) })
+	tc.Expr = receiveValue(q, tc.Expr, func(e java.Expression) any { return r.Visit(e, q) })
 	return tc
 }
 
@@ -863,10 +773,7 @@ func (r *JavaReceiver) VisitImport(imp *java.Import, p any) java.J {
 	staticBefore := java.LeftPadded[bool]{Before: java.EmptySpace, Element: false}
 	q.Receive(staticBefore, func(v any) any { return receiveLeftPadded(r, q, v) })
 	// qualid (Expression - could be Literal or FieldAccess depending on direction)
-	result := q.Receive(imp.Qualid, func(v any) any { return r.Visit(v.(java.Tree), q) })
-	if result != nil {
-		imp.Qualid = result.(java.Expression)
-	}
+	imp.Qualid = receiveValue(q, imp.Qualid, func(e java.Expression) any { return r.Visit(e, q) })
 	// alias
 	var beforeAlias any
 	if imp.Alias != nil {

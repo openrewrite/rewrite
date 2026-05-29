@@ -185,40 +185,6 @@ func (r *JavaTypeReceiver) VisitVariable(v *java.JavaTypeVariable, p any) java.J
 	return v
 }
 
-// receiveScalar receives a simple value from the queue.
-func receiveScalar[T any](q *ReceiveQueue, before T) T {
-	result := q.Receive(before, nil)
-	if result == nil {
-		var zero T
-		return zero
-	}
-	// Handle numeric type conversions from JSON
-	return convertTo[T](result)
-}
-
-// convertTo converts a value to the desired type, handling JSON number conversions.
-func convertTo[T any](v any) T {
-	if t, ok := v.(T); ok {
-		return t
-	}
-	// Handle float64 -> int64 conversion (common with JSON)
-	var zero T
-	switch any(zero).(type) {
-	case int64:
-		switch n := v.(type) {
-		case float64:
-			return any(int64(n)).(T)
-		case int:
-			return any(int64(n)).(T)
-		}
-	case string:
-		if s, ok := v.(string); ok {
-			return any(s).(T)
-		}
-	}
-	return v.(T)
-}
-
 // receiveAsType receives a ref-tracked type from the queue.
 func receiveAsType[T java.JavaType](r *JavaTypeReceiver, q *ReceiveQueue, before T) T {
 	result := q.Receive(before, func(v any) any {
