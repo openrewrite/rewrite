@@ -107,7 +107,11 @@ var goSumLine = regexp.MustCompile(`^\s*(\S+)\s+(\S+?)(/go\.mod)?\s+h1:(\S+)\s*$
 // RPC where sources are passed as strings.
 func ParseGoSum(content string) []tree.GoResolvedDependency {
 	if content == "" {
-		return nil
+		// Return a non-nil empty slice: callers assign this directly to
+		// GoResolutionResult.ResolvedDependencies, and a nil slice would be
+		// serialized as a null list and break the LST write (see
+		// tree.NewGoResolutionResult).
+		return []tree.GoResolvedDependency{}
 	}
 	type slot struct{ module, gomod string }
 	order := []string{}
