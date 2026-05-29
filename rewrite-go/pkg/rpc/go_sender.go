@@ -267,6 +267,9 @@ func (s *GoSender) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	q.GetAndSend(td, func(v any) any { return v.(*golang.TypeDecl).Name },
 		func(v any) { s.Visit(v.(java.Tree), q) })
+	// typeParameters (`[T any]` declaration-site generics; nil for non-generic types)
+	q.GetAndSend(td, func(v any) any { return v.(*golang.TypeDecl).TypeParameters },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// Assign — dereference pointer so sendLeftPadded gets a value type
 	q.GetAndSend(td, func(v any) any {
 		a := v.(*golang.TypeDecl).Assign

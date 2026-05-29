@@ -326,7 +326,11 @@ func (r *JavaReceiver) VisitMethodDeclaration(md *java.MethodDeclaration, p any)
 	// modifiers
 	q.ReceiveList(nil, nil)
 	// typeParameters
-	q.Receive(nil, nil)
+	if tpResult := q.Receive(md.TypeParameters, func(v any) any { return r.Visit(v.(java.Tree), q) }); tpResult != nil {
+		md.TypeParameters = tpResult.(*java.TypeParameters)
+	} else {
+		md.TypeParameters = nil
+	}
 	// returnTypeExpression
 	result := q.Receive(md.ReturnType, func(v any) any { return r.Visit(v.(java.Tree), q) })
 	if result != nil {
@@ -362,6 +366,55 @@ func (r *JavaReceiver) VisitMethodDeclaration(md *java.MethodDeclaration, p any)
 		md.MethodType = nil
 	}
 	return md
+}
+
+func (r *JavaReceiver) VisitTypeParameters(tps *java.TypeParameters, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *tps // shallow copy to avoid mutating remoteObjects baseline
+	tps = &c
+	// annotations
+	q.ReceiveList(nil, nil)
+	// typeParameters (list of right-padded J$TypeParameter)
+	beforeElems := make([]any, len(tps.TypeParameters))
+	for i, e := range tps.TypeParameters {
+		beforeElems[i] = e
+	}
+	afterElems := q.ReceiveList(beforeElems, func(v any) any { return receiveRightPadded(r, q, v) })
+	if afterElems != nil {
+		tps.TypeParameters = make([]java.RightPadded[java.J], len(afterElems))
+		for i, e := range afterElems {
+			tps.TypeParameters[i] = e.(java.RightPadded[java.J])
+		}
+	}
+	return tps
+}
+
+func (r *JavaReceiver) VisitTypeParameter(tp *java.TypeParameter, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *tp // shallow copy to avoid mutating remoteObjects baseline
+	tp = &c
+	// annotations
+	q.ReceiveList(nil, nil)
+	// modifiers
+	q.ReceiveList(nil, nil)
+	// name
+	if result := q.Receive(tp.Name, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
+		tp.Name = result.(java.Expression)
+	}
+	// bounds (container; nil when the parameter shares a sibling's constraint).
+	// Pass the value Container baseline (not the *Container) so the padding
+	// accessors recognize it.
+	var boundsBefore any
+	if tp.Bounds != nil {
+		boundsBefore = *tp.Bounds
+	}
+	if result := q.Receive(boundsBefore, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
+		container := result.(java.Container[java.Expression])
+		tp.Bounds = &container
+	} else {
+		tp.Bounds = nil
+	}
+	return tp
 }
 
 func (r *JavaReceiver) VisitVariableDeclarations(vd *java.VariableDeclarations, p any) java.J {

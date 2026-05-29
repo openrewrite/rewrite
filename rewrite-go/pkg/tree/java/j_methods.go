@@ -30,6 +30,30 @@ func (n *Annotation) WithID(id uuid.UUID) J {
 func (n *Annotation) GetPrefix() Space    { return n.Prefix }
 func (n *Annotation) GetMarkers() Markers { return n.Markers }
 
+func (n *TypeParameters) GetID() uuid.UUID { return n.ID }
+func (n *TypeParameters) WithID(id uuid.UUID) J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *TypeParameters) GetPrefix() Space    { return n.Prefix }
+func (n *TypeParameters) GetMarkers() Markers { return n.Markers }
+
+func (n *TypeParameter) GetID() uuid.UUID { return n.ID }
+func (n *TypeParameter) WithID(id uuid.UUID) J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *TypeParameter) GetPrefix() Space    { return n.Prefix }
+func (n *TypeParameter) GetMarkers() Markers { return n.Markers }
+
 func (n *ArrayAccess) GetID() uuid.UUID { return n.ID }
 func (n *ArrayAccess) WithID(id uuid.UUID) J {
 	if n.ID == id {
