@@ -17,7 +17,7 @@
 package format
 
 import (
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -44,18 +44,18 @@ import (
 // the entire visited subtree.
 type AutoFormatVisitor struct {
 	visitor.GoVisitor
-	stopAfter tree.Tree
+	stopAfter java.Tree
 }
 
 // NewAutoFormatVisitor returns a composer visitor that, on its first
 // Visit, queues the four per-responsibility passes via DoAfterVisit.
 // The recipe runner's after-visit drain runs them in order. Each pass
 // sees the partially-normalized tree from its predecessors.
-func NewAutoFormatVisitor(stopAfter tree.Tree) *AutoFormatVisitor {
+func NewAutoFormatVisitor(stopAfter java.Tree) *AutoFormatVisitor {
 	return visitor.Init(&AutoFormatVisitor{stopAfter: stopAfter})
 }
 
-func (v *AutoFormatVisitor) Visit(t tree.Tree, p any) tree.Tree {
+func (v *AutoFormatVisitor) Visit(t java.Tree, p any) java.Tree {
 	if t == nil {
 		return nil
 	}

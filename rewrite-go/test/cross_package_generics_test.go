@@ -23,7 +23,7 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
 // genericsScaffold builds a multi-package project rooted at a temp dir and
@@ -31,7 +31,7 @@ import (
 // case stages files via the on-disk vendor walker pattern so the parser
 // resolves cross-package generic references the same way it does in
 // production parses.
-func genericsScaffold(t *testing.T, files map[string]string, modulePath, mainRel string) *tree.CompilationUnit {
+func genericsScaffold(t *testing.T, files map[string]string, modulePath, mainRel string) *golang.CompilationUnit {
 	t.Helper()
 	root := t.TempDir()
 	for rel, content := range files {

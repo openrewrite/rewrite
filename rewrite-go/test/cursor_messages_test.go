@@ -20,7 +20,8 @@ import (
 	"testing"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -98,8 +99,8 @@ func TestCursorComputeMessageIfAbsent(t *testing.T) {
 func TestCursorPutMessageOnFirstEnclosing(t *testing.T) {
 	root, _, leaf := threeFrameCursor(t)
 	// Stash a message on the first ancestor whose value is a CompilationUnit.
-	leaf.PutMessageOnFirstEnclosing(func(t tree.Tree) bool {
-		_, ok := t.(*tree.CompilationUnit)
+	leaf.PutMessageOnFirstEnclosing(func(t java.Tree) bool {
+		_, ok := t.(*golang.CompilationUnit)
 		return ok
 	}, "tag", "matched")
 	// Found ancestor (every frame in this fixture is the same CU); the
@@ -108,7 +109,7 @@ func TestCursorPutMessageOnFirstEnclosing(t *testing.T) {
 		t.Fatalf("expected leaf to receive the message, got %v", got)
 	}
 	// Sanity: a predicate matching nothing leaves the chain untouched.
-	leaf.PutMessageOnFirstEnclosing(func(tree.Tree) bool { return false }, "x", 1)
+	leaf.PutMessageOnFirstEnclosing(func(java.Tree) bool { return false }, "x", 1)
 	if got := root.GetMessage("x"); got != nil {
 		t.Fatalf("expected no-op when predicate matches nothing, got %v", got)
 	}

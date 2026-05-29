@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // roundTripNode serializes `before` via GoSender, then feeds the
@@ -30,7 +30,7 @@ import (
 // GoReceiver. The `seed` argument is the empty node skeleton the
 // receiver starts from (matching how a real session has a baseline
 // from a prior GET_OBJECT cycle).
-func roundTripNode(t *testing.T, before tree.Tree, seed tree.Tree) any {
+func roundTripNode(t *testing.T, before java.Tree, seed java.Tree) any {
 	t.Helper()
 	var messages []RpcObjectData
 	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
@@ -53,9 +53,9 @@ func roundTripNode(t *testing.T, before tree.Tree, seed tree.Tree) any {
 func TestJavaReceiverPreVisitAppliesWireID(t *testing.T) {
 	id := uuid.MustParse("12345678-1111-2222-3333-123456789abc")
 	got := roundTripNode(t,
-		&tree.Identifier{ID: id, Name: "x"},
-		&tree.Identifier{},
-	).(*tree.Identifier)
+		&java.Identifier{ID: id, Name: "x"},
+		&java.Identifier{},
+	).(*java.Identifier)
 
 	if got.ID != id {
 		t.Errorf("ID: got %s, want %s", got.ID, id)
@@ -68,28 +68,28 @@ func TestAnnotationRpcRoundTrip_BasicTag(t *testing.T) {
 	annID := uuid.MustParse("aaaaaaaa-1111-2222-3333-aaaaaaaaaaaa")
 	typeID := uuid.MustParse("bbbbbbbb-1111-2222-3333-bbbbbbbbbbbb")
 	litID := uuid.MustParse("cccccccc-1111-2222-3333-cccccccccccc")
-	before := &tree.Annotation{
+	before := &java.Annotation{
 		ID:             annID,
-		AnnotationType: &tree.Identifier{ID: typeID, Name: "json"},
-		Arguments: &tree.Container[tree.Expression]{
-			Elements: []tree.RightPadded[tree.Expression]{
-				{Element: &tree.Literal{
+		AnnotationType: &java.Identifier{ID: typeID, Name: "json"},
+		Arguments: &java.Container[java.Expression]{
+			Elements: []java.RightPadded[java.Expression]{
+				{Element: &java.Literal{
 					ID:     litID,
 					Source: `"name"`,
 					Value:  "name",
-					Kind:   tree.StringLiteral,
+					Kind:   java.StringLiteral,
 				}},
 			},
 		},
 	}
 
-	seed := &tree.Annotation{ID: annID}
-	got := roundTripNode(t, before, seed).(*tree.Annotation)
+	seed := &java.Annotation{ID: annID}
+	got := roundTripNode(t, before, seed).(*java.Annotation)
 
 	if got.ID != annID {
 		t.Errorf("ID: got %s, want %s", got.ID, annID)
 	}
-	gotType, ok := got.AnnotationType.(*tree.Identifier)
+	gotType, ok := got.AnnotationType.(*java.Identifier)
 	if !ok {
 		t.Fatalf("AnnotationType: got %T, want *Identifier", got.AnnotationType)
 	}
@@ -102,7 +102,7 @@ func TestAnnotationRpcRoundTrip_BasicTag(t *testing.T) {
 	if len(got.Arguments.Elements) != 1 {
 		t.Fatalf("Arguments.Elements: got %d, want 1", len(got.Arguments.Elements))
 	}
-	gotLit, ok := got.Arguments.Elements[0].Element.(*tree.Literal)
+	gotLit, ok := got.Arguments.Elements[0].Element.(*java.Literal)
 	if !ok {
 		t.Fatalf("Arguments[0]: got %T, want *Literal", got.Arguments.Elements[0].Element)
 	}
@@ -120,19 +120,19 @@ func TestAnnotationRpcRoundTrip_NoArguments(t *testing.T) {
 	// Container.
 	annID := uuid.MustParse("dddddddd-1111-2222-3333-dddddddddddd")
 	typeID := uuid.MustParse("eeeeeeee-1111-2222-3333-eeeeeeeeeeee")
-	before := &tree.Annotation{
+	before := &java.Annotation{
 		ID:             annID,
-		AnnotationType: &tree.Identifier{ID: typeID, Name: "go:noinline"},
+		AnnotationType: &java.Identifier{ID: typeID, Name: "go:noinline"},
 	}
 
-	seed := &tree.Annotation{ID: annID}
-	got := roundTripNode(t, before, seed).(*tree.Annotation)
+	seed := &java.Annotation{ID: annID}
+	got := roundTripNode(t, before, seed).(*java.Annotation)
 
 	if got.Arguments != nil {
 		t.Errorf("Arguments: got %+v, want nil", got.Arguments)
 	}
-	if !reflect.DeepEqual(got.AnnotationType.(*tree.Identifier).Name, "go:noinline") {
-		t.Errorf("AnnotationType.Name: got %q, want %q", got.AnnotationType.(*tree.Identifier).Name, "go:noinline")
+	if !reflect.DeepEqual(got.AnnotationType.(*java.Identifier).Name, "go:noinline") {
+		t.Errorf("AnnotationType.Name: got %q, want %q", got.AnnotationType.(*java.Identifier).Name, "go:noinline")
 	}
 }
 
@@ -140,24 +140,24 @@ func TestAnnotationRpcRoundTrip_PrefixPreserved(t *testing.T) {
 	annID := uuid.MustParse("ffffffff-1111-2222-3333-ffffffffffff")
 	typeID := uuid.MustParse("00000000-1111-2222-3333-000000000000")
 	litID := uuid.MustParse("11111111-aaaa-bbbb-cccc-111111111111")
-	before := &tree.Annotation{
+	before := &java.Annotation{
 		ID:             annID,
-		Prefix:         tree.Space{Whitespace: " "},
-		AnnotationType: &tree.Identifier{ID: typeID, Name: "validate"},
-		Arguments: &tree.Container[tree.Expression]{
-			Elements: []tree.RightPadded[tree.Expression]{
-				{Element: &tree.Literal{
+		Prefix:         java.Space{Whitespace: " "},
+		AnnotationType: &java.Identifier{ID: typeID, Name: "validate"},
+		Arguments: &java.Container[java.Expression]{
+			Elements: []java.RightPadded[java.Expression]{
+				{Element: &java.Literal{
 					ID:     litID,
 					Source: `"required"`,
 					Value:  "required",
-					Kind:   tree.StringLiteral,
+					Kind:   java.StringLiteral,
 				}},
 			},
 		},
 	}
 
-	seed := &tree.Annotation{ID: annID}
-	got := roundTripNode(t, before, seed).(*tree.Annotation)
+	seed := &java.Annotation{ID: annID}
+	got := roundTripNode(t, before, seed).(*java.Annotation)
 
 	if got.Prefix.Whitespace != " " {
 		t.Errorf("Prefix.Whitespace: got %q, want %q", got.Prefix.Whitespace, " ")

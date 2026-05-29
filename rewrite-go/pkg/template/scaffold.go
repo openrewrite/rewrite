@@ -21,7 +21,8 @@ import (
 	"strings"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // ScaffoldKind indicates what kind of Go construct the template represents.
@@ -107,7 +108,7 @@ func buildScaffold(code string, captures map[string]*Capture, imports []string, 
 
 // parseScaffold parses the scaffold source and extracts the target node,
 // skipping the package declaration, imports, and preamble variables.
-func parseScaffold(code string, captures map[string]*Capture, imports []string, kind ScaffoldKind) (tree.J, error) {
+func parseScaffold(code string, captures map[string]*Capture, imports []string, kind ScaffoldKind) (java.J, error) {
 	source, preambleCount := buildScaffold(code, captures, imports, kind)
 
 	p := parser.NewGoParser()
@@ -120,7 +121,7 @@ func parseScaffold(code string, captures map[string]*Capture, imports []string, 
 }
 
 // extractTarget navigates the parsed CompilationUnit to find the template node.
-func extractTarget(cu *tree.CompilationUnit, kind ScaffoldKind, preambleCount int) (tree.J, error) {
+func extractTarget(cu *golang.CompilationUnit, kind ScaffoldKind, preambleCount int) (java.J, error) {
 	stmts := cu.Statements
 
 	switch kind {
@@ -130,7 +131,7 @@ func extractTarget(cu *tree.CompilationUnit, kind ScaffoldKind, preambleCount in
 		if targetIdx >= len(stmts) {
 			return nil, fmt.Errorf("expression scaffold: expected statement at index %d, got %d statements", targetIdx, len(stmts))
 		}
-		vd, ok := stmts[targetIdx].Element.(*tree.VariableDeclarations)
+		vd, ok := stmts[targetIdx].Element.(*java.VariableDeclarations)
 		if !ok {
 			return nil, fmt.Errorf("expression scaffold: expected VariableDeclarations, got %T", stmts[targetIdx].Element)
 		}
@@ -148,7 +149,7 @@ func extractTarget(cu *tree.CompilationUnit, kind ScaffoldKind, preambleCount in
 		// The func is the first (and only) top-level statement after preamble decls.
 		// Find the function declaration.
 		for _, stmt := range stmts {
-			md, ok := stmt.Element.(*tree.MethodDeclaration)
+			md, ok := stmt.Element.(*java.MethodDeclaration)
 			if !ok {
 				continue
 			}

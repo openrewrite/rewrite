@@ -19,12 +19,12 @@ package test
 import (
 	"testing"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
+	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 )
 
 func TestRenamePackage_RewritesImportPath(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.RenamePackage{
+	spec := NewRecipeSpec().WithRecipe(&recipes.RenamePackage{
 		OldPackagePath: "github.com/old/foo",
 		NewPackagePath: "github.com/new/foo",
 	})
@@ -48,7 +48,7 @@ func TestRenamePackage_RewritesImportPath(t *testing.T) {
 func TestRenamePackage_RewritesSubPackageImports(t *testing.T) {
 	// `import "old/foo/sub"` rewrites to `import "new/foo/sub"` when
 	// renaming `old/foo` to `new/foo`.
-	spec := NewRecipeSpec().WithRecipe(&golang.RenamePackage{
+	spec := NewRecipeSpec().WithRecipe(&recipes.RenamePackage{
 		OldPackagePath: "github.com/old/foo",
 		NewPackagePath: "github.com/new/foo",
 	})
@@ -82,7 +82,7 @@ func TestRenamePackage_RewritesSubPackageImports(t *testing.T) {
 }
 
 func TestRenamePackage_LeavesUnrelatedImports(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.RenamePackage{
+	spec := NewRecipeSpec().WithRecipe(&recipes.RenamePackage{
 		OldPackagePath: "github.com/old/foo",
 		NewPackagePath: "github.com/new/foo",
 	})
@@ -101,7 +101,7 @@ func TestRenamePackage_LeavesUnrelatedImports(t *testing.T) {
 }
 
 func TestRenamePackage_IdempotentOnRenamedPath(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.RenamePackage{
+	spec := NewRecipeSpec().WithRecipe(&recipes.RenamePackage{
 		OldPackagePath: "github.com/old/foo",
 		NewPackagePath: "github.com/new/foo",
 	})
@@ -122,7 +122,7 @@ func TestRenamePackage_IdempotentOnRenamedPath(t *testing.T) {
 // "cross-file scope" half of the recipe, distinct from import
 // rewriting in caller files.
 func TestRenamePackage_RewritesOwnedPackageDecl(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.RenamePackage{
+	spec := NewRecipeSpec().WithRecipe(&recipes.RenamePackage{
 		OldPackagePath: "example.com/myapp/internal/old",
 		NewPackagePath: "example.com/myapp/internal/new",
 	})
@@ -154,7 +154,7 @@ func TestRenamePackage_RewritesOwnedPackageDecl(t *testing.T) {
 // rewritten. fileBelongsTo gates this on the file's source-relative
 // directory matching the candidate's module-relative path.
 func TestRenamePackage_LeavesCoincidentPackageDecl(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.RenamePackage{
+	spec := NewRecipeSpec().WithRecipe(&recipes.RenamePackage{
 		OldPackagePath: "example.com/myapp/internal/old",
 		NewPackagePath: "example.com/myapp/internal/new",
 	})
@@ -182,7 +182,7 @@ func TestRenamePackage_LeavesCoincidentPackageDecl(t *testing.T) {
 // End-to-end: a single recipe run handles both the owning file's
 // package declaration AND the consumer's import path in one project.
 func TestRenamePackage_RewritesProjectWide(t *testing.T) {
-	spec := NewRecipeSpec().WithRecipe(&golang.RenamePackage{
+	spec := NewRecipeSpec().WithRecipe(&recipes.RenamePackage{
 		OldPackagePath: "example.com/myapp/internal/old",
 		NewPackagePath: "example.com/myapp/internal/new",
 	})

@@ -19,8 +19,9 @@ package test
 import (
 	"testing"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 func TestParseVarWithType(t *testing.T) {
@@ -131,20 +132,20 @@ func TestParseVarPointerType(t *testing.T) {
 		SourceSpec{
 			Before: "package main\n\nfunc f() {\n\tvar x *int\n\t_ = x\n}\n",
 			Path:   "test.go",
-			AfterRecipe: func(t *testing.T, cu *tree.CompilationUnit) {
-				fn := cu.Statements[0].Element.(*tree.MethodDeclaration)
-				varDecl := fn.Body.Statements[0].Element.(*tree.VariableDeclarations)
+			AfterRecipe: func(t *testing.T, cu *golang.CompilationUnit) {
+				fn := cu.Statements[0].Element.(*java.MethodDeclaration)
+				varDecl := fn.Body.Statements[0].Element.(*java.VariableDeclarations)
 
 				if varDecl.TypeExpr == nil {
 					t.Fatal("expected TypeExpr to be set for 'var x *int'")
 				}
-				pt, ok := varDecl.TypeExpr.(*tree.PointerType)
+				pt, ok := varDecl.TypeExpr.(*golang.PointerType)
 				if !ok {
-					t.Fatalf("expected TypeExpr to be *tree.PointerType, got %T", varDecl.TypeExpr)
+					t.Fatalf("expected TypeExpr to be *golang.PointerType, got %T", varDecl.TypeExpr)
 				}
-				ident, ok := pt.Elem.(*tree.Identifier)
+				ident, ok := pt.Elem.(*java.Identifier)
 				if !ok {
-					t.Fatalf("expected PointerType.Elem to be *tree.Identifier, got %T", pt.Elem)
+					t.Fatalf("expected PointerType.Elem to be *java.Identifier, got %T", pt.Elem)
 				}
 				if ident.Name != "int" {
 					t.Errorf("expected PointerType.Elem name to be 'int', got %q", ident.Name)

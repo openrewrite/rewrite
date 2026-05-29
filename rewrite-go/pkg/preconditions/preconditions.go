@@ -36,7 +36,7 @@ package preconditions
 
 import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // CheckArg is the operand type accepted by Check / Or / And / Not.
@@ -94,9 +94,9 @@ type CheckVisitor struct {
 // Visit runs the gate, then defers to the wrapped visitor when the gate
 // matches. RecipeRef operands are treated as "always matches" in-process
 // (they're wire-only placeholders).
-func (c *CheckVisitor) Visit(t tree.Tree, p any) tree.Tree {
-	sf, isSourceFile := t.(tree.SourceFile)
-	if !isSourceFile {
+func (c *CheckVisitor) Visit(t java.Tree, p any) java.Tree {
+	sf, IsSourceFile := t.(java.SourceFile)
+	if !IsSourceFile {
 		return c.V.Visit(t, p)
 	}
 	if c.matches(sf, p) {
@@ -105,11 +105,11 @@ func (c *CheckVisitor) Visit(t tree.Tree, p any) tree.Tree {
 	return t
 }
 
-func (c *CheckVisitor) matches(t tree.Tree, p any) bool {
+func (c *CheckVisitor) matches(t java.Tree, p any) bool {
 	return operandMatches(c.Check, t, p)
 }
 
-func operandMatches(operand CheckArg, t tree.Tree, p any) bool {
+func operandMatches(operand CheckArg, t java.Tree, p any) bool {
 	switch op := operand.(type) {
 	case nil:
 		return true
@@ -134,7 +134,7 @@ func operandMatches(operand CheckArg, t tree.Tree, p any) bool {
 	}
 }
 
-func evaluateComposite(c *Composite, t tree.Tree, p any) bool {
+func evaluateComposite(c *Composite, t java.Tree, p any) bool {
 	switch c.Op {
 	case "or":
 		for _, operand := range c.Operands {
@@ -160,7 +160,7 @@ func evaluateComposite(c *Composite, t tree.Tree, p any) bool {
 	}
 }
 
-func runVisitor(v recipe.TreeVisitor, t tree.Tree, p any) bool {
+func runVisitor(v recipe.TreeVisitor, t java.Tree, p any) bool {
 	if v == nil {
 		return true
 	}

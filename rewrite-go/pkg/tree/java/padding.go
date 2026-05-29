@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package tree
+package java
 
 // RightPadded wraps an element with trailing whitespace/comments.
 // Used for list elements where whitespace appears after the element

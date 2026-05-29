@@ -23,18 +23,18 @@ import (
 
 	"golang.org/x/mod/modfile"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
-// ParseGoMod parses go.mod content into a tree.GoResolutionResult.
+// ParseGoMod parses go.mod content into a golang.GoResolutionResult.
 // Mirrors org.openrewrite.golang.GoModParser on the Java side.
-func ParseGoMod(path, content string) (*tree.GoResolutionResult, error) {
+func ParseGoMod(path, content string) (*golang.GoResolutionResult, error) {
 	f, err := modfile.Parse(path, []byte(content), nil)
 	if err != nil {
 		return nil, err
 	}
 
-	mrr := tree.NewGoResolutionResult("", "", "", path)
+	mrr := golang.NewGoResolutionResult("", "", "", path)
 
 	if f.Module != nil {
 		mrr.ModulePath = f.Module.Mod.Path
@@ -47,7 +47,7 @@ func ParseGoMod(path, content string) (*tree.GoResolutionResult, error) {
 	}
 
 	for _, r := range f.Require {
-		mrr.Requires = append(mrr.Requires, tree.GoRequire{
+		mrr.Requires = append(mrr.Requires, golang.GoRequire{
 			ModulePath: r.Mod.Path,
 			Version:    r.Mod.Version,
 			Indirect:   r.Indirect,
@@ -55,7 +55,7 @@ func ParseGoMod(path, content string) (*tree.GoResolutionResult, error) {
 	}
 
 	for _, r := range f.Replace {
-		mrr.Replaces = append(mrr.Replaces, tree.GoReplace{
+		mrr.Replaces = append(mrr.Replaces, golang.GoReplace{
 			OldPath:    r.Old.Path,
 			OldVersion: r.Old.Version,
 			NewPath:    r.New.Path,
@@ -64,7 +64,7 @@ func ParseGoMod(path, content string) (*tree.GoResolutionResult, error) {
 	}
 
 	for _, e := range f.Exclude {
-		mrr.Excludes = append(mrr.Excludes, tree.GoExclude{
+		mrr.Excludes = append(mrr.Excludes, golang.GoExclude{
 			ModulePath: e.Mod.Path,
 			Version:    e.Mod.Version,
 		})
@@ -80,7 +80,7 @@ func ParseGoMod(path, content string) (*tree.GoResolutionResult, error) {
 		} else {
 			rng = "[" + r.Low + ", " + r.High + "]"
 		}
-		mrr.Retracts = append(mrr.Retracts, tree.GoRetract{
+		mrr.Retracts = append(mrr.Retracts, golang.GoRetract{
 			VersionRange: rng,
 			Rationale:    strings.TrimSpace(r.Rationale),
 		})
@@ -105,13 +105,13 @@ var goSumLine = regexp.MustCompile(`^\s*(\S+)\s+(\S+?)(/go\.mod)?\s+h1:(\S+)\s*$
 // Mirrors org.openrewrite.golang.GoModParser#parseSumSibling. The Go side
 // is content-based (not filesystem-based) because the parser is invoked via
 // RPC where sources are passed as strings.
-func ParseGoSum(content string) []tree.GoResolvedDependency {
+func ParseGoSum(content string) []golang.GoResolvedDependency {
 	if content == "" {
 		// Return a non-nil empty slice: callers assign this directly to
 		// GoResolutionResult.ResolvedDependencies, and a nil slice would be
 		// serialized as a null list and break the LST write (see
-		// tree.NewGoResolutionResult).
-		return []tree.GoResolvedDependency{}
+		// golang.NewGoResolutionResult).
+		return []golang.GoResolvedDependency{}
 	}
 	type slot struct{ module, gomod string }
 	order := []string{}
@@ -139,11 +139,11 @@ func ParseGoSum(content string) []tree.GoResolvedDependency {
 			s.module = hash
 		}
 	}
-	out := make([]tree.GoResolvedDependency, 0, len(order))
+	out := make([]golang.GoResolvedDependency, 0, len(order))
 	for _, key := range order {
 		s := byKey[key]
 		parts := strings.SplitN(key, "@", 2)
-		out = append(out, tree.GoResolvedDependency{
+		out = append(out, golang.GoResolvedDependency{
 			ModulePath: parts[0],
 			Version:    parts[1],
 			ModuleHash: s.module,

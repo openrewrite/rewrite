@@ -70,4 +70,22 @@ class ComplexForDoTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void forLoopWithParenthesizedSingleVariablePattern() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              for (
+                (x) <-
+                  Seq(1)
+              ) {
+                println(x)
+              }
+            }
+            """
+          )
+        );
+    }
 }

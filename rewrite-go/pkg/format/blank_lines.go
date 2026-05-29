@@ -19,7 +19,7 @@ package format
 import (
 	"strings"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -43,13 +43,13 @@ type BlankLinesVisitor struct {
 
 // NewBlankLinesVisitor returns a visitor configured with the given
 // stopAfter bound. Pass nil to format the entire visited tree.
-func NewBlankLinesVisitor(stopAfter tree.Tree) *BlankLinesVisitor {
+func NewBlankLinesVisitor(stopAfter java.Tree) *BlankLinesVisitor {
 	return visitor.Init(&BlankLinesVisitor{
 		stopAfterTracker: stopAfterTracker{stopAfter: stopAfter},
 	})
 }
 
-func (v *BlankLinesVisitor) Visit(t tree.Tree, p any) tree.Tree {
+func (v *BlankLinesVisitor) Visit(t java.Tree, p any) java.Tree {
 	if v.shouldHalt() {
 		return t
 	}
@@ -58,7 +58,7 @@ func (v *BlankLinesVisitor) Visit(t tree.Tree, p any) tree.Tree {
 	return out
 }
 
-func (v *BlankLinesVisitor) VisitSpace(s tree.Space, p any) tree.Space {
+func (v *BlankLinesVisitor) VisitSpace(s java.Space, p any) java.Space {
 	if !strings.Contains(s.Whitespace, "\n\n\n") {
 		return s
 	}
@@ -66,8 +66,8 @@ func (v *BlankLinesVisitor) VisitSpace(s tree.Space, p any) tree.Space {
 	return s
 }
 
-func (v *BlankLinesVisitor) VisitBlock(block *tree.Block, p any) tree.J {
-	out := v.GoVisitor.VisitBlock(block, p).(*tree.Block)
+func (v *BlankLinesVisitor) VisitBlock(block *java.Block, p any) java.J {
+	out := v.GoVisitor.VisitBlock(block, p).(*java.Block)
 	out = out.WithEnd(adjustSpace(out.End, stripLeadingBlankLines))
 
 	// Strip any leading blank line above the first statement. The
@@ -75,7 +75,7 @@ func (v *BlankLinesVisitor) VisitBlock(block *tree.Block, p any) tree.J {
 	// descendant, so we walk the spine to find it.
 	if len(out.Statements) > 0 && out.Statements[0].Element != nil {
 		first := out.Statements[0]
-		if updated, ok := transformLeftmostPrefix(first.Element, stripLeadingBlankLinesSpace).(tree.Statement); ok {
+		if updated, ok := transformLeftmostPrefix(first.Element, stripLeadingBlankLinesSpace).(java.Statement); ok {
 			first.Element = updated
 			out.Statements[0] = first
 		}
@@ -83,12 +83,12 @@ func (v *BlankLinesVisitor) VisitBlock(block *tree.Block, p any) tree.J {
 	return out
 }
 
-func stripLeadingBlankLinesSpace(s tree.Space) tree.Space {
+func stripLeadingBlankLinesSpace(s java.Space) java.Space {
 	s.Whitespace = stripLeadingBlankLines(s.Whitespace)
 	return s
 }
 
-func adjustSpace(s tree.Space, f func(string) string) tree.Space {
+func adjustSpace(s java.Space, f func(string) string) java.Space {
 	updated := f(s.Whitespace)
 	if updated == s.Whitespace {
 		return s

@@ -23,7 +23,7 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
 // vendorScaffold builds a vendor directory layout under root from a map of
@@ -45,7 +45,7 @@ func vendorScaffold(t *testing.T, root string, files map[string]string) {
 // require/replace metadata, then parses src as the file at sourcePath.
 // Returns the parsed compilation unit so tests can assert on resolved
 // types via the ExpectType helpers.
-func parseInProject(t *testing.T, root string, modulePath string, requires []string, replaces map[string]string, sourcePath, src string) *tree.CompilationUnit {
+func parseInProject(t *testing.T, root string, modulePath string, requires []string, replaces map[string]string, sourcePath, src string) *golang.CompilationUnit {
 	t.Helper()
 	pi := parser.NewProjectImporter(modulePath, nil)
 	pi.SetProjectRoot(root)

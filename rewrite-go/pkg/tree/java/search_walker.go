@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package tree
+package java
 
 import (
 	"reflect"
@@ -44,9 +44,9 @@ type searchWalker struct {
 }
 
 var (
-	treeIface    = reflect.TypeOf((*Tree)(nil)).Elem()
-	markersType  = reflect.TypeOf(Markers{})
-	uuidType     = reflect.TypeOf(uuid.UUID{})
+	treeIface   = reflect.TypeOf((*Tree)(nil)).Elem()
+	markersType = reflect.TypeOf(Markers{})
+	uuidType    = reflect.TypeOf(uuid.UUID{})
 )
 
 func (w *searchWalker) walk(v reflect.Value) {

@@ -22,7 +22,7 @@ import "encoding/json"
 type State int
 
 const (
-	NoChange    State = iota
+	NoChange State = iota
 	Add
 	Delete
 	Change

@@ -21,17 +21,18 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // identTypeWalker collects each visited Identifier's Type into a map.
 type identTypeWalker struct {
 	visitor.GoVisitor
-	types map[string]tree.JavaType
+	types map[string]java.JavaType
 }
 
-func (v *identTypeWalker) VisitIdentifier(ident *tree.Identifier, p any) tree.J {
+func (v *identTypeWalker) VisitIdentifier(ident *java.Identifier, p any) java.J {
 	if ident.Type != nil {
 		v.types[ident.Name] = ident.Type
 	}
@@ -86,7 +87,7 @@ func TestGoProjectWiresImporterIntoHarness(t *testing.T) {
 
 		func main() { _ = sub.Hello() }
 	`).WithPath("main.go")
-	mainSrc.AfterRecipe = func(t *testing.T, cu *tree.CompilationUnit) {
+	mainSrc.AfterRecipe = func(t *testing.T, cu *golang.CompilationUnit) {
 		t.Helper()
 		// Find an Identifier referencing "sub" or "Hello" and assert its
 		// Type came back resolved (non-nil). Without the project importer,
@@ -121,8 +122,8 @@ func TestGoProjectWiresImporterIntoHarness(t *testing.T) {
 
 // collectIdentTypes walks the tree and returns a map of identifier name
 // → its Type (whichever last assignment wins; sufficient for these tests).
-func collectIdentTypes(cu *tree.CompilationUnit) map[string]tree.JavaType {
-	out := map[string]tree.JavaType{}
+func collectIdentTypes(cu *golang.CompilationUnit) map[string]java.JavaType {
+	out := map[string]java.JavaType{}
 	collector := &identTypeWalker{types: out}
 	visitor.Init(collector)
 	collector.Visit(cu, nil)

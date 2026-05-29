@@ -21,7 +21,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // These tests exercise the receiver-side coercion helpers that bridge Java's
@@ -36,15 +36,15 @@ import (
 // the coerce helpers without panicking.
 
 // makeIdent returns an *Identifier (which implements Expression only).
-func makeIdent(name string) *tree.Identifier {
-	return &tree.Identifier{ID: uuid.New(), Name: name}
+func makeIdent(name string) *java.Identifier {
+	return &java.Identifier{ID: uuid.New(), Name: name}
 }
 
 // makeMethodInvocation returns a *MethodInvocation (implements both Statement
 // and Expression — Java sometimes ships it inside RightPadded[Expression]
 // where the Go side expects RightPadded[Statement] and vice versa).
-func makeMethodInvocation() *tree.MethodInvocation {
-	return &tree.MethodInvocation{ID: uuid.New(), Name: makeIdent("doThing")}
+func makeMethodInvocation() *java.MethodInvocation {
+	return &java.MethodInvocation{ID: uuid.New(), Name: makeIdent("doThing")}
 }
 
 // expectPanic runs fn and fails the test if it does NOT panic. Used to lock
@@ -67,10 +67,10 @@ func TestCoerceToStatementRP_AcceptsExpressionVariant(t *testing.T) {
 	// (exactly what Java emits for a for-loop init expression that
 	// happens to also be a valid statement).
 	mi := makeMethodInvocation()
-	var wire any = tree.RightPadded[tree.Expression]{
+	var wire any = java.RightPadded[java.Expression]{
 		Element: mi,
-		After:   tree.EmptySpace,
-		Markers: tree.Markers{},
+		After:   java.EmptySpace,
+		Markers: java.Markers{},
 	}
 
 	// when: the receiver coerces it to RightPadded[Statement]
@@ -80,20 +80,20 @@ func TestCoerceToStatementRP_AcceptsExpressionVariant(t *testing.T) {
 	if got.Element == nil {
 		t.Fatal("Element nil after coerce")
 	}
-	if got.Element.(*tree.MethodInvocation) != mi {
+	if got.Element.(*java.MethodInvocation) != mi {
 		t.Errorf("Element identity lost: want %p, got %p", mi, got.Element)
 	}
 }
 
 func TestRawCastPanics_RightPaddedStatementFromExpression(t *testing.T) {
-	// Pre-fix behavior: java_receiver.go did `result.(tree.RightPadded[tree.Statement])`.
+	// Pre-fix behavior: java_receiver.go did `result.(java.RightPadded[java.Statement])`.
 	// Lock that panic in as a regression sentinel.
-	var wire any = tree.RightPadded[tree.Expression]{
+	var wire any = java.RightPadded[java.Expression]{
 		Element: makeMethodInvocation(),
-		Markers: tree.Markers{},
+		Markers: java.Markers{},
 	}
 	expectPanic(t, "raw cast RP[Expression]->RP[Statement]", func() {
-		_ = wire.(tree.RightPadded[tree.Statement])
+		_ = wire.(java.RightPadded[java.Statement])
 	})
 }
 
@@ -103,10 +103,10 @@ func TestCoerceLeftPaddedIdent_AcceptsExpressionVariant(t *testing.T) {
 	// given: a LeftPadded[Expression] wrapping an *Identifier — the shape
 	// Java emits for FieldAccess.name and Import.alias.
 	id := makeIdent("Foo")
-	var wire any = tree.LeftPadded[tree.Expression]{
-		Before:  tree.EmptySpace,
+	var wire any = java.LeftPadded[java.Expression]{
+		Before:  java.EmptySpace,
 		Element: id,
-		Markers: tree.Markers{},
+		Markers: java.Markers{},
 	}
 
 	// when
@@ -119,12 +119,12 @@ func TestCoerceLeftPaddedIdent_AcceptsExpressionVariant(t *testing.T) {
 }
 
 func TestRawCastPanics_LeftPaddedIdentFromExpression(t *testing.T) {
-	var wire any = tree.LeftPadded[tree.Expression]{
+	var wire any = java.LeftPadded[java.Expression]{
 		Element: makeIdent("Foo"),
-		Markers: tree.Markers{},
+		Markers: java.Markers{},
 	}
 	expectPanic(t, "raw cast LP[Expression]->LP[*Identifier]", func() {
-		_ = wire.(tree.LeftPadded[*tree.Identifier])
+		_ = wire.(java.LeftPadded[*java.Identifier])
 	})
 }
 
@@ -133,20 +133,20 @@ func TestRawCastPanics_LeftPaddedIdentFromExpression(t *testing.T) {
 func TestParseAssignOp(t *testing.T) {
 	cases := []struct {
 		in   string
-		want tree.AssignOp
+		want java.AssignOp
 	}{
 		// Go enum names (what AssignOp.String emits)
-		{"Equals", tree.AssignOpEquals},
-		{"Define", tree.AssignOpDefine},
+		{"Equals", java.AssignOpEquals},
+		{"Define", java.AssignOpDefine},
 		// Java source-symbol forms (what JavaSender ships)
-		{"=", tree.AssignOpEquals},
-		{":=", tree.AssignOpDefine},
+		{"=", java.AssignOpEquals},
+		{":=", java.AssignOpDefine},
 		// Unknown spelling: 0 lets the caller fall back deliberately.
 		{"<-", 0},
 		{"", 0},
 	}
 	for _, c := range cases {
-		if got := tree.ParseAssignOp(c.in); got != c.want {
+		if got := java.ParseAssignOp(c.in); got != c.want {
 			t.Errorf("ParseAssignOp(%q): want %v, got %v", c.in, c.want, got)
 		}
 	}
@@ -157,50 +157,50 @@ func TestParseAssignOp(t *testing.T) {
 func TestCoerceLeftPaddedAssignOp_FromStringDefine(t *testing.T) {
 	// given: Java ships the operator for a `range` loop as LeftPadded[string]{":="}
 	// because ParseAssignOp didn't know ":=" before this fix.
-	var wire any = tree.LeftPadded[string]{
-		Before:  tree.EmptySpace,
+	var wire any = java.LeftPadded[string]{
+		Before:  java.EmptySpace,
 		Element: ":=",
-		Markers: tree.Markers{},
+		Markers: java.Markers{},
 	}
 
 	// when
 	got := coerceLeftPaddedAssignOp(wire)
 
 	// then
-	if got.Element != tree.AssignOpDefine {
+	if got.Element != java.AssignOpDefine {
 		t.Errorf("want AssignOpDefine, got %v", got.Element)
 	}
 }
 
 func TestCoerceLeftPaddedAssignOp_FromStringEquals(t *testing.T) {
-	var wire any = tree.LeftPadded[string]{Element: "="}
-	if got := coerceLeftPaddedAssignOp(wire); got.Element != tree.AssignOpEquals {
+	var wire any = java.LeftPadded[string]{Element: "="}
+	if got := coerceLeftPaddedAssignOp(wire); got.Element != java.AssignOpEquals {
 		t.Errorf("want AssignOpEquals, got %v", got.Element)
 	}
 }
 
 func TestCoerceLeftPaddedAssignOp_FromAlreadyTypedVariant(t *testing.T) {
 	// already-correct variant should pass through unchanged.
-	var wire any = tree.LeftPadded[tree.AssignOp]{Element: tree.AssignOpDefine}
-	if got := coerceLeftPaddedAssignOp(wire); got.Element != tree.AssignOpDefine {
+	var wire any = java.LeftPadded[java.AssignOp]{Element: java.AssignOpDefine}
+	if got := coerceLeftPaddedAssignOp(wire); got.Element != java.AssignOpDefine {
 		t.Errorf("pass-through broke: got %v", got.Element)
 	}
 }
 
 func TestCoerceLeftPaddedAssignOp_UnknownSpellingFallsBack(t *testing.T) {
-	var wire any = tree.LeftPadded[string]{Element: "<-"}
+	var wire any = java.LeftPadded[string]{Element: "<-"}
 	// Defense-in-depth: we'd rather emit a possibly-wrong = than crash the recipe.
-	if got := coerceLeftPaddedAssignOp(wire); got.Element != tree.AssignOpEquals {
+	if got := coerceLeftPaddedAssignOp(wire); got.Element != java.AssignOpEquals {
 		t.Errorf("want fallback to AssignOpEquals, got %v", got.Element)
 	}
 }
 
 func TestRawCastPanics_LeftPaddedAssignOpFromString(t *testing.T) {
-	// Pre-fix: VisitForEachControl did `result.(tree.LeftPadded[tree.AssignOp])`
+	// Pre-fix: VisitForEachControl did `result.(java.LeftPadded[java.AssignOp])`
 	// on a value that was actually LeftPadded[string].
-	var wire any = tree.LeftPadded[string]{Element: ":="}
+	var wire any = java.LeftPadded[string]{Element: ":="}
 	expectPanic(t, "raw cast LP[string]->LP[AssignOp]", func() {
-		_ = wire.(tree.LeftPadded[tree.AssignOp])
+		_ = wire.(java.LeftPadded[java.AssignOp])
 	})
 }
 
@@ -210,13 +210,13 @@ func TestCoerceContainerStatement_FromExpressionVariant(t *testing.T) {
 	// given: a Container[Expression] of two MethodInvocations — both also
 	// satisfy Statement. Java ships VisitCase bodies this way.
 	mi1, mi2 := makeMethodInvocation(), makeMethodInvocation()
-	var wire any = tree.Container[tree.Expression]{
-		Before: tree.EmptySpace,
-		Elements: []tree.RightPadded[tree.Expression]{
-			{Element: mi1, Markers: tree.Markers{}},
-			{Element: mi2, Markers: tree.Markers{}},
+	var wire any = java.Container[java.Expression]{
+		Before: java.EmptySpace,
+		Elements: []java.RightPadded[java.Expression]{
+			{Element: mi1, Markers: java.Markers{}},
+			{Element: mi2, Markers: java.Markers{}},
 		},
-		Markers: tree.Markers{},
+		Markers: java.Markers{},
 	}
 
 	// when
@@ -226,10 +226,10 @@ func TestCoerceContainerStatement_FromExpressionVariant(t *testing.T) {
 	if len(got.Elements) != 2 {
 		t.Fatalf("want 2 elements, got %d", len(got.Elements))
 	}
-	if got.Elements[0].Element.(*tree.MethodInvocation) != mi1 {
+	if got.Elements[0].Element.(*java.MethodInvocation) != mi1 {
 		t.Errorf("element[0] identity lost")
 	}
-	if got.Elements[1].Element.(*tree.MethodInvocation) != mi2 {
+	if got.Elements[1].Element.(*java.MethodInvocation) != mi2 {
 		t.Errorf("element[1] identity lost")
 	}
 }
@@ -237,9 +237,9 @@ func TestCoerceContainerStatement_FromExpressionVariant(t *testing.T) {
 func TestCoerceContainerExpression_FromStatementVariant(t *testing.T) {
 	// given: a Container[Statement] of MethodInvocations — also satisfies Expression.
 	mi := makeMethodInvocation()
-	var wire any = tree.Container[tree.Statement]{
-		Elements: []tree.RightPadded[tree.Statement]{
-			{Element: mi, Markers: tree.Markers{}},
+	var wire any = java.Container[java.Statement]{
+		Elements: []java.RightPadded[java.Statement]{
+			{Element: mi, Markers: java.Markers{}},
 		},
 	}
 
@@ -247,15 +247,15 @@ func TestCoerceContainerExpression_FromStatementVariant(t *testing.T) {
 	got := coerceContainerExpression(wire)
 
 	// then
-	if len(got.Elements) != 1 || got.Elements[0].Element.(*tree.MethodInvocation) != mi {
+	if len(got.Elements) != 1 || got.Elements[0].Element.(*java.MethodInvocation) != mi {
 		t.Fatalf("coerce dropped element: %+v", got)
 	}
 }
 
 func TestRawCastPanics_ContainerStatementFromExpression(t *testing.T) {
-	var wire any = tree.Container[tree.Expression]{}
+	var wire any = java.Container[java.Expression]{}
 	expectPanic(t, "raw cast Container[Expression]->Container[Statement]", func() {
-		_ = wire.(tree.Container[tree.Statement])
+		_ = wire.(java.Container[java.Statement])
 	})
 }
 
@@ -269,26 +269,26 @@ func TestContainerFromElements_HeterogeneousElements(t *testing.T) {
 	mi1 := makeMethodInvocation()
 	mi2 := makeMethodInvocation()
 	elements := []any{
-		tree.RightPadded[tree.Expression]{Element: mi1, Markers: tree.Markers{}},
-		tree.RightPadded[tree.Statement]{Element: mi2, Markers: tree.Markers{}},
+		java.RightPadded[java.Expression]{Element: mi1, Markers: java.Markers{}},
+		java.RightPadded[java.Statement]{Element: mi2, Markers: java.Markers{}},
 	}
 
 	// when: containerFromElements must coerce element 2 to Expression — the
 	// pre-fix raw cast panicked here.
-	got := containerFromElements(tree.EmptySpace, elements, tree.Markers{})
+	got := containerFromElements(java.EmptySpace, elements, java.Markers{})
 
 	// then: a Container[Expression] with both elements preserved.
-	cont, ok := got.(tree.Container[tree.Expression])
+	cont, ok := got.(java.Container[java.Expression])
 	if !ok {
 		t.Fatalf("want Container[Expression], got %T", got)
 	}
 	if len(cont.Elements) != 2 {
 		t.Fatalf("want 2 elements, got %d", len(cont.Elements))
 	}
-	if cont.Elements[0].Element.(*tree.MethodInvocation) != mi1 {
+	if cont.Elements[0].Element.(*java.MethodInvocation) != mi1 {
 		t.Errorf("element[0] identity lost")
 	}
-	if cont.Elements[1].Element.(*tree.MethodInvocation) != mi2 {
+	if cont.Elements[1].Element.(*java.MethodInvocation) != mi2 {
 		t.Errorf("element[1] identity lost — coerce dropped the Statement-variant entry")
 	}
 }
@@ -298,35 +298,35 @@ func TestContainerFromElements_HeterogeneousStatementFirst(t *testing.T) {
 	// Both elements are MethodInvocations, which implement Expression AND Statement.
 	mi1, mi2 := makeMethodInvocation(), makeMethodInvocation()
 	elements := []any{
-		tree.RightPadded[tree.Statement]{Element: mi1, Markers: tree.Markers{}},
-		tree.RightPadded[tree.Expression]{Element: mi2, Markers: tree.Markers{}},
+		java.RightPadded[java.Statement]{Element: mi1, Markers: java.Markers{}},
+		java.RightPadded[java.Expression]{Element: mi2, Markers: java.Markers{}},
 	}
 
 	// when
-	got := containerFromElements(tree.EmptySpace, elements, tree.Markers{})
+	got := containerFromElements(java.EmptySpace, elements, java.Markers{})
 
 	// then: the variant is chosen by "most specific interface all elements satisfy",
 	// not by which slot's label appeared first. Both MIs satisfy Expression, so the
 	// container should be [Expression] — matching the sibling Expression-first test.
-	cont, ok := got.(tree.Container[tree.Expression])
+	cont, ok := got.(java.Container[java.Expression])
 	if !ok {
 		t.Fatalf("want Container[Expression], got %T", got)
 	}
 	if len(cont.Elements) != 2 {
 		t.Fatalf("want 2 elements, got %d", len(cont.Elements))
 	}
-	if cont.Elements[0].Element.(*tree.MethodInvocation) != mi1 {
+	if cont.Elements[0].Element.(*java.MethodInvocation) != mi1 {
 		t.Errorf("element[0] identity lost")
 	}
-	if cont.Elements[1].Element.(*tree.MethodInvocation) != mi2 {
+	if cont.Elements[1].Element.(*java.MethodInvocation) != mi2 {
 		t.Errorf("element[1] identity lost")
 	}
 }
 
-// makeReturnStatement returns a *tree.Return — implements Statement but NOT Expression.
+// makeReturnStatement returns a *java.Return — implements Statement but NOT Expression.
 // Used to exercise mixed Case.Body containers whose elements include statement-only nodes.
-func makeReturnStatement() *tree.Return {
-	return &tree.Return{ID: uuid.New()}
+func makeReturnStatement() *java.Return {
+	return &java.Return{ID: uuid.New()}
 }
 
 func TestContainerFromElements_StatementOnlyElementSurvives(t *testing.T) {
@@ -338,26 +338,26 @@ func TestContainerFromElements_StatementOnlyElementSurvives(t *testing.T) {
 	mi := makeMethodInvocation()
 	ret := makeReturnStatement()
 	elements := []any{
-		tree.RightPadded[tree.Expression]{Element: mi, Markers: tree.Markers{}},
-		tree.RightPadded[tree.Statement]{Element: ret, Markers: tree.Markers{}},
+		java.RightPadded[java.Expression]{Element: mi, Markers: java.Markers{}},
+		java.RightPadded[java.Statement]{Element: ret, Markers: java.Markers{}},
 	}
 
 	// when
-	got := containerFromElements(tree.EmptySpace, elements, tree.Markers{})
+	got := containerFromElements(java.EmptySpace, elements, java.Markers{})
 
 	// then: both elements survive in a Container[Statement] — Statement is the
 	// most specific interface every element satisfies.
-	cont, ok := got.(tree.Container[tree.Statement])
+	cont, ok := got.(java.Container[java.Statement])
 	if !ok {
 		t.Fatalf("want Container[Statement], got %T", got)
 	}
 	if len(cont.Elements) != 2 {
 		t.Fatalf("want 2 elements, got %d", len(cont.Elements))
 	}
-	if cont.Elements[0].Element.(*tree.MethodInvocation) != mi {
+	if cont.Elements[0].Element.(*java.MethodInvocation) != mi {
 		t.Errorf("element[0] (method invocation) identity lost")
 	}
-	if cont.Elements[1].Element.(*tree.Return) != ret {
+	if cont.Elements[1].Element.(*java.Return) != ret {
 		t.Errorf("element[1] (return statement) identity lost — pre-fix this was silently dropped")
 	}
 }
@@ -365,9 +365,9 @@ func TestContainerFromElements_StatementOnlyElementSurvives(t *testing.T) {
 func TestRawCastPanics_HeterogeneousRightPadded(t *testing.T) {
 	// Pre-fix containerFromElements: detected RP[Expression] from elements[0],
 	// then raw-cast elements[1] (an RP[Statement]) to RP[Expression] -> panic.
-	var second any = tree.RightPadded[tree.Statement]{Element: makeMethodInvocation()}
+	var second any = java.RightPadded[java.Statement]{Element: makeMethodInvocation()}
 	expectPanic(t, "raw cast RP[Statement]->RP[Expression]", func() {
-		_ = second.(tree.RightPadded[tree.Expression])
+		_ = second.(java.RightPadded[java.Expression])
 	})
 }
 
@@ -378,19 +378,19 @@ func TestRawCastPanics_HeterogeneousRightPadded(t *testing.T) {
 // the already-typed enum (BinaryOperator/UnaryOperator/AssignmentOperator/
 // AssignOp — all int-based), not the wire-format string. Pre-fix,
 // leftPaddedFromElement only matched the string spellings and fell through
-// to the catch-all `LeftPadded[tree.J]{Before, Markers}` with the element
+// to the catch-all `LeftPadded[java.J]{Before, Markers}` with the element
 // dropped — then VisitBinary's `result.(LeftPadded[BinaryOperator])` cast
 // at java_receiver.go:149 panicked. See /tmp/rewrite-go-rpc-print-panics-round3.md.
 
 func TestLeftPaddedFromElement_PreTypedBinaryOperator(t *testing.T) {
 	// given: NO_CHANGE handed back an already-typed BinaryOperator
-	op := tree.Add
+	op := java.Add
 
 	// when
-	got := leftPaddedFromElement(tree.EmptySpace, op, tree.Markers{})
+	got := leftPaddedFromElement(java.EmptySpace, op, java.Markers{})
 
 	// then: correctly-typed LeftPadded with element preserved
-	lp, ok := got.(tree.LeftPadded[tree.BinaryOperator])
+	lp, ok := got.(java.LeftPadded[java.BinaryOperator])
 	if !ok {
 		t.Fatalf("want LeftPadded[BinaryOperator], got %T", got)
 	}
@@ -401,13 +401,13 @@ func TestLeftPaddedFromElement_PreTypedBinaryOperator(t *testing.T) {
 
 func TestLeftPaddedFromElement_PreTypedUnaryOperator(t *testing.T) {
 	// given
-	op := tree.Negate
+	op := java.Negate
 
 	// when
-	got := leftPaddedFromElement(tree.EmptySpace, op, tree.Markers{})
+	got := leftPaddedFromElement(java.EmptySpace, op, java.Markers{})
 
 	// then
-	lp, ok := got.(tree.LeftPadded[tree.UnaryOperator])
+	lp, ok := got.(java.LeftPadded[java.UnaryOperator])
 	if !ok {
 		t.Fatalf("want LeftPadded[UnaryOperator], got %T", got)
 	}
@@ -418,13 +418,13 @@ func TestLeftPaddedFromElement_PreTypedUnaryOperator(t *testing.T) {
 
 func TestLeftPaddedFromElement_PreTypedAssignmentOperator(t *testing.T) {
 	// given
-	op := tree.AddAssign
+	op := java.AddAssign
 
 	// when
-	got := leftPaddedFromElement(tree.EmptySpace, op, tree.Markers{})
+	got := leftPaddedFromElement(java.EmptySpace, op, java.Markers{})
 
 	// then
-	lp, ok := got.(tree.LeftPadded[tree.AssignmentOperator])
+	lp, ok := got.(java.LeftPadded[java.AssignmentOperator])
 	if !ok {
 		t.Fatalf("want LeftPadded[AssignmentOperator], got %T", got)
 	}
@@ -435,13 +435,13 @@ func TestLeftPaddedFromElement_PreTypedAssignmentOperator(t *testing.T) {
 
 func TestLeftPaddedFromElement_PreTypedAssignOp(t *testing.T) {
 	// given
-	op := tree.AssignOpDefine
+	op := java.AssignOpDefine
 
 	// when
-	got := leftPaddedFromElement(tree.EmptySpace, op, tree.Markers{})
+	got := leftPaddedFromElement(java.EmptySpace, op, java.Markers{})
 
 	// then
-	lp, ok := got.(tree.LeftPadded[tree.AssignOp])
+	lp, ok := got.(java.LeftPadded[java.AssignOp])
 	if !ok {
 		t.Fatalf("want LeftPadded[AssignOp], got %T", got)
 	}
@@ -453,10 +453,10 @@ func TestLeftPaddedFromElement_PreTypedAssignOp(t *testing.T) {
 func TestRawCastPanics_LeftPaddedJOnBinaryOperatorSlot(t *testing.T) {
 	// Lock in the receiver-side panic shape that surfaced pre-fix: without the
 	// pre-typed-enum branches in leftPaddedFromElement, the catch-all returned
-	// LeftPadded[tree.J]{Before, Markers} (element dropped). VisitBinary then
+	// LeftPadded[java.J]{Before, Markers} (element dropped). VisitBinary then
 	// raw-cast that to LeftPadded[BinaryOperator] and panicked.
-	var wire any = tree.LeftPadded[tree.J]{Before: tree.EmptySpace, Markers: tree.Markers{}}
+	var wire any = java.LeftPadded[java.J]{Before: java.EmptySpace, Markers: java.Markers{}}
 	expectPanic(t, "raw cast LP[J]->LP[BinaryOperator]", func() {
-		_ = wire.(tree.LeftPadded[tree.BinaryOperator])
+		_ = wire.(java.LeftPadded[java.BinaryOperator])
 	})
 }
