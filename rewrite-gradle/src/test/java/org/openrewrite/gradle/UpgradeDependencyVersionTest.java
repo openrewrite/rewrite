@@ -2584,6 +2584,58 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Disabled("GradleDependency.Matcher#test only inspects methodInvocation.getArguments().get(0); when a single configuration call lists multiple coordinates separated by commas, a targeted dependency in a later argument is invisible, so its `ext` version variable is never bumped.")
+    @Test
+    void updateVersionDefinedInExtraPropertiesWithMultipleCoordinatesPerImplementationCall() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'org.example:other:1.0',
+                                 'com.google.guava:guava:' + guavaVersion
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "29.0-jre"
+                  }
+              }
+
+              plugins {
+                  id("java")
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              apply from: 'dependencies.gradle'
+              """,
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "30.1.1-jre"
+                  }
+              }
+
+              plugins {
+                  id("java")
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
       "\"com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}\"",
