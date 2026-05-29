@@ -32,24 +32,24 @@ import (
 // AssignmentOperation call site's raw assertion to LeftPadded[AssignmentOperator]
 // panicked — breaking Print on essentially any Go file containing +=, |=, etc.
 //
-// receiveLeftPaddedTyped[T] disambiguates by parsing the wire string with the
+// receiveLeftPaddedEnum[T] disambiguates by parsing the wire string with the
 // parser matching the field's statically-known element type T.
 
-func TestCoerceLeftPaddedTyped_AmbiguousNameResolvesByTargetType(t *testing.T) {
-	// "Addition" is valid for BOTH operator enums; T decides which.
-	asAssign := coerceLeftPaddedTyped[java.AssignmentOperator](java.EmptySpace, "Addition", java.Markers{})
+func TestCoerceLeftPaddedEnum_AmbiguousNameResolvesByParser(t *testing.T) {
+	// "Addition" is valid for BOTH operator enums; the supplied parser decides which.
+	asAssign := coerceLeftPaddedEnum(java.EmptySpace, "Addition", java.Markers{}, java.ParseAssignmentOperator)
 	if asAssign.Element != java.AddAssign {
-		t.Errorf("T=AssignmentOperator: want AddAssign, got %v", asAssign.Element)
+		t.Errorf("ParseAssignmentOperator: want AddAssign, got %v", asAssign.Element)
 	}
-	asBinary := coerceLeftPaddedTyped[java.BinaryOperator](java.EmptySpace, "Addition", java.Markers{})
+	asBinary := coerceLeftPaddedEnum(java.EmptySpace, "Addition", java.Markers{}, java.ParseBinaryOperator)
 	if asBinary.Element != java.Add {
-		t.Errorf("T=BinaryOperator: want Add, got %v", asBinary.Element)
+		t.Errorf("ParseBinaryOperator: want Add, got %v", asBinary.Element)
 	}
 }
 
-func TestCoerceLeftPaddedTyped_PreTypedEnumPassThrough(t *testing.T) {
+func TestCoerceLeftPaddedEnum_PreTypedEnumPassThrough(t *testing.T) {
 	// NO_CHANGE hands back the already-typed enum; it must survive.
-	got := coerceLeftPaddedTyped[java.AssignmentOperator](java.EmptySpace, java.OrAssign, java.Markers{})
+	got := coerceLeftPaddedEnum(java.EmptySpace, java.OrAssign, java.Markers{}, java.ParseAssignmentOperator)
 	if got.Element != java.OrAssign {
 		t.Errorf("pre-typed pass-through: want OrAssign, got %v", got.Element)
 	}

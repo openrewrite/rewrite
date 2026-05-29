@@ -152,56 +152,30 @@ func TestParseAssignOp(t *testing.T) {
 	}
 }
 
-// ----- Group 3b: coerceLeftPaddedAssignOp parses the string form -----
+// ----- Group 3b: AssignOp slots receive via coerceLeftPaddedEnum + parseAssignOpDefaulting -----
 
-func TestCoerceLeftPaddedAssignOp_FromStringDefine(t *testing.T) {
-	// given: Java ships the operator for a `range` loop as LeftPadded[string]{":="}
-	// because ParseAssignOp didn't know ":=" before this fix.
-	var wire any = java.LeftPadded[string]{
-		Before:  java.EmptySpace,
-		Element: ":=",
-		Markers: java.Markers{},
+func TestCoerceLeftPaddedEnum_AssignOpFromString(t *testing.T) {
+	// The wire ships the AssignOp as a string; the parser resolves it to the enum.
+	if got := coerceLeftPaddedEnum(java.EmptySpace, ":=", java.Markers{}, parseAssignOpDefaulting); got.Element != java.AssignOpDefine {
+		t.Errorf(":= want AssignOpDefine, got %v", got.Element)
 	}
-
-	// when
-	got := coerceLeftPaddedAssignOp(wire)
-
-	// then
-	if got.Element != java.AssignOpDefine {
-		t.Errorf("want AssignOpDefine, got %v", got.Element)
+	if got := coerceLeftPaddedEnum(java.EmptySpace, "=", java.Markers{}, parseAssignOpDefaulting); got.Element != java.AssignOpEquals {
+		t.Errorf("= want AssignOpEquals, got %v", got.Element)
 	}
 }
 
-func TestCoerceLeftPaddedAssignOp_FromStringEquals(t *testing.T) {
-	var wire any = java.LeftPadded[string]{Element: "="}
-	if got := coerceLeftPaddedAssignOp(wire); got.Element != java.AssignOpEquals {
-		t.Errorf("want AssignOpEquals, got %v", got.Element)
-	}
-}
-
-func TestCoerceLeftPaddedAssignOp_FromAlreadyTypedVariant(t *testing.T) {
-	// already-correct variant should pass through unchanged.
-	var wire any = java.LeftPadded[java.AssignOp]{Element: java.AssignOpDefine}
-	if got := coerceLeftPaddedAssignOp(wire); got.Element != java.AssignOpDefine {
+func TestCoerceLeftPaddedEnum_AssignOpPreTypedPassThrough(t *testing.T) {
+	// already-typed enum (NO_CHANGE) passes through unchanged.
+	if got := coerceLeftPaddedEnum(java.EmptySpace, java.AssignOpDefine, java.Markers{}, parseAssignOpDefaulting); got.Element != java.AssignOpDefine {
 		t.Errorf("pass-through broke: got %v", got.Element)
 	}
 }
 
-func TestCoerceLeftPaddedAssignOp_UnknownSpellingFallsBack(t *testing.T) {
-	var wire any = java.LeftPadded[string]{Element: "<-"}
+func TestParseAssignOpDefaulting_UnknownSpellingFallsBack(t *testing.T) {
 	// Defense-in-depth: we'd rather emit a possibly-wrong = than crash the recipe.
-	if got := coerceLeftPaddedAssignOp(wire); got.Element != java.AssignOpEquals {
-		t.Errorf("want fallback to AssignOpEquals, got %v", got.Element)
+	if got := parseAssignOpDefaulting("<-"); got != java.AssignOpEquals {
+		t.Errorf("want fallback to AssignOpEquals, got %v", got)
 	}
-}
-
-func TestRawCastPanics_LeftPaddedAssignOpFromString(t *testing.T) {
-	// Pre-fix: VisitForEachControl did `result.(java.LeftPadded[java.AssignOp])`
-	// on a value that was actually LeftPadded[string].
-	var wire any = java.LeftPadded[string]{Element: ":="}
-	expectPanic(t, "raw cast LP[string]->LP[AssignOp]", func() {
-		_ = wire.(java.LeftPadded[java.AssignOp])
-	})
 }
 
 // ----- Group 4: coerceRightPaddedTyped[T] element coercion -----
@@ -279,95 +253,5 @@ func TestRawCastPanics_HeterogeneousRightPadded(t *testing.T) {
 	var second any = java.RightPadded[java.Statement]{Element: makeMethodInvocation()}
 	expectPanic(t, "raw cast RP[Statement]->RP[Expression]", func() {
 		_ = second.(java.RightPadded[java.Expression])
-	})
-}
-
-// ----- Group 6: leftPaddedFromElement preserves pre-typed operator enums -----
-//
-// On the NO_CHANGE path, ReceiveQueue.Receive returns the existing `before`
-// value unchanged. For Binary/Unary/Assignment operator slots that value is
-// the already-typed enum (BinaryOperator/UnaryOperator/AssignmentOperator/
-// AssignOp — all int-based), not the wire-format string. Pre-fix,
-// leftPaddedFromElement only matched the string spellings and fell through
-// to the catch-all `LeftPadded[java.J]{Before, Markers}` with the element
-// dropped — then VisitBinary's `result.(LeftPadded[BinaryOperator])` cast
-// at java_receiver.go:149 panicked. See /tmp/rewrite-go-rpc-print-panics-round3.md.
-
-func TestLeftPaddedFromElement_PreTypedBinaryOperator(t *testing.T) {
-	// given: NO_CHANGE handed back an already-typed BinaryOperator
-	op := java.Add
-
-	// when
-	got := leftPaddedFromElement(java.EmptySpace, op, java.Markers{})
-
-	// then: correctly-typed LeftPadded with element preserved
-	lp, ok := got.(java.LeftPadded[java.BinaryOperator])
-	if !ok {
-		t.Fatalf("want LeftPadded[BinaryOperator], got %T", got)
-	}
-	if lp.Element != op {
-		t.Errorf("Element lost: want %v, got %v", op, lp.Element)
-	}
-}
-
-func TestLeftPaddedFromElement_PreTypedUnaryOperator(t *testing.T) {
-	// given
-	op := java.Negate
-
-	// when
-	got := leftPaddedFromElement(java.EmptySpace, op, java.Markers{})
-
-	// then
-	lp, ok := got.(java.LeftPadded[java.UnaryOperator])
-	if !ok {
-		t.Fatalf("want LeftPadded[UnaryOperator], got %T", got)
-	}
-	if lp.Element != op {
-		t.Errorf("Element lost: want %v, got %v", op, lp.Element)
-	}
-}
-
-func TestLeftPaddedFromElement_PreTypedAssignmentOperator(t *testing.T) {
-	// given
-	op := java.AddAssign
-
-	// when
-	got := leftPaddedFromElement(java.EmptySpace, op, java.Markers{})
-
-	// then
-	lp, ok := got.(java.LeftPadded[java.AssignmentOperator])
-	if !ok {
-		t.Fatalf("want LeftPadded[AssignmentOperator], got %T", got)
-	}
-	if lp.Element != op {
-		t.Errorf("Element lost: want %v, got %v", op, lp.Element)
-	}
-}
-
-func TestLeftPaddedFromElement_PreTypedAssignOp(t *testing.T) {
-	// given
-	op := java.AssignOpDefine
-
-	// when
-	got := leftPaddedFromElement(java.EmptySpace, op, java.Markers{})
-
-	// then
-	lp, ok := got.(java.LeftPadded[java.AssignOp])
-	if !ok {
-		t.Fatalf("want LeftPadded[AssignOp], got %T", got)
-	}
-	if lp.Element != op {
-		t.Errorf("Element lost: want %v, got %v", op, lp.Element)
-	}
-}
-
-func TestRawCastPanics_LeftPaddedJOnBinaryOperatorSlot(t *testing.T) {
-	// Lock in the receiver-side panic shape that surfaced pre-fix: without the
-	// pre-typed-enum branches in leftPaddedFromElement, the catch-all returned
-	// LeftPadded[java.J]{Before, Markers} (element dropped). VisitBinary then
-	// raw-cast that to LeftPadded[BinaryOperator] and panicked.
-	var wire any = java.LeftPadded[java.J]{Before: java.EmptySpace, Markers: java.Markers{}}
-	expectPanic(t, "raw cast LP[J]->LP[BinaryOperator]", func() {
-		_ = wire.(java.LeftPadded[java.BinaryOperator])
 	})
 }

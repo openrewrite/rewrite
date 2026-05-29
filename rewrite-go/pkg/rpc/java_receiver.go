@@ -145,9 +145,7 @@ func (r *JavaReceiver) VisitBinary(b *java.Binary, p any) java.J {
 	if result != nil {
 		b.Left = result.(java.Expression)
 	}
-	if result := q.Receive(b.Operator, func(v any) any { return receiveLeftPaddedTyped[java.BinaryOperator](r, q, v) }); result != nil {
-		b.Operator = result.(java.LeftPadded[java.BinaryOperator])
-	}
+	b.Operator = receiveLeftPaddedEnum(r, q, b.Operator, java.ParseBinaryOperator)
 	rightResult := q.Receive(b.Right, func(v any) any { return r.Visit(v.(java.Tree), q) })
 	if rightResult != nil {
 		b.Right = rightResult.(java.Expression)
@@ -209,9 +207,7 @@ func (r *JavaReceiver) VisitUnary(u *java.Unary, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *u // shallow copy to avoid mutating remoteObjects baseline
 	u = &c
-	if result := q.Receive(u.Operator, func(v any) any { return receiveLeftPaddedTyped[java.UnaryOperator](r, q, v) }); result != nil {
-		u.Operator = result.(java.LeftPadded[java.UnaryOperator])
-	}
+	u.Operator = receiveLeftPaddedEnum(r, q, u.Operator, java.ParseUnaryOperator)
 	result := q.Receive(u.Operand, func(v any) any { return r.Visit(v.(java.Tree), q) })
 	if result != nil {
 		u.Operand = result.(java.Expression)
@@ -294,9 +290,7 @@ func (r *JavaReceiver) VisitAssignmentOperation(a *java.AssignmentOperation, p a
 	if result != nil {
 		a.Variable = result.(java.Expression)
 	}
-	if result := q.Receive(a.Operator, func(v any) any { return receiveLeftPaddedTyped[java.AssignmentOperator](r, q, v) }); result != nil {
-		a.Operator = result.(java.LeftPadded[java.AssignmentOperator])
-	}
+	a.Operator = receiveLeftPaddedEnum(r, q, a.Operator, java.ParseAssignmentOperator)
 	assignResult := q.Receive(a.Assignment, func(v any) any { return r.Visit(v.(java.Tree), q) })
 	if assignResult != nil {
 		a.Assignment = assignResult.(java.Expression)
@@ -683,10 +677,8 @@ func (r *JavaReceiver) VisitForEachControl(fc *java.ForEachControl, p any) java.
 	} else {
 		fc.Value = nil
 	}
-	// operator (left-padded AssignOp as string)
-	if result := q.Receive(fc.Operator, func(v any) any { return receiveLeftPadded(r, q, v) }); result != nil {
-		fc.Operator = coerceLeftPaddedAssignOp(result)
-	}
+	// operator (left-padded AssignOp enum)
+	fc.Operator = receiveLeftPaddedEnum(r, q, fc.Operator, parseAssignOpDefaulting)
 	// iterable
 	result := q.Receive(fc.Iterable, func(v any) any { return r.Visit(v.(java.Tree), q) })
 	if result != nil {

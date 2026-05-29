@@ -155,45 +155,41 @@ func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
 	return leftPaddedFromElement(beforeSpace, elem, markers)
 }
 
-// receiveLeftPaddedTyped deserializes a JLeftPadded into LeftPadded[T] using the
-// caller-supplied element type T, instead of inferring the type from the payload
-// (leftPaddedFromElement). Inference is unsafe for operator enums:
-// they travel the wire as their Java enum-constant name, and those names are
-// AMBIGUOUS — BinaryOperator.Add and AssignmentOperator.AddAssign both serialize to
-// "Addition". leftPaddedFromElement tries ParseBinaryOperator first, so every
+// receiveLeftPaddedEnum receives an enum-valued JLeftPadded field, returning the typed
+// LeftPadded[T] directly — it wraps the q.Receive call, the deserialization closure, and
+// the result assertion so call sites are a single typed assignment.
+//
+// It uses the caller-supplied parser to interpret the wire payload rather than inferring
+// the type from it (leftPaddedFromElement). Inference is unsafe for enums: they travel
+// the wire as their Java enum-constant name, and those names can be AMBIGUOUS across Go
+// enum types — e.g. BinaryOperator.Add and AssignmentOperator.AddAssign both serialize
+// to "Addition". leftPaddedFromElement tries ParseBinaryOperator first, so every
 // compound-assignment operator (+=, |=, …) was mis-typed as LeftPadded[BinaryOperator]
-// and the AssignmentOperation call site's raw assertion panicked. Supplying T lets
-// coerceLeftPaddedTyped pick the right parser. Counterpart to receiveContainerTyped.
-func receiveLeftPaddedTyped[T any](r Receiver, q *ReceiveQueue, before any) java.LeftPadded[T] {
-	beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, before)
-	return coerceLeftPaddedTyped[T](beforeSpace, elem, markers)
+// and the AssignmentOperation call site's raw assertion panicked. The field's type T is
+// inferred from `before` (and the parser), so the call site just passes the matching
+// parser (ParseBinaryOperator, ParseAssignmentOperator, …). Any enum wrapped in a
+// LeftPadded — current or future — should be received this way. Counterpart to
+// receiveContainerTyped.
+func receiveLeftPaddedEnum[T any](r Receiver, q *ReceiveQueue, before java.LeftPadded[T], parse func(string) T) java.LeftPadded[T] {
+	result := q.Receive(before, func(v any) any {
+		beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, v)
+		return coerceLeftPaddedEnum(beforeSpace, elem, markers, parse)
+	})
+	if result == nil {
+		return before
+	}
+	return result.(java.LeftPadded[T])
 }
 
-// coerceLeftPaddedTyped builds a LeftPadded[T] from a received element. The element
-// may already be a T (NO_CHANGE pass-through, a visited J/Space, or a pre-typed enum)
-// or the wire form of an operator enum — its ambiguous Java enum-constant name as a
-// string. In the string case T selects the parser, so "Addition" resolves to
-// AddAssign for T=AssignmentOperator but Add for T=BinaryOperator.
-func coerceLeftPaddedTyped[T any](before java.Space, elem any, m java.Markers) java.LeftPadded[T] {
+// coerceLeftPaddedEnum builds a LeftPadded[T] for an enum slot. The element is either
+// already a T (NO_CHANGE pass-through / pre-typed enum) or the enum's Java
+// enum-constant name as a string, which `parse` resolves to the T constant.
+func coerceLeftPaddedEnum[T any](before java.Space, elem any, m java.Markers, parse func(string) T) java.LeftPadded[T] {
 	if e, ok := elem.(T); ok {
 		return java.LeftPadded[T]{Before: before, Element: e, Markers: m}
 	}
 	if s, ok := elem.(string); ok {
-		var zero T
-		var parsed any
-		switch any(zero).(type) {
-		case java.BinaryOperator:
-			parsed = java.ParseBinaryOperator(s)
-		case java.AssignmentOperator:
-			parsed = java.ParseAssignmentOperator(s)
-		case java.UnaryOperator:
-			parsed = java.ParseUnaryOperator(s)
-		case java.AssignOp:
-			parsed = java.ParseAssignOp(s)
-		}
-		if e, ok := parsed.(T); ok {
-			return java.LeftPadded[T]{Before: before, Element: e, Markers: m}
-		}
+		return java.LeftPadded[T]{Before: before, Element: parse(s), Markers: m}
 	}
 	return java.LeftPadded[T]{Before: before, Markers: m}
 }
@@ -354,27 +350,14 @@ func coerceLeftPaddedIdent(lp any) java.LeftPadded[*java.Identifier] {
 	return java.LeftPadded[*java.Identifier]{Before: before, Markers: m}
 }
 
-// coerceLeftPaddedAssignOp converts a LeftPadded of any variant to LeftPadded[AssignOp].
-// Java ships the operator as a literal source symbol ("=", ":=") so leftPaddedFromElement
-// produces a LeftPadded[string] when ParseAssignOp can't resolve it; this helper
-// re-parses and falls back to AssignOpEquals defensively.
-func coerceLeftPaddedAssignOp(lp any) java.LeftPadded[java.AssignOp] {
-	if lp, ok := lp.(java.LeftPadded[java.AssignOp]); ok {
-		return lp
+// parseAssignOpDefaulting parses a Go assignment operator, defaulting to "=" rather
+// than crashing the recipe on an unrecognized spelling. Used as the receiveLeftPaddedEnum
+// parser for AssignOp slots.
+func parseAssignOpDefaulting(s string) java.AssignOp {
+	if op := java.ParseAssignOp(s); op != 0 {
+		return op
 	}
-	elem := leftPaddedElement(lp)
-	before := leftPaddedBefore(lp).(java.Space)
-	m := leftPaddedMarkers(lp).(java.Markers)
-	if op, ok := elem.(java.AssignOp); ok {
-		return java.LeftPadded[java.AssignOp]{Element: op, Before: before, Markers: m}
-	}
-	if s, ok := elem.(string); ok {
-		if op := java.ParseAssignOp(s); op != 0 {
-			return java.LeftPadded[java.AssignOp]{Element: op, Before: before, Markers: m}
-		}
-		return java.LeftPadded[java.AssignOp]{Element: java.AssignOpEquals, Before: before, Markers: m}
-	}
-	return java.LeftPadded[java.AssignOp]{Element: java.AssignOpEquals, Before: before, Markers: m}
+	return java.AssignOpEquals
 }
 
 func leftPaddedBefore(lp any) any {
@@ -460,41 +443,16 @@ func leftPaddedMarkers(lp any) any {
 
 // leftPaddedFromElement creates a LeftPadded with the correct generic type
 // based on the element's concrete type.
+// leftPaddedFromElement infers a LeftPadded's generic type from the element's concrete
+// type. Enum-valued slots (operators, AssignOp) do NOT come through here — they use
+// receiveLeftPaddedEnum, which resolves the ambiguous wire name via a caller-supplied
+// parser — so this only handles unambiguous element kinds.
 func leftPaddedFromElement(before java.Space, elem any, markers java.Markers) any {
-	// String values may encode operator enums
-	if s, ok := elem.(string); ok {
-		if op := java.ParseBinaryOperator(s); op != 0 {
-			return java.LeftPadded[java.BinaryOperator]{Before: before, Element: op, Markers: markers}
-		}
-		if op := java.ParseAssignmentOperator(s); op != 0 {
-			return java.LeftPadded[java.AssignmentOperator]{Before: before, Element: op, Markers: markers}
-		}
-		if op := java.ParseUnaryOperator(s); op != 0 {
-			return java.LeftPadded[java.UnaryOperator]{Before: before, Element: op, Markers: markers}
-		}
-		if op := java.ParseAssignOp(s); op != 0 {
-			return java.LeftPadded[java.AssignOp]{Before: before, Element: op, Markers: markers}
-		}
-		return java.LeftPadded[string]{Before: before, Element: s, Markers: markers}
-	}
 	if b, ok := elem.(bool); ok {
 		return java.LeftPadded[bool]{Before: before, Element: b, Markers: markers}
 	}
 	if sp, ok := elem.(java.Space); ok {
 		return java.LeftPadded[java.Space]{Before: before, Element: sp, Markers: markers}
-	}
-	// Pre-typed operator enums (NO_CHANGE path passes the existing typed value through)
-	if op, ok := elem.(java.BinaryOperator); ok {
-		return java.LeftPadded[java.BinaryOperator]{Before: before, Element: op, Markers: markers}
-	}
-	if op, ok := elem.(java.UnaryOperator); ok {
-		return java.LeftPadded[java.UnaryOperator]{Before: before, Element: op, Markers: markers}
-	}
-	if op, ok := elem.(java.AssignmentOperator); ok {
-		return java.LeftPadded[java.AssignmentOperator]{Before: before, Element: op, Markers: markers}
-	}
-	if op, ok := elem.(java.AssignOp); ok {
-		return java.LeftPadded[java.AssignOp]{Before: before, Element: op, Markers: markers}
 	}
 	// Interface types — prefer Expression over Statement
 	if expr, ok := elem.(java.Expression); ok {
