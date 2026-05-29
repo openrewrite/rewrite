@@ -63,7 +63,7 @@ func TestGoProjectMarkerRoundTrip(t *testing.T) {
 	}
 	got, ok := after.Entries[0].(golang.GoProject)
 	if !ok {
-		t.Fatalf("entry is %T, want tree.GoProject", after.Entries[0])
+		t.Fatalf("entry is %T, want golang.GoProject", after.Entries[0])
 	}
 	if got.Ident != id {
 		t.Errorf("Ident: want %s, got %s", id, got.Ident)
@@ -108,7 +108,7 @@ func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
 	}
 	got, ok := after.Entries[0].(golang.GoResolutionResult)
 	if !ok {
-		t.Fatalf("entry is %T, want tree.GoResolutionResult", after.Entries[0])
+		t.Fatalf("entry is %T, want golang.GoResolutionResult", after.Entries[0])
 	}
 	if !reflect.DeepEqual(mrr, got) {
 		t.Errorf("round-trip mismatch\nbefore: %+v\nafter:  %+v", mrr, got)

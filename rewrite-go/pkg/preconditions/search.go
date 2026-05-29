@@ -98,7 +98,7 @@ func (v *UsesTypeVisitor) treeUsesType(t java.Tree) bool {
 }
 
 // UsesMethodVisitor matches files using a specific method, by walking
-// the tree for *tree.MethodInvocation nodes and consulting MethodMatcher.
+// the tree for *java.MethodInvocation nodes and consulting MethodMatcher.
 //
 // Mirrors org.openrewrite.java.search.HasMethod.
 type UsesMethodVisitor struct {
@@ -154,7 +154,7 @@ func markFound(t java.Tree) java.Tree {
 // walkTree does a best-effort iterative DFS over a tree. Returns “false“
 // from “visit“ to stop walking. Implementation uses pkg/tree's existing
 // SearchWalker if available; otherwise falls back to walking the
-// tree.J interface via reflection-free iteration of known shapes.
+// java.J interface via reflection-free iteration of known shapes.
 //
 // For simplicity we delegate to a shared helper that knows how to descend
 // into common LST nodes — see WalkSubtree below.

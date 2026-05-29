@@ -141,11 +141,11 @@ func TestParseVarPointerType(t *testing.T) {
 				}
 				pt, ok := varDecl.TypeExpr.(*golang.PointerType)
 				if !ok {
-					t.Fatalf("expected TypeExpr to be *tree.PointerType, got %T", varDecl.TypeExpr)
+					t.Fatalf("expected TypeExpr to be *golang.PointerType, got %T", varDecl.TypeExpr)
 				}
 				ident, ok := pt.Elem.(*java.Identifier)
 				if !ok {
-					t.Fatalf("expected PointerType.Elem to be *tree.Identifier, got %T", pt.Elem)
+					t.Fatalf("expected PointerType.Elem to be *java.Identifier, got %T", pt.Elem)
 				}
 				if ident.Name != "int" {
 					t.Errorf("expected PointerType.Elem name to be 'int', got %q", ident.Name)

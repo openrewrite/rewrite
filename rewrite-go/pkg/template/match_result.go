@@ -20,7 +20,7 @@ import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 
 // MatchResult holds the captured AST nodes from a successful pattern match.
 type MatchResult struct {
-	bindings map[string]any // single: tree.J, variadic: []tree.J
+	bindings map[string]any // single: java.J, variadic: []java.J
 }
 
 // NewMatchResult creates a MatchResult from binding pairs.

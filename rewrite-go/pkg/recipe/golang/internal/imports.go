@@ -542,7 +542,7 @@ func FindModulePath(cu *golang.CompilationUnit) string {
 	return ""
 }
 
-// _ tree.GoResolutionResult is referenced via FindModulePath; this
+// _ golang.GoResolutionResult is referenced via FindModulePath; this
 // silences the unused-import linter when callers don't pull in the tree
 // package explicitly.
 var _ = uuid.UUID{}

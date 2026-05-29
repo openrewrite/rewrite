@@ -159,7 +159,7 @@ func mergeGoSumIntoGoMod(specs []SourceSpec) {
 }
 
 // GoProject groups a go.mod and one or more .go SourceSpecs as siblings of
-// a single project. Every child receives a tree.GoProject marker. Mirrors
+// a single project. Every child receives a golang.GoProject marker. Mirrors
 // the Java-side Assertions.goProject(name, sources...).
 //
 // Example:
@@ -176,7 +176,7 @@ func GoProject(name string, sources ...Sources) Sources {
 
 // GoMod creates a SourceSpec for go.mod content. The content is dedented
 // the same way Golang(...) is and parsed (via parser.ParseGoMod) at
-// construction time so the resulting tree.GoResolutionResult marker is
+// construction time so the resulting golang.GoResolutionResult marker is
 // already attached to spec.Markers — recipes / tests can read module
 // path, requires, replaces, etc. without re-parsing.
 //

@@ -386,7 +386,7 @@ func (v *GoVisitor) VisitIf(ifStmt *java.If, p any) java.J {
 	return ifStmt
 }
 
-// VisitElse handles the synthetic *tree.Else wrapper that JavaSender produces
+// VisitElse handles the synthetic *java.Else wrapper that JavaSender produces
 // for RPC parity with Java's J.If.Else. The node never appears in a parsed
 // Go AST — language-level recipes go through VisitIf instead — so the default
 // implementation simply visits the body so traversal terminates correctly.

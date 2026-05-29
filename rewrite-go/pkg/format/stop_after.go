@@ -29,7 +29,7 @@
 // DoAfterVisit. Each is independently usable for recipes that only need
 // one pass.
 //
-// All visitors honor a `stopAfter tree.Tree` parameter: when non-nil,
+// All visitors honor a `stopAfter java.Tree` parameter: when non-nil,
 // traversal halts after the given node has been visited, leaving
 // downstream subtrees untouched. When nil, the entire visited subtree
 // is processed.

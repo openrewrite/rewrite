@@ -35,7 +35,7 @@ func extractID(v any) any {
 
 // withPrefixViaReflection invokes the concrete type's typed
 // `WithPrefix(Space) *T` method via reflection and returns the result
-// as tree.Tree. Mirrors what rewrite-java's `j.withPrefix(...)` does
+// as java.Tree. Mirrors what rewrite-java's `j.withPrefix(...)` does
 // polymorphically — Go can't express that on the J interface because
 // the typed method returns the concrete pointer (not J), and Go
 // doesn't allow covariant return types on interface methods. Reflection

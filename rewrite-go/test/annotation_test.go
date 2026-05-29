@@ -26,7 +26,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// Step 1 of AnnotationService rollout: tree.Annotation type + visitor +
+// Step 1 of AnnotationService rollout: java.Annotation type + visitor +
 // printer entry. No parser wiring yet — these tests construct
 // annotations programmatically and verify the visitor walks them and
 // the printer emits the expected struct-tag form.

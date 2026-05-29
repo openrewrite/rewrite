@@ -26,7 +26,7 @@ import (
 
 // TestGoProjectTagsGoSiblingsButNotMod confirms the Go-side test harness
 // matches the Java-side Assertions.goProject(...) shape: a project wrapper
-// tags every .go sibling with a tree.GoProject marker, and the go.mod
+// tags every .go sibling with a golang.GoProject marker, and the go.mod
 // sibling round-trips verbatim (Go-side go.mod parsing is a follow-up).
 func TestGoProjectTagsGoSiblingsButNotMod(t *testing.T) {
 	goSrc := test.Golang(`

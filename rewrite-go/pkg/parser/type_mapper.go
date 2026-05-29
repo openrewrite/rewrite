@@ -40,7 +40,7 @@ func newTypeMapper() *typeMapper {
 	}
 }
 
-// mapType converts a go/types.Type to a tree.JavaType.
+// mapType converts a go/types.Type to a java.JavaType.
 func (m *typeMapper) mapType(t types.Type) java.JavaType {
 	if t == nil {
 		return nil

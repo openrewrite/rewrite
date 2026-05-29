@@ -86,7 +86,7 @@ func TestCoerceToStatementRP_AcceptsExpressionVariant(t *testing.T) {
 }
 
 func TestRawCastPanics_RightPaddedStatementFromExpression(t *testing.T) {
-	// Pre-fix behavior: java_receiver.go did `result.(tree.RightPadded[tree.Statement])`.
+	// Pre-fix behavior: java_receiver.go did `result.(java.RightPadded[java.Statement])`.
 	// Lock that panic in as a regression sentinel.
 	var wire any = java.RightPadded[java.Expression]{
 		Element: makeMethodInvocation(),
@@ -196,7 +196,7 @@ func TestCoerceLeftPaddedAssignOp_UnknownSpellingFallsBack(t *testing.T) {
 }
 
 func TestRawCastPanics_LeftPaddedAssignOpFromString(t *testing.T) {
-	// Pre-fix: VisitForEachControl did `result.(tree.LeftPadded[tree.AssignOp])`
+	// Pre-fix: VisitForEachControl did `result.(java.LeftPadded[java.AssignOp])`
 	// on a value that was actually LeftPadded[string].
 	var wire any = java.LeftPadded[string]{Element: ":="}
 	expectPanic(t, "raw cast LP[string]->LP[AssignOp]", func() {
@@ -323,7 +323,7 @@ func TestContainerFromElements_HeterogeneousStatementFirst(t *testing.T) {
 	}
 }
 
-// makeReturnStatement returns a *tree.Return — implements Statement but NOT Expression.
+// makeReturnStatement returns a *java.Return — implements Statement but NOT Expression.
 // Used to exercise mixed Case.Body containers whose elements include statement-only nodes.
 func makeReturnStatement() *java.Return {
 	return &java.Return{ID: uuid.New()}
@@ -378,7 +378,7 @@ func TestRawCastPanics_HeterogeneousRightPadded(t *testing.T) {
 // the already-typed enum (BinaryOperator/UnaryOperator/AssignmentOperator/
 // AssignOp — all int-based), not the wire-format string. Pre-fix,
 // leftPaddedFromElement only matched the string spellings and fell through
-// to the catch-all `LeftPadded[tree.J]{Before, Markers}` with the element
+// to the catch-all `LeftPadded[java.J]{Before, Markers}` with the element
 // dropped — then VisitBinary's `result.(LeftPadded[BinaryOperator])` cast
 // at java_receiver.go:149 panicked. See /tmp/rewrite-go-rpc-print-panics-round3.md.
 
@@ -453,7 +453,7 @@ func TestLeftPaddedFromElement_PreTypedAssignOp(t *testing.T) {
 func TestRawCastPanics_LeftPaddedJOnBinaryOperatorSlot(t *testing.T) {
 	// Lock in the receiver-side panic shape that surfaced pre-fix: without the
 	// pre-typed-enum branches in leftPaddedFromElement, the catch-all returned
-	// LeftPadded[tree.J]{Before, Markers} (element dropped). VisitBinary then
+	// LeftPadded[java.J]{Before, Markers} (element dropped). VisitBinary then
 	// raw-cast that to LeftPadded[BinaryOperator] and panicked.
 	var wire any = java.LeftPadded[java.J]{Before: java.EmptySpace, Markers: java.Markers{}}
 	expectPanic(t, "raw cast LP[J]->LP[BinaryOperator]", func() {

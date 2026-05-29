@@ -137,7 +137,7 @@ func SendMarkersCodec(m java.Markers, q *SendQueue) {
 }
 
 // hasGenericMarkerCodec reports whether sendMarkerCodecFields will dispatch
-// sub-field messages for a tree.GenericMarker with the given Java FQN.
+// sub-field messages for a java.GenericMarker with the given Java FQN.
 // Markers not listed here have no RpcCodec on either side and must travel
 // inline (as the ADD message's Value) so the receiver does not desync waiting
 // for sub-fields that never arrive.

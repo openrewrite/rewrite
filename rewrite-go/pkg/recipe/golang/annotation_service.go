@@ -200,7 +200,7 @@ func annotationsOn(t java.Tree) []*java.Annotation {
 // renders on its own line above the decl (directive convention).
 //
 // matcher selects which decls receive the annotation. Pass
-// `func(t tree.Tree) bool { return true }` to apply universally
+// `func(t java.Tree) bool { return true }` to apply universally
 // (rare; most recipes scope by decl name or context).
 //
 // For struct field tags, recipes typically construct the annotation

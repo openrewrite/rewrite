@@ -254,7 +254,7 @@ func updateRightPadded(rp any, elem any, after java.Space, markers java.Markers)
 
 // rightPaddedFromElement creates the most specific RightPadded variant based on
 // the element's concrete type. This is needed for factory-created fallback instances
-// (RightPadded[tree.J]) where we don't know the desired variant until we see the element.
+// (RightPadded[java.J]) where we don't know the desired variant until we see the element.
 func rightPaddedFromElement(elem any, after java.Space, markers java.Markers) any {
 	// Types that are only J (not Statement or Expression) need explicit handling
 	switch e := elem.(type) {
@@ -309,7 +309,7 @@ func coerceToExpressionRP(rp any) java.RightPadded[java.Expression] {
 	if expr, ok := elem.(java.Expression); ok {
 		return java.RightPadded[java.Expression]{Element: expr, After: after, Markers: m}
 	}
-	panic(fmt.Sprintf("coerceToExpressionRP: element does not implement tree.Expression (rp=%T elem=%T nil=%v)", rp, elem, elem == nil))
+	panic(fmt.Sprintf("coerceToExpressionRP: element does not implement java.Expression (rp=%T elem=%T nil=%v)", rp, elem, elem == nil))
 }
 
 // coerceToStatementRP converts a RightPadded of any variant to RightPadded[Statement].
@@ -324,7 +324,7 @@ func coerceToStatementRP(rp any) java.RightPadded[java.Statement] {
 	if stmt, ok := elem.(java.Statement); ok {
 		return java.RightPadded[java.Statement]{Element: stmt, After: after, Markers: m}
 	}
-	panic(fmt.Sprintf("coerceToStatementRP: element does not implement tree.Statement (rp=%T elem=%T nil=%v)", rp, elem, elem == nil))
+	panic(fmt.Sprintf("coerceToStatementRP: element does not implement java.Statement (rp=%T elem=%T nil=%v)", rp, elem, elem == nil))
 }
 
 // coerceRightPaddedIdent converts a RightPadded of any variant to RightPadded[*Identifier].
@@ -706,7 +706,7 @@ func containerFromElements(before java.Space, elements []any, markers java.Marke
 		}
 		return java.Container[java.Statement]{Before: before, Elements: elems, Markers: markers}
 	default:
-		// Truly heterogeneous (nothing common beyond tree.J). Use Container[tree.J]
+		// Truly heterogeneous (nothing common beyond java.J). Use Container[java.J]
 		// so callers can decide how to coerce — coerceContainerStatement and
 		// coerceContainerExpression both already handle this variant element-wise.
 		elems := make([]java.RightPadded[java.J], len(elements))

@@ -29,7 +29,7 @@ import (
 // primitives use ExpectPrimitiveType.
 //
 // Fails the test if no matching identifier is found, if its Type is nil,
-// or if the type does not implement tree.FullyQualified.
+// or if the type does not implement java.FullyQualified.
 func ExpectType(t *testing.T, root java.Tree, name string, expectedFQN string) {
 	t.Helper()
 	c := visitor.Init(&identifierTypeCollector{name: name})

@@ -78,7 +78,7 @@ func TestParseScaffoldExpression(t *testing.T) {
 	}
 	bin, ok := node.(*java.Binary)
 	if !ok {
-		t.Fatalf("expected *tree.Binary, got %T", node)
+		t.Fatalf("expected *java.Binary, got %T", node)
 	}
 	if bin.Left == nil || bin.Right == nil {
 		t.Fatal("binary should have left and right")
@@ -171,7 +171,7 @@ func TestPatternMatchWithCapture(t *testing.T) {
 	}
 	lit, ok := captured.(*java.Literal)
 	if !ok {
-		t.Fatalf("expected captured value to be *tree.Literal, got %T", captured)
+		t.Fatalf("expected captured value to be *java.Literal, got %T", captured)
 	}
 	if lit.Source != "1" {
 		t.Errorf("expected captured literal source '1', got %q", lit.Source)

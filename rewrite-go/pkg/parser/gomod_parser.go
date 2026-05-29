@@ -26,7 +26,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 )
 
-// ParseGoMod parses go.mod content into a tree.GoResolutionResult.
+// ParseGoMod parses go.mod content into a golang.GoResolutionResult.
 // Mirrors org.openrewrite.golang.GoModParser on the Java side.
 func ParseGoMod(path, content string) (*golang.GoResolutionResult, error) {
 	f, err := modfile.Parse(path, []byte(content), nil)
@@ -110,7 +110,7 @@ func ParseGoSum(content string) []golang.GoResolvedDependency {
 		// Return a non-nil empty slice: callers assign this directly to
 		// GoResolutionResult.ResolvedDependencies, and a nil slice would be
 		// serialized as a null list and break the LST write (see
-		// tree.NewGoResolutionResult).
+		// golang.NewGoResolutionResult).
 		return []golang.GoResolvedDependency{}
 	}
 	type slot struct{ module, gomod string }

@@ -248,7 +248,7 @@ func init() {
 
 	// Padding types — needed when Java sends ADD messages for new padding
 	// wrappers during bidirectional tree transfer (e.g., after a recipe
-	// recreates a statement list element). Uses RightPadded[tree.J] etc.
+	// recreates a statement list element). Uses RightPadded[java.J] etc.
 	// as the broadest type that the padding accessors can handle.
 	RegisterFactory("org.openrewrite.java.tree.JRightPadded", func() any { return java.RightPadded[java.J]{} })
 	RegisterFactory("org.openrewrite.java.tree.JLeftPadded", func() any { return java.LeftPadded[java.J]{} })

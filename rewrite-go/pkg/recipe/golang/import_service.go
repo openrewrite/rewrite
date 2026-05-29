@@ -40,10 +40,10 @@ import (
 //
 //	type myVisitor struct{ visitor.GoVisitor }
 //
-//	func (v *myVisitor) VisitMethodInvocation(mi *tree.MethodInvocation, p any) tree.J {
+//	func (v *myVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
 //	    if shouldRewrite(mi) {
 //	        // ...rewrite mi...
-//	        cu := v.Cursor().FirstEnclosing(reflect.TypeOf((*tree.CompilationUnit)(nil)))
+//	        cu := v.Cursor().FirstEnclosing(reflect.TypeOf((*golang.CompilationUnit)(nil)))
 //	        svc := recipe.Service[*golang.ImportService](cu)
 //	        v.DoAfterVisit(svc.AddImportVisitor("fmt", nil, false))
 //	    }
