@@ -152,174 +152,65 @@ func TestParseAssignOp(t *testing.T) {
 	}
 }
 
-// ----- Group 3b: coerceLeftPaddedAssignOp parses the string form -----
+// ----- Group 3b: AssignOp slots receive via coerceLeftPaddedEnum + parseAssignOpDefaulting -----
 
-func TestCoerceLeftPaddedAssignOp_FromStringDefine(t *testing.T) {
-	// given: Java ships the operator for a `range` loop as LeftPadded[string]{":="}
-	// because ParseAssignOp didn't know ":=" before this fix.
-	var wire any = java.LeftPadded[string]{
-		Before:  java.EmptySpace,
-		Element: ":=",
-		Markers: java.Markers{},
+func TestCoerceLeftPaddedEnum_AssignOpFromString(t *testing.T) {
+	// The wire ships the AssignOp as a string; the parser resolves it to the enum.
+	if got := coerceLeftPaddedEnum(java.EmptySpace, ":=", java.Markers{}, parseAssignOpDefaulting); got.Element != java.AssignOpDefine {
+		t.Errorf(":= want AssignOpDefine, got %v", got.Element)
 	}
-
-	// when
-	got := coerceLeftPaddedAssignOp(wire)
-
-	// then
-	if got.Element != java.AssignOpDefine {
-		t.Errorf("want AssignOpDefine, got %v", got.Element)
+	if got := coerceLeftPaddedEnum(java.EmptySpace, "=", java.Markers{}, parseAssignOpDefaulting); got.Element != java.AssignOpEquals {
+		t.Errorf("= want AssignOpEquals, got %v", got.Element)
 	}
 }
 
-func TestCoerceLeftPaddedAssignOp_FromStringEquals(t *testing.T) {
-	var wire any = java.LeftPadded[string]{Element: "="}
-	if got := coerceLeftPaddedAssignOp(wire); got.Element != java.AssignOpEquals {
-		t.Errorf("want AssignOpEquals, got %v", got.Element)
-	}
-}
-
-func TestCoerceLeftPaddedAssignOp_FromAlreadyTypedVariant(t *testing.T) {
-	// already-correct variant should pass through unchanged.
-	var wire any = java.LeftPadded[java.AssignOp]{Element: java.AssignOpDefine}
-	if got := coerceLeftPaddedAssignOp(wire); got.Element != java.AssignOpDefine {
+func TestCoerceLeftPaddedEnum_AssignOpPreTypedPassThrough(t *testing.T) {
+	// already-typed enum (NO_CHANGE) passes through unchanged.
+	if got := coerceLeftPaddedEnum(java.EmptySpace, java.AssignOpDefine, java.Markers{}, parseAssignOpDefaulting); got.Element != java.AssignOpDefine {
 		t.Errorf("pass-through broke: got %v", got.Element)
 	}
 }
 
-func TestCoerceLeftPaddedAssignOp_UnknownSpellingFallsBack(t *testing.T) {
-	var wire any = java.LeftPadded[string]{Element: "<-"}
+func TestParseAssignOpDefaulting_UnknownSpellingFallsBack(t *testing.T) {
 	// Defense-in-depth: we'd rather emit a possibly-wrong = than crash the recipe.
-	if got := coerceLeftPaddedAssignOp(wire); got.Element != java.AssignOpEquals {
-		t.Errorf("want fallback to AssignOpEquals, got %v", got.Element)
+	if got := parseAssignOpDefaulting("<-"); got != java.AssignOpEquals {
+		t.Errorf("want fallback to AssignOpEquals, got %v", got)
 	}
 }
 
-func TestRawCastPanics_LeftPaddedAssignOpFromString(t *testing.T) {
-	// Pre-fix: VisitForEachControl did `result.(java.LeftPadded[java.AssignOp])`
-	// on a value that was actually LeftPadded[string].
-	var wire any = java.LeftPadded[string]{Element: ":="}
-	expectPanic(t, "raw cast LP[string]->LP[AssignOp]", func() {
-		_ = wire.(java.LeftPadded[java.AssignOp])
-	})
-}
+// ----- Group 4: coerceRightPaddedTyped[T] element coercion -----
+//
+// receiveContainerTyped[T] builds Container[T] by running each received element
+// through coerceRightPaddedTyped[T], so these element-level tests lock in the
+// guarantees the deleted coerceContainerStatement/coerceContainerExpression/
+// containerFromElements heuristics used to provide — without the type inference.
 
-// ----- Group 4: Container[Statement] from Container[Expression] -----
-
-func TestCoerceContainerStatement_FromExpressionVariant(t *testing.T) {
-	// given: a Container[Expression] of two MethodInvocations — both also
-	// satisfy Statement. Java ships VisitCase bodies this way.
-	mi1, mi2 := makeMethodInvocation(), makeMethodInvocation()
-	var wire any = java.Container[java.Expression]{
-		Before: java.EmptySpace,
-		Elements: []java.RightPadded[java.Expression]{
-			{Element: mi1, Markers: java.Markers{}},
-			{Element: mi2, Markers: java.Markers{}},
-		},
-		Markers: java.Markers{},
-	}
-
-	// when
-	got := coerceContainerStatement(wire)
-
-	// then
-	if len(got.Elements) != 2 {
-		t.Fatalf("want 2 elements, got %d", len(got.Elements))
-	}
-	if got.Elements[0].Element.(*java.MethodInvocation) != mi1 {
-		t.Errorf("element[0] identity lost")
-	}
-	if got.Elements[1].Element.(*java.MethodInvocation) != mi2 {
-		t.Errorf("element[1] identity lost")
-	}
-}
-
-func TestCoerceContainerExpression_FromStatementVariant(t *testing.T) {
-	// given: a Container[Statement] of MethodInvocations — also satisfies Expression.
+func TestCoerceRightPaddedTyped_StatementFromExpressionVariant(t *testing.T) {
+	// given: a RightPadded[Expression] wrapping a *MethodInvocation (also a
+	// Statement). Java ships VisitCase bodies and parameter lists this way.
 	mi := makeMethodInvocation()
-	var wire any = java.Container[java.Statement]{
-		Elements: []java.RightPadded[java.Statement]{
-			{Element: mi, Markers: java.Markers{}},
-		},
+	var wire any = java.RightPadded[java.Expression]{Element: mi, Markers: java.Markers{}}
+
+	// when: a Statement-typed field coerces it.
+	got := coerceRightPaddedTyped[java.Statement](wire)
+
+	// then: the element survives, now typed as Statement.
+	if got.Element.(*java.MethodInvocation) != mi {
+		t.Errorf("element identity lost: want %p, got %p", mi, got.Element)
 	}
+}
+
+func TestCoerceRightPaddedTyped_ExpressionFromStatementVariant(t *testing.T) {
+	// given: a RightPadded[Statement] wrapping a *MethodInvocation (also Expression).
+	mi := makeMethodInvocation()
+	var wire any = java.RightPadded[java.Statement]{Element: mi, Markers: java.Markers{}}
 
 	// when
-	got := coerceContainerExpression(wire)
+	got := coerceRightPaddedTyped[java.Expression](wire)
 
 	// then
-	if len(got.Elements) != 1 || got.Elements[0].Element.(*java.MethodInvocation) != mi {
-		t.Fatalf("coerce dropped element: %+v", got)
-	}
-}
-
-func TestRawCastPanics_ContainerStatementFromExpression(t *testing.T) {
-	var wire any = java.Container[java.Expression]{}
-	expectPanic(t, "raw cast Container[Expression]->Container[Statement]", func() {
-		_ = wire.(java.Container[java.Statement])
-	})
-}
-
-// ----- Group 5: containerFromElements with heterogeneous RP variants -----
-
-func TestContainerFromElements_HeterogeneousElements(t *testing.T) {
-	// given: a slice whose first entry is RightPadded[Expression] (used to set
-	// the detected variant) but whose subsequent entries are RightPadded[Statement].
-	// This is exactly what Java sends for switch-case body containers when the
-	// payload includes both expression-statements and pure statements.
-	mi1 := makeMethodInvocation()
-	mi2 := makeMethodInvocation()
-	elements := []any{
-		java.RightPadded[java.Expression]{Element: mi1, Markers: java.Markers{}},
-		java.RightPadded[java.Statement]{Element: mi2, Markers: java.Markers{}},
-	}
-
-	// when: containerFromElements must coerce element 2 to Expression — the
-	// pre-fix raw cast panicked here.
-	got := containerFromElements(java.EmptySpace, elements, java.Markers{})
-
-	// then: a Container[Expression] with both elements preserved.
-	cont, ok := got.(java.Container[java.Expression])
-	if !ok {
-		t.Fatalf("want Container[Expression], got %T", got)
-	}
-	if len(cont.Elements) != 2 {
-		t.Fatalf("want 2 elements, got %d", len(cont.Elements))
-	}
-	if cont.Elements[0].Element.(*java.MethodInvocation) != mi1 {
-		t.Errorf("element[0] identity lost")
-	}
-	if cont.Elements[1].Element.(*java.MethodInvocation) != mi2 {
-		t.Errorf("element[1] identity lost — coerce dropped the Statement-variant entry")
-	}
-}
-
-func TestContainerFromElements_HeterogeneousStatementFirst(t *testing.T) {
-	// given: opposite ordering — Statement-labelled RightPadded first, Expression follows.
-	// Both elements are MethodInvocations, which implement Expression AND Statement.
-	mi1, mi2 := makeMethodInvocation(), makeMethodInvocation()
-	elements := []any{
-		java.RightPadded[java.Statement]{Element: mi1, Markers: java.Markers{}},
-		java.RightPadded[java.Expression]{Element: mi2, Markers: java.Markers{}},
-	}
-
-	// when
-	got := containerFromElements(java.EmptySpace, elements, java.Markers{})
-
-	// then: the variant is chosen by "most specific interface all elements satisfy",
-	// not by which slot's label appeared first. Both MIs satisfy Expression, so the
-	// container should be [Expression] — matching the sibling Expression-first test.
-	cont, ok := got.(java.Container[java.Expression])
-	if !ok {
-		t.Fatalf("want Container[Expression], got %T", got)
-	}
-	if len(cont.Elements) != 2 {
-		t.Fatalf("want 2 elements, got %d", len(cont.Elements))
-	}
-	if cont.Elements[0].Element.(*java.MethodInvocation) != mi1 {
-		t.Errorf("element[0] identity lost")
-	}
-	if cont.Elements[1].Element.(*java.MethodInvocation) != mi2 {
-		t.Errorf("element[1] identity lost")
+	if got.Element.(*java.MethodInvocation) != mi {
+		t.Errorf("element identity lost: want %p, got %p", mi, got.Element)
 	}
 }
 
@@ -329,134 +220,38 @@ func makeReturnStatement() *java.Return {
 	return &java.Return{ID: uuid.New()}
 }
 
-func TestContainerFromElements_StatementOnlyElementSurvives(t *testing.T) {
-	// given: a Case.Body-shaped list with a method call (Expression+Statement) and
-	// a return (Statement-only). Before the variant-detection fix, picking the
-	// Expression variant from the first element caused coerceToExpressionRP to
-	// silently drop the return statement — surfacing as truncated Go source after
-	// a round trip. See diagnostic findings in /tmp/rewrite-go-rpc-nil-debug-patches.md.
-	mi := makeMethodInvocation()
+func TestCoerceRightPaddedTyped_StatementOnlyElementSurvives(t *testing.T) {
+	// given: a *Return (Statement-only, NOT an Expression) arriving in a
+	// type-erased RightPadded[java.J] — the shape a mixed Case.Body produces.
+	// Pre-fix, inferring Expression for the whole container silently dropped this
+	// element (truncated Go source after a round trip); a Statement-typed field
+	// must preserve it.
 	ret := makeReturnStatement()
-	elements := []any{
-		java.RightPadded[java.Expression]{Element: mi, Markers: java.Markers{}},
-		java.RightPadded[java.Statement]{Element: ret, Markers: java.Markers{}},
-	}
+	var wire any = java.RightPadded[java.J]{Element: ret, Markers: java.Markers{}}
 
 	// when
-	got := containerFromElements(java.EmptySpace, elements, java.Markers{})
+	got := coerceRightPaddedTyped[java.Statement](wire)
 
-	// then: both elements survive in a Container[Statement] — Statement is the
-	// most specific interface every element satisfies.
-	cont, ok := got.(java.Container[java.Statement])
-	if !ok {
-		t.Fatalf("want Container[Statement], got %T", got)
-	}
-	if len(cont.Elements) != 2 {
-		t.Fatalf("want 2 elements, got %d", len(cont.Elements))
-	}
-	if cont.Elements[0].Element.(*java.MethodInvocation) != mi {
-		t.Errorf("element[0] (method invocation) identity lost")
-	}
-	if cont.Elements[1].Element.(*java.Return) != ret {
-		t.Errorf("element[1] (return statement) identity lost — pre-fix this was silently dropped")
+	// then
+	if got.Element.(*java.Return) != ret {
+		t.Errorf("return statement identity lost — pre-fix this was silently dropped")
 	}
 }
 
-func TestRawCastPanics_HeterogeneousRightPadded(t *testing.T) {
-	// Pre-fix containerFromElements: detected RP[Expression] from elements[0],
-	// then raw-cast elements[1] (an RP[Statement]) to RP[Expression] -> panic.
-	var second any = java.RightPadded[java.Statement]{Element: makeMethodInvocation()}
-	expectPanic(t, "raw cast RP[Statement]->RP[Expression]", func() {
-		_ = second.(java.RightPadded[java.Expression])
+func TestRawCastPanics_ContainerStatementFromExpression(t *testing.T) {
+	// Sentinel for the cross-instantiation panic receiveContainerTyped avoids:
+	// an inferred Container[Expression] is not assertable to Container[Statement].
+	var wire any = java.Container[java.Expression]{}
+	expectPanic(t, "raw cast Container[Expression]->Container[Statement]", func() {
+		_ = wire.(java.Container[java.Statement])
 	})
 }
 
-// ----- Group 6: leftPaddedFromElement preserves pre-typed operator enums -----
-//
-// On the NO_CHANGE path, ReceiveQueue.Receive returns the existing `before`
-// value unchanged. For Binary/Unary/Assignment operator slots that value is
-// the already-typed enum (BinaryOperator/UnaryOperator/AssignmentOperator/
-// AssignOp — all int-based), not the wire-format string. Pre-fix,
-// leftPaddedFromElement only matched the string spellings and fell through
-// to the catch-all `LeftPadded[java.J]{Before, Markers}` with the element
-// dropped — then VisitBinary's `result.(LeftPadded[BinaryOperator])` cast
-// at java_receiver.go:149 panicked. See /tmp/rewrite-go-rpc-print-panics-round3.md.
-
-func TestLeftPaddedFromElement_PreTypedBinaryOperator(t *testing.T) {
-	// given: NO_CHANGE handed back an already-typed BinaryOperator
-	op := java.Add
-
-	// when
-	got := leftPaddedFromElement(java.EmptySpace, op, java.Markers{})
-
-	// then: correctly-typed LeftPadded with element preserved
-	lp, ok := got.(java.LeftPadded[java.BinaryOperator])
-	if !ok {
-		t.Fatalf("want LeftPadded[BinaryOperator], got %T", got)
-	}
-	if lp.Element != op {
-		t.Errorf("Element lost: want %v, got %v", op, lp.Element)
-	}
-}
-
-func TestLeftPaddedFromElement_PreTypedUnaryOperator(t *testing.T) {
-	// given
-	op := java.Negate
-
-	// when
-	got := leftPaddedFromElement(java.EmptySpace, op, java.Markers{})
-
-	// then
-	lp, ok := got.(java.LeftPadded[java.UnaryOperator])
-	if !ok {
-		t.Fatalf("want LeftPadded[UnaryOperator], got %T", got)
-	}
-	if lp.Element != op {
-		t.Errorf("Element lost: want %v, got %v", op, lp.Element)
-	}
-}
-
-func TestLeftPaddedFromElement_PreTypedAssignmentOperator(t *testing.T) {
-	// given
-	op := java.AddAssign
-
-	// when
-	got := leftPaddedFromElement(java.EmptySpace, op, java.Markers{})
-
-	// then
-	lp, ok := got.(java.LeftPadded[java.AssignmentOperator])
-	if !ok {
-		t.Fatalf("want LeftPadded[AssignmentOperator], got %T", got)
-	}
-	if lp.Element != op {
-		t.Errorf("Element lost: want %v, got %v", op, lp.Element)
-	}
-}
-
-func TestLeftPaddedFromElement_PreTypedAssignOp(t *testing.T) {
-	// given
-	op := java.AssignOpDefine
-
-	// when
-	got := leftPaddedFromElement(java.EmptySpace, op, java.Markers{})
-
-	// then
-	lp, ok := got.(java.LeftPadded[java.AssignOp])
-	if !ok {
-		t.Fatalf("want LeftPadded[AssignOp], got %T", got)
-	}
-	if lp.Element != op {
-		t.Errorf("Element lost: want %v, got %v", op, lp.Element)
-	}
-}
-
-func TestRawCastPanics_LeftPaddedJOnBinaryOperatorSlot(t *testing.T) {
-	// Lock in the receiver-side panic shape that surfaced pre-fix: without the
-	// pre-typed-enum branches in leftPaddedFromElement, the catch-all returned
-	// LeftPadded[java.J]{Before, Markers} (element dropped). VisitBinary then
-	// raw-cast that to LeftPadded[BinaryOperator] and panicked.
-	var wire any = java.LeftPadded[java.J]{Before: java.EmptySpace, Markers: java.Markers{}}
-	expectPanic(t, "raw cast LP[J]->LP[BinaryOperator]", func() {
-		_ = wire.(java.LeftPadded[java.BinaryOperator])
+func TestRawCastPanics_HeterogeneousRightPadded(t *testing.T) {
+	// Sentinel: RightPadded[Statement] is not assertable to RightPadded[Expression]
+	// — coerceRightPaddedTyped re-wraps instead of asserting.
+	var second any = java.RightPadded[java.Statement]{Element: makeMethodInvocation()}
+	expectPanic(t, "raw cast RP[Statement]->RP[Expression]", func() {
+		_ = second.(java.RightPadded[java.Expression])
 	})
 }

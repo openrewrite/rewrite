@@ -126,13 +126,13 @@ func receiveRightPadded(r Receiver, q *ReceiveQueue, before any) any {
 	return rightPaddedFromElement(elem, after, m)
 }
 
-// receiveLeftPadded deserializes a LeftPadded element.
-func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
-	// Before space
+// receiveLeftPaddedParts deserializes the three wire fields of a JLeftPadded —
+// before-space, element, markers — shared by receiveLeftPadded (type-inferred) and
+// receiveLeftPaddedEnum (type-directed).
+func receiveLeftPaddedParts(r Receiver, q *ReceiveQueue, before any) (java.Space, any, java.Markers) {
 	beforeSpace := q.Receive(leftPaddedBefore(before), func(v any) any {
 		return receiveSpace(v.(java.Space), q)
 	})
-	// Element
 	elem := q.Receive(leftPaddedElement(before), func(v any) any {
 		if _, ok := v.(java.Space); ok {
 			return receiveSpace(v.(java.Space), q)
@@ -142,49 +142,56 @@ func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
 		}
 		return v
 	})
-	// Markers
 	markers := q.Receive(leftPaddedMarkers(before), func(v any) any {
 		return receiveMarkersCodec(q, v.(java.Markers))
 	})
-
-	return updateLeftPadded(before, beforeSpace.(java.Space), elem, markers.(java.Markers))
+	return beforeSpace.(java.Space), elem, markers.(java.Markers)
 }
 
-// receiveContainer deserializes a Container.
-// ContainerType hints for empty container creation
-const (
-	ContainerStatement  = "statement"
-	ContainerExpression = "expression"
-	ContainerImport     = "import"
-)
+// receiveLeftPadded deserializes a LeftPadded element, inferring its type from the
+// payload. Operator fields must use receiveLeftPaddedEnum instead (see its doc).
+func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
+	beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, before)
+	return leftPaddedFromElement(beforeSpace, elem, markers)
+}
 
-func receiveContainerAs(r Receiver, q *ReceiveQueue, before any, hint string) any {
-	result := receiveContainer(r, q, before)
-	// If the result is an empty Container[Expression] but the caller needs Statement, convert
-	if hint == ContainerStatement {
-		if c, ok := result.(java.Container[java.Expression]); ok && len(c.Elements) == 0 {
-			return java.Container[java.Statement]{Before: c.Before, Markers: c.Markers}
-		}
+// receiveLeftPaddedEnum receives an enum-valued JLeftPadded field, returning the typed
+// LeftPadded[T] directly — it wraps the q.Receive call, the deserialization closure, and
+// the result assertion so call sites are a single typed assignment.
+//
+// It uses the caller-supplied parser to interpret the wire payload rather than inferring
+// the type from it (leftPaddedFromElement). Inference is unsafe for enums: they travel
+// the wire as their Java enum-constant name, and those names can be AMBIGUOUS across Go
+// enum types — e.g. BinaryOperator.Add and AssignmentOperator.AddAssign both serialize
+// to "Addition". leftPaddedFromElement tries ParseBinaryOperator first, so every
+// compound-assignment operator (+=, |=, …) was mis-typed as LeftPadded[BinaryOperator]
+// and the AssignmentOperation call site's raw assertion panicked. The field's type T is
+// inferred from `before` (and the parser), so the call site just passes the matching
+// parser (ParseBinaryOperator, ParseAssignmentOperator, …). Any enum wrapped in a
+// LeftPadded — current or future — should be received this way. Counterpart to
+// receiveContainerTyped.
+func receiveLeftPaddedEnum[T any](r Receiver, q *ReceiveQueue, before java.LeftPadded[T], parse func(string) T) java.LeftPadded[T] {
+	result := q.Receive(before, func(v any) any {
+		beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, v)
+		return coerceLeftPaddedEnum(beforeSpace, elem, markers, parse)
+	})
+	if result == nil {
+		return before
 	}
-	return result
+	return result.(java.LeftPadded[T])
 }
 
-func receiveContainer(r Receiver, q *ReceiveQueue, before any) any {
-	// Before space
-	beforeSpace := q.Receive(containerBefore(before), func(v any) any {
-		return receiveSpace(v.(java.Space), q)
-	})
-	// Elements
-	elemsBefore := containerElements(before)
-	elemsAfter := q.ReceiveList(elemsBefore, func(v any) any {
-		return receiveRightPadded(r, q, v)
-	})
-	// Markers
-	markers := q.Receive(containerMarkers(before), func(v any) any {
-		return receiveMarkersCodec(q, v.(java.Markers))
-	})
-
-	return updateContainer(before, beforeSpace.(java.Space), elemsAfter, markers.(java.Markers))
+// coerceLeftPaddedEnum builds a LeftPadded[T] for an enum slot. The element is either
+// already a T (NO_CHANGE pass-through / pre-typed enum) or the enum's Java
+// enum-constant name as a string, which `parse` resolves to the T constant.
+func coerceLeftPaddedEnum[T any](before java.Space, elem any, m java.Markers, parse func(string) T) java.LeftPadded[T] {
+	if e, ok := elem.(T); ok {
+		return java.LeftPadded[T]{Before: before, Element: e, Markers: m}
+	}
+	if s, ok := elem.(string); ok {
+		return java.LeftPadded[T]{Before: before, Element: parse(s), Markers: m}
+	}
+	return java.LeftPadded[T]{Before: before, Markers: m}
 }
 
 // Accessor functions for generic padding types (using type switches for Go's type-parameterized structs)
@@ -297,8 +304,8 @@ func rightPaddedFromElement(elem any, after java.Space, markers java.Markers) an
 
 // coerceToExpressionRP converts a RightPadded of any variant to RightPadded[Expression].
 // Panics if the underlying element does not implement Expression — silently dropping it
-// (the previous behavior) corrupts the LST. containerFromElements should ensure this
-// helper is only called when every element does satisfy Expression.
+// (the previous behavior) corrupts the LST. Callers must only use this for fields whose
+// every element is known to satisfy Expression.
 func coerceToExpressionRP(rp any) java.RightPadded[java.Expression] {
 	if rp, ok := rp.(java.RightPadded[java.Expression]); ok {
 		return rp
@@ -327,20 +334,6 @@ func coerceToStatementRP(rp any) java.RightPadded[java.Statement] {
 	panic(fmt.Sprintf("coerceToStatementRP: element does not implement java.Statement (rp=%T elem=%T nil=%v)", rp, elem, elem == nil))
 }
 
-// coerceRightPaddedIdent converts a RightPadded of any variant to RightPadded[*Identifier].
-func coerceRightPaddedIdent(rp any) java.RightPadded[*java.Identifier] {
-	if rp, ok := rp.(java.RightPadded[*java.Identifier]); ok {
-		return rp
-	}
-	elem := rightPaddedElement(rp)
-	after := rightPaddedAfter(rp).(java.Space)
-	m := rightPaddedMarkers(rp).(java.Markers)
-	if id, ok := elem.(*java.Identifier); ok {
-		return java.RightPadded[*java.Identifier]{Element: id, After: after, Markers: m}
-	}
-	return java.RightPadded[*java.Identifier]{After: after, Markers: m}
-}
-
 // coerceLeftPaddedIdent converts a LeftPadded of any variant to LeftPadded[*Identifier].
 // Java may send the value generic-parameterized on Expression even though the element
 // is an *Identifier; this helper bridges that asymmetry.
@@ -357,27 +350,14 @@ func coerceLeftPaddedIdent(lp any) java.LeftPadded[*java.Identifier] {
 	return java.LeftPadded[*java.Identifier]{Before: before, Markers: m}
 }
 
-// coerceLeftPaddedAssignOp converts a LeftPadded of any variant to LeftPadded[AssignOp].
-// Java ships the operator as a literal source symbol ("=", ":=") so leftPaddedFromElement
-// produces a LeftPadded[string] when ParseAssignOp can't resolve it; this helper
-// re-parses and falls back to AssignOpEquals defensively.
-func coerceLeftPaddedAssignOp(lp any) java.LeftPadded[java.AssignOp] {
-	if lp, ok := lp.(java.LeftPadded[java.AssignOp]); ok {
-		return lp
+// parseAssignOpDefaulting parses a Go assignment operator, defaulting to "=" rather
+// than crashing the recipe on an unrecognized spelling. Used as the receiveLeftPaddedEnum
+// parser for AssignOp slots.
+func parseAssignOpDefaulting(s string) java.AssignOp {
+	if op := java.ParseAssignOp(s); op != 0 {
+		return op
 	}
-	elem := leftPaddedElement(lp)
-	before := leftPaddedBefore(lp).(java.Space)
-	m := leftPaddedMarkers(lp).(java.Markers)
-	if op, ok := elem.(java.AssignOp); ok {
-		return java.LeftPadded[java.AssignOp]{Element: op, Before: before, Markers: m}
-	}
-	if s, ok := elem.(string); ok {
-		if op := java.ParseAssignOp(s); op != 0 {
-			return java.LeftPadded[java.AssignOp]{Element: op, Before: before, Markers: m}
-		}
-		return java.LeftPadded[java.AssignOp]{Element: java.AssignOpEquals, Before: before, Markers: m}
-	}
-	return java.LeftPadded[java.AssignOp]{Element: java.AssignOpEquals, Before: before, Markers: m}
+	return java.AssignOpEquals
 }
 
 func leftPaddedBefore(lp any) any {
@@ -461,50 +441,18 @@ func leftPaddedMarkers(lp any) any {
 	}
 }
 
-// updateLeftPadded creates a correctly-typed LeftPadded from the element.
-// Uses the element's concrete type to determine the generic type parameter,
-// since Go lacks generic covariance (LeftPadded[J] != LeftPadded[Expression]).
-func updateLeftPadded(lp any, before java.Space, elem any, markers java.Markers) any {
-	return leftPaddedFromElement(before, elem, markers)
-}
-
 // leftPaddedFromElement creates a LeftPadded with the correct generic type
 // based on the element's concrete type.
+// leftPaddedFromElement infers a LeftPadded's generic type from the element's concrete
+// type. Enum-valued slots (operators, AssignOp) do NOT come through here — they use
+// receiveLeftPaddedEnum, which resolves the ambiguous wire name via a caller-supplied
+// parser — so this only handles unambiguous element kinds.
 func leftPaddedFromElement(before java.Space, elem any, markers java.Markers) any {
-	// String values may encode operator enums
-	if s, ok := elem.(string); ok {
-		if op := java.ParseBinaryOperator(s); op != 0 {
-			return java.LeftPadded[java.BinaryOperator]{Before: before, Element: op, Markers: markers}
-		}
-		if op := java.ParseAssignmentOperator(s); op != 0 {
-			return java.LeftPadded[java.AssignmentOperator]{Before: before, Element: op, Markers: markers}
-		}
-		if op := java.ParseUnaryOperator(s); op != 0 {
-			return java.LeftPadded[java.UnaryOperator]{Before: before, Element: op, Markers: markers}
-		}
-		if op := java.ParseAssignOp(s); op != 0 {
-			return java.LeftPadded[java.AssignOp]{Before: before, Element: op, Markers: markers}
-		}
-		return java.LeftPadded[string]{Before: before, Element: s, Markers: markers}
-	}
 	if b, ok := elem.(bool); ok {
 		return java.LeftPadded[bool]{Before: before, Element: b, Markers: markers}
 	}
 	if sp, ok := elem.(java.Space); ok {
 		return java.LeftPadded[java.Space]{Before: before, Element: sp, Markers: markers}
-	}
-	// Pre-typed operator enums (NO_CHANGE path passes the existing typed value through)
-	if op, ok := elem.(java.BinaryOperator); ok {
-		return java.LeftPadded[java.BinaryOperator]{Before: before, Element: op, Markers: markers}
-	}
-	if op, ok := elem.(java.UnaryOperator); ok {
-		return java.LeftPadded[java.UnaryOperator]{Before: before, Element: op, Markers: markers}
-	}
-	if op, ok := elem.(java.AssignmentOperator); ok {
-		return java.LeftPadded[java.AssignmentOperator]{Before: before, Element: op, Markers: markers}
-	}
-	if op, ok := elem.(java.AssignOp); ok {
-		return java.LeftPadded[java.AssignOp]{Before: before, Element: op, Markers: markers}
 	}
 	// Interface types — prefer Expression over Statement
 	if expr, ok := elem.(java.Expression); ok {
@@ -599,127 +547,51 @@ func containerMarkers(c any) any {
 	}
 }
 
-// coerceContainerStatement converts a Container of any variant to Container[Statement].
-// When the inbound is Container[Expression], each element is coerced element-wise.
-func coerceContainerStatement(c any) java.Container[java.Statement] {
-	if c, ok := c.(java.Container[java.Statement]); ok {
-		return c
+// coerceRightPaddedTyped converts a RightPadded of any variant to RightPadded[T].
+// Java erases the element type parameter of JRightPadded on the wire, so the value
+// receiveRightPadded hands back may be parameterized on a wider interface (e.g.
+// RightPadded[Expression]) than the field's declared RightPadded[T]. Go generics
+// are invariant and distinct instantiations are unrelated at runtime, so this
+// re-wraps the element under T.
+//
+// Unlike coerceToExpressionRP/coerceToStatementRP — which panic when the element
+// doesn't satisfy the target type — this falls back to an element-less padding.
+// Those coerce single-slot fields where a non-conforming element is an unambiguous
+// bug worth failing loudly on; this coerces container elements, where a stray
+// element should not abort the whole container's (and thus the node's) receive.
+func coerceRightPaddedTyped[T any](rp any) java.RightPadded[T] {
+	if rp, ok := rp.(java.RightPadded[T]); ok {
+		return rp
 	}
-	if ec, ok := c.(java.Container[java.Expression]); ok {
-		elems := make([]java.RightPadded[java.Statement], 0, len(ec.Elements))
-		for _, rp := range ec.Elements {
-			elems = append(elems, coerceToStatementRP(rp))
-		}
-		return java.Container[java.Statement]{Before: ec.Before, Elements: elems, Markers: ec.Markers}
+	elem := rightPaddedElement(rp)
+	after := rightPaddedAfter(rp).(java.Space)
+	m := rightPaddedMarkers(rp).(java.Markers)
+	if e, ok := elem.(T); ok {
+		return java.RightPadded[T]{Element: e, After: after, Markers: m}
 	}
-	if jc, ok := c.(java.Container[java.J]); ok {
-		elems := make([]java.RightPadded[java.Statement], 0, len(jc.Elements))
-		for _, rp := range jc.Elements {
-			elems = append(elems, coerceToStatementRP(rp))
-		}
-		return java.Container[java.Statement]{Before: jc.Before, Elements: elems, Markers: jc.Markers}
-	}
-	return java.Container[java.Statement]{}
+	return java.RightPadded[T]{After: after, Markers: m}
 }
 
-// coerceContainerExpression converts a Container of any variant to Container[Expression].
-// When the inbound is Container[Statement], each element is coerced element-wise.
-func coerceContainerExpression(c any) java.Container[java.Expression] {
-	if c, ok := c.(java.Container[java.Expression]); ok {
-		return c
+// receiveContainerTyped deserializes a JContainer into a Go Container[T], building
+// it directly from the field's statically-known element type T rather than inferring
+// the type from the payload. Inference has to guess for empty containers — and since
+// Go generics are invariant (see coerceRightPaddedTyped), a guessed Container[Expression]
+// for an empty imports field is not assertable to Container[*Import] and would panic.
+// Supplying T up front sidesteps that. The type-safe counterpart to sendContainer.
+func receiveContainerTyped[T any](r Receiver, q *ReceiveQueue, before any) java.Container[T] {
+	beforeSpace := q.Receive(containerBefore(before), func(v any) any {
+		return receiveSpace(v.(java.Space), q)
+	})
+	elemsBefore := containerElements(before)
+	elemsAfter := q.ReceiveList(elemsBefore, func(v any) any {
+		return receiveRightPadded(r, q, v)
+	})
+	markers := q.Receive(containerMarkers(before), func(v any) any {
+		return receiveMarkersCodec(q, v.(java.Markers))
+	})
+	elems := make([]java.RightPadded[T], len(elemsAfter))
+	for i, rp := range elemsAfter {
+		elems[i] = coerceRightPaddedTyped[T](rp)
 	}
-	if sc, ok := c.(java.Container[java.Statement]); ok {
-		elems := make([]java.RightPadded[java.Expression], 0, len(sc.Elements))
-		for _, rp := range sc.Elements {
-			elems = append(elems, coerceToExpressionRP(rp))
-		}
-		return java.Container[java.Expression]{Before: sc.Before, Elements: elems, Markers: sc.Markers}
-	}
-	if jc, ok := c.(java.Container[java.J]); ok {
-		elems := make([]java.RightPadded[java.Expression], 0, len(jc.Elements))
-		for _, rp := range jc.Elements {
-			elems = append(elems, coerceToExpressionRP(rp))
-		}
-		return java.Container[java.Expression]{Before: jc.Before, Elements: elems, Markers: jc.Markers}
-	}
-	return java.Container[java.Expression]{}
-}
-
-// updateContainer creates a correctly-typed Container from the elements.
-// Always uses element-type detection since Go lacks generic covariance.
-func updateContainer(c any, before java.Space, elements []any, markers java.Markers) any {
-	return containerFromElements(before, elements, markers)
-}
-
-// containerFromElements creates a Container whose generic type is the most
-// specific interface satisfied by *every* element. Picking based on the first
-// element alone silently drops Statement-only entries (Return, If, …) when
-// the first element happens to be an Expression — that is the root cause of
-// the Case.Body corruption documented in the round-trip diagnostics.
-func containerFromElements(before java.Space, elements []any, markers java.Markers) any {
-	if len(elements) == 0 {
-		// Empty container — default to Expression since most containers
-		// (method arguments, type parameters) expect Expression.
-		return java.Container[java.Expression]{Before: before, Markers: markers}
-	}
-
-	allImport := true
-	allExpr := true
-	allStmt := true
-	for _, e := range elements {
-		elem := rightPaddedElement(e)
-		if _, ok := elem.(*java.Import); !ok {
-			allImport = false
-		}
-		if _, ok := elem.(java.Expression); !ok {
-			allExpr = false
-		}
-		if _, ok := elem.(java.Statement); !ok {
-			allStmt = false
-		}
-	}
-
-	switch {
-	case allImport:
-		elems := make([]java.RightPadded[*java.Import], len(elements))
-		for i, e := range elements {
-			if rp, ok := e.(java.RightPadded[*java.Import]); ok {
-				elems[i] = rp
-			}
-		}
-		return java.Container[*java.Import]{Before: before, Elements: elems, Markers: markers}
-	case allExpr:
-		// All elements implement Expression — safe to fit into Container[Expression].
-		elems := make([]java.RightPadded[java.Expression], len(elements))
-		for i, e := range elements {
-			elems[i] = coerceToExpressionRP(e)
-		}
-		return java.Container[java.Expression]{Before: before, Elements: elems, Markers: markers}
-	case allStmt:
-		// Some element does not implement Expression but all implement Statement
-		// (mixed Case.Body: method calls + return). Without this branch, the old
-		// first-element-only detection would pick Expression and silently drop the
-		// Statement-only entries via coerceToExpressionRP's fallback.
-		elems := make([]java.RightPadded[java.Statement], len(elements))
-		for i, e := range elements {
-			elems[i] = coerceToStatementRP(e)
-		}
-		return java.Container[java.Statement]{Before: before, Elements: elems, Markers: markers}
-	default:
-		// Truly heterogeneous (nothing common beyond java.J). Use Container[java.J]
-		// so callers can decide how to coerce — coerceContainerStatement and
-		// coerceContainerExpression both already handle this variant element-wise.
-		elems := make([]java.RightPadded[java.J], len(elements))
-		for i, e := range elements {
-			elem := rightPaddedElement(e)
-			after := rightPaddedAfter(e).(java.Space)
-			m := rightPaddedMarkers(e).(java.Markers)
-			if j, ok := elem.(java.J); ok {
-				elems[i] = java.RightPadded[java.J]{Element: j, After: after, Markers: m}
-			} else {
-				elems[i] = java.RightPadded[java.J]{After: after, Markers: m}
-			}
-		}
-		return java.Container[java.J]{Before: before, Elements: elems, Markers: markers}
-	}
+	return java.Container[T]{Before: beforeSpace.(java.Space), Elements: elems, Markers: markers.(java.Markers)}
 }
