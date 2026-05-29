@@ -436,33 +436,59 @@ class ScalaTreeVisitor(
           case _ => new S.StatementExpression(Tree.randomId(), j)
         }
         val select = asExpression(visitTree(app.fun))
-        val openIdx = positionOfNext("(", cursor)
-        val argContainerPrefix = if (openIdx > cursor) Space.format(source, cursor, openIdx) else Space.EMPTY
-        if (openIdx >= 0) cursor = openIdx + 1
+
+        // Detect block argument `(expr) { ... }` vs normal parens `(expr)(args)`
+        val firstArgNonWs = if (app.args.nonEmpty) indexOfNextNonWhitespace(cursor) else -1
+        val isBlockArg = firstArgNonWs >= 0 && firstArgNonWs < source.length &&
+          source.charAt(firstArgNonWs) == '{'
+
         val args = new util.ArrayList[JRightPadded[Expression]]()
-        for (i <- app.args.indices) {
-          val arg = app.args(i)
-          val argExpr = asExpression(visitTree(arg))
-          val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
-          val afterSpace = if (i == app.args.size - 1) {
-            val closePos = positionOfNext(")", Math.max(cursor, argEnd))
-            if (closePos > argEnd) Space.format(source, argEnd, closePos) else Space.EMPTY
-          } else {
-            val commaPos = positionOfNext(",", Math.max(cursor, argEnd))
-            val space = if (commaPos > argEnd) Space.format(source, argEnd, commaPos) else Space.EMPTY
-            if (commaPos >= cursor) cursor = commaPos + 1
-            space
+        var argContainerPrefix = Space.EMPTY
+        val markers = new util.ArrayList[org.openrewrite.marker.Marker]()
+        markers.add(FunctionApplication.create())
+
+        if (isBlockArg) {
+          markers.add(new BlockArgument(Tree.randomId()))
+          for (arg <- app.args) {
+            val argSpace = extractPrefix(arg.span)
+            visitTree(arg) match {
+              case expr: Expression =>
+                args.add(JRightPadded.build(expr.withPrefix(argSpace).asInstanceOf[Expression]))
+              case block: J.Block =>
+                val blockExpr = new S.StatementExpression(Tree.randomId(), block.withPrefix(argSpace))
+                args.add(JRightPadded.build(blockExpr.asInstanceOf[Expression]))
+              case _ =>
+            }
           }
-          args.add(new JRightPadded(argExpr, afterSpace, Markers.EMPTY))
+        } else {
+          val openIdx = positionOfNext("(", cursor)
+          argContainerPrefix = if (openIdx > cursor) Space.format(source, cursor, openIdx) else Space.EMPTY
+          if (openIdx >= 0) cursor = openIdx + 1
+          for (i <- app.args.indices) {
+            val arg = app.args(i)
+            val argExpr = asExpression(visitTree(arg))
+            val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+            val afterSpace = if (i == app.args.size - 1) {
+              val closePos = positionOfNext(")", Math.max(cursor, argEnd))
+              if (closePos > argEnd) Space.format(source, argEnd, closePos) else Space.EMPTY
+            } else {
+              val commaPos = positionOfNext(",", Math.max(cursor, argEnd))
+              val space = if (commaPos > argEnd) Space.format(source, argEnd, commaPos) else Space.EMPTY
+              if (commaPos >= cursor) cursor = commaPos + 1
+              space
+            }
+            args.add(new JRightPadded(argExpr, afterSpace, Markers.EMPTY))
+          }
+          val closeParen = positionOfNext(")", cursor)
+          if (closeParen >= 0) cursor = closeParen + 1
         }
-        val closeParen = positionOfNext(")", cursor)
-        if (closeParen >= 0) cursor = closeParen + 1
+
         updateCursor(app.span.end)
         val mt = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
         val nameId = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
           Collections.emptyList(), "apply", null, null)
         new J.MethodInvocation(Tree.randomId(), prefix,
-          Markers.build(Collections.singletonList(FunctionApplication.create())),
+          Markers.build(markers),
           JRightPadded.build(select), null, nameId,
           JContainer.build(argContainerPrefix, args, Markers.EMPTY), mt)
     }
