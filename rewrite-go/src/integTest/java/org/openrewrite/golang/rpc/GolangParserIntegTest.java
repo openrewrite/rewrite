@@ -328,6 +328,113 @@ class GolangParserIntegTest implements RewriteTest {
     }
 
     @Test
+    void typeSetUnionConstraintWithApproximation() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Signed interface {
+                                \t~int | ~int8 | ~int16 | ~int32 | ~int64
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void standaloneApproximationConstraint() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type MyInt interface {
+                                \t~int
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void unionOfNamedConstraints() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Signed interface {
+                                \t~int | ~int64
+                                }
+
+                                type Unsigned interface {
+                                \t~uint | ~uint64
+                                }
+
+                                type Integer interface {
+                                \tSigned | Unsigned
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void plainUnionWithoutApproximation() {
+        // Mirrors klauspost/compress .../le.go — a plain union of
+        // primitive type names with no `~`.
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Indexer interface {
+                                \tint | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void unionOfQualifiedNameAndSlice() {
+        // Mirrors golang-jwt/jwt .../token.go — `crypto.PublicKey | []uint8`.
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                import "crypto"
+
+                                type VerificationKey interface {
+                                \tcrypto.PublicKey | []uint8
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void typeSetUnionWithCompositeOperands() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type ByteSeq interface {
+                                \t~[]byte | ~string
+                                }
+
+                                type IntPtr interface {
+                                \t*int | *int64
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
     void mapType() {
         rewriteRun(
                 go(

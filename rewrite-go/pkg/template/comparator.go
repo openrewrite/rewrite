@@ -319,6 +319,12 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 	case *golang.TypeList:
 		cand := candidate.(*golang.TypeList)
 		return c.matchStatementContainer(p.Types, cand.Types)
+	case *golang.Union:
+		cand := candidate.(*golang.Union)
+		return c.matchExpressionRightPaddedList(p.Types, cand.Types)
+	case *golang.UnderlyingType:
+		cand := candidate.(*golang.UnderlyingType)
+		return c.matchOptionalExpression(p.Element, cand.Element)
 	case *golang.TypeDecl:
 		cand := candidate.(*golang.TypeDecl)
 		if !c.matchNode(p.Name, cand.Name) {

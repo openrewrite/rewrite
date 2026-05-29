@@ -329,6 +329,13 @@ func getLeadingPrefix(j java.J) java.Space {
 		return n.Prefix
 	case *golang.TypeList:
 		return n.Prefix
+	case *golang.Union:
+		if len(n.Types) > 0 {
+			return getLeadingPrefix(n.Types[0].Element)
+		}
+		return n.Prefix
+	case *golang.UnderlyingType:
+		return n.Prefix
 	case *golang.TypeDecl:
 		return n.Prefix
 	case *golang.MultiAssignment:

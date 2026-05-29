@@ -214,6 +214,10 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitFuncType(n, p)
 	case *golang.TypeList:
 		return v.self().VisitTypeList(n, p)
+	case *golang.Union:
+		return v.self().VisitUnion(n, p)
+	case *golang.UnderlyingType:
+		return v.self().VisitUnderlyingType(n, p)
 	case *golang.TypeDecl:
 		return v.self().VisitTypeDecl(n, p)
 	case *golang.StructType:
@@ -294,6 +298,8 @@ type VisitorI interface {
 	VisitChannel(ch *golang.Channel, p any) java.J
 	VisitFuncType(ft *golang.FuncType, p any) java.J
 	VisitTypeList(tl *golang.TypeList, p any) java.J
+	VisitUnion(u *golang.Union, p any) java.J
+	VisitUnderlyingType(ut *golang.UnderlyingType, p any) java.J
 	VisitTypeDecl(td *golang.TypeDecl, p any) java.J
 	VisitStructType(st *golang.StructType, p any) java.J
 	VisitInterfaceType(it *golang.InterfaceType, p any) java.J
@@ -773,6 +779,20 @@ func (v *GoVisitor) VisitTypeList(tl *golang.TypeList, p any) java.J {
 	tl = tl.WithPrefix(v.self().VisitSpace(tl.Prefix, p))
 	tl = tl.WithMarkers(v.visitMarkers(tl.Markers, p))
 	return tl
+}
+
+func (v *GoVisitor) VisitUnion(u *golang.Union, p any) java.J {
+	u = u.WithPrefix(v.self().VisitSpace(u.Prefix, p))
+	u = u.WithMarkers(v.visitMarkers(u.Markers, p))
+	u.Types = visitRightPaddedExpressionList(v, u.Types, p)
+	return u
+}
+
+func (v *GoVisitor) VisitUnderlyingType(ut *golang.UnderlyingType, p any) java.J {
+	ut = ut.WithPrefix(v.self().VisitSpace(ut.Prefix, p))
+	ut = ut.WithMarkers(v.visitMarkers(ut.Markers, p))
+	ut.Element = visitExpression(v, ut.Element, p)
+	return ut
 }
 
 func (v *GoVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {

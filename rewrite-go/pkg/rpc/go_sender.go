@@ -251,6 +251,29 @@ func (s *GoSender) VisitTypeList(tl *golang.TypeList, p any) java.J {
 	return tl
 }
 
+func (s *GoSender) VisitUnion(u *golang.Union, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSendList(u,
+		func(v any) []any {
+			types := v.(*golang.Union).Types
+			result := make([]any, len(types))
+			for i, t := range types {
+				result[i] = t
+			}
+			return result
+		},
+		func(v any) any { return containerElementID(v) },
+		func(v any) { sendRightPadded(s, v, q) })
+	return u
+}
+
+func (s *GoSender) VisitUnderlyingType(ut *golang.UnderlyingType, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(ut, func(v any) any { return v.(*golang.UnderlyingType).Element },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return ut
+}
+
 func (s *GoSender) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 	q := p.(*SendQueue)
 	// leadingAnnotations (`//go:` directives modeled as J.Annotation)

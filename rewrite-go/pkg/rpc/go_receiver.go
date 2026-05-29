@@ -363,6 +363,35 @@ func (r *GoReceiver) VisitTypeList(tl *golang.TypeList, p any) java.J {
 	return tl
 }
 
+func (r *GoReceiver) VisitUnion(u *golang.Union, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *u // shallow copy to avoid mutating remoteObjects baseline
+	u = &c
+	beforeTypes := make([]any, len(u.Types))
+	for i, t := range u.Types {
+		beforeTypes[i] = t
+	}
+	afterTypes := q.ReceiveList(beforeTypes, func(v any) any { return receiveRightPadded(r, q, v) })
+	if afterTypes != nil {
+		u.Types = make([]java.RightPadded[java.Expression], len(afterTypes))
+		for i, t := range afterTypes {
+			u.Types[i] = coerceToExpressionRP(t)
+		}
+	}
+	return u
+}
+
+func (r *GoReceiver) VisitUnderlyingType(ut *golang.UnderlyingType, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *ut // shallow copy to avoid mutating remoteObjects baseline
+	ut = &c
+	result := q.Receive(ut.Element, func(v any) any { return r.Visit(v.(java.Tree), q) })
+	if result != nil {
+		ut.Element = result.(java.Expression)
+	}
+	return ut
+}
+
 func (r *GoReceiver) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *td // shallow copy to avoid mutating remoteObjects baseline
