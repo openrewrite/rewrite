@@ -848,22 +848,47 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 	q := rpc.NewReceiveQueue(s.reverseRemoteRefs, fetchBatch)
 
 	receiver := rpc.NewGoReceiver()
-	obj := q.Receive(before, func(v any) any {
-		// ExecutionContext uses an empty-body codec (matches JS execution.ts):
-		// the type tag arrives via the queue envelope; no field messages follow.
-		if ctx, ok := v.(*recipe.ExecutionContext); ok {
-			return ctx
-		}
-		if t, ok := v.(java.Tree); ok {
-			return receiver.Visit(t, q)
-		}
-		return v
-	})
 
-	// Consume the END_OF_OBJECT sentinel if present
-	if len(q.PeekBatch()) > 0 && q.PeekBatch()[0].State == rpc.EndOfObject {
-		q.Take()
-	}
+	var obj any
+	func() {
+		// A panic mid-receive leaves Go's per-id baseline diverged from Java's:
+		// Java records remoteObjects[id] when it generates the diff, so its next
+		// send would be a CHANGE delta against a baseline Go never finished
+		// applying — desyncing the wire and cascading "expected CHANGE with
+		// positions" / position panics into unrelated later requests. Drop our
+		// baseline so the next GetObject for this id re-syncs as a full ADD.
+		// Mirrors the getObject recovery in RewriteRpc (Java) and rewrite-rpc.ts
+		// (JS): on failure they `remoteObjects.remove(id)` and rethrow.
+		//
+		// The shared ref table is intentionally left intact. Java's
+		// reverse-direction send refs are connection-scoped (cleared only on
+		// Reset), so discarding ours would make Java's bare {ref:N} look-ups
+		// fail with "received reference to unknown object: N" — turning a single
+		// failed request into a fresh cascade.
+		defer func() {
+			if r := recover(); r != nil {
+				delete(s.reverseRemoteObjects, id)
+				panic(r) // surface as one clear error via safeHandleRequest
+			}
+		}()
+
+		obj = q.Receive(before, func(v any) any {
+			// ExecutionContext uses an empty-body codec (matches JS execution.ts):
+			// the type tag arrives via the queue envelope; no field messages follow.
+			if ctx, ok := v.(*recipe.ExecutionContext); ok {
+				return ctx
+			}
+			if t, ok := v.(java.Tree); ok {
+				return receiver.Visit(t, q)
+			}
+			return v
+		})
+
+		// Consume the END_OF_OBJECT sentinel if present
+		if len(q.PeekBatch()) > 0 && q.PeekBatch()[0].State == rpc.EndOfObject {
+			q.Take()
+		}
+	}()
 
 	if obj != nil {
 		s.reverseRemoteObjects[id] = obj
