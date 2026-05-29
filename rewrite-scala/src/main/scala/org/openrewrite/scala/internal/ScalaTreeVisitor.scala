@@ -4995,17 +4995,10 @@ class ScalaTreeVisitor(
         var probe = scanCursor
         while (probe < source.length && source.charAt(probe).isWhitespace) probe += 1
         if (probe < source.length && source.charAt(probe) == '(') {
-          var depth = 1
-          var i = probe + 1
-          while (i < source.length && depth > 0) {
-            val c = source.charAt(i)
-            if (c == '(') depth += 1
-            else if (c == ')') depth -= 1
-            i += 1
-          }
-          if (depth == 0) {
-            extraListsBuf.append(source.substring(scanCursor, i))
-            scanCursor = i
+          val closePos = positionOfMatchingClose('(', ')', probe + 1)
+          if (closePos >= 0) {
+            extraListsBuf.append(source.substring(scanCursor, closePos + 1))
+            scanCursor = closePos + 1
           } else {
             keepScanning = false
           }
@@ -5874,14 +5867,8 @@ class ScalaTreeVisitor(
       // Skip a `[...]` type parameter list. After the type params, an ordinary
       // def may have `()` (regular method) or `:`/`=` (parameterless method).
       if (i < source.length && source.charAt(i) == '[') {
-        var depth = 1
-        i += 1
-        while (i < source.length && depth > 0) {
-          val c = source.charAt(i)
-          if (c == '[') depth += 1
-          else if (c == ']') depth -= 1
-          i += 1
-        }
+        val closePos = positionOfMatchingClose('[', ']', i + 1)
+        i = if (closePos >= 0) closePos + 1 else source.length
         while (i < source.length && source.charAt(i).isWhitespace) i += 1
       }
       if (i < source.length) {
@@ -5943,33 +5930,10 @@ class ScalaTreeVisitor(
     val braceStart = cursor + braceIdx
 
     // Find matching closing brace
-    var depth = 1
-    var i = braceStart + 1
-    var inString = false
-    var inLineComment = false
-    var inBlockComment = false
-    while (i < source.length && depth > 0) {
-      val ch = source.charAt(i)
-      if (inLineComment) {
-        if (ch == '\n') inLineComment = false
-      } else if (inBlockComment) {
-        if (ch == '*' && i + 1 < source.length && source.charAt(i + 1) == '/') { inBlockComment = false; i += 1 }
-      } else if (inString) {
-        if (ch == '\\') i += 1
-        else if (ch == '"') inString = false
-      } else {
-        ch match {
-          case '/' if i + 1 < source.length && source.charAt(i + 1) == '/' => inLineComment = true
-          case '/' if i + 1 < source.length && source.charAt(i + 1) == '*' => inBlockComment = true; i += 1
-          case '"' => inString = true
-          case '{' => depth += 1
-          case '}' => depth -= 1
-          case _ =>
-        }
-      }
-      if (depth > 0) i += 1
+    val closingBrace = {
+      val p = positionOfMatchingClose('{', '}', braceStart + 1)
+      if (p >= 0) p else source.length
     }
-    val closingBrace = i
 
     // Extract the body block source (including { and })
     val bodyBlockSource = source.substring(braceStart, Math.min(closingBrace + 1, source.length))
@@ -7822,6 +7786,15 @@ class ScalaTreeVisitor(
     import scala.jdk.CollectionConverters.*
     val enumsList = enums.asJava
     val rpEnums = new util.ArrayList[JRightPadded[S.For.Enumerator]]()
+
+    // Pre-compute the matching close bracket position for paren/brace form.
+    // positionOfNext() would incorrectly stop at the first ')' inside a pattern like `(x)`,
+    // so we use positionOfMatchingClose to track depth while skipping comments and strings.
+    val closeBracketPosition: Int = if (!isParenless) {
+      val p = positionOfMatchingClose(openBracket, closeChar, cursor)
+      if (p >= 0) p else spanEnd
+    } else spanEnd
+
     var i = 0
     while (i < enumsList.size) {
       val isLast = i + 1 == enumsList.size
@@ -7839,19 +7812,15 @@ class ScalaTreeVisitor(
             if (doIdx >= 0 && doIdx < bodyStart) doIdx else bodyStart
           }
         }
-        else {
-          val closeIdx = positionOfNext(closeChar.toString, cursor)
-          if (closeIdx >= 0) closeIdx else spanEnd
-        }
+        else closeBracketPosition
       rpEnums.add(buildForEnumerator(enumsList.get(i), isLast, enumEnd))
       i += 1
     }
     val enumerators = JContainer.build(beforeOpen, rpEnums, Markers.EMPTY)
 
-    // Find closing bracket (only in paren form)
-    if (!isParenless) {
-      val closeIdx = positionOfNext(closeChar.toString, cursor)
-      if (closeIdx >= 0) cursor = closeIdx + 1
+    // Advance past the closing bracket (only in paren form)
+    if (!isParenless && closeBracketPosition < source.length) {
+      cursor = closeBracketPosition + 1
     }
 
     // Capture space before body / `yield` / `do`
@@ -8321,7 +8290,41 @@ class ScalaTreeVisitor(
     }
     -1
   }
-  
+
+  /** Returns the index of the bracket that matches the open bracket assumed to be at
+   *  {@code afterOpen - 1}, searching forward from {@code afterOpen} in {@code source}.
+   *  Skips nested bracket pairs, {@code //} and {@code /* */} comments, and
+   *  {@code "..."} string literals (including {@code \\} escape sequences).
+   *  Returns -1 if the matching close is not found before end of source. */
+  private def positionOfMatchingClose(openChar: Char, closeChar: Char, afterOpen: Int): Int = {
+    var depth = 1
+    var i = afterOpen
+    var inLineComment = false
+    var inBlockComment = false
+    var inString = false
+    while (i < source.length && depth > 0) {
+      val c = source.charAt(i)
+      if (inLineComment) {
+        if (c == '\n') inLineComment = false
+        i += 1
+      } else if (inBlockComment) {
+        if (c == '*' && i + 1 < source.length && source.charAt(i + 1) == '/') { inBlockComment = false; i += 2 }
+        else i += 1
+      } else if (inString) {
+        if (c == '\\') i += 2
+        else { if (c == '"') inString = false; i += 1 }
+      } else if (c == '/' && i + 1 < source.length && source.charAt(i + 1) == '/') { inLineComment = true; i += 2 }
+      else if (c == '/' && i + 1 < source.length && source.charAt(i + 1) == '*') { inBlockComment = true; i += 2 }
+      else if (c == '"') { inString = true; i += 1 }
+      else {
+        if (c == openChar) depth += 1
+        else if (c == closeChar) depth -= 1
+        if (depth > 0) i += 1
+      }
+    }
+    if (depth == 0) i else -1
+  }
+
   /**
    * Skip whitespace and Scala comments (`/* ... */` and `//`) and return the
    * position of the next significant character. Returns `source.length` if no
