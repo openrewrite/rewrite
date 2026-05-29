@@ -408,7 +408,7 @@ func (r *JavaReceiver) VisitTypeParameter(tp *java.TypeParameter, p any) java.J 
 	if tp.Bounds != nil {
 		boundsBefore = *tp.Bounds
 	}
-	if result := q.Receive(boundsBefore, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
+	if result := q.Receive(boundsBefore, func(v any) any { return receiveContainerTyped[java.Expression](r, q, v) }); result != nil {
 		container := result.(java.Container[java.Expression])
 		tp.Bounds = &container
 	} else {
