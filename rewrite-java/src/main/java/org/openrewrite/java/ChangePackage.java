@@ -21,7 +21,6 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.internal.JavaSourceSetCompat;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
@@ -383,22 +382,21 @@ public class ChangePackage extends Recipe {
             if (!sourceSet.isPresent()) {
                 return false;
             }
-            JavaSourceSet ss = sourceSet.get();
 
             Set<String> typesInChangedPackage = new HashSet<>();
-            JavaSourceSetCompat.classpathTypesInPackage(ss, changedPackage)
-                    .forEach(fq -> typesInChangedPackage.add(fq.getClassName()));
-            if (!changedPackage.equals(originalPackage)) {
-                JavaSourceSetCompat.classpathTypesInPackage(ss, originalPackage)
-                        .forEach(fq -> typesInChangedPackage.add(fq.getClassName()));
-            }
-            if (typesInChangedPackage.isEmpty()) {
-                return false;
+            Set<String> typesInOtherPackages = new HashSet<>();
+            for (JavaType.FullyQualified fq : sourceSet.get().getClasspath()) {
+                String pkg = fq.getPackageName();
+                String className = fq.getClassName();
+                if (pkg.equals(changedPackage) || pkg.equals(originalPackage)) {
+                    typesInChangedPackage.add(className);
+                } else if (otherStarPackages.contains(pkg)) {
+                    typesInOtherPackages.add(className);
+                }
             }
 
-            for (String pkg : otherStarPackages) {
-                if (JavaSourceSetCompat.classpathTypesInPackage(ss, pkg)
-                        .anyMatch(fq -> typesInChangedPackage.contains(fq.getClassName()))) {
+            for (String typeName : typesInChangedPackage) {
+                if (typesInOtherPackages.contains(typeName)) {
                     return true;
                 }
             }
@@ -416,9 +414,10 @@ public class ChangePackage extends Recipe {
             }
             Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
             if (sourceSet.isPresent()) {
-                Optional<JavaType.FullyQualified> hit = JavaSourceSetCompat.findClasspathType(sourceSet.get(), fqn);
-                if (hit.isPresent()) {
-                    return hit.get();
+                for (JavaType.FullyQualified fq : sourceSet.get().getClasspath()) {
+                    if (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fqn)) {
+                        return fq;
+                    }
                 }
             }
             return JavaType.ShallowClass.build(fqn);

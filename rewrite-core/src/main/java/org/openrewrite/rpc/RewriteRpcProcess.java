@@ -39,8 +39,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.openrewrite.internal.StringUtils.readFully;
@@ -66,6 +69,8 @@ public class RewriteRpcProcess extends Thread {
 
     private final Map<String, String> environment = new LinkedHashMap<>();
 
+    private final Set<String> unsetEnvNames = new LinkedHashSet<>();
+
     @Setter
     private @Nullable Path stderrRedirect;
 
@@ -88,6 +93,17 @@ public class RewriteRpcProcess extends Thread {
         return environment;
     }
 
+    /**
+     * Strip these env vars from the spawned process's environment before
+     * applying {@link #environment()}. Use when the subprocess bundles its
+     * own runtime (e.g. a packaged Node) and inherited runtime-specific
+     * vars from the parent — {@code NODE_OPTIONS}, {@code NODE_PATH},
+     * {@code PYTHONHOME}, … — corrupt its startup.
+     */
+    public void unsetEnv(Collection<String> names) {
+        this.unsetEnvNames.addAll(names);
+    }
+
     public RewriteRpcProcess trace() {
         this.trace = true;
         return this;
@@ -97,6 +113,9 @@ public class RewriteRpcProcess extends Thread {
     public void run() {
         try {
             ProcessBuilder pb = new ProcessBuilder(command);
+            // Strip inherited vars BEFORE putAll so the caller's explicit
+            // environment (which can re-set any of these names) wins.
+            unsetEnvNames.forEach(pb.environment()::remove);
             pb.environment().putAll(environment);
             if (workingDirectory != null) {
                 pb.directory(workingDirectory.toFile());

@@ -20,7 +20,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.internal.JavaSourceSetCompat;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
@@ -646,8 +645,8 @@ public class ChangeType extends Recipe {
                     return sf;
                 }
                 ambiguous = false;
-                for (String pkg : otherStarPackages) {
-                    if (JavaSourceSetCompat.findClasspathType(sourceSet.get(), pkg + "." + simpleName).isPresent()) {
+                for (JavaType.FullyQualified fq : sourceSet.get().getClasspath()) {
+                    if (fq.getClassName().equals(simpleName) && otherStarPackages.contains(fq.getPackageName())) {
                         ambiguous = true;
                         break;
                     }
