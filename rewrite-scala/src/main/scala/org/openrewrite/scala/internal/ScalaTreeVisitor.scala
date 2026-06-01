@@ -7946,12 +7946,25 @@ class ScalaTreeVisitor(
     buildSFor(prefix, forYield.enums.asInstanceOf[List[Trees.Tree[?]]], forYield.expr, yielding = true, endPos)
   }
 
-  private def visitByNameTypeTree(bnt: Trees.ByNameTypeTree[?]): J.Identifier = {
-    // By-name parameter type: `=> Int` — preserve as identifier with source text
+  /**
+   * By-name parameter type `=> Int`. Modeled as a degenerate `S.FunctionType`:
+   * no parameters, unparenthesized. The printer renders empty + unparenthesized
+   * params as just `=>`, so this round-trips to `=> Int` without a dedicated type.
+   * It stays distinguishable from `() => Int` (empty params, but parenthesized).
+   */
+  private def visitByNameTypeTree(bnt: Trees.ByNameTypeTree[?]): S.FunctionType = {
     val prefix = extractPrefix(bnt.span)
-    val text = extractSource(bnt.span)
-    updateCursor(bnt.span.end)
-    ident(text, prefix)
+    val beforeArrow = sourceBefore("=>")
+    val returnType = visitTypeTree(bnt.result)
+    S.FunctionType.build(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      false,
+      JContainer.empty[TypeTree](),
+      new JLeftPadded(beforeArrow, returnType, Markers.EMPTY),
+      typeOfTree(bnt)
+    )
   }
 
   private def visitTypeBoundsTree(tbt: Trees.TypeBoundsTree[?]): J.Identifier = {
