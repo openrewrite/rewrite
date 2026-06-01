@@ -247,6 +247,16 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
                 .withPostfix(q.receive(variadic.isPostfix()));
     }
 
+    @Override
+    public J visitRangeLoop(Go.RangeLoop rangeLoop, RpcReceiveQueue q) {
+        return rangeLoop
+                .getPadding().withKey(q.receive(rangeLoop.getPadding().getKey(), el -> visitRightPadded(el, q)))
+                .getPadding().withValue(q.receive(rangeLoop.getPadding().getValue(), el -> visitRightPadded(el, q)))
+                .getPadding().withOperator(q.receive(rangeLoop.getPadding().getOperator(), o -> visitLeftPadded(o, q, toEnum(Go.RangeLoop.Type.class))))
+                .withIterable(q.receive(rangeLoop.getIterable(), expr -> (Expression) visitNonNull(expr, q)))
+                .getPadding().withBody(q.receive(rangeLoop.getPadding().getBody(), el -> visitRightPadded(el, q)));
+    }
+
     // Delegation methods to JavaReceiver for RPC-specific visit methods
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RpcReceiveQueue q) {
         return delegate.visitLeftPadded(left, q);
@@ -286,55 +296,6 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
-        }
-
-        @Override
-        public J visitForEachControl(J.ForEachLoop.Control control, RpcReceiveQueue q) {
-            // Go sends: key (right-padded), value (right-padded), operator (left-padded string), iterable
-            // Read these and construct a valid ForEachLoop.Control
-
-            // key (right-padded Expression, nullable)
-            @SuppressWarnings({"unchecked", "rawtypes"})
-            JRightPadded<Expression> key = (JRightPadded<Expression>) ((RpcReceiveQueue) q).receive(
-                    null, (java.util.function.UnaryOperator) el -> visitRightPadded((JRightPadded<?>) el, q));
-            // value (right-padded Expression, nullable)
-            @SuppressWarnings({"unchecked", "rawtypes"})
-            JRightPadded<Expression> value = (JRightPadded<Expression>) ((RpcReceiveQueue) q).receive(
-                    null, (java.util.function.UnaryOperator) el -> visitRightPadded((JRightPadded<?>) el, q));
-            // operator (left-padded string - AssignOp, skip it)
-            q.receive(null);
-            // iterable (Expression)
-            Expression iterable = q.receive(null, el -> (Expression) visitNonNull(el, q));
-            if (iterable == null) {
-                iterable = new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY);
-            }
-
-            // Build a synthetic VariableDeclarations to represent key/value
-            J.Identifier varName;
-            if (key != null && key.getElement() instanceof J.Identifier) {
-                varName = (J.Identifier) key.getElement();
-            } else {
-                varName = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                        Collections.emptyList(), "_", null, null);
-            }
-
-            J.VariableDeclarations.NamedVariable namedVar = new J.VariableDeclarations.NamedVariable(
-                    Tree.randomId(), varName.getPrefix(), varName.getMarkers(),
-                    varName.withPrefix(Space.EMPTY), Collections.emptyList(), null, null);
-
-            J.VariableDeclarations varDecls = new J.VariableDeclarations(
-                    Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                    Collections.emptyList(), Collections.emptyList(), null,
-                    null, Collections.emptyList(),
-                    Collections.singletonList(JRightPadded.build(namedVar)));
-
-            Space afterVar = key != null ? key.getAfter() : Space.EMPTY;
-
-            @SuppressWarnings("unchecked")
-            JRightPadded<Statement> varPadded = (JRightPadded<Statement>) (JRightPadded<?>) JRightPadded.build(varDecls).withAfter(afterVar);
-            return control
-                    .getPadding().withVariable(varPadded)
-                    .getPadding().withIterable(JRightPadded.build(iterable));
         }
 
         @Override

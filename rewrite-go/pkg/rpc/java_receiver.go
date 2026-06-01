@@ -552,57 +552,6 @@ func (r *JavaReceiver) VisitForControl(fc *java.ForControl, p any) java.J {
 	return fc
 }
 
-func (r *JavaReceiver) VisitForEachLoop(f *java.ForEachLoop, p any) java.J {
-	q := p.(*ReceiveQueue)
-	c := *f // shallow copy to avoid mutating remoteObjects baseline
-	f = &c
-	ctrl := &f.Control
-	if result := q.Receive(ctrl, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
-		f.Control = *result.(*java.ForEachControl)
-	}
-	// body - Java sends RightPadded<Statement> wrapping the Block
-	if bodyResult := q.Receive(nil, func(v any) any { return receiveRightPadded(r, q, v) }); bodyResult != nil {
-		rp := coerceToStatementRP(bodyResult)
-		if blk, ok := rp.Element.(*java.Block); ok {
-			f.Body = blk
-		}
-	}
-	return f
-}
-
-func (r *JavaReceiver) VisitForEachControl(fc *java.ForEachControl, p any) java.J {
-	q := p.(*ReceiveQueue)
-	c := *fc // shallow copy to avoid mutating remoteObjects baseline
-	fc = &c
-	// key (right-padded, nullable)
-	var beforeKey any
-	if fc.Key != nil {
-		beforeKey = *fc.Key
-	}
-	if result := q.Receive(beforeKey, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
-		rp := coerceToExpressionRP(result)
-		fc.Key = &rp
-	} else {
-		fc.Key = nil
-	}
-	// value (right-padded, nullable)
-	var beforeValue any
-	if fc.Value != nil {
-		beforeValue = *fc.Value
-	}
-	if result := q.Receive(beforeValue, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
-		rp := coerceToExpressionRP(result)
-		fc.Value = &rp
-	} else {
-		fc.Value = nil
-	}
-	// operator (left-padded AssignOp enum)
-	fc.Operator = receiveLeftPaddedEnum(r, q, fc.Operator, parseAssignOpDefaulting)
-	// iterable
-	fc.Iterable = receiveValue(q, fc.Iterable, func(e java.Expression) any { return r.Visit(e, q) })
-	return fc
-}
-
 func (r *JavaReceiver) VisitSwitch(sw *java.Switch, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *sw // shallow copy to avoid mutating remoteObjects baseline

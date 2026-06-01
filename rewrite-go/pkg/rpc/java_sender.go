@@ -386,45 +386,6 @@ func (s *JavaSender) VisitForControl(fc *java.ForControl, p any) java.J {
 	return fc
 }
 
-func (s *JavaSender) VisitForEachLoop(f *java.ForEachLoop, p any) java.J {
-	q := p.(*SendQueue)
-	q.GetAndSend(f, func(v any) any {
-		ctrl := v.(*java.ForEachLoop).Control
-		return &ctrl
-	}, func(v any) { s.Visit(v.(java.Tree), q) })
-	q.GetAndSend(f, func(v any) any {
-		return java.RightPadded[java.Statement]{Element: v.(*java.ForEachLoop).Body, After: java.EmptySpace}
-	}, func(v any) { sendRightPadded(s, v, q) })
-	return f
-}
-
-func (s *JavaSender) VisitForEachControl(fc *java.ForEachControl, p any) java.J {
-	q := p.(*SendQueue)
-	// Go sends: key (right-padded), value (right-padded), operator (left-padded string), iterable
-	// Java GolangReceiver override reads this format
-	q.GetAndSend(fc, func(v any) any {
-		k := v.(*java.ForEachControl).Key
-		if k == nil {
-			return nil
-		}
-		return *k
-	}, func(v any) { sendRightPadded(s, v, q) })
-	q.GetAndSend(fc, func(v any) any {
-		val := v.(*java.ForEachControl).Value
-		if val == nil {
-			return nil
-		}
-		return *val
-	}, func(v any) { sendRightPadded(s, v, q) })
-	q.GetAndSend(fc, func(v any) any {
-		op := v.(*java.ForEachControl).Operator
-		return java.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
-	}, func(v any) { sendLeftPadded(s, v, q) })
-	q.GetAndSend(fc, func(v any) any { return v.(*java.ForEachControl).Iterable },
-		func(v any) { s.Visit(v.(java.Tree), q) })
-	return fc
-}
-
 func (s *JavaSender) VisitSwitch(sw *java.Switch, p any) java.J {
 	q := p.(*SendQueue)
 	// selector - wrap tag in ControlParentheses for Java's J.Switch model

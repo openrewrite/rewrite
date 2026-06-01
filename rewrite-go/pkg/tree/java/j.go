@@ -717,54 +717,8 @@ func (n *ForControl) WithMarkers(markers Markers) *ForControl {
 	return &c
 }
 
-// ForEachLoop represents a for-range loop: `for k, v := range expr { body }`
-type ForEachLoop struct {
-	ID      uuid.UUID
-	Prefix  Space
-	Markers Markers
-	Control ForEachControl
-	Body    *Block
-}
-
-func (*ForEachLoop) IsTree()      {}
-func (*ForEachLoop) IsJ()         {}
-func (*ForEachLoop) IsStatement() {}
-
-func (n *ForEachLoop) WithPrefix(prefix Space) *ForEachLoop {
-	c := *n
-	c.Prefix = prefix
-	return &c
-}
-
-func (n *ForEachLoop) WithMarkers(markers Markers) *ForEachLoop {
-	c := *n
-	c.Markers = markers
-	return &c
-}
-
-func (n *ForEachLoop) WithBody(body *Block) *ForEachLoop {
-	c := *n
-	c.Body = body
-	return &c
-}
-
-// ForEachControl holds the variable and iterable of a for-range loop.
-// The "range" keyword is implicit (always present).
-//
-// Structure: `for` [key] [`,` value] [`:=`|`=`] `range` iterable
-//   - Key and Value may be nil (e.g., `for range expr {}`)
-//   - When Key is non-nil, Operator contains `:=` or `=`
-type ForEachControl struct {
-	ID       uuid.UUID
-	Prefix   Space
-	Markers  Markers
-	Key      *RightPadded[Expression] // nil for `for range expr`; After = space after key (including comma)
-	Value    *RightPadded[Expression] // nil when no value; After = space before operator
-	Operator LeftPadded[AssignOp]     // `:=` or `=`; Before = space before operator. Unused when Key is nil
-	Iterable Expression               // expression after "range" keyword
-}
-
-// AssignOp distinguishes := from = in assignment contexts.
+// AssignOp distinguishes := from = in assignment contexts (e.g. Go's
+// `for k, v := range` vs `for k, v = range`, modeled by golang.RangeLoop).
 type AssignOp int
 
 const (
@@ -796,21 +750,6 @@ func ParseAssignOp(s string) AssignOp {
 	default:
 		return 0 // Unknown
 	}
-}
-
-func (*ForEachControl) IsTree() {}
-func (*ForEachControl) IsJ()    {}
-
-func (n *ForEachControl) WithPrefix(prefix Space) *ForEachControl {
-	c := *n
-	c.Prefix = prefix
-	return &c
-}
-
-func (n *ForEachControl) WithMarkers(markers Markers) *ForEachControl {
-	c := *n
-	c.Markers = markers
-	return &c
 }
 
 // Switch represents a switch statement.

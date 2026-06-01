@@ -553,38 +553,30 @@ func (p *GoPrinter) VisitForControl(control *java.ForControl, param any) java.J 
 	return control
 }
 
-func (p *GoPrinter) VisitForEachLoop(forEach *java.ForEachLoop, param any) java.J {
+func (p *GoPrinter) VisitRangeLoop(loop *golang.RangeLoop, param any) java.J {
 	out := param.(*PrintOutputCapture)
-	p.beforeSyntax(forEach.Prefix, forEach.Markers, out)
+	p.beforeSyntax(loop.Prefix, loop.Markers, out)
 	out.Append("for")
-	p.Visit(&forEach.Control, out)
-	p.Visit(forEach.Body, out)
-	p.afterSyntax(forEach.Markers, out)
-	return forEach
-}
-
-func (p *GoPrinter) VisitForEachControl(control *java.ForEachControl, param any) java.J {
-	out := param.(*PrintOutputCapture)
-	p.beforeSyntax(control.Prefix, control.Markers, out)
-	if control.Key != nil {
-		p.Visit(control.Key.Element, out)
-		p.visitSpace(control.Key.After, out)
-		if control.Value != nil {
+	if loop.Key != nil {
+		p.Visit(loop.Key.Element, out)
+		p.visitSpace(loop.Key.After, out)
+		if loop.Value != nil {
 			out.Append(",")
-			p.Visit(control.Value.Element, out)
-			p.visitSpace(control.Value.After, out)
+			p.Visit(loop.Value.Element, out)
+			p.visitSpace(loop.Value.After, out)
 		}
-		if control.Operator.Element == java.AssignOpDefine {
+		if loop.Operator.Element == java.AssignOpDefine {
 			out.Append(":=")
 		} else {
 			out.Append("=")
 		}
-		p.visitSpace(control.Operator.Before, out)
 	}
+	p.visitSpace(loop.Operator.Before, out)
 	out.Append("range")
-	p.Visit(control.Iterable, out)
-	p.afterSyntax(control.Markers, out)
-	return control
+	p.Visit(loop.Iterable, out)
+	p.Visit(loop.Body.Element, out)
+	p.afterSyntax(loop.Markers, out)
+	return loop
 }
 
 // VisitAnnotation prints an Annotation in struct-tag form

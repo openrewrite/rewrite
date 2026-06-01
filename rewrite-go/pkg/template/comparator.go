@@ -219,19 +219,18 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 			return false
 		}
 		return c.matchOptionalRightPaddedStmt(p.Update, cand.Update)
-	case *java.ForEachLoop:
-		cand := candidate.(*java.ForEachLoop)
-		return c.matchNode(&p.Control, &cand.Control) &&
-			c.matchNode(p.Body, cand.Body)
-	case *java.ForEachControl:
-		cand := candidate.(*java.ForEachControl)
+	case *golang.RangeLoop:
+		cand := candidate.(*golang.RangeLoop)
 		if !c.matchOptionalRightPaddedExpr2(p.Key, cand.Key) {
 			return false
 		}
 		if !c.matchOptionalRightPaddedExpr2(p.Value, cand.Value) {
 			return false
 		}
-		return c.matchNode(p.Iterable, cand.Iterable)
+		if !c.matchNode(p.Iterable, cand.Iterable) {
+			return false
+		}
+		return c.matchNode(p.Body.Element, cand.Body.Element)
 	case *java.Switch:
 		cand := candidate.(*java.Switch)
 		if !c.matchOptionalRightPaddedStmt(p.Init, cand.Init) {

@@ -234,30 +234,6 @@ func (n *ForControl) WithID(id uuid.UUID) J {
 func (n *ForControl) GetPrefix() Space    { return n.Prefix }
 func (n *ForControl) GetMarkers() Markers { return n.Markers }
 
-func (n *ForEachControl) GetID() uuid.UUID { return n.ID }
-func (n *ForEachControl) WithID(id uuid.UUID) J {
-	if n.ID == id {
-		return n
-	}
-	c := *n
-	c.ID = id
-	return &c
-}
-func (n *ForEachControl) GetPrefix() Space    { return n.Prefix }
-func (n *ForEachControl) GetMarkers() Markers { return n.Markers }
-
-func (n *ForEachLoop) GetID() uuid.UUID { return n.ID }
-func (n *ForEachLoop) WithID(id uuid.UUID) J {
-	if n.ID == id {
-		return n
-	}
-	c := *n
-	c.ID = id
-	return &c
-}
-func (n *ForEachLoop) GetPrefix() Space    { return n.Prefix }
-func (n *ForEachLoop) GetMarkers() Markers { return n.Markers }
-
 func (n *ForLoop) GetID() uuid.UUID { return n.ID }
 func (n *ForLoop) WithID(id uuid.UUID) J {
 	if n.ID == id {

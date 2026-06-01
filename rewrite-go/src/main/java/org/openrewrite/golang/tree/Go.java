@@ -2282,4 +2282,148 @@ public interface Go extends J {
             return new CoordinateBuilder.Expression(this);
         }
     }
+
+    // ---------------------------------------------------------------
+    // RangeLoop (Go's for-range: for k, v := range expr { body })
+    // ---------------------------------------------------------------
+
+    /**
+     * Go's {@code for ... range} loop. Unlike Java's single-variable
+     * {@link J.ForEachLoop.Control}, Go ranges bind a {@code key} and an
+     * optional {@code value} (or none, for {@code for range expr}), joined by
+     * {@code :=} or {@code =}. {@code operator.before} is the whitespace before
+     * the {@code range} keyword.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class RangeLoop implements Go, Loop {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @Nullable
+        JRightPadded<Expression> key;
+
+        @Nullable
+        JRightPadded<Expression> value;
+
+        JLeftPadded<Type> operator;
+
+        @With
+        @Getter
+        Expression iterable;
+
+        JRightPadded<Statement> body;
+
+        public @Nullable Expression getKey() {
+            return key == null ? null : key.getElement();
+        }
+
+        public @Nullable Expression getValue() {
+            return value == null ? null : value.getElement();
+        }
+
+        public Type getOperator() {
+            return operator.getElement();
+        }
+
+        public Go.RangeLoop withOperator(Type operator) {
+            return getPadding().withOperator(this.operator.withElement(operator));
+        }
+
+        @Override
+        public Statement getBody() {
+            return body.getElement();
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public Go.RangeLoop withBody(Statement body) {
+            return getPadding().withBody(this.body.withElement(body));
+        }
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitRangeLoop(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        /** Whether the loop binds variables with {@code :=} (define) or {@code =} (assign). */
+        public enum Type {
+            Equals,
+            Define
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.RangeLoop t;
+
+            public @Nullable JRightPadded<Expression> getKey() {
+                return t.key;
+            }
+
+            public Go.RangeLoop withKey(@Nullable JRightPadded<Expression> key) {
+                return t.key == key ? t : new Go.RangeLoop(t.padding, t.id, t.prefix, t.markers, key, t.value, t.operator, t.iterable, t.body);
+            }
+
+            public @Nullable JRightPadded<Expression> getValue() {
+                return t.value;
+            }
+
+            public Go.RangeLoop withValue(@Nullable JRightPadded<Expression> value) {
+                return t.value == value ? t : new Go.RangeLoop(t.padding, t.id, t.prefix, t.markers, t.key, value, t.operator, t.iterable, t.body);
+            }
+
+            public JLeftPadded<Type> getOperator() {
+                return t.operator;
+            }
+
+            public Go.RangeLoop withOperator(JLeftPadded<Type> operator) {
+                return t.operator == operator ? t : new Go.RangeLoop(t.padding, t.id, t.prefix, t.markers, t.key, t.value, operator, t.iterable, t.body);
+            }
+
+            public JRightPadded<Statement> getBody() {
+                return t.body;
+            }
+
+            public Go.RangeLoop withBody(JRightPadded<Statement> body) {
+                return t.body == body ? t : new Go.RangeLoop(t.padding, t.id, t.prefix, t.markers, t.key, t.value, t.operator, t.iterable, body);
+            }
+        }
+    }
 }
