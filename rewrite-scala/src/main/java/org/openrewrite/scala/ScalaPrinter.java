@@ -637,6 +637,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitXmlLiteral((S.XmlLiteral) tree, p);
         } else if (tree instanceof S.Alternative) {
             return visitAlternative((S.Alternative) tree, p);
+        } else if (tree instanceof S.Binding) {
+            return visitBinding((S.Binding) tree, p);
         } else if (tree instanceof S.QualifiedSuper) {
             return visitQualifiedSuper((S.QualifiedSuper) tree, p);
         } else if (tree instanceof S.AnnotatedExpression) {
@@ -1744,6 +1746,16 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visitContainer("", alternative.getPadding().getPatterns(), JContainer.Location.LANGUAGE_EXTENSION, "|", "", p);
         afterSyntax(alternative, p);
         return alternative;
+    }
+
+    public J visitBinding(S.Binding binding, PrintOutputCapture<P> p) {
+        beforeSyntax(binding, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(binding.getName(), p);
+        visitSpace(binding.getBeforeAt(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append('@');
+        visit(binding.getPattern(), p);
+        afterSyntax(binding, p);
+        return binding;
     }
 
     public J visitQualifiedSuper(S.QualifiedSuper qualifiedSuper, PrintOutputCapture<P> p) {

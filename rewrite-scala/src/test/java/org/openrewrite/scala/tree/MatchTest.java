@@ -16,11 +16,59 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.ScalaIsoVisitor;
+import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class MatchTest implements RewriteTest {
+
+    @Test
+    void atBindingIsNotCollapsedIntoSingleIdentifier() {
+        AtomicReference<S.Binding> binding = new AtomicReference<>();
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              case class Person(name: String, age: Int)
+              def handle(x: Any): String = x match {
+                case p@Person(name, _) => name
+                case _ => ""
+              }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                new ScalaIsoVisitor<Integer>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                        // the whole pattern must never be stuffed into one identifier name
+                        assertThat(identifier.getSimpleName()).doesNotContain("@", "(");
+                        return identifier;
+                    }
+
+                    @Override
+                    public J visitBinding(S.Binding b, Integer p) {
+                        binding.set(b);
+                        return super.visitBinding(b, p);
+                    }
+                }.visit(cu, 0);
+
+                assertThat(binding.get()).isNotNull();
+                assertThat(binding.get().getName().getSimpleName()).isEqualTo("p");
+                assertThat(binding.get().getPattern()).isInstanceOf(J.MethodInvocation.class);
+                J.MethodInvocation pattern = (J.MethodInvocation) binding.get().getPattern();
+                assertThat(pattern.getSelect()).isInstanceOf(J.Identifier.class);
+                assertThat(((J.Identifier) pattern.getSelect()).getSimpleName()).isEqualTo("Person");
+                assertThat(pattern.getArguments()).hasSize(2);
+            })
+          )
+        );
+    }
 
     @Test
     void emptyCaseBodyWithGuardPreservesAlignmentBeforeArrow() {
