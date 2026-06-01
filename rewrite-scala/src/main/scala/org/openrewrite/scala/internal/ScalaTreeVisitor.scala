@@ -7498,12 +7498,23 @@ class ScalaTreeVisitor(
       JLeftPadded.build(arg).withBefore(beforeEq), typeFor(namedArg.span))
   }
 
-  private def visitBind(bind: Trees.Bind[?]): J.Identifier = {
-    // At-binding pattern: `all@List(head, _*)` — preserve as identifier with source text
+  private def visitBind(bind: Trees.Bind[?]): S.Binding = {
+    // At-binding pattern: `p@Person(name, _)`, `all@List(head, _*)`, `msg@(_: String)`.
     val prefix = extractPrefix(bind.span)
-    val text = extractSource(bind.span)
+    val nameStr = bind.name.toString
+    val name = ident(nameStr)
+    cursor = cursor + nameStr.length
+    val atPos = positionOfNext("@", cursor)
+    val beforeAt = if (atPos >= cursor) Space.format(source, cursor, atPos) else Space.EMPTY
+    if (atPos >= 0) cursor = atPos + 1
+    val pattern: Expression = visitTree(bind.body) match {
+      case e: Expression => e
+      case j: J => new S.StatementExpression(Tree.randomId(), j)
+      case _ => throw new UnsupportedOperationException(
+        s"Bind body did not produce an Expression: ${bind.body.getClass.getSimpleName}")
+    }
     updateCursor(bind.span.end)
-    ident(text, prefix)
+    new S.Binding(Tree.randomId(), prefix, Markers.EMPTY, name, beforeAt, pattern, typeFor(bind.span))
   }
 
   private def visitAlternative(alt: Trees.Alternative[?]): S.Alternative = {

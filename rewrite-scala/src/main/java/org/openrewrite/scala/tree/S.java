@@ -1859,6 +1859,63 @@ public interface S extends J {
         }
     }
 
+    /**
+     * Represents a Scala pattern binding (at-binding): {@code p @ Person(name, _)},
+     * {@code all @ List(head, _*)}, or {@code msg @ (_: String)}. The bound variable
+     * {@code name} is matched against {@code pattern}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class Binding implements S, Expression {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        J.Identifier name;
+
+        /**
+         * Space before the {@code @} separator.
+         */
+        @With @Getter
+        Space beforeAt;
+
+        @With @Getter
+        Expression pattern;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public Binding(UUID id, Space prefix, Markers markers,
+                       J.Identifier name, Space beforeAt, Expression pattern,
+                       @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.name = name;
+            this.beforeAt = beforeAt;
+            this.pattern = pattern;
+            this.type = type;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitBinding(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
 
     /**
      * Represents a Scala refined (structural) type:
