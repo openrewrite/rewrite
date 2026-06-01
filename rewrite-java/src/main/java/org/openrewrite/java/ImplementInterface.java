@@ -25,7 +25,6 @@ import java.util.Objects;
 
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.tree.Space.format;
 
 public class ImplementInterface<P> extends JavaIsoVisitor<P> {
     private final J.ClassDeclaration scope;
@@ -66,8 +65,7 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
 
             TypeTree impl = TypeTree.build(classDecl.getSimpleName().equals(interfaceType.getClassName()) ?
                             interfaceType.getFullyQualifiedName() : interfaceType.getClassName())
-                    .withType(interfaceType)
-                    .withPrefix(c.getImplements() == null ? Space.EMPTY : format(" "));
+                    .withType(interfaceType);
 
             if (typeParameters != null && !typeParameters.isEmpty()) {
                 typeParameters.stream()
@@ -82,7 +80,7 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
 
                 J.ParameterizedType typedImpl = new J.ParameterizedType(
                         randomId(),
-                        Space.EMPTY,
+                        Space.SINGLE_SPACE,
                         Markers.EMPTY,
                         interfaceType instanceof JavaType.Parameterized ? impl.withType(((JavaType.Parameterized) interfaceType).getType()) : impl,
                         JContainer.build(Space.EMPTY, elements, Markers.EMPTY),
@@ -91,7 +89,8 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
 
                 c = c.withImplements(ListUtils.concat(c.getImplements(), typedImpl));
             } else {
-                c = c.withImplements(ListUtils.concat(c.getImplements(), impl));
+                TypeTree spacedImpl = impl.withPrefix(Space.SINGLE_SPACE);
+                c = c.withImplements(ListUtils.concat(c.getImplements(), spacedImpl));
             }
         }
 
