@@ -259,6 +259,24 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 			c.matchNode(p.Statement, cand.Statement)
 
 	// Go-specific nodes
+	case *golang.Unary:
+		cand := candidate.(*golang.Unary)
+		return p.Operator.Element == cand.Operator.Element &&
+			c.matchNode(p.Expression, cand.Expression)
+	case *golang.Binary:
+		cand := candidate.(*golang.Binary)
+		return c.matchNode(p.Left, cand.Left) &&
+			p.Operator.Element == cand.Operator.Element &&
+			c.matchNode(p.Right, cand.Right)
+	case *golang.AssignmentOperation:
+		cand := candidate.(*golang.AssignmentOperation)
+		return c.matchNode(p.Variable, cand.Variable) &&
+			p.Operator.Element == cand.Operator.Element &&
+			c.matchNode(p.Assignment, cand.Assignment)
+	case *golang.Variadic:
+		cand := candidate.(*golang.Variadic)
+		return p.Postfix == cand.Postfix &&
+			c.matchNode(p.Element, cand.Element)
 	case *golang.GoStmt:
 		cand := candidate.(*golang.GoStmt)
 		return c.matchNode(p.Expr, cand.Expr)

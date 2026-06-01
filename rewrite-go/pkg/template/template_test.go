@@ -24,6 +24,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -289,6 +290,42 @@ func TestRewritePreservesFormatting(t *testing.T) {
 	}
 }
 
+func TestPatternMatchGoUnary(t *testing.T) {
+	// given a Go-specific unary (address-of) expression `&b` in the source
+	p := parser.NewGoParser()
+	cu, err := p.Parse("test.go", "package main\n\nfunc f(b int) { g(&b) }\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var found java.J
+	v := visitor.Init(&goUnaryFinder{found: &found})
+	v.Visit(cu, nil)
+	if found == nil {
+		t.Fatal("could not find golang.Unary '&b' in parsed tree")
+	}
+
+	// when matching a pattern that captures the operand of `&<expr>`
+	expr := Expr("expr")
+	pat := Expression(fmt.Sprintf("&%s", expr)).
+		Captures(expr).
+		Build()
+
+	// then the pattern matches (regression: golang.Unary had no comparator case)
+	result := pat.Match(found, nil)
+	if result == nil {
+		t.Fatal("pattern '&<expr>' should match golang.Unary '&b'")
+	}
+	captured := result.Get("expr")
+	if captured == nil {
+		t.Fatal("expected capture 'expr' to be bound")
+	}
+	ident, ok := captured.(*java.Identifier)
+	if !ok || ident.Name != "b" {
+		t.Fatalf("expected captured identifier 'b', got %T %v", captured, captured)
+	}
+}
+
 // --- Test helpers ---
 
 type rewriteRecipeWithVisitor struct {
@@ -313,6 +350,19 @@ func (v *identFinder) VisitIdentifier(ident *java.Identifier, p any) java.J {
 		*v.found = ident
 	}
 	return v.GoVisitor.VisitIdentifier(ident, p)
+}
+
+// goUnaryFinder walks the tree to find the first Go-specific Unary expression.
+type goUnaryFinder struct {
+	visitor.GoVisitor
+	found *java.J
+}
+
+func (v *goUnaryFinder) VisitGoUnary(u *golang.Unary, p any) java.J {
+	if *v.found == nil {
+		*v.found = u
+	}
+	return v.GoVisitor.VisitGoUnary(u, p)
 }
 
 // binaryFinder walks the tree to find the first Binary expression.
