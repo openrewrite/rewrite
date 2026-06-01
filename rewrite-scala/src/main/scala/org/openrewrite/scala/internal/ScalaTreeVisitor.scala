@@ -5583,11 +5583,26 @@ class ScalaTreeVisitor(
         return visitMethodInvocationFromTypeApply(ta, sel, savedCursor)
 
       case id: Trees.Ident[?] if id.name.toString == "classOf" && ta.args.size == 1 =>
-        // classOf[String] — preserve as identifier (Statement + Expression)
+        // classOf[String] is a type application with no value argument list.
         val prefix = extractPrefix(ta.span)
-        val text = extractSource(ta.span)
+        val nameEnd = if (id.span.exists) Math.max(0, id.span.end - offsetAdjustment) else cursor + "classOf".length
+        if (nameEnd > cursor && nameEnd <= source.length) {
+          cursor = nameEnd
+        }
+        val typeParams = parseTypeApplyArgs(ta)
+        val omitParens = Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))
+        val args = JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](), omitParens)
         updateCursor(ta.span.end)
-        return ident(text, prefix)
+        return new J.MethodInvocation(
+          Tree.randomId(),
+          prefix,
+          Markers.EMPTY,
+          null,
+          typeParams,
+          ident("classOf"),
+          args,
+          methodTypeOfTree(ta)
+        )
 
       case _ =>
         // Other TypeApply (e.g., Array[Int]): preserve as identifier with source text.
