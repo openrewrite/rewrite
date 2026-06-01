@@ -447,9 +447,20 @@ func (v *GoVisitor) VisitMethodDeclaration(md *java.MethodDeclaration, p any) ja
 		}
 		md = md.WithLeadingAnnotations(anns)
 	}
+	if md.Receiver != nil {
+		recv := *md.Receiver
+		recv.Before = v.self().VisitSpace(recv.Before, p)
+		recv.Elements = visitRightPaddedList(v, recv.Elements, p)
+		md.Receiver = &recv
+	}
 	md = md.WithName(visitAndCast[*java.Identifier](v, md.Name, p))
 	if md.TypeParameters != nil {
 		md = md.WithTypeParameters(visitAndCast[*java.TypeParameters](v, md.TypeParameters, p))
+	}
+	md.Parameters.Before = v.self().VisitSpace(md.Parameters.Before, p)
+	md.Parameters.Elements = visitRightPaddedList(v, md.Parameters.Elements, p)
+	if md.ReturnType != nil {
+		md.ReturnType = visitExpression(v, md.ReturnType, p)
 	}
 	if md.Body != nil {
 		md = md.WithBody(visitAndCast[*java.Block](v, md.Body, p))
@@ -549,6 +560,13 @@ func (v *GoVisitor) VisitVariableDeclarator(vd *java.VariableDeclarator, p any) 
 func (v *GoVisitor) VisitImport(imp *java.Import, p any) java.J {
 	imp = imp.WithPrefix(v.self().VisitSpace(imp.Prefix, p))
 	imp = imp.WithMarkers(v.visitMarkers(imp.Markers, p))
+	if imp.Alias != nil {
+		alias := *imp.Alias
+		alias.Before = v.self().VisitSpace(alias.Before, p)
+		alias.Element = visitAndCast[*java.Identifier](v, alias.Element, p)
+		imp.Alias = &alias
+	}
+	imp.Qualid = visitExpression(v, imp.Qualid, p)
 	return imp
 }
 
@@ -577,6 +595,9 @@ func (v *GoVisitor) VisitSwitch(sw *java.Switch, p any) java.J {
 func (v *GoVisitor) VisitCase(c *java.Case, p any) java.J {
 	c = c.WithPrefix(v.self().VisitSpace(c.Prefix, p))
 	c = c.WithMarkers(v.visitMarkers(c.Markers, p))
+	c.Expressions.Before = v.self().VisitSpace(c.Expressions.Before, p)
+	c.Expressions.Elements = visitRightPaddedExpressionList(v, c.Expressions.Elements, p)
+	c.Body = visitRightPaddedList(v, c.Body, p)
 	return c
 }
 
@@ -591,6 +612,24 @@ func (v *GoVisitor) VisitForLoop(forLoop *java.ForLoop, p any) java.J {
 func (v *GoVisitor) VisitForControl(control *java.ForControl, p any) java.J {
 	control = control.WithPrefix(v.self().VisitSpace(control.Prefix, p))
 	control = control.WithMarkers(v.visitMarkers(control.Markers, p))
+	if control.Init != nil {
+		init := *control.Init
+		init.Element = visitAndCast[java.Statement](v, init.Element, p)
+		init.After = v.self().VisitSpace(init.After, p)
+		control.Init = &init
+	}
+	if control.Condition != nil {
+		cond := *control.Condition
+		cond.Element = visitExpression(v, cond.Element, p)
+		cond.After = v.self().VisitSpace(cond.After, p)
+		control.Condition = &cond
+	}
+	if control.Update != nil {
+		update := *control.Update
+		update.Element = visitAndCast[java.Statement](v, update.Element, p)
+		update.After = v.self().VisitSpace(update.After, p)
+		control.Update = &update
+	}
 	return control
 }
 
@@ -604,48 +643,79 @@ func (v *GoVisitor) VisitForEachLoop(forEach *java.ForEachLoop, p any) java.J {
 func (v *GoVisitor) VisitForEachControl(control *java.ForEachControl, p any) java.J {
 	control = control.WithPrefix(v.self().VisitSpace(control.Prefix, p))
 	control = control.WithMarkers(v.visitMarkers(control.Markers, p))
+	if control.Key != nil {
+		key := *control.Key
+		key.Element = visitExpression(v, key.Element, p)
+		key.After = v.self().VisitSpace(key.After, p)
+		control.Key = &key
+	}
+	if control.Value != nil {
+		value := *control.Value
+		value.Element = visitExpression(v, value.Element, p)
+		value.After = v.self().VisitSpace(value.After, p)
+		control.Value = &value
+	}
+	control.Operator.Before = v.self().VisitSpace(control.Operator.Before, p)
+	control.Iterable = visitExpression(v, control.Iterable, p)
 	return control
 }
 
 func (v *GoVisitor) VisitBreak(b *java.Break, p any) java.J {
 	b = b.WithPrefix(v.self().VisitSpace(b.Prefix, p))
 	b = b.WithMarkers(v.visitMarkers(b.Markers, p))
+	if b.Label != nil {
+		b.Label = visitAndCast[*java.Identifier](v, b.Label, p)
+	}
 	return b
 }
 
 func (v *GoVisitor) VisitContinue(c *java.Continue, p any) java.J {
 	c = c.WithPrefix(v.self().VisitSpace(c.Prefix, p))
 	c = c.WithMarkers(v.visitMarkers(c.Markers, p))
+	if c.Label != nil {
+		c.Label = visitAndCast[*java.Identifier](v, c.Label, p)
+	}
 	return c
 }
 
 func (v *GoVisitor) VisitLabel(l *java.Label, p any) java.J {
 	l = l.WithPrefix(v.self().VisitSpace(l.Prefix, p))
 	l = l.WithMarkers(v.visitMarkers(l.Markers, p))
+	l.Name.Element = visitAndCast[*java.Identifier](v, l.Name.Element, p)
+	l.Name.After = v.self().VisitSpace(l.Name.After, p)
+	l.Statement = visitAndCast[java.Statement](v, l.Statement, p)
 	return l
 }
 
 func (v *GoVisitor) VisitGoStmt(g *golang.GoStmt, p any) java.J {
 	g = g.WithPrefix(v.self().VisitSpace(g.Prefix, p))
 	g = g.WithMarkers(v.visitMarkers(g.Markers, p))
+	g.Expr = visitExpression(v, g.Expr, p)
 	return g
 }
 
 func (v *GoVisitor) VisitDefer(d *golang.Defer, p any) java.J {
 	d = d.WithPrefix(v.self().VisitSpace(d.Prefix, p))
 	d = d.WithMarkers(v.visitMarkers(d.Markers, p))
+	d.Expr = visitExpression(v, d.Expr, p)
 	return d
 }
 
 func (v *GoVisitor) VisitSend(s *golang.Send, p any) java.J {
 	s = s.WithPrefix(v.self().VisitSpace(s.Prefix, p))
 	s = s.WithMarkers(v.visitMarkers(s.Markers, p))
+	s.Channel = visitExpression(v, s.Channel, p)
+	s.Arrow.Before = v.self().VisitSpace(s.Arrow.Before, p)
+	s.Arrow.Element = visitExpression(v, s.Arrow.Element, p)
 	return s
 }
 
 func (v *GoVisitor) VisitGoto(g *golang.Goto, p any) java.J {
 	g = g.WithPrefix(v.self().VisitSpace(g.Prefix, p))
 	g = g.WithMarkers(v.visitMarkers(g.Markers, p))
+	if g.Label != nil {
+		g.Label = visitAndCast[*java.Identifier](v, g.Label, p)
+	}
 	return g
 }
 
@@ -719,30 +789,48 @@ func (v *GoVisitor) VisitAnnotation(ann *java.Annotation, p any) java.J {
 func (v *GoVisitor) VisitArrayType(at *java.ArrayType, p any) java.J {
 	at = at.WithPrefix(v.self().VisitSpace(at.Prefix, p))
 	at = at.WithMarkers(v.visitMarkers(at.Markers, p))
+	at.Dimension.Before = v.self().VisitSpace(at.Dimension.Before, p)
+	if at.Length != nil {
+		at.Length = visitExpression(v, at.Length, p)
+	}
+	at.Dimension.Element = v.self().VisitSpace(at.Dimension.Element, p)
+	at.ElementType = visitExpression(v, at.ElementType, p)
 	return at
 }
 
 func (v *GoVisitor) VisitParentheses(paren *java.Parentheses, p any) java.J {
 	paren = paren.WithPrefix(v.self().VisitSpace(paren.Prefix, p))
 	paren = paren.WithMarkers(v.visitMarkers(paren.Markers, p))
+	paren.Tree.Element = visitExpression(v, paren.Tree.Element, p)
+	paren.Tree.After = v.self().VisitSpace(paren.Tree.After, p)
 	return paren
 }
 
 func (v *GoVisitor) VisitTypeCast(tc *java.TypeCast, p any) java.J {
 	tc = tc.WithPrefix(v.self().VisitSpace(tc.Prefix, p))
 	tc = tc.WithMarkers(v.visitMarkers(tc.Markers, p))
+	tc.Expr = visitExpression(v, tc.Expr, p)
+	if tc.Clazz != nil {
+		tc.Clazz = visitAndCast[*java.ControlParentheses](v, tc.Clazz, p)
+	}
 	return tc
 }
 
 func (v *GoVisitor) VisitControlParentheses(cp *java.ControlParentheses, p any) java.J {
 	cp = cp.WithPrefix(v.self().VisitSpace(cp.Prefix, p))
 	cp = cp.WithMarkers(v.visitMarkers(cp.Markers, p))
+	cp.Tree.Element = visitExpression(v, cp.Tree.Element, p)
+	cp.Tree.After = v.self().VisitSpace(cp.Tree.After, p)
 	return cp
 }
 
 func (v *GoVisitor) VisitArrayAccess(aa *java.ArrayAccess, p any) java.J {
 	aa = aa.WithPrefix(v.self().VisitSpace(aa.Prefix, p))
 	aa = aa.WithMarkers(v.visitMarkers(aa.Markers, p))
+	aa.Indexed = visitExpression(v, aa.Indexed, p)
+	if aa.Dimension != nil {
+		aa.Dimension = visitAndCast[*java.ArrayDimension](v, aa.Dimension, p)
+	}
 	return aa
 }
 
@@ -773,6 +861,8 @@ func (v *GoVisitor) VisitIndexList(il *golang.IndexList, p any) java.J {
 func (v *GoVisitor) VisitArrayDimension(ad *java.ArrayDimension, p any) java.J {
 	ad = ad.WithPrefix(v.self().VisitSpace(ad.Prefix, p))
 	ad = ad.WithMarkers(v.visitMarkers(ad.Markers, p))
+	ad.Index.Element = visitExpression(v, ad.Index.Element, p)
+	ad.Index.After = v.self().VisitSpace(ad.Index.After, p)
 	return ad
 }
 
@@ -790,18 +880,35 @@ func (v *GoVisitor) VisitComposite(c *golang.Composite, p any) java.J {
 func (v *GoVisitor) VisitKeyValue(kv *golang.KeyValue, p any) java.J {
 	kv = kv.WithPrefix(v.self().VisitSpace(kv.Prefix, p))
 	kv = kv.WithMarkers(v.visitMarkers(kv.Markers, p))
+	kv.Key = visitExpression(v, kv.Key, p)
+	kv.Value.Before = v.self().VisitSpace(kv.Value.Before, p)
+	kv.Value.Element = visitExpression(v, kv.Value.Element, p)
 	return kv
 }
 
 func (v *GoVisitor) VisitSlice(s *golang.Slice, p any) java.J {
 	s = s.WithPrefix(v.self().VisitSpace(s.Prefix, p))
 	s = s.WithMarkers(v.visitMarkers(s.Markers, p))
+	s.Indexed = visitExpression(v, s.Indexed, p)
+	s.OpenBracket = v.self().VisitSpace(s.OpenBracket, p)
+	s.Low.Element = visitExpression(v, s.Low.Element, p)
+	s.Low.After = v.self().VisitSpace(s.Low.After, p)
+	s.High.Element = visitExpression(v, s.High.Element, p)
+	s.High.After = v.self().VisitSpace(s.High.After, p)
+	if s.Max != nil {
+		s.Max = visitExpression(v, s.Max, p)
+	}
+	s.CloseBracket = v.self().VisitSpace(s.CloseBracket, p)
 	return s
 }
 
 func (v *GoVisitor) VisitMapType(mt *golang.MapType, p any) java.J {
 	mt = mt.WithPrefix(v.self().VisitSpace(mt.Prefix, p))
 	mt = mt.WithMarkers(v.visitMarkers(mt.Markers, p))
+	mt.OpenBracket = v.self().VisitSpace(mt.OpenBracket, p)
+	mt.Key.Element = visitExpression(v, mt.Key.Element, p)
+	mt.Key.After = v.self().VisitSpace(mt.Key.After, p)
+	mt.Value = visitExpression(v, mt.Value, p)
 	return mt
 }
 
@@ -818,24 +925,33 @@ func (v *GoVisitor) VisitStatementExpression(se *golang.StatementExpression, p a
 func (v *GoVisitor) VisitPointerType(pt *golang.PointerType, p any) java.J {
 	pt = pt.WithPrefix(v.self().VisitSpace(pt.Prefix, p))
 	pt = pt.WithMarkers(v.visitMarkers(pt.Markers, p))
+	pt.Elem = visitExpression(v, pt.Elem, p)
 	return pt
 }
 
 func (v *GoVisitor) VisitChannel(ch *golang.Channel, p any) java.J {
 	ch = ch.WithPrefix(v.self().VisitSpace(ch.Prefix, p))
 	ch = ch.WithMarkers(v.visitMarkers(ch.Markers, p))
+	ch.Value = visitExpression(v, ch.Value, p)
 	return ch
 }
 
 func (v *GoVisitor) VisitFuncType(ft *golang.FuncType, p any) java.J {
 	ft = ft.WithPrefix(v.self().VisitSpace(ft.Prefix, p))
 	ft = ft.WithMarkers(v.visitMarkers(ft.Markers, p))
+	ft.Parameters.Before = v.self().VisitSpace(ft.Parameters.Before, p)
+	ft.Parameters.Elements = visitRightPaddedList(v, ft.Parameters.Elements, p)
+	if ft.ReturnType != nil {
+		ft.ReturnType = visitExpression(v, ft.ReturnType, p)
+	}
 	return ft
 }
 
 func (v *GoVisitor) VisitTypeList(tl *golang.TypeList, p any) java.J {
 	tl = tl.WithPrefix(v.self().VisitSpace(tl.Prefix, p))
 	tl = tl.WithMarkers(v.visitMarkers(tl.Markers, p))
+	tl.Types.Before = v.self().VisitSpace(tl.Types.Before, p)
+	tl.Types.Elements = visitRightPaddedList(v, tl.Types.Elements, p)
 	return tl
 }
 
@@ -893,12 +1009,18 @@ func (v *GoVisitor) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 func (v *GoVisitor) VisitStructType(st *golang.StructType, p any) java.J {
 	st = st.WithPrefix(v.self().VisitSpace(st.Prefix, p))
 	st = st.WithMarkers(v.visitMarkers(st.Markers, p))
+	if st.Body != nil {
+		st.Body = visitAndCast[*java.Block](v, st.Body, p)
+	}
 	return st
 }
 
 func (v *GoVisitor) VisitInterfaceType(it *golang.InterfaceType, p any) java.J {
 	it = it.WithPrefix(v.self().VisitSpace(it.Prefix, p))
 	it = it.WithMarkers(v.visitMarkers(it.Markers, p))
+	if it.Body != nil {
+		it.Body = visitAndCast[*java.Block](v, it.Body, p)
+	}
 	return it
 }
 
@@ -914,6 +1036,11 @@ func (v *GoVisitor) VisitMultiAssignment(ma *golang.MultiAssignment, p any) java
 func (v *GoVisitor) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	cc = cc.WithPrefix(v.self().VisitSpace(cc.Prefix, p))
 	cc = cc.WithMarkers(v.visitMarkers(cc.Markers, p))
+	if cc.Comm != nil {
+		cc.Comm = visitAndCast[java.Statement](v, cc.Comm, p)
+	}
+	cc.Colon = v.self().VisitSpace(cc.Colon, p)
+	cc.Body = visitRightPaddedList(v, cc.Body, p)
 	return cc
 }
 
