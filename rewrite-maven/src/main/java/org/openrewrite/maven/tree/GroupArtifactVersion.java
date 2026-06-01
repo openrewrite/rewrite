@@ -16,6 +16,8 @@
 
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
@@ -23,6 +25,7 @@ import org.jspecify.annotations.Nullable;
 import java.io.Serializable;
 import java.util.Objects;
 
+@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @Value
 @With
 public class GroupArtifactVersion implements Serializable {

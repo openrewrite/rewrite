@@ -252,6 +252,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private List<RecipeBundleResolver> resolvers = Collections.emptyList();
         private final Map<String, String> environment = new HashMap<>();
+        private final Set<String> unsetEnvNames = new LinkedHashSet<>();
         private static final Path DEFAULT_NPX_PATH = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");
         private Supplier<@Nullable Path> npxPathSupplier = () -> DEFAULT_NPX_PATH;
         private @Nullable Path log;
@@ -324,6 +325,22 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         public Builder environment(Map<String, String> environment) {
             this.environment.putAll(environment);
+            return this;
+        }
+
+        /**
+         * Strip these env vars from the spawned Node process's environment
+         * before {@link #environment(Map)} is applied. The cli bundles its
+         * own Node runtime; inheriting {@code NODE_OPTIONS},
+         * {@code NODE_PATH}, {@code NODE_TLS_REJECT_UNAUTHORIZED}, etc.
+         * from a parent process (e.g. a harness setting
+         * {@code NODE_OPTIONS=--require <instrumentation>.cjs} for its own
+         * bookkeeping) corrupts the bundled runtime's startup. The caller
+         * can still re-set any of these names via {@link #environment(Map)};
+         * the explicit value wins.
+         */
+        public Builder unsetEnv(Collection<String> names) {
+            this.unsetEnvNames.addAll(names);
             return this;
         }
 
@@ -427,6 +444,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             }
             process.setStderrRedirect(log);
 
+            process.unsetEnv(unsetEnvNames);
             process.environment().putAll(environment);
             // caller-provided options, if any, are taking precedence over the options baked above
             process.environment().merge("NODE_OPTIONS", " --enable-source-maps", (callerProvided, local) -> local + " " + callerProvided);

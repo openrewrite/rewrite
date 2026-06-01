@@ -634,7 +634,7 @@ public interface JavaType {
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (!(o instanceof Class)) return false;
             Class aClass = (Class) o;
             return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedName, aClass.fullyQualifiedName) &&
                    (typeParameters == null && aClass.typeParameters == null || typeParameters != null && Arrays.equals(typeParameters, aClass.typeParameters));
@@ -984,7 +984,7 @@ public interface JavaType {
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (!(o instanceof Parameterized)) return false;
             Parameterized that = (Parameterized) o;
             return Objects.equals(type, that.type) && Arrays.equals(typeParameters, that.typeParameters);
         }
@@ -1072,7 +1072,7 @@ public interface JavaType {
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (!(o instanceof GenericTypeVariable)) return false;
             GenericTypeVariable that = (GenericTypeVariable) o;
             return name.equals(that.name) && variance == that.variance &&
                    (variance == Variance.INVARIANT && bounds == null && that.bounds == null || bounds != null && Arrays.equals(bounds, that.bounds));
@@ -1147,7 +1147,7 @@ public interface JavaType {
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (!(o instanceof Array)) return false;
             Array array = (Array) o;
             return Objects.equals(elemType, array.elemType);
         }
@@ -1657,7 +1657,7 @@ public interface JavaType {
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (!(o instanceof Method)) return false;
             Method method = (Method) o;
             return Objects.equals(name, method.name) &&
                    Objects.equals(declaringType, method.declaringType) &&
@@ -1788,7 +1788,7 @@ public interface JavaType {
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (!(o instanceof Variable)) return false;
             Variable variable = (Variable) o;
             return Objects.equals(name, variable.name) && Objects.equals(owner, variable.owner);
         }
