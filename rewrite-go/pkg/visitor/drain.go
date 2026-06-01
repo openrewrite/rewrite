@@ -26,6 +26,12 @@ type AfterVisitsProvider interface {
 	DoAfterVisit(AfterVisitor)
 }
 
+// PendingAfterVisitsProvider is implemented by visitors that can expose
+// their queued after-visits without draining them.
+type PendingAfterVisitsProvider interface {
+	PendingAfterVisits() []AfterVisitor
+}
+
 // DrainAfterVisits applies any visitors that `editor` queued via
 // GoVisitor.DoAfterVisit. After-visits can themselves queue more
 // after-visits (transitive); this loops until no provider has anything
