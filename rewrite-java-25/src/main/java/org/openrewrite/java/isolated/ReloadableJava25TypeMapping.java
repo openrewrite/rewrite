@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaTypeFactory;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -44,6 +45,21 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
     private final ReloadableJava25TypeSignatureBuilder signatureBuilder = new ReloadableJava25TypeSignatureBuilder();
 
     private final JavaTypeFactory typeFactory;
+
+    /**
+     * Canonical {@link JavaType.Class} for the given FQN, routed through
+     * the type factory so the cache dedupes per signature and a
+     * type-table-backed factory hands back the full body it carries
+     * (NOT necessarily a "shallow" class). Use this from parser code
+     * paths that today reach for {@link JavaType.ShallowClass#build} —
+     * those bypass the factory and produce non-canonical instances that
+     * break identity comparisons in downstream consumers (e.g. V3
+     * type-table writers).
+     */
+    public JavaType.Class classFor(String fqn) {
+        return typeFactory.computeClass(fqn, fqn, Flag.Public.getBitMask(),
+                JavaType.Class.Kind.Class, null, stub -> {});
+    }
 
     public JavaType type(@Nullable Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof NullType) {

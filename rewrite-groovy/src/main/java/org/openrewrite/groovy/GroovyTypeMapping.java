@@ -43,6 +43,20 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeFactory);
     }
 
+    /**
+     * Canonical {@link JavaType.Class} for the given FQN, routed through
+     * the type factory so the cache dedupes per signature and so a
+     * type-table-backed factory hands back the full body it carries
+     * (i.e. this is NOT necessarily a shallow class). The parser uses
+     * this when it doesn't have a Groovy AST node to map — for example,
+     * a dynamically-typed Groovy parameter (Object) or a catch-block
+     * with implicit Exception.
+     */
+    JavaType.Class classFor(String fqn) {
+        return typeFactory.computeClass(fqn, fqn, Flag.Public.getBitMask(),
+                JavaType.Class.Kind.Class, null, stub -> {});
+    }
+
     @Override
     public JavaType type(@Nullable ASTNode type) {
         if (type == null) {
@@ -74,7 +88,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             }
         } catch (NoClassDefFoundError e) {
             // e.getMessage() returns fully qualified name of type that couldn't be found on the classpath
-            return JavaType.ShallowClass.build(e.getMessage());
+            return classFor(e.getMessage());
         }
 
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());

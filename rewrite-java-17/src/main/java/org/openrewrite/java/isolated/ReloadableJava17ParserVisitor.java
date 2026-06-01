@@ -1615,7 +1615,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                         expr,
                         padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, emptyList(), part.trim(), null, null)),
                         (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
-                                JavaType.ShallowClass.build(fullName) :
+                                typeMapping.classFor(fullName) :
                                 null
                 );
             }

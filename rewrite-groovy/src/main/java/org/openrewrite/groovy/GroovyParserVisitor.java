@@ -1057,9 +1057,9 @@ public class GroovyParserVisitor {
                 TypeTree paramType;
                 if (param.isDynamicTyped()) {
                     if (sourceStartsWith("java.lang.Object")) {
-                        paramType = new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), skip(name()), JavaType.ShallowClass.build("java.lang.Object"), null);
+                        paramType = new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), skip(name()), typeMapping.classFor("java.lang.Object"), null);
                     } else {
-                        paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null);
+                        paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", typeMapping.classFor("java.lang.Object"), null);
                     }
                 } else {
                     paramType = visitTypeTree(param.getType());
@@ -1530,7 +1530,7 @@ public class GroovyParserVisitor {
                     skip(classSuffix);
                 }
             }
-            queue.add(TypeTree.build(name)
+            queue.add(TypeTree.build(name, null, typeMapping::classFor)
                     .withType(typeMapping.type(type))
                     .withPrefix(prefix));
         }
@@ -1799,7 +1799,7 @@ public class GroovyParserVisitor {
                     !source.startsWith("Exception", cursor) &&
                     !source.startsWith("java.lang.Exception", cursor)) {
                 paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, emptyList(), "",
-                        JavaType.ShallowClass.build(Exception.class.getName()), null);
+                        typeMapping.classFor(Exception.class.getName()), null);
             } else {
                 paramType = visitTypeTree(param.getOriginType()).withPrefix(paramPrefix);
             }
@@ -3446,7 +3446,7 @@ public class GroovyParserVisitor {
             Space importPrefix = sourceBefore("import");
             JLeftPadded<Boolean> statik = importNode.isStatic() ? padLeft(sourceBefore("static"), true) : padLeft(EMPTY, false);
             Space space = whitespace();
-            J.FieldAccess qualid = TypeTree.build(name()).withPrefix(space);
+            J.FieldAccess qualid = TypeTree.<J.FieldAccess>build(name(), null, typeMapping::classFor).withPrefix(space);
             JLeftPadded<J.Identifier> alias = null;
             if (sourceStartsWith("as", "\n", " ")) {
                 alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), name(), null, null));
@@ -3551,7 +3551,7 @@ public class GroovyParserVisitor {
                 if (Character.isJavaIdentifierStart(c) && !isKeywordLiteral) {
                     String name = name();
                     if (!name.isEmpty()) {
-                        return TypeTree.build(name)
+                        return TypeTree.build(name, null, typeMapping::classFor)
                                 .withType(typeMapping.type(value.getType()))
                                 .withPrefix(prefix);
                     }
@@ -3708,7 +3708,7 @@ public class GroovyParserVisitor {
                         expr,
                         padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, emptyList(), part.trim(), null, null)),
                         (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
-                                JavaType.ShallowClass.build(fullName) :
+                                typeMapping.classFor(fullName) :
                                 null
                 );
             }

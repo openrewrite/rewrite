@@ -29,10 +29,27 @@ import static org.openrewrite.Tree.randomId;
 public interface TypeTree extends NameTree {
 
     static <T extends TypeTree & Expression> T build(String fullyQualifiedName) {
-        return TypeTree.build(fullyQualifiedName, null);
+        return TypeTree.build(fullyQualifiedName, null, JavaType.ShallowClass::build);
     }
 
     static <T extends TypeTree & Expression> T build(String fullyQualifiedName, @Nullable Character escape) {
+        return TypeTree.build(fullyQualifiedName, escape, JavaType.ShallowClass::build);
+    }
+
+    /**
+     * Build a dotted-name {@link TypeTree} routing each Uppercased leaf
+     * through {@code typeFor} instead of allocating a fresh
+     * {@link JavaType.ShallowClass}. Parser code should pass
+     * {@code typeFactory::computeClass} (or a wrapper around it) so
+     * type-table-backed factories hand back the canonical
+     * {@link JavaType.Class} they carry — see
+     * {@code ReloadableJavaXTypeMapping.classFor}.
+     *
+     * @param typeFor maps an FQN to its canonical {@link JavaType.Class}
+     */
+    static <T extends TypeTree & Expression> T build(String fullyQualifiedName,
+                                                      @Nullable Character escape,
+                                                      java.util.function.Function<String, JavaType.Class> typeFor) {
         StringBuilder fullName = new StringBuilder();
         Expression expr = null;
         String nextLeftPad = "";
@@ -101,7 +118,7 @@ public interface TypeTree extends NameTree {
                                     Markers.EMPTY
                             ),
                             Character.isUpperCase(part.charAt(0)) ?
-                                    JavaType.ShallowClass.build(fullName.toString()) :
+                                    typeFor.apply(fullName.toString()) :
                                     null
                     );
                 }
