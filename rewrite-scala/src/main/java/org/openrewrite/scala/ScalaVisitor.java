@@ -285,6 +285,16 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return a;
     }
 
+    public J visitBinding(S.Binding binding, P p) {
+        S.Binding b = binding;
+        b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        b = b.withName(visitAndCast(b.getName(), p));
+        b = b.withBeforeAt(visitSpace(b.getBeforeAt(), Space.Location.LANGUAGE_EXTENSION, p));
+        b = b.withPattern(visitAndCast(b.getPattern(), p));
+        return b;
+    }
+
     public J visitQualifiedSuper(S.QualifiedSuper qualifiedSuper, P p) {
         S.QualifiedSuper q = qualifiedSuper;
         q = q.withPrefix(visitSpace(q.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
