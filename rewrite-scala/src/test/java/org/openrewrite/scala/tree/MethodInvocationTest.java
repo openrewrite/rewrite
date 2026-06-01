@@ -148,6 +148,13 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void explicitDotCallToSymbolicOperatorAsArgument() {
+        rewriteRun(
+          scala("val x = f(a.|(b), c)")
+        );
+    }
+
+    @Test
     void partialFunctionBlockAndTupleLambdaBlockArgs() {
         rewriteRun(
           scala(

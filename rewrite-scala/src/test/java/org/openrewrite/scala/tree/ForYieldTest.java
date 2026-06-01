@@ -94,6 +94,21 @@ class ForYieldTest implements RewriteTest {
     }
 
     @Test
+    void scala3IndentedForYieldWithTupleGenerator() {
+        rewriteRun(
+          scala(
+            """
+              val result =
+                for
+                  (a, b) <- xs
+                  c <- ys
+                yield c
+              """
+          )
+        );
+    }
+
+    @Test
     void scala3ParenlessForDoSingleLine() {
         rewriteRun(
           scala(
