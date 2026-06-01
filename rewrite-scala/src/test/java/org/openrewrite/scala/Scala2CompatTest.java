@@ -1313,6 +1313,51 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
+    void minimalLambdaTupleTypeAscription() {
+        rewriteRun(
+            scala(
+                """
+                val f = (t: (Int, String)) => t
+                """
+            )
+        );
+    }
+
+    @Test
+    void valTupleAndFunctionTypeAscription() {
+        rewriteRun(
+            scala(
+                """
+                val x: (Int, String) = (1, "a")
+                val f: Int => String = _.toString
+                """
+            )
+        );
+    }
+
+    @Test
+    void expressionTupleTypeAscription() {
+        rewriteRun(
+            scala(
+                """
+                val y = (1, "a"): (Int, String)
+                """
+            )
+        );
+    }
+
+    @Test
+    void contextFunctionTypeAscription() {
+        rewriteRun(
+            scala(
+                """
+                val f: Int ?=> String = _.toString
+                """
+            )
+        );
+    }
+
+    @Test
     void preservesWhitespaceBeforeFirstElementInDelimitedList() {
         rewriteRun(
             scala(

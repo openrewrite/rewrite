@@ -3013,12 +3013,18 @@ class ScalaTreeVisitor(
         Space.SINGLE_SPACE
       }
 
-      val typeExpr: TypeTree = visitTree(vd.tpt) match {
-        case tt: TypeTree => tt.withPrefix(typeSpace)
-        case id: J.Identifier => id.withPrefix(typeSpace)
-        case unknown: J.Unknown => unknown.withPrefix(typeSpace)  // Handle J.Unknown types
-        case _ => null
+      // Use visitTypeTree so type-position shapes that share an untyped node with a
+      // value expression (tuple types `(A, B)`, function types `A => B`, repeated
+      // types `T*`) map to proper TypeTrees instead of falling through to `null`.
+      // Those sub-visitors are cursor-based, so rewind the cursor (parked at the end
+      // of the whole parameter span by the `extractSource` above) to the type's start
+      // before visiting; the leading space after the colon is applied via `typeSpace`.
+      if (vd.tpt.span.exists) {
+        cursor = Math.max(0, vd.tpt.span.start - offsetAdjustment)
       }
+      val visitedType = visitTypeTree(vd.tpt)
+      val typeExpr: TypeTree =
+        if (visitedType != null) visitedType.withPrefix(typeSpace) else null
 
       // Create the variable
       val variable = new J.VariableDeclarations.NamedVariable(
@@ -3275,19 +3281,21 @@ class ScalaTreeVisitor(
         }
       }
       
-      // Visit the type
+      // Visit the type. Prefer visitTypeTree so type-position shapes that share an
+      // untyped node with a value expression (tuple `(A, B)`, function `A => B`,
+      // repeated `T*`) map to proper TypeTrees rather than a source-text identifier.
       val savedCursorType = cursor
-      typeExpression = visitTree(vd.tpt) match {
-        case tt: TypeTree =>
-          // For type expressions, preserve the space after the colon
-          tt.withPrefix(afterColon).asInstanceOf[TypeTree]
-        case other =>
-          // Intersection types (A & B), union types (A | B), and other complex type
-          // expressions — preserve source text as identifier
-          cursor = savedCursorType
-          val typeText = extractSource(vd.tpt.span)
-          updateCursor(vd.tpt.span.end)
-          ident(typeText, afterColon)
+      val visitedType = visitTypeTree(vd.tpt)
+      typeExpression = if (visitedType != null) {
+        // For type expressions, preserve the space after the colon
+        visitedType.withPrefix(afterColon).asInstanceOf[TypeTree]
+      } else {
+        // Intersection types (A & B), union types (A | B), and other complex type
+        // expressions — preserve source text as identifier
+        cursor = savedCursorType
+        val typeText = extractSource(vd.tpt.span)
+        updateCursor(vd.tpt.span.end)
+        ident(typeText, afterColon)
       }
     }
     
@@ -8127,12 +8135,19 @@ class ScalaTreeVisitor(
 
     val parameters = JContainer.build(containerBefore, paramElements, Markers.EMPTY)
 
-    // Space immediately before `=>`.
-    val beforeArrow = if (cursor < arrowAbs && arrowAbs <= source.length) {
-      Space.format(source, cursor, arrowAbs)
+    // Detect the Scala 3 context-function arrow `?=>` (a `?` immediately before `=>`).
+    // The `?` is treated as part of the arrow token; a marker records it so the printer
+    // re-emits `?=>` instead of `=>`.
+    val isContextArrow = arrowAbs > funcStart && arrowAbs - 1 >= 0 &&
+      arrowAbs - 1 < source.length && source.charAt(arrowAbs - 1) == '?'
+    val arrowTokenStart = if (isContextArrow) arrowAbs - 1 else arrowAbs
+
+    // Space immediately before the arrow token.
+    val beforeArrow = if (cursor < arrowTokenStart && arrowTokenStart <= source.length) {
+      Space.format(source, cursor, arrowTokenStart)
     } else Space.EMPTY
 
-    // Move past the arrow.
+    // Move past the arrow (`=>` is always the last two characters of the token).
     if (arrowAbs >= cursor) {
       cursor = arrowAbs + 2
     }
@@ -8143,10 +8158,14 @@ class ScalaTreeVisitor(
 
     if (funcEnd > cursor) cursor = funcEnd
 
+    val funcMarkers = if (isContextArrow)
+      Markers.build(Collections.singletonList(new ContextFunctionArrow(java.util.UUID.randomUUID())))
+    else Markers.EMPTY
+
     S.FunctionType.build(
       Tree.randomId(),
       prefix,
-      Markers.EMPTY,
+      funcMarkers,
       parenthesized,
       parameters,
       new JLeftPadded(beforeArrow, returnType, Markers.EMPTY),
@@ -8891,12 +8910,12 @@ class ScalaTreeVisitor(
           }
 
           // Visit the type tree — its natural prefix is the space AFTER the colon.
-          val typeTree = visitTree(typed.tpt) match {
-            case tt: TypeTree => tt
-            case id: J.Identifier => id.asInstanceOf[TypeTree]
-            case _ =>
-              cursor = savedCursor
-              return visitUnknown(typed)
+          // Prefer visitTypeTree so tuple `(A, B)`, function `A => B`, and repeated
+          // `T*` ascriptions map to proper TypeTrees instead of failing as unknown.
+          val typeTree = visitTypeTree(typed.tpt)
+          if (typeTree == null) {
+            cursor = savedCursor
+            return visitUnknown(typed)
           }
 
           updateCursor(typed.span.end)

@@ -1805,7 +1805,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
         JLeftPadded<TypeTree> rt = functionType.getPadding().getReturnType();
         visitSpace(rt.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
-        p.append("=>");
+        if (functionType.getMarkers().findFirst(ContextFunctionArrow.class).isPresent()) {
+            p.append("?=>");
+        } else {
+            p.append("=>");
+        }
         visit(rt.getElement(), p);
         afterSyntax(functionType, p);
         return functionType;
