@@ -67,7 +67,7 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
             TypeTree impl = TypeTree.build(classDecl.getSimpleName().equals(interfaceType.getClassName()) ?
                             interfaceType.getFullyQualifiedName() : interfaceType.getClassName())
                     .withType(interfaceType)
-                    .withPrefix(format(" "));
+                    .withPrefix(c.getImplements() == null ? Space.EMPTY : format(" "));
 
             if (typeParameters != null && !typeParameters.isEmpty()) {
                 typeParameters.stream()
