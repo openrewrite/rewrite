@@ -3009,6 +3009,13 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitTernaryExpression(TernaryExpression ternary) {
+            // AST transformations like @Slf4j create synthetic ternary guards (e.g. log.isInfoEnabled() ? log.info(...) : null)
+            // whose boolean condition has no source position. Only the true-branch exists in the original source, so skip
+            // the synthetic wrapper and visit only the true expression to avoid corrupting the cursor.
+            if (ternary.getBooleanExpression().getLineNumber() < 0) {
+                queue.add(doVisit(ternary.getTrueExpression()));
+                return;
+            }
             queue.add(insideParentheses(ternary, fmt -> new J.Ternary(randomId(), fmt, Markers.EMPTY,
                     doVisit(ternary.getBooleanExpression()),
                     padLeft(sourceBefore("?"), doVisit(ternary.getTrueExpression())),
@@ -3940,8 +3947,10 @@ public class GroovyParserVisitor {
                 MethodCallExpression expr = (MethodCallExpression) node;
                 // The trait AST transformation rewrites implicit-this calls inside trait method bodies to use a synthetic
                 // $self variable expression that has no source position; without a valid object position there's nothing
-                // to scan, so skip the parenthesis-level computation.
-                if (expr.getObjectExpression().getLineNumber() < 0) {
+                // to scan, so skip the parenthesis-level computation. Similarly, AST transformations like @Slf4j can
+                // produce synthetic MethodCallExpressions (e.g. log.isInfoEnabled()) whose own line number is -1 even
+                // though the object expression has a valid position; guard against that to avoid a negative array index.
+                if (expr.getObjectExpression().getLineNumber() < 0 || expr.getLineNumber() < 0) {
                     return null;
                 }
                 return determineParenthesisLevel(expr, expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
