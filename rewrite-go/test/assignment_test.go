@@ -19,7 +19,12 @@ package test
 import (
 	"testing"
 
+	"github.com/google/uuid"
+
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 func TestParseAssignment(t *testing.T) {
@@ -109,4 +114,49 @@ func TestParseMultiAssignFromFunc(t *testing.T) {
 				val, err := divide(10, 2)
 			}
 		`))
+}
+
+// ident builds a bare identifier expression for the visitor fixtures.
+func ident(name string) java.Expression {
+	return &java.Identifier{ID: uuid.New(), Name: name}
+}
+
+// callRecorder records every method invocation it visits, by name.
+type callRecorder struct {
+	visitor.GoVisitor
+	visited []string
+}
+
+func (v *callRecorder) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
+	v.visited = append(v.visited, mi.Name.Name)
+	return v.GoVisitor.VisitMethodInvocation(mi, p)
+}
+
+// TestMultiAssignmentVisitsRHSMethodInvocation confirms that a method
+// invocation on the RHS of a multi-target assignment (`data, err := f()`)
+// is actually visited. Regression test: VisitMultiAssignment previously
+// only walked Prefix/Markers and never recursed into Values, so any
+// recipe relying on VisitMethodInvocation silently skipped the call.
+func TestMultiAssignmentVisitsRHSMethodInvocation(t *testing.T) {
+	// given
+	call := &java.MethodInvocation{
+		ID:        uuid.New(),
+		Name:      &java.Identifier{ID: uuid.New(), Name: "ReadAll"},
+		Arguments: java.Container[java.Expression]{},
+	}
+	ma := &golang.MultiAssignment{
+		ID:        uuid.New(),
+		Variables: []java.RightPadded[java.Expression]{{Element: ident("data")}, {Element: ident("err")}},
+		Values:    []java.RightPadded[java.Expression]{{Element: call}},
+	}
+
+	// when
+	rec := &callRecorder{}
+	v := visitor.Init(rec)
+	v.Visit(ma, nil)
+
+	// then
+	if len(rec.visited) != 1 || rec.visited[0] != "ReadAll" {
+		t.Errorf("expected RHS method invocation %q to be visited, got %v", "ReadAll", rec.visited)
+	}
 }

@@ -905,6 +905,9 @@ func (v *GoVisitor) VisitInterfaceType(it *golang.InterfaceType, p any) java.J {
 func (v *GoVisitor) VisitMultiAssignment(ma *golang.MultiAssignment, p any) java.J {
 	ma = ma.WithPrefix(v.self().VisitSpace(ma.Prefix, p))
 	ma = ma.WithMarkers(v.visitMarkers(ma.Markers, p))
+	ma.Variables = visitRightPaddedExpressionList(v, ma.Variables, p)
+	ma.Operator.Before = v.self().VisitSpace(ma.Operator.Before, p)
+	ma.Values = visitRightPaddedExpressionList(v, ma.Values, p)
 	return ma
 }
 
