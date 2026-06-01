@@ -2408,4 +2408,119 @@ public interface S extends J {
             return new CoordinateBuilder.Statement(this);
         }
     }
+
+    /**
+     * A Scala string interpolation such as {@code s"Hello, $name"}, {@code f"$x%2.2f"}, or
+     * {@code raw"a\nb"}. The {@code interpolator} identifier captures the {@code s}/{@code f}/{@code raw}
+     * (or any custom {@link StringContext} extension) prefix. {@code parts} interleaves
+     * {@link J.Literal} text chunks with {@link Interpolation} nodes, so the embedded
+     * expressions are first-class, visitable LST elements rather than opaque source text.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class InterpolatedString implements S, Expression, TypedTree {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        J.Identifier interpolator;
+
+        @With @Getter
+        String delimiter;
+
+        @With @Getter
+        List<Expression> parts;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public InterpolatedString(UUID id, Space prefix, Markers markers, J.Identifier interpolator,
+                                  String delimiter, List<Expression> parts, @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.interpolator = interpolator;
+            this.delimiter = delimiter;
+            this.parts = parts;
+            this.type = type;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitInterpolatedString(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * A single interpolation inside an {@link InterpolatedString}: {@code $name} (no braces) or
+     * {@code ${expr}} (braces). The wrapped {@code expression} is a real LST {@link Expression}.
+     * When {@code braces} is {@code true}, {@code afterExpression} holds any whitespace before the
+     * closing {@code }} (e.g. {@code ${ x }}).
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class Interpolation implements S, Expression {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        boolean braces;
+
+        @With @Getter
+        Expression expression;
+
+        @With @Getter
+        Space afterExpression;
+
+        public Interpolation(UUID id, Space prefix, Markers markers, boolean braces,
+                             Expression expression, Space afterExpression) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.braces = braces;
+            this.expression = expression;
+            this.afterExpression = afterExpression;
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return expression.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Interpolation withType(@Nullable JavaType type) {
+            return withExpression(expression.withType(type));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitInterpolation(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
 }

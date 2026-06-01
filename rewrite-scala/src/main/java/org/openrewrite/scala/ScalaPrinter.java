@@ -637,6 +637,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitXmlLiteral((S.XmlLiteral) tree, p);
         } else if (tree instanceof S.Alternative) {
             return visitAlternative((S.Alternative) tree, p);
+        } else if (tree instanceof S.InterpolatedString) {
+            return visitInterpolatedString((S.InterpolatedString) tree, p);
+        } else if (tree instanceof S.Interpolation) {
+            return visitInterpolation((S.Interpolation) tree, p);
         } else if (tree instanceof S.QualifiedSuper) {
             return visitQualifiedSuper((S.QualifiedSuper) tree, p);
         } else if (tree instanceof S.AnnotatedExpression) {
@@ -1744,6 +1748,33 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visitContainer("", alternative.getPadding().getPatterns(), JContainer.Location.LANGUAGE_EXTENSION, "|", "", p);
         afterSyntax(alternative, p);
         return alternative;
+    }
+
+    public J visitInterpolatedString(S.InterpolatedString interpolatedString, PrintOutputCapture<P> p) {
+        beforeSyntax(interpolatedString, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(interpolatedString.getInterpolator(), p);
+        p.append(interpolatedString.getDelimiter());
+        for (Expression part : interpolatedString.getParts()) {
+            visit(part, p);
+        }
+        p.append(interpolatedString.getDelimiter());
+        afterSyntax(interpolatedString, p);
+        return interpolatedString;
+    }
+
+    public J visitInterpolation(S.Interpolation interpolation, PrintOutputCapture<P> p) {
+        beforeSyntax(interpolation, Space.Location.LANGUAGE_EXTENSION, p);
+        p.append('$');
+        if (interpolation.isBraces()) {
+            p.append('{');
+        }
+        visit(interpolation.getExpression(), p);
+        visitSpace(interpolation.getAfterExpression(), Space.Location.LANGUAGE_EXTENSION, p);
+        if (interpolation.isBraces()) {
+            p.append('}');
+        }
+        afterSyntax(interpolation, p);
+        return interpolation;
     }
 
     public J visitQualifiedSuper(S.QualifiedSuper qualifiedSuper, PrintOutputCapture<P> p) {

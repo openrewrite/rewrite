@@ -7366,12 +7366,98 @@ class ScalaTreeVisitor(
     )
   }
 
-  private def visitInterpolatedString(interp: untpd.InterpolatedString): J.Identifier = {
-    // String interpolation like s"Hello, $name" — preserve as identifier (Statement + Expression)
+  private def visitInterpolatedString(interp: untpd.InterpolatedString): S.InterpolatedString = {
+    // String interpolation like s"Hello, $name", f"$x%2.2f", raw"a\nb". The dotty AST models
+    // this as InterpolatedString(id, segments) where each segment is either a Thicket(literalPart,
+    // expr) pair or a trailing bare Literal. We map the literal text chunks to J.Literal and each
+    // embedded `$expr` / `${expr}` to S.Interpolation, so the expressions stay first-class.
     val prefix = extractPrefix(interp.span)
-    val sourceText = extractSource(interp.span)
+    val interpStart = Math.max(0, interp.span.start - offsetAdjustment)
+    val interpName = interp.id.toString
+    val interpolator = ident(interpName)
+    cursor = Math.max(cursor, interpStart + interpName.length)
+    val delimiter = if (source.startsWith("\"\"\"", cursor)) "\"\"\"" else "\""
+    cursor = Math.min(source.length, cursor + delimiter.length)
+
+    val parts = new util.ArrayList[Expression]()
+
+    def addLiteral(litTree: Trees.Literal[?]): Unit = {
+      val ls = Math.max(0, litTree.span.start - offsetAdjustment)
+      val le = Math.max(0, litTree.span.end - offsetAdjustment)
+      if (le > ls && le <= source.length) {
+        val text = source.substring(ls, le)
+        if (text.nonEmpty) {
+          parts.add(new J.Literal(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+            litTree.const.value, text, Collections.emptyList(), JavaType.Primitive.String))
+        }
+        cursor = le
+      }
+    }
+
+    def asExpression(j: J): Expression = j match {
+      case e: Expression => e
+      case s: Statement => new S.StatementExpression(Tree.randomId(), s)
+      case other => throw new UnsupportedOperationException(
+        s"Interpolation expression did not produce an Expression: ${other.getClass.getName}")
+    }
+
+    // A `${...}` block that wraps a single expression is unwrapped so the printer can re-add the
+    // braces; a multi-statement block (rare, e.g. `${ val x = 1; x }`) keeps its own braces.
+    def singleExpr(b: untpd.Block): Option[untpd.Tree] = {
+      val all = b.stats ++ (if (b.expr.isEmpty) Nil else List(b.expr))
+      all match {
+        case single :: Nil => Some(single)
+        case _ => None
+      }
+    }
+
+    interp.segments.foreach {
+      case th: untpd.Thicket =>
+        val trees = th.trees
+        trees.head match {
+          case lit: Trees.Literal[?] => addLiteral(lit)
+          case _ =>
+        }
+        val exprTree = trees(1)
+        val dollarPos = cursor
+        val braces = dollarPos + 1 < source.length && source.charAt(dollarPos + 1) == '{'
+        if (braces) {
+          val inner = exprTree match {
+            case b: untpd.Block => singleExpr(b)
+            case t => Some(t)
+          }
+          inner match {
+            case Some(innerExpr) =>
+              cursor = dollarPos + 2 // past `${`
+              val exprJ = asExpression(visitTree(innerExpr))
+              val blockEnd = Math.max(0, exprTree.span.end - offsetAdjustment)
+              val bracePos = blockEnd - 1
+              val afterExpr =
+                if (bracePos > cursor && bracePos <= source.length) Space.format(source.substring(cursor, bracePos))
+                else Space.EMPTY
+              cursor = Math.max(cursor, blockEnd)
+              parts.add(new S.Interpolation(Tree.randomId(), Space.EMPTY, Markers.EMPTY, true, exprJ, afterExpr))
+            case None =>
+              cursor = dollarPos + 1 // at `{`, let the block self-print its braces
+              val exprJ = asExpression(visitTree(exprTree))
+              parts.add(new S.Interpolation(Tree.randomId(), Space.EMPTY, Markers.EMPTY, false, exprJ, Space.EMPTY))
+          }
+        } else {
+          cursor = dollarPos + 1 // past `$`, at the identifier
+          val exprJ = asExpression(visitTree(exprTree))
+          parts.add(new S.Interpolation(Tree.randomId(), Space.EMPTY, Markers.EMPTY, false, exprJ, Space.EMPTY))
+        }
+      case lit: Trees.Literal[?] =>
+        addLiteral(lit)
+      case other =>
+        throw new UnsupportedOperationException(
+          s"Unexpected interpolated string segment: ${other.getClass.getName}")
+    }
+
+    cursor = Math.min(source.length, cursor + delimiter.length) // closing quote
     updateCursor(interp.span.end)
-    ident(sourceText, prefix)
+    new S.InterpolatedString(Tree.randomId(), prefix, Markers.EMPTY, interpolator, delimiter, parts,
+      JavaType.Primitive.String)
   }
 
   private def visitSymbolLit(sym: untpd.SymbolLit): J.Identifier = {
