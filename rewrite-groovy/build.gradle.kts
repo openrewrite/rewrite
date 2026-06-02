@@ -62,6 +62,7 @@ dependencies {
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
     testRuntimeOnly("org.apache.groovy:groovy-all:4.+")
+    testRuntimeOnly("org.spockframework:spock-core:2.4-groovy-4.0")
     testRuntimeOnly(project(":rewrite-java-21"))
 }
 

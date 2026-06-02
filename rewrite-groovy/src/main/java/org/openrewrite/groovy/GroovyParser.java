@@ -95,7 +95,8 @@ public class GroovyParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        CompilerConfiguration configuration = new CompilerConfiguration();
+        // pass system properties so that users have flexibility to change behavior of groovy compiler
+        CompilerConfiguration configuration = new CompilerConfiguration(System.getProperties());
         configuration.setTolerance(Integer.MAX_VALUE);
         configuration.setWarningLevel(WarningMessage.NONE);
         configuration.setClasspathList(classpath == null ? emptyList() : classpath.stream()
