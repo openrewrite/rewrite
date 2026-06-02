@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SubclassCodecDispatchTest {
 
     /**
-     * Stand-in for a moderne-cli V3 lazy proxy: a non-final SourceFile subtype whose
+     * An example non-final SourceFile subtype whose
      * runtime class name is not the canonical type registered with the codec.
      */
     static class LazyXmlDocument extends Xml.Document {
