@@ -287,14 +287,18 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
         String[] paramNames = null;
         if (method.getParameters().length > 0) {
-            paramNames = new String[method.getParameters().length];
-            Parameter[] parameters = method.getParameters();
-            for (int i = 0; i < parameters.length; i++) {
-                Parameter p = parameters[i];
+            // Exclude synthetic parameters (e.g. the leading name/ordinal params
+            // of an enum constructor) so parameterNames stays aligned with
+            // parameterTypes below, which also skips synthetic parameters. Sizing
+            // the array to all parameters and filling only the non-synthetic
+            // slots left null holes and a length mismatch between the two lists.
+            List<String> names = new ArrayList<>();
+            for (Parameter p : method.getParameters()) {
                 if (!p.isSynthetic()) {
-                    paramNames[i] = p.getName();
+                    names.add(p.getName());
                 }
             }
+            paramNames = names.isEmpty() ? null : names.toArray(new String[0]);
         }
 
         String[] finalParamNames = paramNames;
