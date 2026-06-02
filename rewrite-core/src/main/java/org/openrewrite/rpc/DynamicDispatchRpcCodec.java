@@ -103,7 +103,7 @@ public abstract class DynamicDispatchRpcCodec<T> implements RpcCodec<T> {
             }
         }
         // Defense-in-depth: the keyed bucket missed. This happens when {@code sourceFileType}
-        // is a proxy/subclass runtime class name (e.g. a moderne-cli V3 lazy proxy) rather
+        // is a proxy/subclass runtime class name rather
         // than the canonical registered type, including when such a string arrives from a
         // remote. Scan all registered codecs for one assignable from the instance's runtime
         // type. {@code getType()} is a language marker interface (e.g. Xml, Json), so at most
@@ -140,9 +140,7 @@ public abstract class DynamicDispatchRpcCodec<T> implements RpcCodec<T> {
 
     /**
      * Resolves the canonical, codec-registered source file type name for a (possibly
-     * subclassed/proxied) runtime class. A moderne-cli V3 LST is a lazy-loading proxy
-     * generated as {@code Lazy_X extends <realTreeType>}; its {@code getClass().getName()}
-     * is the proxy name, which is not a key in the codec map. Walking the superclass chain
+     * subclassed/proxied) runtime class. Walking the superclass chain
      * lands on the concrete registered type (e.g. {@code Xml$Document}), whose name equals
      * the codec's {@link #getSourceFileType()} key. Normal LSTs match on the first iteration,
      * so behavior is unchanged for them.
