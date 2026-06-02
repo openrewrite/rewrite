@@ -55,6 +55,10 @@ func (s *GoSender) Visit(t java.Tree, p any) java.Tree {
 		s.sendParseError(pe, p.(*SendQueue))
 		return pe
 	}
+	if gm, ok := t.(*golang.GoMod); ok {
+		sendGoMod(gm, p.(*SendQueue))
+		return gm
+	}
 	return s.GoVisitor.Visit(t, p)
 }
 

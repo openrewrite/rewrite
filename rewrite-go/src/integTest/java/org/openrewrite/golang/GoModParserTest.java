@@ -15,17 +15,42 @@
  */
 package org.openrewrite.golang;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.golang.marker.GoResolutionResult;
+import org.openrewrite.golang.rpc.GoRewriteRpc;
+import org.openrewrite.golang.tree.GoMod;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.text.PlainText;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.golang.Assertions.goMod;
 
+@Timeout(value = 120, unit = TimeUnit.SECONDS)
 class GoModParserTest implements RewriteTest {
+
+    @TempDir
+    Path tempDir;
+
+    @BeforeEach
+    void before() {
+        Path binaryPath = Paths.get("build/rewrite-go-rpc").toAbsolutePath();
+        GoRewriteRpc.setFactory(GoRewriteRpc.builder()
+                .goBinaryPath(binaryPath)
+                .log(tempDir.resolve("go-rpc.log")));
+    }
+
+    @AfterEach
+    void after() {
+        GoRewriteRpc.shutdownCurrent();
+    }
 
     @Test
     void moduleAndGoDirective() {
@@ -100,7 +125,7 @@ class GoModParserTest implements RewriteTest {
 
                                 require (
                                 	github.com/foo/bar v1.0.0
-                                	github.com/baz/qux v2.1.3 // indirect
+                                	github.com/baz/qux v1.5.0 // indirect
                                 )
                                 """,
                         spec -> spec.afterRecipe(doc -> {
@@ -114,7 +139,7 @@ class GoModParserTest implements RewriteTest {
 
                             GoResolutionResult.Require r2 = marker.getRequires().get(1);
                             assertThat(r2.getModulePath()).isEqualTo("github.com/baz/qux");
-                            assertThat(r2.getVersion()).isEqualTo("v2.1.3");
+                            assertThat(r2.getVersion()).isEqualTo("v1.5.0");
                             assertThat(r2.isIndirect()).isTrue();
                         })
                 )
@@ -230,7 +255,7 @@ class GoModParserTest implements RewriteTest {
 
                                 replace (
                                 	github.com/a/a => github.com/fork/a v1.0.0
-                                	github.com/b/b v2.0.0 => ../b-local
+                                	github.com/b/b v1.2.0 => ../b-local
                                 )
                                 """,
                         spec -> spec.afterRecipe(doc -> {
@@ -245,7 +270,7 @@ class GoModParserTest implements RewriteTest {
 
                             GoResolutionResult.Replace r2 = marker.getReplaces().get(1);
                             assertThat(r2.getOldPath()).isEqualTo("github.com/b/b");
-                            assertThat(r2.getOldVersion()).isEqualTo("v2.0.0");
+                            assertThat(r2.getOldVersion()).isEqualTo("v1.2.0");
                             assertThat(r2.getNewPath()).isEqualTo("../b-local");
                             assertThat(r2.getNewVersion()).isNull();
                         })
@@ -281,7 +306,7 @@ class GoModParserTest implements RewriteTest {
                                 require (
                                 	// important dep
                                 	github.com/foo/bar v1.0.0
-                                	github.com/baz/qux v2.0.0 // indirect
+                                	github.com/baz/qux v1.5.0 // indirect
                                 )
                                 """,
                         spec -> spec.afterRecipe(doc -> {
@@ -294,7 +319,7 @@ class GoModParserTest implements RewriteTest {
         );
     }
 
-    private static GoResolutionResult extractMarker(PlainText doc) {
+    private static GoResolutionResult extractMarker(GoMod doc) {
         List<GoResolutionResult> found = doc.getMarkers().findAll(GoResolutionResult.class);
         assertThat(found).as("GoResolutionResult marker").hasSize(1);
         return found.getFirst();

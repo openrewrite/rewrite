@@ -285,6 +285,24 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return a;
     }
 
+    public J visitInterpolatedString(S.InterpolatedString interpolatedString, P p) {
+        S.InterpolatedString i = interpolatedString;
+        i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withInterpolator(visitAndCast(i.getInterpolator(), p));
+        i = i.withParts(ListUtils.map(i.getParts(), e -> visitAndCast(e, p)));
+        return i;
+    }
+
+    public J visitInterpolation(S.Interpolation interpolation, P p) {
+        S.Interpolation i = interpolation;
+        i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withExpression(visitAndCast(i.getExpression(), p));
+        i = i.withAfterExpression(visitSpace(i.getAfterExpression(), Space.Location.LANGUAGE_EXTENSION, p));
+        return i;
+    }
+
     public J visitBinding(S.Binding binding, P p) {
         S.Binding b = binding;
         b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

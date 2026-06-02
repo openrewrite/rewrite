@@ -464,7 +464,10 @@ func (s *server) handleRequest(req *jsonRPCRequest) *jsonRPCResponse {
 
 // handleGetLanguages returns the supported language types.
 func (s *server) handleGetLanguages() []string {
-	return []string{"org.openrewrite.golang.tree.Go$CompilationUnit"}
+	return []string{
+		"org.openrewrite.golang.tree.Go$CompilationUnit",
+		"org.openrewrite.golang.tree.GoMod",
+	}
 }
 
 // parseRequest is the parameter type for Parse.
@@ -655,12 +658,38 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		}
 	}
 
+	// Parse every go.mod input into a lossless GoMod LST, attaching a
+	// GoResolutionResult marker so recipes can read module metadata
+	// without re-parsing. Mirrors the .go path but produces a GoMod
+	// SourceFile instead of a CompilationUnit.
+	goModByIdx := make(map[int]*golang.GoMod, len(resolvedInputs))
+	for _, r := range resolvedInputs {
+		if filepath.Base(r.sourcePath) != "go.mod" {
+			continue
+		}
+		gm, err := goparser.ParseGoModFile(r.sourcePath, r.source)
+		if err != nil {
+			parseErrByIdx[r.idx] = err
+			continue
+		}
+		if mrr, err := goparser.ParseGoMod(r.sourcePath, r.source); err == nil && mrr != nil && mrr.ModulePath != "" {
+			gm.Markers.Entries = append(gm.Markers.Entries, *mrr)
+		}
+		goModByIdx[r.idx] = gm
+	}
+
 	// Emit results in input order.
 	ids := make([]string, 0, len(req.Inputs))
 	for _, r := range resolvedInputs {
 		if cu, ok := cuByIdx[r.idx]; ok && cu != nil {
 			id := cu.ID.String()
 			s.localObjects[id] = cu
+			ids = append(ids, id)
+			continue
+		}
+		if gm, ok := goModByIdx[r.idx]; ok && gm != nil {
+			id := gm.Ident.String()
+			s.localObjects[id] = gm
 			ids = append(ids, id)
 			continue
 		}
@@ -754,6 +783,9 @@ func (s *server) handlePrint(params json.RawMessage) (any, *rpcError) {
 			return printer.PrintWithMarkers(cu, mp), nil
 		}
 		return printer.Print(cu), nil
+	}
+	if gm, ok := obj.(*golang.GoMod); ok {
+		return printer.PrintGoMod(gm), nil
 	}
 	if t, ok := obj.(java.Tree); ok {
 		if mp != nil {
