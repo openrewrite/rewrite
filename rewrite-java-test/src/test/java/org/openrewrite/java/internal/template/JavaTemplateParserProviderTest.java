@@ -23,7 +23,7 @@ import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,12 +32,12 @@ class JavaTemplateParserProviderTest {
 
     @Test
     void cursorMessageDeliversTypeFactoryToTemplateParser() {
-        AtomicBoolean factoryUsed = new AtomicBoolean(false);
         JavaTypeFactory factory = new DefaultJavaTypeFactory(new JavaTypeCache()) {
             @Override
-            public JavaType.Class classFor(String fqn) {
-                factoryUsed.set(true);
-                return super.classFor(fqn);
+            public JavaType.Class computeClass(String fqn, long flags,
+                                               JavaType.FullyQualified.Kind kind,
+                                               Consumer<JavaType.Class> initializer) {
+                return super.computeClass(fqn, flags, kind, initializer);
             }
         };
 
