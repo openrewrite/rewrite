@@ -18,6 +18,7 @@ package org.openrewrite.java.marker;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
@@ -34,25 +35,28 @@ public class JavaVersion implements Marker {
     String targetCompatibility;
 
     public int getMajorVersion() {
-        try {
-            return Integer.parseInt(normalize(sourceCompatibility));
-        } catch (NumberFormatException e) {
-            return -1;
-        }
+        return majorVersionOf(sourceCompatibility);
     }
 
     /**
      * @return The major --release version.
      */
     public int getMajorReleaseVersion() {
+        return majorVersionOf(targetCompatibility);
+    }
+
+    private static int majorVersionOf(@Nullable String version) {
+        if (version == null || version.trim().isEmpty()) {
+            return -1;
+        }
         try {
-            return Integer.parseInt(normalize(targetCompatibility));
+            return Integer.parseInt(normalize(version));
         } catch (NumberFormatException e) {
             return -1;
         }
     }
 
-    private String normalize(String version) {
+    private static String normalize(String version) {
         if (!version.contains(".")) {
             return version;
         }
