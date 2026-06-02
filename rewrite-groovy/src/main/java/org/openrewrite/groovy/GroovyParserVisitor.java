@@ -4097,19 +4097,32 @@ public class GroovyParserVisitor {
 
     private List<J.Modifier> getModifiers() {
         List<J.Modifier> modifiers = new ArrayList<>();
-        Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.keySet());
-        String currentModifier = possibleModifiers.stream().filter(this::sourceStartsWith).findFirst().orElse(null);
-        while (currentModifier != null) {
-            possibleModifiers.remove(currentModifier);
-            modifiers.add(new J.Modifier(randomId(), whitespace(), Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
-            skip(currentModifier);
-            currentModifier = possibleModifiers.stream()
-                    // Try to avoid confusing a variable name with an incidentally similar modifier keyword like `def defaultPublicStaticFinal = 0`
-                    .filter(modifierName -> sourceStartsWith(modifierName, "\n", " ", ")"))
-                    .findFirst()
-                    .orElse(null);
+        String keyword;
+        while ((keyword = nextModifierKeyword()) != null) {
+            modifiers.add(new J.Modifier(randomId(), whitespace(), Markers.EMPTY, keyword, modifierNameToType.get(keyword), emptyList()));
+            skip(keyword);
         }
         return modifiers;
+    }
+
+    /**
+     * Peeks at the next token without consuming it and returns it only if it is a modifier keyword whose end falls
+     * on an identifier boundary. Requiring the character after the keyword to not be an identifier part keeps a
+     * variable name from being mistaken for an incidentally similar keyword (e.g. {@code defaultValue} is not the
+     * {@code def} keyword), while still recognizing a keyword that is immediately followed by punctuation such as
+     * {@code def(key, value)} destructuring.
+     */
+    private @Nullable String nextModifierKeyword() {
+        int start = indexOfNextNonWhitespace(cursor, source);
+        for (String keyword : modifierNameToType.keySet()) {
+            if (source.startsWith(keyword, start)) {
+                int after = start + keyword.length();
+                if (after >= source.length() || !isJavaIdentifierPart(source.charAt(after))) {
+                    return keyword;
+                }
+            }
+        }
+        return null;
     }
 
     private <G2 extends J> JRightPadded<G2> maybeSemicolon(G2 g) {
