@@ -150,7 +150,7 @@ class TemplateCache {
             relativeTo: workspaceDir,
             sourceFileCache: templateSourceFileCache
         });
-        const parseGenerator = parser.parse({text: fullTemplateString, sourcePath: 'template.ts'});
+        const parseGenerator = parser.parse({text: fullTemplateString, sourcePath: 'template.tsx'});
         cu = (await parseGenerator.next()).value as JS.CompilationUnit;
 
         this.cache.set(key, cu);

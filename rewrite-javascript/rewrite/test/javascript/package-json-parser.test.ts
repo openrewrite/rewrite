@@ -188,6 +188,7 @@ describe("PackageJsonParser", () => {
 
         expect(parser.accept("package.json")).toBe(true);
         expect(parser.accept("/some/path/package.json")).toBe(true);
+        expect(parser.accept(path.normalize("/some/path/package.json"))).toBe(true);
         expect(parser.accept("package-lock.json")).toBe(false);
         expect(parser.accept("tsconfig.json")).toBe(false);
         expect(parser.accept("index.ts")).toBe(false);
@@ -468,6 +469,7 @@ empty-value=
             // Create a subdirectory structure: rootDir/subproject/
             const subprojectDir = path.join(rootDir.path, 'subproject');
             fs.mkdirSync(subprojectDir);
+            const subprojectPackageJson = path.join(subprojectDir, 'package.json');
 
             // Write package.json in subdirectory
             const packageJsonContent = {
@@ -478,7 +480,7 @@ empty-value=
                 }
             };
             fs.writeFileSync(
-                path.join(subprojectDir, 'package.json'),
+                subprojectPackageJson,
                 JSON.stringify(packageJsonContent, null, 2)
             );
 
@@ -509,7 +511,7 @@ empty-value=
             // Parse with relativeTo set to root directory (simulating Git root)
             const parser = new PackageJsonParser({relativeTo: rootDir.path});
             const results: Json.Document[] = [];
-            for await (const result of parser.parse(path.join(subprojectDir, 'package.json'))) {
+            for await (const result of parser.parse(subprojectPackageJson)) {
                 results.push(result as Json.Document);
             }
 
@@ -518,7 +520,7 @@ empty-value=
             expect(marker).toBeDefined();
             expect(marker!.name).toBe("subproject");
             // Path should be relative to relativeTo
-            expect(marker!.path).toBe("subproject/package.json");
+            expect(marker!.path).toBe(path.normalize("subproject/package.json"));
             // Should have found the lock file in the subdirectory
             expect(marker!.resolvedDependencies.length).toBeGreaterThan(0);
             // Check that dependency is resolved

@@ -21,8 +21,6 @@ import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.yaml.tree.Yaml;
 
 public class YamlRpcCodec extends DynamicDispatchRpcCodec<Yaml> {
-    private final YamlSender sender = new YamlSender();
-    private final YamlReceiver receiver = new YamlReceiver();
 
     @Override
     public String getSourceFileType() {
@@ -36,11 +34,11 @@ public class YamlRpcCodec extends DynamicDispatchRpcCodec<Yaml> {
 
     @Override
     public void rpcSend(Yaml after, RpcSendQueue q) {
-        sender.visit(after, q);
+        new YamlSender().visit(after, q);
     }
 
     @Override
     public Yaml rpcReceive(Yaml before, RpcReceiveQueue q) {
-        return receiver.visitNonNull(before, q);
+        return new YamlReceiver().visitNonNull(before, q);
     }
 }

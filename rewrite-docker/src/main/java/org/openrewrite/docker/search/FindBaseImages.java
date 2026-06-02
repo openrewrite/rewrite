@@ -1,0 +1,124 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.docker.search;
+
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.docker.table.BaseImages;
+import org.openrewrite.docker.trait.DockerFrom;
+import org.openrewrite.docker.tree.Docker;
+import org.openrewrite.marker.SearchResult;
+
+@Value
+@EqualsAndHashCode(callSuper = false)
+public class FindBaseImages extends Recipe {
+
+    transient BaseImages baseImages = new BaseImages(this);
+
+    @Option(displayName = "Image name pattern",
+            description = "A glob pattern to match against base image names. If not specified, all base images are matched.",
+            example = "ubuntu*",
+            required = false)
+    @Nullable
+    String imageNamePattern;
+
+    @Option(displayName = "Tag pattern",
+            description = "A glob pattern to match against image tags. If not specified, all tags are matched.",
+            example = "20.*",
+            required = false)
+    @Nullable
+    String tagPattern;
+
+    @Option(displayName = "Digest pattern",
+            description = "A glob pattern to match against image digests. If not specified, all digests are matched.",
+            example = "sha256:*",
+            required = false)
+    @Nullable
+    String digestPattern;
+
+    @Option(displayName = "Platform pattern",
+            description = "A glob pattern to match against platform flags. If not specified, all platforms are matched.",
+            example = "linux/amd64",
+            required = false)
+    @Nullable
+    String platformPattern;
+
+    @Override
+    public String getDisplayName() {
+        return "Find Docker base images";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Find all base images (`FROM` instructions) in Dockerfiles.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        DockerFrom.Matcher matcher = new DockerFrom.Matcher();
+        if (imageNamePattern != null) {
+            matcher.imageName(imageNamePattern);
+        }
+        if (tagPattern != null) {
+            matcher.tag(tagPattern);
+        }
+        if (digestPattern != null) {
+            matcher.digest(digestPattern);
+        }
+        if (platformPattern != null) {
+            matcher.platform(platformPattern);
+        }
+        return matcher.asVisitor((image, ctx) -> {
+            String imageName = image.getImageName();
+            Docker.From from = image.getTree();
+            if (imageName == null) {
+                return from;
+            }
+
+            String stageName = image.getStageName();
+            String tag = image.getTag();
+            String digest = image.getDigest();
+            String platform = image.getPlatform();
+
+            // Insert row into data table
+            baseImages.insertRow(ctx, new BaseImages.Row(
+                    image.getCursor().firstEnclosingOrThrow(Docker.File.class).getSourcePath().toString(),
+                    stageName,
+                    imageName,
+                    tag,
+                    digest,
+                    platform
+            ));
+
+            // Build message with image reference
+            String message = imageName;
+            if (tag != null) {
+                message += ":" + tag;
+            }
+            if (digest != null) {
+                message += "@" + digest;
+            }
+
+            // Mark the FROM instruction as a search result
+            return SearchResult.found(from, message);
+        });
+    }
+}

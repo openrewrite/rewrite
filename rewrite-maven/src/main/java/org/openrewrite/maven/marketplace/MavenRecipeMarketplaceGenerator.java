@@ -23,6 +23,7 @@ import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,42 +33,52 @@ import java.util.List;
 
 public class MavenRecipeMarketplaceGenerator {
     private final GroupArtifactVersion gav;
-    private final Path recipeJar;
+    private final Path path;
     private final List<Path> classpath;
 
-    public MavenRecipeMarketplaceGenerator(GroupArtifact ga, Path recipeJar, List<Path> classpath) {
+    /**
+     * Create a generator for recipe marketplace CSV.
+     *
+     * @param ga        The group and artifact of the recipe module
+     * @param path      Path to a jar file or directory containing class files
+     * @param classpath List of paths to dependencies (jars or directories)
+     */
+    public MavenRecipeMarketplaceGenerator(GroupArtifact ga, Path path, List<Path> classpath) {
         this.gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), "");
-        this.recipeJar = recipeJar;
+        this.path = path;
         this.classpath = classpath;
     }
 
     public RecipeMarketplace generate() {
-        if (Files.notExists(recipeJar)) {
-            throw new IllegalArgumentException("Recipe JAR does not exist " + recipeJar);
+        if (Files.notExists(path)) {
+            throw new IllegalArgumentException("Recipe path does not exist: " + path);
         }
 
-        @SuppressWarnings("DataFlowIssue") MavenRecipeBundleReader bundleReader = new MavenRecipeBundleReader(
+        try (MavenRecipeBundleReader bundleReader = new MavenRecipeBundleReader(
                 new RecipeBundle("maven", gav.getGroupId() + ":" + gav.getArtifactId(),
                         gav.getVersion(), gav.getVersion(), null),
-                // Since we're going to directly set recipeJar and classpath, we can get away with this
+                // Since we're going to directly set recipePath and classpath, we can get away with this
                 null, null,
                 RecipeClassLoader::new
-        );
+        )) {
 
-        bundleReader.recipeJar = recipeJar;
-        bundleReader.classpath = classpath;
+            bundleReader.recipeJar = path;
+            bundleReader.classpath = classpath;
 
-        return bundleReader.marketplaceFromClasspathScan();
+            return bundleReader.marketplaceFromClasspathScan();
+        } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
     }
 
     /**
-     * Main method to generate recipe marketplace CSV for a single recipe JAR.
+     * Main method to generate recipe marketplace CSV for a recipe jar or directory of class files.
      *
-     * @param args [0] = groupId:artifactId, [1] = output CSV path, [2] = recipe JAR path, [3...] = classpath entries
+     * @param args [0] = groupId:artifactId, [1] = output CSV path, [2] = recipe jar or class directory path, [3...] = classpath entries
      */
     public static void main(String[] args) throws IOException {
         if (args.length < 3) {
-            System.err.println("Usage: java MavenRecipeMarketplaceGenerator <groupId:artifactId> <output-csv-path> <recipe-jar> [classpath-entries...]");
+            System.err.println("Usage: java MavenRecipeMarketplaceGenerator <groupId:artifactId> <output-csv-path> <recipe-jar-or-directory> [classpath-entries...]");
             System.exit(1);
         }
 
@@ -80,7 +91,7 @@ public class MavenRecipeMarketplaceGenerator {
         String artifactId = gav[1];
 
         Path outputCsv = Paths.get(args[1]);
-        Path recipeJar = Paths.get(args[2]);
+        Path recipePath = Paths.get(args[2]);
 
         List<Path> classpath = new ArrayList<>();
         for (int i = 3; i < args.length; i++) {
@@ -88,7 +99,7 @@ public class MavenRecipeMarketplaceGenerator {
         }
 
         GroupArtifact ga = new GroupArtifact(groupId, artifactId);
-        RecipeMarketplace marketplace = new MavenRecipeMarketplaceGenerator(ga, recipeJar, classpath).generate();
+        RecipeMarketplace marketplace = new MavenRecipeMarketplaceGenerator(ga, recipePath, classpath).generate();
 
         String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
         Files.write(outputCsv, csv.getBytes(StandardCharsets.UTF_8));

@@ -26,12 +26,12 @@ class DelTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "del x",
-            "del  x",
-            "del x, y",
-            "del  x, y",
-            "del x , y",
-            "del x,  y",
+      "del x",
+      "del  x",
+      "del x, y",
+      "del  x, y",
+      "del x , y",
+      "del x,  y",
     })
     void del(@Language("py") String arg) {
         rewriteRun(python(arg));

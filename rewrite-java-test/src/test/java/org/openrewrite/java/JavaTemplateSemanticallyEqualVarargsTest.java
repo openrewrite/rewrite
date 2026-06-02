@@ -335,7 +335,7 @@ class JavaTemplateSemanticallyEqualVarargsTest implements RewriteTest {
                             J param = matcher.parameter(0);
                             // Varargs matches return a J.NewArray with the matched elements as the initializer
                             if (param instanceof J.NewArray) {
-                                J.NewArray arr = (J.NewArray) param;
+                                var arr = (J.NewArray) param;
                                 assertThat(arr.getInitializer()).hasSize(3);
                                 return SearchResult.found(mi, "varargs:" + arr.getInitializer().size());
                             }

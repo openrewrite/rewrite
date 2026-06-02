@@ -24,6 +24,7 @@ import org.openrewrite.gradle.internal.DefaultImportsCustomizer;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.kotlin.KotlinParser;
 
 import java.nio.file.Path;
@@ -36,6 +37,24 @@ import static java.util.Collections.singletonList;
 
 @RequiredArgsConstructor
 public class GradleParser implements Parser {
+    @SuppressWarnings("LanguageMismatch")
+    private static final String KTS_BUILD_STUBS =
+            "package org.gradle.api\n" +
+            "import org.gradle.plugin.use.PluginDependenciesSpec\n" +
+            "import org.gradle.plugin.use.PluginDependencySpec\n" +
+            "fun Project.plugins(block: PluginDependenciesSpec.() -> Unit) {}\n" +
+            "fun PluginDependenciesSpec.kotlin(module: String): PluginDependencySpec = id(module)\n";
+
+    @SuppressWarnings("LanguageMismatch")
+    private static final String KTS_SETTINGS_STUBS =
+            "package org.gradle.api.initialization\n" +
+            "import org.gradle.plugin.use.PluginDependenciesSpec\n" +
+            "import org.gradle.plugin.use.PluginDependencySpec\n" +
+            "import org.gradle.plugin.management.PluginManagementSpec\n" +
+            "fun Settings.plugins(block: PluginDependenciesSpec.() -> Unit) {}\n" +
+            "fun Settings.pluginManagement(block: PluginManagementSpec.() -> Unit) {}\n" +
+            "fun PluginDependenciesSpec.kotlin(module: String): PluginDependencySpec = id(module)\n";
+
     private final GradleParser.Builder base;
 
     private @Nullable List<Path> defaultClasspath;
@@ -66,6 +85,10 @@ public class GradleParser implements Parser {
             }
             kotlinBuildParser = KotlinParser.builder(base.kotlinParser)
                     .classpath(buildscriptClasspath)
+                    .dependsOn(KTS_BUILD_STUBS)
+                    .isKotlinScript(true)
+                    .scriptImplicitReceivers("org.gradle.api.Project")
+                    .scriptDefaultImports(DefaultImportsCustomizer.DEFAULT_IMPORTS)
                     .build();
         }
         if (groovySettingsParser == null) {
@@ -88,6 +111,10 @@ public class GradleParser implements Parser {
             }
             kotlinSettingsParser = KotlinParser.builder(base.kotlinParser)
                     .classpath(settingsClasspath)
+                    .dependsOn(KTS_SETTINGS_STUBS)
+                    .isKotlinScript(true)
+                    .scriptImplicitReceivers("org.gradle.api.initialization.Settings")
+                    .scriptDefaultImports(DefaultImportsCustomizer.DEFAULT_IMPORTS)
                     .build();
         }
 
@@ -140,6 +167,16 @@ public class GradleParser implements Parser {
 
         public Builder kotlinParser(KotlinParser.Builder kotlinParser) {
             this.kotlinParser = kotlinParser;
+            return this;
+        }
+
+        /**
+         * Forward a {@link JavaTypeFactory} to both the Groovy and Kotlin sub-parsers
+         * so either DSL variant produces types from the caller's factory.
+         */
+        public Builder typeFactory(JavaTypeFactory typeFactory) {
+            this.groovyParser.typeFactory(typeFactory);
+            this.kotlinParser.typeFactory(typeFactory);
             return this;
         }
 

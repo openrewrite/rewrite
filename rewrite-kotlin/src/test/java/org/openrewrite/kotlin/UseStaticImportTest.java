@@ -45,7 +45,7 @@ class UseStaticImportTest implements RewriteTest {
     @Test
     void withImports() {
         rewriteRun(
-          spec -> spec.recipe(new UseStaticImport("java.lang.Integer valueOf(kotlin.Int)")),
+          spec -> spec.recipe(new UseStaticImport("java.lang.Integer valueOf(int)")),
           kotlin(
             """
               import java.util.Collections

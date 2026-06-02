@@ -52,7 +52,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
 
         J[] parameters = createTemplateParameters(template.getCode(), template.getGenericTypes());
         try {
-            J templateTree = template.apply(input, coordinates, (Object[]) parameters);
+            J templateTree = template.applyWithoutFormatting(input, coordinates, (Object[]) parameters);
             return matchTemplate(templateTree, input);
         } catch (RuntimeException e) {
             // FIXME this is just a workaround, as template matching finds many new corner cases in `JavaTemplate` which we need to fix
@@ -198,6 +198,27 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         @Override
         protected boolean isAssignableTo(JavaType to, JavaType from) {
             return TypeUtils.isAssignableTo(to, from, TypeUtils.ComparisonContext.INFER);
+        }
+
+        @Override
+        public J.MemberReference visitMemberReference(J.MemberReference memberRef, J j) {
+            if (isEqual.get() && j instanceof J.MemberReference) {
+                J.MemberReference compareTo = (J.MemberReference) j;
+                // When the template's containing expression is a template parameter placeholder,
+                // always visit it to match against the actual containing expression.
+                // The base class only visits containing when it's a J.Identifier or J.FieldAccess
+                // with a fieldType, which misses literals and other expression types.
+                if (memberRef.getContaining() instanceof J.Empty &&
+                    isTemplateParameterPlaceholder((J.Empty) memberRef.getContaining())) {
+                    if (!memberRef.getReference().getSimpleName().equals(compareTo.getReference().getSimpleName())) {
+                        isEqual.set(false);
+                        return memberRef;
+                    }
+                    visit(memberRef.getContaining(), compareTo.getContaining());
+                    return memberRef;
+                }
+            }
+            return super.visitMemberReference(memberRef, j);
         }
 
         @Override

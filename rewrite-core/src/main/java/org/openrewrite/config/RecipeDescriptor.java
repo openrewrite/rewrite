@@ -15,6 +15,8 @@
  */
 package org.openrewrite.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
@@ -36,6 +38,7 @@ import static java.util.Collections.emptySet;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@AllArgsConstructor(onConstructor = @__(@JsonCreator))
 public class RecipeDescriptor {
     @EqualsAndHashCode.Include
     String name;
@@ -58,6 +61,9 @@ public class RecipeDescriptor {
     List<OptionDescriptor> options;
 
     @With
+    List<RecipeDescriptor> preconditions;
+
+    @With
     List<RecipeDescriptor> recipeList;
 
     @With
@@ -72,6 +78,16 @@ public class RecipeDescriptor {
 
     @Deprecated
     URI source;
+
+    @Deprecated
+    public RecipeDescriptor(String name, String displayName, String instanceName, String description,
+                            Set<String> tags, @Nullable Duration estimatedEffortPerOccurrence,
+                            List<OptionDescriptor> options, List<RecipeDescriptor> recipeList,
+                            List<DataTableDescriptor> dataTables, List<Maintainer> maintainers,
+                            List<Contributor> contributors, List<RecipeExample> examples, URI source) {
+        this(name, displayName, instanceName, description, tags, estimatedEffortPerOccurrence,
+                options, emptyList(), recipeList, dataTables, maintainers, contributors, examples, source);
+    }
 
     /**
      * @param env Provides a source of category descriptors to build category names from more

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {describe} from "@jest/globals";
 import {RecipeSpec} from "../../../src/test";
 import {OrderImports} from "../../../src/javascript/recipes/order-imports";
 import {typescript} from "../../../src/javascript";

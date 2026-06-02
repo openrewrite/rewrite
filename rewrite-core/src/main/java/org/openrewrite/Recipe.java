@@ -33,7 +33,6 @@ import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
@@ -52,6 +51,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
@@ -203,8 +203,6 @@ public abstract class Recipe implements Cloneable {
      * A set of strings used for categorizing related recipes. For example
      * "testing", "junit", "spring". Any individual tag should consist of a
      * single word, all lowercase.
-     *
-     * @return The tags.
      */
     @Getter
     final Set<String> tags = emptySet();
@@ -225,11 +223,21 @@ public abstract class Recipe implements Cloneable {
 
     protected RecipeDescriptor createRecipeDescriptor() {
         List<OptionDescriptor> options = getOptionDescriptors();
-        ArrayList<RecipeDescriptor> recipeList1 = new ArrayList<>();
-        for (Recipe next : getRecipeList()) {
-            recipeList1.add(next.getDescriptor());
+        List<RecipeDescriptor> preconditionDescriptors = emptyList();
+        if (this instanceof RecipePreconditions) {
+            RecipePreconditions recipeWithPreconditions = (RecipePreconditions) this;
+            List<Recipe> preconditions = recipeWithPreconditions.getPreconditions();
+            preconditionDescriptors = new ArrayList<>(preconditions.size());
+            for (Recipe precondition : preconditions) {
+                preconditionDescriptors.add(precondition.getDescriptor());
+            }
         }
-        recipeList1.trimToSize();
+
+        List<Recipe> recipeList = getRecipeList();
+        List<RecipeDescriptor> recipeDescriptors = new ArrayList<>(recipeList.size());
+        for (Recipe next : recipeList) {
+            recipeDescriptors.add(next.getDescriptor());
+        }
 
         URI recipeSource;
         try {
@@ -239,7 +247,7 @@ public abstract class Recipe implements Cloneable {
         }
 
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
-                getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
+                getEstimatedEffortPerOccurrence(), options, preconditionDescriptors, recipeDescriptors, getDataTableDescriptors(),
                 getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 
@@ -266,7 +274,7 @@ public abstract class Recipe implements Cloneable {
                         option.displayName(),
                         option.description(),
                         option.example().isEmpty() ? null : option.example(),
-                        option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                        validValues(option, field.getType()),
                         option.required(),
                         value));
             }
@@ -281,7 +289,7 @@ public abstract class Recipe implements Cloneable {
                             option.displayName(),
                             option.description(),
                             option.example().isEmpty() ? null : option.example(),
-                            option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                            validValues(option, method.getReturnType()),
                             option.required(),
                             null));
                 }
@@ -297,7 +305,7 @@ public abstract class Recipe implements Cloneable {
                             option.displayName(),
                             option.description(),
                             option.example().isEmpty() ? null : option.example(),
-                            option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                            validValues(option, parameter.getType()),
                             option.required(),
                             null));
                 }
@@ -310,6 +318,18 @@ public abstract class Recipe implements Cloneable {
         return options;
     }
 
+    private static @Nullable List<String> validValues(Option option, Class<?> type) {
+        if (!(option.valid().length == 1 && option.valid()[0].isEmpty())) {
+            return Arrays.asList(option.valid());
+        }
+        if (type.isEnum()) {
+            return Arrays.stream(type.getEnumConstants())
+                    .map(e -> ((Enum<?>) e).name())
+                    .collect(Collectors.toList());
+        }
+        return null;
+    }
+
     private static final List<DataTableDescriptor> GLOBAL_DATA_TABLES = Arrays.asList(
             dataTableDescriptorFromDataTable(new SourcesFileResults(Recipe.noop())),
             dataTableDescriptorFromDataTable(new SearchResults(Recipe.noop())),
@@ -317,8 +337,34 @@ public abstract class Recipe implements Cloneable {
             dataTableDescriptorFromDataTable(new RecipeRunStats(Recipe.noop()))
     );
 
+    private static final Set<String> GLOBAL_DATA_TABLE_NAMES;
+
+    static {
+        Set<String> names = new HashSet<>();
+        for (DataTableDescriptor dt : GLOBAL_DATA_TABLES) {
+            names.add(dt.getName());
+        }
+        GLOBAL_DATA_TABLE_NAMES = names;
+    }
+
     public List<DataTableDescriptor> getDataTableDescriptors() {
-        return ListUtils.concatAll(dataTables == null ? emptyList() : dataTables, GLOBAL_DATA_TABLES);
+        Map<String, DataTableDescriptor> byName = new LinkedHashMap<>();
+        if (dataTables != null) {
+            for (DataTableDescriptor dt : dataTables) {
+                byName.putIfAbsent(dt.getName(), dt);
+            }
+        }
+        for (Recipe sub : getRecipeList()) {
+            for (DataTableDescriptor dt : sub.getDataTableDescriptors()) {
+                if (!GLOBAL_DATA_TABLE_NAMES.contains(dt.getName())) {
+                    byName.putIfAbsent(dt.getName(), dt);
+                }
+            }
+        }
+        for (DataTableDescriptor dt : GLOBAL_DATA_TABLES) {
+            byName.putIfAbsent(dt.getName(), dt);
+        }
+        return new ArrayList<>(byName.values());
     }
 
     /**
@@ -449,12 +495,7 @@ public abstract class Recipe implements Cloneable {
 
     @SuppressWarnings("unused")
     public Validated<Object> validate(ExecutionContext ctx) {
-        Validated<Object> validated = validate();
-
-        for (Recipe recipe : getRecipeList()) {
-            validated = validated.and(recipe.validate(ctx));
-        }
-        return validated;
+        return validate();
     }
 
     /**
@@ -474,9 +515,6 @@ public abstract class Recipe implements Cloneable {
             } catch (IllegalAccessException e) {
                 validated = Validated.invalid(field.getName(), null, "Unable to access " + clazz.getName() + "." + field.getName(), e);
             }
-        }
-        for (Recipe recipe : getRecipeList()) {
-            validated = validated.and(recipe.validate());
         }
         return validated;
     }
@@ -561,6 +599,10 @@ public abstract class Recipe implements Cloneable {
                         Map<String, Object> option = new HashMap<>();
                         option.put("value", value);
                         objectMapper.updateValue(optionDescriptor, option);
+
+                        if (optionDescriptor.getType().equals("List")) {
+                            m.put(optionDescriptor.getName(), Arrays.asList(((String) value).split(",")));
+                        }
                     }
                 }
             }

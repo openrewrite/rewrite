@@ -105,8 +105,16 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <J2 extends J> J2 apply(Cursor scope, JavaCoordinates coordinates, Object... parameters) {
+        return doApply(scope, coordinates, true, parameters);
+    }
+
+    <J2 extends J> J2 applyWithoutFormatting(Cursor scope, JavaCoordinates coordinates, Object... parameters) {
+        return doApply(scope, coordinates, false, parameters);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <J2 extends J> J2 doApply(Cursor scope, JavaCoordinates coordinates, boolean autoFormat, Object... parameters) {
         if (!(scope.getValue() instanceof J)) {
             throw new IllegalArgumentException("`scope` must point to a J instance.");
         }
@@ -116,7 +124,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
         //noinspection ConstantConditions
-        J2 result = (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
+        J2 result = (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates, autoFormat)
                 .getMixin()
                 .visit(scope.getValue(), 0, scope.getParentOrThrow());
 

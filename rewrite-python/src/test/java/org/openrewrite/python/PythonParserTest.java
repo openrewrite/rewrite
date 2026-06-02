@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.python.tree.Py;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.python;
 
 @DisabledIfEnvironmentVariable(named = "CI", matches = "true", disabledReason = "No remote client/server available")
@@ -71,6 +72,26 @@ class PythonParserTest implements RewriteTest {
     }
 
     @Test
+    void unicodeEscapes() {
+        rewriteRun(
+          python(
+            """
+              s = "\\uD83D\\uDE00"
+              print(s)
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                var s = (J.Assignment) cu.getStatements().get(0);
+                var str = (J.Literal) s.getAssignment();
+                assertThat(str.getUnicodeEscapes()).satisfiesExactly(
+                  esc -> assertThat(esc.getCodePoint()).isEqualTo("D83D"),
+                  esc -> assertThat(esc.getCodePoint()).isEqualTo("DE00")
+                );
+            })
+          )
+        );
+    }
+
+    @Test
     void parseStringWithParser() {
         SourceFile sf = PythonParser.builder().build()
           .parse(
@@ -84,6 +105,55 @@ class PythonParserTest implements RewriteTest {
         SoftAssertions.assertSoftly(softly -> {
             softly.assertThat(sf).isInstanceOf(Py.CompilationUnit.class);
             softly.assertThat(sf.getMarkers().getMarkers()).isEmpty();
+        });
+    }
+
+    @Test
+    void parsePython2WithLanguageLevel() {
+        SourceFile sf = PythonParser.builder().languageLevel(PythonParser.PythonLanguageLevel.PYTHON_2_7).build()
+          .parse("print \"hello\"\n")
+          .findFirst()
+          .get();
+        SoftAssertions.assertSoftly(softly -> {
+            softly.assertThat(sf).isInstanceOf(Py.CompilationUnit.class);
+            softly.assertThat(sf.getMarkers().getMarkers()).isEmpty();
+        });
+    }
+
+    @Test
+    void parsePython2ComprehensiveRoundTrip() {
+        String source =
+          "import os\n" +
+          "from os.path import join, dirname\n" +
+          "\n" +
+          "\n" +
+          "def greet(name, greeting=\"hello\"):\n" +
+          "    if name:\n" +
+          "        print greeting, name\n" +
+          "    else:\n" +
+          "        print >> sys.stderr, \"missing name\"\n" +
+          "    return greeting + name\n" +
+          "\n" +
+          "\n" +
+          "class Worker(Base):\n" +
+          "    def run(self, items):\n" +
+          "        results = []\n" +
+          "        for item in items:\n" +
+          "            try:\n" +
+          "                results.append(self.process(item))\n" +
+          "            except ValueError, e:\n" +
+          "                self.log(e)\n" +
+          "        return results\n";
+
+        SourceFile sf = PythonParser.builder().languageLevel(PythonParser.PythonLanguageLevel.PYTHON_2_7).build()
+          .parse(source)
+          .findFirst()
+          .get();
+
+        SoftAssertions.assertSoftly(softly -> {
+            softly.assertThat(sf).isInstanceOf(Py.CompilationUnit.class);
+            softly.assertThat(sf.getMarkers().getMarkers()).isEmpty();
+            softly.assertThat(sf.printAll()).isEqualTo(source);
         });
     }
 }

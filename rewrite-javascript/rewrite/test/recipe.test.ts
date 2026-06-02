@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 import {RecipeMarketplace} from "../src";
-import {describe} from "@jest/globals";
 import {activate} from "../fixtures/example-recipe";
 import {ChangeText} from "../fixtures/change-text";
 
@@ -44,9 +43,13 @@ describe("recipes", () => {
                     value: undefined
                 }
             ],
+            preconditions: [],
             recipeList: [],
             tags: [],
-            dataTables: []
+            dataTables: [],
+            maintainers: [],
+            contributors: [],
+            examples: []
         });
     });
 });

@@ -524,6 +524,12 @@ public class TypeUtils {
         if (isWildcard(to) || context.getInference() == TO) {
             // If target "to" wildcard is unbounded, it accepts anything
             if (to.getBounds().isEmpty()) {
+                // A named type variable (e.g. V) should not bind to a wildcard (e.g. ? extends Class<?>),
+                // as this produces uncompilable code when the variable is later used in generic positions
+                // that create nested wildcard captures (e.g. Map<? extends K, ? extends V>).
+                if (!isWildcard(to) && isWildcard(from)) {
+                    return false;
+                }
                 return true;
             }
 

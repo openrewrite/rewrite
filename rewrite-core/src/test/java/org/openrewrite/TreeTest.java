@@ -26,6 +26,14 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 
 import java.nio.file.Paths;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.UnaryOperator;
 
 import static java.util.Objects.requireNonNull;
@@ -34,6 +42,56 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class TreeTest implements RewriteTest {
+
+    @Test
+    void randomIdReturnsUuidV4WithIetfVariant() {
+        for (int i = 0; i < 1000; i++) {
+            UUID id = Tree.randomId();
+            assertThat(id.version()).isEqualTo(4);
+            assertThat(id.variant()).isEqualTo(2); // IETF (RFC 4122)
+        }
+    }
+
+    @Test
+    void randomIdProducesNoDuplicatesAcrossManyCalls() {
+        int n = 1_000_000;
+        Set<UUID> seen = new HashSet<>(n);
+        for (int i = 0; i < n; i++) {
+            seen.add(Tree.randomId());
+        }
+        assertThat(seen).hasSize(n);
+    }
+
+    @Test
+    void randomIdIsUniqueAcrossThreads() throws Exception {
+        int threads = 16;
+        int perThread = 100_000;
+        Set<UUID> ids = ConcurrentHashMap.newKeySet(threads * perThread);
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threads);
+        try {
+            for (int t = 0; t < threads; t++) {
+                pool.submit(() -> {
+                    try {
+                        start.await();
+                        for (int i = 0; i < perThread; i++) {
+                            ids.add(Tree.randomId());
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+            start.countDown();
+            assertThat(done.await(60, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(ids).hasSize(threads * perThread);
+    }
 
     @Test
     void customMarkerPrinting() {
@@ -57,13 +115,13 @@ class TreeTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({
         "true, '\uFEFFHello World'",
         "false, 'Hello World'"
     })
+    @ParameterizedTest
     void printBomHandling(boolean charsetBomMarked, String expected) {
-        PlainText sourceFile = new PlainText(
+        var sourceFile = new PlainText(
             Tree.randomId(),
             Paths.get("test.txt"),
             Markers.EMPTY,
@@ -82,7 +140,7 @@ class TreeTest implements RewriteTest {
 
     @Test
     void printQuarkDoesNotThrowOnBomRestoration() {
-        Quark quark = new Quark(
+        var quark = new Quark(
             Tree.randomId(),
             Paths.get("unknown.file"),
             Markers.EMPTY,

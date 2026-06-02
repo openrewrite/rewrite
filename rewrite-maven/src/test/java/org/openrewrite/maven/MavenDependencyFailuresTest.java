@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
@@ -41,6 +42,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
 
     @DocumentExample
     @Test
+    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void unresolvableParent() { // Dad said he was heading to the corner store for cigarettes, and hasn't been resolvable for the past 20 years :'(
         rewriteRun(
           spec -> spec
@@ -72,14 +74,14 @@ class MavenDependencyFailuresTest implements RewriteTest {
               </project>
               """,
             spec -> spec.after(xml -> {
-                assertThat(xml).contains("org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:");
-                return xml;
+                return assertThat(xml).contains("org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:").actual();
             }
           ))
         );
     }
 
     @Test
+    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void unresolvableMavenMetadata() {
         rewriteRun(
           spec -> spec
@@ -340,6 +342,46 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 .matches(dep -> "org.jvnet.staxex".equals(dep.getGroupId()) &&
                   "stax-ex".equals(dep.getArtifactId()) &&
                   "1.0".equals(dep.getVersion()))))
+        );
+    }
+
+    @Test
+    void unresolvableTgzDependencyShouldNotFailBuild() {
+        rewriteRun(
+          spec -> spec.executionContext(new InMemoryExecutionContext())
+            .typeValidationOptions(TypeValidation.builder()
+              .dependencyModel(false)
+              .build()),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.example.mongo.osx</groupId>
+                    <artifactId>mongodb-osx-ssl-x86_64</artifactId>
+                    <version>3.6.23</version>
+                    <type>tgz</type>
+                    <scope>test</scope>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.example.mongo.linux</groupId>
+                    <artifactId>mongodb-linux-x86_64</artifactId>
+                    <version>3.6.23</version>
+                    <type>tgz</type>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(after -> {
+                // tgz dependencies that can't be downloaded should NOT cause a parse failure
+                Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
+                assertThat(maybeParseException).isEmpty();
+            })
+          )
         );
     }
 

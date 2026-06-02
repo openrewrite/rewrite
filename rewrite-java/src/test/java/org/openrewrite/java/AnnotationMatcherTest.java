@@ -30,7 +30,7 @@ class AnnotationMatcherTest implements RewriteTest {
     class Whitespace {
         @Test
         void spacesAroundEquals() {
-            AnnotationMatcher matcher = new AnnotationMatcher("@java.lang.SuppressWarnings(value = \"foo\")");
+            var matcher = new AnnotationMatcher("@java.lang.SuppressWarnings(value = \"foo\")");
             rewriteRun(
               java(
                 """
@@ -53,7 +53,7 @@ class AnnotationMatcherTest implements RewriteTest {
 
         @Test
         void spacesAroundDots() {
-            AnnotationMatcher matcher = new AnnotationMatcher("@ java .lang. SuppressWarnings");
+            var matcher = new AnnotationMatcher("@ java .lang. SuppressWarnings");
             rewriteRun(
               java(
                 """

@@ -31,13 +31,13 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Comparator.comparingInt;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
-import static org.openrewrite.config.ResourceLoader.RecipeDetail.EXAMPLES;
 
 public class Environment {
     private final Collection<? extends ResourceLoader> resourceLoaders;
@@ -84,7 +84,7 @@ public class Environment {
     }
 
     public Collection<CategoryDescriptor> listCategoryDescriptors() {
-        return resourceLoaders.stream()
+        return Stream.concat(resourceLoaders.stream(), dependencyResourceLoaders.stream())
                 .flatMap(r -> r.listCategoryDescriptors().stream())
                 .collect(toList());
     }
@@ -129,7 +129,7 @@ public class Environment {
         if (activeRecipes.isEmpty()) {
             recipes = emptyList();
         } else if (activeRecipes.size() == 1) {
-            Recipe recipe = loadRecipe(activeRecipes.iterator().next(), EXAMPLES);
+            Recipe recipe = loadRecipe(activeRecipes.iterator().next());
             if (recipe != null) {
                 return recipe;
             }
@@ -182,6 +182,14 @@ public class Environment {
             }
         }
         if (recipe == null) {
+            for (ResourceLoader loader : dependencyResourceLoaders) {
+                recipe = loader.loadRecipe(recipeName, details);
+                if (recipe != null) {
+                    break;
+                }
+            }
+        }
+        if (recipe == null) {
             return null;
         }
 
@@ -196,34 +204,44 @@ public class Environment {
             }
         }
 
-        Map<String, Recipe> dependencyRecipes = new HashMap<>();
-        for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
-            for (Recipe listedRecipe : dependencyResourceLoader.listRecipes()) {
-                dependencyRecipes.putIfAbsent(listedRecipe.getName(), listedRecipe);
-            }
-        }
-        for (Recipe dependency : dependencyRecipes.values()) {
-            if (dependency instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) dependency).initialize(dependencyRecipes::get);
-            }
-        }
-
         if (includeExamples && recipeExamples.containsKey(recipe.getName())) {
             recipe.setExamples(recipeExamples.get(recipe.getName()));
         }
 
         if (recipe instanceof DeclarativeRecipe) {
-            Function<String, @Nullable Recipe> loadFunction = key -> {
-                if (dependencyRecipes.containsKey(key)) {
-                    return dependencyRecipes.get(key);
-                }
-                for (ResourceLoader resourceLoader : resourceLoaders) {
-                    Recipe r = resourceLoader.loadRecipe(key, details);
-                    if (r != null) {
-                        return r;
+            Map<String, Recipe> nameToRecipe = new HashMap<>();
+            Function<String, @Nullable Recipe> loadFunction = new Function<String, Recipe>() {
+                @Override
+                public @Nullable Recipe apply(String key) {
+                    Recipe cached = nameToRecipe.get(key);
+                    if (cached != null) {
+                        return cached;
                     }
+
+                    // Dependencies first to preserve "deps win on name conflicts" priority.
+                    for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
+                        Recipe r = dependencyResourceLoader.loadRecipe(key, details);
+                        if (r != null) {
+                            nameToRecipe.put(key, r);
+                            if (r instanceof DeclarativeRecipe) {
+                                ((DeclarativeRecipe) r).initialize(this);
+                            }
+                            return r;
+                        }
+                    }
+
+                    for (ResourceLoader resourceLoader : resourceLoaders) {
+                        Recipe r = resourceLoader.loadRecipe(key, details);
+                        if (r != null) {
+                            nameToRecipe.put(key, r);
+                            if (r instanceof DeclarativeRecipe) {
+                                ((DeclarativeRecipe) r).initialize(this);
+                            }
+                            return r;
+                        }
+                    }
+                    return null;
                 }
-                return null;
             };
             ((DeclarativeRecipe) recipe).initialize(loadFunction);
         }
@@ -279,7 +297,7 @@ public class Environment {
         this.dependencyResourceLoaders = dependencyResourceLoaders;
     }
 
-    public static Builder builder(Properties properties) {
+    public static Builder builder(@Nullable Properties properties) {
         return new Builder(properties);
     }
 
@@ -288,11 +306,11 @@ public class Environment {
     }
 
     public static class Builder {
-        private final Properties properties;
+        private final @Nullable Properties properties;
         private final Collection<ResourceLoader> resourceLoaders = new ArrayList<>();
         private final Collection<ResourceLoader> dependencyResourceLoaders = new ArrayList<>();
 
-        public Builder(Properties properties) {
+        public Builder(@Nullable Properties properties) {
             this.properties = properties;
         }
 
@@ -310,29 +328,27 @@ public class Environment {
         }
 
         /**
-         * @param jar         A path to a jar file to scan.
+         * @param jar         A path to a jar file or directory containing class files to scan.
          * @param classLoader A classloader that is populated with the transitive dependencies of the jar.
          * @return This builder.
          */
         @SuppressWarnings("unused")
         public Builder scanJar(Path jar, Collection<Path> dependencies, ClassLoader classLoader) {
-            List<ClasspathScanningLoader> firstPassLoaderList = new ArrayList<>();
-            for (Path dep : dependencies) {
-                firstPassLoaderList.add(new ClasspathScanningLoader(dep, properties, emptyList(), classLoader));
-            }
+            // Share a single superclass resolution cache across all loaders to avoid
+            // redundant ASM bytecode reads when resolving class hierarchies.
+            ClasspathScanningLoader.ClassLoaderBackedSuperclassMap sharedSuperclassMap =
+                    new ClasspathScanningLoader.ClassLoaderBackedSuperclassMap(new java.util.HashMap<>(), classLoader);
 
-            /*
-             * Second loader creation pass where the firstPassLoaderList is passed as the
-             * dependencyResourceLoaders list to ensure that we can resolve transitive
-             * dependencies using the loaders we just created. This is necessary because
-             * the first pass may have missing recipes since the full list of loaders was
-             * not provided.
-             */
-            List<ClasspathScanningLoader> secondPassLoaderList = new ArrayList<>();
+            // Create a single set of dependency loaders, passing the list to itself so that
+            // cross-dependency YAML recipe references can be resolved. This works because
+            // scanning is lazy and ensureScanned() nulls the scan action before running it,
+            // preventing re-entrant scans when a dependency loader triggers scanning of
+            // another dependency during YAML resolution.
+            List<ClasspathScanningLoader> dependencyLoaders = new ArrayList<>();
             for (Path dep : dependencies) {
-                secondPassLoaderList.add(new ClasspathScanningLoader(dep, properties, firstPassLoaderList, classLoader));
+                dependencyLoaders.add(new ClasspathScanningLoader(dep, properties, dependencyLoaders, classLoader, sharedSuperclassMap));
             }
-            return load(new ClasspathScanningLoader(jar, properties, secondPassLoaderList, classLoader), secondPassLoaderList);
+            return load(new ClasspathScanningLoader(jar, properties, dependencyLoaders, classLoader, sharedSuperclassMap), dependencyLoaders);
         }
 
         @SuppressWarnings("unused") // Used by rewrite-maven-plugin and CLI

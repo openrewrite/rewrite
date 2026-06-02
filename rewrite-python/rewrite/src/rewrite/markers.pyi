@@ -68,6 +68,7 @@ class ParseExceptionResult(Marker):
     _parser_type: str
     _exception_type: str
     _message: str
+    _tree_type: Optional[str]
 
     def replace(self, **kwargs: Any) -> Self: ...
 
@@ -82,3 +83,5 @@ class ParseExceptionResult(Marker):
     def exception_type(self) -> str: ...
     @property
     def message(self) -> str: ...
+    @property
+    def tree_type(self) -> Optional[str]: ...

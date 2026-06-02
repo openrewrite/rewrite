@@ -295,7 +295,7 @@ public class ChangeDependencyClassifier extends Recipe {
                         }
                         return requested;
                     }));
-                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> {
+                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolvedShallow(), resolved -> {
                         if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId()) && !Objects.equals(resolved.getClassifier(), newClassifier)) {
                             return resolved.withClassifier(newClassifier);
                         }

@@ -22,6 +22,7 @@ import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
@@ -35,8 +36,22 @@ import static java.util.Collections.emptyList;
 public class RecipeClassLoader extends URLClassLoader {
     private final ClassLoader parent;
 
+    // Classes whose FQN collides with a {@link #PARENT_DELEGATED_PREFIXES} entry by
+    // accident — `org.openrewrite.RecipeBuilder` etc. all `startsWith("org.openrewrite.Recipe")`
+    // — but which are Kotlin recipe-DSL internals that must resolve through the recipe-jar's
+    // classloader. Without this exclusion the lambda receivers (child-loaded `EditScope`,
+    // `ScanScope`, etc.) and the anonymous `Recipe` synthesized inside `RecipeBuilder.build()`
+    // (parent-loaded) end up on different loaders, producing a `ClassCastException` on the
+    // first `getVisitor()` call. See moderneinc/moderne-cli#3949.
+    private static final Set<String> NON_DELEGATED_CLASSES = new HashSet<>(Arrays.asList(
+            "org.openrewrite.RecipeBuilder",
+            "org.openrewrite.RecipeDsl",
+            "org.openrewrite.RecipeDslKt"
+    ));
+
     // Core OpenRewrite types that must be loaded from parent (from Moderne's RecipeClassLoader)
     private static final List<String> PARENT_DELEGATED_PREFIXES = Arrays.asList(
+            "org.openrewrite.AbstractRecipe",
             "org.openrewrite.Column",
             "org.openrewrite.Cursor",
             "org.openrewrite.DelegatingExecutionContext",
@@ -50,9 +65,16 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.Result",
             "org.openrewrite.ScanningRecipe",
             "org.openrewrite.SourceFile",
+            "org.openrewrite.Singleton",
             "org.openrewrite.Charset",
             "org.openrewrite.Checksum",
             "org.openrewrite.remote",
+            "org.openrewrite.rpc.Reference",
+            "org.openrewrite.rpc.RpcCodec",
+            "org.openrewrite.rpc.RpcObjectData",
+            "org.openrewrite.rpc.RpcReceiveQueue",
+            "org.openrewrite.rpc.RpcRecipe",
+            "org.openrewrite.rpc.RpcSendQueue",
             "org.openrewrite.Parser",
             "org.openrewrite.Tree",
             "org.openrewrite.Validated",
@@ -61,22 +83,38 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.internal",
             "org.openrewrite.marker",
             "org.openrewrite.scheduling",
+            "org.openrewrite.semver",
             "org.openrewrite.style",
             "org.openrewrite.template",
             "org.openrewrite.trait",
+            "org.openrewrite.polyglot",
             "org.openrewrite.FileAttributes",
+            "org.openrewrite.ParseErrorVisitor",
             "org.openrewrite.PrintOutputCapture",
             "org.openrewrite.ipc.http.HttpSender",
+            "org.openrewrite.gradle.attributes.Category",
+            "org.openrewrite.gradle.attributes.ProjectAttribute",
+            "org.openrewrite.java.JavadocVisitor",
+            "org.openrewrite.java.JavaParser",
+            "org.openrewrite.java.Java17Parser",
+            "org.openrewrite.java.MethodMatcher",
+            "org.openrewrite.java.TypeNameMatcher",
             "org.openrewrite.java.internal.TypesInUse",
+            "org.openrewrite.java.TypeNameMatcher",
+            // JavaSourceSet#getTypeFactory crosses the recipe/parent classloader
+            // boundary when JavaTemplate reads it from the enclosing source file's
+            // marker; the interface must be shared so the cast in JavaTemplateParser
+            // succeeds.
+            "org.openrewrite.java.internal.JavaTypeFactory",
             "org.openrewrite.maven.MavenDownloadingException",
             "org.openrewrite.maven.MavenDownloadingExceptions",
             "org.openrewrite.maven.MavenExecutionContextView",
             "org.openrewrite.maven.MavenSettings",
             "org.openrewrite.maven.internal",
+            "org.openrewrite.maven.attributes.Attributed",
+            "org.openrewrite.protobuf.ProtoVisitor",
             "org.openrewrite.text.PlainText",
-            "org.openrewrite.quark.Quark",
-            "org.openrewrite.java.JavaParser",
-            "org.openrewrite.java.MethodMatcher"
+            "org.openrewrite.quark.Quark"
     );
 
     public RecipeClassLoader(@Nullable Path recipeJar, List<Path> classpath) {
@@ -157,8 +195,30 @@ public class RecipeClassLoader extends URLClassLoader {
             }
         }
 
-        // SLF4J and Jackson should always be from parent
-        if (className.startsWith("org.slf4j") || className.startsWith("com.fasterxml.jackson")) {
+        // Force child-load for Kotlin recipe-DSL types that would otherwise be caught by
+        // a coarse `org.openrewrite.Recipe*` prefix match below. Recipe authors compile
+        // their `recipe { … }` lambdas against the bundled rewrite-kotlin version; the
+        // receiver-type linkage and the in-builder `EditScope()` construction must agree
+        // on which `Class<?>` they resolve to. Covers nested anonymous classes
+        // (`RecipeBuilder$buildSimpleRecipe$1`, etc.).
+        if (NON_DELEGATED_CLASSES.contains(className)) {
+            return false;
+        }
+        for (String cls : NON_DELEGATED_CLASSES) {
+            if (className.startsWith(cls + "$")) {
+                return false;
+            }
+        }
+
+        // SLF4J, Jackson, and the Kotlin runtime should always come from the parent.
+        // Why kotlin: if both the parent and a recipe jar ship kotlin-stdlib, types like
+        // kotlin.jvm.functions.Function1 get defined by both loaders. When Jackson (loaded
+        // from parent) interacts with jackson-module-kotlin (typically bundled in the recipe
+        // jar), the JVM raises a LinkageError on loader-constraint violations.
+        // See moderneinc/customer-requests#2372.
+        if (className.startsWith("org.slf4j") ||
+            className.startsWith("com.fasterxml.jackson") ||
+            className.startsWith("kotlin.")) {
             return true;
         }
 
@@ -213,14 +273,23 @@ public class RecipeClassLoader extends URLClassLoader {
 
     /**
      * Convert paths to URL array for URLClassLoader.
+     * Directories must have URLs ending with '/' for URLClassLoader to recognize them.
      */
     public static URL[] getUrls(@Nullable Path recipeJar, List<Path> classpath) {
         return Stream.concat(classpath.stream(), Stream.of(recipeJar))
                 .filter(Objects::nonNull)
-                .map(Path::toUri)
-                .map(uri -> {
+                .map(path -> {
                     try {
-                        return uri.toURL();
+                        if (Files.isDirectory(path)) {
+                            // For directories, ensure URL ends with '/'
+                            String urlString = path.toUri().toURL().toString();
+                            if (!urlString.endsWith("/")) {
+                                urlString += "/";
+                            }
+                            return new URL(urlString);
+                        } else {
+                            return path.toUri().toURL();
+                        }
                     } catch (MalformedURLException e) {
                         throw new UncheckedIOException(e);
                     }

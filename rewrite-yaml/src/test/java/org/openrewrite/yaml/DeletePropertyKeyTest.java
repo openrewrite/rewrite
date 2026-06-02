@@ -278,4 +278,392 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void globPatternSingleWildcard() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("management.metrics.binders.*.enabled", null, null, null)),
+          yaml(
+            """
+              management.metrics.binders.files.enabled: true
+              management.metrics.binders.jvm.enabled: true
+              management.metrics.export.enabled: true
+              """,
+            """
+              management.metrics.export.enabled: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternSingleWildcardAtEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("management.metrics.binders.files.*", null, null, null)),
+          yaml(
+            """
+              management:
+                metrics:
+                  binders:
+                    files:
+                      enabled: true
+                      disabled: false
+              xyz.export.enabled: true
+              """,
+            """
+              xyz.export.enabled: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternDoubleWildcard() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("management.**.enabled", null, null, null)),
+          yaml(
+            """
+              management.metrics.binders.files.enabled: true
+              management.metrics.enabled: true
+              management.health.enabled: false
+              server.port: 8080
+              """,
+            """
+              server.port: 8080
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternNestedYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("spring.datasource.*.password", null, null, null)),
+          yaml(
+            """
+              spring:
+                datasource:
+                  primary:
+                    url: jdbc:mysql://localhost/db1
+                    password: secret1
+                  secondary:
+                    url: jdbc:mysql://localhost/db2
+                    password: secret2
+              """,
+            """
+              spring:
+                datasource:
+                  primary:
+                    url: jdbc:mysql://localhost/db1
+                  secondary:
+                    url: jdbc:mysql://localhost/db2
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternWithRelaxedBinding() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.*.first-name", null, true, null)),
+          yaml(
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                    last-name: Doe
+                  employee:
+                    firstName: Jane
+                    lastName: Smith
+              """,
+            """
+              acme:
+                my-project:
+                  person:
+                    last-name: Doe
+                  employee:
+                    lastName: Smith
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternWithExactMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.*.first-name", null, false, null)),
+          yaml(
+            """
+              acme:
+                person:
+                  first-name: John
+                  firstName: Jane
+              """,
+            """
+              acme:
+                person:
+                  firstName: Jane
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternWithFoldedBlockScalarDeleteLeading() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.*.first-name", null, null, null)),
+          yaml(
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                    last-name: >-
+                      Doe
+                  employee:
+                    firstName: Jane
+                    lastName: Smith
+              """,
+            """
+              acme:
+                my-project:
+                  person:
+                    last-name: >-
+                      Doe
+                  employee:
+                    lastName: Smith
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternWithFoldedBlockScalarDeleteLeadingScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.*.first-name", null, null, null)),
+          yaml(
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: >-
+                      John
+                    last-name: Doe
+                  employee:
+                    firstName: Jane
+                    lastName: Smith
+              """,
+            """
+              acme:
+                my-project:
+                  person:
+                    last-name: Doe
+                  employee:
+                    lastName: Smith
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternWithFoldedBlockScalarDeleteTrailing() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.*.last-name", null, null, null)),
+          yaml(
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                    last-name: >-
+                      Doe
+                  employee:
+                    firstName: Jane
+                    lastName: Smith
+              """,
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                  employee:
+                    firstName: Jane
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternWithFoldedBlockScalarInSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.items.last-name", null, null, null)),
+          yaml(
+            """
+              acme:
+                items:
+                  - first-name: John
+                    last-name: >-
+                      Doe
+                  - first-name: Jane
+                    last-name: Smith
+              """,
+            """
+              acme:
+                items:
+                  - first-name: John
+                  - first-name: Jane
+              """
+          )
+        );
+    }
+
+    @Test
+    void globPatternWithFoldedBlockScalarHigherParent() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.*.last-name", null, null, null)),
+          yaml(
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                    last-name: >-
+                      Doe
+                other:
+                  key: value
+              """,
+            """
+              acme:
+                my-project:
+                  person:
+                    first-name: John
+                other:
+                  key: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDeletePreExistingEmptyMappings() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("spring.some.property", null, null, null)),
+          yaml(
+            """
+              name: CI workflow
+              on:
+                push:
+                  branches:
+                    - main
+                workflow_dispatch: {}
+
+              jobs:
+                build:
+                  runs-on: ubuntu-latest
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteSiblingOfEmptyMappingPreservesEmptyMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("on.push", null, null, null)),
+          yaml(
+            """
+              name: CI workflow
+              on:
+                push:
+                  branches:
+                    - main
+                  paths:
+                    - 'src/**'
+                workflow_dispatch: {}
+              """,
+            """
+              name: CI workflow
+              on:
+                workflow_dispatch: {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesEmptyMappingThatBecameEmptyFromDeletion() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("parent.child", null, null, null)),
+          yaml(
+            """
+              parent:
+                child: value
+              other: keep
+              """,
+            """
+              other: keep
+              """
+          )
+        );
+    }
+
+    @Test
+    void cascadingDeleteOfDeeplyNestedProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.b.c.d", null, null, null)),
+          yaml(
+            """
+              a:
+                b:
+                  c:
+                    d: value
+              other: keep
+              """,
+            """
+              other: keep
+              """
+          )
+        );
+    }
+
+    @Test
+    void cascadingDeletePreservesEmptyMappingSiblingDeeplyNested() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.b.c.d", null, null, null)),
+          yaml(
+            """
+              a:
+                b:
+                  c:
+                    d: value
+                  empty: {}
+              other: keep
+              """,
+            """
+              a:
+                b:
+                  empty: {}
+              other: keep
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteLastEntryPreservesInlineCommentOnPreviousEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("root.delete-me", null, null, null)),
+          yaml(
+            """
+              root:
+                keep: yes # inline comment
+                delete-me: val
+              """,
+            """
+              root:
+                keep: yes # inline comment
+              """
+          )
+        );
+    }
 }

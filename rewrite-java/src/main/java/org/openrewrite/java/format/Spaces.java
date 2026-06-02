@@ -19,10 +19,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.style.EmptyForInitializerPadStyle;
-import org.openrewrite.java.style.EmptyForIteratorPadStyle;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.SpacesStyle;
+import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.style.Style;
@@ -51,7 +48,8 @@ public class Spaces extends Recipe {
                             Style.from(SpacesStyle.class, cu, IntelliJ::spaces),
                             Style.from(EmptyForInitializerPadStyle.class, cu),
                             Style.from(EmptyForIteratorPadStyle.class, cu),
-                            null, false)
+                            Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces),
+                            null)
                             .visit(cu, ctx);
                 }
                 return super.visit(tree, ctx);
@@ -61,12 +59,12 @@ public class Spaces extends Recipe {
 
     public static <J2 extends J> J2 formatSpaces(J j, Cursor cursor) {
         SourceFile cu = cursor.firstEnclosingOrThrow(SourceFile.class);
-        SpacesStyle style = Style.from(SpacesStyle.class, cu);
         //noinspection unchecked
-        return (J2) new SpacesVisitor<>(style == null ? IntelliJ.spaces() : style,
+        return (J2) new SpacesVisitor<>(
+                Style.from(SpacesStyle.class, cu, IntelliJ::spaces),
                 Style.from(EmptyForInitializerPadStyle.class, cu),
                 Style.from(EmptyForIteratorPadStyle.class, cu),
-                null,
-                false).visitNonNull(j, 0, cursor);
+                Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces),
+                null).visitNonNull(j, 0, cursor);
     }
 }

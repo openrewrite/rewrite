@@ -16,6 +16,7 @@
 import * as path from "path";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
+import * as os from "os";
 import {spawnSync} from "child_process";
 import picomatch from "picomatch";
 import {create as produce} from "mutative";
@@ -474,7 +475,8 @@ export class ProjectParser {
         // Get tracked files
         const tracked = spawnSync("git", ["ls-files"], {
             cwd: this.projectPath,
-            encoding: "utf8"
+            encoding: "utf8",
+            ...(os.platform() === 'win32' ? { shell: true } : {})
         });
 
         if (tracked.status !== 0 || tracked.error) {
@@ -498,7 +500,8 @@ export class ProjectParser {
         // Get untracked but not ignored files
         const untracked = spawnSync("git", ["ls-files", "--others", "--exclude-standard"], {
             cwd: this.projectPath,
-            encoding: "utf8"
+            encoding: "utf8",
+            ...(os.platform() === 'win32' ? { shell: true } : {})
         });
 
         if (untracked.stdout) {

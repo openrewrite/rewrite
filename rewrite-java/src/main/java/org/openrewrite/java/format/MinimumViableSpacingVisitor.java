@@ -63,14 +63,6 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             c = c.withName(c.getName().withPrefix(c.getName().getPrefix().withWhitespace(" ")));
         }
 
-        J.ClassDeclaration.Padding padding = c.getPadding();
-        JContainer<J.TypeParameter> typeParameters = padding.getTypeParameters();
-        if (typeParameters != null && !typeParameters.getElements().isEmpty()) {
-            if (!first && !typeParameters.getBefore().getWhitespace().isEmpty()) {
-                c = padding.withTypeParameters(typeParameters.withBefore(typeParameters.getBefore().withWhitespace(" ")));
-            }
-        }
-
         if (c.getPadding().getExtends() != null) {
             Space before = c.getPadding().getExtends().getBefore();
             if (before.getWhitespace().isEmpty()) {
@@ -95,14 +87,6 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         return c;
-    }
-
-    @Override
-    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
-        if (method.getName().getComments().isEmpty() && method.getName().getPrefix().getWhitespace().contains("\n")) {
-            method = method.withName(method.getName().withPrefix(Space.EMPTY));
-        }
-        return super.visitMethodInvocation(method, p);
     }
 
     @Override

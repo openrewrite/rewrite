@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {beforeEach, describe, expect, test} from '@jest/globals';
 import {capture, isExpressionStatement, JavaScriptParser, JS, pattern} from '../../../src/javascript';
 import {J} from '../../../src/java';
 
@@ -285,8 +284,8 @@ describe('Pattern Debugging', () => {
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
 
-        // The path should show the property that mismatched with kind information for nested objects
-        expect(attempt.explanation!.path).toEqual(['J$MethodInvocation#name', 'J$Identifier#simpleName']);
+        // The path should show the property that mismatched — caught early via methodType.name
+        expect(attempt.explanation!.path).toEqual(['J$MethodInvocation#methodType', 'JavaType$Method#name']);
 
         // Should be a value mismatch
         expect(attempt.explanation!.reason).toBe('value-mismatch');

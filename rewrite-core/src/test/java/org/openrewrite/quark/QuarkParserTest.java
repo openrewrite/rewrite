@@ -16,11 +16,11 @@
 package org.openrewrite.quark;
 
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
 import org.openrewrite.jgit.api.Git;
-import org.openrewrite.jgit.api.errors.GitAPIException;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
@@ -31,7 +31,6 @@ import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.other;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -82,18 +81,16 @@ class QuarkParserTest implements RewriteTest {
                   }
               }))
               .afterRecipe(run -> {
-                  try {
-                      for (Result result : run.getChangeset().getAllResults()) {
-                          try (var git = Git.init().setDirectory(tempDir.toFile()).call()) {
-                              git.apply().setPatch(new ByteArrayInputStream(result.diff().getBytes())).call();
-                          }
-                      }
-                      assertThat(tempDir.toFile().list())
-                        .containsExactlyInAnyOrder("hi.txt.bak", "jon.bak", ".git");
-                      assertThat(Files.readString(tempDir.resolve("jon.bak")).trim()).isEqualTo("jon");
-                  } catch (IOException | GitAPIException e) {
-                      fail(e);
-                  }
+                Assertions.assertDoesNotThrow(() -> {
+                    for (Result result : run.getChangeset().getAllResults()) {
+                        try (var git = Git.init().setDirectory(tempDir.toFile()).call()) {
+                            git.apply().setPatch(new ByteArrayInputStream(result.diff().getBytes())).call();
+                        }
+                    }
+                    assertThat(tempDir.toFile().list())
+                            .containsExactlyInAnyOrder("hi.txt.bak", "jon.bak", ".git");
+                    assertThat(Files.readString(tempDir.resolve("jon.bak")).trim()).isEqualTo("jon");
+                });
               }),
           text(
             "hi",

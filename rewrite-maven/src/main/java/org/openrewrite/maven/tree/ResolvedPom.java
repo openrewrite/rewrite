@@ -572,7 +572,28 @@ public class ResolvedPom {
         }
 
         private Pom resolveParentPom(Pom pom) throws MavenDownloadingException {
-            @SuppressWarnings("DataFlowIssue") GroupArtifactVersion gav = getValues(pom.getParent().getGav());
+            @SuppressWarnings("DataFlowIssue") GroupArtifactVersion rawGav = pom.getParent().getGav();
+            if (rawGav.getVersion() == null) {
+                throw new MavenParsingException("Parent version must always specify a version " + rawGav);
+            }
+
+            // When the parent version contains unresolved property placeholders like
+            // ${project.version}, the properties needed to resolve it may only be available
+            // from the parent itself (see MavenXpp3Reader §4.0.0, "Inherited" on <version>).
+            // Try to find the parent in the reactor first using the raw GAV before attempting
+            // property resolution. MavenPomDownloader.download() checks the reactor (exact GAV
+            // match, property-merged match, and relative-path match) before going remote, so
+            // the exception is only thrown when the parent is genuinely not a local module.
+            if (rawGav.getVersion().contains("${")) {
+                try {
+                    return downloader.download(rawGav,
+                            pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+                } catch (MavenDownloadingException ignored) {
+                    // Parent not found in reactor with raw GAV, fall through to property resolution
+                }
+            }
+
+            GroupArtifactVersion gav = getValues(rawGav);
             if (gav.getVersion() == null) {
                 throw new MavenParsingException("Parent version must always specify a version " + gav);
             }
@@ -925,16 +946,28 @@ public class ResolvedPom {
                     }
                 } else if (d instanceof Defined) {
                     Defined defined = (Defined) d;
+                    GroupArtifactVersion groupArtifactVersion = getValues(defined.getGav());
+                    String gavVersion = groupArtifactVersion.getVersion();
+                    if ("LATEST".equalsIgnoreCase(gavVersion) || "RELEASE".equalsIgnoreCase(gavVersion)) {
+                        MavenMetadata.Versioning versioning = downloader.downloadMetadata(groupArtifactVersion, ResolvedPom.this, repositories).getVersioning();
+                        if ("LATEST".equalsIgnoreCase(gavVersion)) {
+                            groupArtifactVersion = groupArtifactVersion.withVersion(versioning.getLatest());
+                        } else {
+                            groupArtifactVersion = groupArtifactVersion.withVersion(versioning.getRelease());
+                        }
+                    }
+                    final GroupArtifactVersion finalGav = groupArtifactVersion;
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()
-                            .dependencyManagement(defined.withGav(getValues(defined.getGav())), pom);
+                            .dependencyManagement(defined.withGav(finalGav), pom);
 
                     managedDependencyMap.compute(createDependencyManagementKey(defined), (gav, existing) -> {
                         if (existing != null && existing.getBomGav() == null) {
                             return existing;
                         }
+
                         return new ResolvedManagedDependency(
-                                getValues(defined.getGav()),
+                                finalGav,
                                 defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())),
                                 getValue(defined.getType()),
                                 getValue(defined.getClassifier()),
@@ -963,11 +996,27 @@ public class ResolvedPom {
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        return resolveDependencies(scope, new HashMap<>(), downloader, ctx);
+        return doResolveDependencies(scope, new HashMap<>(), true, downloader, ctx);
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
                                                         MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+        return doResolveDependencies(scope, requirements, true, downloader, ctx);
+    }
+
+    /**
+     * Resolves the requested dependencies in the given scope without downloading their transitive closure.
+     * Each returned {@link ResolvedDependency} has an empty {@code dependencies} list. This allows callers who only
+     * need the direct coordinates (for example to re-resolve after a version mutation) to avoid the cost of
+     * transitive POM downloads.
+     */
+    public List<ResolvedDependency> resolveDirectDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+        return doResolveDependencies(scope, new HashMap<>(), false, downloader, ctx);
+    }
+
+    private List<ResolvedDependency> doResolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
+                                                           boolean resolveTransitives,
+                                                           MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
         List<ResolvedDependency> dependencies = new ArrayList<>();
 
         Map<GroupArtifact, DependencyAndDependent> rootDependencies = new LinkedHashMap<>();
@@ -1033,7 +1082,7 @@ public class ResolvedPom {
                             MavenExecutionContextView.view(ctx)
                                     .getResolutionListener()
                                     .clear();
-                            return resolveDependencies(scope, requirements, downloader, ctx);
+                            return doResolveDependencies(scope, requirements, resolveTransitives, downloader, ctx);
                         } else if (contains(dependencies, ga, d.getClassifier())) {
                             // we've already resolved this previously and the requirement didn't change,
                             // so just skip and continue on
@@ -1101,6 +1150,10 @@ public class ResolvedPom {
                         continue;
                     }
 
+                    if (!resolveTransitives) {
+                        continue;
+                    }
+
                     nextDependency:
                     for (Dependency d2 : resolvedPom.getRequestedDependencies()) {
                         if (d2.getGroupId() == null) {
@@ -1149,7 +1202,13 @@ public class ResolvedPom {
                         }
                     }
                 } catch (MavenDownloadingException e) {
-                    exceptions = MavenDownloadingExceptions.append(exceptions, e.setRoot(dd.getRootDependent().getGav()));
+                    String type = dd.getDependency().getType();
+                    if (type != null && !"jar".equals(type) && !"ejb".equals(type)) {
+                        // Non-classpath artifacts may lack a POM; skip like Maven does
+                        ctx.getOnError().accept(e);
+                    } else {
+                        exceptions = MavenDownloadingExceptions.append(exceptions, e.setRoot(dd.getRootDependent().getGav()));
+                    }
                 }
             }
 

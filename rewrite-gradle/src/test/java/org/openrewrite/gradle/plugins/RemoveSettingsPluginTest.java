@@ -17,20 +17,41 @@ package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradleKts;
 
 class RemoveSettingsPluginTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new RemoveSettingsPlugin("com.gradle.enterprise"));
+    }
+
     @DocumentExample
     @Test
     void removePlugin() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveSettingsPlugin("com.gradle.enterprise")),
           settingsGradle(
             """
               plugins {
                   id "com.gradle.enterprise" version "3.12.0"
+              }
+              """,
+            ""
+          )
+        );
+    }
+
+    @Test
+    void removePluginKts() {
+        rewriteRun(
+          settingsGradleKts(
+            """
+              plugins {
+                  id("com.gradle.enterprise") version "3.12.0"
               }
               """,
             ""

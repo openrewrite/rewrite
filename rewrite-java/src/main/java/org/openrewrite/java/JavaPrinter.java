@@ -190,6 +190,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitArrayAccess(ArrayAccess arrayAccess, PrintOutputCapture<P> p) {
+        beforeSyntax(arrayAccess, Space.Location.ARRAY_ACCESS_PREFIX, p);
+        visit(arrayAccess.getIndexed(), p);
+        visit(arrayAccess.getDimension(), p);
+        afterSyntax(arrayAccess, p);
+        return arrayAccess;
+    }
+
+    @Override
     public J visitArrayDimension(ArrayDimension arrayDimension, PrintOutputCapture<P> p) {
         beforeSyntax(arrayDimension, Space.Location.DIMENSION_PREFIX, p);
         p.append('[');
@@ -848,6 +857,12 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visit(method.getName(), p);
         if (!method.getMarkers().findFirst(CompactConstructor.class).isPresent()) {
             visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
+        }
+        for (JLeftPadded<Space> dimension : method.getDimensionsAfterName()) {
+            visitSpace(dimension.getBefore(), Space.Location.DIMENSION_PREFIX, p);
+            p.append('[');
+            visitSpace(dimension.getElement(), Space.Location.DIMENSION, p);
+            p.append(']');
         }
         visitContainer("throws", method.getPadding().getThrows(), JContainer.Location.THROWS, ",", null, p);
         visit(method.getBody(), p);

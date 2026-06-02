@@ -49,6 +49,14 @@ public class RewriteRpcProcessManager<R extends RewriteRpc> {
         this.factory.set(factory);
     }
 
+    public void reset() {
+        R current = rpc.get();
+        //noinspection ConstantValue
+        if (current != null) {
+            current.reset();
+        }
+    }
+
     public void shutdown() {
         R current = rpc.get();
         //noinspection ConstantValue

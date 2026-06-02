@@ -44,14 +44,14 @@ class PythonSpacesTest implements RewriteTest {
                       pass
               """,
             """
-            class Foo:
-                def foo(
-                    a,
-                    b,
-                    c
-                ):
-                    pass
-            """
+              class Foo:
+                  def foo(
+                      a,
+                      b,
+                      c
+                  ):
+                      pass
+              """
           )
         );
     }
@@ -117,15 +117,15 @@ class PythonSpacesTest implements RewriteTest {
         rewriteRun(
           python(
             """
-              class Foo:
-                  def foo ():
-                      pass
-            """,
+                class Foo:
+                    def foo ():
+                        pass
+              """,
             """
-              class Foo:
-                  def foo():
-                      pass
-            """
+                class Foo:
+                    def foo():
+                        pass
+              """
           )
         );
     }
@@ -135,15 +135,15 @@ class PythonSpacesTest implements RewriteTest {
         rewriteRun(
           python(
             """
-              class Foo:
-                  def foo(    ):
-                      pass
-            """,
+                class Foo:
+                    def foo(    ):
+                        pass
+              """,
             """
-              class Foo:
-                  def foo():
-                      pass
-            """
+                class Foo:
+                    def foo():
+                        pass
+              """
           )
         );
     }

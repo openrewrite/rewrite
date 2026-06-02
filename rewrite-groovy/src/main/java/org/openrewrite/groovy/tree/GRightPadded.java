@@ -20,7 +20,8 @@ public class GRightPadded {
         LIST_LITERAL_ELEMENT_SUFFIX(GSpace.Location.LIST_LITERAL_ELEMENT_SUFFIX),
         MAP_ENTRY_KEY(GSpace.Location.MAP_ENTRY_KEY_SUFFIX),
         MAP_LITERAL_ELEMENT_SUFFIX(GSpace.Location.MAP_LITERAL_ELEMENT_SUFFIX),
-        TOP_LEVEL_STATEMENT_SUFFIX(GSpace.Location.TOP_LEVEL_STATEMENT);
+        TOP_LEVEL_STATEMENT_SUFFIX(GSpace.Location.TOP_LEVEL_STATEMENT),
+        TUPLE_ELEMENT_SUFFIX(GSpace.Location.TUPLE_ELEMENT_SUFFIX);
 
         private final GSpace.Location afterLocation;
 

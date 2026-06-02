@@ -550,6 +550,7 @@ class FormattedString(Py, Expression, TypedTree):
     _markers: Markers
     _delimiter: str
     _parts: List[Expression]
+    _type: Optional[JavaType]
 
     def replace(self, **kwargs: Any) -> Self: ...
 
@@ -563,6 +564,8 @@ class FormattedString(Py, Expression, TypedTree):
     def delimiter(self) -> str: ...
     @property
     def parts(self) -> List[Expression]: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
 
     def accept_python(self, v: PythonVisitor[P], p: P) -> J: ...
 

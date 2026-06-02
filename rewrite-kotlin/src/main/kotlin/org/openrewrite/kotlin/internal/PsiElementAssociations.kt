@@ -32,8 +32,7 @@ import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.resolved
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
-import org.jetbrains.kotlin.fir.resolve.dfa.symbol
-import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
+import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
@@ -77,12 +76,12 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             ) {
                 super.visitResolvedTypeRef(resolvedTypeRef, data)
                 if (resolvedTypeRef.psi is KtTypeReference) {
-                    if (resolvedTypeRef.type is ConeClassLikeType) {
-                        if (resolvedTypeRef.type.typeArguments.isNotEmpty() && resolvedTypeRef.psi is KtTypeReference) {
-                            visitType(resolvedTypeRef.type, resolvedTypeRef.psi as KtTypeReference, data)
+                    if (resolvedTypeRef.coneType is ConeClassLikeType) {
+                        if (resolvedTypeRef.coneType.typeArguments.isNotEmpty() && resolvedTypeRef.psi is KtTypeReference) {
+                            visitType(resolvedTypeRef.coneType, resolvedTypeRef.psi as KtTypeReference, data)
                         }
-                    } else if (resolvedTypeRef.type is ConeTypeParameterType) {
-                        visitType(resolvedTypeRef.type, resolvedTypeRef.psi as KtTypeReference, data)
+                    } else if (resolvedTypeRef.coneType is ConeTypeParameterType) {
+                        visitType(resolvedTypeRef.coneType, resolvedTypeRef.psi as KtTypeReference, data)
                     }
                 }
             }
@@ -90,9 +89,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             private fun visitType(firType: ConeTypeProjection, psiType: KtTypeReference,
                                   data: MutableMap<PsiElement, MutableList<FirInfo>>) {
                 if (firType is ConeClassLikeType) {
-                    if (firType.classId != null) {
-                        mapParents(firType.classId!!, PsiTreeUtil.findChildOfType(psiType, KtUserType::class.java), data)
-                    }
+                    mapParents(firType.classId, PsiTreeUtil.findChildOfType(psiType, KtUserType::class.java), data)
                     for (s in firType.attributes) {
                         if (s is CustomAnnotationTypeAttribute && s.annotations.isNotEmpty()) {
                             for (ann in s.annotations) {
@@ -253,7 +250,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
 
     fun primitiveType(psi: PsiElement): JavaType.Primitive {
         return when (val fir = primary(psi)) {
-            is FirConstExpression<*> -> {
+            is FirLiteralExpression -> {
                 typeMapping.primitive(fir)
             }
             else -> JavaType.Primitive.None
@@ -289,15 +286,15 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         val directFirInfos = allFirInfos.filter { filter.invoke(it.fir) }
         return if (directFirInfos.isNotEmpty())
             // It might be more reliable to have explicit mappings in case something changes.
-            return when {
+            when {
                 directFirInfos.size == 1 -> directFirInfos[0].fir
                 else -> {
-                    return when (p) {
+                    when (p) {
                         is KtConstantExpression -> {
-                            directFirInfos.firstOrNull { it.fir is FirConstExpression<*> }?.fir
+                            directFirInfos.firstOrNull { it.fir is FirLiteralExpression }?.fir
                         }
                         is KtImportDirective -> {
-                            directFirInfos.firstOrNull { it.fir is FirImport && it.fir !is FirErrorImport }?.fir
+                            directFirInfos.firstOrNull { it.fir is FirImport }?.fir
                         }
                         is KtNamedFunction -> {
                             val found = directFirInfos.firstOrNull { it.fir is FirFunction }?.fir
@@ -327,7 +324,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 }
             }
         else if (allFirInfos.isNotEmpty()) {
-            return when {
+            when {
                 allFirInfos.size == 1 -> allFirInfos[0].fir
                 // There isn't a RealPsiElement associated to the KT, so, we find the associated FIR element.
                 p is KtArrayAccessExpression -> allFirInfos.firstOrNull { it.fir is FirResolvedNamedReference && (it.fir.name.asString() == "get" || it.fir.name.asString() == "set") }?.fir
@@ -335,7 +332,11 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 p is KtPostfixExpression -> allFirInfos.firstOrNull { it.fir is FirResolvedTypeRef || it.fir is FirFunctionCall }?.fir
                 p is KtTypeReference -> allFirInfos.firstOrNull { it.fir is FirResolvedTypeRef }?.fir
                 p is KtWhenConditionInRange || p is KtBinaryExpression -> allFirInfos.firstOrNull { it.fir is FirFunctionCall }?.fir
-                p is KtNameReferenceExpression -> allFirInfos.firstOrNull { it.fir is FirClass }?.fir
+                // In K2, FIR elements for identifiers in desugared expressions (unary, augmented assignments,
+                // named arguments) may only have KtFakePsiSourceElement, so fall back to these types
+                p is KtNameReferenceExpression -> allFirInfos.firstOrNull { it.fir is FirPropertyAccessExpression }?.fir
+                    ?: allFirInfos.firstOrNull { it.fir is FirResolvedNamedReference }?.fir
+                    ?: allFirInfos.firstOrNull { it.fir is FirClass }?.fir
                 else -> {
                     throw IllegalStateException("Unable to determine the FIR element associated to the PSI." + if (psi == null) "null element" else "original PSI: ${psi.javaClass.name}, mapped PSI: ${p.javaClass.name}")
                 }
@@ -355,7 +356,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         val fir = primary(psi) ?: return null
         return when (fir) {
             is FirResolvedQualifier -> ExpressionType.QUALIFIER
-            is FirArrayLiteral -> ExpressionType.METHOD_INVOCATION
+            is FirCollectionLiteral -> ExpressionType.METHOD_INVOCATION
             is FirFunctionCall -> {
                 if (fir.calleeReference is FirErrorNamedReference)
                     return null
@@ -369,8 +370,9 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 }
             }
             is FirSafeCallExpression -> {
-                return when (fir.selector) {
-                    is FirFunctionCall -> when (fir.selector.calleeReference?.resolved?.resolvedSymbol) {
+                val selector = fir.selector
+                when (selector) {
+                    is FirFunctionCall -> when (selector.calleeReference.resolved?.resolvedSymbol) {
                         is FirConstructorSymbol -> ExpressionType.CONSTRUCTOR
                         is FirNamedFunctionSymbol -> ExpressionType.METHOD_INVOCATION
                         else -> null

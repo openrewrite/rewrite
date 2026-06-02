@@ -16,7 +16,6 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -93,7 +92,6 @@ class TryTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/1944")
     @Test
     void multiCatch() {
@@ -108,7 +106,21 @@ class TryTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite/issues/1944")
+    @Test
+    void multiCatchThreeTypes() {
+        rewriteRun(
+          groovy(
+            """
+              try {
+              } catch (IOException | UncheckedIOException | IllegalArgumentException e) {
+                  println e.message
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1945")
     @Test
     void tryWithResource() {
@@ -123,7 +135,6 @@ class TryTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/1945")
     @Test
     void tryWithResources() {
@@ -132,6 +143,24 @@ class TryTest implements RewriteTest {
             """
               try(ByteArrayInputStream a = new ByteArrayInputStream("".getBytes()); ByteArrayInputStream b = new ByteArrayInputStream("".getBytes())) {
               } catch (Exception e) {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1945")
+    @Test
+    void tryWithResourceAndFinally() {
+        rewriteRun(
+          groovy(
+            """
+              try (ByteArrayInputStream a = new ByteArrayInputStream("".getBytes())) {
+                  def x = a.read()
+              } catch (Exception e) {
+                  println e.message
+              } finally {
+                  println "done"
               }
               """
           )

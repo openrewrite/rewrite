@@ -45,7 +45,7 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 public class DependencyConstraintToRule extends Recipe {
 
-    private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
+    private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("org.gradle.api.Project dependencies(..)", true);
     private static final String CONSTRAINT_MATCHER = "org.gradle.api.artifacts.dsl.DependencyHandler *(..)";
 
     String displayName = "Dependency constraint to resolution rule";
@@ -380,7 +380,14 @@ public class DependencyConstraintToRule extends Recipe {
                             .map(J.MethodInvocation.class::cast)
                             .findFirst()
                             .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
-                    return cu.withStatements(ListUtils.insert(cu.getStatements(), m, insertionIndex));
+                    List<Statement> newStatements = ListUtils.insert(cu.getStatements(), m, insertionIndex);
+                    if (insertionIndex == 0) {
+                        newStatements = ListUtils.map(newStatements, (i, stat) ->
+                                i == 1 && stat.getPrefix().getWhitespace().isEmpty()
+                                        ? stat.withPrefix(stat.getPrefix().withWhitespace("\n\n"))
+                                        : stat);
+                    }
+                    return cu.withStatements(newStatements);
                 } else {
                     K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
                     assert cu != null;
@@ -425,7 +432,14 @@ public class DependencyConstraintToRule extends Recipe {
                     final int finalInsertionIndex = insertionIndex;
                     return cu.withStatements(ListUtils.mapFirst(cu.getStatements(), arg -> {
                         if (arg == block) {
-                            return block.withStatements(ListUtils.insert(block.getStatements(), m, finalInsertionIndex));
+                            List<Statement> newStatements = ListUtils.insert(block.getStatements(), m, finalInsertionIndex);
+                            if (finalInsertionIndex == 0) {
+                                newStatements = ListUtils.map(newStatements, (i, stat) ->
+                                        i == 1 && stat.getPrefix().getWhitespace().isEmpty()
+                                                ? stat.withPrefix(stat.getPrefix().withWhitespace("\n\n"))
+                                                : stat);
+                            }
+                            return block.withStatements(newStatements);
                         }
                         return arg;
                     }));
@@ -460,6 +474,9 @@ public class DependencyConstraintToRule extends Recipe {
         J.Lambda l = (J.Lambda) m.getArguments().get(0);
         if (l.getBody() instanceof J.Block) {
             J.Block b = (J.Block) l.getBody();
+            if (b.getStatements().isEmpty()) {
+                return true;
+            }
             if (b.getStatements().size() == 1) {
                 return b.getStatements().get(0) instanceof J.Return && ((J.Return) b.getStatements().get(0)).getExpression() == null;
             }

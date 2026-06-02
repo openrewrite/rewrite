@@ -410,7 +410,7 @@ public class AddImportTest implements RewriteTest {
               class A
               """,
             spec -> spec.afterRecipe(cu -> {
-                AtomicBoolean found = new AtomicBoolean(false);
+                var found = new AtomicBoolean(false);
                 new KotlinIsoVisitor<Integer>() {
                     @Override
                     public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {

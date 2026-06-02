@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -79,6 +80,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void dontAddDuplicateIfUpdateModelOnPriorRecipeCycleFailed() {
         rewriteRun(
           spec -> spec
@@ -238,7 +240,7 @@ class AddDependencyTest implements RewriteTest {
 
     @Test
     void addDependencyWithClassifier() {
-        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null,
+        var addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null,
           "compile", true, "com.google.common.math.IntMath", null, "linux-x86_64", false, null, null);
         rewriteRun(
           spec -> spec.recipe(addDep),
@@ -1069,7 +1071,7 @@ class AddDependencyTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2255")
     @ParameterizedTest
-    @ValueSource(strings = {"provided", "runtime", "test"})
+    @ValueSource(strings = {"provided", "runtime"})
     void addScopedDependency(String scope) {
         rewriteRun(
           spec -> spec.recipe(addDependency(
@@ -1111,6 +1113,85 @@ class AddDependencyTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """.formatted(scope)
+            )
+          )
+        );
+    }
+
+    @Test
+    void scopedDependencyNotAddedWhenTypeOnlyInMainSources() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency(
+            "com.fasterxml.jackson.core:jackson-core:2.12.0",
+            "com.fasterxml.jackson.core.*",
+            "test"
+          )),
+          mavenProject(
+            "project",
+            srcMainJava(
+              java(
+                """
+                  public class A {
+                      com.fasterxml.jackson.core.Versioned v;
+                  }
+                  """
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void scopedDependencyAddedWhenTypeInTestSources() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency(
+            "com.fasterxml.jackson.core:jackson-core:2.12.0",
+            "com.fasterxml.jackson.core.*",
+            "test"
+          )),
+          mavenProject(
+            "project",
+            srcTestJava(
+              java(
+                """
+                  public class A {
+                      com.fasterxml.jackson.core.Versioned v;
+                  }
+                  """
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-core</artifactId>
+                            <version>2.12.0</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
             )
           )
         );
@@ -2079,6 +2160,66 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doesNotClobberManagedLatestWithExplicitVersion() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>latest</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doesNotClobberLatestWithExplicitVersion() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>latest</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/6426")
     @Test
     void addDependencyUpgradesScopeOnlyWhenExistingDependencyHasNarrowerScopeAndEqualVersion() {
@@ -2118,6 +2259,164 @@ class AddDependencyTest implements RewriteTest {
                 </project>
                 """
             )
+          )
+        );
+    }
+
+    @Test
+    void doesNotDuplicateWhenManagedVersionSatisfiesSemverSelector() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:28.X", "com.google.common.math.IntMath")),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>28.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject(
+            "server",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addsWhenSameGaExistsWithDifferentClassifier() {
+        var addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null,
+          null, true, null, null, "tests", false, null, null);
+        rewriteRun(
+          spec -> spec.recipe(addDep),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>29.0-jre</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>29.0-jre</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>29.0-jre</version>
+                          <classifier>tests</classifier>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDuplicateWhenChainedAfterChangeDependencyWithSemverSelector() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeDependencyGroupIdAndArtifactId(
+              "javax.ws.rs", "javax.ws.rs-api",
+              "jakarta.ws.rs", "jakarta.ws.rs-api",
+              "3.0.x", null),
+            new AddDependency(
+              "jakarta.ws.rs", "jakarta.ws.rs-api", "3.0.x", null,
+              null, true, null, null, null, false, null, null)
+          ),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.ws.rs</groupId>
+                              <artifactId>jakarta.ws.rs-api</artifactId>
+                              <version>3.0.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.ws.rs</groupId>
+                          <artifactId>javax.ws.rs-api</artifactId>
+                          <version>2.1.1</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.ws.rs</groupId>
+                              <artifactId>jakarta.ws.rs-api</artifactId>
+                              <version>3.0.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.ws.rs</groupId>
+                          <artifactId>jakarta.ws.rs-api</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
           )
         );
     }

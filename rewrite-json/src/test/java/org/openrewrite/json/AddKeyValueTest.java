@@ -17,6 +17,7 @@ package org.openrewrite.json;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
@@ -27,7 +28,7 @@ class AddKeyValueTest implements RewriteTest {
     @Test
     void shouldAppendSimpleValue() {
         rewriteRun(
-          spec -> spec.recipe(new AddKeyValue("$.", "key", "\"val\"", false)),
+          spec -> spec.recipe(new AddKeyValue("$", "key", "\"val\"", false)),
           //language=json
           json(
             """
@@ -105,10 +106,32 @@ class AddKeyValueTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6207")
+    @Test
+    void shouldAppendSimpleValueWithTrailingDot() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$.", "surname", "\"Doe\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "name": "John"
+              }
+              """,
+            """
+              {
+                  "name": "John",
+                  "surname": "Doe"
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void shouldNotAppendIfExists() {
         rewriteRun(
-          spec -> spec.recipe(new AddKeyValue("$.", "key", "\"val\"", false)),
+          spec -> spec.recipe(new AddKeyValue("$", "key", "\"val\"", false)),
           //language=json
           json(
             """
@@ -124,7 +147,7 @@ class AddKeyValueTest implements RewriteTest {
     void shouldAppendObject() {
         rewriteRun(
           spec -> spec.recipe(new AddKeyValue(
-            "$.", "key", """
+            "$", "key", """
                 { "a": "b" }
             """.trim(), false)),
           //language=json
@@ -152,7 +175,7 @@ class AddKeyValueTest implements RewriteTest {
     void shouldPrependObject() {
         rewriteRun(
           spec -> spec.recipe(new AddKeyValue(
-            "$.", "key", """
+            "$", "key", """
                 { "a": "b" }
             """.trim(), true)),
           //language=json

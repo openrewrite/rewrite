@@ -274,6 +274,7 @@ public class GradleWrapperScriptDownloader {
         bindings.put("appNameSystemProperty", "org.gradle.appname");
         bindings.put("appHomeRelativePath", "");
         bindings.put("modulePath", "");
+        bindings.put("gitRef", "");
         return bindings;
     }
 

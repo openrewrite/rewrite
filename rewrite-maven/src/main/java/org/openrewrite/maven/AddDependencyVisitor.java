@@ -34,6 +34,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
@@ -92,7 +93,12 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
             ResolvedPom resolvedPom = getResolutionResult().getPom();
             String existingGroupId = resolvedPom.getValue(tag.getChildValue("groupId").orElse(null));
             String existingArtifactId = resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null));
-            if (groupId.equals(existingGroupId) && artifactId.equals(existingArtifactId)) {
+            String wantedType = type == null ? "jar" : type;
+            String existingType = tag.getChildValue("type").orElse("jar");
+            String existingClassifier = tag.getChildValue("classifier").orElse(null);
+            if (groupId.equals(existingGroupId) && artifactId.equals(existingArtifactId) &&
+                    wantedType.equals(existingType) &&
+                    Objects.equals(classifier, existingClassifier)) {
                 Scope requestedScope = Scope.fromName(scope);
                 Scope existingScope = Scope.fromName(resolvedPom.getValue(tag.getChildValue("scope").orElse(null)));
                 if (tag.getMarkers().getMarkers().stream()
@@ -123,6 +129,10 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                                 return e.warn(tag);
                             }
                         }
+                    }
+                    if (versionToUse == null && requestedScope == existingScope) {
+                        getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "doNotAlterDependency", true);
+                        return tag;
                     }
                     if (versionToUse != null) {
                         getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "requestedVersionChange", true);
@@ -157,10 +167,11 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
 
         boolean requestedVersionChange = getCursor().getMessage("requestedVersionChange", false);
         Scope resolvedScope = Scope.fromName(scope);
+        String wantedType = type == null ? "jar" : type;
         Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
         if (dependencies.containsKey(resolvedScope)) {
             for (ResolvedDependency d : dependencies.get(resolvedScope)) {
-                if (d.isDirect() && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                if (d.isDirect() && matchesCoordinate(d, wantedType)) {
                     if (requestedVersionChange) {
                         checkVersionUpdate(d.getVersion());
                     }
@@ -182,7 +193,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
             Scope oldScope = getCursor().getMessage("oldScope");
             if (dependencies.containsKey(oldScope)) {
                 for (ResolvedDependency d : dependencies.get(oldScope)) {
-                    if (d.isDirect() && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                    if (d.isDirect() && matchesCoordinate(d, wantedType)) {
                         if (requestedVersionChange) {
                             checkVersionUpdate(d.getVersion());
                         }
@@ -269,6 +280,13 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
 
             return super.visitTag(tag, ctx);
         }
+    }
+
+    private boolean matchesCoordinate(ResolvedDependency d, String wantedType) {
+        return groupId.equals(d.getGroupId()) &&
+                artifactId.equals(d.getArtifactId()) &&
+                wantedType.equals(d.getType()) &&
+                Objects.equals(classifier, d.getClassifier());
     }
 
     private @Nullable String tryGetFamilyVersion() {

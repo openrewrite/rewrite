@@ -137,31 +137,30 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
-recipeName: org.openrewrite.xmlChangeTagAttributeKey
+recipeName: org.openrewrite.xml.ChangeTagAttributeKey
 examples:
-  - description: '`ChangeXmlAttributeTest#renameReRenderToRender`'
-    parameters:
-      - //a4j:ajax/@reRender
-      - render
-    sources:
-      - before: |
-          <?xml version="1.0" encoding="UTF-8"?>
-          <html xmlns="http://www.w3.org/1999/xhtml"
-                xmlns:a4j="http://richfaces.org/a4j">
-              <body>
-                  <a4j:ajax reRender="form:output" event="change"/>
-              </body>
-          </html>
-        after: |
-          <?xml version="1.0" encoding="UTF-8"?>
-          <html xmlns="http://www.w3.org/1999/xhtml"
-                xmlns:a4j="http://richfaces.org/a4j">
-              <body>
-                  <a4j:ajax render="form:output" event="change"/>
-              </body>
-          </html>
-        path: test.xhtml
-        language: xml
+- description: '`ChangeTagAttributeKeyTest#renameReRenderToRender`'
+  parameters:
+  - /html/body/a4j:ajax/@reRender
+  - render
+  sources:
+  - before: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <html xmlns="http://www.w3.org/1999/xhtml"
+            xmlns:a4j="http://richfaces.org/a4j">
+          <body>
+              <a4j:ajax reRender="form:output" event="change"/>
+          </body>
+      </html>
+    after: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <html xmlns="http://www.w3.org/1999/xhtml"
+            xmlns:a4j="http://richfaces.org/a4j">
+          <body>
+              <a4j:ajax render="form:output" event="change"/>
+          </body>
+      </html>
+    language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.ChangeTagName

@@ -84,6 +84,7 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
 
         // Note: typeParameters should NOT have space before them - they immediately follow the class name
         // e.g., "class DataTable<Row>" not "class DataTable <Row>"
+        // Note: body.prefix spacing (space before '{') is handled by SpacesVisitor, not here.
 
         if (c.extends && c.extends.before.whitespace === "") {
             c = produce(c, draft => {
@@ -99,10 +100,6 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
                 }
             });
         }
-
-        c = produce(c, draft => {
-            draft.body.prefix.whitespace = "";
-        });
 
         return c;
     }

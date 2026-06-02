@@ -1,6 +1,5 @@
 // noinspection JSUnusedLocalSymbols,TypeScriptUnresolvedReference,TypeScriptMissingConfigOption,NpmUsedModulesInstalled,TypeScriptJSXUnresolvedComponent
 
-import {describe} from "@jest/globals";
 import {JavaScriptVisitor, JSX, npm, packageJson, tsx} from "../../../src/javascript";
 import {RecipeSpec} from "../../../src/test";
 import {J, Type} from "../../../src/java";

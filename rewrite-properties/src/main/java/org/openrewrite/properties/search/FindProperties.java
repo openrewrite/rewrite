@@ -61,11 +61,14 @@ public class FindProperties extends Recipe {
      * @return The set of found properties matching the propertyKey.
      */
     public static Set<Properties.Entry> find(Properties p, String propertyKey, @Nullable Boolean relaxedBinding) {
+        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey);
+
         PropertiesVisitor<Set<Properties.Entry>> findVisitor = new PropertiesVisitor<Set<Properties.Entry>>() {
             @Override
             public Properties visitEntry(Properties.Entry entry, Set<Properties.Entry> ps) {
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.matchesGlobRelaxedBinding(entry.getKey(), propertyKey) :
-                        StringUtils.matchesGlob(entry.getKey(), propertyKey)) {
+                if (keyMatcher.matchesGlob(entry.getKey())) {
                     ps.add(entry);
                 }
                 return super.visitEntry(entry, ps);
@@ -79,11 +82,14 @@ public class FindProperties extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey);
+
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.matchesGlobRelaxedBinding(entry.getKey(), propertyKey) :
-                        StringUtils.matchesGlob(entry.getKey(), propertyKey)) {
+                if (keyMatcher.matchesGlob(entry.getKey())) {
                     entry = entry.withValue(entry.getValue().withMarkers(entry.getValue().getMarkers()
                             .computeByType(new SearchResult(randomId(), null), (s1, s2) -> s1 == null ? s2 : s1)));
                 }

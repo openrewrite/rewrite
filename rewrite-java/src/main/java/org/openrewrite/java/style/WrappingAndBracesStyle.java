@@ -20,130 +20,446 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.style.LineWrapSetting;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
-
-import static java.util.Collections.emptyList;
 
 @Value
 @With
 public class WrappingAndBracesStyle implements JavaStyle {
 
-    int hardWrapAt;
-    IfStatement ifStatement;
-    ChainedMethodCalls chainedMethodCalls;
+    @Nullable
+    Integer hardWrapAt;
+    @Nullable
+    KeepWhenFormatting keepWhenFormatting;
+    @Nullable
+    ExtendsImplementsPermitsList extendsImplementsPermitsList;
+    @Nullable
+    ExtendsImplementsPermitsKeyword extendsImplementsPermitsKeyword;
+    @Nullable
+    ThrowsList throwsList;
+    @Nullable
+    ThrowsKeyword throwsKeyword;
+    @Nullable
     MethodDeclarationParameters methodDeclarationParameters;
+    @Nullable
     MethodCallArguments methodCallArguments;
-    @Nullable Annotations classAnnotations;
-    @Nullable Annotations methodAnnotations;
-    @Nullable Annotations fieldAnnotations;
-    @Nullable Annotations parameterAnnotations;
-    @Nullable Annotations localVariableAnnotations;
-    @Nullable Annotations enumFieldAnnotations;
+    @Nullable
+    MethodParentheses methodParentheses; // Not yet implemented
+    @Nullable
+    ChainedMethodCalls chainedMethodCalls;
+    @Nullable
+    IfStatement ifStatement;
+    @Nullable
+    ForStatement forStatement;
+    @Nullable
+    WhileStatement whileStatement;
+    @Nullable
+    DoWhileStatement doWhileStatement;
+    @Nullable
+    SwitchStatement switchStatement;
+    @Nullable
+    TryWithResources tryWithResources;
+    @Nullable
+    TryStatement tryStatement;
+    @Nullable
+    BinaryExpressions binaryExpressions; // Not yet implemented
+    @Nullable
+    AssignmentStatement assignmentStatement; // Not yet implemented
+    @Nullable
+    GroupDeclarations groupDeclarations; // Not yet implemented
+    @Nullable
+    TernaryOperation ternaryOperation; // Not yet implemented
+    @Nullable
+    ArrayInitializer arrayInitializer;
+    @Nullable
+    ModifierList modifierList;
+    @Nullable
+    AssertStatement assertStatement; // Not yet implemented
+    @Nullable
+    EnumConstants enumConstants;
+    @Nullable
+    Annotations classAnnotations;
+    @Nullable
+    Annotations methodAnnotations;
+    @Nullable
+    FieldAnnotations fieldAnnotations;
+    @Nullable
+    ParameterAnnotations parameterAnnotations;
+    @Nullable
+    Annotations localVariableAnnotations;
+    @Nullable
+    Annotations enumFieldAnnotations;
+    @Nullable
+    AnnotationParameters annotationParameters;
+    @Nullable
+    TextBlocks textBlocks;
+    @Nullable
+    RecordComponents recordComponents;
+    @Nullable
+    DeconstructionPatterns deconstructionPatterns; // Not yet implemented
 
-    public IfStatement getIfStatement() {
-        //noinspection ConstantConditions
-        return ifStatement == null ? new IfStatement(false) : ifStatement;
+    public enum ForceBraces {
+        DoNotForce,
+        WhenMultiline, // Not yet implemented
+        Always
     }
 
-    public ChainedMethodCalls getChainedMethodCalls() {
-        //noinspection ConstantConditions
-        return chainedMethodCalls == null ? new ChainedMethodCalls(
-                LineWrapSetting.DoNotWrap,
-                emptyList(),
-                false) : chainedMethodCalls;
+    @Value
+    @With
+    public static class KeepWhenFormatting {
+        @Nullable
+        Boolean lineBreaks;
+        @Nullable
+        Boolean commentAtFirstColumn; // Not yet implemented
+        @Nullable
+        Boolean controlStatementInOneLine; // Not yet implemented
+        @Nullable
+        Boolean multipleExpressionsInOneLine; // Not yet implemented
+        @Nullable
+        Boolean simpleBlocksInOneLine;
+        @Nullable
+        Boolean simpleMethodsInOneLine;
+        @Nullable
+        Boolean simpleLambdasInOneLine;
+        @Nullable
+        Boolean simpleClassesInOneLine;
     }
 
     @Value
     @With
     public static class IfStatement {
+        @Nullable
+        ForceBraces forceBraces;
+        @Nullable
         Boolean elseOnNewLine;
+        @Nullable
+        Boolean specialElseIfTreatment;
     }
 
     @Value
     @With
     public static class Annotations {
+        @Nullable
         LineWrapSetting wrap;
+    }
+
+    @Value
+    @With
+    public static class ExtendsImplementsPermitsList {
+        @Nullable
+        LineWrapSetting wrap;
+        @Nullable
+        Boolean alignWhenMultiline;
+    }
+
+
+    @Value
+    @With
+    public static class ExtendsImplementsPermitsKeyword {
+        @Nullable
+        LineWrapSetting wrap;
+    }
+
+    @Value
+    @With
+    public static class ThrowsList {
+        @Nullable
+        LineWrapSetting wrap;
+        @Nullable
+        Boolean alignWhenMultiline;
+        @Nullable
+        Boolean alignThrowsToMethodStart;
+    }
+
+    @Value
+    @With
+    public static class ThrowsKeyword {
+        @Nullable
+        LineWrapSetting wrap;
+    }
+
+    @Value
+    @With
+    public static class MethodParentheses {
+        @Nullable
+        Boolean alignWhenMultiline;
+        @Nullable
+        Boolean newLineWhenBodyIsPresented;
     }
 
     @Value
     @With
     public static class ChainedMethodCalls {
+        @Nullable
         LineWrapSetting wrap;
-        List<String> builderMethods;
+        @Nullable
+        Boolean wrapFirstCall;
+        @Nullable
         Boolean alignWhenMultiline;
-
-        public LineWrapSetting getWrap() {
-            //noinspection ConstantConditions
-            return wrap == null ? LineWrapSetting.DoNotWrap : wrap;
-        }
-
-        public List<String> getBuilderMethods() {
-            //noinspection ConstantConditions
-            return builderMethods == null ? emptyList() : builderMethods;
-        }
-
-        public Boolean getAlignWhenMultiline() {
-            //noinspection ConstantConditions
-            return alignWhenMultiline == null ? false : alignWhenMultiline;
-        }
+        @Nullable
+        List<String> builderMethods;
+        @Nullable
+        Boolean keepBuilderMethodsIndents; // Not yet implemented
+        @Nullable
+        Boolean moveSemicolonToNewLine; // Not yet implemented
     }
 
     @Value
     @With
     public static class MethodDeclarationParameters {
+        @Nullable
         LineWrapSetting wrap;
+        @Nullable
         Boolean alignWhenMultiline;
+        @Nullable
         Boolean openNewLine;
+        @Nullable
         Boolean closeNewLine;
-
-        public LineWrapSetting getWrap() {
-            //noinspection ConstantConditions
-            return wrap == null ? LineWrapSetting.DoNotWrap : wrap;
-        }
-
-        public Boolean getAlignWhenMultiline() {
-            //noinspection ConstantConditions
-            return alignWhenMultiline == null ? false : alignWhenMultiline;
-        }
-
-        public Boolean getOpenNewLine() {
-            //noinspection ConstantConditions
-            return openNewLine == null ? false : openNewLine;
-        }
-
-        public Boolean getCloseNewLine() {
-            //noinspection ConstantConditions
-            return closeNewLine == null ? false : closeNewLine;
-        }
     }
 
     @Value
     @With
     public static class MethodCallArguments {
+        @Nullable
         LineWrapSetting wrap;
+        @Nullable
         Boolean alignWhenMultiline;
+        @Nullable
+        Boolean takePriorityOverCallChainWrapping; // Not yet implemented
+        @Nullable
         Boolean openNewLine;
+        @Nullable
         Boolean closeNewLine;
+    }
 
-        public LineWrapSetting getWrap() {
-            //noinspection ConstantConditions
-            return wrap == null ? LineWrapSetting.DoNotWrap : wrap;
-        }
+    @Value
+    @With
+    public static class ForStatement {
+        @Nullable
+        LineWrapSetting wrap;
+        @Nullable
+        Boolean alignWhenMultiline;
+        @Nullable
+        Boolean openNewLine;
+        @Nullable
+        Boolean closeNewLine;
+        @Nullable
+        ForceBraces forceBraces;
+    }
 
-        public Boolean getAlignWhenMultiline() {
-            //noinspection ConstantConditions
-            return alignWhenMultiline == null ? false : alignWhenMultiline;
-        }
+    @Value
+    @With
+    public static class WhileStatement {
+        @Nullable
+        ForceBraces forceBraces;
+    }
 
-        public Boolean getOpenNewLine() {
-            //noinspection ConstantConditions
-            return openNewLine == null ? false : openNewLine;
-        }
+    @Value
+    @With
+    public static class DoWhileStatement {
+        @Nullable
+        ForceBraces forceBraces;
+        @Nullable
+        Boolean whileOnNewLine;
+    }
 
-        public Boolean getCloseNewLine() {
-            //noinspection ConstantConditions
-            return closeNewLine == null ? false : closeNewLine;
-        }
+    @Value
+    @With
+    public static class SwitchStatement {
+        @Nullable
+        LineWrapSetting wrap; // Not yet implemented
+        @Nullable
+        Boolean indentCaseBranches;
+        @Nullable
+        Boolean eachCaseOnSeparateLine;
+    }
+
+    @Value
+    @With
+    public static class TryWithResources {
+        @Nullable
+        LineWrapSetting wrap;
+        @Nullable
+        Boolean alignWhenMultiline;
+        @Nullable
+        Boolean openNewLine;
+        @Nullable
+        Boolean closeNewLine;
+    }
+
+    @Value
+    @With
+    public static class TryStatement {
+        @Nullable
+        Boolean catchOnNewLine;
+        @Nullable
+        Boolean finallyOnNewLine;
+        @Nullable
+        LineWrapSetting typesInMulticatch; // Not yet implemented
+        @Nullable
+        Boolean alignTypesInMultiCatch; // Not yet implemented
+    }
+
+    @Value
+    @With
+    public static class BinaryExpressions {
+        @Nullable
+        LineWrapSetting wrap;
+        @Nullable
+        Boolean alignWhenMultiline;
+        @Nullable
+        Boolean operationSignOnNextLine;
+        @Nullable
+        Boolean alignParenthesizedWhenMultiline;
+        @Nullable
+        Boolean openNewLine;
+        @Nullable
+        Boolean closeNewLine;
+    }
+
+    @Value
+    @With
+    public static class AssignmentStatement {
+        @Nullable
+        LineWrapSetting wrap;
+        @Nullable
+        Boolean assignmentSignOnNextLine;
+    }
+
+    @Value
+    @With
+    public static class GroupDeclarations {
+        @Nullable
+        Boolean alignFieldsInColumns;
+        @Nullable
+        Boolean alignVariablesInColumns;
+        @Nullable
+        Boolean alignAssignmentsInColumns;
+        @Nullable
+        Boolean alignSimpleMethodsInColumns;
+    }
+
+    @Value
+    @With
+    public static class TernaryOperation {
+        @Nullable
+        LineWrapSetting wrap;
+        @Nullable
+        Boolean alignWhenMultiline;
+        @Nullable
+        Boolean questionMarkAndColonOnNextLine;
+    }
+
+    @Value
+    @With
+    public static class ArrayInitializer {
+        @Nullable
+        LineWrapSetting wrap;
+        @Nullable
+        Boolean alignWhenMultiline;
+        @Nullable
+        Boolean newLineAfterOpeningCurly;
+        @Nullable
+        Boolean placeClosingCurlyOnNewLine;
+    }
+
+    @Value
+    @With
+    public static class ModifierList {
+        @Nullable
+        Boolean wrapAfterModifierList;
+    }
+
+    @Value
+    @With
+    public static class AssertStatement {
+        @Nullable
+        LineWrapSetting wrap;
+        @Nullable
+        Boolean openNewLine;
+        @Nullable
+        Boolean colonSignsOnNextLine;
+    }
+
+    @Value
+    @With
+    public static class EnumConstants {
+        @Nullable
+        LineWrapSetting wrap;
+    }
+
+    @Value
+    @With
+    public static class FieldAnnotations {
+        @Nullable
+        LineWrapSetting wrap;
+
+        @Nullable
+        Boolean doNotWrapAfterSingleAnnotation;
+    }
+
+    @Value
+    @With
+    public static class ParameterAnnotations {
+        @Nullable
+        LineWrapSetting wrap;
+
+        @Nullable
+        Boolean doNotWrapAfterSingleAnnotation;
+    }
+
+    @Value
+    @With
+    public static class AnnotationParameters {
+        @Nullable
+        LineWrapSetting wrap;
+        @Nullable
+        Boolean alignWhenMultiline;
+        @Nullable
+        Boolean openNewLine;
+        @Nullable
+        Boolean closeNewLine;
+    }
+
+    @Value
+    @With
+    public static class TextBlocks {
+        @Nullable
+        Boolean alignWhenMultiline;
+    }
+
+    @Value
+    @With
+    public static class RecordComponents {
+        @Nullable
+        LineWrapSetting wrap;
+        @Nullable
+        Boolean alignWhenMultiline;
+        @Nullable
+        Boolean openNewLine;
+        @Nullable
+        Boolean closeNewLine;
+        @Nullable
+        Boolean newLineForAnnotations;
+    }
+
+    @Value
+    @With
+    public static class DeconstructionPatterns {
+        @Nullable
+        LineWrapSetting wrap;
+        @Nullable
+        Boolean alignWhenMultiline;
+        @Nullable
+        Boolean openNewLine;
+        @Nullable
+        Boolean closeNewLine;
+    }
+
+    @Override
+    public Style applyDefaults() {
+        return StyleHelper.merge(IntelliJ.wrappingAndBraces(), this);
     }
 }

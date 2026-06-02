@@ -269,6 +269,38 @@ class YamlResourceLoaderTest implements RewriteTest {
           new Properties());
     }
 
+    @Test
+    void nullPropertiesSkipsPlaceholderResolution() {
+        String yaml = //language=yml
+          """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.ChangeTextWithPlaceholder
+            displayName: Change text with placeholder
+            description: Test that placeholder resolution respects null properties.
+            recipeList:
+                - org.openrewrite.text.ChangeText:
+                    toText: "${java_home.jdk21:/bin/java}"
+            """;
+
+        // With null properties, placeholder with default value should be preserved as-is
+        rewriteRun(
+          spec -> spec.recipe(Environment.builder(null)
+            .load(new YamlResourceLoader(new ByteArrayInputStream(yaml.getBytes()),
+              URI.create("rewrite.yml"), null))
+            .build().listRecipes().iterator().next()),
+          text("hello", "${java_home.jdk21:/bin/java}")
+        );
+
+        // With empty properties, the default value gets resolved
+        rewriteRun(
+          spec -> spec.recipe(Environment.builder(new Properties())
+            .load(new YamlResourceLoader(new ByteArrayInputStream(yaml.getBytes()),
+              URI.create("rewrite.yml"), new Properties()))
+            .build().listRecipes().iterator().next()),
+          text("hello", "/bin/java")
+        );
+    }
+
     private static class RecipeWithBadStaticInitializer extends Recipe {
         // Explicitly fail static initialization
         static final int val = 1 / 0;

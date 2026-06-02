@@ -88,6 +88,12 @@ export class OrderImports extends Recipe {
                     return originalImportPosition[aPadded.element.id] - originalImportPosition[bPadded.element.id];
                 });
 
+                // Check if anything actually changed
+                const alreadySorted = sortedSpecifiers.every((s, i) => s === imports[i]);
+                if (alreadySorted) {
+                    return cu;
+                }
+
                 const cuWithImportsSorted = await produceAsync(cu, async draft => {
                     draft.statements = [...sortedSpecifiers, ...restStatements];
                 });

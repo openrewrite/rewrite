@@ -226,7 +226,8 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
                     parentheses.getTree() instanceof J.Binary ||
                     parentheses.getTree() instanceof J.Ternary ||
                     parentheses.getTree() instanceof J.TypeCast ||
-                    parentheses.getTree() instanceof J.SwitchExpression) {
+                    parentheses.getTree() instanceof J.SwitchExpression ||
+                    parentheses.getTree() instanceof J.Unary) {
                 return mi;
             }
             Expression tree = (Expression) parentheses.getTree();

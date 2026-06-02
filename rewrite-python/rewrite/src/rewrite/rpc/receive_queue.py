@@ -22,18 +22,26 @@ This processes the same JSON format that Python sends:
   {"state": "END_OF_OBJECT"}
 ]
 """
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
+from collections import deque
+from typing import Any, Callable, Deque, Dict, List, NamedTuple, Optional, TypeVar, cast
 
 from rewrite import Markers
 from rewrite.rpc.send_queue import RpcObjectState
 
 T = TypeVar('T')
 
+# Hot-path lookup: every received envelope hits this. `Enum.__call__` does a
+# metaclass-driven O(n) value scan in stdlib `enum`; a plain dict is ~5-10×
+# faster, and at ~70M calls per medium-set sequential run that matters.
+_STATE_BY_VALUE: Dict[str, RpcObjectState] = {s.value: s for s in RpcObjectState}
 
-@dataclass
-class RpcObjectData:
-    """Data structure for RPC object messages."""
+
+class RpcObjectData(NamedTuple):
+    """Data structure for RPC object messages.
+
+    Tuple-backed (no __dict__) for cheap instantiation: ~70M of these are
+    created per medium-set sequential run and they're never mutated.
+    """
     state: RpcObjectState
     value_type: Optional[str] = None
     value: Any = None
@@ -66,7 +74,7 @@ class RpcReceiveQueue:
             pull: Function to fetch the next batch of RpcObjectData from Java
             trace: Whether to enable trace logging
         """
-        self._batch: List[Dict[str, Any]] = []
+        self._batch: Deque[Dict[str, Any]] = deque()
         self._refs = refs
         self._source_file_type = source_file_type
         self._pull = pull
@@ -75,25 +83,27 @@ class RpcReceiveQueue:
     def take(self) -> RpcObjectData:
         """Take the next message from the queue, fetching more if needed."""
         if not self._batch:
-            self._batch = self._pull()
+            self._batch = deque(self._pull())
 
         if not self._batch:
             raise RuntimeError("RPC receive queue is empty and pull returned no data")
 
-        raw = self._batch.pop(0)
+        raw = self._batch.popleft()
         return self._parse_message(raw)
 
     def _parse_message(self, raw: Dict[str, Any]) -> RpcObjectData:
         """Parse a raw message dict into RpcObjectData."""
-        state_str = raw.get('state', 'NO_CHANGE')
-        state = RpcObjectState(state_str) if isinstance(state_str, str) else state_str
+        state_raw = raw.get('state', 'NO_CHANGE')
+        # type(x) is str sidesteps the ABC dispatch path that isinstance() takes
+        # — saves a hot per-call ~200 ns × ~70M calls.
+        state = _STATE_BY_VALUE[state_raw] if type(state_raw) is str else state_raw
 
         return RpcObjectData(
-            state=state,
-            value_type=raw.get('valueType'),
-            value=raw.get('value'),
-            ref=raw.get('ref'),
-            trace=raw.get('trace')
+            state,
+            raw.get('valueType'),
+            raw.get('value'),
+            raw.get('ref'),
+            raw.get('trace'),
         )
 
     def receive_defined(
@@ -134,10 +144,6 @@ class RpcReceiveQueue:
             The deserialized object, or None if deleted
         """
         message = self.take()
-
-        if self._trace and message.trace:
-            print(f"RPC Receive: {message}")
-
         ref: Optional[int] = None
 
         if message.state == RpcObjectState.NO_CHANGE:
@@ -195,6 +201,12 @@ class RpcReceiveQueue:
                     after = {'kind': message.value_type, **message.value} if isinstance(message.value, dict) else message.value
                 else:
                     after = message.value
+            elif message.state == RpcObjectState.ADD and message.value_type:
+                raise RuntimeError(
+                    f"No RPC codec registered on the Python side for '{message.value_type}'. "
+                    "The remote side has a codec and sent property messages that will not be consumed, "
+                    "causing RPC queue desynchronization."
+                )
             else:
                 after = before
 

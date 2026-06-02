@@ -135,7 +135,7 @@ class FileAttributes:
                 is_executable = os.access(path, os.X_OK)
                 size = stat.st_size
 
-                return FileAttributes(creation_time, last_access_time, last_modified_time, is_readable, is_writable,
+                return FileAttributes(creation_time, last_modified_time, last_access_time, is_readable, is_writable,
                                       is_executable, size)
             except OSError:
                 pass
@@ -151,7 +151,11 @@ class Checksum:
 class PrintOutputCapture(Generic[P]):
     @dataclass
     class MarkerPrinter(ABC):
-        DEFAULT: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load (line 201)
+        DEFAULT: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
+        SEARCH_MARKERS_ONLY: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
+        VERBOSE: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
+        FENCED: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
+        SANITIZED: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']] = None  # Set at module load
 
         def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
             return ""
@@ -164,7 +168,7 @@ class PrintOutputCapture(Generic[P]):
 
     def __init__(self, p: P, marker_printer: Optional['PrintOutputCapture.MarkerPrinter'] = None):
         self._context = p
-        self._marker_printer: PrintOutputCapture.MarkerPrinter = marker_printer or PrintOutputCapture.MarkerPrinter.DEFAULT
+        self._marker_printer: PrintOutputCapture.MarkerPrinter = marker_printer or PrintOutputCapture.MarkerPrinter.DEFAULT  # ty: ignore[invalid-assignment]  # DEFAULT always set at module load
         self._out: list[str] = []
 
     def get_out(self) -> str:
@@ -198,4 +202,47 @@ class _DefaultMarkerPrinter(PrintOutputCapture.MarkerPrinter):
         return marker.print(cursor, comment_wrapper, False)
 
 
+@dataclass
+class _SearchMarkersOnlyPrinter(PrintOutputCapture.MarkerPrinter):
+    """Only prints SearchResult markers, ignores all others."""
+    def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
+        from .markers import SearchResult
+        if isinstance(marker, SearchResult):
+            return marker.print(cursor, comment_wrapper, False)
+        return ""
+
+
+@dataclass
+class _VerboseMarkerPrinter(PrintOutputCapture.MarkerPrinter):
+    """Prints all markers with verbose=True (shows detail instead of message)."""
+    def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
+        return marker.print(cursor, comment_wrapper, True)
+
+
+@dataclass
+class _FencedMarkerPrinter(PrintOutputCapture.MarkerPrinter):
+    """Prints SearchResult and Markup markers with fenced {{uuid}} format."""
+    def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
+        from .markers import SearchResult, Markup  # ty: ignore[unresolved-import]
+        if isinstance(marker, (SearchResult, Markup)):
+            return "{{" + str(marker.id) + "}}"
+        return ""
+
+    def after_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
+        from .markers import SearchResult, Markup  # ty: ignore[unresolved-import]
+        if isinstance(marker, (SearchResult, Markup)):
+            return "{{" + str(marker.id) + "}}"
+        return ""
+
+
+@dataclass
+class _SanitizedMarkerPrinter(PrintOutputCapture.MarkerPrinter):
+    """Prints nothing - produces clean output without any marker annotations."""
+    pass
+
+
 PrintOutputCapture.MarkerPrinter.DEFAULT = _DefaultMarkerPrinter()
+PrintOutputCapture.MarkerPrinter.SEARCH_MARKERS_ONLY = _SearchMarkersOnlyPrinter()
+PrintOutputCapture.MarkerPrinter.VERBOSE = _VerboseMarkerPrinter()
+PrintOutputCapture.MarkerPrinter.FENCED = _FencedMarkerPrinter()
+PrintOutputCapture.MarkerPrinter.SANITIZED = _SanitizedMarkerPrinter()

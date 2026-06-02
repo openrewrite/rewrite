@@ -408,6 +408,7 @@ const excludedCodes = new Set([
     1308, // 'await' expressions are only allowed within async functions and at the top levels of modules.
     1314, // Global module exports may only appear in module files.
     1315, // Global module exports may only appear in declaration files.
+    1320, // Type of 'await' operand must either be a valid promise or must not contain a callable 'then' member.
     1324, // Dynamic imports only support a second argument when the '--module' option is set to 'esnext', 'node16', 'node18', 'node20', 'nodenext', or 'preserve'.
     1329, // '{0}' accepts too few arguments to be used as a decorator here. Did you mean to call it first and write '@{0}()'?
     1335, // 'unique symbol' types are not allowed here.

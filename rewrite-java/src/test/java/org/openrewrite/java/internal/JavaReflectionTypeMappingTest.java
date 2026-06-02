@@ -74,4 +74,23 @@ class JavaReflectionTypeMappingTest implements JavaTypeMappingTest {
         );
     }
 
+    @Test
+    void syntheticEnumConstructorParametersAreExcluded() {
+        JavaType.FullyQualified roundingMode = TypeUtils.asFullyQualified(typeMapping.type(java.math.RoundingMode.class));
+        JavaType.Method constructor = null;
+        for (JavaType.Method method : roundingMode.getMethods()) {
+            if (method.isConstructor()) {
+                constructor = method;
+                break;
+            }
+        }
+        assertThat(constructor).isNotNull();
+        // An enum constructor carries synthetic name/ordinal parameters in the byte
+        // code. They are excluded from parameterTypes, so they must also be excluded
+        // from parameterNames -- otherwise the names list has null holes for the
+        // synthetic slots and a different length than the types list.
+        assertThat(constructor.getParameterNames()).doesNotContainNull();
+        assertThat(constructor.getParameterNames()).hasSameSizeAs(constructor.getParameterTypes());
+    }
+
 }

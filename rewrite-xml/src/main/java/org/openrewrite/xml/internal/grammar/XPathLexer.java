@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-xml/src/main/antlr/XPathLexer.g4 by ANTLR 4.13.2
+// Generated from rewrite-xml/src/main/antlr/XPathLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.xml.internal.grammar;
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.CharStream;
@@ -32,10 +32,10 @@ public class XPathLexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		WS=1, SLASH=2, DOUBLE_SLASH=3, AXIS_SEP=4, LBRACKET=5, RBRACKET=6, LPAREN=7, 
-		RPAREN=8, AT=9, DOTDOT=10, DOT=11, COMMA=12, EQUALS=13, NOT_EQUALS=14, 
-		LTE=15, GTE=16, LT=17, GT=18, WILDCARD=19, NUMBER=20, AND=21, OR=22, TEXT=23, 
-		COMMENT=24, NODE=25, PROCESSING_INSTRUCTION=26, STRING_LITERAL=27, QNAME=28, 
+		WS=1, SLASH=2, DOUBLE_SLASH=3, AXIS_SEP=4, LBRACKET=5, RBRACKET=6, LPAREN=7,
+		RPAREN=8, AT=9, DOTDOT=10, DOT=11, COMMA=12, EQUALS=13, NOT_EQUALS=14,
+		LTE=15, GTE=16, LT=17, GT=18, WILDCARD=19, NUMBER=20, AND=21, OR=22, TEXT=23,
+		COMMENT=24, NODE=25, PROCESSING_INSTRUCTION=26, STRING_LITERAL=27, QNAME=28,
 		NCNAME=29;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
@@ -47,10 +47,10 @@ public class XPathLexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"WS", "SLASH", "DOUBLE_SLASH", "AXIS_SEP", "LBRACKET", "RBRACKET", "LPAREN", 
-			"RPAREN", "AT", "DOTDOT", "DOT", "COMMA", "EQUALS", "NOT_EQUALS", "LTE", 
-			"GTE", "LT", "GT", "WILDCARD", "NUMBER", "AND", "OR", "TEXT", "COMMENT", 
-			"NODE", "PROCESSING_INSTRUCTION", "STRING_LITERAL", "QNAME", "NCNAME", 
+			"WS", "SLASH", "DOUBLE_SLASH", "AXIS_SEP", "LBRACKET", "RBRACKET", "LPAREN",
+			"RPAREN", "AT", "DOTDOT", "DOT", "COMMA", "EQUALS", "NOT_EQUALS", "LTE",
+			"GTE", "LT", "GT", "WILDCARD", "NUMBER", "AND", "OR", "TEXT", "COMMENT",
+			"NODE", "PROCESSING_INSTRUCTION", "STRING_LITERAL", "QNAME", "NCNAME",
 			"NCNAME_CHARS", "NAME_START_CHAR", "NAME_CHAR"
 		};
 	}
@@ -58,18 +58,18 @@ public class XPathLexer extends Lexer {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, "'/'", "'//'", "'::'", "'['", "']'", "'('", "')'", "'@'", 
-			"'..'", "'.'", "','", "'='", "'!='", "'<='", "'>='", "'<'", "'>'", "'*'", 
+			null, null, "'/'", "'//'", "'::'", "'['", "']'", "'('", "')'", "'@'",
+			"'..'", "'.'", "','", "'='", "'!='", "'<='", "'>='", "'<'", "'>'", "'*'",
 			null, "'and'", "'or'", "'text'", "'comment'", "'node'", "'processing-instruction'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "WS", "SLASH", "DOUBLE_SLASH", "AXIS_SEP", "LBRACKET", "RBRACKET", 
-			"LPAREN", "RPAREN", "AT", "DOTDOT", "DOT", "COMMA", "EQUALS", "NOT_EQUALS", 
-			"LTE", "GTE", "LT", "GT", "WILDCARD", "NUMBER", "AND", "OR", "TEXT", 
-			"COMMENT", "NODE", "PROCESSING_INSTRUCTION", "STRING_LITERAL", "QNAME", 
+			null, "WS", "SLASH", "DOUBLE_SLASH", "AXIS_SEP", "LBRACKET", "RBRACKET",
+			"LPAREN", "RPAREN", "AT", "DOTDOT", "DOT", "COMMA", "EQUALS", "NOT_EQUALS",
+			"LTE", "GTE", "LT", "GT", "WILDCARD", "NUMBER", "AND", "OR", "TEXT",
+			"COMMENT", "NODE", "PROCESSING_INSTRUCTION", "STRING_LITERAL", "QNAME",
 			"NCNAME"
 		};
 	}

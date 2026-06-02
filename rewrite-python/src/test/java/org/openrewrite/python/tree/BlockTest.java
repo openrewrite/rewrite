@@ -72,9 +72,9 @@ class BlockTest implements RewriteTest {
           """
             def f():
                 pass
-                
+            
                 pass
-                
+            
                 pass
             """
         ));
@@ -116,12 +116,12 @@ class BlockTest implements RewriteTest {
             def f1():
                 def f2():
                     pass
-                    
+            
                 def f3():
-                    
+            
                     def f4():
                         pass
-                    
+            
                     pass%s""".formatted(eof)
         ));
     }
@@ -136,7 +136,7 @@ class BlockTest implements RewriteTest {
               print(1) # a comment
               print(2)
               print(3)
-                            
+              
               print(4)  # a comment
               print(5)%s""".formatted(eof)
           )

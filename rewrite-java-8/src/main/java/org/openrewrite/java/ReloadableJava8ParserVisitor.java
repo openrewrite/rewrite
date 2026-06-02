@@ -31,7 +31,7 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
@@ -98,7 +98,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                                         @Nullable FileAttributes fileAttributes,
                                         EncodingDetectingInputStream source,
                                         Collection<NamedStyles> styles,
-                                        JavaTypeCache typeCache,
+                                        JavaTypeFactory typeFactory,
                                         ExecutionContext ctx,
                                         Context context) {
         this.sourcePath = sourcePath;
@@ -109,7 +109,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         this.styles = styles;
         this.ctx = ctx;
         this.context = context;
-        this.typeMapping = new ReloadableJava8TypeMapping(typeCache);
+        this.typeMapping = new ReloadableJava8TypeMapping(typeFactory);
     }
 
     @Override
@@ -446,10 +446,12 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 return Markers.EMPTY;
             });
 
+            Space enumValueSetPrefix = enumValues.get(0).getElement().getPrefix();
+            enumValues.set(0, enumValues.get(0).withElement(enumValues.get(0).getElement().withPrefix(EMPTY)));
             enumSet = padRight(
                     new J.EnumValueSet(
                             randomId(),
-                            EMPTY,
+                            enumValueSetPrefix,
                             Markers.EMPTY,
                             enumValues,
                             skip(";") != null
@@ -716,7 +718,12 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitImport(ImportTree node, Space fmt) {
-        skip("import");
+        Space beforeImport = sourceBefore("import");
+        if (!beforeImport.isEmpty()) {
+            fmt = Space.build(
+                    fmt.getWhitespace() + beforeImport.getWhitespace(),
+                    ListUtils.concatAll(fmt.getComments(), beforeImport.getComments()));
+        }
         return new J.Import(randomId(), fmt, Markers.EMPTY,
                 new JLeftPadded<>(node.isStatic() ? sourceBefore("static") : EMPTY,
                         node.isStatic(), Markers.EMPTY),
@@ -939,7 +946,28 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         List<J.Annotation> returnTypeAnnotations = collectAnnotations(annotationPosTable);
-        TypeTree returnType = convert(node.getReturnType());
+        boolean cStyleArrayReturn = false;
+        TypeTree returnType;
+        if (node.getReturnType() instanceof JCArrayTypeTree) {
+            JCExpression elementType = (JCExpression) node.getReturnType();
+            while (elementType instanceof JCArrayTypeTree || elementType instanceof JCAnnotatedType) {
+                if (elementType instanceof JCAnnotatedType) {
+                    elementType = ((JCAnnotatedType) elementType).underlyingType;
+                }
+                if (elementType instanceof JCArrayTypeTree) {
+                    elementType = ((JCArrayTypeTree) elementType).elemtype;
+                }
+            }
+            int idx = indexOfNextNonWhitespace(elementType.getEndPosition(endPosTable), source);
+            if (idx != -1 && (source.charAt(idx) == '[' || source.charAt(idx) == '@')) {
+                returnType = convert(node.getReturnType());
+            } else {
+                returnType = convert(elementType);
+                cStyleArrayReturn = true;
+            }
+        } else {
+            returnType = convert(node.getReturnType());
+        }
         if (returnType != null && !returnTypeAnnotations.isEmpty()) {
             returnType = new J.AnnotatedType(randomId(), EMPTY, Markers.EMPTY,
                     returnTypeAnnotations, returnType);
@@ -978,6 +1006,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"),
                         Markers.EMPTY), EMPTY)), Markers.EMPTY);
 
+        List<JLeftPadded<Space>> cStyleDimensions = cStyleArrayReturn ? arrayDimensions() : emptyList();
+
         JContainer<NameTree> throws_ = node.getThrows().isEmpty() ? null :
                 JContainer.build(sourceBefore("throws"), convertAll(node.getThrows(), commaDelim, noDelim),
                         Markers.EMPTY);
@@ -990,7 +1020,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         return new J.MethodDeclaration(randomId(), fmt, Markers.EMPTY,
                 modifierResults.getLeadingAnnotations(),
                 modifierResults.getModifiers(), typeParams,
-                returnType, name, params, throws_, body, defaultValue,
+                returnType, name, params, cStyleDimensions, throws_, body, defaultValue,
                 typeMapping.methodDeclarationType(jcMethod.sym, null));
     }
 
@@ -1327,7 +1357,9 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         JCArrayTypeTree arrayTypeTree = null;
         while (typeIdent instanceof JCAnnotatedType || typeIdent instanceof JCArrayTypeTree) {
             if (typeIdent instanceof JCAnnotatedType) {
-                mapAnnotations(((JCAnnotatedType) typeIdent).getAnnotations(), annotationPosTable);
+                if (count > 0) {
+                    mapAnnotations(((JCAnnotatedType) typeIdent).getAnnotations(), annotationPosTable);
+                }
                 typeIdent = ((JCAnnotatedType) typeIdent).getUnderlyingType();
             }
             if (typeIdent instanceof JCArrayTypeTree) {
@@ -1339,16 +1371,26 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             }
         }
 
+        List<J.Annotation> leadingAnnotations = leadingAnnotations(annotationPosTable);
         Space prefix = whitespace();
-        TypeTree elemType = convert(typeIdent);
+        TypeTree elemType;
+        if (!annotationPosTable.isEmpty() && typeIdent instanceof JCFieldAccess) {
+            elemType = annotatedTypeTree(typeIdent, annotationPosTable);
+        } else {
+            elemType = convert(typeIdent);
+        }
         List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
         JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
         assert arrayTypeTree != null;
-        return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
+        TypeTree result = new J.ArrayType(randomId(), prefix, Markers.EMPTY,
                 count == 1 ? elemType : mapDimensions(elemType, arrayTypeTree.getType(), annotationPosTable),
                 annotations,
                 dimension,
                 typeMapping.type(tree));
+        if (!leadingAnnotations.isEmpty()) {
+            result = new J.AnnotatedType(randomId(), EMPTY, Markers.EMPTY, leadingAnnotations, result);
+        }
+        return result;
     }
 
     private TypeTree mapDimensions(TypeTree baseType, Tree tree, Map<Integer, JCAnnotation> annotationPosTable) {
@@ -1384,8 +1426,11 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     public J visitTypeParameter(TypeParameterTree node, Space fmt) {
         List<J.Annotation> annotations = convertAll(node.getAnnotations());
 
-        Expression name = buildName(node.getName().toString())
-                .withPrefix(sourceBefore(node.getName().toString()));
+        // Type parameter names are always a single identifier per the Java grammar
+        // (T, E, K, V, ?). No dotted names possible.
+        String typeParamName = node.getName().toString();
+        J.Identifier name = new J.Identifier(randomId(), sourceBefore(typeParamName),
+                Markers.EMPTY, emptyList(), typeParamName, null, null);
 
         // see https://docs.oracle.com/javase/tutorial/java/generics/bounded.html
         JContainer<TypeTree> bounds = node.getBounds().isEmpty() ? null :
@@ -1393,44 +1438,6 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim), Markers.EMPTY);
 
         return new J.TypeParameter(randomId(), fmt, Markers.EMPTY, annotations, emptyList(), name, bounds);
-    }
-
-    private <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {
-        String[] parts = fullyQualifiedName.split("\\.");
-
-        String fullName = "";
-        Expression expr = null;
-        for (int i = 0; i < parts.length; i++) {
-            String part = parts[i];
-            if (i == 0) {
-                fullName = part;
-                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), part, null, null);
-            } else {
-                fullName += "." + part;
-
-                int endOfPrefix = indexOfNextNonWhitespace(0, part);
-                Space identFmt = endOfPrefix > 0 ? format(part.substring(0, endOfPrefix)) : EMPTY;
-
-                Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
-                //noinspection ResultOfMethodCallIgnored
-                whitespaceSuffix.matches();
-                Space namePrefix = i == parts.length - 1 ? EMPTY : format(whitespaceSuffix.group(1));
-
-                expr = new J.FieldAccess(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        expr,
-                        padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, emptyList(), part.trim(), null, null)),
-                        (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
-                                JavaType.ShallowClass.build(fullName) :
-                                null
-                );
-            }
-        }
-
-        //noinspection unchecked,ConstantConditions
-        return (T) expr;
     }
 
     @Override
@@ -1529,7 +1536,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         TypeTree typeExpr;
         if (vartype == null || endPos(vartype) < 0 || vartype instanceof JCErroneous) {
             typeExpr = null; // this is a lambda parameter with an inferred type expression
-        } else if (isLombokGenerated(node)) {
+        } else if (hasLombokGeneratedSymbol(node)) {
             Space space = whitespace();
             boolean lombokVal = source.startsWith("val", cursor);
             cursor += 3; // skip `val` or `var`
@@ -1925,7 +1932,39 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
      * --------------
      */
 
-    private static boolean isLombokGenerated(Tree t) {
+    private boolean isLombokGenerated(Tree t) {
+        if (!hasLombokGeneratedSymbol(t)) {
+            return false;
+        }
+        // If the lombok annotation is actually present in the source, the user wrote it themselves
+        if (t instanceof JCAnnotation) {
+            int pos = ((JCAnnotation) t).pos;
+            return !(pos >= 0 && pos < source.length() &&
+                    (source.startsWith("@Generated", pos) || source.startsWith("@lombok.Generated", pos)));
+        }
+        List<JCAnnotation> annotations;
+        if (t instanceof JCMethodDecl) {
+            annotations = ((JCMethodDecl) t).getModifiers().getAnnotations();
+        } else if (t instanceof JCClassDecl) {
+            annotations = ((JCClassDecl) t).getModifiers().getAnnotations();
+        } else if (t instanceof JCVariableDecl) {
+            annotations = ((JCVariableDecl) t).getModifiers().getAnnotations();
+        } else {
+            return true;
+        }
+        for (JCAnnotation ann : annotations) {
+            if (hasLombokGeneratedSymbol(ann)) {
+                int pos = ann.pos;
+                if (pos >= 0 && pos < source.length() &&
+                        (source.startsWith("@Generated", pos) || source.startsWith("@lombok.Generated", pos))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean hasLombokGeneratedSymbol(Tree t) {
         Tree tree = (t instanceof JCAnnotation) ? ((JCAnnotation) t).getAnnotationType() : t;
 
         Symbol sym = extractSymbol(tree);
@@ -2139,7 +2178,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = cursor; i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 JCAnnotation jcAnnotation = annotationPosTable.get(i);
-                if (isLombokGenerated(jcAnnotation.getAnnotationType())) {
+                if (isLombokGenerated(jcAnnotation)) {
                     continue;
                 }
                 J.Annotation annotation = convert(jcAnnotation);
@@ -2164,7 +2203,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
             if (inMultilineComment && c == '/' && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
-            } else if (inComment && c == '\n' || c == '\r') {
+            } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
                 // Check: char is whitespace OR next char is an `@` (which is an annotation preceded by modifier/annotation without space)
@@ -2191,6 +2230,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                             currentAnnotations = new ArrayList<>();
                             word.set("");
                             afterLastModifierPosition = cursor;
+                            i = cursor - 1;
                         }
                     }
                 } else {
@@ -2288,7 +2328,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
             if (inMultilineComment && c == '/' && i > 0 && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
-            } else if (inComment && c == '\n' || c == '\r') {
+            } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
                 if (!Character.isWhitespace(c)) {

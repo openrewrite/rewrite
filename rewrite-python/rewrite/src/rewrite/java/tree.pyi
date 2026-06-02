@@ -1471,6 +1471,7 @@ class MethodDeclaration(Statement, TypedTree):
     _name_annotations: List[Annotation]
     _name: Identifier
     _parameters: JContainer[Statement]
+    _dimensions_after_name: List[JLeftPadded[Space]]
     _throws: Optional[JContainer[NameTree]]
     _body: Optional[Block]
     _default_value: Optional[JLeftPadded[Expression]]

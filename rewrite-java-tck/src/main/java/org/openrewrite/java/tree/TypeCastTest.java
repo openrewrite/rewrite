@@ -39,6 +39,50 @@ class TypeCastTest implements RewriteTest {
     }
 
     @Test
+    void annotatedArrayTypeCast() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+
+              class Test {
+                  @Target(ElementType.TYPE_USE)
+                  @interface Nullable {}
+
+                  Object[] m(Object o) {
+                      return (@Nullable Object[]) o;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotatedArrayTypeCastInExpression() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              import java.lang.reflect.Array;
+
+              class Test {
+                  @Target(ElementType.TYPE_USE)
+                  @interface Nullable {}
+
+                  Object[] m(Object o) {
+                      Object[] varargs = (@Nullable Object[]) Array.newInstance(Object.class, 1);
+                      return varargs;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void intersectionCast() {
         rewriteRun(
           java(

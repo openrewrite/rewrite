@@ -40,9 +40,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               @Override
               public J.Package visitPackage(J.Package pkg, ExecutionContext p) {
                   if ("a".equals(pkg.getExpression().printTrimmed(getCursor()))) {
-                      return JavaTemplate.builder("b")
-                        .build()
-                        .apply(getCursor(), pkg.getCoordinates().replace());
+                      return JavaTemplate.apply("b", getCursor(), pkg.getCoordinates().replace());
                   }
                   return super.visitPackage(pkg, p);
               }

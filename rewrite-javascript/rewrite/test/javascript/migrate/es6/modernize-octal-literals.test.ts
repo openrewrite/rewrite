@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {describe} from "@jest/globals";
 import {RecipeSpec} from "../../../../src/test";
 import {ModernizeOctalLiterals} from "../../../../src/javascript/migrate/es6/modernize-octal-literals";
 import {javascript} from "../../../../src/javascript";

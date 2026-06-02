@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-protobuf/src/main/antlr/Protobuf2Parser.g4 by ANTLR 4.13.2
+// Generated from rewrite-protobuf/src/main/antlr/Protobuf2Parser.g4 by ANTLR 4.13.2
 package org.openrewrite.protobuf.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -195,6 +195,18 @@ public class Protobuf2ParserBaseListener implements Protobuf2ParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitMessageField(Protobuf2Parser.MessageFieldContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterGroup(Protobuf2Parser.GroupContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitGroup(Protobuf2Parser.GroupContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

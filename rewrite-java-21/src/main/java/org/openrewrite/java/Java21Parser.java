@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 
 import java.lang.reflect.Constructor;
 import java.net.URI;
@@ -84,16 +85,17 @@ public class Java21Parser implements JavaParser {
 
                 Constructor<?> parserConstructor = parserImplementation
                         .getDeclaredConstructor(Boolean.TYPE, Collection.class, Collection.class, Collection.class, Charset.class,
-                                Collection.class, JavaTypeCache.class);
+                                Collection.class, JavaTypeCache.class, JavaTypeFactory.class);
 
                 parserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) parserConstructor
-                        .newInstance(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
+                        .newInstance(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, resolvedTypeFactory());
 
                 return new Java21Parser(delegate);
             } catch (Exception e) {
-                throw new IllegalStateException("Unable to construct Java21Parser.", e);
+                throw new IllegalStateException("Unable to construct Java21Parser. java.version: " + System.getProperty("java.version") + ", classpath: " + resolvedClasspath() +
+                                                "\nhttps://docs.openrewrite.org/reference/faq#im-getting-unable-to-construct-java21parser-or-similar-when-running-my-recipe-what-does-this-mean", e);
             }
         }
     }

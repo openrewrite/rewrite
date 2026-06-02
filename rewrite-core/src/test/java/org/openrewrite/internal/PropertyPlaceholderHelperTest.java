@@ -89,6 +89,72 @@ class PropertyPlaceholderHelperTest {
     }
 
     @Test
+    void escapedPlaceholder() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("\\${java.version}", k -> "should-not-resolve");
+        assertThat(s).isEqualTo("${java.version}");
+    }
+
+    @Test
+    void escapedPlaceholderWithOtherPrefix() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", null);
+        var s = helper.replacePlaceholders("\\%%{k1}", k -> "should-not-resolve");
+        assertThat(s).isEqualTo("%%{k1}");
+    }
+
+    @Test
+    void mixedEscapedAndResolvedPlaceholders() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("${greeting} \\${java.version}", k -> "greeting".equals(k) ? "hello" : null);
+        assertThat(s).isEqualTo("hello ${java.version}");
+    }
+
+    @Test
+    void unresolvedPlaceholderLeftAsIs() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("${unresolved}", k -> null);
+        assertThat(s).isEqualTo("${unresolved}");
+    }
+
+    @Test
+    void normalResolutionStillWorks() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("${greeting} ${name}", k -> switch (k) {
+            case "greeting" -> "hello";
+            case "name" -> "world";
+            default -> null;
+        });
+        assertThat(s).isEqualTo("hello world");
+    }
+
+    @Test
+    void backslashNotBeforePrefixIsPreserved() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("path\\to\\file", k -> null);
+        assertThat(s).isEqualTo("path\\to\\file");
+    }
+
+    @Test
+    void selfReferencingPropertyDoesNotStackOverflow() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var props = new java.util.HashMap<String, String>();
+        props.put("revision", "${revision}");
+        var s = helper.replacePlaceholders("${revision}", props::get);
+        assertThat(s).isEqualTo("${revision}");
+    }
+
+    @Test
+    void cyclicPropertyReferenceDoesNotStackOverflow() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var props = new java.util.HashMap<String, String>();
+        props.put("revision", "${project.build.version}");
+        props.put("project.build.version", "${revision}");
+        var s = helper.replacePlaceholders("${revision}", props::get);
+        // The cycle should be detected and the placeholder left unresolved
+        assertThat(s).contains("${");
+    }
+
+    @Test
     void withValueSeparatorAndNullReplacement() {
         var helper = new PropertyPlaceholderHelper("%%{", "}", ",");
         var s = helper.replacePlaceholders("%%{k1,oh}%%{k2}", k -> switch (k) {

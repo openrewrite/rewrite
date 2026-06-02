@@ -17,7 +17,8 @@ import {PrintOutputCapture, TreePrinters} from "../print";
 import {YamlVisitor} from "./visitor";
 import {printTag, Yaml} from "./tree";
 import {Cursor} from "../tree";
-import {Markers} from "../markers";
+import {findMarker, Markers} from "../markers";
+import "./markers"; // Ensures Yaml.Markers is defined
 
 class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
 
@@ -88,7 +89,9 @@ class YamlPrinter extends YamlVisitor<PrintOutputCapture> {
         await this.beforeSyntax(entry, p);
         await this.visit(entry.key, p);
         p.append(entry.beforeMappingValueIndicator);
-        p.append(':');
+        if (!findMarker(entry, Yaml.Markers.OmitColon)) {
+            p.append(':');
+        }
         await this.visit(entry.value, p);
         this.afterSyntax(entry, p);
         return entry;

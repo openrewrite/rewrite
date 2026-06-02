@@ -40,12 +40,15 @@ public class PythonRpcResetExtension implements BeforeEachCallback, AfterEachCal
 
     @Override
     public void beforeEach(ExtensionContext context) {
-        // Configure the factory with tracing on first use
+        // Configure the factory with tracing on first use.
+        // The python version can be overridden via system property (e.g., by the py2CompatibilityTest suite).
         if (!factoryConfigured) {
+            String pythonVersion = System.getProperty("rewrite.python.version", "3");
             PythonRewriteRpc.setFactory(
-                PythonRewriteRpc.builder()
-                    .traceRpcMessages()
-                    .log(java.nio.file.Paths.get("build/python-rpc.log"))
+              PythonRewriteRpc.builder()
+                .pythonVersion(pythonVersion)
+                .traceRpcMessages()
+                .log(java.nio.file.Paths.get("build/python-rpc.log"))
             );
             factoryConfigured = true;
         }

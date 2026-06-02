@@ -285,7 +285,7 @@ export namespace JS {
     export interface ImportSpecifier extends JS, Expression, TypedTree {
         readonly kind: typeof Kind.ImportSpecifier;
         readonly importType: J.LeftPadded<boolean>;
-        readonly specifier: J.Identifier | Alias;
+        readonly specifier: J.Identifier | Alias | J.Empty;
         readonly type?: Type;
     }
 

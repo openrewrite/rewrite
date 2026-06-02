@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
+import org.openrewrite.tree.ParseError;
 
 import java.util.List;
 
@@ -30,6 +31,15 @@ class ProtoParserTest implements RewriteTest {
     void noNullsForProto3Files() {
         List<SourceFile> sources = ProtoParser.builder().build().parse("syntax = \"proto3\";").toList();
         assertThat(sources).singleElement().isInstanceOf(PlainText.class);
+    }
+
+    @Test
+    void malformedSyntaxDoesNotThrowNPE() {
+        List<SourceFile> sources = ProtoParser.builder().build().parse("syntax = proto2;").toList();
+        assertThat(sources).singleElement().satisfiesAnyOf(
+                s -> assertThat(s).isInstanceOf(PlainText.class),
+                s -> assertThat(s).isInstanceOf(ParseError.class)
+        );
     }
 
     @Test

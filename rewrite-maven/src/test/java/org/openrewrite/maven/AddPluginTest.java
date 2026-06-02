@@ -215,6 +215,53 @@ class AddPluginTest implements RewriteTest {
     }
 
     @Test
+    void dontDuplicate() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>100.0</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void dontDuplicateMinimalCompiler() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPlugin("org.apache.maven.plugins", "maven-compiler-plugin", null, null, null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void updatePluginVersion() {
         rewriteRun(
           pomXml(

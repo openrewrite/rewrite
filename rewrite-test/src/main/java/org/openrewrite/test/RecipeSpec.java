@@ -106,6 +106,22 @@ public class RecipeSpec {
     @Nullable
     RecipePrinter recipePrinter;
 
+    @Nullable
+    RewriteRunner runner;
+
+    /**
+     * Selects how the recipe is executed for this run. The default is
+     * {@link RewriteRunner#IN_PROCESS}; pass an alternative (e.g. a moderne-cli
+     * runner) to exercise the same test through an out-of-process backend.
+     * <p>
+     * Resolution order: per-call spec runner &gt; per-class
+     * {@link RewriteTest#runner()} &gt; {@link RewriteRunner#IN_PROCESS}.
+     */
+    public RecipeSpec runner(RewriteRunner runner) {
+        this.runner = runner;
+        return this;
+    }
+
     /**
      * Configuration that applies to all source file inputs.
      */
@@ -209,9 +225,12 @@ public class RecipeSpec {
     @Incubating(since = "7.35.0")
     public <E> RecipeSpec dataTable(Class<E> rowType, UncheckedConsumer<List<E>> extract) {
         return afterRecipe(run -> {
-            for (Map.Entry<DataTable<?>, List<?>> dataTableListEntry : run.getDataTables().entrySet()) {
-                if (dataTableListEntry.getKey().getType().equals(rowType)) {
-                    List<E> rows = run.getDataTableRows(dataTableListEntry.getKey().getName());
+            DataTableStore store = run.getDataTableStore();
+            for (DataTable<?> dt : store.getDataTables()) {
+                if (dt.getType().equals(rowType)) {
+                    @SuppressWarnings("unchecked")
+                    List<E> rows = (List<E>) store.getRows(dt.getName(), dt.getGroup())
+                            .collect(java.util.stream.Collectors.toList());
                     assertThat(rows).isNotNull();
                     assertThat(rows).isNotEmpty();
                     extract.accept(rows);
@@ -219,7 +238,7 @@ public class RecipeSpec {
                 }
             }
             String message = "No data table found with row type: " + rowType;
-            Set<DataTable<?>> tables = run.getDataTables().keySet();
+            Collection<DataTable<?>> tables = store.getDataTables();
             if (!tables.isEmpty()) {
                 message += "\nFound data tables row type(s): " + tables.stream()
                         .map(it -> it.getType().getName().replace("$", "."))
@@ -238,9 +257,17 @@ public class RecipeSpec {
     @Incubating(since = "7.35.0")
     public <E, V> RecipeSpec dataTableAsCsv(String name, String expect) {
         afterRecipe(run -> {
-            DataTable<?> dataTable = run.getDataTable(name);
+            DataTableStore store = run.getDataTableStore();
+            DataTable<?> dataTable = null;
+            for (DataTable<?> dt : store.getDataTables()) {
+                if (dt.getName().equals(name)) {
+                    dataTable = dt;
+                    break;
+                }
+            }
             assertThat(dataTable).isNotNull();
-            List<E> rows = run.getDataTableRows(name);
+            List<?> rows = store.getRows(dataTable.getName(), dataTable.getGroup())
+                    .collect(java.util.stream.Collectors.toList());
             StringWriter writer = new StringWriter();
             CsvMapper mapper = CsvMapper.builder()
                     .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)

@@ -15,19 +15,37 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 @SuppressWarnings({"unused", "unchecked"})
+@Getter
+@EqualsAndHashCode(callSuper = false)
 public class MergeSpacesVisitor extends JavaVisitor<Object> {
+
+    private final WrappingAndBracesStyle wrappingAndBracesStyle;
+
+    public MergeSpacesVisitor(List<NamedStyles> styles) {
+        this.wrappingAndBracesStyle = getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces);
+    }
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, @Nullable Object ctx) {
@@ -40,12 +58,26 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
     }
 
     @Override
+    public @Nullable J visit(@Nullable Tree tree, Object o) {
+        if (o instanceof J.Block && !(tree instanceof J.Block)) {
+            //Wrapping can introduce blocks
+            return super.visit((J.Block) o, o);
+        }
+        return super.visit(tree, o);
+    }
+
+    @Override
     @SuppressWarnings("unused")
     public Space visitSpace(@Nullable Space space, Space.Location loc, @Nullable Object ctx) {
         if (space == ctx || !(ctx instanceof Space)) {
             return space;
         }
         Space newSpace = (Space) ctx;
+        if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && space.getWhitespace().contains("\n")) {
+            if (newSpace.getWhitespace().contains("\n")) {
+                newSpace = newSpace.withWhitespace(space.getWhitespace().substring(0, space.getWhitespace().lastIndexOf("\n") + 1) + newSpace.getWhitespace().substring(newSpace.getWhitespace().lastIndexOf("\n") + 1));
+            }
+        }
         if (space == null) {
             return newSpace;
         }
@@ -54,25 +86,42 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         if (space.getComments().isEmpty() || space.getComments().size() != newSpace.getComments().size()) {
             return space;
         }
+        Space finalNewSpace = newSpace;
         return space.withComments(ListUtils.map(space.getComments(), (index, comment) -> {
+            Comment newComment = finalNewSpace.getComments().get(index);
             if (comment instanceof Javadoc.DocComment) {
                 Javadoc.DocComment docComment = (Javadoc.DocComment) comment;
-                if (!(newSpace.getComments().get(index) instanceof Javadoc.DocComment)) {
+                if (!(newComment instanceof Javadoc.DocComment)) {
                     return docComment;
                 }
-                Javadoc.DocComment replaceWith = (Javadoc.DocComment) newSpace.getComments().get(index);
+                Javadoc.DocComment replaceWith = (Javadoc.DocComment) newComment;
                 comment = docComment.withBody(ListUtils.map(docComment.getBody(), (i, jdoc) -> {
-                    if(!(jdoc instanceof Javadoc.LineBreak && replaceWith.getBody().get(i) instanceof Javadoc.LineBreak)) {
+                    if (!(jdoc instanceof Javadoc.LineBreak && replaceWith.getBody().get(i) instanceof Javadoc.LineBreak)) {
                         return jdoc;
                     }
-                    return ((Javadoc.LineBreak) jdoc).withMargin(((Javadoc.LineBreak) replaceWith.getBody().get(i)).getMargin());
+                    String newMargin = ((Javadoc.LineBreak) replaceWith.getBody().get(i)).getMargin();
+                    if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && ((Javadoc.LineBreak) jdoc).getMargin().contains("\n")) {
+                        if (newMargin.contains("\n")) {
+                            return ((Javadoc.LineBreak) jdoc).withMargin(((Javadoc.LineBreak) jdoc).getMargin().substring(0, ((Javadoc.LineBreak) jdoc).getMargin().lastIndexOf("\n") + 1) + newMargin.substring(newMargin.lastIndexOf("\n") + 1));
+                        } else {
+                            return jdoc;
+                        }
+                    }
+                    return ((Javadoc.LineBreak) jdoc).withMargin(newMargin);
                 }));
             } else if (comment instanceof TextComment) {
-                if (newSpace.getComments().get(index) instanceof TextComment) {
-                    comment = ((TextComment) comment).withText(((TextComment) newSpace.getComments().get(index)).getText());
+                if (newComment instanceof TextComment) {
+                    comment = ((TextComment) comment).withText(((TextComment) newComment).getText());
                 }
             }
-            return comment.withSuffix(newSpace.getComments().get(index).getSuffix());
+            if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && comment.getSuffix().contains("\n")) {
+                if (newComment.getSuffix().contains("\n")) {
+                    return comment.withSuffix(comment.getSuffix().substring(0, comment.getSuffix().lastIndexOf("\n") + 1) + newComment.getSuffix().substring(newComment.getSuffix().lastIndexOf("\n") + 1));
+                } else {
+                    return comment;
+                }
+            }
+            return comment.withSuffix(newComment.getSuffix());
         }));
     }
 
@@ -823,7 +872,7 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         J.Literal l = literal;
         l = l.withPrefix(visitSpace(l.getPrefix(), Space.Location.LITERAL_PREFIX, newLiteral.getPrefix()));
         l = l.withMarkers(visitMarkers(l.getMarkers(), newLiteral.getMarkers()));
-        Expression temp = (Expression) visitExpression(l, newLiteral);
+        Expression temp = (Expression) visitExpression(l.withValue(newLiteral.getValue()).withValueSource(newLiteral.getValueSource()), newLiteral); // for text blocks indentation, we use the new literal's value
         if (!(temp instanceof J.Literal)) {
             return temp;
         }
@@ -1559,5 +1608,23 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
         J.Erroneous u = erroneous;
         u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.ERRONEOUS, newErroneous.getPrefix()));
         return u.withMarkers(visitMarkers(u.getMarkers(), newErroneous.getMarkers()));
+    }
+
+    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
+        S style = NamedStyles.merge(styleClass, styles);
+        if (style != null) {
+            return StyleHelper.merge(defaultStyle.get(), style);
+        }
+        return defaultStyle.get();
+    }
+
+    private boolean evaluate(Supplier<Boolean> supplier, boolean defaultValue) {
+        try {
+            return supplier.get();
+        } catch (NoSuchMethodError e) {
+            // Handle newly introduced method calls on style that are not part of lst yet
+            return defaultValue;
+        }
     }
 }

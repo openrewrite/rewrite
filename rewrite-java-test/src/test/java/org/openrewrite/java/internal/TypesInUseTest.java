@@ -17,10 +17,13 @@ package org.openrewrite.java.internal;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
-import static java.util.stream.Collectors.toList;
+import java.util.Collections;
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
@@ -55,8 +58,34 @@ class TypesInUseTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 var foundTypes = cu.getTypesInUse().getVariables().stream()
                   .map(v -> TypeUtils.asFullyQualified(v.getType()).getFullyQualifiedName())
-                  .collect(toList());
+                  .toList();
                 assertThat(foundTypes).containsExactlyInAnyOrder("org.openrewrite.test.YesOrNo$Status");
+            })
+          )
+        );
+    }
+
+    @Test
+    void publicFactoryReturnsInstanceWithSuppliedSets() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite.test;
+              public class Foo {}
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                Set<JavaType> types = Collections.emptySet();
+                Set<JavaType.Method> declaredMethods = Collections.emptySet();
+                Set<JavaType.Method> usedMethods = Collections.emptySet();
+                Set<JavaType.Variable> variables = Collections.emptySet();
+
+                TypesInUse tiu = TypesInUse.of(cu, types, declaredMethods, usedMethods, variables);
+
+                assertThat(tiu.getCu()).isSameAs(cu);
+                assertThat(tiu.getTypesInUse()).isSameAs(types);
+                assertThat(tiu.getDeclaredMethods()).isSameAs(declaredMethods);
+                assertThat(tiu.getUsedMethods()).isSameAs(usedMethods);
+                assertThat(tiu.getVariables()).isSameAs(variables);
             })
           )
         );

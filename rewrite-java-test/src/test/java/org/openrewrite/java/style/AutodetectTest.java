@@ -58,6 +58,73 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(8);
     }
 
+    @Test
+    void continuationIndentFromTextBlock() {
+        var cus = jp().parse(
+          """
+            public interface CoffeeRepository {
+
+                static final String QUERY = ""\"
+                    SELECT * FROM coffee
+                    WHERE size = :size
+                    AND price <= :maxPrice
+                    ORDER BY price DESC
+                    ""\";
+                        
+                List<String> findByNameContainingIgnoreCase(String name);
+                
+                List<String> findBySizeAndPriceGreaterThan(String size, int price);
+                
+                List<Coffee> findAffordableCoffeesBySize(String size,
+                                                          int maxPrice);
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(4);
+    }
+
+    @Test
+    void continuationIndentFromTextBlockStartingOnNewLine() {
+        var cus = jp().parse(
+          """
+            public interface CoffeeRepository {
+
+                static final String QUERY =
+                    ""\"
+                        SELECT * FROM coffee
+                        WHERE size = :size
+                        AND price <= :maxPrice
+                        ORDER BY price DESC
+                        ""\";
+                        
+                List<String> findByNameContainingIgnoreCase(String name);
+                
+                List<String> findBySizeAndPriceGreaterThan(String size, int price);
+                
+                List<Coffee> findAffordableCoffeesBySize(String size,
+                                                          int maxPrice);
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(4);
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/3552")
     @Test
     void continuationIndentFromParameters() {
@@ -95,9 +162,9 @@ class AutodetectTest implements RewriteTest {
 
         var detector = Autodetect.detector();
         cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var wrap = detector.build().getStyle(WrappingAndBracesStyle.class);
 
-        assertThat(tabsAndIndents.getMethodDeclarationParameters().getAlignWhenMultiple()).isTrue();
+        assertThat(wrap.getMethodDeclarationParameters().getAlignWhenMultiline()).isTrue();
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1221")

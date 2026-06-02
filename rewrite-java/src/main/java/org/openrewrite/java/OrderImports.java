@@ -94,13 +94,11 @@ public class OrderImports extends Recipe {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                 Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
-                List<JavaType.FullyQualified> classpath = emptyList();
-                if (sourceSet.isPresent()) {
-                    classpath = sourceSet.get().getClasspath();
-                }
+                List<JavaType.FullyQualified> classpath = sourceSet.map(JavaSourceSet::getClasspath).orElse(emptyList());
+                boolean classpathDirty = JavaSourceSet.isDirty(ctx, cu);
 
                 ImportLayoutStyle importLayoutStyle = importLayoutStyle(cu, namedStyles);
-                List<JRightPadded<J.Import>> orderedImports = importLayoutStyle.orderImports(cu.getPadding().getImports(), classpath);
+                List<JRightPadded<J.Import>> orderedImports = importLayoutStyle.orderImports(cu.getPadding().getImports(), classpath, classpathDirty);
 
                 boolean changed = false;
                 if (orderedImports.size() != cu.getImports().size()) {
@@ -155,11 +153,11 @@ public class OrderImports extends Recipe {
         if (allPresent) {
             return cu;
         }
-        // New styles must appear first to take precedence
+        // New styles must appear last to take precedence
         List<Marker> markers = cu.getMarkers().getMarkers();
         for (NamedStyles namedStyle : parsedStyles) {
             if (existingStyles.stream().noneMatch(es -> namedStylesEqual(namedStyle, es))) {
-                markers = ListUtils.concat(namedStyle, markers);
+                markers = ListUtils.concat(markers, namedStyle);
             }
         }
         return cu.withMarkers(Markers.build(markers));

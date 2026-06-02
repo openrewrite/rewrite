@@ -102,7 +102,8 @@ async function installPrettierToCache(version: string): Promise<void> {
         cwd: cacheDir,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
-        timeout: 120000 // 2 minutes
+        timeout: 120000, // 2 minutes
+        ...(os.platform() === 'win32' ? { shell: true } : {})
     });
 
     if (result.error) {

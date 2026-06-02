@@ -44,6 +44,16 @@ class RecipeStack {
     @Getter
     int recipePosition;
 
+    /**
+     * The next recipe that will be processed after the current one, or null if
+     * at the end of the recipe list. Available after {@link #recurseRecipeList}
+     * is called for the current recipe.
+     */
+    @NonFinal
+    @Getter
+    @Nullable
+    Recipe nextRecipe;
+
     public <T> @Nullable T reduce(LargeSourceSet sourceSet, Recipe recipe, ExecutionContext ctx,
                                   BiFunction<@Nullable T, Stack<Recipe>, @Nullable T> consumer, @Nullable T acc) {
         init(recipe);
@@ -57,12 +67,14 @@ class RecipeStack {
             Stack<Recipe> recipeStack = allRecipesStack.pop();
             if (recipeStack.peek().maxCycles() >= ctx.getCycle()) {
                 sourceSet.setRecipe(recipeStack);
-                acc = consumer.apply(acc, recipeStack);
                 recurseRecipeList(recipeStack);
+                this.nextRecipe = allRecipesStack.isEmpty() ? null : allRecipesStack.peek().peek();
+                acc = consumer.apply(acc, recipeStack);
             } else {
                 this.recipePosition = recipePosition.getAndAdd(countRecipes(recipeStack.peek()));
             }
         }
+        this.nextRecipe = null;
         return acc;
     }
 

@@ -46,15 +46,24 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             Markers.EMPTY, new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY),
             emptyList(), Space.format(" "));
 
+    private final boolean autoFormat;
+
     public JavaTemplateJavaExtension(JavaTemplateParser templateParser, Substitutions substitutions,
-                                     String substitutedTemplate, JavaCoordinates coordinates) {
+                                     String substitutedTemplate, JavaCoordinates coordinates,
+                                     boolean autoFormat) {
         super(templateParser, substitutions, substitutedTemplate, coordinates);
+        this.autoFormat = autoFormat;
     }
 
     @Override
     public TreeVisitor<? extends J, Integer> getMixin() {
         return new JavaVisitor<Integer>() {
             private boolean substituted;
+
+            @Override
+            public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, Integer p, Cursor parent) {
+                return autoFormat ? super.autoFormat(j, stopAfter, p, parent) : j;
+            }
 
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer p) {
@@ -70,6 +79,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 } else if (loc == ANNOTATION_ARGUMENTS && mode == JavaCoordinates.Mode.REPLACEMENT &&
                            isScope(annotation)) {
                     List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), "@Example(" + substitutedTemplate + ")"));
+                    if (gen.isEmpty()) {
+                        throw new IllegalStateException("Unable to parse annotation arguments from template: \n" +
+                                                        substitutedTemplate +
+                                                        "\nUse JavaTemplate.Builder.doBeforeParseTemplate() to see what stub is being generated and include it in any bug report.");
+                    }
                     return annotation.withArguments(gen.get(0).getArguments());
                 }
 
@@ -255,7 +269,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if (loc == LAMBDA_PARAMETERS_PREFIX && isScope(lambda.getParameters())) {
                     return lambda.withParameters(unsubstitute(templateParser.parseLambdaParameters(getCursor(), substitutedTemplate)));
                 }
-                return maybeReplaceStatement(lambda, J.class, 0);
+                if (loc == STATEMENT_PREFIX && isScope(lambda)) {
+                    return maybeReplaceStatement(lambda, J.class, 0);
+                }
+                // Recurse into the lambda's body so that templates targeting an expression or
+                // statement inside the body (e.g. `lambda.getBody().getCoordinates().replace()`)
+                // can find their scope. Without this, the visitor stops at the lambda and the
+                // apply call silently returns the input unchanged.
+                return super.visitLambda(lambda, p);
             }
 
             @Override
@@ -426,12 +447,40 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     }
                     return m;
                 }
+                Object parentValue = getCursor().getParentTreeCursor().getValue();
+                if (loc == STATEMENT_PREFIX && isScope(method) &&
+                    (parentValue instanceof J.Return ||
+                     parentValue instanceof J.Assignment ||
+                     parentValue instanceof J.AssignmentOperation ||
+                     parentValue instanceof J.TypeCast)) {
+                    // Method invocation is used as an expression (e.g., inside return, assignment, type cast),
+                    // not as a standalone statement in a block. Parse as expression replacement.
+                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                                    getCursor(),
+                                    substitutedTemplate,
+                                    substitutions.getTypeVariables(),
+                                    loc))
+                            .withPrefix(method.getPrefix()), integer);
+                }
                 return maybeReplaceStatement(method, J.class, 0);
             }
 
             @Override
             public J visitNewClass(J.NewClass newClass, Integer p) {
                 if (isScope(newClass)) {
+                    Object parentValue = getCursor().getParentTreeCursor().getValue();
+                    if (loc == STATEMENT_PREFIX &&
+                        (parentValue instanceof J.Return ||
+                         parentValue instanceof J.Assignment ||
+                         parentValue instanceof J.AssignmentOperation ||
+                         parentValue instanceof J.TypeCast)) {
+                        return autoFormat(unsubstitute(templateParser.parseExpression(
+                                        getCursor(),
+                                        substitutedTemplate,
+                                        substitutions.getTypeVariables(),
+                                        loc))
+                                .withPrefix(newClass.getPrefix()), p);
+                    }
                     // allow a `J.NewClass` to also be replaced by an expression
                     return maybeReplaceStatement(newClass, J.class, p);
                 }
@@ -513,7 +562,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             private <J2 extends J> @Nullable J2 unsubstitute(J2 j) {
                 try {
-                    return substitutions.unsubstitute(j);
+                    J2 result = substitutions.unsubstitute(j);
+                    if (!substitutions.getTypeVariables().isEmpty()) {
+                        result = substitutions.resolveTypeVariables(result);
+                    }
+                    return result;
                 } finally {
                     substituted = true;
                 }
@@ -521,7 +574,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             private <J2 extends J> List<J2> unsubstitute(List<J2> js) {
                 try {
-                    return substitutions.unsubstitute(js);
+                    List<J2> result = substitutions.unsubstitute(js);
+                    if (!substitutions.getTypeVariables().isEmpty()) {
+                        result = ListUtils.map(result, substitutions::resolveTypeVariables);
+                    }
+                    return result;
                 } finally {
                     substituted = true;
                 }

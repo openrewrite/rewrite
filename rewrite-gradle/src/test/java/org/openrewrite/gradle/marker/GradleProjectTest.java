@@ -87,6 +87,7 @@ class GradleProjectTest implements RewriteTest {
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
               .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .filteredOn(repo -> "https://example.com/maven2".equals(repo.getUri()))
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -132,6 +133,7 @@ class GradleProjectTest implements RewriteTest {
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
               .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .filteredOn(repo -> "https://example.com/maven2".equals(repo.getUri()))
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -180,6 +182,7 @@ class GradleProjectTest implements RewriteTest {
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
               .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .filteredOn(repo -> "https://example.com/maven2".equals(repo.getUri()))
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -223,6 +226,7 @@ class GradleProjectTest implements RewriteTest {
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
               .satisfies(gp -> assertThat(gp.getMavenRepositories())
+                .filteredOn(repo -> "https://example.com/maven2".equals(repo.getUri()))
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -683,8 +687,8 @@ class GradleProjectTest implements RewriteTest {
     }
 }
 
-@SuppressWarnings("NullableProblems")
 @EqualsAndHashCode(callSuper = false)
+@SuppressWarnings("NullableProblems")
 @Value
 class UpgradeDependencyInMarker extends Recipe {
 
@@ -716,8 +720,8 @@ class UpgradeDependencyInMarker extends Recipe {
 }
 
 @EqualsAndHashCode(callSuper = false)
-@Value
 @SuppressWarnings("NullableProblems")
+@Value
 class RemoveDependency extends Recipe {
 
     List<GroupArtifact> gas;
@@ -752,8 +756,8 @@ class RemoveDependency extends Recipe {
     }
 }
 
-@SuppressWarnings("NullableProblems")
 @EqualsAndHashCode(callSuper = false)
+@SuppressWarnings("NullableProblems")
 @Value
 class ChangeConstraint extends Recipe {
 
@@ -779,8 +783,8 @@ class ChangeConstraint extends Recipe {
     }
 }
 
-@SuppressWarnings("NullableProblems")
 @EqualsAndHashCode(callSuper = false)
+@SuppressWarnings("NullableProblems")
 @Value
 class RemoveConstraint extends Recipe {
 

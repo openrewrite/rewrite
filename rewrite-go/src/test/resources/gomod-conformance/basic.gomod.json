@@ -1,0 +1,12 @@
+{
+  "modulePath": "example.com/foo",
+  "goVersion": "1.22",
+  "toolchain": "",
+  "requires": [
+    {"modulePath": "github.com/google/uuid", "version": "v1.6.0", "indirect": false}
+  ],
+  "replaces": [],
+  "excludes": [],
+  "retracts": [],
+  "resolvedDependencies": []
+}

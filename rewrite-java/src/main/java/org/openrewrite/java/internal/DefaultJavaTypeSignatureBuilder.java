@@ -116,7 +116,9 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
         JavaType.Intersection it = (JavaType.Intersection) type;
         StringJoiner bounds = new StringJoiner(" & ");
         for (JavaType bound : it.getBounds()) {
-            bounds.add(signature(bound));
+            if (parameterizedStack == null || !parameterizedStack.contains(bound)) {
+                bounds.add(signature(bound));
+            }
         }
         return bounds.toString();
     }
@@ -128,19 +130,24 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
         if (parameterizedStack == null) {
             parameterizedStack = newSetFromMap(new IdentityHashMap<>());
         }
-        parameterizedStack.add(pt);
-
-        String baseType = signature(pt.getType());
-        StringBuilder s = new StringBuilder(baseType);
-
-        StringJoiner typeParameters = new StringJoiner(", ", "<", ">");
-        for (JavaType typeParameter : pt.getTypeParameters()) {
-            typeParameters.add(signature(typeParameter));
+        if (!parameterizedStack.add(pt)) {
+            return classSignature(pt.getType());
         }
-        s.append(typeParameters);
 
-        parameterizedStack.remove(pt);
-        return s.toString();
+        try {
+            String baseType = signature(pt.getType());
+            StringBuilder s = new StringBuilder(baseType);
+
+            StringJoiner typeParameters = new StringJoiner(", ", "<", ">");
+            for (JavaType typeParameter : pt.getTypeParameters()) {
+                typeParameters.add(signature(typeParameter));
+            }
+            s.append(typeParameters);
+
+            return s.toString();
+        } finally {
+            parameterizedStack.remove(pt);
+        }
     }
 
     @Override
@@ -191,11 +198,16 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
     private String multiCatchSignature(Object type) {
         JavaType.MultiCatch multiCatch = (JavaType.MultiCatch) type;
         StringBuilder s = new StringBuilder();
-        for (int i = 0; i < multiCatch.getThrowableTypes().size(); i++) {
-            if (i > 0) {
+        List<JavaType> throwableTypes = multiCatch.getThrowableTypes();
+        for (int i = 0; i < throwableTypes.size(); i++) {
+            JavaType throwableType = throwableTypes.get(i);
+            if (parameterizedStack != null && parameterizedStack.contains(throwableType)) {
+                continue;
+            }
+            if (i > 0 && s.length() > 0) {
                 s.append('|');
             }
-            s.append(signature(multiCatch.getThrowableTypes().get(i)));
+            s.append(signature(throwableType));
         }
         return s.toString();
     }

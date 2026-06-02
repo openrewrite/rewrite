@@ -1330,7 +1330,13 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withImplements(@Nullable List<TypeTree> implementings) {
-            return getPadding().withImplements(JContainer.withElementsNullable(this.implementings, implementings));
+            JContainer<TypeTree> updated = JContainer.withElementsNullable(this.implementings, implementings);
+            if (updated != null && this.implementings == null) {
+                List<TypeTree> normalized = ListUtils.mapFirst(updated.getElements(), first ->
+                        first.getPrefix().isEmpty() ? first.withPrefix(Space.SINGLE_SPACE) : first);
+                updated = JContainer.withElements(updated, normalized).withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withImplements(updated);
         }
 
         @Nullable
@@ -1341,7 +1347,13 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withPermits(@Nullable List<TypeTree> permitting) {
-            return getPadding().withPermits(JContainer.withElementsNullable(this.permitting, permitting));
+            JContainer<TypeTree> updated = JContainer.withElementsNullable(this.permitting, permitting);
+            if (updated != null && this.permitting == null) {
+                List<TypeTree> normalized = ListUtils.mapFirst(updated.getElements(), first ->
+                        first.getPrefix().isEmpty() ? first.withPrefix(Space.SINGLE_SPACE) : first);
+                updated = JContainer.withElements(updated, normalized).withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withPermits(updated);
         }
 
         @With
@@ -3225,7 +3237,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class DeconstructionPattern implements J, TypedTree {
+    final class DeconstructionPattern implements J, Expression, TypedTree {
 
         @Nullable
         @NonFinal
@@ -3265,6 +3277,12 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitDeconstructionPattern(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         @Override
@@ -3877,8 +3895,29 @@ public interface J extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator})
     final class MethodDeclaration implements J, Statement, TypedTree {
+
+        @Deprecated
+        @ToBeRemoved(after = "2026-09-17")
+        public MethodDeclaration(
+                UUID id,
+                Space prefix,
+                Markers markers,
+                List<Annotation> leadingAnnotations,
+                List<Modifier> modifiers,
+                @Nullable TypeParameters typeParameters,
+                @Nullable TypeTree returnTypeExpression,
+                IdentifierWithAnnotations name,
+                JContainer<Statement> parameters,
+                @Nullable JContainer<NameTree> throwz,
+                @Nullable Block body,
+                @Nullable JLeftPadded<Expression> defaultValue,
+                JavaType.@Nullable Method methodType) {
+            this(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression,
+                    name, parameters, emptyList(), throwz, body, defaultValue, methodType);
+        }
+
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -3962,6 +4001,14 @@ public interface J extends Tree {
             return getPadding().withParameters(JContainer.withElements(this.parameters, parameters));
         }
 
+        /**
+         * C-style array dimensions that appear after the method parameters rather than
+         * after the return type. For example: {@code byte toByteArray()[]}.
+         */
+        @With
+        @Getter
+        List<JLeftPadded<Space>> dimensionsAfterName;
+
         @Nullable
         JContainer<NameTree> throwz;
 
@@ -3970,7 +4017,13 @@ public interface J extends Tree {
         }
 
         public MethodDeclaration withThrows(@Nullable List<NameTree> throwz) {
-            return getPadding().withThrows(JContainer.withElementsNullable(this.throwz, throwz));
+            JContainer<NameTree> updated = JContainer.withElementsNullable(this.throwz, throwz);
+            if (updated != null && this.throwz == null) {
+                List<NameTree> normalized = ListUtils.mapFirst(updated.getElements(), first ->
+                        first.getPrefix().isEmpty() ? first.withPrefix(Space.SINGLE_SPACE) : first);
+                updated = JContainer.withElements(updated, normalized).withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withThrows(updated);
         }
 
         /**
@@ -4002,7 +4055,7 @@ public interface J extends Tree {
             if (type == this.methodType) {
                 return this;
             }
-            return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, throwz, body, defaultValue, type);
+            return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, dimensionsAfterName, throwz, body, defaultValue, type);
         }
 
         @Override
@@ -4105,7 +4158,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withParameters(JContainer<Statement> parameters) {
-                return t.parameters == parameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.throwz, t.body, t.defaultValue, t.methodType);
+                return t.parameters == parameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.dimensionsAfterName, t.throwz, t.body, t.defaultValue, t.methodType);
             }
 
             public @Nullable JContainer<NameTree> getThrows() {
@@ -4113,7 +4166,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withThrows(@Nullable JContainer<NameTree> throwz) {
-                return t.throwz == throwz ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, throwz, t.body, t.defaultValue, t.methodType);
+                return t.throwz == throwz ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.dimensionsAfterName, throwz, t.body, t.defaultValue, t.methodType);
             }
 
             public @Nullable JLeftPadded<Expression> getDefaultValue() {
@@ -4121,7 +4174,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withDefaultValue(@Nullable JLeftPadded<Expression> defaultValue) {
-                return t.defaultValue == defaultValue ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, defaultValue, t.methodType);
+                return t.defaultValue == defaultValue ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.dimensionsAfterName, t.throwz, t.body, defaultValue, t.methodType);
             }
 
             public @Nullable TypeParameters getTypeParameters() {
@@ -4129,7 +4182,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withTypeParameters(@Nullable TypeParameters typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.methodType);
+                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.dimensionsAfterName, t.throwz, t.body, t.defaultValue, t.methodType);
             }
         }
 
@@ -4157,7 +4210,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withTypeParameters(@Nullable TypeParameters typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.methodType);
+                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.dimensionsAfterName, t.throwz, t.body, t.defaultValue, t.methodType);
             }
 
             public IdentifierWithAnnotations getName() {
@@ -4165,7 +4218,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withName(IdentifierWithAnnotations name) {
-                return t.name == name ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, name, t.parameters, t.throwz, t.body, t.defaultValue, t.methodType);
+                return t.name == name ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, name, t.parameters, t.dimensionsAfterName, t.throwz, t.body, t.defaultValue, t.methodType);
             }
         }
     }
@@ -5613,7 +5666,11 @@ public interface J extends Tree {
         }
 
         public Try withResources(@Nullable List<Resource> resources) {
-            return getPadding().withResources(JContainer.withElementsNullable(this.resources, resources));
+            JContainer<Resource> updated = JContainer.withElementsNullable(this.resources, resources);
+            if (updated != null && this.resources == null) {
+                updated = updated.withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withResources(updated);
         }
 
         @With
@@ -5844,7 +5901,13 @@ public interface J extends Tree {
         }
 
         public TypeParameter withBounds(@Nullable List<TypeTree> bounds) {
-            return getPadding().withBounds(JContainer.withElementsNullable(this.bounds, bounds));
+            JContainer<TypeTree> updated = JContainer.withElementsNullable(this.bounds, bounds);
+            if (updated != null && this.bounds == null) {
+                List<TypeTree> normalized = ListUtils.mapFirst(updated.getElements(), first ->
+                        first.getPrefix().isEmpty() ? first.withPrefix(Space.SINGLE_SPACE) : first);
+                updated = JContainer.withElements(updated, normalized).withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withBounds(updated);
         }
 
         @Override
@@ -5878,6 +5941,62 @@ public interface J extends Tree {
             public TypeParameter withBounds(@Nullable JContainer<TypeTree> bounds) {
                 return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.name, bounds);
             }
+        }
+    }
+
+    /**
+     * A type bound on a type parameter, such as {@code <: Comparable} (upper) or
+     * {@code >: Null} (lower) in Scala, or {@code extends Number} in Java.
+     * <p>
+     * Implements {@link TypeTree} so it can be used as an element in
+     * {@link TypeParameter}'s existing {@code JContainer<TypeTree> bounds} without
+     * a breaking change. Old LSTs that have bare {@link TypeTree} elements in bounds
+     * are implicitly upper bounds.
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    final class TypeBound implements J, TypeTree {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+
+        Markers markers;
+
+        Kind kind;
+
+        /**
+         * The constraining type, e.g. {@code Number} in {@code extends Number}.
+         */
+        TypeTree boundedType;
+
+        public enum Kind {
+            /**
+             * Upper type bound. Java {@code extends}, Scala {@code <:}, Kotlin {@code :}.
+             */
+            Upper,
+            /**
+             * Lower type bound. Scala {@code >:}.
+             */
+            Lower
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return boundedType.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public TypeBound withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            // Visited as part of TypeParameter bounds traversal
+            return this;
         }
     }
 

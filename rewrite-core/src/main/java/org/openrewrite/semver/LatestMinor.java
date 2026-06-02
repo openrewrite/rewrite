@@ -47,7 +47,7 @@ public class LatestMinor implements VersionComparator {
         }
 
         //noinspection ConstantConditions
-        return TildeRange.build("~" + Semver.majorVersion(currentVersion) + "." + Semver.minorVersion(currentVersion), metadataPattern)
+        return TildeRange.build("~" + Semver.majorVersion(currentVersion), metadataPattern)
                 .getValue()
                 .compare(currentVersion, v1, v2);
     }

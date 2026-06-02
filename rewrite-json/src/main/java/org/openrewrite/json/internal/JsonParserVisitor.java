@@ -20,7 +20,6 @@ import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
-import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.json.internal.grammar.JSON5BaseVisitor;
 import org.openrewrite.json.internal.grammar.JSON5Parser;
 import org.openrewrite.json.tree.*;
@@ -50,12 +49,12 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     private int cursor = 0;
     private int codePointCursor = 0;
 
-    public JsonParserVisitor(Path path, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source) {
+    public JsonParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
         this.fileAttributes = fileAttributes;
-        this.source = source.readFully();
-        this.charset = source.getCharset();
-        this.charsetBomMarked = source.isCharsetBomMarked();
+        this.source = source;
+        this.charset = charset;
+        this.charsetBomMarked = charsetBomMarked;
     }
 
     @Override
@@ -254,8 +253,12 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
             });
         }
 
-        // visit numbers
-        return (JsonValue) super.visitValue(ctx);
+        // visit numbers, objects, arrays
+        JsonValue result = (JsonValue) super.visitValue(ctx);
+        if (result == null) {
+            throw new IllegalStateException("Unable to parse value at position " + ctx.getStart().getStartIndex());
+        }
+        return result;
     }
 
     private Space prefix(ParserRuleContext ctx) {
@@ -325,39 +328,45 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     private int positionOfNext(String untilDelim, @Nullable Character stop) {
         boolean inMultiLineComment = false;
         boolean inSingleLineComment = false;
+        char stringQuote = 0; // 0 = not in string, '"' or '\'' = in that string type
 
         int delimIndex = cursor;
         for (; delimIndex < source.length() - untilDelim.length() + 1; delimIndex++) {
+            char c = source.charAt(delimIndex);
+
+            if (stringQuote != 0) {
+                if (c == '\\' && delimIndex + 1 < source.length()) {
+                    delimIndex++;
+                } else if (c == stringQuote) {
+                    stringQuote = 0;
+                }
+                continue;
+            }
+
             if (inSingleLineComment) {
-                if (source.charAt(delimIndex) == '\n') {
+                if (c == '\n') {
                     inSingleLineComment = false;
                 }
-            } else {
-                if (inMultiLineComment) {
-                    if (source.charAt(delimIndex) == '*' && source.charAt(delimIndex + 1) == '/') {
-                        inMultiLineComment = false;
-                        delimIndex += 2;
-                    }
-                } else if (source.charAt(delimIndex) == '/' && source.length() - untilDelim.length() > delimIndex + 1) {
-                    int next = source.charAt(delimIndex + 1);
-                    if (next == '/') {
-                        inSingleLineComment = true;
-                        delimIndex++;
-                    } else if (next == '*') {
-                        inMultiLineComment = true;
-                        delimIndex++;
-                    }
+            } else if (inMultiLineComment) {
+                if (c == '*' && delimIndex + 1 < source.length() && source.charAt(delimIndex + 1) == '/') {
+                    inMultiLineComment = false;
+                    delimIndex++;
                 }
-
-                if (!inMultiLineComment && !inSingleLineComment) {
-                    if (stop != null && source.charAt(delimIndex) == stop) {
-                        return -1; // reached stop word before finding the delimiter
-                    }
-
-                    if (source.startsWith(untilDelim, delimIndex)) {
-                        break; // found it!
-                    }
+            } else if (c == '"' || c == '\'') {
+                stringQuote = c;
+            } else if (c == '/' && source.length() - untilDelim.length() > delimIndex + 1) {
+                char next = source.charAt(delimIndex + 1);
+                if (next == '/') {
+                    inSingleLineComment = true;
+                    delimIndex++;
+                } else if (next == '*') {
+                    inMultiLineComment = true;
+                    delimIndex++;
                 }
+            } else if (stop != null && c == stop) {
+                return -1; // reached stop word before finding the delimiter
+            } else if (source.startsWith(untilDelim, delimIndex)) {
+                break; // found it!
             }
         }
 

@@ -238,7 +238,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
                         directory != null) {
                     Path path = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
                     try {
-                        acc.filteredResourcePathsToDeclaringPoms.put(path.getParent().resolve(directory), getResolutionResult());
+                        acc.filteredResourcePathsToDeclaringPoms.put(path.resolveSibling(directory), getResolutionResult());
                     } catch (InvalidPathException ignored) {
                     } // fail quietly
                 }

@@ -68,7 +68,7 @@ public class FindPlugins extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
+        MethodMatcher pluginMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependenciesSpec id(..)", true);
 
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
@@ -85,7 +85,7 @@ public class FindPlugins extends Recipe {
 
                             @Override
                             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                                if (pluginMatcher.matches(method)) {
+                                if (pluginMatcher.matches(method, true)) {
                                     if (method.getArguments().get(0) instanceof J.Literal &&
                                         pluginId.equals(((J.Literal) method.getArguments().get(0)).getValue())) {
                                         found.set(true);
@@ -126,11 +126,13 @@ public class FindPlugins extends Recipe {
                 Function.identity()
         );
 
-        MethodMatcher idMatcher = new MethodMatcher("PluginSpec id(..)", false);
-        MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
+        MethodMatcher idMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependenciesSpec id(..)", true);
+        MethodMatcher versionMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependencySpec version(..)", true);
         List<GradlePlugin> pluginsWithVersion = plugins.stream()
                 .flatMap(plugin -> {
-                    if (versionMatcher.matches(plugin) && idMatcher.matches(plugin.getSelect()) && plugin.getArguments().get(0) instanceof J.Literal) {
+                    if (versionMatcher.matches(plugin, true) &&
+                            plugin.getSelect() instanceof J.MethodInvocation && idMatcher.matches((J.MethodInvocation) plugin.getSelect(), true) &&
+                            plugin.getArguments().get(0) instanceof J.Literal) {
                         return Stream.of(new GradlePlugin(
                                 plugin,
                                 requireNonNull(((J.Literal) requireNonNull(((J.MethodInvocation) plugin.getSelect()))
@@ -141,7 +143,7 @@ public class FindPlugins extends Recipe {
                     return Stream.empty();
                 }).collect(toList());
         List<GradlePlugin> pluginsWithoutVersion = plugins.stream().flatMap(plugin -> {
-            if (idMatcher.matches(plugin) && pluginsWithVersion.stream()
+            if (idMatcher.matches(plugin, true) && pluginsWithVersion.stream()
                     .noneMatch(it -> it.getPluginId().equals(plugin.getSimpleName()))) {
                 return Stream.of(new GradlePlugin(
                         plugin,

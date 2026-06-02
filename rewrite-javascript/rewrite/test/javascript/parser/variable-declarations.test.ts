@@ -253,7 +253,7 @@ describe('variable declaration mapping', () => {
             `)
         ));
 
-    test.each([
+    test.for([
         "const c =  function(): number { return 116; };",
         "const c =  136;",
         "const c =  (1 > 0) ? 116 : 119;"

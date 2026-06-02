@@ -34,6 +34,7 @@ import * as fsp from "fs/promises";
 import * as path from "path";
 import * as os from "os";
 import {spawnSync} from "child_process";
+import {isDeepStrictEqual} from "util";
 import * as YAML from "yaml";
 
 /**
@@ -59,9 +60,14 @@ interface PackageManagerConfig {
 const PACKAGE_MANAGER_CONFIGS: Record<PackageManager, PackageManagerConfig> = {
     [PackageManager.Npm]: {
         lockFile: 'package-lock.json',
-        // --ignore-scripts prevents prepublish/prepare scripts from running in temp directory
-        installLockOnlyCommand: ['npm', 'install', '--package-lock-only', '--ignore-scripts'],
-        installCommand: ['npm', 'install', '--ignore-scripts'],
+        // --ignore-scripts prevents prepublish/prepare scripts from running in temp directory.
+        // --legacy-peer-deps disables npm 7+'s strict peer-dep enforcement. The install here is
+        // purely a validity check on the bumped package.json; the resulting node_modules is not
+        // shipped to the user. Strict peer enforcement creates false negatives in common
+        // ecosystem upgrades (e.g. Angular major bumps where third-party libs lag), which would
+        // otherwise prevent the bump from being written even when it is correct.
+        installLockOnlyCommand: ['npm', 'install', '--package-lock-only', '--ignore-scripts', '--legacy-peer-deps'],
+        installCommand: ['npm', 'install', '--ignore-scripts', '--legacy-peer-deps'],
         listCommand: ['npm', 'list', '--json', '--all'],
     },
     [PackageManager.YarnClassic]: {
@@ -80,9 +86,11 @@ const PACKAGE_MANAGER_CONFIGS: Record<PackageManager, PackageManagerConfig> = {
     },
     [PackageManager.Pnpm]: {
         lockFile: 'pnpm-lock.yaml',
-        // --ignore-scripts prevents lifecycle scripts from running in temp directory
-        installLockOnlyCommand: ['pnpm', 'install', '--lockfile-only', '--ignore-scripts'],
-        installCommand: ['pnpm', 'install', '--ignore-scripts'],
+        // --ignore-scripts prevents lifecycle scripts from running in temp directory.
+        // --no-strict-peer-dependencies disables pnpm's strict peer-dep enforcement (see the
+        // `npm` entry above for rationale).
+        installLockOnlyCommand: ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--no-strict-peer-dependencies'],
+        installCommand: ['pnpm', 'install', '--ignore-scripts', '--no-strict-peer-dependencies'],
         listCommand: ['pnpm', 'list', '--json', '--depth=Infinity'],
     },
     [PackageManager.Bun]: {
@@ -238,6 +246,7 @@ function runInstall(pm: PackageManager, options: InstallOptions): PackageManager
             stdio: ['pipe', 'pipe', 'pipe'],
             timeout: options.timeout ?? 120000,
             env: options.env ? {...process.env, ...options.env} : process.env,
+            ...(os.platform() === 'win32' ? { shell: true } : {})
         });
 
         if (result.error) {
@@ -291,6 +300,7 @@ export function runList(pm: PackageManager, cwd: string, timeout: number = 30000
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout,
+        ...(os.platform() === 'win32' ? { shell: true } : {})
     });
 
     if (result.error || result.status !== 0) {
@@ -569,6 +579,16 @@ export async function updateNodeResolutionMarker<T extends BaseProjectUpdateInfo
         existingMarker.packageManager,
         existingMarker.npmrcConfigs
     );
+
+    // If the new marker is structurally identical to the existing one (ignoring the
+    // auto-generated id), return doc unchanged to avoid minting a fresh AST identity
+    // for a no-op marker update. This prevents the empty-diff guard from firing on
+    // recipes that don't modify package.json (e.g. lock-file-only fix strategies).
+    const {id: _existingId, ...existingRest} = existingMarker;
+    const {id: _newId, ...newRest} = newMarker;
+    if (isDeepStrictEqual(existingRest, newRest)) {
+        return doc;
+    }
 
     // Replace the marker in the document
     return {

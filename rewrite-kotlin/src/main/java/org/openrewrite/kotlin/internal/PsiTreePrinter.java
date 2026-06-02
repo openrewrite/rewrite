@@ -17,7 +17,7 @@ package org.openrewrite.kotlin.internal;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import org.jetbrains.kotlin.KtFakeSourceElement;
+import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
@@ -29,7 +29,7 @@ import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.declarations.FirProperty;
 import org.jetbrains.kotlin.fir.expressions.*;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
-import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag;
+import org.jetbrains.kotlin.fir.types.ConeClassLikeLookupTag;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
 import org.jetbrains.kotlin.ir.IrElement;
@@ -42,6 +42,7 @@ import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIrTypeMapping;
@@ -65,7 +66,7 @@ public class PsiTreePrinter {
 
     private static final String CONTINUE_PREFIX = "----";
     private static final String UNVISITED_PREFIX = "#";
-    private static final KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new JavaTypeCache());
+    private static final KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new DefaultJavaTypeFactory(new JavaTypeCache()));
 
     // Set to true to print types and verify, otherwise just verify the parse to print idempotent.
     private final static boolean printTypes = true;
@@ -488,7 +489,7 @@ public class PsiTreePrinter {
 
             if (source instanceof KtRealPsiSourceElement) {
                 sb.append("Real ");
-            } else if (source instanceof KtFakeSourceElement) {
+            } else if (source.getKind() instanceof KtFakeSourceElementKind) {
                 sb.append("Fake ");
             } else {
                 sb.append(source.getClass().getSimpleName());
@@ -547,7 +548,7 @@ public class PsiTreePrinter {
             return ((FirProperty) firElement).getName().toString();
         } else if (firElement instanceof FirResolvedTypeRef) {
             FirResolvedTypeRef resolvedTypeRef = (FirResolvedTypeRef) firElement;
-            ConeKotlinType coneKotlinType = resolvedTypeRef.getType();
+            ConeKotlinType coneKotlinType = resolvedTypeRef.getConeType();
             return printConeKotlinType(coneKotlinType);
         } else if (firElement instanceof FirResolvedNamedReference) {
             return ((FirResolvedNamedReference) firElement).getName().toString();
@@ -577,8 +578,8 @@ public class PsiTreePrinter {
                 }
                 return sb.toString();
             }
-        } else if (firElement instanceof FirConstExpression) {
-            Object value = ((FirConstExpression<?>) firElement).getValue();
+        } else if (firElement instanceof FirLiteralExpression) {
+            Object value = ((FirLiteralExpression) firElement).getValue();
             return value != null ? value.toString() : null;
             // return ((FirConstExpression<?>) firElement).getKind().toString();
         } else if (firElement instanceof FirWhenBranch) {

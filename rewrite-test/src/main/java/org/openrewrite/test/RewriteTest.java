@@ -19,6 +19,7 @@ import org.assertj.core.api.SoftAssertions;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.*;
@@ -34,6 +35,7 @@ import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -50,6 +52,18 @@ import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 @SuppressWarnings("unused")
 public interface RewriteTest extends SourceSpecs {
+    /**
+     * Registry of customizers applied to the {@link ExecutionContext} produced by
+     * {@link #defaultExecutionContext(SourceSpec[])}. Test framework integrations
+     * (e.g. a JUnit Jupiter {@code BeforeAllCallback}) can register a customizer
+     * once at startup without {@code rewrite-test} taking a dependency on the
+     * framework.
+     * <p>
+     * The map is keyed by the integration's class so {@code putIfAbsent(MyExt.class, MyExt::load)}
+     * is naturally idempotent — callers do not need their own one-shot guard.
+     */
+    Map<Class<?>, Consumer<ExecutionContext>> defaultExecutionContextCustomizers = new ConcurrentHashMap<>();
+
     static AdHocRecipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
         return new AdHocRecipe(null, null, null, visitor, null, null);
     }
@@ -123,6 +137,17 @@ public interface RewriteTest extends SourceSpecs {
 
     default void defaults(RecipeSpec spec) {
         spec.recipe(Recipe.noop());
+    }
+
+    /**
+     * Class-level default {@link RewriteRunner}. Override (or via {@code @ExtendWith})
+     * to run every {@code rewriteRun} call in this class through a non-default backend
+     * — typically a moderne-cli runner that stages the test's sources to a temp dir,
+     * invokes the CLI, and translates the result back into a {@link RecipeRun}.
+     * Per-call overrides via {@link RecipeSpec#runner(RewriteRunner)} take precedence.
+     */
+    default RewriteRunner runner() {
+        return RewriteRunner.IN_PROCESS;
     }
 
     default void rewriteRun(SourceSpecs... sourceSpecs) {
@@ -226,11 +251,18 @@ public interface RewriteTest extends SourceSpecs {
         for (SourceSpec<?> s : sourceSpecs) {
             s.customizeExecutionContext.accept(ctx);
         }
-        List<Validated<Object>> validations = new ArrayList<>();
-        recipe.validateAll(ctx, validations);
-        assertThat(validations.stream().filter(Validated::isInvalid))
-                .as("Recipe validation must have no failures")
-                .isEmpty();
+
+        // Imperative recipes are loaded with no user-provided arguments, so all optional parameters are null.
+        // Skip recipe validation for these since custom validate() methods (e.g. requiring at least one of several
+        // optional parameters) would fail on an unconfigured instance.
+        if (recipe instanceof DeclarativeRecipe
+                || recipe.getDescriptor().getOptions().stream().allMatch(OptionDescriptor::isRequired)) {
+            List<Validated<Object>> validations = new ArrayList<>();
+            recipe.validateAll(ctx, validations);
+            assertThat(validations.stream().filter(Validated::isInvalid))
+                    .as("Recipe validation must have no failures")
+                    .isEmpty();
+        }
 
         Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
         List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers;
@@ -305,7 +337,7 @@ public interface RewriteTest extends SourceSpecs {
 
                 SourceSpec<?> nextSpec = sourceSpecIter.next();
                 for (Marker marker : nextSpec.getMarkers()) {
-                    markers = markers.setByType(marker);
+                    markers = markers.add(marker);
                 }
                 sourceFile = sourceFile.withMarkers(markers);
 
@@ -393,6 +425,13 @@ public interface RewriteTest extends SourceSpecs {
             recipeCtx = testClassSpec.getRecipeExecutionContext();
         }
 
+        // Apply customizations (like Maven settings) to recipe execution context when different from parsing context
+        if (recipeCtx != ctx) {
+            for (SourceSpec<?> s : sourceSpecs) {
+                s.customizeExecutionContext.accept(recipeCtx);
+            }
+        }
+
         LargeSourceSet lss;
         if (testMethodSpec.getSourceSet() != null) {
             lss = testMethodSpec.getSourceSet().apply(runnableSourceFiles);
@@ -405,12 +444,13 @@ public interface RewriteTest extends SourceSpecs {
         recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
                 .setValidateCursorAcyclic(TypeValidation.before(testMethodSpec, testClassSpec).cursorAcyclic())
                 .setValidateImmutableExecutionContext(TypeValidation.before(testMethodSpec, testClassSpec).immutableExecutionContext());
-        RecipeRun recipeRun = recipe.run(
-                lss,
-                recipeCtx,
-                cycles,
-                expectedCyclesThatMakeChanges + 1
-        );
+        RewriteRunner runner = testMethodSpec.getRunner() != null ? testMethodSpec.getRunner() :
+                testClassSpec.getRunner() != null ? testClassSpec.getRunner() :
+                        runner();
+        RewriteRunner.Context runnerContext = new RewriteRunner.Context(
+                lss, runnableSourceFiles, recipeCtx, cycles, expectedCyclesThatMakeChanges,
+                Arrays.asList(sourceSpecs), testClassSpec, testMethodSpec);
+        RecipeRun recipeRun = runner.run(recipe, runnerContext);
 
         for (Consumer<RecipeRun> afterRecipe : testClassSpec.afterRecipes) {
             afterRecipe.accept(recipeRun);
@@ -455,6 +495,7 @@ public interface RewriteTest extends SourceSpecs {
                                 sourceSpec.after.apply(actual) :
                                 trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
                         assertThat(actual).as("Unexpected result in \"" + result.getAfter().getSourcePath() + "\"").isEqualTo(expected);
+                        sourceSpec.validateSource.accept(result.getAfter(), TypeValidation.after(testMethodSpec, testClassSpec));
                         continue nextSourceSpec;
                     }
                 }
@@ -481,6 +522,7 @@ public interface RewriteTest extends SourceSpecs {
                         expectedNewResults.add(result);
                         //noinspection unchecked
                         ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                        sourceSpec.validateSource.accept(result.getAfter(), TypeValidation.after(testMethodSpec, testClassSpec));
                         if (sourceSpec.sourcePath != null) {
                             assertThat(result.getAfter().getSourcePath())
                                     .isEqualTo(sourceSpec.dir.resolve(sourceSpec.sourcePath));
@@ -545,7 +587,15 @@ public interface RewriteTest extends SourceSpecs {
                             boolean isRemote = result.getAfter() instanceof Remote;
                             if (!isRemote && Objects.equals(result.getBefore().getSourcePath(), result.getAfter().getSourcePath()) &&
                                 Objects.equals(before, actualAfter)) {
-                                fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");
+                                // Marker-only change (e.g. updated JavaSourceSet classpath) — no visible diff.
+                                // Still call afterRecipe so marker assertions work, then skip.
+                                allResults.remove(result);
+                                try {
+                                    //noinspection unchecked
+                                    ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                                } catch (ClassCastException ignored) {
+                                }
+                                continue nextSourceFile;
                             }
 
                             assert result.getBefore() != null;
@@ -671,6 +721,9 @@ public interface RewriteTest extends SourceSpecs {
             }
             fail("Failed to parse sources or run recipe", t);
         });
+        for (Consumer<ExecutionContext> customizer : defaultExecutionContextCustomizers.values()) {
+            customizer.accept(ctx);
+        }
         return ParsingExecutionContextView.view(ctx).setCharset(StandardCharsets.UTF_8);
     }
 

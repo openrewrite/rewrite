@@ -59,6 +59,9 @@ class RemovePassIntegTest implements RewriteTest {
     @AfterEach
     void after() throws IOException {
         PythonRewriteRpc.shutdownCurrent();
+        // Reset factory to default so other tests don't inherit a log path
+        // pointing at this test's (soon-to-be-deleted) temp directory
+        PythonRewriteRpc.setFactory(PythonRewriteRpc.builder());
         if (Files.exists(tempDir.resolve("python-rpc.log"))) {
             System.out.println("=== Python RPC Log ===");
             System.out.println(Files.readString(tempDir.resolve("python-rpc.log")));

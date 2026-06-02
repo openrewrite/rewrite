@@ -16,6 +16,7 @@
 package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
@@ -25,8 +26,6 @@ import java.util.Collection;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
-import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 
 public class IntelliJ extends NamedStyles {
     private static final IntelliJ INSTANCE = new IntelliJ();
@@ -71,8 +70,7 @@ public class IntelliJ extends NamedStyles {
     }
 
     public static TabsAndIndentsStyle tabsAndIndents() {
-        return new TabsAndIndentsStyle(false, 4, 4, 8, false,
-                new TabsAndIndentsStyle.MethodDeclarationParameters(true), new TabsAndIndentsStyle.RecordComponents(true));
+        return new TabsAndIndentsStyle(false, 4, 4, 8, false);
     }
 
     public static BlankLinesStyle blankLines() {
@@ -100,16 +98,40 @@ public class IntelliJ extends NamedStyles {
     public static WrappingAndBracesStyle wrappingAndBraces() {
         return new WrappingAndBracesStyle(
                 120,
-                new WrappingAndBracesStyle.IfStatement(false),
-                new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, emptyList(), false),
-                new WrappingAndBracesStyle.MethodDeclarationParameters(DoNotWrap, false, false, false),
-                new WrappingAndBracesStyle.MethodCallArguments(DoNotWrap, false, false, false),
-                new WrappingAndBracesStyle.Annotations(WrapAlways),
-                new WrappingAndBracesStyle.Annotations(WrapAlways),
-                new WrappingAndBracesStyle.Annotations(WrapAlways),
-                new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                new WrappingAndBracesStyle.Annotations(DoNotWrap),
-                new WrappingAndBracesStyle.Annotations(DoNotWrap)
+                new WrappingAndBracesStyle.KeepWhenFormatting(true, true, true, false, false, false, false, false),
+                new WrappingAndBracesStyle.ExtendsImplementsPermitsList(LineWrapSetting.DoNotWrap, false),
+                new WrappingAndBracesStyle.ExtendsImplementsPermitsKeyword(LineWrapSetting.DoNotWrap),
+                new WrappingAndBracesStyle.ThrowsList(LineWrapSetting.DoNotWrap, false, false),
+                new WrappingAndBracesStyle.ThrowsKeyword(LineWrapSetting.DoNotWrap),
+                new WrappingAndBracesStyle.MethodDeclarationParameters(LineWrapSetting.DoNotWrap, true, false, false),
+                new WrappingAndBracesStyle.MethodCallArguments(LineWrapSetting.DoNotWrap, false, false, false, false),
+                new WrappingAndBracesStyle.MethodParentheses(false, false),
+                new WrappingAndBracesStyle.ChainedMethodCalls(LineWrapSetting.DoNotWrap, false, false, emptyList(), false, false),
+                new WrappingAndBracesStyle.IfStatement(WrappingAndBracesStyle.ForceBraces.DoNotForce, false, true),
+                new WrappingAndBracesStyle.ForStatement(LineWrapSetting.DoNotWrap, true, false, false, WrappingAndBracesStyle.ForceBraces.DoNotForce),
+                new WrappingAndBracesStyle.WhileStatement(WrappingAndBracesStyle.ForceBraces.DoNotForce),
+                new WrappingAndBracesStyle.DoWhileStatement(WrappingAndBracesStyle.ForceBraces.DoNotForce, false),
+                new WrappingAndBracesStyle.SwitchStatement(LineWrapSetting.DoNotWrap, true, true), // should be WrapIfTooLong
+                new WrappingAndBracesStyle.TryWithResources(LineWrapSetting.DoNotWrap, true, false, false),
+                new WrappingAndBracesStyle.TryStatement(false, false, LineWrapSetting.DoNotWrap, true), // should be WrapIfTooLong
+                new WrappingAndBracesStyle.BinaryExpressions(LineWrapSetting.DoNotWrap, false, false, false, false, false),
+                new WrappingAndBracesStyle.AssignmentStatement(LineWrapSetting.DoNotWrap, false),
+                new WrappingAndBracesStyle.GroupDeclarations(false, false, false, false),
+                new WrappingAndBracesStyle.TernaryOperation(LineWrapSetting.DoNotWrap, false, false),
+                new WrappingAndBracesStyle.ArrayInitializer(LineWrapSetting.DoNotWrap, false, false, false),
+                new WrappingAndBracesStyle.ModifierList(false),
+                new WrappingAndBracesStyle.AssertStatement(LineWrapSetting.DoNotWrap, false, false),
+                new WrappingAndBracesStyle.EnumConstants(LineWrapSetting.DoNotWrap),
+                new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways),
+                new WrappingAndBracesStyle.Annotations(LineWrapSetting.WrapAlways),
+                new WrappingAndBracesStyle.FieldAnnotations(LineWrapSetting.WrapAlways, false),
+                new WrappingAndBracesStyle.ParameterAnnotations(LineWrapSetting.DoNotWrap, false),
+                new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap),
+                new WrappingAndBracesStyle.Annotations(LineWrapSetting.DoNotWrap),
+                new WrappingAndBracesStyle.AnnotationParameters(LineWrapSetting.DoNotWrap, false, false, false),
+                new WrappingAndBracesStyle.TextBlocks(false),
+                new WrappingAndBracesStyle.RecordComponents(LineWrapSetting.DoNotWrap, true, false, false, false), // should be WrapIfTooLong
+                new WrappingAndBracesStyle.DeconstructionPatterns(LineWrapSetting.DoNotWrap, true, true, true) // should be WrapIfTooLong
         );
     }
 

@@ -53,7 +53,11 @@
       "Bash(../../gradlew dependencies --configuration runtimeClasspath)",
       "Bash(../../gradlew dependencies --configuration implementation)",
       "Bash(../../gradlew dependencies)",
-      "Bash(../../gradlew dependencies --configuration compileClasspath)"
+      "Bash(../../gradlew dependencies --configuration compileClasspath)",
+      "Bash(javac:*)",
+      "Bash(java:*)",
+      "Bash(scalac:*)",
+      "Bash(scala:*)"
     ],
     "deny": []
   }

@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.search.HasSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -30,7 +31,6 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
-import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -171,14 +171,28 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Scanned acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
+            final TreeVisitor<?, ExecutionContext> hasTestSourceSet = new HasSourceSet("test").getVisitor();
+
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (tree instanceof JavaSourceFile) {
+                    if ("test".equals(scope) && onlyIfUsing != null && sourceFile == hasTestSourceSet.visit(sourceFile, ctx)) {
+                        return sourceFile;
+                    }
+                    JavaProject javaProject = sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null);
+                    String knownScope = javaProject == null ? null : acc.scopeByProject.get(javaProject);
+                    // "compile" is the broadest scope; no further file in this project can change the answer
+                    if ("compile".equals(knownScope)) {
+                        return sourceFile;
+                    }
+                    JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
+                    // If we already know "test" scope and this file is also in a test source set, no further info
+                    if ("test".equals(knownScope) && javaSourceSet != null && "test".equals(javaSourceSet.getName())) {
+                        return sourceFile;
+                    }
                     if (onlyIfUsing == null || sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx)) {
                         acc.usingType = true;
-                        JavaProject javaProject = sourceFile.getMarkers().findFirst(JavaProject.class).orElse(null);
-                        JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
                         if (javaProject != null && javaSourceSet != null) {
                             acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
                                     scope /* a `compile` scope dependency will also be available in test source set */ :
@@ -215,18 +229,15 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return maven;
                 }
 
-                VersionComparator vc = requireNonNull(Semver.validate(version, versionPattern).getValue());
-
-                // If the dependency is already in compile scope it will be available everywhere, no need to continue
+                // If the dependency is already on the classpath as a transitive dependency (and the recipe accepts that),
+                // no direct declaration is needed. Direct duplicates are handled by AddDependencyVisitor below.
                 Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
                 if (dependencies.get(Scope.Compile) != null) {
                     for (ResolvedDependency d : dependencies.get(Scope.Compile)) {
-                        if (hasAcceptableTransitivity(d, acc) &&
+                        if (d.isTransitive() &&
+                            hasAcceptableTransitivity(d, acc) &&
                             groupId.equals(d.getGroupId()) &&
-                            artifactId.equals(d.getArtifactId()) &&
-                            (d.isTransitive() ||
-                                    (d.isDirect() && version.equals(d.getVersion())))
-                        ) {
+                            artifactId.equals(d.getArtifactId())) {
                             return maven;
                         }
                     }
@@ -236,7 +247,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 Scope resolvedScopeEnum = Scope.fromName(resolvedScope);
                 if ((resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) && dependencies.get(resolvedScopeEnum) != null) {
                     for (ResolvedDependency d : dependencies.get(resolvedScopeEnum)) {
-                        if (hasAcceptableTransitivity(d, acc) &&
+                        if (d.isTransitive() &&
+                                hasAcceptableTransitivity(d, acc) &&
                                 groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                             return maven;
                         }

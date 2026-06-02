@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -839,6 +840,57 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                   """
               )
             )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/6687")
+    @Test
+    void removesUnusedPropertiesInSinglePomWithResourceFilteringEnabled() {
+        rewriteRun(
+          pomXml(
+            """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.sample</groupId>
+              <artifactId>test.application</artifactId>
+              <version>1.0.0</version>
+              <name>test-application</name>
+              <packaging>jar</packaging>
+            
+              <properties>
+                <junk>junk</junk>
+              </properties>
+            
+              <build>
+                <resources>
+                  <resource>
+                    <directory>src/main/resources</directory>
+                    <filtering>true</filtering>
+                  </resource>
+                </resources>
+              </build>
+            </project>
+            """,
+            """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.sample</groupId>
+              <artifactId>test.application</artifactId>
+              <version>1.0.0</version>
+              <name>test-application</name>
+              <packaging>jar</packaging>
+            
+              <build>
+                <resources>
+                  <resource>
+                    <directory>src/main/resources</directory>
+                    <filtering>true</filtering>
+                  </resource>
+                </resources>
+              </build>
+            </project>
+            """
           )
         );
     }

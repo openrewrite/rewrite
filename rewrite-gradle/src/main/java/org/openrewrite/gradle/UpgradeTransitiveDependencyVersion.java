@@ -68,7 +68,7 @@ import static org.openrewrite.gradle.UpgradeDependencyVersion.getGradleProjectKe
 @EqualsAndHashCode(callSuper = false)
 @RequiredArgsConstructor
 public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTransitiveDependencyVersion.DependencyVersionState> {
-    private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
+    private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("org.gradle.api.Project dependencies(..)", true);
     private static final MethodMatcher CONSTRAINTS_MATCHER = new MethodMatcher("org.gradle.api.artifacts.dsl.DependencyHandler constraints(..)", true);
     private static final String CONSTRAINT_MATCHER = "org.gradle.api.artifacts.dsl.DependencyHandler *(..)";
 
@@ -700,7 +700,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-            if (DEPENDENCIES_DSL_MATCHER.matches(method)) {
+            if (!isKotlinDsl && DEPENDENCIES_DSL_MATCHER.matches(method)) {
                 G.CompilationUnit withConstraints = (G.CompilationUnit) parseAsGradle(
                         //language=groovy
                         "plugins { id 'java' }\n" +
@@ -1094,7 +1094,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         return ((J.Literal) arg).withValue(gav.toString())
                                 .withValueSource(quote + gav.toString() + quote);
                     } else if (arg instanceof J.Lambda) {
-                        arg = (Expression) new RemoveVersionVisitor().visitNonNull(arg, ctx);
+                        arg = (Expression) new UpdateVersionVisitor(gav.getVersion()).visitNonNull(arg, ctx);
                     }
                     if (because != null) {
                         Expression arg2 = (Expression) new UpdateBecauseTextVisitor(because)
@@ -1114,23 +1114,31 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         }
     }
 
-    @SuppressWarnings("NullableProblems")
-    private static class RemoveVersionVisitor extends JavaIsoVisitor<ExecutionContext> {
+    /**
+     * Updates version constraint methods (strictly, require, prefer) with a new version
+     * instead of removing the version block entirely.
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    private static class UpdateVersionVisitor extends JavaIsoVisitor<ExecutionContext> {
+        String newVersion;
 
         @Override
-        public J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
-            J.Return r = super.visitReturn(_return, ctx);
-            if (r.getExpression() == null) {
-                return null;
-            }
-            return r;
-        }
-
-        @Override
-        public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if ("version".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
-                return null;
+            String methodName = m.getSimpleName();
+            // Update version constraint methods: strictly, require, prefer
+            if ("strictly".equals(methodName) || "require".equals(methodName) || "prefer".equals(methodName)) {
+                return m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+                    if (arg instanceof J.Literal) {
+                        J.Literal literal = (J.Literal) arg;
+                        String valueSource = literal.getValueSource();
+                        char quote = valueSource != null ? valueSource.charAt(0) : '\'';
+                        return literal.withValue(newVersion)
+                                .withValueSource(quote + newVersion + quote);
+                    }
+                    return arg;
+                }));
             }
             return m;
         }

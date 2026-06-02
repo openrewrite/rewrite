@@ -932,6 +932,63 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void unwrapUnaryInAssignment() {
+        rewriteRun(
+          unnecessaryParentheses(style -> style.withAssign(true)),
+          java(
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      int a = (++i);
+                      int b = (i++);
+                      int c = (--i);
+                      int d = (i--);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      int a = ++i;
+                      int b = i++;
+                      int c = --i;
+                      int d = i--;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapUnaryInMethodArgument() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      System.out.println((++i));
+                      System.out.println((i++));
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      System.out.println(++i);
+                      System.out.println(i++);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @ExpectedToFail("Not implemented yet")
     @Test
     void unwrapBinaryInIf() {
@@ -1134,6 +1191,54 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   class D {
                     void f(Object x) {
                       (x = "Foo").toString();
+                    }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/moderneinc/customer-requests/issues/1790")
+        @Test
+        void methodInvocationSelectUnary() {
+            //language=java
+            rewriteRun(
+              java(
+                """
+                  class A {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (++i).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class B {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (i++).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class C {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (--i).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class D {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (i--).toString();
                     }
                   }
                   """

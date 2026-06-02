@@ -17,17 +17,19 @@ package org.openrewrite.marketplace;
 
 import lombok.RequiredArgsConstructor;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collection;
 import java.util.Properties;
 
 @RequiredArgsConstructor
 public class YamlRecipeBundleResolver implements RecipeBundleResolver {
     private final Properties properties;
+    private final RecipeMarketplace marketplace;
+    private final Collection<RecipeBundleResolver> resolvers;
 
     @Override
     public String getEcosystem() {
@@ -40,7 +42,7 @@ public class YamlRecipeBundleResolver implements RecipeBundleResolver {
             Path path = Paths.get(bundle.getPackageName());
             if (Files.exists(path)) {
                 try (InputStream is = Files.newInputStream(path)) {
-                    return new YamlRecipeBundleReader(bundle, is, path.toUri(), properties);
+                    return new YamlRecipeBundleReader(bundle, is, path.toUri(), properties, marketplace, resolvers);
                 }
             }
         } catch (Exception ignored) {
@@ -49,7 +51,7 @@ public class YamlRecipeBundleResolver implements RecipeBundleResolver {
         try {
             URI resource = URI.create(bundle.getPackageName());
             try (InputStream is = resource.toURL().openStream()) {
-                return new YamlRecipeBundleReader(bundle, is, resource, properties);
+                return new YamlRecipeBundleReader(bundle, is, resource, properties, marketplace, resolvers);
             }
         } catch (Exception e) {
             throw new RuntimeException(e);

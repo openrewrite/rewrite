@@ -37,6 +37,8 @@ import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
 import org.yaml.snakeyaml.scanner.ScannerImpl;
 
+import org.openrewrite.yaml.marker.OmitColon;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -52,6 +54,12 @@ public class YamlParser implements org.openrewrite.Parser {
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s+(@[^\n\r@]+@)");
     // Only match single-line Helm templates that don't span multiple lines
     private static final Pattern HELM_TEMPLATE_PATTERN = Pattern.compile("\\{\\{[^{}\\n\\r]*}}");
+    // Match single-brace placeholder templates like {C App} that contain at least one space
+    // These are invalid YAML but used by some tools as placeholders
+    private static final Pattern SINGLE_BRACE_TEMPLATE_PATTERN = Pattern.compile("\\{[A-Za-z][^{}\\n\\r]*\\s[^{}\\n\\r]*}");
+    // Match placeholder values starting with multiple asterisks like "*** REMOVED ***"
+    // These are invalid YAML aliases but used as credential placeholders
+    private static final Pattern ASTERISK_PLACEHOLDER_PATTERN = Pattern.compile(":\\s+(\\*{2,}[^\n\r]*)");
 
     @Override
     public Stream<SourceFile> parse(@Language("yml") String... sources) {
@@ -95,6 +103,7 @@ public class YamlParser implements org.openrewrite.Parser {
         String yamlSource = source.readFully();
         Map<String, String> variableByUuid = new HashMap<>();
         Map<String, String> helmTemplateByUuid = new HashMap<>();
+        Map<String, String> singleBraceTemplateByUuid = new HashMap<>();
 
         // First, replace all Helm templates with UUIDs
         String processedSource = yamlSource;
@@ -108,6 +117,22 @@ public class YamlParser implements org.openrewrite.Parser {
         helmMatcher.appendTail(helmBuffer);
         processedSource = helmBuffer.toString();
 
+        // Convert standalone Helm template lines (lines where a UUID is the only content)
+        // to YAML comments so they don't create structurally invalid YAML
+        processedSource = convertStandaloneHelmLinesToComments(
+                processedSource, helmTemplateByUuid.keySet());
+
+        // Then, replace single-brace templates like {C App} with UUIDs
+        Matcher singleBraceMatcher = SINGLE_BRACE_TEMPLATE_PATTERN.matcher(processedSource);
+        StringBuffer singleBraceBuffer = new StringBuffer();
+        while (singleBraceMatcher.find()) {
+            String uuid = UUID.randomUUID().toString();
+            singleBraceTemplateByUuid.put(uuid, singleBraceMatcher.group());
+            singleBraceMatcher.appendReplacement(singleBraceBuffer, uuid);
+        }
+        singleBraceMatcher.appendTail(singleBraceBuffer);
+        processedSource = singleBraceBuffer.toString();
+
         // Then, replace @variable@ patterns with UUIDs
         StringBuilder yamlSourceWithPlaceholders = new StringBuilder();
         Matcher variableMatcher = VARIABLE_PATTERN.matcher(processedSource);
@@ -118,6 +143,23 @@ public class YamlParser implements org.openrewrite.Parser {
             variableByUuid.put(uuid, variableMatcher.group(1));
             yamlSourceWithPlaceholders.append(uuid);
             pos = variableMatcher.end(1);
+        }
+
+        if (pos < processedSource.length()) {
+            yamlSourceWithPlaceholders.append(processedSource, pos, processedSource.length());
+        }
+
+        // Then, replace asterisk placeholder patterns like "*** REMOVED ***" with UUIDs
+        processedSource = yamlSourceWithPlaceholders.toString();
+        yamlSourceWithPlaceholders = new StringBuilder();
+        Matcher asteriskMatcher = ASTERISK_PLACEHOLDER_PATTERN.matcher(processedSource);
+        pos = 0;
+        while (pos < processedSource.length() && asteriskMatcher.find(pos)) {
+            yamlSourceWithPlaceholders.append(processedSource, pos, asteriskMatcher.start(1));
+            String uuid = UUID.randomUUID().toString();
+            variableByUuid.put(uuid, asteriskMatcher.group(1));
+            yamlSourceWithPlaceholders.append(uuid);
+            pos = asteriskMatcher.end(1);
         }
 
         if (pos < processedSource.length()) {
@@ -204,14 +246,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         if (mappingStartEvent.getAnchor() != null) {
                             anchor = buildYamlAnchor(reader, lastEnd, fmt, mappingStartEvent.getAnchor(), event.getEndMark().getIndex(), false);
                             anchors.put(mappingStartEvent.getAnchor(), anchor);
-
-                            // dashPrefixIndex could be 0 (if anchoring a sequence item) or greater than 0 (if anchoring entire list)
-                            int dashPrefixIndex = commentAwareIndexOf('-', fmt);
                             lastEnd = lastEnd + mappingStartEvent.getAnchor().length() + fmt.length() + 1;
-
-                            if (dashPrefixIndex > 0) {
-                                fmt = fmt.substring(0, dashPrefixIndex);
-                            }
                         }
 
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex() - 1);
@@ -293,25 +328,19 @@ public class YamlParser implements org.openrewrite.Parser {
                             case FOLDED:
                             case LITERAL:
                                 scalarValue = reader.readStringFromBuffer(valueStart + 1, event.getEndMark().getIndex() - 1);
-                                if (scalarValue.endsWith("\n")) {
-                                    newLine = "\n";
-                                    scalarValue = scalarValue.substring(0, scalarValue.length() - 1);
-                                }
                                 break;
                             default:
                                 scalarValue = reader.readStringFromBuffer(valueStart + 1, event.getEndMark().getIndex() - 1);
                                 break;
                         }
-                        // First restore any Helm template UUIDs
-                        for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
-                            if (scalarValue.contains(entry.getKey())) {
-                                scalarValue = scalarValue.replace(entry.getKey(), entry.getValue());
-                            }
-                        }
-                        // Then check for variable UUIDs (these are exact matches)
-                        if (variableByUuid.containsKey(scalarValue)) {
-                            scalarValue = variableByUuid.get(scalarValue);
-                        }
+                        // Restore Helm/single-brace/variable placeholder UUIDs. A UUID may be
+                        // the entire scalar value (e.g. `key: @var@`) or embedded within a longer
+                        // scalar (e.g. markdown bold text inside a block scalar that happened to
+                        // match the asterisk placeholder regex). A restored value may itself
+                        // embed another UUID (e.g. an asterisk placeholder wrapping a Helm
+                        // expression like `**${{ ... }}**`), so this resolves to a fixpoint.
+                        scalarValue = restorePlaceholders(scalarValue, helmTemplateByUuid,
+                                singleBraceTemplateByUuid, variableByUuid);
 
                         Yaml.Scalar.Style style;
                         switch (scalar.getScalarStyle()) {
@@ -470,7 +499,7 @@ public class YamlParser implements org.openrewrite.Parser {
             }
 
             Yaml.Documents result = new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, suffix, documents);
-            if (helmTemplateByUuid.isEmpty() && variableByUuid.isEmpty()) {
+            if (helmTemplateByUuid.isEmpty() && variableByUuid.isEmpty() && singleBraceTemplateByUuid.isEmpty()) {
                 return result;
             }
 
@@ -480,18 +509,8 @@ public class YamlParser implements org.openrewrite.Parser {
                     if (StringUtils.isBlank(text)) {
                         return text;
                     }
-                    String result = text;
-                    for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
-                        if (result.contains(entry.getKey())) {
-                            result = result.replace(entry.getKey(), entry.getValue());
-                        }
-                    }
-                    for (Map.Entry<String, String> entry : variableByUuid.entrySet()) {
-                        if (result.contains(entry.getKey())) {
-                            result = result.replace(entry.getKey(), entry.getValue());
-                        }
-                    }
-                    return result;
+                    return restorePlaceholders(text, helmTemplateByUuid,
+                            singleBraceTemplateByUuid, variableByUuid);
                 }
 
                 @Override
@@ -622,6 +641,162 @@ public class YamlParser implements org.openrewrite.Parser {
     }
 
 
+    /**
+     * After Helm templates have been replaced with UUIDs, lines consisting entirely
+     * of a UUID are standalone control flow directives. A bare UUID on its own line
+     * creates invalid YAML, so we prepend # to make it a YAML comment.
+     */
+    private static String convertStandaloneHelmLinesToComments(
+            String source,
+            Set<String> helmUuids) {
+        if (helmUuids.isEmpty()) {
+            return source;
+        }
+
+        StringBuilder result = new StringBuilder(source.length());
+
+        boolean inBlockScalar = false;
+        int blockScalarBaseIndent = -1;
+
+        int i = 0;
+        while (i < source.length()) {
+            int lineEnd = i;
+            while (lineEnd < source.length() && source.charAt(lineEnd) != '\n' && source.charAt(lineEnd) != '\r') {
+                lineEnd++;
+            }
+
+            String lineContent = source.substring(i, lineEnd);
+            String trimmed = lineContent.trim();
+            int indent = leadingSpaceCount(lineContent);
+
+            if (inBlockScalar) {
+                if (!trimmed.isEmpty() && indent <= blockScalarBaseIndent) {
+                    inBlockScalar = false;
+                } else {
+                    result.append(lineContent);
+                    i = appendNewline(source, lineEnd, result);
+                    continue;
+                }
+            }
+
+            if (helmUuids.contains(trimmed)) {
+                result.append(lineContent, 0, indent);
+                result.append('#');
+                result.append(trimmed);
+            } else {
+                result.append(lineContent);
+                if (isBlockScalarIndicator(trimmed)) {
+                    inBlockScalar = true;
+                    blockScalarBaseIndent = indent;
+                }
+            }
+
+            i = appendNewline(source, lineEnd, result);
+        }
+
+        return result.toString();
+    }
+
+    private static int appendNewline(String source, int lineEnd, StringBuilder result) {
+        if (lineEnd < source.length()) {
+            result.append(source.charAt(lineEnd));
+            lineEnd++;
+            if (lineEnd < source.length() && source.charAt(lineEnd - 1) == '\r' && source.charAt(lineEnd) == '\n') {
+                result.append(source.charAt(lineEnd));
+                lineEnd++;
+            }
+        }
+        return lineEnd;
+    }
+
+    /**
+     * Restore template/variable UUID placeholders to their original text. The Helm
+     * placeholder may appear in its comment-wrapped form ({@code #uuid}, produced for
+     * standalone control-flow lines) or bare. Because a restored value can itself embed
+     * another UUID (e.g. an asterisk placeholder capturing {@code **${{ ... }}**}, whose
+     * value contains a Helm UUID), the replacements are repeated until they reach a
+     * fixpoint.
+     */
+    private static String restorePlaceholders(
+            String text,
+            Map<String, String> helmTemplateByUuid,
+            Map<String, String> singleBraceTemplateByUuid,
+            Map<String, String> variableByUuid) {
+        String result = text;
+        String previous;
+        do {
+            previous = result;
+            for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
+                // Check comment-wrapped form first (standalone Helm lines converted to #uuid)
+                String commentKey = "#" + entry.getKey();
+                if (result.contains(commentKey)) {
+                    result = result.replace(commentKey, entry.getValue());
+                } else if (result.contains(entry.getKey())) {
+                    result = result.replace(entry.getKey(), entry.getValue());
+                }
+            }
+            for (Map.Entry<String, String> entry : singleBraceTemplateByUuid.entrySet()) {
+                if (result.contains(entry.getKey())) {
+                    result = result.replace(entry.getKey(), entry.getValue());
+                }
+            }
+            for (Map.Entry<String, String> entry : variableByUuid.entrySet()) {
+                if (result.contains(entry.getKey())) {
+                    result = result.replace(entry.getKey(), entry.getValue());
+                }
+            }
+        } while (!result.equals(previous));
+        return result;
+    }
+
+    private static boolean isBlockScalarIndicator(String trimmedLine) {
+        // A block scalar header is | or > (optionally followed by chomp/indent
+        // modifiers like +, -, or a digit). It can appear as a mapping value
+        // ("key: |"), as a sequence entry value ("- >-"), or bare at the start of
+        // a document. Strip any leading sequence-entry dashes, then any mapping key,
+        // to isolate the value portion.
+        String value = trimmedLine;
+        while (value.equals("-") || value.startsWith("- ")) {
+            value = value.length() == 1 ? "" : value.substring(2).trim();
+        }
+        int colonIndex = value.indexOf(':');
+        if (colonIndex != -1) {
+            value = value.substring(colonIndex + 1).trim();
+        }
+        // Strip trailing comment
+        int commentIndex = value.indexOf(" #");
+        if (commentIndex != -1) {
+            value = value.substring(0, commentIndex).trim();
+        }
+        if (value.isEmpty()) {
+            return false;
+        }
+        char first = value.charAt(0);
+        if (first != '|' && first != '>') {
+            return false;
+        }
+        // Check that remaining chars (if any) are valid block scalar modifiers
+        for (int j = 1; j < value.length(); j++) {
+            char c = value.charAt(j);
+            if (c != '+' && c != '-' && !Character.isDigit(c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int leadingSpaceCount(String line) {
+        int count = 0;
+        for (int j = 0; j < line.length(); j++) {
+            if (line.charAt(j) == ' ') {
+                count++;
+            } else {
+                break;
+            }
+        }
+        return count;
+    }
+
     @Override
     public boolean accept(Path path) {
         String fileName = path.toString();
@@ -667,9 +842,22 @@ public class YamlParser implements org.openrewrite.Parser {
                 key = (Yaml.Scalar) block;
             } else if (key == null && block instanceof Yaml.Alias) {
                 key = (Yaml.Alias) block;
+            } else if (key == null) {
+                // Complex YAML key (mapping or sequence used as key).
+                // The YamlKey interface only supports Scalar and Alias, so convert
+                // the complex key to a placeholder Scalar. This won't round-trip
+                // and will become a ParseError, but prevents NPE/ClassCastException.
+                key = new Yaml.Scalar(randomId(), block.getPrefix(), Markers.EMPTY,
+                        Yaml.Scalar.Style.PLAIN, null, null, "");
             } else {
                 String keySuffix = block.getPrefix();
-                block = block.withPrefix(keySuffix.substring(commentAwareIndexOf(':', keySuffix) + 1));
+                int colonIndex = commentAwareIndexOf(':', keySuffix);
+                // In flow mappings like { "MV7", "7J04" }, entries may lack explicit colons.
+                // Only omit colon when we're in a flow mapping (has opening brace)
+                // AND there's no colon in the keySuffix. For block mappings or when anchors
+                // consume the colon, we assume the colon was present.
+                boolean omitColon = colonIndex == -1 && startBracePrefix != null;
+                block = block.withPrefix(keySuffix.substring(colonIndex + 1));
 
                 // Begin moving whitespace from the key to the entry that contains the key
                 String originalKeyPrefix = key.getPrefix();
@@ -683,8 +871,9 @@ public class YamlParser implements org.openrewrite.Parser {
                         commentAwareIndexOf(':', originalKeyPrefix)) + 1;
                 String entryPrefix = originalKeyPrefix.substring(entryPrefixStartIndex);
                 String beforeMappingValueIndicator = keySuffix.substring(0,
-                        Math.max(commentAwareIndexOf(':', keySuffix), 0));
-                entries.add(new Yaml.Mapping.Entry(randomId(), entryPrefix, Markers.EMPTY, key, beforeMappingValueIndicator, block));
+                        Math.max(colonIndex, 0));
+                Markers markers = omitColon ? Markers.EMPTY.addIfAbsent(new OmitColon(randomId())) : Markers.EMPTY;
+                entries.add(new Yaml.Mapping.Entry(randomId(), entryPrefix, markers, key, beforeMappingValueIndicator, block));
                 key = null;
             }
         }

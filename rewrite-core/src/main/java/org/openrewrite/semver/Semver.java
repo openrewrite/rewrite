@@ -35,40 +35,59 @@ public class Semver {
     }
 
     /**
-     * Validates the given version against an optional pattern
+     * Validates the given version against an optional pattern.
+     * <p>
+     * The {@code metadataPattern} is interpreted first as a regular expression. If that fails to
+     * compile, it is treated as a glob (where {@code *} matches any run of characters and {@code ?}
+     * matches any single character) and converted to an equivalent regex via
+     * {@link StringUtils#globToRegex(String)}. This lets simple patterns like {@code "+backpatch*"}
+     * work without needing to be regex-escaped.
      *
      * @param toVersion       the version to validate. Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used.
      * @param metadataPattern optional metadata appended to the version. Allows version selection to be extended beyond the original Node Semver semantics. So for example,
-     *                        Setting 'version' to "25-29" can be paired with a metadata pattern of "-jre" to select Guava 29.0-jre
+     *                        setting 'version' to "25-29" can be paired with a metadata pattern of "-jre" to select Guava 29.0-jre. Accepts either a regex or a glob.
      * @return the validation result
      */
     public static Validated<VersionComparator> validate(String toVersion, @Nullable String metadataPattern) {
+        String canonicalPattern = canonicalizeMetadataPattern(metadataPattern);
         return Validated.<VersionComparator, String>testNone(
                 "metadataPattern",
-                "must be a valid regular expression",
-                metadataPattern, metadata -> {
-                    try {
-                        if (metadata != null) {
-                            Pattern.compile(metadata);
-                        }
-                        return true;
-                    } catch (Throwable e) {
-                        return false;
-                    }
-                }
+                "must be a valid regular expression or glob",
+                metadataPattern, metadata -> metadata == null || canonicalPattern != null
         ).and(Validated.<VersionComparator>none()
-                .or(LatestRelease.buildLatestRelease(toVersion, metadataPattern))
-                .or(LatestIntegration.build(toVersion, metadataPattern))
-                .or(LatestMinor.build(toVersion, metadataPattern))
-                .or(LatestPatch.build(toVersion, metadataPattern))
-                .or(HyphenRange.build(toVersion, metadataPattern))
-                .or(XRange.build(toVersion, metadataPattern))
-                .or(TildeRange.build(toVersion, metadataPattern))
-                .or(CaretRange.build(toVersion, metadataPattern))
-                .or(SetRange.build(toVersion, metadataPattern))
-                .or(ExactVersionWithPattern.build(toVersion, metadataPattern))
+                .or(LatestRelease.buildLatestRelease(toVersion, canonicalPattern))
+                .or(LatestIntegration.build(toVersion, canonicalPattern))
+                .or(LatestMinor.build(toVersion, canonicalPattern))
+                .or(LatestPatch.build(toVersion, canonicalPattern))
+                .or(HyphenRange.build(toVersion, canonicalPattern))
+                .or(XRange.build(toVersion, canonicalPattern))
+                .or(TildeRange.build(toVersion, canonicalPattern))
+                .or(CaretRange.build(toVersion, canonicalPattern))
+                .or(SetRange.build(toVersion, canonicalPattern))
+                .or(ExactVersionWithPattern.build(toVersion, canonicalPattern))
                 .or(ExactVersion.build(toVersion))
         );
+    }
+
+    private static @Nullable String canonicalizeMetadataPattern(@Nullable String metadataPattern) {
+        if (metadataPattern == null) {
+            return null;
+        }
+        try {
+            Pattern.compile(metadataPattern);
+            return metadataPattern;
+        } catch (Throwable regexFailure) {
+            String asRegex = StringUtils.globToRegex(metadataPattern);
+            try {
+                if (asRegex != null) {
+                    Pattern.compile(asRegex);
+                    return asRegex;
+                }
+            } catch (Throwable ignored) {
+                // fall through
+            }
+            return null;
+        }
     }
 
     public static String majorVersion(String version) {
@@ -115,18 +134,18 @@ public class Semver {
             return version1.compareTo(version2) >= 0 ? version1 : version2;
         }
         try {
-            int maj1 = Integer.parseInt(major1);
-            int maj2 = Integer.parseInt(major2);
+            long maj1 = Long.parseLong(major1);
+            long maj2 = Long.parseLong(major2);
             if (maj1 != maj2) return maj1 > maj2 ? version1 : version2;
 
-            int min1 = Integer.parseInt(minor1);
-            int min2 = Integer.parseInt(minor2);
+            long min1 = Long.parseLong(minor1);
+            long min2 = Long.parseLong(minor2);
             if (min1 != min2) return min1 > min2 ? version1 : version2;
 
             String[] parts1 = version1.split("[.-]");
             String[] parts2 = version2.split("[.-]");
-            int patch1 = parts1.length > 2 && parts1[2].matches("\\d+") ? Integer.parseInt(parts1[2]) : 0;
-            int patch2 = parts2.length > 2 && parts2[2].matches("\\d+") ? Integer.parseInt(parts2[2]) : 0;
+            long patch1 = parts1.length > 2 && parts1[2].matches("\\d+") ? Long.parseLong(parts1[2]) : 0;
+            long patch2 = parts2.length > 2 && parts2[2].matches("\\d+") ? Long.parseLong(parts2[2]) : 0;
             if (patch1 != patch2) return patch1 > patch2 ? version1 : version2;
 
             String label1 = parts1.length > 3 ? parts1[3].toLowerCase() : "";

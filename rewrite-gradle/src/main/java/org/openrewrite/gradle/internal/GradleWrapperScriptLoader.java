@@ -37,6 +37,7 @@ import static java.util.Objects.requireNonNull;
 public class GradleWrapperScriptLoader {
     @Getter
     private final Map<String, Version> allVersions = new HashMap<>();
+    private final NavigableMap<String, Version> sortedVersions = new TreeMap<>(new LatestRelease(null));
 
     public GradleWrapperScriptLoader() {
         try (BufferedReader in = new BufferedReader(new InputStreamReader(requireNonNull(
@@ -47,6 +48,7 @@ public class GradleWrapperScriptLoader {
                 String[] row = line.split(",");
                 Version version = new Version(row[0], row[1], row[2]);
                 allVersions.put(row[0], version);
+                sortedVersions.put(row[0], version);
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -54,7 +56,14 @@ public class GradleWrapperScriptLoader {
     }
 
     public Nearest findNearest(String requestedVersion) {
-        return new Nearest(requestedVersion, allVersions.get(requestedVersion));
+        Version exact = allVersions.get(requestedVersion);
+        if (exact != null) {
+            return new Nearest(requestedVersion, exact);
+        }
+        // Fall back to the nearest version that is <= the requested version, or the latest overall
+        Map.Entry<String, Version> floor = sortedVersions.floorEntry(requestedVersion);
+        Version resolved = floor != null ? floor.getValue() : sortedVersions.lastEntry().getValue();
+        return new Nearest(requestedVersion, resolved);
     }
 
     @SuppressWarnings("resource")

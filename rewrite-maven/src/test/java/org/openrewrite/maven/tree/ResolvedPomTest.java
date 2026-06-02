@@ -306,7 +306,7 @@ class ResolvedPomTest implements RewriteTest {
                 assertThat(pluginManagement).hasSize(1);
                 Plugin plugin = pluginManagement.getFirst();
                 assertThat(plugin).extracting(Plugin::getArtifactId).isEqualTo("maven-enforcer-plugin");
-                ObjectMapper objectMapper = new ObjectMapper();
+                var objectMapper = new ObjectMapper();
                 assertThat(plugin.getExecutions())
                   .hasSize(2)
                   .containsExactlyInAnyOrder(

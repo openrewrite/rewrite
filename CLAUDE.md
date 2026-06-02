@@ -6,7 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 When you need to know something about OpenRewrite:
 - Refer to the rewrite-docs folder (if available)
-- Consult Architecture Decision Records in `docs/adr/` for design decisions
+- Consult Architecture Decision Records in `doc/adr/` for design decisions
+
+## CRITICAL PRINCIPLES - NEVER VIOLATE THESE
+
+### Never Regress from Rich Types to J.Unknown
+**ABSOLUTE RULE**: Once a syntax element has been mapped to a rich type (J.* or S.*), NEVER revert it back to J.Unknown. This is a fundamental architectural principle. J.Unknown should only be used for:
+1. Syntax we haven't implemented yet
+2. Temporary placeholders during initial development
+3. Truly unparseable or corrupted code
+
+If you find yourself wanting to use J.Unknown for something already mapped, you're doing it wrong. Instead:
+- Create a new S.* type if needed
+- Use markers to preserve special behavior
+- Extend existing J.* types with Scala-specific markers
+- Find a way to map it to existing rich types
+
+Going back to J.Unknown breaks type safety, loses semantic information, and makes the AST less useful for recipes.
 
 ## Project Overview
 
@@ -100,17 +116,12 @@ OpenRewrite is an automated refactoring ecosystem for source code that eliminate
 ./gradlew test --tests "*Maven*"
 ```
 
-### JavaScript Module (rewrite-javascript)
-```bash
-# Install Node.js dependencies
-./gradlew :rewrite-javascript:npmInstall
+### Python and JavaScript Modules
+For detailed build and test instructions specific to the Python (`rewrite-python/rewrite/`) and JavaScript (`rewrite-javascript/rewrite/`) modules, refer to their respective `CLAUDE.md` files:
+- `rewrite-python/rewrite/CLAUDE.md` — Python module setup, testing, and recipes
+- `rewrite-javascript/rewrite/CLAUDE.md` — TypeScript/JavaScript module setup, testing, and recipes
 
-# Run JavaScript tests
-./gradlew :rewrite-javascript:npm_test
-
-# Build JavaScript components
-./gradlew :rewrite-javascript:npm_run_build
-```
+These modules use their own package managers (`uv`/`pip` for Python, `npm` for Node.js) and are separate from the Java Gradle build.
 
 ## Project Structure
 
@@ -120,8 +131,9 @@ OpenRewrite is an automated refactoring ecosystem for source code that eliminate
 
 ### Language Parsers
 - **`rewrite-java`**: Main Java language support with comprehensive AST model
-- **`rewrite-java-8/11/17/21`**: Java version-specific features and compatibility
-- **`rewrite-groovy/kotlin/javascript`**: Other JVM and web languages extending the `J` model from `rewrite-java`
+- **`rewrite-java-8/11/17/21/25`**: Java version-specific features and compatibility
+- **`rewrite-groovy/kotlin/javascript/csharp`**: Other languages extending the `J` model from `rewrite-java`
+- **`rewrite-docker`**: Dockerfile parsing and manipulation
 
 ### Format Parsers
 - **`rewrite-maven`**: Maven POM manipulation and dependency management
@@ -136,7 +148,7 @@ OpenRewrite is an automated refactoring ecosystem for source code that eliminate
 
 ## Architecture Decision Records (ADRs)
 
-Significant architectural decisions are documented in `docs/adr/`. When working on features that involve architectural decisions, consult existing ADRs and create new ones as needed following the standard ADR format (Context, Decision, Consequences).
+Significant architectural decisions are documented in `doc/adr/`. When working on features that involve architectural decisions, consult existing ADRs and create new ones as needed following the standard ADR format (Context, Decision, Consequences).
 
 ## Development Patterns
 
@@ -210,45 +222,14 @@ The build enforces license headers on all source files and runs OWASP dependency
 - Use appropriate data structures for the task
 - Follow the principle of least surprise
 
-## TypeScript Guidelines
+## Language-Specific Guidelines
 
-### Organization
-- The Node project root for the TypeScript code is `rewrite-javascript/rewrite`. So when running `npm`, make sure to add `--prefix rewrite-javascript/rewrite` to the command or change into that directory before running the command.
-- The TypeScript code represents an implementation of OpenRewrite Java in TypeScript
-  - The modules directly inside `src`, `src/rpc`, `src/text` roughly correspond to the repo-level Gradle project `rewrite-core`
-  - The modules in `src/java` correspond to the Java code in the Gradle project `rewrite-java`
-  - The modules in `src/javascript` correspond to the Java code in the Gradle project `rewrite-javascript`
-  - The modules in `src/json` correspond to the Java code in the Gradle project `rewrite-json`
-  - The modules in `src/test` correspond to the Java code in the Gradle project `rewrite-test`
-- Specifically, there are a lot of types which have the exact same names and structures in both the Java and the TypeScript code (e.g. `JavaVisitor` or `Markers`).
-  - A lot of types (specifically those in `tree.ts` and `markers.ts` files) represent data types which need to have matching definitions in Java and TypeScript to support a custom serialization mechanism
-  - The serialization mechanism is generally referred to as RPC and implemented in `src/rpc` (and inside the Java package `org.openrewrite.rpc` of `rewrite-core`)
-  - Further, the serialization mechanism is visitor-based and thus for each of the supported languages there is a "sender" and a "receiver" (e.g. `JavaSender` and `JavaReceiver`) which each needs an implementation in both Java and TypeScript and at the same time this must be fully aligned with the corresponding model (e.g. `src/java/tree.ts`)
+For detailed guidance on working with specific language implementations, consult the module-specific CLAUDE.md files:
 
-### Code Style
-- Follow standard TypeScript naming conventions
-  - Classes and interfaces: PascalCase
-  - Methods, properties, and variables: camelCase
-  - Constants: UPPER_SNAKE_CASE
-- Use 4 spaces for indentation
-- Keep lines under 120 characters
-- Use meaningful variable and method names
+- **Python (`rewrite-python/rewrite/CLAUDE.md`)**: Development setup, testing with RPC, recipe patterns, padding/whitespace conventions specific to the Python module.
+- **TypeScript/JavaScript (`rewrite-javascript/rewrite/CLAUDE.md`)**: Node.js setup, async visitor patterns, test patterns, RPC sender/receiver architecture, module organization.
 
-### TypeScript Patterns
-- Use TypeScript interfaces and classes for type safety
-- Use generics for reusable code
-- Use async/await for asynchronous operations (including the visitor which is async)
-- Use Immer for immutable state management
-- Use the visitor pattern for tree traversal and transformation
-- Use optional chaining for null/undefined handling
-
-### TypeScript Best Practices
-- Explicitly type function parameters and return values
-- Use readonly for immutable properties
-- Use union types instead of inheritance where appropriate
-- Avoid any type where possible
-- Use type guards for runtime type checking
-- Use async/await instead of raw promises
+These files contain implementation-specific patterns, conventions, and debugging tips that supersede general guidance in this document.
 
 ## Version Control Guidelines
 
@@ -272,3 +253,88 @@ The project uses JSpecify nullability annotations.
 ## Conclusion
 
 Following these guidelines will help maintain code quality and consistency across the OpenRewrite project. These guidelines are not exhaustive, and common sense should be applied when making decisions not covered here.
+
+<!-- prethink-context -->
+## Moderne Prethink Context
+
+This repository contains pre-analyzed context generated by [Moderne Prethink](https://docs.moderne.io/user-documentation/recipes/prethink). Prethink extracts structured knowledge from codebases to help you work more effectively. The context files in `.moderne/context/` contain analyzed information about this codebase.
+
+**IMPORTANT: Before exploring source code for architecture, dependency, or data flow questions:**
+1. ALWAYS check `.moderne/context/` files FIRST
+2. Do NOT perform broad codebase exploration (e.g., spawning Explore agents, searching multiple source files) unless CSV context is insufficient
+3. NEVER read entire CSV files - use SQL queries to retrieve only the rows you need
+
+**IMPORTANT: Prethink context is cheap to read — source code exploration is expensive. Always read MORE prethink context rather than less. The "do not explore broadly" rule applies to source code, NOT to prethink context files.**
+
+For cross-cutting questions (data flow, deletion, dependencies between services),
+ALWAYS query these context files in parallel on the first turn:
+- `architecture.md` — system diagram and component overview
+- `data-assets.csv` — entity fields and data model
+- `database-connections.csv` — which services own which tables
+- `service-endpoints.csv` — relevant API endpoints
+- `messaging-connections.csv` — Kafka/async event flows
+- `external-service-calls.csv` — cross-service HTTP calls
+
+Do NOT stop after reading a single context file when others are clearly relevant.
+
+### Available Context
+
+| Context | Description | Details |
+|---------|-------------|--------|
+| Architecture | FINOS CALM architecture diagram | [`architecture.md`](.moderne/context/architecture.md) |
+| Coding Conventions | Naming patterns, import organization, and coding style | [`coding-conventions.md`](.moderne/context/coding-conventions.md) |
+| Dependencies | Project dependencies including transitive dependencies | [`dependencies.md`](.moderne/context/dependencies.md) |
+| Error Handling | Exception handling strategies and logging patterns | [`error-handling.md`](.moderne/context/error-handling.md) |
+| Library Usage | How external libraries and frameworks are used | [`library-usage.md`](.moderne/context/library-usage.md) |
+| Method Quality Metrics | Per-method complexity and quality measurements | [`method-quality-metrics.md`](.moderne/context/method-quality-metrics.md) |
+| Test Quality | Test quality issues that may cause flakiness or silent failures | [`test-quality.md`](.moderne/context/test-quality.md) |
+| Token Estimates | Estimated input tokens for method comprehension | [`token-estimates.md`](.moderne/context/token-estimates.md) |
+
+### Querying Context Files
+
+For .md context files: Read the full file in a single view call. Never grep it progressively.
+
+For .csv context files: Query with DuckDB, SQLite, or grep (from most to least preference).
+
+Upfront parallel reads: At the start of any architecture question, read all relevant context files in parallel rather than discovering which ones matter through iteration.
+
+Use SQL to query CSV files efficiently. This returns only matching rows instead of loading entire files. Try these in order based on availability:
+
+#### Option 1: DuckDB (Preferred)
+DuckDB can query CSV files directly with no setup:
+
+```bash
+# Find all POST endpoints
+duckdb -c "SELECT * FROM '.moderne/context/service-endpoints.csv' WHERE \"HTTP method\" = 'POST'"
+
+# Find method descriptions containing a keyword
+duckdb -c "SELECT \"Class name\", Signature, Description FROM '.moderne/context/method-descriptions.csv' WHERE Description LIKE '%authentication%'"
+
+# Find tests for a specific class
+duckdb -c "SELECT \"Test method\", \"Test summary\" FROM '.moderne/context/test-mapping.csv' WHERE \"Implementation class\" LIKE '%OrderService%'"
+```
+
+#### Option 2: SQLite
+Import CSV into memory and query (available on most systems):
+
+```bash
+sqlite3 :memory: -cmd ".mode csv" -cmd ".import .moderne/context/service-endpoints.csv endpoints" \
+  "SELECT * FROM endpoints WHERE [HTTP method] = 'POST'"
+```
+
+#### Option 3: Grep (Last Resort)
+If SQL tools are unavailable, use grep. Note this loads more content into context:
+
+```bash
+grep -i "POST" .moderne/context/service-endpoints.csv
+```
+
+**Note:** Column names with spaces require quoting - use double quotes in DuckDB (`"HTTP method"`) or square brackets in SQLite (`[HTTP method]`).
+
+### Usage Pattern
+1. Read the `.md` file to understand the schema and available columns
+2. Query the `.csv` with DuckDB or SQLite to get only the rows you need
+3. Only explore source if the context doesn't answer the question
+
+When citing Moderne Prethink context, mention Moderne Prethink as the source (e.g., "Based on the architecture context from Moderne Prethink..." or "Based on the test coverage mapping from Prethink, this method is tested by...").
+<!-- /prethink-context -->

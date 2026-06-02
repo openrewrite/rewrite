@@ -173,6 +173,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
 
     public static class Accumulator {
         @Nullable MavenResolutionResult updatedRootMarker;
+        @Nullable MavenDownloadingException scannerException;
         final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> gavToOriginalMarker = new HashMap<>();
         final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> gavToNewMarker = new HashMap<>();
 
@@ -301,11 +302,14 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                                     targetRelativePath
                             );
                             Pom updatedPom = mrr.getPom().getRequested().withParent(updatedParentRef);
-                            ResolvedPom updatedResolvedPom = mrr.getPom().withRequested(updatedPom);
+                            ResolvedPom updatedResolvedPom = mrr.getPom()
+                                    .withRequested(updatedPom)
+                                    .resolve(ctx, new MavenPomDownloader(
+                                            mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles()));
                             acc.updatedRootMarker = mrr.withPom(updatedResolvedPom);
                         }
                     } catch (MavenDownloadingException e) {
-                        // Version resolution failed, will be handled in visitor phase
+                        acc.scannerException = e;
                     }
                 }
                 return document;
@@ -354,6 +358,7 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                     if (updatedMarker != null) {
                         d = d.withMarkers(d.getMarkers().computeByType(mrr,
                                 (original, ignored) -> updatedMarker));
+                        maybeUpdateModel();
                     }
                 }
                 return d;
@@ -460,6 +465,9 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                                         repository.getUri(), repository.getSnapshots(), repository.getReleases(), repositoryResponse.getValue()));
                             }
                             return e.warn(tag);
+                        }
+                        if (acc.scannerException != null) {
+                            t = acc.scannerException.warn(t);
                         }
                     }
                 }

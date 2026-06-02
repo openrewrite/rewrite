@@ -126,6 +126,139 @@ class ChangePropertyValueTest implements RewriteTest {
     }
 
     @Test
+    void changePropertyInProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("sonar.host.url", "https://new-sonar.example.com", false, false)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>sonar</id>
+                    <activation>
+                      <activeByDefault>true</activeByDefault>
+                    </activation>
+                    <properties>
+                      <sonar.host.url>http://old-sonar.example.com</sonar.host.url>
+                      <java.version>21</java.version>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>sonar</id>
+                    <activation>
+                      <activeByDefault>true</activeByDefault>
+                    </activation>
+                    <properties>
+                      <sonar.host.url>https://new-sonar.example.com</sonar.host.url>
+                      <java.version>21</java.version>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changePropertyInBothProjectAndProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("java.version", "21", false, false)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                  <java.version>17</java.version>
+                </properties>
+
+                <profiles>
+                  <profile>
+                    <id>sonar</id>
+                    <properties>
+                      <java.version>17</java.version>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                  <java.version>21</java.version>
+                </properties>
+
+                <profiles>
+                  <profile>
+                    <id>sonar</id>
+                    <properties>
+                      <java.version>21</java.version>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotChangeUnrelatedPropertyInProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("sonar.host.url", "https://new-sonar.example.com", false, false)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>sonar</id>
+                    <properties>
+                      <java.version>21</java.version>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void addPropertyInOrder() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("key", "value", true, false)),

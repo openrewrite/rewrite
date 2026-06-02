@@ -42,8 +42,8 @@ import java.util.function.Consumer;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.sourceSet;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 import static org.openrewrite.test.SourceSpecs.dir;
@@ -284,16 +284,14 @@ public final class Assertions {
                     return next(space);
                 }
             }.visit(cu, 0);
-            try {
+            assertDoesNotThrow(() -> {
                 String s = visited.printAll();
                 InMemoryExecutionContext ctx = new InMemoryExecutionContext();
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
                 SourceFile cu2 = spec.getParser().build().parse(ctx, s).findFirst().get();
                 String s1 = cu2.printAll();
                 assertEquals(s, s1, "Parser is not whitespace print idempotent");
-            } catch (Exception e) {
-                fail(e);
-            }
+            });
         };
     }
 
@@ -476,7 +474,19 @@ public final class Assertions {
             return inPackageDeclaration() || inImport() || isClassName() ||
                     isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
                     isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident) ||
-                    isInJavaDoc(ident) || isWhenLabel() || isUseSite();
+                    isInJavaDoc(ident) || isWhenLabel() || isUseSite() || isNamedArgument();
+        }
+
+        private boolean isNamedArgument() {
+            // Named argument identifiers (e.g., `s` in `foo(s = "hello")`) are labels, not variable references
+            Cursor parent = getCursor().getParentTreeCursor();
+            if (parent.getValue() instanceof J.Assignment) {
+                Cursor grandparent = parent.getParentTreeCursor();
+                Object gp = grandparent.getValue();
+                return gp instanceof J.MethodInvocation || gp instanceof J.NewClass ||
+                        gp instanceof K.ConstructorInvocation;
+            }
+            return false;
         }
 
         private boolean inPackageDeclaration() {

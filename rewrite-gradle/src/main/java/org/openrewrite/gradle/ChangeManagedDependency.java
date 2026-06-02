@@ -28,6 +28,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
@@ -149,6 +150,7 @@ public class ChangeManagedDependency extends Recipe {
                         GradleProject gp = maybeGp.get();
                         t = t.withMarkers(t.getMarkers().setByType(updateGradleModel(gp)));
                     }
+                    JavaSourceSet.markDirty(ctx, (SourceFile) t);
                 }
                 return t;
             }
@@ -189,7 +191,7 @@ public class ChangeManagedDependency extends Recipe {
                         }
                         return requested;
                     }));
-                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> {
+                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolvedShallow(), resolved -> {
                         assert resolved != null;
                         if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
                             resolved = updatedResolved.computeIfAbsent(resolved, r -> {

@@ -81,9 +81,10 @@ class JavaVisitor(TreeVisitor[J, P]):
             if element is None:
                 return None
         after = self.visit_space(right.after, p)
-        if element is right.element and after is right.after:
+        markers = self.visit_markers(right.markers, p)
+        if element is right.element and after is right.after and markers is right.markers:
             return right
-        return right.replace(element=element, after=after)
+        return right.replace(element=element, after=after, markers=markers)
 
     def visit_container(
         self,
@@ -94,15 +95,21 @@ class JavaVisitor(TreeVisitor[J, P]):
         if container is None:
             return None
         before = self.visit_space(container.before, p)
+        original_elements = container.padding.elements
         elements = list_map(
             lambda e: self.visit_right_padded(e, p),
-            container.padding.elements
+            original_elements
         )
+        # Track if list_map detected any changes (returns same list if unchanged)
+        elements_changed = elements is not original_elements
         # Filter out None elements (deleted by visitor)
-        elements = [e for e in elements if e is not None]
-        if before is container.before and elements == list(container.padding.elements):
+        filtered_elements = [e for e in elements if e is not None]
+        # Check if filtering removed any elements
+        if len(filtered_elements) != len(elements):
+            elements_changed = True
+        if before is container.before and not elements_changed:
             return container
-        return container.replace(before=before).padding.replace(elements=elements)
+        return container.replace(before=before).padding.replace(elements=filtered_elements)
 
     # -------------------------------------------------------------------------
     # Java tree visitor methods
@@ -841,18 +848,12 @@ class JavaVisitor(TreeVisitor[J, P]):
         if not isinstance(temp_expr, j.MethodInvocation):
             return temp_expr
         method = temp_expr
-        method = method.replace(markers=self.visit_markers(method.markers, p))
-        method = method.padding.replace(
-            select=self.visit_right_padded(method.padding.select, p)
-        )
         method = method.replace(
-            type_parameters=self.visit_container(method.padding.type_parameters, p)
-        )
-        method = method.replace(
-            name=self.visit_and_cast(method.name, j.Identifier, p)
-        )
-        method = method.replace(
-            arguments=self.visit_container(method.padding.arguments, p)
+            markers=self.visit_markers(method.markers, p),
+            select=self.visit_right_padded(method.padding.select, p),
+            type_parameters=self.visit_container(method.padding.type_parameters, p),
+            name=self.visit_and_cast(method.name, j.Identifier, p),
+            arguments=self.visit_container(method.padding.arguments, p),
         )
         return method
 
@@ -1388,3 +1389,59 @@ class JavaVisitor(TreeVisitor[J, P]):
         erroneous = temp_expr
         erroneous = erroneous.replace(markers=self.visit_markers(erroneous.markers, p))
         return erroneous
+
+
+class _TreeVisitorAsJavaVisitor(JavaVisitor):
+    """Adapts a generic ``TreeVisitor`` as a ``JavaVisitor``.
+
+    Returned by :meth:`TreeVisitor.adapt` when a Java LST node's ``accept``
+    is called with a non-Java visitor. The wrapper is-a ``JavaVisitor`` so
+    Java-specific dispatch (``visit_method_declaration`` and friends) finds
+    the default child-traversal implementations that ``JavaVisitor``
+    provides; ``pre_visit`` / ``post_visit`` / ``default_value`` /
+    ``is_acceptable`` plus ``_cursor`` / ``_visit_count`` / ``_after_visit``
+    are forwarded to the wrapped visitor so user-defined logic still runs
+    against the right state.
+    """
+
+    def __init__(self, wrapped: TreeVisitor):
+        self._wrapped = wrapped
+
+    @property
+    def _cursor(self):
+        return self._wrapped._cursor
+
+    @_cursor.setter
+    def _cursor(self, value):
+        self._wrapped._cursor = value
+
+    @property
+    def _visit_count(self):
+        return self._wrapped._visit_count
+
+    @_visit_count.setter
+    def _visit_count(self, value):
+        self._wrapped._visit_count = value
+
+    @property
+    def _after_visit(self):
+        return self._wrapped._after_visit
+
+    @_after_visit.setter
+    def _after_visit(self, value):
+        self._wrapped._after_visit = value
+
+    def pre_visit(self, tree, p):
+        return self._wrapped.pre_visit(tree, p)
+
+    def post_visit(self, tree, p):
+        return self._wrapped.post_visit(tree, p)
+
+    def default_value(self, tree, p):
+        return self._wrapped.default_value(tree, p)
+
+    def is_acceptable(self, source_file, p):
+        return self._wrapped.is_acceptable(source_file, p)
+
+
+TreeVisitor.register_adapter(JavaVisitor, _TreeVisitorAsJavaVisitor)

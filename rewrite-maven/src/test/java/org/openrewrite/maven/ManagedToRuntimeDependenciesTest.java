@@ -17,17 +17,24 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ManagedToRuntimeDependenciesTest implements RewriteTest {
 
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new ManagedToRuntimeDependencies());
+    }
+
+
     @DocumentExample
     @Test
     void convertNonImportManagedDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new ManagedToRuntimeDependencies()),
           pomXml(
             """
               <project>
@@ -98,7 +105,6 @@ class ManagedToRuntimeDependenciesTest implements RewriteTest {
     @Test
     void scopeMapping() {
         rewriteRun(
-          spec -> spec.recipe(new ManagedToRuntimeDependencies()),
           pomXml(
             """
               <project>
@@ -181,7 +187,6 @@ class ManagedToRuntimeDependenciesTest implements RewriteTest {
     @Test
     void addToExistingDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new ManagedToRuntimeDependencies()),
           pomXml(
             """
               <project>
@@ -239,7 +244,6 @@ class ManagedToRuntimeDependenciesTest implements RewriteTest {
     @Test
     void onlyImportScopedDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new ManagedToRuntimeDependencies()),
           pomXml(
             """
               <project>
@@ -274,7 +278,6 @@ class ManagedToRuntimeDependenciesTest implements RewriteTest {
     @Test
     void noDependencyManagement() {
         rewriteRun(
-          spec -> spec.recipe(new ManagedToRuntimeDependencies()),
           pomXml(
             """
               <project>
@@ -298,7 +301,6 @@ class ManagedToRuntimeDependenciesTest implements RewriteTest {
     @Test
     void preserveOtherDependencyElements() {
         rewriteRun(
-          spec -> spec.recipe(new ManagedToRuntimeDependencies()),
           pomXml(
             """
               <project>

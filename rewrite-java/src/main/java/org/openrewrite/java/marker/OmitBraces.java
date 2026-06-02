@@ -18,15 +18,28 @@ package org.openrewrite.java.marker;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
 @Value
 @With
-public class OmitBraces implements Marker {
+public class OmitBraces implements Marker, RpcCodec<OmitBraces> {
     UUID id;
 
     public OmitBraces(UUID id) {
         this.id = id;
+    }
+
+    @Override
+    public void rpcSend(OmitBraces after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+    }
+
+    @Override
+    public OmitBraces rpcReceive(OmitBraces before, RpcReceiveQueue q) {
+        return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
     }
 }

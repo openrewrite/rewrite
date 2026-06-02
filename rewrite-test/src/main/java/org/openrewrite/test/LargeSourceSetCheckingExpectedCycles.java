@@ -21,6 +21,7 @@ import org.openrewrite.Result;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 
+import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.emptyMap;
@@ -53,6 +54,15 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
     @Override
     protected InMemoryLargeSourceSet withChanges(@Nullable Map<SourceFile, List<Recipe>> deletions, List<SourceFile> mapped) {
         return new LargeSourceSetCheckingExpectedCycles(this, deletions, mapped);
+    }
+
+    @Override
+    public void onGenerateCollision(Path sourcePath, boolean existingFile) {
+        if (existingFile) {
+            fail("Recipe generated a source file that already exists in the source set: " + sourcePath);
+        } else {
+            fail("Recipe generated multiple source files at the same path: " + sourcePath);
+        }
     }
 
     @Override
@@ -120,7 +130,8 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
             } else if (cyclesThatResultedInChanges != expectedCyclesThatMakeChanges) {
                 fail("Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges > 1 ? "s" : "") + ", " +
                      "but took " + cyclesThatResultedInChanges + " cycle" + (cyclesThatResultedInChanges > 1 ? "s" : "") + ". " +
-                     "This usually indicates the recipe is making changes after it should have stabilized.");
+                     "This usually indicates the recipe is making changes after it should have stabilized.\n" +
+                     "https://docs.openrewrite.org/authoring-recipes/recipe-conventions-and-best-practices#stay-single-cycle");
             }
         }
     }

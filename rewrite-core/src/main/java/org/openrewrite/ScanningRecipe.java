@@ -35,13 +35,9 @@ import static java.util.Collections.emptyList;
  */
 @SuppressWarnings("ALL")
 public abstract class ScanningRecipe<T> extends Recipe {
-    @Nullable
-    private String recipeAccMessage;
+    private String recipeAccMessage = "org.openrewrite.recipe.acc." + UUID.randomUUID();
 
-    private String getRecipeAccMessage() {
-        if (recipeAccMessage == null) {
-            recipeAccMessage = "org.openrewrite.recipe.acc." + UUID.randomUUID();
-        }
+    String getRecipeAccMessage() {
         return recipeAccMessage;
     }
 

@@ -2,6 +2,10 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
+tasks.withType<Javadoc>().configureEach {
+    exclude("**/AddProperty**")
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api("org.jetbrains:annotations:latest.release")

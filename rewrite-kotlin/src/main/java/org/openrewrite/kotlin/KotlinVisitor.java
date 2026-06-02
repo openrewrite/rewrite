@@ -69,6 +69,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         K.AnnotatedExpression ae = annotatedExpression;
         ae = ae.withMarkers(visitMarkers(ae.getMarkers(), p));
         ae = ae.withAnnotations(ListUtils.map(ae.getAnnotations(), a -> visitAndCast(a, p)));
+        ae = ae.withExpression(visitAndCast(ae.getExpression(), p));
         Expression temp = (Expression) visitExpression(ae, p);
         if (!(temp instanceof K.AnnotatedExpression)) {
             return temp;

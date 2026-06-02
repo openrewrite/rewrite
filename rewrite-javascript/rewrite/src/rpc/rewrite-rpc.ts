@@ -32,7 +32,8 @@ import {
     Print,
     TraceGetObject,
     Visit,
-    VisitResponse
+    VisitResponse,
+    BatchVisit
 } from "./request";
 import {RecipeMarketplace} from "../marketplace";
 import {initializeMetricsCsv} from "./request/metrics";
@@ -87,6 +88,7 @@ export class RewriteRpc {
         const marketplace = options.marketplace || new RecipeMarketplace();
 
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
+        BatchVisit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
             this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
@@ -106,8 +108,49 @@ export class RewriteRpc {
             }
         )
 
+        // Clears local caches. Captured here so it can close over the
+        // constructor-local `preparedRecipes` while still being callable
+        // from the public `reset()` method on the class.
+        const clearLocalState = () => {
+            this.localObjects.clear();
+            this.localObjectIds.clear();
+            this.remoteObjects.clear();
+            this.remoteRefs.clear();
+            this.localRefs.clear();
+            preparedRecipes.clear();
+            this.remoteLanguages = undefined;
+        };
+        this.clearLocalState = clearLocalState;
+
+        this.connection.onRequest(
+            new rpc.RequestType0<boolean, Error>("Reset"),
+            async () => {
+                // Inbound Reset only clears local state — never sends a Reset
+                // back to the originator. Mirrors the Java handler in
+                // RewriteRpc.java around line 222.
+                clearLocalState();
+                return true;
+            }
+        )
+
         RewriteRpc.set(this);
         this.connection.listen();
+    }
+
+    private readonly clearLocalState!: () => void;
+
+    /**
+     * Reset both the remote and local RPC caches. Sends a `Reset` request to the
+     * remote — which clears the remote's state without sending one back — and
+     * then clears local caches. Use this between independent operations (e.g.
+     * between tests) so accumulated objects and prepared recipes don't leak
+     * across boundaries.
+     */
+    async reset(): Promise<void> {
+        await this.connection.sendRequest(
+            new rpc.RequestType0<boolean, Error>("Reset"),
+        );
+        this.clearLocalState();
     }
 
     static set(value: RewriteRpc) {
@@ -124,7 +167,11 @@ export class RewriteRpc {
     }
 
     async getObject<P>(id: string, sourceFileType?: string): Promise<P> {
-        const localObject = this.localObjects.get(id);
+        // Use the last synced state as the baseline for receiving diffs.
+        // This must match what the remote used as its baseline when computing the diff.
+        // Using localObjects here would be wrong if the local side modified the tree
+        // (e.g., via a local recipe) since the remote doesn't know about those changes.
+        const before = this.remoteObjects.get(id);
 
         const q = new RpcReceiveQueue(this.remoteRefs, sourceFileType, () => {
             return this.connection.sendRequest(
@@ -133,7 +180,15 @@ export class RewriteRpc {
             );
         }, this.logger, this.traceGetObject.receive);
 
-        const remoteObject = await q.receive<P>(localObject);
+        let remoteObject: P;
+        try {
+            remoteObject = await q.receive<P>(before as P);
+        } catch (e) {
+            // Reset our tracking of the remote state so the next interaction
+            // forces a full object sync (ADD) instead of a delta (CHANGE).
+            this.remoteObjects.delete(id);
+            throw e;
+        }
 
         const eof = (await q.take());
         if (eof.state !== RpcObjectState.END_OF_OBJECT) {
@@ -299,5 +354,10 @@ class IdentityMap {
         } else {
             return this.primitiveMap.has(key);
         }
+    }
+
+    clear(): void {
+        this.objectMap = new WeakMap<any, string>();
+        this.primitiveMap.clear();
     }
 }

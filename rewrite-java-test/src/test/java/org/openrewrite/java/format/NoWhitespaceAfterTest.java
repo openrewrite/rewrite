@@ -340,6 +340,35 @@ class NoWhitespaceAfterTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6917")
+    @Test
+    void typeUseAnnotationOnFieldAccess() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle(style ->
+            style.withDot(true)))),
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+
+              class Test {
+                  Cache.@Nullable ValueWrapper get(Object key) {
+                      return null;
+                  }
+              }
+
+              class Cache {
+                  class ValueWrapper {}
+              }
+
+              @Target(ElementType.TYPE_USE)
+              @interface Nullable {}
+              """,
+            autoFormatIsIdempotent()
+          )
+        );
+    }
+
     @Test
     void doNotAllowLinebreak() {
         rewriteRun(

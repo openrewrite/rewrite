@@ -173,7 +173,7 @@ class AddParentPomTest implements RewriteTest {
 
     @Test
     void multiModuleRelativePath() {
-        AddParentPom recipe = new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "1.5.12.RELEASE", "", null);
+        var recipe = new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "1.5.12.RELEASE", "", null);
         rewriteRun(
           spec -> spec.recipe(recipe),
           mavenProject("parent",

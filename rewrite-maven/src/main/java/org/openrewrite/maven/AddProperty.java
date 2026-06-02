@@ -75,8 +75,8 @@ public class AddProperty extends Recipe {
                     return document;
                 }
 
-                // If there is a parent pom in the same project, update the property there instead
-                if (document.getRoot().getChild("parent")
+                // If there is a parent pom in the same project and the property already exists locally, consolidate it to the parent instead
+                if (parentValue != null && document.getRoot().getChild("parent")
                         .flatMap(tag -> tag.getChild("relativePath"))
                         .flatMap(Xml.Tag::getValue)
                         .flatMap(v -> v.trim().isEmpty() ? Optional.empty() : Optional.of(v))

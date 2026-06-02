@@ -20,9 +20,13 @@ import org.openrewrite.internal.ReflectionUtils;
 
 import javax.annotation.processing.Processor;
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.net.URL;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -77,8 +81,18 @@ public class LombokSupport {
                     Class.forName("java.util.List"));
             shadowLoaderConstructor.setAccessible(true);
 
+            // Wrap parserClassLoader to prevent ShadowClassLoader from scanning every jar
+            // on the parent classpath. ShadowClassLoader.getResources() iterates over all
+            // parent resources and calls isPartOfShadowSuffix() on each URL, which opens
+            // each jar as a ZipInputStream and reads every entry — extremely slow for large
+            // classpaths. By returning empty resource enumerations from the parent, the
+            // ShadowClassLoader relies solely on its override jars (set via
+            // shadow.override.lombok) which already contain everything Lombok needs.
+            // Class loading still delegates normally through the parent chain.
+            ClassLoader resourceFilteredParent = new ResourceFilteredClassLoader(parserClassLoader);
+
             ClassLoader lombokShadowLoader = (ClassLoader) shadowLoaderConstructor.newInstance(
-                    parserClassLoader,
+                    resourceFilteredParent,
                     "lombok",
                     null,
                     emptyList(),
@@ -91,6 +105,28 @@ public class LombokSupport {
             } else {
                 System.clearProperty("shadow.override.lombok");
             }
+        }
+    }
+
+    /**
+     * A classloader that delegates class loading to its parent but returns empty results
+     * for resource enumeration. This prevents Lombok's {@code ShadowClassLoader} from
+     * scanning every jar on the classpath via {@code ZipInputStream} when filtering
+     * parent resources in {@code getResources()}.
+     */
+    static class ResourceFilteredClassLoader extends ClassLoader {
+        ResourceFilteredClassLoader(ClassLoader parent) {
+            super(parent);
+        }
+
+        @Override
+        public Enumeration<URL> getResources(String name) throws IOException {
+            return Collections.emptyEnumeration();
+        }
+
+        @Override
+        public @Nullable URL getResource(String name) {
+            return null;
         }
     }
 }

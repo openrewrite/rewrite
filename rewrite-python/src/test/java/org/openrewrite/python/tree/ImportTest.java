@@ -110,10 +110,10 @@ class ImportTest implements RewriteTest {
         rewriteRun(
           python(
             """
-             import sys
-             
-             import math
-             """
+              import sys
+              
+              import math
+              """
           )
         );
     }
@@ -124,11 +124,11 @@ class ImportTest implements RewriteTest {
         rewriteRun(
           python(
             """
-             from math import (
-                 sin,
-                 cos
-             )
-             """
+              from math import (
+                  sin,
+                  cos
+              )
+              """
           )
         );
     }

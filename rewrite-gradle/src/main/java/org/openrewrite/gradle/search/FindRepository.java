@@ -61,8 +61,8 @@ public class FindRepository extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher pluginManagementMatcher = new MethodMatcher("RewriteSettings pluginManagement(..)");
-        MethodMatcher buildscriptMatcher = new MethodMatcher("RewriteGradleProject buildscript(..)");
+        MethodMatcher pluginManagementMatcher = new MethodMatcher("org.gradle.api.initialization.Settings pluginManagement(..)", true);
+        MethodMatcher buildscriptMatcher = new MethodMatcher("org.gradle.api.Project buildscript(..)", true);
         return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {

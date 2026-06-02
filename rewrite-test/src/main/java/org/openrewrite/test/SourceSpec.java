@@ -125,7 +125,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
 
     public SourceSpec<T> markers(Marker... markers) {
         for (Marker marker : markers) {
-            this.markers = this.markers.computeByType(marker, (existing, replacement) -> existing);
+            this.markers = this.markers.add(marker);
         }
         return this;
     }
@@ -148,6 +148,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         return this;
     }
 
+    @SuppressWarnings("unused")
     public SourceSpec<T> beforeRecipeParseError(ThrowingConsumer<ParseError> beforeRecipe) {
         return mapBeforeRecipe(t -> {
             if (t instanceof ParseError) {

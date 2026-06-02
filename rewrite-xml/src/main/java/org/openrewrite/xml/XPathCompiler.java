@@ -21,6 +21,7 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Token;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.xml.internal.ThrowingErrorListener;
 import org.openrewrite.xml.internal.grammar.XPathLexer;
 import org.openrewrite.xml.internal.grammar.XPathParser;
 
@@ -72,8 +73,13 @@ final class XPathCompiler {
     }
 
     private static CompiledXPath compileInternal(String expression) {
+        ThrowingErrorListener errorListener = new ThrowingErrorListener(expression);
         XPathLexer lexer = new XPathLexer(CharStreams.fromString(expression));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(errorListener);
         XPathParser parser = new XPathParser(new CommonTokenStream(lexer));
+        parser.removeErrorListeners();
+        parser.addErrorListener(errorListener);
         return compileXPathExpression(parser.xpathExpression());
     }
 

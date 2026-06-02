@@ -16,6 +16,8 @@
 package org.openrewrite.protobuf.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.protobuf.Assertions.proto;
@@ -32,6 +34,41 @@ class FieldTest implements RewriteTest {
                 optional uint32 age = 1;
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void fieldNamedGroup() {
+        rewriteRun(
+          proto(
+            """
+              syntax = 'proto2';
+              message MyMessage {
+                optional string group = 8;
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "bool", "bytes", "double", "enum", "extend", "fixed32", "fixed64", "float",
+      "group", "import", "int32", "int64", "map", "message", "oneof", "option",
+      "optional", "package", "public", "repeated", "required", "reserved",
+      "returns", "rpc", "service", "sfixed32", "sfixed64", "sint32", "sint64",
+      "stream", "string", "syntax", "to", "uint32", "uint64", "weak"
+    })
+    void fieldNamedAfterKeyword(String keyword) {
+        rewriteRun(
+          proto(
+            """
+              syntax = 'proto2';
+              message MyMessage {
+                optional bool %s = 1;
+              }
+              """.formatted(keyword)
           )
         );
     }

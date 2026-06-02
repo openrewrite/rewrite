@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -188,7 +187,6 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @Disabled("Parser does not support semicolon after package declaration yet")
     @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/396")
     @Test
     void semicolonAfterPackage() {
@@ -206,7 +204,6 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @Disabled("Parser does not support semicolon between imports yet")
     @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/396")
     @Test
     void semicolonBetweenImports() {
@@ -235,6 +232,27 @@ class ImportTest implements RewriteTest {
             """
               import java.util.List;
               ;class BetweenImport { }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6310")
+    @Test
+    void extraSemicolonAfterImportWithComment() {
+        rewriteRun(
+          spec -> spec
+            .typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+          java(
+            """
+              import java.util.*;; // Semicolon here
+              import java.io.*;   // Followed by another import
+
+              public class Main {
+                  public static void main(String[] args) {
+                      System.out.printf("Hello and welcome!");
+                  }
+              }
               """
           )
         );
