@@ -170,9 +170,7 @@ public class ModwRunner implements RewriteRunner {
     public static final String LICENSE_KEY_ENV = "MODERNE_LICENSE_KEY";
 
     /**
-     * Origin URL given to the staged fixture repo by default. A real public GitHub
-     * URL so the CLI's no-license open-source check passes; override per runner via
-     * the builder's {@code originUrl} when a different origin is needed.
+     * Origin URL given to the staged fixture repo by default.
      */
     public static final String DEFAULT_ORIGIN_URL = "https://github.com/openrewrite/rewrite.git";
 
@@ -240,8 +238,7 @@ public class ModwRunner implements RewriteRunner {
 
         String version = resolveCliVersion(cliVersion);
         initGitRepo(repoDir, originUrl);
-        System.out.println("[modw] CLI regression target version: " + version +
-                ", fixture origin: " + originUrl);
+        System.out.println("[modw] CLI regression target version: " + version);
         if (!downloadModw(version, modwScript)) {
             // The targeted CLI isn't published yet: interpret as a deliberate skip so
             // a known compatibility break can be silenced by pointing at the
@@ -256,6 +253,15 @@ public class ModwRunner implements RewriteRunner {
         Map<String, String> env = new HashMap<>();
         env.put("MODERNE_CLI_HOME", cliHome.toAbsolutePath().toString());
         env.put("MODERNE_WRAPPER_VERSION", version);
+
+        // modw needs a Java 25+ JDK. When this test JVM is already 25+ (the cliCompat
+        // task pins an Azul Zulu 25 toolchain), point modw at it explicitly via
+        // MODERNE_JAVA_HOME so the Gradle toolchain — not an ambient JAVA_HOME — governs
+        // the CLI's Java. Below 25 (e.g. an IDE run on an older JDK), leave modw to its
+        // own auto-detection so it can find a suitable JDK elsewhere.
+        if (runningJavaMajor() >= 25) {
+            env.put("MODERNE_JAVA_HOME", System.getProperty("java.home"));
+        }
 
         // Source the heavy platform distribution (~150MB+) from Artifactory too, when
         // it serves it; otherwise leave the wrapper on its Maven Central default.
@@ -413,6 +419,21 @@ public class ModwRunner implements RewriteRunner {
         return value == null || value.trim().isEmpty() ? null : value.trim();
     }
 
+    /** The major version of the JVM running this test (e.g. 8, 21, 25), Java 8-compatible. */
+    private static int runningJavaMajor() {
+        String spec = System.getProperty("java.specification.version", "");
+        try {
+            // "1.8" -> 8 (legacy scheme); "25" / "25.0.1" -> 25 (modern scheme).
+            if (spec.startsWith("1.")) {
+                return Integer.parseInt(spec.substring(2));
+            }
+            int dot = spec.indexOf('.');
+            return Integer.parseInt(dot >= 0 ? spec.substring(0, dot) : spec);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     /** Copy an environment variable from this JVM into the child process env when set. */
     private static void forwardIfPresent(Map<String, String> env, String name) {
         String value = System.getenv(name);
@@ -443,9 +464,6 @@ public class ModwRunner implements RewriteRunner {
      * serve the artifact, so the wrapper's own fallback still applies.
      */
     private static @Nullable String resolveArtifactoryDistributionUrl(String version) {
-        if (version.endsWith("-SNAPSHOT")) {
-            return null;
-        }
         String artifactId = distributionArtifactId();
         if (artifactId == null) {
             return null;
