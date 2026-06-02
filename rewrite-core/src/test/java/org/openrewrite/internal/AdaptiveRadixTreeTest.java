@@ -34,20 +34,30 @@ class AdaptiveRadixTreeTest {
     }
 
     @Test
-    void searchSurvivesDeepChain() {
+    void surviveDeepChainOnSmallStack() throws Exception {
         // Inserting a family of strict-extension keys ("a", "aa", "aaa", ...) builds
         // a chain of keyLength=0 internal nodes — one per extension. A recursive
-        // search walks one stack frame per byte of the longest key. With JVM defaults
-        // ~10k frames blows the stack; with the iterative implementation, even much
-        // longer keys are bounded by memory rather than the stack.
-        AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
-        int depth = 20_000;
-        StringBuilder sb = new StringBuilder(depth);
-        for (int i = 1; i <= depth; i++) {
-            sb.append('a');
-            tree.insert(sb.toString(), i);
+        // insert/search would walk one frame per byte; with the iterative
+        // implementation, even much longer keys are bounded by memory rather than the
+        // stack. Run on a small-stack thread so that the regression catches the bug
+        // regardless of JVM/platform defaults.
+        Throwable[] error = new Throwable[1];
+        Thread t = new Thread(null, () -> {
+            AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
+            int depth = 20_000;
+            StringBuilder sb = new StringBuilder(depth);
+            for (int i = 1; i <= depth; i++) {
+                sb.append('a');
+                tree.insert(sb.toString(), i);
+            }
+            assertThat(tree.search(sb.toString())).isEqualTo(depth);
+        }, "AdaptiveRadixTreeTest-smallStack", 128 * 1024);
+        t.setUncaughtExceptionHandler((thr, ex) -> error[0] = ex);
+        t.start();
+        t.join();
+        if (error[0] != null) {
+            throw new AssertionError("Failed on 128KB stack", error[0]);
         }
-        assertThat(tree.search(sb.toString())).isEqualTo(depth);
     }
 
     @Test

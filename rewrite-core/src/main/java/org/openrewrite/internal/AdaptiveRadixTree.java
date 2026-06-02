@@ -19,7 +19,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 @Incubating(since = "8.38.0")
 public class AdaptiveRadixTree<V> {
@@ -201,57 +203,93 @@ public class AdaptiveRadixTree<V> {
 
         @Override
         Node<V> insert(byte[] key, int depth, V value, KeyTable keyTable) {
-            if (!matchesPartialKey(key, depth, keyTable)) {
-                // Find common prefix length
-                int commonPrefix = 0;
-                int maxLength = Math.min(key.length - depth, keyLength);
-                while (commonPrefix < maxLength && key[depth + commonPrefix] == keyTable.get(keyOffset + commonPrefix)) {
-                    commonPrefix++;
+            // Iterative descent: each step strictly advances `depth`, so we bound work
+            // by the key length rather than the JVM stack. We push every internal node
+            // we pass through onto a path stack and, after performing the terminal
+            // action, walk back up rewriting child slots only as far as a node's
+            // identity actually changes.
+            List<InternalNode<V>> pathNodes = new ArrayList<>();
+            List<Byte> pathSlots = new ArrayList<>();
+            InternalNode<V> current = this;
+            Node<V> replacement;
+
+            while (true) {
+                if (current.keyLength != 0) {
+                    if (!current.matchesPartialKey(key, depth, keyTable)) {
+                        int commonPrefix = 0;
+                        int maxLength = Math.min(key.length - depth, current.keyLength);
+                        while (commonPrefix < maxLength &&
+                               key[depth + commonPrefix] == keyTable.get(current.keyOffset + commonPrefix)) {
+                            commonPrefix++;
+                        }
+
+                        Node4<V> newNode = current.split(commonPrefix, keyTable);
+
+                        int remainingNewLength = key.length - (depth + commonPrefix);
+                        if (remainingNewLength > 0) {
+                            byte firstByte = key[depth + commonPrefix];
+                            Node<V> leafNode = LeafNode.create(
+                                    key, depth + commonPrefix + 1, remainingNewLength - 1,
+                                    value, keyTable);
+                            InternalNode<V> grown = newNode.addChild(firstByte, leafNode, keyTable);
+                            replacement = grown != null ? grown : newNode;
+                        } else {
+                            newNode.value = value;
+                            replacement = newNode;
+                        }
+                        break;
+                    }
+                    depth += current.keyLength;
                 }
 
-                Node4<V> newNode = split(commonPrefix, keyTable);
-
-                // Handle remaining parts of new key
-                int remainingNewLength = key.length - (depth + commonPrefix);
-                if (remainingNewLength > 0) {
-                    byte firstByte = key[depth + commonPrefix];
-                    Node<V> leafNode = LeafNode.create(
-                            key, depth + commonPrefix + 1, remainingNewLength - 1,
-                            value, keyTable);
-                    InternalNode<V> grown = newNode.addChild(firstByte, leafNode, keyTable);
-                    return grown != null ? grown : newNode;
-                } else {
-                    newNode.value = value;
-                    return newNode;
+                if (depth == key.length) {
+                    current.value = value;
+                    replacement = current;
+                    break;
                 }
+
+                byte nextByte = key[depth];
+                Node<V> child = current.getChild(nextByte);
+
+                if (child == null) {
+                    Node<V> newChild = LeafNode.create(key, depth + 1, key.length - (depth + 1), value, keyTable);
+                    InternalNode<V> grown = current.addChild(nextByte, newChild, keyTable);
+                    replacement = grown != null ? grown : current;
+                    break;
+                }
+
+                if (!(child instanceof InternalNode)) {
+                    // LeafNode.insert is non-recursive and may return a new node.
+                    Node<V> newChild = child.insert(key, depth + 1, value, keyTable);
+                    if (newChild != child) {
+                        InternalNode<V> grown = current.addChild(nextByte, newChild, keyTable);
+                        replacement = grown != null ? grown : current;
+                    } else {
+                        replacement = current;
+                    }
+                    break;
+                }
+
+                pathNodes.add(current);
+                pathSlots.add(nextByte);
+                current = (InternalNode<V>) child;
+                depth++;
             }
 
-            depth += keyLength;
-
-            // We've reached the end of the key
-            if (depth == key.length) {
-                this.value = value;
-                return this;
+            // Walk back up. At each ancestor, point its slot at `replacement`. If the
+            // ancestor itself grew, that grown node becomes the next iteration's
+            // replacement; otherwise the ancestor's identity is preserved and nothing
+            // above needs touching, since their child pointers still resolve to it.
+            for (int i = pathNodes.size() - 1; i >= 0; i--) {
+                InternalNode<V> ancestor = pathNodes.get(i);
+                byte slot = pathSlots.get(i);
+                InternalNode<V> grown = ancestor.addChild(slot, replacement, keyTable);
+                if (grown == null) {
+                    return this;
+                }
+                replacement = grown;
             }
-
-            // Continue with child node
-            byte nextByte = key[depth];
-            Node<V> child = getChild(nextByte);
-
-            if (child == null) {
-                // Create new leaf node
-                Node<V> newChild = LeafNode.create(key, depth + 1, key.length - (depth + 1), value, keyTable);
-                InternalNode<V> grown = addChild(nextByte, newChild, keyTable);
-                return grown != null ? grown : this;
-            }
-
-            // Recursively insert into child node
-            Node<V> newChild = child.insert(key, depth + 1, value, keyTable);
-            if (newChild != child) {
-                InternalNode<V> grown = addChild(nextByte, newChild, keyTable);
-                return grown != null ? grown : this;
-            }
-            return this;
+            return replacement;
         }
 
         private Node4<V> split(int commonPrefix, KeyTable keyTable) {
