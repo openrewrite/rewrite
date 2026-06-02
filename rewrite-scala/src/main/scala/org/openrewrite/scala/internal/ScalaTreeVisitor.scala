@@ -51,6 +51,7 @@ import org.openrewrite.scala.tree.S
 
 import java.util
 import java.util.{Collections, Arrays}
+import scala.jdk.CollectionConverters.*
 
 /**
  * Visitor that traverses the Scala compiler AST and builds OpenRewrite LST nodes.
@@ -5807,16 +5808,7 @@ class ScalaTreeVisitor(
       Markers.EMPTY
     )
     
-    // Resolve type: try span-based first, then derive from the base clazz type
-    var paramType: JavaType = typeOfTree(at)
-    if (paramType == null) {
-      // Fall back to the type of the base class identifier (e.g., List → java.util.List)
-      paramType = clazz match {
-        case id: J.Identifier => id.getType
-        case fa: J.FieldAccess => fa.getType
-        case _ => null
-      }
-    }
+    val paramType = parameterizedTypeForAppliedTypeTree(clazz, typeArgs, typeOfTree(at))
 
     new J.ParameterizedType(
       Tree.randomId(),
@@ -5826,6 +5818,42 @@ class ScalaTreeVisitor(
       typeParameters,
       paramType
     )
+  }
+
+  private def parameterizedTypeForAppliedTypeTree(
+    clazz: NameTree,
+    typeArgs: util.List[JRightPadded[Expression]],
+    mappedType: JavaType
+  ): JavaType = mappedType match {
+    case pt: JavaType.Parameterized => pt
+    case _ =>
+      val fallbackType =
+        if (mappedType == null || mappedType.isInstanceOf[JavaType.Unknown]) clazz.getType
+        else mappedType
+
+      fallbackType match {
+        case pt: JavaType.Parameterized if !typeArgs.isEmpty =>
+          new JavaType.Parameterized(null, pt.getType, typeArgs.asScala.map(typeArgType).asJava)
+        case fq: JavaType.FullyQualified if !fq.isInstanceOf[JavaType.Unknown] && !typeArgs.isEmpty =>
+          new JavaType.Parameterized(null, fq, typeArgs.asScala.map(typeArgType).asJava)
+        case _ =>
+          mappedType
+      }
+  }
+
+  private def typeArgType(arg: JRightPadded[Expression]): JavaType = {
+    arg.getElement.getType match {
+      case null | _: JavaType.Unknown =>
+      case t => return t
+    }
+
+    arg.getElement match {
+      case id: J.Identifier =>
+        val mapped = typeForName(id.getSimpleName)
+        if (mapped != null) mapped else JavaType.Unknown.getInstance()
+      case _ =>
+        JavaType.Unknown.getInstance()
+    }
   }
 
   /**

@@ -118,13 +118,31 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
       case Some(sym) =>
         try {
           val tpe = sym.info
-          if (tpe == null || tpe == NoType) null
-          else mapType(tpe)
+          val mapped = if (tpe == null || tpe == NoType) null else mapType(tpe)
+          if (mapped == null || mapped.isInstanceOf[JavaType.Unknown]) typeForPredefAlias(name)
+          else mapped
         } catch {
-          case _: Throwable => null
+          case _: Throwable => typeForPredefAlias(name)
         }
-      case None => null
+      case None => typeForPredefAlias(name)
     }
+  }
+
+  private def typeForPredefAlias(name: String): JavaType = name match {
+    case "String" => JavaType.ShallowClass.build("java.lang.String")
+    case "Int" => JavaType.Primitive.Int
+    case "Long" => JavaType.Primitive.Long
+    case "Short" => JavaType.Primitive.Short
+    case "Byte" => JavaType.Primitive.Byte
+    case "Char" => JavaType.Primitive.Char
+    case "Float" => JavaType.Primitive.Float
+    case "Double" => JavaType.Primitive.Double
+    case "Boolean" => JavaType.Primitive.Boolean
+    case "Unit" => JavaType.Primitive.Void
+    case "Any" | "AnyRef" => JavaType.ShallowClass.build("java.lang.Object")
+    case "Null" => JavaType.Primitive.Null
+    case "Nothing" => JavaType.ShallowClass.build("scala.Nothing")
+    case _ => null
   }
 
   /** Look up JavaType.Method by span start position. */
