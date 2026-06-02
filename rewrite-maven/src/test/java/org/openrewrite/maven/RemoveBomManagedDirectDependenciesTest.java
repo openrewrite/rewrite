@@ -49,6 +49,10 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
                   </dependencyManagement>
                   <dependencies>
                       <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-web</artifactId>
+                      </dependency>
+                      <dependency>
                           <groupId>org.apache.tomcat.embed</groupId>
                           <artifactId>tomcat-embed-core</artifactId>
                           <version>9.0.50</version>
@@ -72,6 +76,53 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-web</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    /**
+     * The recipe should not remove a direct dependency that is not reachable transitively
+     * through another direct dependency: removing it would drop it from the classpath entirely,
+     * breaking the build. In that case the user should instead drop the version via
+     * {@code RemoveRedundantDependencyVersions} (or upgrade the dependency explicitly).
+     */
+    @Test
+    void keepDependencyNotReachableTransitively() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveBomManagedDirectDependencies(
+              "org.springframework.boot", "*-dependencies", "*", "*")),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>test</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-dependencies</artifactId>
+                              <version>3.0.0</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.apache.tomcat.embed</groupId>
+                          <artifactId>tomcat-embed-core</artifactId>
+                          <version>9.0.50</version>
+                      </dependency>
+                  </dependencies>
               </project>
               """
           )
@@ -272,6 +323,10 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
                       <artifactId>child</artifactId>
                       <dependencies>
                           <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-starter-web</artifactId>
+                          </dependency>
+                          <dependency>
                               <groupId>org.apache.tomcat.embed</groupId>
                               <artifactId>tomcat-embed-core</artifactId>
                               <version>9.0.50</version>
@@ -287,6 +342,12 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
                           <version>1.0-SNAPSHOT</version>
                       </parent>
                       <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-starter-web</artifactId>
+                          </dependency>
+                      </dependencies>
                   </project>
                   """
             )
@@ -318,6 +379,10 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
                   </dependencyManagement>
                   <dependencies>
                       <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-web</artifactId>
+                      </dependency>
+                      <dependency>
                           <groupId>org.apache.tomcat.embed</groupId>
                           <artifactId>tomcat-embed-core</artifactId>
                           <version>9.0.50</version>
@@ -347,6 +412,10 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
                       </dependencies>
                   </dependencyManagement>
                   <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-web</artifactId>
+                      </dependency>
                       <dependency>
                           <groupId>com.fasterxml.jackson.core</groupId>
                           <artifactId>jackson-core</artifactId>

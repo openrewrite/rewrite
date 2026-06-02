@@ -22,13 +22,25 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedManagedDependency;
+import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static java.util.Collections.singletonList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
@@ -75,7 +87,10 @@ public class RemoveBomManagedDirectDependencies extends Recipe {
         return "Removes directly declared dependencies when they have a version that is incompatible with " +
                "the version managed by an imported BOM. This is useful during framework upgrades (e.g., Spring Boot) " +
                "where transitive dependencies receive major version bumps and explicitly declared older versions " +
-               "should be removed to use the BOM-managed versions instead.";
+               "should be removed to use the BOM-managed versions instead. " +
+               "A dependency is only removed when it would still be reachable transitively through another " +
+               "direct dependency, so the BOM-managed version takes its place rather than the dependency " +
+               "disappearing from the classpath.";
     }
 
     @Override
@@ -123,7 +138,9 @@ public class RemoveBomManagedDirectDependencies extends Recipe {
                             String managedVersion = managedDep.getVersion();
                             String resolvedDeclaredVersion = getResolutionResult().getPom().getValue(declaredVersion);
 
-                            if (resolvedDeclaredVersion != null && hasDifferentMajorVersion(resolvedDeclaredVersion, managedVersion)) {
+                            if (resolvedDeclaredVersion != null &&
+                                hasDifferentMajorVersion(resolvedDeclaredVersion, managedVersion) &&
+                                isReachableViaOtherDirectDependency(dependency, ctx)) {
                                 doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                                 maybeUpdateModel();
                             }
@@ -153,6 +170,61 @@ public class RemoveBomManagedDirectDependencies extends Recipe {
                 String declaredMajor = Semver.majorVersion(declaredVersion);
                 String managedMajor = Semver.majorVersion(managedVersion);
                 return !declaredMajor.equals(managedMajor);
+            }
+
+            /**
+             * Returns true if the given direct dependency would still be reachable transitively
+             * if it were removed. Because Maven dependency mediation already collapsed any deeper
+             * occurrences of the target onto the depth-0 direct declaration, the resolved tree
+             * alone is not enough to answer this question: we have to inspect the raw POMs of the
+             * other resolved dependencies to see whether any of them declare the target as a
+             * dependency. This guards against removing a dependency that is only present because
+             * it is declared directly.
+             */
+            private boolean isReachableViaOtherDirectDependency(ResolvedDependency target, ExecutionContext ctx) {
+                String targetGroupId = target.getGroupId();
+                String targetArtifactId = target.getArtifactId();
+                ResolvedPom rootPom = getResolutionResult().getPom();
+                MavenPomDownloader downloader = new MavenPomDownloader(ctx);
+                Set<String> visited = new HashSet<>();
+                for (Map.Entry<Scope, List<ResolvedDependency>> entry : getResolutionResult().getDependencies().entrySet()) {
+                    Scope scope = entry.getKey();
+                    if (scope != Scope.Compile && scope != Scope.Runtime && scope != Scope.Provided) {
+                        continue;
+                    }
+                    for (ResolvedDependency rd : entry.getValue()) {
+                        if (rd.getGroupId().equals(targetGroupId) && rd.getArtifactId().equals(targetArtifactId)) {
+                            continue;
+                        }
+                        String key = rd.getGroupId() + ":" + rd.getArtifactId();
+                        if (!visited.add(key)) {
+                            continue;
+                        }
+                        try {
+                            List<MavenRepository> repos = rootPom.getRepositories();
+                            if (repos.isEmpty()) {
+                                repos = singletonList(MavenRepository.MAVEN_CENTRAL);
+                            }
+                            Pom pom = downloader.download(rd.getGav().asGroupArtifactVersion(), null, rootPom, repos);
+                            for (Dependency declared : pom.getDependencies()) {
+                                String g = pom.getValue(declared.getGroupId());
+                                String a = pom.getValue(declared.getArtifactId());
+                                if (g == null || a == null) {
+                                    continue;
+                                }
+                                if (g.equals(targetGroupId) && a.equals(targetArtifactId)) {
+                                    String declaredScope = declared.getScope();
+                                    if (declaredScope == null || "compile".equals(declaredScope) || "runtime".equals(declaredScope)) {
+                                        return true;
+                                    }
+                                }
+                            }
+                        } catch (Exception ignored) {
+                            // skip on download failure; the dep is conservatively treated as unreachable here
+                        }
+                    }
+                }
+                return false;
             }
         };
     }

@@ -86,7 +86,10 @@ public class RemoveBomManagedDirectDependencies extends Recipe {
         return "Removes directly declared dependencies when they have a version that is incompatible with " +
                "the version managed by an imported BOM (platform or enforcedPlatform). This is useful during " +
                "framework upgrades (e.g., Spring Boot) where transitive dependencies receive major version " +
-               "bumps and explicitly declared older versions should be removed to use the BOM-managed versions instead.";
+               "bumps and explicitly declared older versions should be removed to use the BOM-managed versions instead. " +
+               "A dependency is only removed when it would still be reachable transitively through another " +
+               "direct dependency in every configuration where it is declared, so the BOM-managed version takes " +
+               "its place rather than the dependency disappearing from the classpath.";
     }
 
     @Override
@@ -184,12 +187,60 @@ public class RemoveBomManagedDirectDependencies extends Recipe {
                     String managedVersion = findManagedVersion(dep.getGroupId(), dep.getArtifactId(),
                             dep.getRequested().getClassifier(), configName);
 
-                    if (managedVersion != null && hasDifferentMajorVersion(declaredVersion, managedVersion)) {
+                    if (managedVersion != null &&
+                        hasDifferentMajorVersion(declaredVersion, managedVersion) &&
+                        isReachableViaOtherDirectDependency(dep)) {
                         statementsToRemove.add(m);
                     }
 
                     return m;
                 }
+            }
+
+            /**
+             * Returns true if the given direct dependency would still be reachable in every resolved
+             * configuration where it appears as a direct dependency via another direct dependency's
+             * transitive closure. This guards against removing a dependency that is only present
+             * because it is declared directly.
+             */
+            private boolean isReachableViaOtherDirectDependency(ResolvedDependency target) {
+                String targetGroupId = target.getGroupId();
+                String targetArtifactId = target.getArtifactId();
+                boolean foundInAnyConfig = false;
+                for (GradleDependencyConfiguration cfg : gp.getConfigurations()) {
+                    List<ResolvedDependency> direct = cfg.getDirectResolved();
+                    boolean targetIsDirectHere = false;
+                    for (ResolvedDependency d : direct) {
+                        if (d.getGroupId().equals(targetGroupId) && d.getArtifactId().equals(targetArtifactId)) {
+                            targetIsDirectHere = true;
+                            break;
+                        }
+                    }
+                    if (!targetIsDirectHere) {
+                        continue;
+                    }
+                    foundInAnyConfig = true;
+                    boolean reachableHere = false;
+                    for (ResolvedDependency directDep : direct) {
+                        if (directDep.getGroupId().equals(targetGroupId) &&
+                            directDep.getArtifactId().equals(targetArtifactId)) {
+                            continue;
+                        }
+                        for (ResolvedDependency child : directDep.getDependencies()) {
+                            if (!child.findDependencies(targetGroupId, targetArtifactId).isEmpty()) {
+                                reachableHere = true;
+                                break;
+                            }
+                        }
+                        if (reachableHere) {
+                            break;
+                        }
+                    }
+                    if (!reachableHere) {
+                        return false;
+                    }
+                }
+                return foundInAnyConfig;
             }
 
             private @Nullable String findManagedVersion(String groupId, String artifactId, @Nullable String classifier, String configName) {

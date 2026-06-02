@@ -49,6 +49,7 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
 
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web")
                   implementation("org.apache.tomcat.embed:tomcat-embed-core:9.0.50")
               }
               """,
@@ -63,6 +64,35 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
 
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web")
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * The recipe should not remove a direct dependency that is not reachable transitively
+     * through another direct dependency: removing it would drop it from the classpath entirely,
+     * breaking the build. In that case the user should instead drop the version (e.g. via
+     * {@code RemoveRedundantDependencyVersions}) or upgrade the dependency explicitly.
+     */
+    @Test
+    void keepDependencyNotReachableTransitively() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.apache.tomcat.embed:tomcat-embed-core:9.0.50")
               }
               """
           )
@@ -150,6 +180,7 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
 
               dependencies {
                   implementation(enforcedPlatform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web")
                   implementation("org.apache.tomcat.embed:tomcat-embed-core:9.0.50")
               }
               """,
@@ -164,6 +195,7 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
 
               dependencies {
                   implementation(enforcedPlatform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web")
               }
               """
           )
@@ -185,6 +217,7 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
 
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web")
                   implementation(group: "org.apache.tomcat.embed", name: "tomcat-embed-core", version: "9.0.50")
               }
               """,
@@ -199,6 +232,7 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
 
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web")
               }
               """
           )
@@ -222,6 +256,7 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
 
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web")
                   implementation("org.apache.tomcat.embed:tomcat-embed-core:9.0.50")
                   implementation("com.fasterxml.jackson.core:jackson-core:2.10.0")
               }
@@ -237,6 +272,7 @@ class RemoveBomManagedDirectDependenciesTest implements RewriteTest {
 
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.springframework.boot:spring-boot-starter-web")
                   implementation("com.fasterxml.jackson.core:jackson-core:2.10.0")
               }
               """
