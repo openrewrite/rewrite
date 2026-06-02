@@ -40,7 +40,7 @@ class GroovySlf4jTest implements RewriteTest {
     }
 
     @Test
-    void slf4jWithCConcatenation() {
+    void slf4jWithConcatenation() {
         rewriteRun(
           groovy(
             """
