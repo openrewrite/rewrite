@@ -173,26 +173,30 @@ public class AdaptiveRadixTree<V> {
         @Override
         @Nullable
         V search(byte[] key, int depth, KeyTable keyTable) {
-            // Fast path for empty partial key
-            if (keyLength == 0) {
-                if (depth == key.length) {
-                    return value;
+            // Iterative descent: each step strictly advances `depth`, so we bound work
+            // by the key length rather than the JVM stack. LeafNode.search remains
+            // non-recursive and is delegated to when we land on one.
+            InternalNode<V> node = this;
+            while (true) {
+                if (node.keyLength != 0) {
+                    if (!node.matchesPartialKey(key, depth, keyTable)) return null;
+                    depth += node.keyLength;
                 }
-                Node<V> child = getChild(key[depth]);
-                return child != null ? child.search(key, depth + 1, keyTable) : null;
+
+                if (depth == key.length) {
+                    return node.value;
+                }
+
+                Node<V> child = node.getChild(key[depth]);
+                if (child == null) return null;
+                depth++;
+
+                if (child instanceof InternalNode) {
+                    node = (InternalNode<V>) child;
+                } else {
+                    return child.search(key, depth, keyTable);
+                }
             }
-
-            if (!matchesPartialKey(key, depth, keyTable)) return null;
-            depth += keyLength;
-
-            // We've reached the end of the search key
-            if (depth == key.length) {
-                return value;
-            }
-
-            // If there's more key to search but we've found a value, keep searching
-            Node<V> child = getChild(key[depth]);
-            return child != null ? child.search(key, depth + 1, keyTable) : null;
         }
 
         @Override

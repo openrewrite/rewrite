@@ -34,6 +34,23 @@ class AdaptiveRadixTreeTest {
     }
 
     @Test
+    void searchSurvivesDeepChain() {
+        // Inserting a family of strict-extension keys ("a", "aa", "aaa", ...) builds
+        // a chain of keyLength=0 internal nodes — one per extension. A recursive
+        // search walks one stack frame per byte of the longest key. With JVM defaults
+        // ~10k frames blows the stack; with the iterative implementation, even much
+        // longer keys are bounded by memory rather than the stack.
+        AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
+        int depth = 20_000;
+        StringBuilder sb = new StringBuilder(depth);
+        for (int i = 1; i <= depth; i++) {
+            sb.append('a');
+            tree.insert(sb.toString(), i);
+        }
+        assertThat(tree.search(sb.toString())).isEqualTo(depth);
+    }
+
+    @Test
     void fullInternaNode() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("cat", 1);
