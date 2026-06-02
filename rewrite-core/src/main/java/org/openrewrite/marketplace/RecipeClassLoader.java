@@ -101,7 +101,7 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.java.TypeNameMatcher",
             "org.openrewrite.java.internal.TypesInUse",
             "org.openrewrite.java.TypeNameMatcher",
-            // Cursor-message wiring (TYPE_FACTORY_PROVIDER_KEY) passes a Provider
+            // Cursor-message wiring (TYPE_FACTORY_KEY) passes a JavaTypeFactory
             // implementation across the recipe/parent classloader boundary; the
             // interface must be shared so the cast in JavaTemplateParser succeeds.
             "org.openrewrite.java.internal.JavaTypeFactory",

@@ -54,7 +54,7 @@ public class JavaTemplateParser {
      * reuse of types resolved during the main parse. Per-file cursors may
      * override the root default to provide per-classpath factories.
      */
-    public static final String TYPE_FACTORY_PROVIDER_KEY = "org.openrewrite.java.typeFactoryProvider";
+    public static final String TYPE_FACTORY_KEY = "org.openrewrite.java.typeFactory";
 
     private static final String PACKAGE_STUB = "package #{}; class $Template {}";
     private static final String PARAMETER_STUB = "abstract class $Template { abstract void $template(#{}); }";
@@ -288,9 +288,9 @@ public class JavaTemplateParser {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
-        JavaTypeFactory.Provider typeFactoryProvider = cursor.getNearestMessage(TYPE_FACTORY_PROVIDER_KEY);
-        if (parser instanceof JavaParser.Builder && typeFactoryProvider != null) {
-            ((JavaParser.Builder<?, ?>) parser).typeFactoryProvider(typeFactoryProvider);
+        JavaTypeFactory typeFactory = cursor.getNearestMessage(TYPE_FACTORY_KEY);
+        if (parser instanceof JavaParser.Builder && typeFactory != null) {
+            ((JavaParser.Builder<?, ?>) parser).typeFactory(typeFactory);
         }
         Parser jp = parser.build();
         return getJavaSourceFile(stub, jp, ctx)

@@ -33,9 +33,9 @@ import static java.util.Collections.newSetFromMap;
  * type tables built from class files (where ASM provides the descriptors).
  * <p>
  * Type signatures (class, parameterized, generic, array, primitive) use the
- * same format as {@link DefaultJavaTypeSignatureBuilder} since these are used
- * as FQN-based cache keys and must be consistent with
- * {@link JavaTypeFactory#get(String)} lookups.
+ * same format as {@link DefaultJavaTypeSignatureBuilder} since these are
+ * used as FQN-based cache keys (the FQN passed to
+ * {@link JavaTypeFactory#computeClass}).
  * <p>
  * Method signatures: {@code declaringFQN.methodName:(paramDescriptors)returnDescriptor}
  * <br>Example: {@code java.lang.String.substring:(II)Ljava/lang/String;}

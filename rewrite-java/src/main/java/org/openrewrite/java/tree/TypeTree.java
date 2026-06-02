@@ -29,27 +29,18 @@ import static org.openrewrite.Tree.randomId;
 public interface TypeTree extends NameTree {
 
     static <T extends TypeTree & Expression> T build(String fullyQualifiedName) {
-        return TypeTree.build(fullyQualifiedName, null, JavaType.ShallowClass::build);
-    }
-
-    static <T extends TypeTree & Expression> T build(String fullyQualifiedName, @Nullable Character escape) {
-        return TypeTree.build(fullyQualifiedName, escape, JavaType.ShallowClass::build);
+        return TypeTree.build(fullyQualifiedName, null);
     }
 
     /**
-     * Build a dotted-name {@link TypeTree} routing each Uppercased leaf
-     * through {@code typeFor} instead of allocating a fresh
-     * {@link JavaType.ShallowClass}. Parser code should pass
-     * {@code typeFactory::computeClass} (or a wrapper around it) so
-     * type-table-backed factories hand back the canonical
-     * {@link JavaType.Class} they carry — see
-     * {@code ReloadableJavaXTypeMapping.classFor}.
-     *
-     * @param typeFor maps an FQN to its canonical {@link JavaType.Class}
+     * Build a dotted-name {@link TypeTree}. Each Uppercased segment becomes a
+     * {@link J.FieldAccess} whose type is a fresh {@link JavaType.ShallowClass}
+     * for that segment's FQN. This produces a usable name tree without going
+     * through a parser's type factory &mdash; recipes that need richer
+     * attribution should construct the tree themselves and attach the
+     * resolved {@link JavaType} via {@code .withType(...)}.
      */
-    static <T extends TypeTree & Expression> T build(String fullyQualifiedName,
-                                                      @Nullable Character escape,
-                                                      java.util.function.Function<String, JavaType.Class> typeFor) {
+    static <T extends TypeTree & Expression> T build(String fullyQualifiedName, @Nullable Character escape) {
         StringBuilder fullName = new StringBuilder();
         Expression expr = null;
         String nextLeftPad = "";
@@ -118,7 +109,7 @@ public interface TypeTree extends NameTree {
                                     Markers.EMPTY
                             ),
                             Character.isUpperCase(part.charAt(0)) ?
-                                    typeFor.apply(fullName.toString()) :
+                                    JavaType.ShallowClass.build(fullName.toString()) :
                                     null
                     );
                 }
