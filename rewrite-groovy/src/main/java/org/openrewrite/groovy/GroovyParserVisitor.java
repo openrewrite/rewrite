@@ -4163,15 +4163,26 @@ public class GroovyParserVisitor {
      * identifier segments.
      */
     private J.FieldAccess buildImportQualid(ImportNode importNode, Space prefix) {
-        // Build [outermost, ..., leaf] class chain. Empty for package star imports.
-        List<ClassNode> classChain = new ArrayList<>();
-        for (ClassNode c = importNode.getType(); c != null; c = c.getOuterClass()) {
-            classChain.add(0, c);
+        // Build the [outermost, ..., leaf] chain of resolved class types so each class segment
+        // carries its own type. ClassNode.getOuterClass() is unreliable for resolved import types
+        // (it returns null even for nested classes like java.util.Map.Entry), so instead we walk
+        // the owning-class links of the attributed leaf type, which proper type attribution
+        // populates from the JVM enclosing-class chain. Empty for star/package imports and for
+        // types that can't be resolved (asFullyQualified returns null for JavaType.Unknown).
+        List<JavaType.FullyQualified> classChain = new ArrayList<>();
+        if (importNode.getType() != null) {
+            JavaType leaf = typeMapping.type(importNode.getType());
+            if (leaf instanceof JavaType.Parameterized) {
+                leaf = ((JavaType.Parameterized) leaf).getType();
+            }
+            for (JavaType.FullyQualified c = TypeUtils.asFullyQualified(leaf); c != null; c = c.getOwningClass()) {
+                classChain.add(0, c);
+            }
         }
         int packageSegmentCount = 0;
         if (!classChain.isEmpty()) {
             String pkg = classChain.get(0).getPackageName();
-            if (pkg != null && !pkg.isEmpty()) {
+            if (!pkg.isEmpty()) {
                 packageSegmentCount = 1;
                 for (int i = 0; i < pkg.length(); i++) {
                     if (pkg.charAt(i) == '.') packageSegmentCount++;
@@ -4207,8 +4218,7 @@ public class GroovyParserVisitor {
             if (!"*".equals(segment)) {
                 int classIdx = segmentIndex - packageSegmentCount;
                 if (classIdx >= 0 && classIdx < classChain.size()) {
-                    JavaType t = typeMapping.type(classChain.get(classIdx));
-                    segmentType = t instanceof JavaType.Parameterized ? ((JavaType.Parameterized) t).getType() : t;
+                    segmentType = classChain.get(classIdx);
                 }
             }
 
