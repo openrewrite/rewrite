@@ -20,6 +20,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.golang.marker.GoProject;
 import org.openrewrite.golang.tree.Go;
+import org.openrewrite.golang.tree.GoMod;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -61,8 +62,8 @@ public final class Assertions {
         });
     }
 
-    public static SourceSpecs goMod(@Nullable String before, Consumer<SourceSpec<PlainText>> spec) {
-        SourceSpec<PlainText> goMod = new SourceSpec<>(PlainText.class, null, GoModParser.builder(), before, null);
+    public static SourceSpecs goMod(@Nullable String before, Consumer<SourceSpec<GoMod>> spec) {
+        SourceSpec<GoMod> goMod = new SourceSpec<>(GoMod.class, null, GoModParser.builder(), before, null);
         goMod.path("go.mod");
         spec.accept(goMod);
         return goMod;
@@ -74,8 +75,8 @@ public final class Assertions {
     }
 
     public static SourceSpecs goMod(@Nullable String before, String after,
-                                    Consumer<SourceSpec<PlainText>> spec) {
-        SourceSpec<PlainText> goMod = new SourceSpec<>(PlainText.class, null, GoModParser.builder(), before, s -> after);
+                                    Consumer<SourceSpec<GoMod>> spec) {
+        SourceSpec<GoMod> goMod = new SourceSpec<>(GoMod.class, null, GoModParser.builder(), before, s -> after);
         goMod.path("go.mod");
         spec.accept(goMod);
         return goMod;
