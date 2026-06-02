@@ -24,7 +24,7 @@ import dotty.tools.dotc.core.Symbols.Symbol
 import dotty.tools.dotc.core.Types.*
 import dotty.tools.dotc.util.Spans
 
-import org.openrewrite.java.internal.JavaTypeFactory
+import org.openrewrite.java.internal.{JavaReflectionTypeMapping, JavaTypeFactory}
 import org.openrewrite.java.tree.{Flag, JavaType, TypeUtils}
 
 import java.util
@@ -45,6 +45,11 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
 
   private val signatureBuilder = new ScalaTypeSignatureBuilder
   private val unknown: JavaType = JavaType.Unknown.getInstance()
+
+  // For mapping Scala constant tags and other real Java classes (like
+  // java.lang.String) through proper reflection-driven type attribution
+  // rather than a synthetic stub.
+  private val reflectionTypeMapping = new JavaReflectionTypeMapping(typeFactory)
 
   // Span-based lookup: start position → typed tree nodes (multiple nodes may share a start position)
   // Uses start position only — end positions may differ between untpd and tpd trees
@@ -240,8 +245,6 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
     if (tpe == null || tpe == NoType) return null
 
     val sig = signatureBuilder.signature(tpe)
-    val existing: JavaType = typeFactory.get(sig)
-    if (existing != null) return existing
 
     try {
       tpe.dealias match {
@@ -262,12 +265,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
             case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
             case other => other
           }
-          val normalizedSig = normalizedFqn
-          val existingNorm: JavaType = typeFactory.get(normalizedSig)
-          if (existingNorm != null && existingNorm.isInstanceOf[JavaType.FullyQualified])
-            existingNorm.asInstanceOf[JavaType.FullyQualified]
-          else
-            mapClassType(ci.cls, normalizedFqn, normalizedSig)
+          mapClassType(ci.cls, normalizedFqn, normalizedFqn)
         case mt: MethodType => mapMethodResultType(mt)
         case pt: PolyType => mapMethodResultType(pt.resultType)
         case _ => unknown
@@ -295,7 +293,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
       case Constants.LongTag => JavaType.Primitive.Long
       case Constants.FloatTag => JavaType.Primitive.Float
       case Constants.DoubleTag => JavaType.Primitive.Double
-      case Constants.StringTag => JavaType.ShallowClass.build("java.lang.String")
+      case Constants.StringTag => reflectionTypeMapping.`type`(classOf[String])
       case Constants.NullTag => JavaType.Primitive.Null
       case Constants.UnitTag => JavaType.Primitive.Void
       case _ => mapType(ct.underlying)
@@ -346,7 +344,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
       case _ => return unknown
     }
 
-    typeFactory.computeParameterized(sig, at, (pt: JavaType.Parameterized) => {
+    typeFactory.computeParameterized(sig, (pt: JavaType.Parameterized) => {
       val typeArgs = new ArrayList[JavaType]()
       at.args.foreach { arg =>
         val mapped = mapType(arg)
@@ -358,7 +356,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
 
   private def mapGenericTypeVariable(tp: TypeParamRef, sig: String): JavaType = {
     val name = tp.paramName.toString
-    typeFactory.computeGenericTypeVariable(sig, name, JavaType.GenericTypeVariable.Variance.INVARIANT, tp,
+    typeFactory.computeGenericTypeVariable(sig, name, JavaType.GenericTypeVariable.Variance.INVARIANT,
       (gtv: JavaType.GenericTypeVariable) => {
         var bounds: ArrayList[JavaType] = null
         var resolvedVariance = JavaType.GenericTypeVariable.Variance.INVARIANT
@@ -379,7 +377,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
   }
 
   private def mapTypeBounds(tb: TypeBounds, sig: String): JavaType = {
-    typeFactory.computeGenericTypeVariable(sig, "?", JavaType.GenericTypeVariable.Variance.INVARIANT, tb,
+    typeFactory.computeGenericTypeVariable(sig, "?", JavaType.GenericTypeVariable.Variance.INVARIANT,
       (gtv: JavaType.GenericTypeVariable) => {
         var bounds: ArrayList[JavaType] = null
         var variance = JavaType.GenericTypeVariable.Variance.INVARIANT
@@ -399,13 +397,10 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
   }
 
   def mapClassType(sym: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
-    val existing: JavaType = typeFactory.get(sig)
-    if (existing != null && existing.isInstanceOf[JavaType.FullyQualified])
-      return existing.asInstanceOf[JavaType.FullyQualified]
-
-    // Use ShallowClass for library types to avoid deep recursive type hierarchies
-    // that cause StackOverflowError in recipes like ChangeType.
-    // Source-defined classes (those with a sourceFile) get full population.
+    // Synthesize a canonical-but-empty Class for library types to avoid deep
+    // recursive type hierarchies that cause StackOverflowError in recipes like
+    // ChangeType. Source-defined classes (those with a sourceFile) get full
+    // population below.
     val isSourceDefined = try {
       val src = sym.source
       src != null && src.exists && !sym.is(Flags.JavaDefined) && src.name.endsWith(".scala")
@@ -414,9 +409,9 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
     }
 
     if (!isSourceDefined) {
-      val shallow = JavaType.ShallowClass.build(fqn)
-      typeFactory.put(sig, shallow)
-      return shallow
+      return typeFactory.computeClass(fqn, Flag.Public.getBitMask, JavaType.FullyQualified.Kind.Class, _ => {
+        // Library type — body intentionally not populated.
+      })
     }
 
     val kind = if (sym.is(Flags.Trait)) JavaType.FullyQualified.Kind.Interface
@@ -425,7 +420,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
 
     val flagsBits = mapFlags(sym)
 
-    typeFactory.computeClass(sig, fqn, flagsBits, kind, sym, (clazz: JavaType.Class) => {
+    typeFactory.computeClass(fqn, flagsBits, kind, (clazz: JavaType.Class) => {
       // For source-defined classes, populate members and methods (but use ShallowClass for supertypes)
       val supertype: JavaType.FullyQualified = try {
         val parentTypes = sym.info match {
@@ -514,7 +509,9 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
       case _ => null
     }
 
-    typeFactory.computeMethod(sig, flagsBits, name, paramNamesArr, null, null, sym, (method: JavaType.Method) => {
+    val finalParamNames = paramNamesArr
+    typeFactory.methodFor(sig, () => {
+      val method = new JavaType.Method(null, flagsBits, null, name, null, finalParamNames, null, null, null, null, null)
       val paramTypes: util.List[JavaType] = sym.info match {
         case mt: MethodType =>
           val pts = new ArrayList[JavaType]()
@@ -538,6 +535,7 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
       val returnType = mapType(sym.info.finalResultType)
 
       method.unsafeSet(declaringType, returnType, paramTypes, null, null)
+      method
     })
   }
 
@@ -546,19 +544,24 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
 
     val sig = signatureBuilder.variableSignature(sym)
     val flagsBits = mapFlags(sym)
-    typeFactory.computeVariable(sig, flagsBits, sym.name.toString, sym, (variable: JavaType.Variable) => {
+    typeFactory.variableFor(sig, () => {
+      val variable = new JavaType.Variable(null, flagsBits, sym.name.toString, null, null, null)
       val ownerType = try { mapType(sym.owner.info) } catch { case _: Throwable => unknown }
       val varType = try { mapType(sym.info) } catch { case _: Throwable => unknown }
       variable.unsafeSet(ownerType, varType, null.asInstanceOf[java.util.List[JavaType.FullyQualified]])
+      variable
     })
   }
 
   /** Create a constructor method type for a given class type. */
   def mapConstructorType(fq: JavaType.FullyQualified): JavaType.Method = {
     val sig = fq.getFullyQualifiedName + "{name=<constructor>,return=" + fq.getFullyQualifiedName + ",parameters=[]}"
-    typeFactory.computeMethod(sig, Flag.Public.getBitMask, "<constructor>", null, null, null, fq,
-      (method: JavaType.Method) =>
-        method.unsafeSet(fq, fq, java.util.Collections.emptyList[JavaType](), null, null))
+    typeFactory.methodFor(sig, () => {
+      val method = new JavaType.Method(null, Flag.Public.getBitMask, null, "<constructor>",
+        null, null.asInstanceOf[Array[String]], null, null, null, null, null)
+      method.unsafeSet(fq, fq, java.util.Collections.emptyList[JavaType](), null, null)
+      method
+    })
   }
 
   // --- Helpers ---

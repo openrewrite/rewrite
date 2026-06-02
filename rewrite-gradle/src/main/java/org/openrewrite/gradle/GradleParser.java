@@ -171,12 +171,12 @@ public class GradleParser implements Parser {
         }
 
         /**
-         * Forward a {@link JavaTypeFactory.Provider} to both the Groovy and Kotlin
-         * sub-parsers so either DSL variant produces types from the caller's factory.
+         * Forward a {@link JavaTypeFactory} to both the Groovy and Kotlin sub-parsers
+         * so either DSL variant produces types from the caller's factory.
          */
-        public Builder typeFactoryProvider(JavaTypeFactory.Provider provider) {
-            this.groovyParser.typeFactoryProvider(provider);
-            this.kotlinParser.typeFactoryProvider(provider);
+        public Builder typeFactory(JavaTypeFactory typeFactory) {
+            this.groovyParser.typeFactory(typeFactory);
+            this.kotlinParser.typeFactory(typeFactory);
             return this;
         }
 

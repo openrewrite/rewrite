@@ -52,10 +52,6 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         String signature = signatureBuilder.signature(type);
-        JavaType existing = typeFactory.get(signature);
-        if (existing != null) {
-            return existing;
-        }
 
         if (type instanceof Type.IntersectionClassType) {
             return intersectionType((Type.IntersectionClassType) type, signature);
@@ -81,19 +77,24 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType intersectionType(Type.IntersectionClassType type, String signature) {
-        return typeFactory.computeIntersection(signature, type, intersection -> {
+        return typeFactory.intersectionFor(signature, () -> {
+            JavaType.Intersection intersection = new JavaType.Intersection(null);
             List<? extends TypeMirror> bounds = type.getBounds();
             List<JavaType> types = new ArrayList<>(bounds.size());
             for (TypeMirror bound : bounds) {
                 types.add(type((Type) bound));
             }
             intersection.unsafeSet(types);
+            return intersection;
         });
     }
 
     private JavaType array(Type type, String signature) {
-        return typeFactory.computeArray(signature, type, arr ->
-                arr.unsafeSet(type(((Type.ArrayType) type).elemtype), null));
+        return typeFactory.arrayFor(signature, () -> {
+            JavaType.Array arr = new JavaType.Array(null, null, null);
+            arr.unsafeSet(type(((Type.ArrayType) type).elemtype), null);
+            return arr;
+        });
     }
 
     /**
@@ -123,7 +124,8 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             }
         }
         Tree leafTree = tree;
-        return typeFactory.computeArray(signature, annotatedType, arr -> {
+        return typeFactory.arrayFor(signature, () -> {
+            JavaType.Array arr = new JavaType.Array(null, null, null);
             JavaType element = type(leafTree);
             for (int i = 0; i < chain.size() - 1; i++) {
                 Tree t = chain.get(i);
@@ -134,6 +136,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             JavaType.@Nullable FullyQualified[] outerAnnos = !chain.isEmpty() && chain.get(chain.size() - 1) instanceof JCTree.JCAnnotatedType
                     ? mapAnnotations(((JCTree.JCAnnotatedType) chain.get(chain.size() - 1)).annotations) : null;
             arr.unsafeSet(element, outerAnnos);
+            return arr;
         });
     }
 
@@ -149,7 +152,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType.GenericTypeVariable generic(Type.WildcardType wildcard, String signature) {
-        return typeFactory.computeGenericTypeVariable(signature, "?", INVARIANT, wildcard, gtv -> {
+        return typeFactory.computeGenericTypeVariable(signature, "?", INVARIANT, gtv -> {
             JavaType.GenericTypeVariable.Variance variance;
             List<JavaType> bounds;
 
@@ -185,7 +188,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         } else {
             name = type.tsym.name.toString();
         }
-        return typeFactory.computeGenericTypeVariable(signature, name, INVARIANT, type, gtv -> {
+        return typeFactory.computeGenericTypeVariable(signature, name, INVARIANT, gtv -> {
             List<JavaType> bounds = null;
             if (type.getUpperBound() instanceof Type.IntersectionClassType) {
                 Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();
@@ -214,79 +217,73 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         Type.ClassType symType = (Type.ClassType) sym.type;
         String fqn = sym.flatName().toString();
 
-        JavaType cachedAtFqn = typeFactory.get(fqn);
-        JavaType.Class clazz = cachedAtFqn instanceof JavaType.Parameterized ?
-                (JavaType.Class) ((JavaType.Parameterized) cachedAtFqn).getType() :
-                (JavaType.Class) cachedAtFqn;
-        if (clazz == null) {
+        JavaType.Class clazz = typeFactory.computeClass(fqn, sym.flags_field, getKind(sym), c -> {
             completeClassSymbol(sym);
-            clazz = typeFactory.computeClass(fqn, fqn, sym.flags_field, getKind(sym), sym, c -> {
-                JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
+            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
 
-                JavaType.FullyQualified owner = null;
-                if (sym.owner instanceof Symbol.ClassSymbol) {
-                    owner = TypeUtils.asFullyQualified(type(sym.owner.type));
+            JavaType.FullyQualified owner = null;
+            if (sym.owner instanceof Symbol.ClassSymbol) {
+                owner = TypeUtils.asFullyQualified(type(sym.owner.type));
+            }
+
+            List<JavaType.FullyQualified> interfaces = null;
+            if (symType.interfaces_field != null) {
+                interfaces = new ArrayList<>(symType.interfaces_field.length());
+                for (com.sun.tools.javac.code.Type iParam : symType.interfaces_field) {
+                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam));
+                    if (javaType != null) {
+                        interfaces.add(javaType);
+                    }
                 }
+            }
 
-                List<JavaType.FullyQualified> interfaces = null;
-                if (symType.interfaces_field != null) {
-                    interfaces = new ArrayList<>(symType.interfaces_field.length());
-                    for (com.sun.tools.javac.code.Type iParam : symType.interfaces_field) {
-                        JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam));
-                        if (javaType != null) {
-                            interfaces.add(javaType);
+            List<JavaType.Variable> fields = null;
+            List<JavaType.Method> methods = null;
+
+            if (sym.members_field != null) {
+                for (Symbol elem : sym.members_field.getElements()) {
+                    if (elem instanceof Symbol.VarSymbol &&
+                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
+                                    Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
+                        if ("java.lang.String".equals(fqn) && "serialPersistentFields".equals(elem.name.toString())) {
+                            // there is a "serialPersistentFields" member within the String class which is used in normal Java
+                            // serialization to customize how the String field is serialized. This field is tripping up Jackson
+                            // serialization and is intentionally filtered to prevent errors.
+                            continue;
+                        }
+
+                        if (fields == null) {
+                            fields = new ArrayList<>();
+                        }
+                        fields.add(variableType(elem, c));
+                    } else if (elem instanceof Symbol.MethodSymbol &&
+                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
+                        if (methods == null) {
+                            methods = new ArrayList<>();
+                        }
+                        Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) elem;
+                        if (!methodSymbol.isStaticOrInstanceInit()) {
+                            methods.add(methodDeclarationType(methodSymbol, c));
                         }
                     }
                 }
+            }
 
-                List<JavaType.Variable> fields = null;
-                List<JavaType.Method> methods = null;
-
-                if (sym.members_field != null) {
-                    for (Symbol elem : sym.members_field.getElements()) {
-                        if (elem instanceof Symbol.VarSymbol &&
-                                (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
-                                        Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                            if ("java.lang.String".equals(fqn) && "serialPersistentFields".equals(elem.name.toString())) {
-                                // there is a "serialPersistentFields" member within the String class which is used in normal Java
-                                // serialization to customize how the String field is serialized. This field is tripping up Jackson
-                                // serialization and is intentionally filtered to prevent errors.
-                                continue;
-                            }
-
-                            if (fields == null) {
-                                fields = new ArrayList<>();
-                            }
-                            fields.add(variableType(elem, c));
-                        } else if (elem instanceof Symbol.MethodSymbol &&
-                                (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
-                            if (methods == null) {
-                                methods = new ArrayList<>();
-                            }
-                            Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) elem;
-                            if (!methodSymbol.isStaticOrInstanceInit()) {
-                                methods.add(methodDeclarationType(methodSymbol, c));
-                            }
-                        }
-                    }
+            List<JavaType> typeParameters = null;
+            if (symType.typarams_field != null && symType.typarams_field.length() > 0) {
+                typeParameters = new ArrayList<>(symType.typarams_field.length());
+                for (Type tParam : symType.typarams_field) {
+                    typeParameters.add(type(tParam));
                 }
-
-                List<JavaType> typeParameters = null;
-                if (symType.typarams_field != null && symType.typarams_field.length() > 0) {
-                    typeParameters = new ArrayList<>(symType.typarams_field.length());
-                    for (Type tParam : symType.typarams_field) {
-                        typeParameters.add(type(tParam));
-                    }
-                }
-                c.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
-            });
-        }
+            }
+            c.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
+        });
 
         if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
             // NOTE because of completion that happens when building the base type,
             // the signature may shift from when it was first calculated.
             JavaType.Class finalClazz = clazz;
-            return typeFactory.computeParameterized(signature, classType, pt -> {
+            return typeFactory.computeParameterized(signature, pt -> {
                 List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());
                 for (Type tParam : classType.typarams_field) {
                     typeParameters.add(type(tParam));
@@ -381,24 +378,27 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         String signature = signatureBuilder.variableSignature(symbol);
-        JavaType resolvedOwner = owner;
-        if (owner == null) {
-            Type type = symbol.owner.type;
-            Symbol sym = symbol.owner;
+        return typeFactory.variableFor(signature, () -> {
+            JavaType.Variable variable = new JavaType.Variable(
+                    null, symbol.flags_field, symbol.name.toString(), null, null, null);
+            JavaType resolvedOwner = owner;
+            if (owner == null) {
+                Type type = symbol.owner.type;
+                Symbol sym = symbol.owner;
 
-            if (sym.type instanceof Type.ForAll) {
-                type = ((Type.ForAll) type).qtype;
+                if (sym.type instanceof Type.ForAll) {
+                    type = ((Type.ForAll) type).qtype;
+                }
+
+                resolvedOwner = type instanceof Type.MethodType ?
+                        methodDeclarationType(sym, (JavaType.FullyQualified) type(sym.owner.type)) :
+                        type(type);
+                assert resolvedOwner != null;
             }
 
-            resolvedOwner = type instanceof Type.MethodType ?
-                    methodDeclarationType(sym, (JavaType.FullyQualified) type(sym.owner.type)) :
-                    type(type);
-            assert resolvedOwner != null;
-        }
-
-        JavaType finalOwner = resolvedOwner;
-        return typeFactory.computeVariable(signature, symbol.flags_field, symbol.name.toString(), symbol, variable ->
-                variable.unsafeSet(finalOwner, type(symbol.type), listAnnotations(symbol)));
+            variable.unsafeSet(resolvedOwner, type(symbol.type), listAnnotations(symbol));
+            return variable;
+        });
     }
 
     /**
@@ -445,45 +445,49 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
 
         Type finalSelectType = selectType;
         JavaType.FullyQualified finalDeclaringType = resolvedDeclaringType;
-        return typeFactory.computeMethod(signature, methodSymbol.flags_field,
-                methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
-                paramNames, null, null, methodSymbol, method -> {
-                    JavaType returnType = null;
-                    List<JavaType> parameterTypes = null;
-                    List<JavaType> exceptionTypes = null;
+        String[] finalParamNames = paramNames;
+        return typeFactory.methodFor(signature, () -> {
+            JavaType.Method method = new JavaType.Method(
+                    null, methodSymbol.flags_field, null,
+                    methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
+                    null, finalParamNames, null, null, null, null, null);
+            JavaType returnType = null;
+            List<JavaType> parameterTypes = null;
+            List<JavaType> exceptionTypes = null;
 
-                    if (finalSelectType instanceof Type.MethodType) {
-                        Type.MethodType methodType = (Type.MethodType) finalSelectType;
+            if (finalSelectType instanceof Type.MethodType) {
+                Type.MethodType methodType = (Type.MethodType) finalSelectType;
 
-                        if (!methodType.argtypes.isEmpty()) {
-                            parameterTypes = new ArrayList<>(methodType.argtypes.size());
-                            for (com.sun.tools.javac.code.Type argtype : methodType.argtypes) {
-                                if (argtype != null) {
-                                    JavaType javaType = type(argtype);
-                                    parameterTypes.add(javaType);
-                                }
-                            }
+                if (!methodType.argtypes.isEmpty()) {
+                    parameterTypes = new ArrayList<>(methodType.argtypes.size());
+                    for (com.sun.tools.javac.code.Type argtype : methodType.argtypes) {
+                        if (argtype != null) {
+                            JavaType javaType = type(argtype);
+                            parameterTypes.add(javaType);
                         }
-
-                        returnType = type(methodType.restype);
-
-                        if (!methodType.thrown.isEmpty()) {
-                            exceptionTypes = new ArrayList<>(methodType.thrown.size());
-                            for (Type exceptionType : methodType.thrown) {
-                                JavaType javaType = type(exceptionType);
-                                exceptionTypes.add(javaType);
-                            }
-                        }
-                    } else if (finalSelectType instanceof Type.UnknownType) {
-                        returnType = JavaType.Unknown.getInstance();
                     }
+                }
 
-                    assert returnType != null;
+                returnType = type(methodType.restype);
 
-                    method.unsafeSet(finalDeclaringType,
-                            methodSymbol.isConstructor() ? finalDeclaringType : returnType,
-                            parameterTypes, exceptionTypes, listAnnotations(methodSymbol));
-                });
+                if (!methodType.thrown.isEmpty()) {
+                    exceptionTypes = new ArrayList<>(methodType.thrown.size());
+                    for (Type exceptionType : methodType.thrown) {
+                        JavaType javaType = type(exceptionType);
+                        exceptionTypes.add(javaType);
+                    }
+                }
+            } else if (finalSelectType instanceof Type.UnknownType) {
+                returnType = JavaType.Unknown.getInstance();
+            }
+
+            assert returnType != null;
+
+            method.unsafeSet(finalDeclaringType,
+                    methodSymbol.isConstructor() ? finalDeclaringType : returnType,
+                    parameterTypes, exceptionTypes, listAnnotations(methodSymbol));
+            return method;
+        });
     }
 
     /**
@@ -549,61 +553,65 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             }
 
             JavaType.FullyQualified finalDeclaringType = resolvedDeclaringType;
-            return typeFactory.computeMethod(signature, methodSymbol.flags_field,
-                    methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
-                    paramNames, defaultValues,
-                    declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0]),
-                    methodSymbol, method -> {
-                        Type signatureType = methodSymbol.type instanceof Type.ForAll ?
-                                ((Type.ForAll) methodSymbol.type).qtype :
-                                methodSymbol.type;
+            String[] finalParamNames = paramNames;
+            List<String> finalDefaultValues = defaultValues;
+            String[] finalFormalTypeNames = declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0]);
+            return typeFactory.methodFor(signature, () -> {
+                JavaType.Method method = new JavaType.Method(
+                        null, methodSymbol.flags_field, null,
+                        methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
+                        null, finalParamNames, null, null, null, finalDefaultValues, finalFormalTypeNames);
+                Type signatureType = methodSymbol.type instanceof Type.ForAll ?
+                        ((Type.ForAll) methodSymbol.type).qtype :
+                        methodSymbol.type;
 
-                        List<JavaType> exceptionTypes = null;
+                List<JavaType> exceptionTypes = null;
 
-                        Type selectType = methodSymbol.type;
-                        if (selectType instanceof Type.ForAll) {
-                            selectType = ((Type.ForAll) selectType).qtype;
+                Type selectType = methodSymbol.type;
+                if (selectType instanceof Type.ForAll) {
+                    selectType = ((Type.ForAll) selectType).qtype;
+                }
+
+                if (selectType instanceof Type.MethodType) {
+                    Type.MethodType methodType = (Type.MethodType) selectType;
+                    if (!methodType.thrown.isEmpty()) {
+                        exceptionTypes = new ArrayList<>(methodType.thrown.size());
+                        for (Type exceptionType : methodType.thrown) {
+                            JavaType javaType = type(exceptionType);
+                            exceptionTypes.add(javaType);
                         }
+                    }
+                }
 
-                        if (selectType instanceof Type.MethodType) {
-                            Type.MethodType methodType = (Type.MethodType) selectType;
-                            if (!methodType.thrown.isEmpty()) {
-                                exceptionTypes = new ArrayList<>(methodType.thrown.size());
-                                for (Type exceptionType : methodType.thrown) {
-                                    JavaType javaType = type(exceptionType);
-                                    exceptionTypes.add(javaType);
-                                }
+                JavaType returnType;
+                List<JavaType> parameterTypes = null;
+
+                if (signatureType instanceof Type.ForAll) {
+                    signatureType = ((Type.ForAll) signatureType).qtype;
+                }
+                if (signatureType instanceof Type.MethodType) {
+                    Type.MethodType mt = (Type.MethodType) signatureType;
+
+                    if (!mt.argtypes.isEmpty()) {
+                        parameterTypes = new ArrayList<>(mt.argtypes.size());
+                        for (com.sun.tools.javac.code.Type argtype : mt.argtypes) {
+                            if (argtype != null) {
+                                JavaType javaType = type(argtype);
+                                parameterTypes.add(javaType);
                             }
                         }
+                    }
 
-                        JavaType returnType;
-                        List<JavaType> parameterTypes = null;
+                    returnType = type(mt.restype);
+                } else {
+                    throw new UnsupportedOperationException("Unexpected method signature type" + signatureType.getClass().getName());
+                }
 
-                        if (signatureType instanceof Type.ForAll) {
-                            signatureType = ((Type.ForAll) signatureType).qtype;
-                        }
-                        if (signatureType instanceof Type.MethodType) {
-                            Type.MethodType mt = (Type.MethodType) signatureType;
-
-                            if (!mt.argtypes.isEmpty()) {
-                                parameterTypes = new ArrayList<>(mt.argtypes.size());
-                                for (com.sun.tools.javac.code.Type argtype : mt.argtypes) {
-                                    if (argtype != null) {
-                                        JavaType javaType = type(argtype);
-                                        parameterTypes.add(javaType);
-                                    }
-                                }
-                            }
-
-                            returnType = type(mt.restype);
-                        } else {
-                            throw new UnsupportedOperationException("Unexpected method signature type" + signatureType.getClass().getName());
-                        }
-
-                        method.unsafeSet(finalDeclaringType,
-                                methodSymbol.isConstructor() ? finalDeclaringType : returnType,
-                                parameterTypes, exceptionTypes, listAnnotations(methodSymbol));
-                    });
+                method.unsafeSet(finalDeclaringType,
+                        methodSymbol.isConstructor() ? finalDeclaringType : returnType,
+                        parameterTypes, exceptionTypes, listAnnotations(methodSymbol));
+                return method;
+            });
         }
 
         return null;

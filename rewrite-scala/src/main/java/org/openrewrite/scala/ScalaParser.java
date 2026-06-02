@@ -182,8 +182,6 @@ public class ScalaParser implements Parser {
         @Nullable
         private JavaTypeFactory typeFactory;
 
-        private JavaTypeFactory.@Nullable Provider typeFactoryProvider;
-
         private boolean logCompilationWarningsAndErrors = false;
         private final List<NamedStyles> styles = new ArrayList<>();
 
@@ -197,7 +195,6 @@ public class ScalaParser implements Parser {
             this.artifactNames = base.artifactNames;
             this.typeCache = base.typeCache;
             this.typeFactory = base.typeFactory;
-            this.typeFactoryProvider = base.typeFactoryProvider;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
         }
@@ -239,8 +236,8 @@ public class ScalaParser implements Parser {
         }
 
         /**
-         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} or
-         * {@link #typeFactoryProvider} instead. The cache becomes an implementation
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} instead.
+         * The cache becomes an implementation
          * detail of the default {@link DefaultJavaTypeFactory}.
          */
         @Deprecated
@@ -253,12 +250,6 @@ public class ScalaParser implements Parser {
         @SuppressWarnings("unused")
         public Builder typeFactory(JavaTypeFactory typeFactory) {
             this.typeFactory = typeFactory;
-            return this;
-        }
-
-        @SuppressWarnings("unused")
-        public Builder typeFactoryProvider(JavaTypeFactory.Provider provider) {
-            this.typeFactoryProvider = provider;
             return this;
         }
 
@@ -281,9 +272,6 @@ public class ScalaParser implements Parser {
         public ScalaParser build() {
             Collection<Path> cp = resolvedClasspath();
             JavaTypeFactory factory = typeFactory;
-            if (factory == null && typeFactoryProvider != null) {
-                factory = typeFactoryProvider.create(cp == null ? new ArrayList<>() : new ArrayList<>(cp), null);
-            }
             if (factory == null) {
                 factory = new DefaultJavaTypeFactory(typeCache);
             }

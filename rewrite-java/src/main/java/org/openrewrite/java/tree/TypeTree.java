@@ -32,6 +32,14 @@ public interface TypeTree extends NameTree {
         return TypeTree.build(fullyQualifiedName, null);
     }
 
+    /**
+     * Build a dotted-name {@link TypeTree}. Each Uppercased segment becomes a
+     * {@link J.FieldAccess} whose type is a fresh {@link JavaType.ShallowClass}
+     * for that segment's FQN. This produces a usable name tree without going
+     * through a parser's type factory &mdash; recipes that need richer
+     * attribution should construct the tree themselves and attach the
+     * resolved {@link JavaType} via {@code .withType(...)}.
+     */
     static <T extends TypeTree & Expression> T build(String fullyQualifiedName, @Nullable Character escape) {
         StringBuilder fullName = new StringBuilder();
         Expression expr = null;
