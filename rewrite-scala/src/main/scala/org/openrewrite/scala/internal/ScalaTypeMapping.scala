@@ -510,33 +510,33 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
     }
 
     val finalParamNames = paramNamesArr
-    typeFactory.methodFor(sig, () => {
-      val method = new JavaType.Method(null, flagsBits, null, name, null, finalParamNames, null, null, null, null, null)
-      val paramTypes: util.List[JavaType] = sym.info match {
-        case mt: MethodType =>
-          val pts = new ArrayList[JavaType]()
-          mt.paramInfos.foreach(pt => pts.add(mapType(pt)))
-          pts
-        case pt: PolyType => pt.resultType match {
+    typeFactory.methodFor(sig,
+      () => new JavaType.Method(null, flagsBits, null, name, null, finalParamNames, null, null, null, null, null),
+      (method: JavaType.Method) => {
+        val paramTypes: util.List[JavaType] = sym.info match {
           case mt: MethodType =>
             val pts = new ArrayList[JavaType]()
-            mt.paramInfos.foreach(pt2 => pts.add(mapType(pt2)))
+            mt.paramInfos.foreach(pt => pts.add(mapType(pt)))
             pts
+          case pt: PolyType => pt.resultType match {
+            case mt: MethodType =>
+              val pts = new ArrayList[JavaType]()
+              mt.paramInfos.foreach(pt2 => pts.add(mapType(pt2)))
+              pts
+            case _ => null
+          }
           case _ => null
         }
-        case _ => null
-      }
 
-      val declaringType = try {
-        TypeUtils.asFullyQualified(mapType(sym.owner.info))
-      } catch {
-        case _: Throwable => null
-      }
-      val returnType = mapType(sym.info.finalResultType)
+        val declaringType = try {
+          TypeUtils.asFullyQualified(mapType(sym.owner.info))
+        } catch {
+          case _: Throwable => null
+        }
+        val returnType = mapType(sym.info.finalResultType)
 
-      method.unsafeSet(declaringType, returnType, paramTypes, null, null)
-      method
-    })
+        method.unsafeSet(declaringType, returnType, paramTypes, null, null)
+      })
   }
 
   def mapVariableType(sym: Symbol): JavaType.Variable = {
@@ -556,12 +556,12 @@ class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using 
   /** Create a constructor method type for a given class type. */
   def mapConstructorType(fq: JavaType.FullyQualified): JavaType.Method = {
     val sig = fq.getFullyQualifiedName + "{name=<constructor>,return=" + fq.getFullyQualifiedName + ",parameters=[]}"
-    typeFactory.methodFor(sig, () => {
-      val method = new JavaType.Method(null, Flag.Public.getBitMask, null, "<constructor>",
-        null, null.asInstanceOf[Array[String]], null, null, null, null, null)
-      method.unsafeSet(fq, fq, java.util.Collections.emptyList[JavaType](), null, null)
-      method
-    })
+    typeFactory.methodFor(sig,
+      () => new JavaType.Method(null, Flag.Public.getBitMask, null, "<constructor>",
+        null, null.asInstanceOf[Array[String]], null, null, null, null, null),
+      (method: JavaType.Method) => {
+        method.unsafeSet(fq, fq, java.util.Collections.emptyList[JavaType](), null, null)
+      })
   }
 
   // --- Helpers ---

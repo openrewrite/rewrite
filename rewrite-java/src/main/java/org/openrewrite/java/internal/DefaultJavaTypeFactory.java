@@ -107,14 +107,20 @@ public class DefaultJavaTypeFactory implements JavaTypeFactory {
     // ---------------------------------------------------------------------
 
     @Override
-    public JavaType.Method methodFor(String signature, Supplier<JavaType.Method> builder) {
+    public JavaType.Method methodFor(String signature, Supplier<JavaType.Method> stub,
+                                     Consumer<JavaType.Method> initializer) {
         JavaType.Method cached = cache.get(signature);
         if (cached != null) {
             return cached;
         }
-        JavaType.Method built = builder.get();
-        cache.put(signature, built);
-        return built;
+        // Cache the bare stub before running the initializer so a re-entrant
+        // lookup on the same signature (e.g. the @AliasFor annotation-element
+        // cycle) resolves to this in-progress instance instead of recursing.
+        // Same cycle-breaking contract as computeClass.
+        JavaType.Method method = stub.get();
+        cache.put(signature, method);
+        initializer.accept(method);
+        return method;
     }
 
     @Override

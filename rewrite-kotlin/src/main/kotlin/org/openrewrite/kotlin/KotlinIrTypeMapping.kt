@@ -360,8 +360,9 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
         }
         val name = if (function is IrConstructor) "<constructor>" else function.name.asString()
         val finalParamNames = paramNamesArr
-        return typeFactory.methodFor(signature) {
-            val method = JavaType.Method(null, methodFlags, null, name, null, finalParamNames, null, null, null, null, null)
+        return typeFactory.methodFor(signature, {
+            JavaType.Method(null, methodFlags, null, name, null, finalParamNames, null, null, null, null, null)
+        }) { method ->
             var declaringType = when (val irParent = function.parent) {
                 is IrField -> TypeUtils.asFullyQualified(type(irParent.parent))
                 else -> TypeUtils.asFullyQualified(type(irParent))
@@ -386,7 +387,6 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
                 (if (function is IrConstructor) declaringType else returnType) ?: JavaType.Unknown.getInstance(),
                 paramTypes, null, listAnnotations(function.annotations)
             )
-            method
         }
     }
 
@@ -407,8 +407,9 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
         val paramNamesArr: kotlin.Array<String> = kotlin.Array(ownerRegularParams.size) { ownerRegularParams[it].name.asString() }
         val flags = mapToFlagsBitmap(type.symbol.owner.visibility)
         val name = type.symbol.owner.name.asString()
-        return typeFactory.methodFor(signature) {
-            val method = JavaType.Method(null, flags, null, name, null, paramNamesArr, null, null, null, null, null)
+        return typeFactory.methodFor(signature, {
+            JavaType.Method(null, flags, null, name, null, paramNamesArr, null, null, null, null, null)
+        }) { method ->
             var declaringType = TypeUtils.asFullyQualified(type(type.symbol.owner.parent))
             if (declaringType is JavaType.Parameterized) {
                 declaringType = declaringType.type
@@ -429,7 +430,6 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
                 returnType,
                 paramTypes, null, listAnnotations(type.symbol.owner.annotations)
             )
-            method
         }
     }
 
@@ -437,8 +437,9 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
         val ownerRegularParams = type.symbol.owner.parameters.filter { it.kind == IrParameterKind.Regular }
         val paramNamesArr: kotlin.Array<String> = kotlin.Array(ownerRegularParams.size) { ownerRegularParams[it].name.asString() }
         val flags = mapToFlagsBitmap(type.symbol.owner.visibility)
-        return typeFactory.methodFor(signature) {
-            val method = JavaType.Method(null, flags, null, "<constructor>", null, paramNamesArr, null, null, null, null, null)
+        return typeFactory.methodFor(signature, {
+            JavaType.Method(null, flags, null, "<constructor>", null, paramNamesArr, null, null, null, null, null)
+        }) { method ->
             var declaringType = TypeUtils.asFullyQualified(type(type.symbol.owner.parent))
             if (declaringType is JavaType.Parameterized) {
                 declaringType = declaringType.type
@@ -459,7 +460,6 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
                 returnType ?: JavaType.Unknown.getInstance(),
                 paramTypes, null, listAnnotations(type.symbol.owner.annotations)
             )
-            method
         }
     }
 

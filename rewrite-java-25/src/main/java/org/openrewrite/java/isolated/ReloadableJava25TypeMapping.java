@@ -459,11 +459,12 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         String[] finalParamNames = paramNames;
-        return typeFactory.methodFor(signature, () -> {
-            JavaType.Method method = new JavaType.Method(
-                    null, methodSymbol.flags_field, null,
-                    methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
-                    null, finalParamNames, null, null, null, null, null);
+        return typeFactory.methodFor(signature,
+                () -> new JavaType.Method(
+                        null, methodSymbol.flags_field, null,
+                        methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
+                        null, finalParamNames, null, null, null, null, null),
+                method -> {
             JavaType returnType = null;
             List<JavaType> parameterTypes = null;
             List<JavaType> exceptionTypes = null;
@@ -497,7 +498,6 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
             method.unsafeSet(resolvedDeclaringType,
                     methodSymbol.isConstructor() ? resolvedDeclaringType : returnType,
                     parameterTypes, exceptionTypes, listAnnotations(methodSymbol));
-            return method;
         });
     }
 
@@ -567,11 +567,12 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
         String[] finalParamNames = paramNames;
         List<String> finalDefaultValues = defaultValues;
         String[] finalFormalTypeNames = declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0]);
-        return typeFactory.methodFor(signature, () -> {
-            JavaType.Method method = new JavaType.Method(
-                    null, methodSymbol.flags_field, null,
-                    methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
-                    null, finalParamNames, null, null, null, finalDefaultValues, finalFormalTypeNames);
+        return typeFactory.methodFor(signature,
+                () -> new JavaType.Method(
+                        null, methodSymbol.flags_field, null,
+                        methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
+                        null, finalParamNames, null, null, null, finalDefaultValues, finalFormalTypeNames),
+                method -> {
             Type signatureType = methodSymbol.type instanceof Type.ForAll ?
                     ((Type.ForAll) methodSymbol.type).qtype :
                     methodSymbol.type;
@@ -621,7 +622,6 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
             method.unsafeSet(finalDeclaringType,
                     methodSymbol.isConstructor() ? finalDeclaringType : returnType,
                     parameterTypes, exceptionTypes, listAnnotations(methodSymbol));
-            return method;
         });
     }
 

@@ -23,6 +23,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -302,10 +303,11 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         }
 
         String[] finalParamNames = paramNames;
-        return typeFactory.methodFor(signature, () -> {
-            JavaType.Method mappedMethod = new JavaType.Method(
-                    null, method.getModifiers(), null, "<constructor>",
-                    null, finalParamNames, null, null, null, null, null);
+        return typeFactory.methodFor(signature,
+                () -> new JavaType.Method(
+                        null, method.getModifiers(), null, "<constructor>",
+                        null, finalParamNames, null, null, null, null, null),
+                mappedMethod -> {
             List<JavaType> thrownExceptions = null;
             if (method.getExceptionTypes().length > 0) {
                 thrownExceptions = new ArrayList<>(method.getExceptionTypes().length);
@@ -336,7 +338,6 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
 
             mappedMethod.unsafeSet(declaringType, declaringType, parameterTypes, thrownExceptions, annotations);
-            return mappedMethod;
         });
     }
 
@@ -410,10 +411,11 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         String[] finalParamNames = paramNames;
         List<String> finalDefaultValues = defaultValues;
         String[] finalFormalTypeNames = declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0]);
-        return typeFactory.methodFor(signature, () -> {
-            JavaType.Method mappedMethod = new JavaType.Method(
-                    null, method.getModifiers(), null, method.getName(),
-                    null, finalParamNames, null, null, null, finalDefaultValues, finalFormalTypeNames);
+        return typeFactory.methodFor(signature,
+                () -> new JavaType.Method(
+                        null, method.getModifiers(), null, method.getName(),
+                        null, finalParamNames, null, null, null, finalDefaultValues, finalFormalTypeNames),
+                mappedMethod -> {
             List<JavaType> thrownExceptions = null;
             if (method.getExceptionTypes().length > 0) {
                 thrownExceptions = new ArrayList<>(method.getExceptionTypes().length);
@@ -441,7 +443,6 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
             JavaType returnType = type(method.getGenericReturnType());
             mappedMethod.unsafeSet(declaringType, returnType, parameterTypes, thrownExceptions, annotations);
-            return mappedMethod;
         });
     }
 }

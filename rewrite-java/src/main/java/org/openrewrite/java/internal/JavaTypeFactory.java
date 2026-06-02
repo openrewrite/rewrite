@@ -154,6 +154,35 @@ public interface JavaTypeFactory {
             JavaType.GenericTypeVariable.Variance variance,
             Consumer<JavaType.GenericTypeVariable> initializer);
 
+    /**
+     * Build for {@link JavaType.Method} with cycle-breaking on the same key.
+     * Unlike {@link #variableFor}/{@link #arrayFor}/{@link #intersectionFor},
+     * a method's attribution can recurse back to its own signature: an
+     * annotation-element method whose own annotations reference an annotation
+     * whose element is that same method (the Spring {@code @AliasFor} shape &mdash;
+     * {@code value()} is annotated {@code @AliasFor}, and {@code @AliasFor}'s
+     * element is {@code value()}). So this mirrors {@link #computeClass}:
+     * {@code stub} constructs the bare instance from non-recursive header fields,
+     * which is cached <em>before</em> {@code initializer} runs the (possibly
+     * self-referential) attribution onto that same instance. A re-entrant lookup
+     * on the same signature then hits the cached stub instead of recursing &mdash;
+     * the signature and cache are the cycle-breaker, the same way they are for
+     * {@link #computeClass}.
+     *
+     * @param signature   an opaque per-factory key from a {@link JavaTypeSignatureBuilder}
+     *                    &mdash; canonical shape
+     *                    {@code com.MyThing{name=add,return=void,parameters=[Integer]}}.
+     * @param stub        constructs the bare method from non-recursive header fields
+     *                    (name, flags, parameter names, default value, declared
+     *                    formal type names); must not resolve any type that could
+     *                    recurse to this signature.
+     * @param initializer populates the cached stub's recursive attribution
+     *                    (declaring type, return type, parameter types, thrown
+     *                    exceptions, annotations) via {@code unsafeSet}.
+     */
+    JavaType.Method methodFor(String signature, Supplier<JavaType.Method> stub,
+                              Consumer<JavaType.Method> initializer);
+
     // ---------------------------------------------------------------------
     // Atomic build ({@code *For})
     //
@@ -161,15 +190,6 @@ public interface JavaTypeFactory {
     // constructs the instance fully before the factory caches it; no
     // half-built object is ever observable through the cache.
     // ---------------------------------------------------------------------
-
-    /**
-     * Atomic build for {@link JavaType.Method}.
-     *
-     * @param signature an opaque per-factory key from a {@link JavaTypeSignatureBuilder}
-     *                  &mdash; canonical shape
-     *                  {@code com.MyThing{name=add,return=void,parameters=[Integer]}}.
-     */
-    JavaType.Method methodFor(String signature, Supplier<JavaType.Method> builder);
 
     /**
      * Atomic build for {@link JavaType.Variable}.
