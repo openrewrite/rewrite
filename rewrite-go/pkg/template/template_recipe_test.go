@@ -162,8 +162,9 @@ func TestNewRecipeMultipleBeforeSecondMatches(t *testing.T) {
 	)
 }
 
-func TestNewRecipeWithImports(t *testing.T) {
-	// Replace `fmt.Sprintf("%d", n)` with `strconv.Itoa(n)`
+func TestNewRecipeImportsAreTemplateContextOnly(t *testing.T) {
+	// Imports on the after template let `strconv.Itoa(n)` parse, but callers
+	// are responsible for source-file import edits via MaybeAddImport.
 	n := Expr("n")
 	r := NewRecipe(
 		RecipeName("test.SprintfToItoa"),

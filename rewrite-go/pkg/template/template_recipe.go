@@ -118,7 +118,8 @@ func AsStatement() RecipeOption {
 	}
 }
 
-// Imports adds required imports for a before or after template.
+// Imports adds imports to the synthetic source used to parse a before or
+// after template. It does not edit imports in the source file being rewritten.
 func Imports(pkgs ...string) BeforeOption {
 	return func(s *beforeSpec) { s.imports = append(s.imports, pkgs...) }
 }

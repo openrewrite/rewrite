@@ -54,6 +54,10 @@ func (r *GoReceiver) Visit(t java.Tree, p any) java.Tree {
 		c := *pe
 		return r.receiveParseError(&c, p.(*ReceiveQueue))
 	}
+	if gm, ok := t.(*golang.GoMod); ok {
+		c := *gm
+		return receiveGoMod(&c, p.(*ReceiveQueue))
+	}
 	return r.GoVisitor.Visit(t, p)
 }
 
