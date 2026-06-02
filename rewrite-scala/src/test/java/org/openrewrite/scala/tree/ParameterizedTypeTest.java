@@ -16,8 +16,15 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class ParameterizedTypeTest implements RewriteTest {
@@ -31,6 +38,52 @@ class ParameterizedTypeTest implements RewriteTest {
               val list: List[String] = List("a", "b", "c")
             }
             """
+          )
+        );
+    }
+
+    @Test
+    void arrayTypeAnnotationIsParameterizedType() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val args: Array[String] = Array.empty[String]
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<TypeTree> typeExpression = new AtomicReference<>();
+
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer p) {
+                        J.VariableDeclarations.NamedVariable variable = multiVariable.getVariables().get(0);
+                        if ("args".equals(variable.getSimpleName())) {
+                            typeExpression.set(multiVariable.getTypeExpression());
+                        }
+                        return super.visitVariableDeclarations(multiVariable, p);
+                    }
+                }.visit(cu, 0);
+
+                assertThat(typeExpression.get())
+                  .as("Array[String] should parse as a parameterized type annotation")
+                  .isInstanceOf(J.ParameterizedType.class);
+
+                J.ParameterizedType arrayType = (J.ParameterizedType) typeExpression.get();
+                assertThat(arrayType.getClazz()).isInstanceOf(J.Identifier.class);
+                assertThat(((J.Identifier) arrayType.getClazz()).getSimpleName()).isEqualTo("Array");
+                assertThat(arrayType.getTypeParameters()).hasSize(1);
+                assertThat(arrayType.getTypeParameters().get(0)).isInstanceOf(J.Identifier.class);
+                assertThat(((J.Identifier) arrayType.getTypeParameters().get(0)).getSimpleName()).isEqualTo("String");
+                assertThat(arrayType.getType()).isInstanceOf(JavaType.Parameterized.class);
+                JavaType.Parameterized attributedType = (JavaType.Parameterized) arrayType.getType();
+                assertThat(attributedType.getType().getFullyQualifiedName()).isEqualTo("scala.Array");
+                assertThat(attributedType.getTypeParameters()).hasSize(1);
+                assertThat(attributedType.getTypeParameters().get(0))
+                  .isInstanceOf(JavaType.FullyQualified.class);
+                assertThat(((JavaType.FullyQualified) attributedType.getTypeParameters().get(0)).getFullyQualifiedName())
+                  .isEqualTo("java.lang.String");
+            })
           )
         );
     }
