@@ -472,26 +472,36 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         templates: RewriteTemplates,
         ctx: RecipeIrGenContext,
     ): IrSimpleFunctionSymbol? {
-        // v1: always dispatch to the Kotlin helper. Plan §Design.4 reasoned
-        // about which SOURCES the visitor walks (JavaVisitor walks both .java
-        // and .kt via TreeVisitorAdapter), but the TEMPLATE engine must match
-        // the recipe author's source language. Recipes authored in Kotlin
-        // carry Kotlin syntax in their before/after templates — trailing
-        // lambdas, `<Type>` arg lists, extension calls, `..<` — none of which
-        // JavaTemplate can parse. Always-Kotlin works because recipes
-        // authored under this DSL are by definition in .kt source.
+        // v2: route all-Java method-invocation bodies through the Java helper
+        // (JavaVisitor + JavaTemplate). The LST-structural classifier decides
+        // "all-Java": if the before/after lambdas don't structurally reference
+        // any K.* tree node, JavaVisitor matches the same call sites against
+        // both Java and Kotlin sources (via TreeVisitorAdapter) and
+        // JavaTemplate can parse the after template — none of the after-
+        // template syntax that's Kotlin-only (trailing lambdas, `<Type>` arg
+        // lists, extension calls, `..<`) can appear without dragging a K.*
+        // reference into the lambdas. So the classifier is sufficient.
         //
-        // `methodInvocationRewriteJava` exists for a future cross-language
-        // path (`java { rewrite { } to { } }` explicit shape) and for recipes
-        // authored in Java someday; v1 has no way to reach it from the DSL.
-        // The LST-structural classifier still computes [usesKotlinTreeNode]
-        // — it's plumbing for the eventual third helper (JavaVisitor +
-        // KotlinTemplate) the plan deferred.
-        @Suppress("UNUSED_VARIABLE")
+        // Three Kotlin-only shapes are never safe to route to Java:
+        //   - property access (`d.inHours` is Kotlin property syntax;
+        //     the Java visitor walks `J.FieldAccess`, a different LST node)
+        //   - wrapped-in-not-null (`!!` is a Kotlin-only operator)
+        //   - chained calls (the chain encoding's `\t`-separated spec is only
+        //     parsed by the Kotlin helper; the Java helper splits on `\n` only)
+        //
+        // The Java symbol may legitimately be null when authors compile
+        // against a rewrite-kotlin without [GeneratedRecipeSupport.methodInvocationRewriteJava]
+        // (i.e. older snapshots) — fall back to the Kotlin helper in that case
+        // so the recipe still compiles, even though it won't match Java
+        // sources without TreeVisitorAdapter glue.
         val classifierResult = templates.usesKotlinTreeNode
+        val isChain = templates.matcherSpecs.any { it.contains('\t') }
+        val canRouteToJava = !classifierResult && !isChain
         return when {
             templates.propertyAccess -> ctx.propertyAccessRewriteKotlinSymbol
             templates.wrappedInNotNull -> ctx.methodInvocationRewriteKotlinNotNullSymbol
+            canRouteToJava -> ctx.methodInvocationRewriteJavaSymbol
+                ?: ctx.methodInvocationRewriteKotlinSymbol
             else -> ctx.methodInvocationRewriteKotlinSymbol
         }
     }
@@ -628,14 +638,22 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * LST-structural classifier. Scans all type references inside the before
-     * + after lambdas; returns true if ANY references a Kotlin-specific tree
-     * node (FQN starts with `org.openrewrite.kotlin.tree.K.`).
+     * LST-structural classifier. Scans the before + after lambdas; returns
+     * true if ANY of:
+     *  - a value-parameter type references a Kotlin-specific tree node
+     *    (FQN starts with `org.openrewrite.kotlin.tree.K.`)
+     *  - a call expression resolves to a callee in the `kotlin.*` package
+     *    namespace (Kotlin stdlib function or extension — `String.lowercase`,
+     *    `StringBuilder.appendLine`, `kotlin.enumValues`, etc.)
      *
-     * Per plan §Design.4: method-name / callee-package / API-level signals are
-     * NOT used. The MethodMatcher spec, resolved at FIR time pre-inline,
-     * already encodes the Kotlin-extension target correctly even when the
-     * generated visitor is Java-rooted.
+     * The call-FQN check exists because v2 dispatch routes the non-Kotlin
+     * case through `JavaTemplate`, which can't parse Kotlin-extension call
+     * syntax in the after-template. If a Kotlin-stdlib callee appears
+     * anywhere in the lambdas, the recipe stays on the Kotlin helper.
+     *
+     * Per plan §Design.4: only LST-structural and callee-namespace signals
+     * drive promotion. The MethodMatcher spec built at FIR time pre-inline
+     * still works against either visitor's matched node.
      */
     private fun classifyKotlinPromotion(lambdas: List<IrFunctionExpression>): Boolean {
         var found = false
@@ -653,6 +671,21 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                         found = true
                         return
                     }
+                }
+                expression.acceptChildrenVoid(this)
+            }
+
+            override fun visitCall(expression: IrCall) {
+                if (found) return
+                // Callee FQN in the `kotlin.*` namespace promotes to Kotlin:
+                // JavaTemplate can't parse Kotlin-extension call syntax in
+                // the after-template (`s.lowercase()`, `sb.appendLine("x")`,
+                // `enumValues<E>()` all resolve to `kotlin.text.lowercase`,
+                // `kotlin.text.StringsKt.appendLine`, `kotlin.enumValues`).
+                val fqn = expression.symbol.owner.kotlinFqName.asString()
+                if (fqn == "kotlin" || fqn.startsWith("kotlin.")) {
+                    found = true
+                    return
                 }
                 expression.acceptChildrenVoid(this)
             }
