@@ -627,22 +627,36 @@ export class JavaScriptTypeMapping {
             return undefined;
         }
 
-        // Remove @types/ prefix and decode DefinitelyTyped scoped package encoding
-        // DefinitelyTyped encodes scoped packages using __ instead of /
-        // Example: @types/testing-library__react -> @testing-library/react
-        if (moduleName.startsWith('@types/')) {
-            moduleName = moduleName.substring('@types/'.length);
-            // Decode __ encoding for scoped packages
-            // testing-library__react -> @testing-library/react
-            if (moduleName.includes('__')) {
-                const parts = moduleName.split('__');
+        return this.normalizePackageName(moduleName);
+    }
+
+    /**
+     * Normalize a node_modules package name to the specifier consumers actually import.
+     *
+     * DefinitelyTyped packages (`@types/<pkg>`) are never importable under that name — the
+     * importable specifier is `<pkg>`, with DefinitelyTyped's `__` scoped-package encoding
+     * decoded back to a `@scope/name` form. Using the importable specifier keeps attributed
+     * fully qualified names consistent regardless of whether a type is reached through a direct
+     * import (which already resolves via the module specifier) or transitively (e.g. a call's
+     * return type), which falls back to the declaration file's `node_modules` path.
+     *
+     * Examples:
+     * - `@types/express-serve-static-core` -> `express-serve-static-core`
+     * - `@types/node`                      -> `node`
+     * - `@types/testing-library__react`    -> `@testing-library/react`
+     */
+    private normalizePackageName(packageName: string): string {
+        if (packageName.startsWith('@types/')) {
+            packageName = packageName.substring('@types/'.length);
+            // Decode __ encoding for scoped packages: testing-library__react -> @testing-library/react
+            if (packageName.includes('__')) {
+                const parts = packageName.split('__');
                 if (parts.length === 2) {
-                    moduleName = `@${parts[0]}/${parts[1]}`;
+                    packageName = `@${parts[0]}/${parts[1]}`;
                 }
             }
         }
-
-        return moduleName;
+        return packageName;
     }
 
     /**
@@ -1143,6 +1157,11 @@ export class JavaScriptTypeMapping {
                 if (packageName.startsWith('@') && pathParts.length > 1) {
                     packageName = `${packageName}/${pathParts[1]}`;
                 }
+
+                // Normalize `@types/<pkg>` to the importable specifier `<pkg>` so that types
+                // reached transitively (e.g. a call's return type, resolved via the declaration
+                // file's node_modules path) match the names used for directly imported types.
+                packageName = this.normalizePackageName(packageName);
 
                 // Find the symbol name (everything after the last dot in the original cleaned name)
                 const lastDotIndex = cleanedName.lastIndexOf('.');
