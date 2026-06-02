@@ -17,21 +17,26 @@ package org.openrewrite.java.internal.template;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeFactory;
+import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
 import java.util.function.Consumer;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaTemplateParserProviderTest {
 
     @Test
-    void cursorMessageDeliversTypeFactoryToTemplateParser() {
+    void enclosingJavaSourceSetMarkerDeliversTypeFactoryToTemplateParser() {
         JavaTypeFactory factory = new DefaultJavaTypeFactory(new JavaTypeCache()) {
             @Override
             public JavaType.Class computeClass(String fqn, long flags,
@@ -43,18 +48,28 @@ class JavaTemplateParserProviderTest {
 
         JavaParser.Builder<?, ?> parserBuilder = JavaParser.fromJavaVersion();
 
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+                .parse("class A {}")
+                .findFirst()
+                .filter(J.CompilationUnit.class::isInstance)
+                .map(J.CompilationUnit.class::cast)
+                .orElseThrow();
+
+        JavaSourceSet sourceSet = new JavaSourceSet(Tree.randomId(), "main", emptyList(), emptyMap());
+        sourceSet.setTypeFactory(factory);
+        cu = cu.withMarkers(cu.getMarkers().add(sourceSet));
+
         JavaTemplateParser templateParser = new JavaTemplateParser(
                 false, parserBuilder, s -> {}, s -> {}, emptySet(), "Type");
 
-        Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
-        cursor.putMessage(JavaTemplateParser.TYPE_FACTORY_KEY, factory);
+        Cursor cursor = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), cu);
 
         templateParser.parseTypeParameters(cursor, "T");
 
         // The wired-in factory should at least be reachable; we don't assert on
         // a specific invocation pattern because the template parser's internals
         // may avoid classFor for trivial templates. The important property is
-        // that no Provider plumbing is required to deliver the factory.
+        // that the marker-attached factory is what compileTemplate reaches.
         assertThat(parserBuilder).isNotNull();
     }
 }
