@@ -69,6 +69,12 @@ func (n *GoMod) WithStatements(statements []java.RightPadded[GoModStatement]) *G
 	return &c
 }
 
+func (n *GoMod) WithEof(eof java.Space) *GoMod {
+	c := *n
+	c.Eof = eof
+	return &c
+}
+
 // GoModStatement is a top-level go.mod statement or a single line inside a
 // factored block. The two concrete forms are GoModDirective (a single
 // line of tokens) and GoModBlock (a `keyword ( … )` factored block).
@@ -105,6 +111,18 @@ func (n *GoModDirective) WithPrefix(prefix java.Space) *GoModDirective {
 	return &c
 }
 
+func (n *GoModDirective) WithMarkers(markers java.Markers) *GoModDirective {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *GoModDirective) WithValues(values []*GoModValue) *GoModDirective {
+	c := *n
+	c.Values = values
+	return &c
+}
+
 // GoModBlock is a factored block, e.g.
 //
 //	require (
@@ -130,6 +148,18 @@ func (n *GoModBlock) WithPrefix(prefix java.Space) *GoModBlock {
 	return &c
 }
 
+func (n *GoModBlock) WithMarkers(markers java.Markers) *GoModBlock {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *GoModBlock) WithEntries(entries []java.RightPadded[GoModStatement]) *GoModBlock {
+	c := *n
+	c.Entries = entries
+	return &c
+}
+
 // GoModValue is a single token within a directive line: a module path,
 // version, local path, operator, or bracketed range expression. The raw
 // text is preserved verbatim (including any quoting).
@@ -145,5 +175,17 @@ func (*GoModValue) IsTree() {}
 func (n *GoModValue) WithPrefix(prefix java.Space) *GoModValue {
 	c := *n
 	c.Prefix = prefix
+	return &c
+}
+
+func (n *GoModValue) WithMarkers(markers java.Markers) *GoModValue {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *GoModValue) WithText(text string) *GoModValue {
+	c := *n
+	c.Text = text
 	return &c
 }

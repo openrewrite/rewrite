@@ -121,6 +121,14 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 	switch n := t.(type) {
 	case *golang.CompilationUnit:
 		return v.self().VisitCompilationUnit(n, p)
+	case *golang.GoMod:
+		return v.self().VisitGoMod(n, p)
+	case *golang.GoModDirective:
+		return v.self().VisitGoModDirective(n, p)
+	case *golang.GoModBlock:
+		return v.self().VisitGoModBlock(n, p)
+	case *golang.GoModValue:
+		return v.self().VisitGoModValue(n, p)
 	case *java.Identifier:
 		return v.self().VisitIdentifier(n, p)
 	case *java.Literal:
@@ -264,6 +272,12 @@ type VisitorI interface {
 	Visit(t java.Tree, p any) java.Tree
 	PreVisit(t java.Tree, p any) java.Tree
 	VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J
+	// go.mod nodes are Tree, not J (their tokens are not Java
+	// expressions), so these return java.Tree rather than java.J.
+	VisitGoMod(gm *golang.GoMod, p any) java.Tree
+	VisitGoModDirective(d *golang.GoModDirective, p any) java.Tree
+	VisitGoModBlock(b *golang.GoModBlock, p any) java.Tree
+	VisitGoModValue(val *golang.GoModValue, p any) java.Tree
 	VisitIdentifier(ident *java.Identifier, p any) java.J
 	VisitLiteral(lit *java.Literal, p any) java.J
 	VisitBinary(bin *java.Binary, p any) java.J
@@ -362,6 +376,44 @@ func (v *GoVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java
 	cu = cu.WithStatements(visitRightPaddedList(v, cu.Statements, p))
 	cu = cu.WithEOF(v.self().VisitSpace(cu.EOF, p))
 	return cu
+}
+
+func (v *GoVisitor) VisitGoMod(gm *golang.GoMod, p any) java.Tree {
+	gm = gm.WithPrefix(v.self().VisitSpace(gm.Prefix, p))
+	gm = gm.WithMarkers(v.visitMarkers(gm.Markers, p))
+	gm = gm.WithStatements(visitGoModStatementList(v, gm.Statements, p))
+	gm = gm.WithEof(v.self().VisitSpace(gm.Eof, p))
+	return gm
+}
+
+func (v *GoVisitor) VisitGoModDirective(d *golang.GoModDirective, p any) java.Tree {
+	d = d.WithPrefix(v.self().VisitSpace(d.Prefix, p))
+	d = d.WithMarkers(v.visitMarkers(d.Markers, p))
+	values := make([]*golang.GoModValue, 0, len(d.Values))
+	for _, val := range d.Values {
+		visited := v.self().Visit(val, p)
+		if visited == nil {
+			continue
+		}
+		values = append(values, visited.(*golang.GoModValue))
+	}
+	d = d.WithValues(values)
+	return d
+}
+
+func (v *GoVisitor) VisitGoModBlock(b *golang.GoModBlock, p any) java.Tree {
+	b = b.WithPrefix(v.self().VisitSpace(b.Prefix, p))
+	b = b.WithMarkers(v.visitMarkers(b.Markers, p))
+	b.BeforeLParen = v.self().VisitSpace(b.BeforeLParen, p)
+	b = b.WithEntries(visitGoModStatementList(v, b.Entries, p))
+	b.BeforeRParen = v.self().VisitSpace(b.BeforeRParen, p)
+	return b
+}
+
+func (v *GoVisitor) VisitGoModValue(val *golang.GoModValue, p any) java.Tree {
+	val = val.WithPrefix(v.self().VisitSpace(val.Prefix, p))
+	val = val.WithMarkers(v.visitMarkers(val.Markers, p))
+	return val
 }
 
 func (v *GoVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
@@ -1074,6 +1126,23 @@ func visitAndCast[T java.Tree](v *GoVisitor, t java.Tree, p any) T {
 		return zero
 	}
 	return result.(T)
+}
+
+// visitGoModStatementList visits a right-padded list of go.mod statements.
+// GoModStatement is a java.Tree (not java.J), so the J-constrained
+// visitRightPaddedList helper can't be reused here.
+func visitGoModStatementList(v *GoVisitor, list []java.RightPadded[golang.GoModStatement], p any) []java.RightPadded[golang.GoModStatement] {
+	result := make([]java.RightPadded[golang.GoModStatement], 0, len(list))
+	for _, rp := range list {
+		visited := v.self().Visit(rp.Element, p)
+		if visited == nil {
+			continue
+		}
+		rp.Element = visited.(golang.GoModStatement)
+		rp.After = v.self().VisitSpace(rp.After, p)
+		result = append(result, rp)
+	}
+	return result
 }
 
 func visitExpression(v *GoVisitor, expr java.Expression, p any) java.Expression {
