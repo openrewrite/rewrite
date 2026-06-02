@@ -21,16 +21,23 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Preconditions
 import org.openrewrite.Recipe
 import org.openrewrite.TreeVisitor
+import org.openrewrite.java.JavaVisitor
 import org.openrewrite.kotlin.KotlinVisitor
 
 /**
- * v1 dispatch coverage for the IR pass's helper selection. The
- * LST-structural classifier still runs (it computes `usesKotlinTreeNode`)
- * but v1 always dispatches to the Kotlin helper — see
- * `RecipeIrGenerationExtension.pickHelperSymbol` for the reasoning. These
- * tests pin that v1 behavior so a future change that re-enables the
- * Java-template path doesn't accidentally regress recipes authored in
- * Kotlin (every recipe in Kotlin1To2.kt today).
+ * v2 dispatch coverage for the IR pass's helper selection. The
+ * LST-structural classifier promotes a recipe to the Kotlin helper when
+ * either a value-parameter type references a `K.*` tree node OR a call
+ * expression resolves into the `kotlin.*` namespace (Kotlin stdlib
+ * function / extension that `JavaTemplate` can't parse). All-Java bodies
+ * — no K.* tree nodes, no `kotlin.*` calls — dispatch to the Java helper
+ * (`JavaVisitor` + `JavaTemplate`), which still matches both Java and
+ * Kotlin sources via `TreeVisitorAdapter` but parses the after-template
+ * as Java.
+ *
+ * Property-access and not-null shapes stay Kotlin-only — `J.FieldAccess`
+ * is a different LST node than Kotlin property access, and `!!` has no
+ * Java analogue.
  *
  * Test strategy: compile each recipe via the K2 plugin, load the synthesized
  * `<Name>$KtRecipe` class through the compilation result's classloader, and
@@ -39,7 +46,7 @@ import org.openrewrite.kotlin.KotlinVisitor
 class JavaKotlinClassifierTest {
 
     @Test
-    fun `all-Java body still dispatches to KotlinVisitor in v1`() {
+    fun `kotlin lowercase uppercase stdlib extensions dispatch to KotlinVisitor`() {
         val r = compileRecipe(
             """
             import org.openrewrite.recipe
@@ -55,7 +62,7 @@ class JavaKotlinClassifierTest {
     }
 
     @Test
-    fun `kotlin stdlib extension call dispatches to KotlinVisitor`() {
+    fun `kotlin appendLine extension dispatches to KotlinVisitor`() {
         val r = compileRecipe(
             """
             import org.openrewrite.recipe
@@ -71,7 +78,7 @@ class JavaKotlinClassifierTest {
     }
 
     @Test
-    fun `reified-generic stdlib call dispatches to KotlinVisitor`() {
+    fun `reified-generic Kotlin builtin dispatches to KotlinVisitor`() {
         val r = compileRecipe(
             """
             import org.openrewrite.recipe
@@ -85,6 +92,30 @@ class JavaKotlinClassifierTest {
             propertyName = "EnumEntriesRename",
         )
         assertThat(unwrap(r.getVisitor())).isInstanceOf(KotlinVisitor::class.java)
+    }
+
+    @Test
+    fun `all-Java body dispatches to JavaVisitor in v2`() {
+        // Pure-Java callees on both sides: `StringBuilder.appendCodePoint(I)`
+        // matcher and `StringBuilder.append(String)` after-template. Both
+        // resolve to `java.lang.{AbstractStringBuilder,StringBuilder}` members
+        // — no `K.*` LST node references, no `kotlin.*` callees in the
+        // lambdas. JavaTemplate parses the after; JavaVisitor matches the
+        // call sites against both Java and Kotlin sources (TreeVisitorAdapter
+        // glue). This is the dispatch path that unlocks the Kotlin DSL for
+        // Java-source migrations like adopt-jdk-9plus-idioms.
+        val r = compileRecipe(
+            """
+            import org.openrewrite.recipe
+            val ReplaceCodePoint = recipe("d", "desc") {
+                edit {
+                    rewrite { sb: StringBuilder -> sb.appendCodePoint(65) } to { sb -> sb.append("A") }
+                }
+            }
+            """.trimIndent(),
+            propertyName = "ReplaceCodePoint",
+        )
+        assertThat(unwrap(r.getVisitor())).isInstanceOf(JavaVisitor::class.java)
     }
 
     /**
