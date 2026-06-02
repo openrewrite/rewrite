@@ -269,11 +269,17 @@ func AddToBlock(cu *golang.CompilationUnit, imp *java.Import, modulePath string)
 		}
 		// Wire the leading-space convention onto the new import: the
 		// space between `import` and the path lives on the Qualid
-		// literal's Prefix.
-		if lit, ok := imp.Qualid.(*java.Literal); ok {
-			cloned := *lit
-			cloned.Prefix = java.Space{Whitespace: " "}
-			imp.Qualid = &cloned
+		// literal's Prefix for regular imports. For aliased imports, the
+		// space after `import` lives on Import.Prefix and the space between
+		// alias and path lives on the literal.
+		if imp.Alias != nil {
+			imp.Prefix = java.Space{Whitespace: " "}
+		} else {
+			if lit, ok := imp.Qualid.(*java.Literal); ok {
+				cloned := *lit
+				cloned.Prefix = java.Space{Whitespace: " "}
+				imp.Qualid = &cloned
+			}
 		}
 	}
 	imps := *c.Imports
@@ -309,7 +315,7 @@ func promoteToGrouped(imps *java.Container[*java.Import]) {
 	if rp.Element != nil {
 		imp := *rp.Element
 		imp.Prefix = java.Space{Whitespace: "\n\t"}
-		if lit, ok := imp.Qualid.(*java.Literal); ok {
+		if lit, ok := imp.Qualid.(*java.Literal); ok && imp.Alias == nil {
 			cloned := *lit
 			cloned.Prefix = java.EmptySpace
 			imp.Qualid = &cloned
@@ -421,6 +427,11 @@ func NewImport(path string, alias *string) *java.Import {
 		Qualid: &java.Literal{ID: uuid.New(), Source: `"` + path + `"`, Value: path, Kind: java.StringLiteral},
 	}
 	if alias != nil {
+		if lit, ok := imp.Qualid.(*java.Literal); ok {
+			cloned := *lit
+			cloned.Prefix = java.Space{Whitespace: " "}
+			imp.Qualid = &cloned
+		}
 		imp.Alias = &java.LeftPadded[*java.Identifier]{
 			Before: java.Space{Whitespace: " "},
 			Element: &java.Identifier{

@@ -83,6 +83,15 @@ func (v *GoVisitor) AfterVisits() []AfterVisitor {
 	return out
 }
 
+// PendingAfterVisits returns the currently queued follow-up visitors
+// without clearing the queue. Helper APIs use this to keep convenience
+// methods like MaybeAddImport idempotent before the drain runs.
+func (v *GoVisitor) PendingAfterVisits() []AfterVisitor {
+	out := make([]AfterVisitor, len(v.afterVisits))
+	copy(out, v.afterVisits)
+	return out
+}
+
 // Visit dispatches to the appropriate visit method based on the node's concrete type.
 //
 // Lifecycle:

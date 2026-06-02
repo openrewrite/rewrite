@@ -99,7 +99,8 @@ func (b *TemplateBuilder) Captures(caps ...*Capture) *TemplateBuilder {
 	return b
 }
 
-// Imports adds required imports for the template code.
+// Imports adds imports to the synthetic source used to parse the template.
+// It does not edit imports in the source file being rewritten.
 func (b *TemplateBuilder) Imports(pkgs ...string) *TemplateBuilder {
 	b.imports = append(b.imports, pkgs...)
 	return b
