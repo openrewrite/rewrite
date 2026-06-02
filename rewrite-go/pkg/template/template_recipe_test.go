@@ -162,8 +162,9 @@ func TestNewRecipeMultipleBeforeSecondMatches(t *testing.T) {
 	)
 }
 
-func TestNewRecipeWithImports(t *testing.T) {
-	// Replace `fmt.Sprintf("%d", n)` with `strconv.Itoa(n)`
+func TestNewRecipeImportsAreTemplateContextOnly(t *testing.T) {
+	// Imports on the after template let `strconv.Itoa(n)` parse, but callers
+	// are responsible for source-file import edits via SourceImports.
 	n := Expr("n")
 	r := NewRecipe(
 		RecipeName("test.SprintfToItoa"),
@@ -191,6 +192,67 @@ func TestNewRecipeWithImports(t *testing.T) {
 			func f(n int) string {
 				return strconv.Itoa(n)
 			}
+		`),
+	)
+}
+
+func TestNewRecipeWithSourceImports(t *testing.T) {
+	// SourceImports explicitly adds "strconv" to the file; the import cleanup
+	// pass removes "fmt" once the replacement no longer uses it.
+	n := Expr("n")
+	r := NewRecipe(
+		RecipeName("test.SprintfToItoa"),
+		WithDisplayName("Use strconv.Itoa"),
+		WithBefore(fmt.Sprintf(`fmt.Sprintf("%%d", %s)`, n), Imports("fmt")),
+		WithAfter(fmt.Sprintf(`strconv.Itoa(%s)`, n), Imports("strconv"), SourceImports("strconv")),
+		WithCaptures(n),
+	)
+
+	spec := test.NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		test.Golang(`
+			package main
+
+			import "fmt"
+
+			func f(n int) string {
+				return fmt.Sprintf("%d", n)
+			}
+		`, `
+			package main
+
+			import (
+				"strconv"
+			)
+
+			func f(n int) string {
+				return strconv.Itoa(n)
+			}
+		`),
+	)
+}
+
+func TestNewRecipeWithAliasedSourceImport(t *testing.T) {
+	blank := "_"
+	r := NewRecipe(
+		RecipeName("test.AddPprofImport"),
+		WithDisplayName("Add pprof import"),
+		WithBefore(`x`),
+		WithAfter(`y`, SourceImport("net/http/pprof", &blank)),
+	)
+
+	spec := test.NewRecipeSpec().WithRecipe(r)
+	spec.RewriteRun(t,
+		test.Golang(`
+			package main
+
+			var a = x
+		`, `
+			package main
+
+			import _ "net/http/pprof"
+
+			var a = y
 		`),
 	)
 }

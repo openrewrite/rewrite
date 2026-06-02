@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
+	recipegolang "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -34,22 +35,31 @@ type RecipeOption func(*templateRecipeConfig)
 type BeforeOption func(*beforeSpec)
 
 type beforeSpec struct {
-	code    string
-	imports []string
-	kind    *ScaffoldKind // nil = auto-detect
+	code          string
+	imports       []string
+	sourceImports []SourceImportSpec
+	kind          *ScaffoldKind // nil = auto-detect
+}
+
+// SourceImportSpec describes an import that should be added to the source file
+// when an after template is applied.
+type SourceImportSpec struct {
+	Path  string
+	Alias *string
 }
 
 type templateRecipeConfig struct {
-	name         string
-	displayName  string
-	description  string
-	tags         []string
-	befores      []beforeSpec
-	afterCode    string
-	afterImports []string
-	afterKind    *ScaffoldKind
-	captures     []*Capture
-	kind         *ScaffoldKind // global override
+	name          string
+	displayName   string
+	description   string
+	tags          []string
+	befores       []beforeSpec
+	afterCode     string
+	afterImports  []string
+	sourceImports []SourceImportSpec
+	afterKind     *ScaffoldKind
+	captures      []*Capture
+	kind          *ScaffoldKind // global override
 }
 
 // RecipeName sets the fully qualified recipe name.
@@ -93,6 +103,7 @@ func WithAfter(code string, opts ...BeforeOption) RecipeOption {
 			opt(&spec)
 		}
 		c.afterImports = spec.imports
+		c.sourceImports = spec.sourceImports
 		c.afterKind = spec.kind
 	}
 }
@@ -118,9 +129,29 @@ func AsStatement() RecipeOption {
 	}
 }
 
-// Imports adds required imports for a before or after template.
+// Imports adds imports to the synthetic source used to parse a before or
+// after template. It does not edit imports in the source file being rewritten.
 func Imports(pkgs ...string) BeforeOption {
 	return func(s *beforeSpec) { s.imports = append(s.imports, pkgs...) }
+}
+
+// SourceImports declares regular imports to add to the source file when an
+// after template is applied. It is only meaningful on WithAfter.
+func SourceImports(pkgs ...string) BeforeOption {
+	return func(s *beforeSpec) {
+		for _, pkg := range pkgs {
+			s.sourceImports = append(s.sourceImports, SourceImportSpec{Path: pkg})
+		}
+	}
+}
+
+// SourceImport declares an import with optional alias to add to the source file
+// when an after template is applied. Pass "_" for blank imports or "." for dot
+// imports.
+func SourceImport(path string, alias *string) BeforeOption {
+	return func(s *beforeSpec) {
+		s.sourceImports = append(s.sourceImports, SourceImportSpec{Path: path, Alias: alias})
+	}
 }
 
 // NewRecipe creates a recipe.Recipe from declarative before/after templates.
@@ -157,7 +188,7 @@ func buildRecipe(cfg *templateRecipeConfig) recipe.Recipe {
 	afterKind := resolveKind(cfg.afterKind, cfg.kind, cfg.afterCode)
 	after := buildTemplate(cfg.afterCode, caps, cfg.afterImports, afterKind)
 
-	v := newTemplateRecipeVisitor(befores, after)
+	v := newTemplateRecipeVisitor(befores, after, cfg.sourceImports)
 
 	return &builtTemplateRecipe{
 		name:        cfg.name,
@@ -224,12 +255,13 @@ func detectScaffoldKind(code string) ScaffoldKind {
 // templateRecipeVisitor tries each before pattern in order; first match wins.
 type templateRecipeVisitor struct {
 	visitor.GoVisitor
-	befores []*GoPattern
-	after   *GoTemplate
+	befores       []*GoPattern
+	after         *GoTemplate
+	sourceImports []SourceImportSpec
 }
 
-func newTemplateRecipeVisitor(befores []*GoPattern, after *GoTemplate) *templateRecipeVisitor {
-	v := &templateRecipeVisitor{befores: befores, after: after}
+func newTemplateRecipeVisitor(befores []*GoPattern, after *GoTemplate, sourceImports []SourceImportSpec) *templateRecipeVisitor {
+	v := &templateRecipeVisitor{befores: befores, after: after, sourceImports: sourceImports}
 	v.Self = v
 	return v
 }
@@ -252,6 +284,12 @@ func (v *templateRecipeVisitor) Visit(t java.Tree, p any) java.Tree {
 		}
 		replaced := v.after.Apply(nil, match)
 		if replaced != nil {
+			if len(v.sourceImports) > 0 {
+				for _, imp := range v.sourceImports {
+					recipegolang.MaybeAddImport(v, imp.Path, imp.Alias, false)
+				}
+				v.DoAfterVisit(recipe.Service[*recipegolang.ImportService](nil).RemoveUnusedImportsVisitor())
+			}
 			return setLeadingPrefix(replaced, getLeadingPrefix(j))
 		}
 	}
@@ -325,7 +363,7 @@ func (tr *TemplateRecipe) InitTemplate(opts ...RecipeOption) {
 	afterKind := resolveKind(cfg.afterKind, cfg.kind, cfg.afterCode)
 	after := buildTemplate(cfg.afterCode, caps, cfg.afterImports, afterKind)
 
-	tr.editor = newTemplateRecipeVisitor(befores, after)
+	tr.editor = newTemplateRecipeVisitor(befores, after, cfg.sourceImports)
 }
 
 // Editor returns the auto-generated visitor.
