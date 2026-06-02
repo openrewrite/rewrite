@@ -246,6 +246,18 @@ public class RpcSendQueue {
                 }
             }
 
+            // Synthetic tree subclasses generated outside the org.openrewrite packages
+            // -- e.g. moderne-cli's V3 lazy proxies, emitted as `Lazy_X extends <realType>`
+            // -- must be reported to the remote as their real (super) type, not the proxy
+            // class name, which the remote has no codec/factory for.
+            if (pkg != null && !pkg.getName().startsWith("org.openrewrite")) {
+                Class<?> superclass = afterType.getSuperclass();
+                Package superPkg = superclass == null ? null : superclass.getPackage();
+                if (superPkg != null && superPkg.getName().startsWith("org.openrewrite") && !Object.class.equals(superclass)) {
+                    return superclass.getName();
+                }
+            }
+
             return afterType.getName();
         }
     };
