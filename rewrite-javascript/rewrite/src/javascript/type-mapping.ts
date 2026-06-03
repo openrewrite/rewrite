@@ -1180,6 +1180,24 @@ export class JavaScriptTypeMapping {
             if (this.sourceRoot) {
                 cleanedName = path.relative(this.sourceRoot, cleanedName);
             }
+        } else if (!cleanedName.includes('.') &&
+            (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum))) {
+            // Bare class/interface/enum name whose declaring package was dropped (e.g. `Logger`
+            // from a package that does `export = Logger`). TypeScript's getFullyQualifiedName drops
+            // the package here because the symbol has no `parent`, so the package would otherwise be
+            // lost. Recover it from the symbol's declaration file — but only for genuine module
+            // exports from node_modules. Excluded by construction:
+            //  - namespace/module objects (e.g. the `React` namespace), whose bare name is intentional
+            //    and which are not Class/Interface/Enum symbols;
+            //  - local declarations (extractModuleNameFromPath returns undefined);
+            //  - ambient globals (which are `global.`-qualified, hence not bare).
+            const declarationFile = symbol.declarations?.[0]?.getSourceFile();
+            if (declarationFile && ts.isExternalModule(declarationFile)) {
+                const packageName = this.extractModuleNameFromPath(declarationFile.fileName);
+                if (packageName) {
+                    cleanedName = `${packageName}.${cleanedName}`;
+                }
+            }
         }
 
         return cleanedName.endsWith('Constructor') ?
