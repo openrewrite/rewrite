@@ -1198,11 +1198,48 @@ export class JavaScriptTypeMapping {
                     cleanedName = `${packageName}.${cleanedName}`;
                 }
             }
+        } else if (cleanedName.includes('.')) {
+            // Namespace-qualified name such as `Bull.Queue` or `request.SuperAgentStatic`, where
+            // the leading segment is the package's internal `export =` namespace rather than the
+            // importable package name. Replace it with the declaring package so the FQN identifies
+            // the package the type actually comes from.
+            //
+            // Preserved as-is:
+            //  - UMD globals (`export as namespace X`, e.g. React, lodash `_`, jQuery `$`): the
+            //    namespace name is the conventional public identifier;
+            //  - `global.*` (TypeScript's marker for ambient globals);
+            //  - namespaces that already match the package name, and any non-node_modules type.
+            const namespaceName = cleanedName.substring(0, cleanedName.indexOf('.'));
+            if (namespaceName !== 'global') {
+                const declarationFile = symbol.declarations?.[0]?.getSourceFile();
+                if (declarationFile && ts.isExternalModule(declarationFile)) {
+                    const packageName = this.extractModuleNameFromPath(declarationFile.fileName);
+                    if (packageName && packageName !== namespaceName &&
+                        !this.isUmdGlobalNamespace(declarationFile, namespaceName)) {
+                        cleanedName = packageName + cleanedName.substring(cleanedName.indexOf('.'));
+                    }
+                }
+            }
         }
 
         return cleanedName.endsWith('Constructor') ?
             cleanedName.substring(0, cleanedName.length - 'Constructor'.length) :
             cleanedName;
+    }
+
+    /**
+     * Whether {@code namespaceName} is exposed as a UMD global from the given declaration file
+     * (e.g. `export as namespace React`). The namespace name of a UMD global is the conventional
+     * public identifier (React, lodash `_`, jQuery `$`) and must be preserved rather than replaced
+     * with the package name.
+     */
+    private isUmdGlobalNamespace(sourceFile: ts.SourceFile, namespaceName: string): boolean {
+        for (const statement of sourceFile.statements) {
+            if (ts.isNamespaceExportDeclaration(statement) && statement.name.text === namespaceName) {
+                return true;
+            }
+        }
+        return false;
     }
 
 
