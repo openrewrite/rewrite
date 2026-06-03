@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -90,33 +91,53 @@ public abstract class DynamicDispatchRpcCodec<T> implements RpcCodec<T> {
 
     @SuppressWarnings("unchecked")
     public static <T> @Nullable RpcCodec<T> getCodec(Object t, @Nullable String sourceFileType) {
-        if (sourceFileType == null) {
-            return null;
-        }
         // Discover codecs from any classloader we haven't seen yet. Covers plugin/recipe
         // classloaders that weren't visible when this class's static initializer ran.
         discoverFrom(Thread.currentThread().getContextClassLoader());
         discoverFrom(t.getClass().getClassLoader());
-        for (DynamicDispatchRpcCodec<?> codec : CODEC_BY_TYPE.getOrDefault(sourceFileType, emptyList())) {
-            if (codec.getType().isAssignableFrom(t.getClass())) {
-                return (RpcCodec<T>) codec;
-            }
-        }
-        // Defense-in-depth: the keyed bucket missed. This happens when {@code sourceFileType}
-        // is a proxy/subclass runtime class name rather
-        // than the canonical registered type, including when such a string arrives from a
-        // remote. Scan all registered codecs for one assignable from the instance's runtime
-        // type. {@code getType()} is a language marker interface (e.g. Xml, Json), so at most
-        // one language's codec is assignable from a given tree instance.
-        for (List<DynamicDispatchRpcCodec<?>> bucket : CODEC_BY_TYPE.values()) {
-            for (DynamicDispatchRpcCodec<?> codec : bucket) {
+        // The source-file-keyed lookup is an override hook for language-specific codecs; it needs
+        // a key. A cross-cutting value (e.g. JavaType) has no enclosing source file type, so it is
+        // resolved purely by assignability below, which is why the keyed lookup is skipped (not
+        // short-circuited to null) when sourceFileType is absent.
+        if (sourceFileType != null) {
+            for (DynamicDispatchRpcCodec<?> codec : CODEC_BY_TYPE.getOrDefault(sourceFileType, emptyList())) {
                 if (codec.getType().isAssignableFrom(t.getClass())) {
                     return (RpcCodec<T>) codec;
                 }
             }
         }
-        return null;
+        // The keyed bucket missed. This happens when {@code sourceFileType} is a proxy/subclass
+        // runtime class name rather than the canonical registered type (including when such a
+        // string arrives from a remote), or when {@code t} is a cross-cutting value type (e.g.
+        // JavaType) whose codec is not registered under the enclosing source file's type. Resolve
+        // by assignability, cached per value class so this stays off the per-node hot path.
+        return (RpcCodec<T>) FALLBACK_CODEC.get(t.getClass()).orElse(null);
     }
+
+    /**
+     * Caches, per value class, the codec resolved by scanning all registered codecs for one
+     * whose {@link #getType()} is assignable from that class. {@code getType()} is a language
+     * marker (e.g. {@code Xml}, {@code Json}, {@code JavaType}), so at most one codec matches a
+     * given value. The scan runs once per value class; the result is then memoized for the life
+     * of the class.
+     */
+    private static final ClassValue<Optional<DynamicDispatchRpcCodec<?>>> FALLBACK_CODEC =
+            new ClassValue<Optional<DynamicDispatchRpcCodec<?>>>() {
+                @Override
+                protected Optional<DynamicDispatchRpcCodec<?>> computeValue(Class<?> valueClass) {
+                    // Mirror getCodec's discovery so a value's own codec (carried by its
+                    // classloader) is registered before we scan, then cache the result.
+                    discoverFrom(valueClass.getClassLoader());
+                    for (List<DynamicDispatchRpcCodec<?>> bucket : CODEC_BY_TYPE.values()) {
+                        for (DynamicDispatchRpcCodec<?> codec : bucket) {
+                            if (codec.getType().isAssignableFrom(valueClass)) {
+                                return Optional.of(codec);
+                            }
+                        }
+                    }
+                    return Optional.empty();
+                }
+            };
 
     /**
      * Memoized per {@link Class}: see {@link #canonicalSourceFileType(Class)}.
