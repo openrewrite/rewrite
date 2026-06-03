@@ -87,9 +87,9 @@ queue.add('job', {});
         // The fix: bare `Logger` becomes `bunyan.Logger`.
         expect(captured.get('log')).toBe('bunyan.Logger');
 
-        // Guard: a namespace-qualified FQN must NOT be rewritten to the package name.
-        // `new Bull('q')` is `Bull.Queue` (internal namespace) — this change is bare-name only,
-        // so it stays `Bull.Queue` rather than becoming `bull.Queue`.
-        expect(captured.get('queue')).toMatch(/^Bull\.Queue/);
+        // `new Bull('q')` is declared in bull's internal `Bull` namespace; the importable
+        // package name is `bull`, so the FQN is rewritten to `bull.Queue` (see
+        // type-mapping-namespace-replacement.test.ts for the dedicated coverage).
+        expect(captured.get('queue')).toMatch(/^bull\.Queue/);
     }, 180000);
 });
