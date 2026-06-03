@@ -123,11 +123,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val RECIPE_FQN: FqName = FqName("org.openrewrite.recipe")
         val RECIPES_FQN: FqName = FqName("org.openrewrite.recipes")
 
-        const val REWRITE_ADVICE_0_TO = "org.openrewrite.RewriteAdvice0.to"
-        const val REWRITE_ADVICE_1_TO = "org.openrewrite.RewriteAdvice1.to"
-        const val REWRITE_ADVICE_2_TO = "org.openrewrite.RewriteAdvice2.to"
-
-        val REWRITE_ADVICE_TO_FQNS = setOf(REWRITE_ADVICE_0_TO, REWRITE_ADVICE_1_TO, REWRITE_ADVICE_2_TO)
+        val REWRITE_ADVICE_TO_FQNS: Set<String> = (0..12).map { "org.openrewrite.RewriteAdvice$it.to" }.toSet()
 
         const val EDIT_SCOPE_REWRITE_FQN = "org.openrewrite.EditScope.rewrite"
         const val RECIPE_BUILDER_EDIT_FQN = "org.openrewrite.RecipeBuilder.edit"
