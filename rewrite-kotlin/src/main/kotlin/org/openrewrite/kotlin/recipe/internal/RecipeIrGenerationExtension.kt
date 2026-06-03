@@ -142,6 +142,12 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         for (file in moduleFragment.files) {
             processFile(file, ctx)
         }
+        // Replace the FIR-side default bodies of mapped-type fallback
+        // extensions (synthesized in `RecipeFirMappedTypeFallbackExtension`)
+        // with actual calls to the underlying Java instance method. Without
+        // this pass the generated extensions would throw the FIR-default
+        // stub at runtime.
+        MappedTypeFallbackBodyGenerator.generate(moduleFragment, pluginContext)
     }
 
     // ------------------------------------------------------------------
