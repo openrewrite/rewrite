@@ -84,6 +84,12 @@ export class PrepareRecipe {
 
     private static async installSubRecipes(recipe: Recipe, marketplace: RecipeMarketplace) {
         for (const subRecipe of await recipe.recipeList()) {
+            // An RpcRecipe is a proxy for a recipe already prepared on a remote
+            // peer; it has no no-arg constructor to install and its sub-recipes
+            // live remotely, so there is nothing to register locally.
+            if (subRecipe instanceof RpcRecipe) {
+                continue;
+            }
             if (!marketplace.findRecipe(subRecipe.name)) {
                 await marketplace.install(subRecipe.constructor as any, []);
                 await this.installSubRecipes(subRecipe, marketplace);

@@ -19,6 +19,7 @@ import {CreateText} from "./create-text";
 import {ChangeText} from "./change-text";
 import {ChangeVersion} from "./change-version";
 import {RecipeWithRecipeList} from "./recipe-with-recipe-list";
+import {RecipeWithRpcSubRecipe} from "./recipe-with-rpc-sub-recipe";
 import {ReplaceId} from "./replace-id";
 import {FindIdentifierWithRemotePathPrecondition} from "./remote-path-precondition";
 import {FindIdentifierWithPathPrecondition} from "./path-precondition";
@@ -35,6 +36,7 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(CreateText, JavaScript);
     await marketplace.install(ChangeVersion, JavaScript);
     await marketplace.install(RecipeWithRecipeList, JavaScript);
+    await marketplace.install(RecipeWithRpcSubRecipe, JavaScript);
     await marketplace.install(ReplaceId, JavaScript);
     await marketplace.install(FindIdentifier, JavaScript);
     await marketplace.install(FindIdentifierWithRemotePathPrecondition, JavaScript);
