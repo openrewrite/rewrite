@@ -16,11 +16,16 @@
 package org.openrewrite.csharp.rpc;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
+import org.openrewrite.csharp.CsDocCommentPrinter;
 import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.csharp.tree.CsDocComment;
 import org.openrewrite.csharp.tree.CsDocCommentRawComment;
 import org.openrewrite.csharp.tree.Linq;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcSendQueue;
@@ -873,12 +878,24 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
         @Override
         public void visitSpace(Space space, RpcSendQueue q) {
-            q.getAndSendList(space, Space::getComments,
+            // Structured doc-comment trees are not transmitted over the wire; flatten them
+            // back to their raw textual form. The receiver (and lazy re-parse in
+            // CSharpVisitor.visitSpace) will reconstruct a DocComment when a visitor needs one.
+            List<Comment> originalComments = space.getComments();
+            List<Comment> wireComments = ListUtils.map(originalComments, c ->
+                    c instanceof CsDocComment.DocComment ? toRawComment((CsDocComment.DocComment) c) : c);
+            Space spaceForSend = wireComments == originalComments ? space : space.withComments(wireComments);
+
+            q.getAndSendList(spaceForSend, Space::getComments,
                     c -> {
                         if (c instanceof TextComment) {
                             return ((TextComment) c).getText() + c.getSuffix();
                         } else if (c instanceof CsDocCommentRawComment) {
                             return ((CsDocCommentRawComment) c).getText() + c.getSuffix();
+                        } else if (c instanceof CsDocComment.DocComment) {
+                            // A DocComment may appear in the "before" snapshot on incremental sends
+                            // even though the "after" list is always flattened to raw comments.
+                            return toRawComment((CsDocComment.DocComment) c).getText() + c.getSuffix();
                         }
                         throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
                     },
@@ -898,6 +915,16 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
                         q.getAndSend(c, Comment::getMarkers);
                     });
             q.getAndSend(space, Space::getWhitespace);
+        }
+
+        private static CsDocCommentRawComment toRawComment(CsDocComment.DocComment d) {
+            PrintOutputCapture<Integer> out = new PrintOutputCapture<>(0);
+            new CsDocCommentPrinter<Integer>().visit(d, out, new Cursor(null, Cursor.ROOT_VALUE));
+            String printed = out.getOut();
+            // CsDocCommentPrinter emits the leading "///"; CsDocCommentRawComment.printComment
+            // prepends "//", so the raw text starts after the first two slashes.
+            String rawText = printed.startsWith("//") ? printed.substring(2) : printed;
+            return new CsDocCommentRawComment(rawText, d.getSuffix(), d.getMarkers());
         }
     }
 }
