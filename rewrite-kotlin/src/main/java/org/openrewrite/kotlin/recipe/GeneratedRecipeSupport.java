@@ -79,11 +79,12 @@ public final class GeneratedRecipeSupport {
      * literal {@code (kind, value)} at each position).
      */
     public static TreeVisitor<?, ExecutionContext> methodInvocationRewrite(
-            String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv) {
+            String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv, int strictArgCount) {
         // Chain mode: a single matcher spec line containing a tab encodes a
         // two-segment chain <outerSpec>\t<innerSpec>. Substitution-source CSV
         // is segment-tagged ("o:N" / "i:N"). v1 supports single-before chains
-        // only; multi-before chains are rejected at IR-pass time.
+        // only; multi-before chains are rejected at IR-pass time. Chains never
+        // carry a variadic run, so strictArgCount is irrelevant there.
         if (matcherSpecsLines.indexOf('\t') >= 0) {
             return chainMethodInvocationRewrite(matcherSpecsLines, afterTemplate, substitutionSourcesCsv);
         }
@@ -92,7 +93,7 @@ public final class GeneratedRecipeSupport {
         for (int i = 0; i < specs.length; i++) {
             matchers[i] = new MethodMatcher(specs[i]);
         }
-        int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
+        SubSource[][] substitutionSourcesByMatcher = parseSourcesPerMatcher(substitutionSourcesCsv, specs.length);
         TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -104,23 +105,13 @@ public final class GeneratedRecipeSupport {
                     }
                 }
                 if (matchedIdx >= 0) {
-                    int[] substitutionSources = substitutionSourcesByMatcher[matchedIdx];
-                    Object[] substitutions = new Object[substitutionSources.length];
-                    for (int i = 0; i < substitutionSources.length; i++) {
-                        int src = substitutionSources[i];
-                        if (src < 0) {
-                            if (method.getSelect() == null) {
-                                return super.visitMethodInvocation(method, ctx);
-                            }
-                            substitutions[i] = method.getSelect();
-                        } else {
-                            if (src >= method.getArguments().size()) {
-                                return super.visitMethodInvocation(method, ctx);
-                            }
-                            substitutions[i] = method.getArguments().get(src);
-                        }
+                    Applied applied = prepareSubstitutions(
+                            method, substitutionSourcesByMatcher[matchedIdx], afterTemplate, strictArgCount);
+                    if (applied == null) {
+                        return super.visitMethodInvocation(method, ctx);
                     }
-                    J result = KotlinTemplate.builder(afterTemplate).build()
+                    Object[] substitutions = applied.substitutions;
+                    J result = KotlinTemplate.builder(applied.template).build()
                             .apply(getCursor(), method.getCoordinates().replace(), substitutions);
                     // Preserve the matched call's reified type arguments. The
                     // after-template's type args (if any) are placeholders the
@@ -491,13 +482,13 @@ public final class GeneratedRecipeSupport {
      * dance is Kotlin-specific.
      */
     public static TreeVisitor<?, ExecutionContext> methodInvocationRewriteJava(
-            String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv) {
+            String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv, int strictArgCount) {
         String[] specs = matcherSpecsLines.isEmpty() ? new String[0] : matcherSpecsLines.split("\n");
         MethodMatcher[] matchers = new MethodMatcher[specs.length];
         for (int i = 0; i < specs.length; i++) {
             matchers[i] = new MethodMatcher(specs[i]);
         }
-        int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
+        SubSource[][] substitutionSourcesByMatcher = parseSourcesPerMatcher(substitutionSourcesCsv, specs.length);
         TreeVisitor<?, ExecutionContext> walker = new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -509,23 +500,13 @@ public final class GeneratedRecipeSupport {
                     }
                 }
                 if (matchedIdx >= 0) {
-                    int[] substitutionSources = substitutionSourcesByMatcher[matchedIdx];
-                    Object[] substitutions = new Object[substitutionSources.length];
-                    for (int i = 0; i < substitutionSources.length; i++) {
-                        int src = substitutionSources[i];
-                        if (src < 0) {
-                            if (method.getSelect() == null) {
-                                return super.visitMethodInvocation(method, ctx);
-                            }
-                            substitutions[i] = method.getSelect();
-                        } else {
-                            if (src >= method.getArguments().size()) {
-                                return super.visitMethodInvocation(method, ctx);
-                            }
-                            substitutions[i] = method.getArguments().get(src);
-                        }
+                    Applied applied = prepareSubstitutions(
+                            method, substitutionSourcesByMatcher[matchedIdx], afterTemplate, strictArgCount);
+                    if (applied == null) {
+                        return super.visitMethodInvocation(method, ctx);
                     }
-                    J result = JavaTemplate.builder(afterTemplate).build()
+                    Object[] substitutions = applied.substitutions;
+                    J result = JavaTemplate.builder(applied.template).build()
                             .apply(getCursor(), method.getCoordinates().replace(), substitutions);
                     if (result instanceof J.MethodInvocation) {
                         JContainer<Expression> matchedTypeArgs = method.getPadding().getTypeParameters();
@@ -715,6 +696,146 @@ public final class GeneratedRecipeSupport {
             result[i] = parseCsv(lines[i]);
         }
         return result;
+    }
+
+    /**
+     * Marks the variadic-run position in an after template. Must stay
+     * byte-identical to {@code RecipeIrGenerationExtension.VARARGS_SENTINEL}.
+     * Control-char-fenced so it can never collide with real source text.
+     */
+    private static final String VARARGS_SENTINEL = "VARARGS";
+
+    /**
+     * A single substitution source parsed from the CSV. {@link #SELECT} pulls
+     * the matched call's receiver; {@link #ARG} pulls one positional argument;
+     * {@link #VARARG} expands to {@code getArguments()[pos..end]} — the
+     * variadic-by-default run.
+     */
+    private static final class SubSource {
+        static final int SELECT = 0;
+        static final int ARG = 1;
+        static final int VARARG = 2;
+        final int kind;
+        final int pos;
+        SubSource(int kind, int pos) { this.kind = kind; this.pos = pos; }
+    }
+
+    private static SubSource parseSource(String token) {
+        if (!token.isEmpty() && token.charAt(0) == 'V') {
+            return new SubSource(SubSource.VARARG, Integer.parseInt(token.substring(1)));
+        }
+        int n = Integer.parseInt(token);
+        return n < 0 ? new SubSource(SubSource.SELECT, -1) : new SubSource(SubSource.ARG, n);
+    }
+
+    /**
+     * Parse a per-matcher substitution-source CSV (same shared / {@code \n}-
+     * delimited shape as {@link #parseCsvPerMatcher}) into {@link SubSource}
+     * rows, supporting the {@code V<k>} variadic token.
+     */
+    private static SubSource[][] parseSourcesPerMatcher(String csv, int matcherCount) {
+        if (matcherCount == 0) {
+            return new SubSource[0][];
+        }
+        if (csv.indexOf('\n') < 0) {
+            SubSource[] shared = parseSourceRow(csv);
+            SubSource[][] result = new SubSource[matcherCount][];
+            for (int i = 0; i < matcherCount; i++) {
+                result[i] = shared;
+            }
+            return result;
+        }
+        String[] lines = csv.split("\n", -1);
+        if (lines.length != matcherCount) {
+            throw new IllegalStateException(
+                    "expected " + matcherCount + " per-matcher CSVs but got " + lines.length);
+        }
+        SubSource[][] result = new SubSource[matcherCount][];
+        for (int i = 0; i < matcherCount; i++) {
+            result[i] = parseSourceRow(lines[i]);
+        }
+        return result;
+    }
+
+    private static SubSource[] parseSourceRow(String row) {
+        if (row.isEmpty()) {
+            return new SubSource[0];
+        }
+        String[] parts = row.split(",");
+        SubSource[] out = new SubSource[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            out[i] = parseSource(parts[i]);
+        }
+        return out;
+    }
+
+    /** Expanded after template + the substitution array it aligns with. */
+    private static final class Applied {
+        final String template;
+        final Object[] substitutions;
+        Applied(String template, Object[] substitutions) {
+            this.template = template;
+            this.substitutions = substitutions;
+        }
+    }
+
+    /**
+     * Build the substitution array for a matched invocation and, when the
+     * recipe is variadic, expand the {@link #VARARGS_SENTINEL} in the after
+     * template to one {@code #{any()}} placeholder per matched run argument.
+     * Returns {@code null} (caller should skip) when the arity guard fails or a
+     * source can't be satisfied (missing receiver / out-of-range arg).
+     *
+     * <p>Placeholders bind positionally, so expanding the sentinel in place and
+     * splicing the run args at the same ordinal keeps template and array
+     * aligned.
+     */
+    private static @Nullable Applied prepareSubstitutions(
+            J.MethodInvocation method, SubSource[] sources, String afterTemplate, int strictArgCount) {
+        List<Expression> args = method.getArguments();
+        // The canonical zero-arg call is a single J.Empty — treat as 0 args so a
+        // variadic run collapses to `()` rather than splicing the placeholder.
+        boolean noArgs = args.size() == 1 && args.get(0) instanceof J.Empty;
+        int argCount = noArgs ? 0 : args.size();
+        if (strictArgCount >= 0 && argCount != strictArgCount) {
+            return null;
+        }
+        List<Object> substitutions = new ArrayList<>(sources.length);
+        int varargCount = -1;
+        for (SubSource s : sources) {
+            switch (s.kind) {
+                case SubSource.SELECT:
+                    if (method.getSelect() == null) {
+                        return null;
+                    }
+                    substitutions.add(method.getSelect());
+                    break;
+                case SubSource.ARG:
+                    if (s.pos >= argCount) {
+                        return null;
+                    }
+                    substitutions.add(args.get(s.pos));
+                    break;
+                case SubSource.VARARG:
+                    varargCount = Math.max(0, argCount - s.pos);
+                    for (int i = s.pos; i < s.pos + varargCount; i++) {
+                        substitutions.add(args.get(i));
+                    }
+                    break;
+            }
+        }
+        String template = afterTemplate;
+        if (varargCount >= 0) {
+            StringBuilder placeholders = new StringBuilder();
+            for (int i = 0; i < varargCount; i++) {
+                if (i > 0) {
+                    placeholders.append(", ");
+                }
+                placeholders.append("#{any()}");
+            }
+            template = afterTemplate.replace(VARARGS_SENTINEL, placeholders.toString());
+        }
+        return new Applied(template, substitutions.toArray());
     }
 
 /**
