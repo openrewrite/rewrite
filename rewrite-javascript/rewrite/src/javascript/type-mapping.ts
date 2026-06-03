@@ -84,6 +84,40 @@ export class JavaScriptTypeMapping {
     }
 
     /**
+     * Resolve the type of a decorator from the symbol it references, naming it by the decorator's
+     * fully qualified name (e.g. `typeorm.Entity`) rather than the generic function type of the
+     * decorator factory. Decorators are the JavaScript/TypeScript analogue of Java annotations, so
+     * — like {@code J.Annotation} in the Java LST — they are typed as a {@link Type.FullyQualified}
+     * with {@code classKind = Annotation}, which lets recipes match them by fully qualified name.
+     *
+     * @param node the identifier or qualified name naming the decorator (e.g. `Entity` in `@Entity()`)
+     */
+    annotationType(node: ts.Node): Type.FullyQualified | undefined {
+        const symbol = this.checker.getSymbolAtLocation(node);
+        if (!symbol) {
+            return undefined;
+        }
+        const fullyQualifiedName = this.getFullyQualifiedNameFromSymbol(symbol);
+        if (!fullyQualifiedName || fullyQualifiedName === 'unknown') {
+            return undefined;
+        }
+        return {
+            kind: Type.Kind.Class,
+            flags: 0,
+            classKind: Type.Class.Kind.Annotation,
+            fullyQualifiedName,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        } as Type.Class;
+    }
+
+    /**
      * Resolve the declared type of a class / interface / enum / class-expression.
      *
      * Using {@code getTypeAtLocation} on these declaration nodes is unsafe: TypeScript returns
