@@ -16,21 +16,15 @@
 package org.openrewrite.csharp.rpc;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
-import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
-import org.openrewrite.csharp.CsDocCommentPrinter;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.csharp.tree.CsDocComment;
 import org.openrewrite.csharp.tree.CsDocCommentRawComment;
 import org.openrewrite.csharp.tree.Linq;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcSendQueue;
-
-import java.util.List;
 
 import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.Reference.getValueNonNull;
@@ -878,53 +872,39 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
         @Override
         public void visitSpace(Space space, RpcSendQueue q) {
-            // Structured doc-comment trees are not transmitted over the wire; flatten them
-            // back to their raw textual form. The receiver (and lazy re-parse in
-            // CSharpVisitor.visitSpace) will reconstruct a DocComment when a visitor needs one.
-            List<Comment> originalComments = space.getComments();
-            List<Comment> wireComments = ListUtils.map(originalComments, c ->
-                    c instanceof CsDocComment.DocComment ? toRawComment((CsDocComment.DocComment) c) : c);
-            Space spaceForSend = wireComments == originalComments ? space : space.withComments(wireComments);
-
-            q.getAndSendList(spaceForSend, Space::getComments,
+            q.getAndSendList(space, Space::getComments,
                     c -> {
                         if (c instanceof TextComment) {
                             return ((TextComment) c).getText() + c.getSuffix();
                         } else if (c instanceof CsDocCommentRawComment) {
                             return ((CsDocCommentRawComment) c).getText() + c.getSuffix();
                         } else if (c instanceof CsDocComment.DocComment) {
-                            // A DocComment may appear in the "before" snapshot on incremental sends
-                            // even though the "after" list is always flattened to raw comments.
-                            return toRawComment((CsDocComment.DocComment) c).getText() + c.getSuffix();
+                            // A structured doc comment is a proper tree, so it is keyed by its id
+                            // (like Javadoc.DocComment on the Java side) and decomposed over RPC.
+                            return ((CsDocComment.DocComment) c).getId();
                         }
                         throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
                     },
                     c -> {
-                        if (c instanceof TextComment) {
-                            TextComment tc = (TextComment) c;
-                            q.getAndSend(tc, TextComment::isMultiline);
-                            q.getAndSend(tc, TextComment::getText);
-                        } else if (c instanceof CsDocCommentRawComment) {
-                            CsDocCommentRawComment dc = (CsDocCommentRawComment) c;
-                            q.getAndSend(dc, CsDocCommentRawComment::isMultiline);
-                            q.getAndSend(dc, CsDocCommentRawComment::getText);
+                        if (c instanceof CsDocComment.DocComment) {
+                            new CsDocCommentSender(delegate).visit((CsDocComment.DocComment) c, q);
                         } else {
-                            throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
+                            if (c instanceof TextComment) {
+                                TextComment tc = (TextComment) c;
+                                q.getAndSend(tc, TextComment::isMultiline);
+                                q.getAndSend(tc, TextComment::getText);
+                            } else if (c instanceof CsDocCommentRawComment) {
+                                CsDocCommentRawComment dc = (CsDocCommentRawComment) c;
+                                q.getAndSend(dc, CsDocCommentRawComment::isMultiline);
+                                q.getAndSend(dc, CsDocCommentRawComment::getText);
+                            } else {
+                                throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
+                            }
+                            q.getAndSend(c, Comment::getSuffix);
+                            q.getAndSend(c, Comment::getMarkers);
                         }
-                        q.getAndSend(c, Comment::getSuffix);
-                        q.getAndSend(c, Comment::getMarkers);
                     });
             q.getAndSend(space, Space::getWhitespace);
-        }
-
-        private static CsDocCommentRawComment toRawComment(CsDocComment.DocComment d) {
-            PrintOutputCapture<Integer> out = new PrintOutputCapture<>(0);
-            new CsDocCommentPrinter<Integer>().visit(d, out, new Cursor(null, Cursor.ROOT_VALUE));
-            String printed = out.getOut();
-            // CsDocCommentPrinter emits the leading "///"; CsDocCommentRawComment.printComment
-            // prepends "//", so the raw text starts after the first two slashes.
-            String rawText = printed.startsWith("//") ? printed.substring(2) : printed;
-            return new CsDocCommentRawComment(rawText, d.getSuffix(), d.getMarkers());
         }
     }
 }

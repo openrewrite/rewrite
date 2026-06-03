@@ -1093,6 +1093,31 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         public new void ConsumePreVisit(J j, RpcReceiveQueue q) => base.ConsumePreVisit(j, q);
         public new void PopPreVisit() => base.PopPreVisit();
 
+        public override Space VisitSpace(Space space, RpcReceiveQueue q)
+        {
+            var comments = q.ReceiveList(space.Comments, c =>
+            {
+                // The Java side decomposes a structured CsDocComment.DocComment tree; the C#
+                // side has no such model, so drain it and re-flatten to a raw XmlDocComment.
+                if (c is StructuredDocComment)
+                {
+                    return CsDocCommentReceiver.ReceiveDocComment(q);
+                }
+                var multiline = q.Receive(c.Multiline);
+                var text = q.Receive(c.Text);
+                var suffix = q.Receive(c.Suffix);
+                // C# Comment doesn't have Markers; consume and discard
+                q.Receive<Markers>(Markers.Empty);
+                if (c is XmlDocComment)
+                {
+                    return new XmlDocComment(text!, suffix!, multiline);
+                }
+                return new TextComment(text!, suffix!, multiline);
+            });
+            var whitespace = q.Receive(space.Whitespace);
+            return space.WithComments(comments!).WithWhitespace(whitespace!);
+        }
+
         public override J? Visit(Tree? tree, RpcReceiveQueue q)
         {
             // DeconstructionPattern is a J type whose visit method lives in JavaReceiver,
