@@ -19,9 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 @Incubating(since = "8.38.0")
 public class AdaptiveRadixTree<V> {
@@ -204,12 +202,14 @@ public class AdaptiveRadixTree<V> {
         @Override
         Node<V> insert(byte[] key, int depth, V value, KeyTable keyTable) {
             // Iterative descent: each step strictly advances `depth`, so we bound work
-            // by the key length rather than the JVM stack. We push every internal node
-            // we pass through onto a path stack and, after performing the terminal
-            // action, walk back up rewriting child slots only as far as a node's
-            // identity actually changes.
-            List<InternalNode<V>> pathNodes = new ArrayList<>();
-            List<Byte> pathSlots = new ArrayList<>();
+            // by the key length rather than the JVM stack. Only the immediate parent of
+            // the node where the terminal action happens can ever need its child slot
+            // repointed: every slot we descend through already exists in its node, so
+            // `addChild` replaces it in place (returning null) and never grows an
+            // ancestor. Ancestors above that parent keep their identity, so the original
+            // root is returned unchanged.
+            InternalNode<V> parent = null;
+            byte parentSlot = 0;
             InternalNode<V> current = this;
             Node<V> replacement;
 
@@ -270,26 +270,23 @@ public class AdaptiveRadixTree<V> {
                     break;
                 }
 
-                pathNodes.add(current);
-                pathSlots.add(nextByte);
+                parent = current;
+                parentSlot = nextByte;
                 current = (InternalNode<V>) child;
                 depth++;
             }
 
-            // Walk back up. At each ancestor, point its slot at `replacement`. If the
-            // ancestor itself grew, that grown node becomes the next iteration's
-            // replacement; otherwise the ancestor's identity is preserved and nothing
-            // above needs touching, since their child pointers still resolve to it.
-            for (int i = pathNodes.size() - 1; i >= 0; i--) {
-                InternalNode<V> ancestor = pathNodes.get(i);
-                byte slot = pathSlots.get(i);
-                InternalNode<V> grown = ancestor.addChild(slot, replacement, keyTable);
-                if (grown == null) {
-                    return this;
-                }
-                replacement = grown;
+            // No ancestor was traversed: `replacement` is the new root of this subtree.
+            if (parent == null) {
+                return replacement;
             }
-            return replacement;
+            // Point the immediate parent's existing slot at `replacement`. Because the
+            // slot already exists, this replaces in place without growing the parent, so
+            // every ancestor above keeps its identity and the original root stays valid.
+            if (replacement != current) {
+                parent.addChild(parentSlot, replacement, keyTable);
+            }
+            return this;
         }
 
         private Node4<V> split(int commonPrefix, KeyTable keyTable) {
