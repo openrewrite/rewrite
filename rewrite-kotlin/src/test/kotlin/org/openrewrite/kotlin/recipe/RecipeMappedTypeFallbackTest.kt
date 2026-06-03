@@ -60,19 +60,18 @@ class RecipeMappedTypeFallbackTest {
     }
 
     /**
-     * `String.formatted(Object... args)` is the vararg case. We currently
-     * surface it as a plain `Array<Any?>` parameter (not Kotlin's `vararg`
-     * — see comment in `RecipeFirMappedTypeFallbackExtension.generateExtensionFor`),
-     * so authors must call it with an explicit `arrayOf(...)`.
+     * `String.formatted(Object... args)` is the vararg case. It is re-exposed
+     * as a real Kotlin `vararg`, so authors call it with natural trailing
+     * arguments (`f.formatted("x", "y")`) — no explicit array required.
      */
     @Test
-    fun `String#formatted accepts explicit array argument`() {
+    fun `String#formatted accepts natural vararg arguments`() {
         val result = RecipePluginCompileFixture.compile(
             """
             import org.openrewrite.recipe
             val r = recipe("d", "desc") {
                 edit {
-                    rewrite { f: String -> java.lang.String.format(f) } to { f -> f.formatted(arrayOf<Any?>("x")) }
+                    rewrite { f: String -> java.lang.String.format(f) } to { f -> f.formatted("x", "y") }
                 }
             }
             """.trimIndent(),

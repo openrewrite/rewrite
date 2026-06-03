@@ -27,6 +27,7 @@ import org.jetbrains.kotlin.fir.extensions.FirDeclarationGenerationExtension
 import org.jetbrains.kotlin.fir.plugin.createTopLevelFunction
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
+import org.jetbrains.kotlin.fir.types.ConeKotlinTypeProjectionOut
 import org.jetbrains.kotlin.fir.types.constructClassLikeType
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
@@ -174,10 +175,9 @@ internal class RecipeFirMappedTypeFallbackExtension(session: FirSession) :
                 if (method.isSynthetic) continue
                 if (method.isBridge) continue
                 // Note: vararg methods like `String.formatted(Object... args)`
-                // are emitted as plain Array<out Any?> parameters below
-                // (see generateExtensionFor). Authors lose the trailing-vararg
-                // convenience syntax (must pass a literal array) for these
-                // entries — acceptable for the recipe DSL use case.
+                // are re-exposed as real Kotlin `vararg` parameters below
+                // (see generateExtensionFor), so authors keep the natural
+                // `x.formatted(a, b, c)` call syntax.
                 // Skip methods whose name collides with an existing kotlin
                 // member of the same arity to avoid `equals/hashCode/toString`
                 // double-declaration in the generated facade.
@@ -293,25 +293,21 @@ internal class RecipeFirMappedTypeFallbackExtension(session: FirSession) :
         ) {
             extensionReceiverType(receiverType)
             for ((idx, p) in entry.method.parameters.withIndex()) {
-                // Java vararg: declare an `Array<Any?>` parameter (non-vararg
-                // from Kotlin's POV) so authors call the extension with an
-                // explicit `arrayOf(...)`. We don't surface `isVararg=true`
-                // here because the FIR-builder + IR-backend pair has a
-                // round-tripping bug with synthesized varargs whose element
-                // type is `Any?` (the call-side IR construction emits a
-                // `vararg(...)` expression whose element type doesn't match
-                // the param's declared element type, tripping
+                // Java vararg (`Object... args`): surface as a real Kotlin
+                // `vararg args: Any?` so authors write `x.formatted(a, b, c)`
+                // naturally and the recipe DSL's variadic machinery sees the
+                // varargs nature. The parameter's declared type must be the
+                // OUT-projected `Array<out Any?>` (what Kotlin uses for a
+                // vararg) — an invariant `Array<Any?>` here is what tripped
                 // `IllegalStateException: Vararg expression has incorrect type`
-                // during fir2ir).
-                val paramType = if (p.isVarArgs && p.type.isArray) {
-                    arrayOfAny()
-                } else {
-                    mapJavaTypeToKotlin(p.type)
-                }
+                // during fir2ir (the call-side `vararg(...)` element type
+                // mismatched the param's declared element type).
+                val isVarargParam = p.isVarArgs && p.type.isArray
+                val paramType = if (isVarargParam) arrayOfOutAny() else mapJavaTypeToKotlin(p.type)
                 valueParameter(
                     name = Name.identifier(p.name ?: "p$idx"),
                     type = paramType,
-                    isVararg = false,
+                    isVararg = isVarargParam,
                 )
             }
             // Default body — IR phase replaces this with a direct invokevirtual.
@@ -358,11 +354,16 @@ internal class RecipeFirMappedTypeFallbackExtension(session: FirSession) :
     private fun stdLibClass(packageName: String, className: String): ClassId =
         ClassId(FqName(packageName), Name.identifier(className))
 
-    /** Construct `Array<Any?>` as a ConeKotlinType for vararg-Object methods. */
-    private fun arrayOfAny(): ConeKotlinType {
+    /**
+     * Construct `Array<out Any?>` as a ConeKotlinType — the declared type of a
+     * Kotlin `vararg args: Any?` parameter. The `out` projection is essential:
+     * an invariant `Array<Any?>` mismatches the element type K2 derives when
+     * building the call-side vararg expression, crashing fir2ir.
+     */
+    private fun arrayOfOutAny(): ConeKotlinType {
         val any = stdLibClass("kotlin", "Any").constructClassLikeType(emptyArray(), true)
         val arrayCls = stdLibClass("kotlin", "Array")
-        return arrayCls.constructClassLikeType(arrayOf(any), false)
+        return arrayCls.constructClassLikeType(arrayOf(ConeKotlinTypeProjectionOut(any)), false)
     }
 
     private val ConeKotlinType.classId: ClassId?
