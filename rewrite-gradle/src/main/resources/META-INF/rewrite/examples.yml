@@ -545,7 +545,10 @@ examples:
       plugins {
           id 'java'
           id 'jacoco'
+          id 'application'
       }
+
+      mainClassName = "com.example.AppMain"
 
       repositories {
           mavenCentral()
@@ -553,11 +556,29 @@ examples:
 
       dependencies {
           implementation group: 'com.google.guava', name: 'guava', version: '31.1-jre'
+          implementation("org.apache.httpcomponents:httpclient") {
+              version = {
+                  strictly("4.5.13")
+              }
+          }
+      }
+
+      task doSomething(type: JavaExec) {
+          main = "com.example.AppMain"
+      }
+
+      tasks.register("runEverything", JavaExec) {
+          main = "com.example.AppMain"
       }
     after: |
       plugins {
           id 'java'
           id 'jacoco'
+          id 'application'
+      }
+
+      application {
+          mainClass = "com.example.AppMain"
       }
 
       repositories {
@@ -566,6 +587,19 @@ examples:
 
       dependencies {
           implementation "com.google.guava:guava:31.1-jre"
+          implementation("org.apache.httpcomponents:httpclient") {
+              version {
+                  strictly("4.5.13")
+              }
+          }
+      }
+
+      task doSomething(type: JavaExec) {
+          mainClass = "com.example.AppMain"
+      }
+
+      tasks.register("runEverything", JavaExec) {
+          mainClass = "com.example.AppMain"
       }
     path: build.gradle
     language: groovy
@@ -1044,6 +1078,94 @@ examples:
     language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.gradle9.RewriteSpreadAllInConfigurationsBlock
+examples:
+- description: '`RewriteSpreadAllInConfigurationsBlockTest#rewriteSpreadAllAtTopLevel`'
+  sources:
+  - before: |
+      configurations {
+          all*.exclude group: "log4j", module: "log4j"
+      }
+    after: |
+      configurations.all {
+          exclude group: "log4j", module: "log4j"
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.gradle9.UseJavaExtensionBlock
+examples:
+- description: '`UseJavaExtensionBlockTest#wrapsAndNormalizesBothCompatibilityAssignments`'
+  sources:
+  - before: |
+      plugins {
+          id 'java'
+      }
+
+      sourceCompatibility = '17'
+      targetCompatibility = '17'
+    after: |
+      plugins {
+          id 'java'
+      }
+
+      java {
+          sourceCompatibility = JavaVersion.VERSION_17
+          targetCompatibility = JavaVersion.VERSION_17
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.gradle9.UseMainClassPropertyForApplication
+examples:
+- description: '`UseMainClassPropertyForApplicationTest#mainClassNameInApplicationBlock`'
+  sources:
+  - before: |
+      plugins {
+          id 'application'
+      }
+
+      application {
+          mainClassName = "com.example.AppMain"
+      }
+    after: |
+      plugins {
+          id 'application'
+      }
+
+      application {
+          mainClass = "com.example.AppMain"
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.gradle9.UseVersionClosure
+examples:
+- description: '`UseVersionClosureTest#convertsVersionAssignmentToClosure`'
+  sources:
+  - before: |
+      dependencies {
+          implementation('org.example:lib') {
+              version = {
+                  strictly '1.0'
+              }
+          }
+      }
+    after: |
+      dependencies {
+          implementation('org.example:lib') {
+              version {
+                  strictly '1.0'
+              }
+          }
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.plugins.AddBuildPlugin
 examples:
 - description: '`AddBuildPluginTest#addPluginWithoutVersionToNewBlock`'
@@ -1294,16 +1416,10 @@ examples:
       plugins {
           id 'java'
       }
-    after: |
-      /*~~(https://plugins.gradle.org/m2)~~>*/plugins {
-          id 'java'
-      }
     path: build.gradle
     language: groovy
   - before: |
       rootProject.name = 'my-project'
-    after: |
-      /*~~(https://plugins.gradle.org/m2)~~>*/rootProject.name = 'my-project'
     language: settingsGradle
 ---
 type: specs.openrewrite.org/v1beta/example
@@ -1315,14 +1431,6 @@ examples:
   sources:
   - before: |
       plugins {
-          id 'java'
-      }
-
-      repositories {
-          maven { url 'https://repo.spring.io/milestone' }
-      }
-    after: |
-      /*~~(https://repo.spring.io/milestone)~~>*/plugins {
           id 'java'
       }
 
@@ -1513,14 +1621,6 @@ examples:
   sources:
   - before: |
       plugins {
-          id 'java'
-      }
-
-      repositories {
-          maven { url 'https://repo.spring.io/milestone' }
-      }
-    after: |
-      /*~~(https://repo.spring.io/milestone)~~>*/plugins {
           id 'java'
       }
 
