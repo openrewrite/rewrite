@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.csharp.tree.CsDocComment;
 import org.openrewrite.csharp.tree.CsDocCommentRawComment;
 import org.openrewrite.csharp.tree.Linq;
 import org.openrewrite.java.internal.rpc.JavaReceiver;
@@ -885,6 +886,9 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
         public Space visitSpace(Space space, RpcReceiveQueue q) {
             return space
                     .withComments(q.receiveList(space.getComments(), c -> {
+                        if (c instanceof CsDocComment.DocComment) {
+                            return (Comment) new CsDocCommentReceiver(delegate).visit((CsDocComment.DocComment) c, q);
+                        }
                         if (c instanceof CsDocCommentRawComment) {
                             CsDocCommentRawComment dc = (CsDocCommentRawComment) c;
                             q.receive(dc.isMultiline()); // consume; always true

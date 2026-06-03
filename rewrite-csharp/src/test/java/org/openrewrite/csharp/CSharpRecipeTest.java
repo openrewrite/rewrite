@@ -184,6 +184,34 @@ class CSharpRecipeTest implements RewriteTest {
     }
 
     @Test
+    void structuredDocCommentSurvivesPrintRoundTrip() throws Exception {
+        // A CSharpVisitor pass converts the raw doc comment into a structured CsDocComment tree.
+        // When the modified tree is printed (serialized back to the C# side), the structured
+        // comment is decomposed over RPC and the C# side re-flattens it to text. This used to
+        // throw "Unexpected comment type ...$DocComment" / fail to map the type on the C# side.
+        String source = "class Foo {\n    /// <summary>Does <c>x</c>.</summary>\n    void Test() {\n    }\n}\n";
+        CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
+        Path tempDir = Files.createTempDirectory("csharp-doc-test-");
+        try (OutputStream os = Files.newOutputStream(tempDir.resolve("Test.cs"))) {
+            os.write(source.getBytes(StandardCharsets.UTF_8));
+        }
+        Path csproj = tempDir.resolve("Test.csproj");
+        try (OutputStream os = Files.newOutputStream(csproj)) {
+            os.write(("<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n" +
+              "    <TargetFramework>net10.0</TargetFramework>\n  </PropertyGroup>\n</Project>\n")
+              .getBytes(StandardCharsets.UTF_8));
+        }
+        SourceFile sf = rpc.parseSolution(csproj, tempDir, new InMemoryExecutionContext())
+          .filter(f -> f instanceof Cs.CompilationUnit).toList().getFirst();
+
+        SourceFile modified = (SourceFile) new CSharpIsoVisitor<InMemoryExecutionContext>()
+          .visit(sf, new InMemoryExecutionContext());
+
+        String printed = rpc.print(modified);
+        assertThat(printed).contains("<summary>Does <c>x</c>.</summary>");
+    }
+
+    @Test
     void directRecipeApplication() throws Exception {
         String source = "using Newtonsoft.Json;\nclass Foo {\n    void Test() {\n        var json = JsonConvert.SerializeObject(\"test\");\n    }\n}\n";
         CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
