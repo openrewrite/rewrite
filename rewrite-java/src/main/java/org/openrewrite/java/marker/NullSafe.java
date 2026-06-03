@@ -26,6 +26,7 @@ import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
 
+import java.beans.ConstructorProperties;
 import java.util.UUID;
 
 /**
@@ -48,6 +49,7 @@ public class NullSafe implements Marker, RpcCodec<NullSafe> {
         this(id, Space.EMPTY);
     }
 
+    @ConstructorProperties({"id", "dotPrefix"})
     public NullSafe(UUID id, Space dotPrefix) {
         this.id = id;
         this.dotPrefix = dotPrefix != null ? dotPrefix : Space.EMPTY;
