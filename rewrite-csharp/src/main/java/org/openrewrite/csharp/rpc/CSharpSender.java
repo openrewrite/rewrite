@@ -143,6 +143,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, RpcSendQueue q) {
+        q.getAndSend(pragmaChecksumDirective, Cs.PragmaChecksumDirective::getKeywordSpacing, space -> visitSpace(space, q));
         q.getAndSend(pragmaChecksumDirective, Cs.PragmaChecksumDirective::getArguments);
         return pragmaChecksumDirective;
     }
@@ -188,6 +189,8 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J visitPragmaWarningDirective(Cs.PragmaWarningDirective pragmaWarningDirective, RpcSendQueue q) {
         q.getAndSend(pragmaWarningDirective, Cs.PragmaWarningDirective::getAction);
+        q.getAndSend(pragmaWarningDirective, Cs.PragmaWarningDirective::getKeywordSpacing, space -> visitSpace(space, q));
+        q.getAndSend(pragmaWarningDirective, Cs.PragmaWarningDirective::getActionSpacing, space -> visitSpace(space, q));
         q.getAndSendList(pragmaWarningDirective, p -> p.getPadding().getWarningCodes(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         return pragmaWarningDirective;
     }

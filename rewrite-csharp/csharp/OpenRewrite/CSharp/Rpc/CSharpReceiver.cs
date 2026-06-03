@@ -496,8 +496,11 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitPragmaWarningDirective(PragmaWarningDirective pwd, RpcReceiveQueue q)
     {
         var action = q.ReceiveAndGet(pwd.Action, RpcReceiveQueue.ToEnum<PragmaWarningAction>());
+        var keywordSpacing = q.Receive(pwd.KeywordSpacing, space => VisitSpace(space, q))!;
+        var actionSpacing = q.Receive(pwd.ActionSpacing, space => VisitSpace(space, q))!;
         var warningCodes = q.ReceiveList(pwd.WarningCodes, rp => _delegate.VisitRightPadded(rp, q));
-        return pwd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAction(action).WithWarningCodes(warningCodes!);
+        return pwd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAction(action)
+            .WithWarningCodes(warningCodes!).WithKeywordSpacing(keywordSpacing).WithActionSpacing(actionSpacing);
     }
 
     // ---- NullableDirective ----
@@ -568,8 +571,10 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- PragmaChecksumDirective ----
     public override J VisitPragmaChecksumDirective(PragmaChecksumDirective pcd, RpcReceiveQueue q)
     {
+        var keywordSpacing = q.Receive(pcd.KeywordSpacing, space => VisitSpace(space, q))!;
         var arguments = q.Receive<string>(pcd.Arguments);
-        return pcd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithArguments(arguments!);
+        return pcd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
+            .WithKeywordSpacing(keywordSpacing).WithArguments(arguments!);
     }
 
     // ---- LineDirective ----

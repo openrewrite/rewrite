@@ -217,6 +217,59 @@ public class LambdaTests : RewriteTest
         );
     }
 
+    // Parameters with modifiers but no explicit type (ref/out/in)
+
+    [Fact]
+    public void UntypedRefParameter()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    delegate void D(ref int x);
+                    void Bar() {
+                        D f = (ref x) => x++;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void UntypedRefParameters()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    delegate void D(ref int a, ref int b);
+                    void Bar() {
+                        D f = static (ref a, ref b) => a += b;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void UntypedOutParameter()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    delegate void D(out int x);
+                    void Bar() {
+                        D f = (out x) => x = 1;
+                    }
+                }
+                """
+            )
+        );
+    }
+
     // Block body lambdas
 
     [Fact]
