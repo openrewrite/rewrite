@@ -156,6 +156,29 @@ public abstract class DynamicDispatchRpcCodec<T> implements RpcCodec<T> {
         return CANONICAL_SOURCE_FILE_TYPE.get(type);
     }
 
+    /**
+     * Canonicalizes a (possibly subclassed) value's runtime type to the topmost class still
+     * assignable to this codec's {@link #getType()} language marker. When a tree is represented
+     * at runtime by a synthetic subclass generated outside the {@code org.openrewrite} packages,
+     * its {@code getClass().getName()} is a name the remote cannot reconstruct, because the
+     * remote resolves codecs by exact string match. Walking up while the superclass remains
+     * assignable to {@link #getType()} strips the synthetic layer and lands on the real tree
+     * node class (e.g. {@code J$Literal}).
+     * <p>
+     * This relies on real tree nodes sitting directly on {@link Object} (they {@code implement}
+     * their language interfaces rather than {@code extend} a base class), so for a value that is
+     * not subclassed the loop never advances and the result equals {@code value.getClass().getName()}
+     * -- behavior is unchanged. Only a synthetic subclass advances the walk.
+     */
+    @Override
+    public String valueType(Object value) {
+        Class<?> type = value.getClass();
+        for (Class<?> s = type.getSuperclass(); s != null && getType().isAssignableFrom(s); s = s.getSuperclass()) {
+            type = s;
+        }
+        return type.getName();
+    }
+
     public abstract String getSourceFileType();
 
     public abstract Class<? extends T> getType();

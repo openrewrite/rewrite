@@ -45,6 +45,21 @@ public interface RpcCodec<T> {
      */
     T rpcReceive(T before, RpcReceiveQueue q);
 
+    /**
+     * The wire type name the remote uses to reconstruct {@code value}. Defaults to the
+     * value's concrete runtime class name, which is correct for a value that encodes
+     * itself (a {@code value instanceof RpcCodec}), since such values are not represented
+     * by a generated subclass for transport. {@link DynamicDispatchRpcCodec} overrides this
+     * to canonicalize a subclassed runtime type back to the registered tree type, which is
+     * the name the remote can actually reconstruct.
+     *
+     * @param value the value being sent; its runtime type may be a generated subclass.
+     * @return the fully-qualified type name the remote should reconstruct.
+     */
+    default String valueType(Object value) {
+        return value.getClass().getName();
+    }
+
     static <T> @Nullable RpcCodec<T> forInstance(T t, @Nullable String sourceFileType) {
         // First check for a dynamic dispatch codec (allows language-specific overrides)
         RpcCodec<T> dynamicCodec = DynamicDispatchRpcCodec.getCodec(t, sourceFileType);

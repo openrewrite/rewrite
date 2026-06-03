@@ -121,7 +121,7 @@ public class RpcSendQueue {
             put(new RpcObjectData(DELETE, null, null, null, trace));
         } else {
             RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
-            put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null, trace));
+            put(new RpcObjectData(CHANGE, valueType(afterVal, afterCodec), onChange == null && afterCodec == null ? afterVal : null, null, trace));
             doChange(afterVal, beforeVal, onChange, afterCodec);
         }
     }
@@ -149,8 +149,9 @@ public class RpcSendQueue {
                         // Type changed - treat as ADD
                         add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
                     } else {
-                        put(new RpcObjectData(CHANGE, getValueType(anAfter), null, null, trace));
-                        doChange(anAfter, aBefore, onChangeRun, RpcCodec.forInstance(anAfter, sourceFileType));
+                        RpcCodec<Object> anAfterCodec = RpcCodec.forInstance((Object) anAfter, sourceFileType);
+                        put(new RpcObjectData(CHANGE, valueType(anAfter, anAfterCodec), null, null, trace));
+                        doChange(anAfter, aBefore, onChangeRun, anAfterCodec);
                     }
                 }
             }
@@ -186,7 +187,7 @@ public class RpcSendQueue {
             refs.put(afterVal, ref);
         }
         RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
-        put(new RpcObjectData(ADD, getValueType(afterVal),
+        put(new RpcObjectData(ADD, valueType(afterVal, afterCodec),
                 onChange == null && afterCodec == null ? afterVal : null, ref, trace));
         doChange(afterVal, null, onChange, afterCodec);
     }
@@ -246,20 +247,23 @@ public class RpcSendQueue {
                 }
             }
 
-            // Synthetic tree subclasses generated outside the org.openrewrite packages
-            // -- must be reported to the remote as their real (super) type, not the proxy
-            // class name, which the remote has no codec/factory for.
-            if (pkg != null && !pkg.getName().startsWith("org.openrewrite")) {
-                Class<?> superclass = afterType.getSuperclass();
-                Package superPkg = superclass == null ? null : superclass.getPackage();
-                if (superPkg != null && superPkg.getName().startsWith("org.openrewrite") && !Object.class.equals(superclass)) {
-                    return superclass.getName();
-                }
-            }
-
             return afterType.getName();
         }
     };
+
+    /**
+     * The wire type name for {@code after}. When a codec handles the value, the codec
+     * decides (a {@link DynamicDispatchRpcCodec} canonicalizes a proxied/subclassed runtime
+     * type back to its registered tree type); otherwise we fall back to the static
+     * {@link #getValueType(Object)} which filters out java.lang/collection/{@code JavaType}
+     * cases that have no codec.
+     */
+    private static @Nullable String valueType(@Nullable Object after, @Nullable RpcCodec<?> codec) {
+        if (after == null) {
+            return null;
+        }
+        return codec != null ? codec.valueType(after) : getValueType(after);
+    }
 
     private static @Nullable String getValueType(@Nullable Object after) {
         return after == null ? null : VALUE_TYPE_CACHE.get(after.getClass());
