@@ -1308,7 +1308,9 @@ public sealed class PragmaWarningDirective(
     Space prefix,
     Markers markers,
     PragmaWarningAction action,
-    IList<JRightPadded<Expression>> warningCodes
+    IList<JRightPadded<Expression>> warningCodes,
+    Space keywordSpacing,
+    Space actionSpacing
 ) : Cs, Statement, IEquatable<PragmaWarningDirective>
 {
     public Guid Id { get; } = id;
@@ -1317,16 +1319,26 @@ public sealed class PragmaWarningDirective(
     public PragmaWarningAction Action { get; } = action;
     public IList<JRightPadded<Expression>> WarningCodes { get; } = warningCodes;
 
+    /// <summary>Whitespace between <c>#pragma</c> and <c>warning</c> (usually a single space).</summary>
+    public Space KeywordSpacing { get; } = keywordSpacing;
+
+    /// <summary>Whitespace between <c>warning</c> and the action keyword (<c>disable</c>/<c>restore</c>).</summary>
+    public Space ActionSpacing { get; } = actionSpacing;
+
     public PragmaWarningDirective WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Action, WarningCodes);
+        id == Id ? this : new(id, Prefix, Markers, Action, WarningCodes, KeywordSpacing, ActionSpacing);
     public PragmaWarningDirective WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Action, WarningCodes);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Action, WarningCodes, KeywordSpacing, ActionSpacing);
     public PragmaWarningDirective WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Action, WarningCodes);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Action, WarningCodes, KeywordSpacing, ActionSpacing);
     public PragmaWarningDirective WithAction(PragmaWarningAction action) =>
-        action == Action ? this : new(Id, Prefix, Markers, action, WarningCodes);
+        action == Action ? this : new(Id, Prefix, Markers, action, WarningCodes, KeywordSpacing, ActionSpacing);
     public PragmaWarningDirective WithWarningCodes(IList<JRightPadded<Expression>> warningCodes) =>
-        ReferenceEquals(warningCodes, WarningCodes) ? this : new(Id, Prefix, Markers, Action, warningCodes);
+        ReferenceEquals(warningCodes, WarningCodes) ? this : new(Id, Prefix, Markers, Action, warningCodes, KeywordSpacing, ActionSpacing);
+    public PragmaWarningDirective WithKeywordSpacing(Space keywordSpacing) =>
+        ReferenceEquals(keywordSpacing, KeywordSpacing) ? this : new(Id, Prefix, Markers, Action, WarningCodes, keywordSpacing, ActionSpacing);
+    public PragmaWarningDirective WithActionSpacing(Space actionSpacing) =>
+        ReferenceEquals(actionSpacing, ActionSpacing) ? this : new(Id, Prefix, Markers, Action, WarningCodes, KeywordSpacing, actionSpacing);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1342,22 +1354,30 @@ public sealed class PragmaChecksumDirective(
     Guid id,
     Space prefix,
     Markers markers,
+    Space keywordSpacing,
     string arguments
 ) : Cs, Statement, IEquatable<PragmaChecksumDirective>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
+
+    /// <summary>Whitespace between <c>#pragma</c> and <c>checksum</c> (usually a single space).</summary>
+    public Space KeywordSpacing { get; } = keywordSpacing;
+
+    /// <summary>The raw text following <c>checksum</c> (file/guid/hash), whitespace preserved verbatim.</summary>
     public string Arguments { get; } = arguments;
 
     public PragmaChecksumDirective WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Arguments);
+        id == Id ? this : new(id, Prefix, Markers, KeywordSpacing, Arguments);
     public PragmaChecksumDirective WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Arguments);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, KeywordSpacing, Arguments);
     public PragmaChecksumDirective WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Arguments);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, KeywordSpacing, Arguments);
+    public PragmaChecksumDirective WithKeywordSpacing(Space keywordSpacing) =>
+        ReferenceEquals(keywordSpacing, KeywordSpacing) ? this : new(Id, Prefix, Markers, keywordSpacing, Arguments);
     public PragmaChecksumDirective WithArguments(string arguments) =>
-        arguments == Arguments ? this : new(Id, Prefix, Markers, arguments);
+        arguments == Arguments ? this : new(Id, Prefix, Markers, KeywordSpacing, arguments);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 

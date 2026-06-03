@@ -146,6 +146,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, RpcReceiveQueue q) {
         return pragmaChecksumDirective
+                .withKeywordSpacing(q.receive(pragmaChecksumDirective.getKeywordSpacing(), space -> visitSpace(space, q)))
                 .withArguments(q.receiveAndGet(pragmaChecksumDirective.getArguments(), (String s) -> s));
     }
 
@@ -731,6 +732,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     public J visitPragmaWarningDirective(Cs.PragmaWarningDirective pragmaWarningDirective, RpcReceiveQueue q) {
         return pragmaWarningDirective
                 .withAction(q.receiveAndGet(pragmaWarningDirective.getAction(), toEnum(Cs.PragmaWarningDirective.PragmaWarningAction.class)))
+                .withKeywordSpacing(q.receive(pragmaWarningDirective.getKeywordSpacing(), space -> visitSpace(space, q)))
+                .withActionSpacing(q.receive(pragmaWarningDirective.getActionSpacing(), space -> visitSpace(space, q)))
                 .getPadding().withWarningCodes(q.receiveList(pragmaWarningDirective.getPadding().getWarningCodes(), el -> visitRightPadded(el, q)));
     }
 
