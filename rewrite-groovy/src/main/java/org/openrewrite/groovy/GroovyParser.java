@@ -99,8 +99,7 @@ public class GroovyParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        // pass system properties so that users have flexibility to change behavior of groovy compiler
-        CompilerConfiguration configuration = new CompilerConfiguration(System.getProperties());
+        CompilerConfiguration configuration = new CompilerConfiguration();
         configuration.setTolerance(Integer.MAX_VALUE);
         configuration.setWarningLevel(WarningMessage.NONE);
         configuration.setClasspathList(classpath == null ? emptyList() : classpath.stream()
@@ -198,8 +197,7 @@ public class GroovyParser implements Parser {
      * <p>
      * This intentionally only targets <em>global</em> transformations. Annotation-driven <em>local</em>
      * transformations (e.g. {@code @Builder}, {@code @Memoize}) are unaffected and continue to contribute
-     * type attribution. Any names already configured (for example via the
-     * {@code groovy.disabled.global.ast.transformations} system property) are preserved.
+     * type attribution. Any names already configured (for example by a compiler customizer) are preserved.
      */
     private void disableGlobalAstTransformations(CompilerConfiguration configuration) {
         Set<String> disabled = configuration.getDisabledGlobalASTTransformations() == null ?
