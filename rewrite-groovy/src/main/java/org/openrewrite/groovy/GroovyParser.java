@@ -38,9 +38,13 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -112,6 +116,7 @@ public class GroovyParser implements Parser {
         for (Consumer<CompilerConfiguration> compilerCustomizer : compilerCustomizers) {
             compilerCustomizer.accept(configuration);
         }
+        disableGlobalAstTransformations(configuration);
 
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         return StreamSupport.stream(sources.spliterator(), false)
@@ -178,6 +183,46 @@ public class GroovyParser implements Parser {
                         }
                     }
                 });
+    }
+
+    private static final String AST_TRANSFORMATION_SERVICE = "META-INF/services/org.codehaus.groovy.transform.ASTTransformation";
+
+    /**
+     * OpenRewrite parses Groovy only to build a source-faithful LST; it never executes the parsed code.
+     * Global AST transformations (Spock, {@code @Grab}, instrumentation agents, Gradle plugins, ...) are
+     * discovered from whatever happens to be on the classpath and rewrite the AST <em>away</em> from the
+     * original source text. That desynchronizes the position-based {@link GroovyParserVisitor} and surfaces
+     * as "Failed to parse ... at cursor position N". Since they serve no purpose for parsing, disable every
+     * global transformation we can discover so that the same source always produces the same LST regardless
+     * of which transformations happen to be present in the runtime.
+     * <p>
+     * This intentionally only targets <em>global</em> transformations. Annotation-driven <em>local</em>
+     * transformations (e.g. {@code @Builder}, {@code @Memoize}) are unaffected and continue to contribute
+     * type attribution. Any names already configured (for example via the
+     * {@code groovy.disabled.global.ast.transformations} system property) are preserved.
+     */
+    private void disableGlobalAstTransformations(CompilerConfiguration configuration) {
+        Set<String> disabled = configuration.getDisabledGlobalASTTransformations() == null ?
+                new HashSet<>() : new HashSet<>(configuration.getDisabledGlobalASTTransformations());
+        // Enumerate through a loader configured exactly like the per-source loaders below, so that
+        // transformations registered on the configured classpath and on the runtime classpath are both found.
+        try (GroovyClassLoader transformLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration, true)) {
+            Enumeration<URL> services = transformLoader.getResources(AST_TRANSFORMATION_SERVICE);
+            while (services.hasMoreElements()) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(services.nextElement().openStream(), StandardCharsets.UTF_8))) {
+                    for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+                        int comment = line.indexOf('#');
+                        String name = (comment >= 0 ? line.substring(0, comment) : line).trim();
+                        if (!name.isEmpty()) {
+                            disabled.add(name);
+                        }
+                    }
+                }
+            }
+        } catch (IOException ignored) {
+            // If discovery fails, fall back to whatever was already configured; never worse than before.
+        }
+        configuration.setDisabledGlobalASTTransformations(disabled);
     }
 
     @Override
