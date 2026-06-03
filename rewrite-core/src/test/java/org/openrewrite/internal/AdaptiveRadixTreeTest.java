@@ -82,6 +82,39 @@ class AdaptiveRadixTreeTest {
     }
 
     @Test
+    void copySurvivesDeepChainOnSmallStack() throws Exception {
+        // A deep chain of keyLength=0 internal nodes makes a recursive copy() walk one
+        // frame per level. Build the tree on the main thread (insert is iterative), then
+        // copy on a small-stack thread so the regression is caught regardless of
+        // JVM/platform defaults. The copy must be both complete and independent.
+        int depth = 20_000;
+        AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
+        StringBuilder sb = new StringBuilder(depth);
+        for (int i = 1; i <= depth; i++) {
+            sb.append('a');
+            tree.insert(sb.toString(), i);
+        }
+        String longest = sb.toString();
+
+        Throwable[] error = new Throwable[1];
+        Thread t = new Thread(null, () -> {
+            AdaptiveRadixTree<Integer> copy = tree.copy();
+            assertThat(copy.search(longest)).isEqualTo(depth);
+            assertThat(copy.search("a")).isEqualTo(1);
+            // A deep copy must be independent: mutating it must not affect the original.
+            copy.insert(longest, -1);
+            assertThat(copy.search(longest)).isEqualTo(-1);
+            assertThat(tree.search(longest)).isEqualTo(depth);
+        }, "AdaptiveRadixTreeTest-copySmallStack", 128 * 1024);
+        t.setUncaughtExceptionHandler((thr, ex) -> error[0] = ex);
+        t.start();
+        t.join();
+        if (error[0] != null) {
+            throw new AssertionError("copy() failed on 128KB stack", error[0]);
+        }
+    }
+
+    @Test
     void insertAndSearch_MultipleKeys() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         tree.insert("cat", 1);

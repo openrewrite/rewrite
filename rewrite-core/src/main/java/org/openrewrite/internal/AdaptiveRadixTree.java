@@ -19,7 +19,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Deque;
 
 @Incubating(since = "8.38.0")
 public class AdaptiveRadixTree<V> {
@@ -50,7 +52,12 @@ public class AdaptiveRadixTree<V> {
 
         abstract Node<V> insert(byte[] key, int depth, V value, KeyTable keyTable);
 
-        abstract Node<V> copy(); // New abstract method
+        /**
+         * Clone this node without recursing into children: child references are copied
+         * as-is. Whole-tree deep copies are assembled iteratively by
+         * {@link AdaptiveRadixTree#deepCopy} so they are bounded by heap, not the JVM stack.
+         */
+        abstract Node<V> shallowCopy();
 
         protected boolean matchesPartialKey(byte[] key, int depth, KeyTable keyTable) {
             return keyTable.matches(key, depth, keyOffset, keyLength);
@@ -147,7 +154,7 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        Node<V> copy() {
+        Node<V> shallowCopy() {
             return new LeafNode<>(keyOffset, keyLength, value);
         }
     }
@@ -164,6 +171,21 @@ public class AdaptiveRadixTree<V> {
 
         // Return the new node if growth occurred, otherwise null
         abstract @Nullable InternalNode<V> addChild(byte key, Node<V> child, KeyTable keyTable);
+
+        /**
+         * Replace each child reference (initially shared with the source node after a
+         * {@link #shallowCopy()}) with a shallow clone of it, pushing any internal clone
+         * onto {@code work} so its own children get cloned in turn.
+         */
+        abstract void cloneChildrenInto(Deque<InternalNode<V>> work);
+
+        static <V> Node<V> pushClone(Node<V> child, Deque<InternalNode<V>> work) {
+            Node<V> clone = child.shallowCopy();
+            if (clone instanceof InternalNode) {
+                work.push((InternalNode<V>) clone);
+            }
+            return clone;
+        }
 
         void adjustKey(int newKeyOffset, int newKeyLength) {
             this.keyOffset = newKeyOffset;
@@ -424,9 +446,8 @@ public class AdaptiveRadixTree<V> {
             return null;
         }
 
-        @SuppressWarnings("DataFlowIssue")
         @Override
-        Node<V> copy() {
+        Node<V> shallowCopy() {
             Node4<V> clone = new Node4<>(keyOffset, keyLength);
             clone.value = this.value;
             clone.size = this.size;
@@ -434,11 +455,20 @@ public class AdaptiveRadixTree<V> {
             clone.k1 = this.k1;
             clone.k2 = this.k2;
             clone.k3 = this.k3;
-            if (size > 0) clone.c0 = c0.copy();
-            if (size > 1) clone.c1 = c1.copy();
-            if (size > 2) clone.c2 = c2.copy();
-            if (size > 3) clone.c3 = c3.copy();
+            clone.c0 = this.c0;
+            clone.c1 = this.c1;
+            clone.c2 = this.c2;
+            clone.c3 = this.c3;
             return clone;
+        }
+
+        @SuppressWarnings("DataFlowIssue")
+        @Override
+        void cloneChildrenInto(Deque<InternalNode<V>> work) {
+            if (size > 0) c0 = pushClone(c0, work);
+            if (size > 1) c1 = pushClone(c1, work);
+            if (size > 2) c2 = pushClone(c2, work);
+            if (size > 3) c3 = pushClone(c3, work);
         }
     }
 
@@ -529,18 +559,21 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        Node<V> copy() {
+        Node<V> shallowCopy() {
             Node16<V> clone = new Node16<>(keyOffset, keyLength);
             clone.value = this.value;
             clone.size = this.size;
             clone.keys = Arrays.copyOf(this.keys, this.keys.length);
             clone.children = Arrays.copyOf(this.children, this.children.length);
-            // Deep copy children
+            return clone;
+        }
+
+        @Override
+        void cloneChildrenInto(Deque<InternalNode<V>> work) {
             for (int i = 0; i < size; i++) {
                 //noinspection DataFlowIssue
-                clone.children[i] = children[i].copy();
+                children[i] = pushClone(children[i], work);
             }
-            return clone;
         }
     }
 
@@ -728,23 +761,23 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        Node<V> copy() {
+        Node<V> shallowCopy() {
             Node64<V> clone = new Node64<>(keyOffset, keyLength);
             clone.value = this.value;
             clone.bitmap0 = this.bitmap0;
             clone.bitmap1 = this.bitmap1;
             clone.bitmap2 = this.bitmap2;
             clone.bitmap3 = this.bitmap3;
-
-            clone.children = new Node[this.children.length];
-
-            // Deep copy children
-            for (int i = 0; i < this.children.length; i++) {
-                //noinspection DataFlowIssue
-                clone.children[i] = this.children[i].copy();
-            }
-
+            clone.children = Arrays.copyOf(this.children, this.children.length);
             return clone;
+        }
+
+        @Override
+        void cloneChildrenInto(Deque<InternalNode<V>> work) {
+            for (int i = 0; i < children.length; i++) {
+                //noinspection DataFlowIssue
+                children[i] = pushClone(children[i], work);
+            }
         }
     }
 
@@ -772,18 +805,20 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        Node<V> copy() {
+        Node<V> shallowCopy() {
             Node256<V> clone = new Node256<>(keyOffset, keyLength);
             clone.value = this.value;
             System.arraycopy(this.children, 0, clone.children, 0, this.children.length);
-            // Deep copy children
+            return clone;
+        }
+
+        @Override
+        void cloneChildrenInto(Deque<InternalNode<V>> work) {
             for (int i = 0; i < 256; i++) {
-                Node<V> child = children[i];
-                if (child != null) {
-                    clone.children[i] = child.copy();
+                if (children[i] != null) {
+                    children[i] = pushClone(children[i], work);
                 }
             }
-            return clone;
         }
     }
 
@@ -812,9 +847,24 @@ public class AdaptiveRadixTree<V> {
     public AdaptiveRadixTree<V> copy() {
         AdaptiveRadixTree<V> newTree = new AdaptiveRadixTree<>(keyTable.copy());
         if (root != null) {
-            newTree.root = root.copy();
+            newTree.root = deepCopy(root);
         }
         return newTree;
+    }
+
+    // Iterative deep copy: clone the root shallowly, then repeatedly replace each cloned
+    // node's child references with shallow clones of their own. An explicit stack bounds
+    // the work by heap rather than the JVM call stack, matching insert/search.
+    private static <V> Node<V> deepCopy(Node<V> root) {
+        Node<V> rootClone = root.shallowCopy();
+        if (rootClone instanceof InternalNode) {
+            Deque<InternalNode<V>> work = new ArrayDeque<>();
+            work.push((InternalNode<V>) rootClone);
+            while (!work.isEmpty()) {
+                work.pop().cloneChildrenInto(work);
+            }
+        }
+        return rootClone;
     }
 
     public void clear() {
