@@ -409,6 +409,11 @@
   eolDate: "2025-06-01"
   suggestedReplacement: 26 or 24
 
+- imageName: node
+  tagPatterns: ["25", "25-*", "25.*"]
+  eolDate: "2026-06-01"
+  suggestedReplacement: 26 or 24
+
 # Eclipse Temurin (formerly AdoptOpenJDK) - most common OpenJDK distribution
 - imageName: eclipse-temurin
   tagPatterns: ["16", "16-*", "16.*"]
