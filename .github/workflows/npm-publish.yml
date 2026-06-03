@@ -1,8 +1,8 @@
 ---
 name: npm-publish
 
-# Publishes only after `ci` succeeds for a push to main or `publish` succeeds
-# for a version tag. `ci` also runs for PRs, schedules, and manual dispatches;
+# Publishes after `ci` succeeds for a push to (or manual dispatch on) main, or
+# `publish` succeeds for a version tag. `ci` also runs for PRs and schedules;
 # those must not publish to npm.
 on:
   workflow_run:
@@ -24,7 +24,8 @@ jobs:
       (
         (
           github.event.workflow_run.name == 'ci' &&
-          github.event.workflow_run.event == 'push' &&
+          (github.event.workflow_run.event == 'push' ||
+           github.event.workflow_run.event == 'workflow_dispatch') &&
           github.event.workflow_run.head_branch == 'main'
         ) ||
         (
