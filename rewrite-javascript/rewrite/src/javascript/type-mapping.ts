@@ -207,6 +207,49 @@ export class JavaScriptTypeMapping {
             }
         }
 
+        // A type alias to an intersection or a plain anonymous object (e.g. kafkajs's
+        // `export type Producer = Sender & {...}`, or `export type Consumer = {...}`) loses its name
+        // when TypeScript resolves the structure, leaving an unnamed intersection / `<unknown>`.
+        // TypeScript still records the originating alias via `aliasSymbol`; use it to attribute the
+        // nominal name (e.g. `kafkajs.Producer`) so the type is matchable. Unions keep their
+        // structural Union mapping (recipes rely on it), and mapped / instantiated utility types
+        // (`Partial<T>`, `Record<K, V>`, ...) are intentionally left untouched.
+        if (type.aliasSymbol) {
+            let nameableAlias = !!(type.flags & ts.TypeFlags.Intersection);
+            if (!nameableAlias && (type.flags & ts.TypeFlags.Object)) {
+                const objectFlags = (type as ts.ObjectType).objectFlags;
+                nameableAlias = !!(objectFlags & ts.ObjectFlags.Anonymous) &&
+                    !(objectFlags & ts.ObjectFlags.Mapped) &&
+                    !(objectFlags & ts.ObjectFlags.Instantiated);
+            }
+            if (nameableAlias) {
+                const fullyQualifiedName = this.getFullyQualifiedNameFromSymbol(type.aliasSymbol);
+                if (fullyQualifiedName && fullyQualifiedName !== 'unknown') {
+                    const aliasSignature = this.getSignature(type);
+                    const cached = this.typeCache.get(aliasSignature);
+                    if (cached) {
+                        return cached;
+                    }
+                    const aliasType: Type.Class = {
+                        kind: Type.Kind.Class,
+                        flags: 0,
+                        classKind: Type.Class.Kind.Interface,
+                        fullyQualifiedName,
+                        typeParameters: [],
+                        annotations: [],
+                        interfaces: [],
+                        members: [],
+                        methods: [],
+                        toJSON: function () {
+                            return Type.signature(this);
+                        }
+                    } as Type.Class;
+                    this.typeCache.set(aliasSignature, aliasType);
+                    return aliasType;
+                }
+            }
+        }
+
         // Skip problematic type constructs EARLY - before any caching or recursion
         // These can cause deep recursion and are often computed/structural types
         if (type.flags & ts.TypeFlags.Object) {
