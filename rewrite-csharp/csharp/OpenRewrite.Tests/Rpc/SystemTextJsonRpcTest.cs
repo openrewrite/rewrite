@@ -16,6 +16,9 @@
 using System.Text.Json;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
+using OpenRewrite.CSharp.Rpc;
+using OpenRewrite.Xml.Recipes;
+using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Tests.Rpc;
 
@@ -60,5 +63,76 @@ public class SystemTextJsonRpcTest
         Assert.Contains("\"value\":\"hi\"", json);
         Assert.DoesNotContain("\"ref\"", json);        // null omitted
         Assert.DoesNotContain("\"trace\"", json);      // null omitted
+    }
+
+    [Fact]
+    public async Task PrepareRecipe_WithJsonElementStringOptions_AppliesValues()
+    {
+        var marketplace = new RecipeMarketplace();
+        marketplace.Install(new ChangeXmlCharData());
+        var server = new RewriteRpcServer(marketplace);
+
+        // SystemTextJsonFormatter deserializes object-typed option values to JsonElement,
+        // which is exactly the shape PrepareRecipe receives over the wire.
+        var request = new PrepareRecipeRequest
+        {
+            Id = "OpenRewrite.Xml.Recipes.ChangeXmlCharData",
+            Options = new Dictionary<string, object?>
+            {
+                ["OldText"] = JsonSerializer.SerializeToElement("original", RpcJson.Options),
+                ["NewText"] = JsonSerializer.SerializeToElement("modified", RpcJson.Options),
+            },
+        };
+
+        var response = await server.PrepareRecipe(request);
+
+        Assert.Equal("original", OptionValue(response, "OldText"));
+        Assert.Equal("modified", OptionValue(response, "NewText"));
+    }
+
+    [Fact]
+    public async Task PrepareRecipe_WithJsonElementTypedOptions_ConvertsToPropertyTypes()
+    {
+        var recipe = new TypedOptionRecipe();
+        var marketplace = new RecipeMarketplace();
+        marketplace.Install(recipe);
+        var server = new RewriteRpcServer(marketplace);
+
+        var request = new PrepareRecipeRequest
+        {
+            Id = recipe.Name,
+            Options = new Dictionary<string, object?>
+            {
+                ["Count"] = JsonSerializer.SerializeToElement(42, RpcJson.Options),
+                ["Enabled"] = JsonSerializer.SerializeToElement(true, RpcJson.Options),
+                ["Label"] = JsonSerializer.SerializeToElement("hi", RpcJson.Options),
+            },
+        };
+
+        var response = await server.PrepareRecipe(request);
+
+        Assert.Equal(42, OptionValue(response, "Count"));
+        Assert.Equal(true, OptionValue(response, "Enabled"));
+        Assert.Equal("hi", OptionValue(response, "Label"));
+    }
+
+    private static object? OptionValue(PrepareRecipeResponse response, string name) =>
+        response.Descriptor.Options.Single(o => o.Name == name).Value;
+
+    private class TypedOptionRecipe : OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "Typed option recipe";
+        public override string Description => "Recipe with options of several types for conversion testing.";
+
+        [Option(DisplayName = "Count", Description = "An integer option")]
+        public int Count { get; set; }
+
+        [Option(DisplayName = "Enabled", Description = "A boolean option")]
+        public bool Enabled { get; set; }
+
+        [Option(DisplayName = "Label", Description = "A string option")]
+        public string Label { get; set; } = "";
+
+        public override ITreeVisitor<ExecutionContext> GetVisitor() => ITreeVisitor<ExecutionContext>.Noop();
     }
 }
