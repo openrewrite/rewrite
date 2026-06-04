@@ -39,6 +39,7 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -115,13 +116,35 @@ public class GroovyParser implements Parser {
         for (Consumer<CompilerConfiguration> compilerCustomizer : compilerCustomizers) {
             compilerCustomizer.accept(configuration);
         }
-        disableGlobalAstTransformations(configuration);
+
+        // Two loaders, both built once and reused across every source in this batch:
+        //
+        //  - `transformLoader` is classpath-free: it discovers (and lets us disable) global AST transformations
+        //    but deliberately does NOT carry the compile classpath. The parser never runs global transforms, so
+        //    scanning the (potentially huge) compile classpath for them — which Groovy's CompilationUnit
+        //    constructor otherwise does once per source file — is pure overhead.
+        //
+        //  - `classLoader` carries the compile classpath and is what Groovy resolves types with (passed as both
+        //    the SourceUnit loader and the CompilationUnit's type-resolution loader). Groovy resolves types by
+        //    actually loading classes, so a fresh loader per file would re-resolve the same classpath types
+        //    (e.g. the Gradle API) from scratch for every script, each miss re-walking the delegation chain and
+        //    re-opening classpath JARs. Sharing one loader warms the JVM's per-loader class table once and
+        //    reuses it. This is safe because parsing stops at CANONICALIZATION and never defines script classes
+        //    into the loader (its script source cache stays empty), and GroovyClassLoader is parallel-capable.
+        //
+        // Both must outlive the lazily-consumed stream returned below, so they are closed via the stream's
+        // onClose handler (for try-with-resources consumers) and otherwise released by GC once the consumed
+        // stream is dereferenced. The produced LST holds JavaType, not Class references, so closing the loaders
+        // after parsing never affects results.
+        GroovyClassLoader transformLoader = new GroovyClassLoader(getClass().getClassLoader());
+        disableGlobalAstTransformations(configuration, transformLoader);
+        GroovyClassLoader classLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration, true);
 
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         return StreamSupport.stream(sources.spliterator(), false)
                 .map(input -> {
                     ParseWarningCollector errorCollector = new ParseWarningCollector(configuration, this);
-                    try (GroovyClassLoader classLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration, true)) {
+                    try {
                         SourceUnit unit = new SourceUnit(
                                 "doesntmatter",
                                 new InputStreamReaderSource(input.getSource(ctx), configuration),
@@ -131,7 +154,7 @@ public class GroovyParser implements Parser {
                         );
 
                         pctx.getParsingListener().startedParsing(input);
-                        CompilationUnit compUnit = new LessAstTransformationsCompilationUnit(configuration, null, classLoader, classLoader);
+                        CompilationUnit compUnit = new LessAstTransformationsCompilationUnit(configuration, null, classLoader, transformLoader);
                         compUnit.addSource(unit);
                         compUnit.compile(Phases.CANONICALIZATION);
                         ModuleNode ast = unit.getAST();
@@ -181,7 +204,19 @@ public class GroovyParser implements Parser {
                             }
                         }
                     }
+                })
+                .onClose(() -> {
+                    closeQuietly(classLoader);
+                    closeQuietly(transformLoader);
                 });
+    }
+
+    private static void closeQuietly(Closeable closeable) {
+        try {
+            closeable.close();
+        } catch (IOException ignored) {
+            // Best-effort: the loaders hold at most classpath JAR handles, which GC releases otherwise.
+        }
     }
 
     private static final String AST_TRANSFORMATION_SERVICE = "META-INF/services/org.codehaus.groovy.transform.ASTTransformation";
@@ -189,22 +224,26 @@ public class GroovyParser implements Parser {
     /**
      * OpenRewrite parses Groovy only to build a source-faithful LST; it never executes the parsed code.
      * Global AST transformations (Spock, {@code @Grab}, instrumentation agents, Gradle plugins, ...) are
-     * discovered from whatever happens to be on the classpath and rewrite the AST <em>away</em> from the
-     * original source text. That desynchronizes the position-based {@link GroovyParserVisitor} and surfaces
-     * as "Failed to parse ... at cursor position N". Since they serve no purpose for parsing, disable every
-     * global transformation we can discover so that the same source always produces the same LST regardless
-     * of which transformations happen to be present in the runtime.
+     * discovered from a classpath and rewrite the AST <em>away</em> from the original source text. That
+     * desynchronizes the position-based {@link GroovyParserVisitor} and surfaces as "Failed to parse ... at
+     * cursor position N". Since they serve no purpose for parsing, disable every global transformation the
+     * parser could discover so that the same source always produces the same LST.
+     * <p>
+     * Discovery uses the {@code transformLoader} the per-source {@link LessAstTransformationsCompilationUnit}s
+     * are given — a classpath-free loader (see {@link #parseInputs}). Transformations registered only on the
+     * compile classpath are therefore never discovered (so they cannot run and need not be disabled); this
+     * method only has to neutralize transformations reachable on the runtime classpath, such as groovy-core's
+     * {@code @Grab} handler. Enumerating through that same loader keeps the disabled set exactly aligned with
+     * what {@link CompilationUnit} would otherwise register.
      * <p>
      * This intentionally only targets <em>global</em> transformations. Annotation-driven <em>local</em>
      * transformations (e.g. {@code @Builder}, {@code @Memoize}) are unaffected and continue to contribute
      * type attribution. Any names already configured (for example by a compiler customizer) are preserved.
      */
-    private void disableGlobalAstTransformations(CompilerConfiguration configuration) {
+    private void disableGlobalAstTransformations(CompilerConfiguration configuration, GroovyClassLoader transformLoader) {
         Set<String> disabled = configuration.getDisabledGlobalASTTransformations() == null ?
                 new HashSet<>() : new HashSet<>(configuration.getDisabledGlobalASTTransformations());
-        // Enumerate through a loader configured exactly like the per-source loaders below, so that
-        // transformations registered on the configured classpath and on the runtime classpath are both found.
-        try (GroovyClassLoader transformLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration, true)) {
+        try {
             Enumeration<URL> services = transformLoader.getResources(AST_TRANSFORMATION_SERVICE);
             while (services.hasMoreElements()) {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(services.nextElement().openStream(), StandardCharsets.UTF_8))) {
