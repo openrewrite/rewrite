@@ -29,6 +29,7 @@ import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Getter;
+import org.openrewrite.internal.BackwardCompatibleObjectIdModule;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,7 +53,7 @@ public class RecipeSerializer {
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
                 .configure(MapperFeature.PROPAGATE_TRANSIENT_MARKER, true)
                 .build()
-                .registerModules(new ParameterNamesModule(), new JavaTimeModule())
+                .registerModules(new ParameterNamesModule(), new JavaTimeModule(), new BackwardCompatibleObjectIdModule())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .setSerializationInclusion(JsonInclude.Include.NON_NULL);
         maybeAddKotlinModule(m);
