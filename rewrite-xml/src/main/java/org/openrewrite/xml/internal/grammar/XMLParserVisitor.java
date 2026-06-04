@@ -98,6 +98,12 @@ public interface XMLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitElement(XMLParser.ElementContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link XMLParser#voidClose}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitVoidClose(XMLParser.VoidCloseContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link XMLParser#jspdirective}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
