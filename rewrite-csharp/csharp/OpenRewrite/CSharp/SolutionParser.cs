@@ -575,6 +575,12 @@ public class SolutionParser
 
         var dotNetProject = CreateDotNetProjectMarker(projectPath, projectName);
 
+        // One shared symbol→JavaType cache for the whole project. Roslyn interns symbols
+        // per Compilation, so every document in this project resolves a given type to the
+        // same JavaType instance — letting the RPC layer (asRef) serialize each type once
+        // per project instead of re-serializing it for every referencing file.
+        var projectTypeCache = new Dictionary<ISymbol, OpenRewrite.Java.JavaType>(SymbolEqualityComparer.Default);
+
         var results = new List<SourceFile>();
         var fileIndex = 0;
         var projectSw = Stopwatch.StartNew();
@@ -607,11 +613,11 @@ public class SolutionParser
                 if (configSymbolSets.Count > 1)
                 {
                     cu = _parser.ParseWithConfigurations(source, relativePath, semanticModel, configSymbolSets,
-                        charsetBomMarked);
+                        charsetBomMarked, projectTypeCache);
                 }
                 else
                 {
-                    cu = _parser.Parse(source, relativePath, semanticModel, charsetBomMarked);
+                    cu = _parser.Parse(source, relativePath, semanticModel, charsetBomMarked, projectTypeCache);
                 }
 
                 // Attach formatting style marker from .editorconfig
