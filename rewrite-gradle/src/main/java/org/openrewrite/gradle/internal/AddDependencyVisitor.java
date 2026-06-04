@@ -57,6 +57,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.ENFORCED_PLATFORM;
 import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.PLATFORM;
+import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
 
 @RequiredArgsConstructor
 public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
@@ -348,13 +349,13 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 if (isKotlinDsl) {
                     dependencies = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, ctx)
                             .findFirst()
-                            .map(K.CompilationUnit.class::cast)
+                            .map(requireParsed(K.CompilationUnit.class))
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                             .getStatements().get(0)).getStatements().get(0);
                 } else {
                     dependencies = (J.MethodInvocation) GRADLE_PARSER.parse(ctx, template)
                             .findFirst()
-                            .map(G.CompilationUnit.class::cast)
+                            .map(requireParsed(G.CompilationUnit.class))
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                             .getStatements().get(0);
                 }
@@ -375,13 +376,13 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 if (isKotlinDsl) {
                     dependency = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, ctx)
                             .findFirst()
-                            .map(K.CompilationUnit.class::cast)
+                            .map(requireParsed(K.CompilationUnit.class))
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                             .getStatements().get(0)).getStatements().get(0);
                 } else {
                     dependency = (J.MethodInvocation) GRADLE_PARSER.parse(ctx, template)
                             .findFirst()
-                            .map(G.CompilationUnit.class::cast)
+                            .map(requireParsed(G.CompilationUnit.class))
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                             .getStatements().get(0);
                 }

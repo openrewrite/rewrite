@@ -27,6 +27,8 @@ import org.openrewrite.java.tree.J;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class EnableDevelocityBuildCache extends Recipe {
@@ -103,7 +105,7 @@ public class EnableDevelocityBuildCache extends Recipe {
                 "}";
         return (J.MethodInvocation) GradleParser.builder().build()
                 .parse(ctx, conf)
-                .map(G.CompilationUnit.class::cast)
+                .map(requireParsed(G.CompilationUnit.class))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                 .getStatements()
