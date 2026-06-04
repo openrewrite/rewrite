@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using System.Diagnostics;
+using LibGit2Sharp;
 using OpenRewrite.CSharp;
 
 namespace OpenRewrite.Tests;
@@ -159,7 +159,7 @@ public class SolutionParserTests : IDisposable
     public async Task GitIgnoredFilesAreExcluded()
     {
         // Initialize a git repo with a .gitignore that excludes **/[Pp]ackages/*
-        RunGit("init");
+        Repository.Init(_tempDir);
         WriteFile(".gitignore", "**/[Pp]ackages/*\n");
 
         // Create a project that includes a source file under .nuget/packages/
@@ -212,23 +212,6 @@ public class SolutionParserTests : IDisposable
 
         // Both files should be parsed since there's no git repo
         Assert.Equal(2, results.Count);
-    }
-
-    private void RunGit(string args)
-    {
-        var psi = new ProcessStartInfo("git", args)
-        {
-            WorkingDirectory = _tempDir,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        using var process = Process.Start(psi)!;
-        process.WaitForExit(10_000);
-        if (process.ExitCode != 0)
-            throw new InvalidOperationException(
-                $"git {args} failed: {process.StandardError.ReadToEnd()}");
     }
 
     [Fact]
