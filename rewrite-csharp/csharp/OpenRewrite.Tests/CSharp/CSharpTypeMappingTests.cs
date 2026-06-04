@@ -412,4 +412,45 @@ public class CSharpTypeMappingTests : RewriteTest
         var stringArg = Assert.IsType<JavaType.Class>(Assert.Single(paramType.TypeParameters!));
         Assert.Equal("System.String", stringArg.FullyQualifiedName);
     }
+
+    [Fact]
+    public async Task SharedTypeCache_DedupesTypeInstancesAcrossDocumentsInProject()
+    {
+        // Two documents in ONE compilation both reference the same user type `Shared`.
+        // Roslyn interns symbols per Compilation, so the `Shared` ISymbol is identical
+        // across both documents' semantic models. A per-project shared type cache must
+        // therefore yield the SAME JavaType instance for `Shared` in both documents, so
+        // RPC asRef() can serialize it once instead of re-serializing it per file.
+        var refs = await Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
+        const string sharedSrc = "public class Shared { }";
+        const string srcA = "class A { Shared f; }";
+        const string srcB = "class B { Shared g; }";
+        var treeShared = CSharpSyntaxTree.ParseText(sharedSrc, path: "shared.cs");
+        var treeA = CSharpSyntaxTree.ParseText(srcA, path: "a.cs");
+        var treeB = CSharpSyntaxTree.ParseText(srcB, path: "b.cs");
+        var compilation = CSharpCompilation.Create("TestCompilation")
+            .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddReferences(refs)
+            .AddSyntaxTrees(ImplicitUsingsSyntaxTree, treeShared, treeA, treeB);
+        var smA = compilation.GetSemanticModel(treeA);
+        var smB = compilation.GetSemanticModel(treeB);
+
+        var parser = new CSharpParser();
+
+        // Baseline: parsed independently (no shared cache), each document builds its own
+        // JavaType instance for `Shared` — this is the per-document duplication.
+        var indepA = FindVariableDeclaration(parser.Parse(srcA, "a.cs", smA), "f")!.TypeExpression?.Type;
+        var indepB = FindVariableDeclaration(parser.Parse(srcB, "b.cs", smB), "g")!.TypeExpression?.Type;
+        Assert.NotNull(indepA);
+        Assert.NotNull(indepB);
+        Assert.NotSame(indepA, indepB);
+
+        // With a shared per-project cache, both documents resolve `Shared` to the SAME instance.
+        var sharedCache = new Dictionary<ISymbol, JavaType>(SymbolEqualityComparer.Default);
+        var typeA = FindVariableDeclaration(parser.Parse(srcA, "a.cs", smA, typeCache: sharedCache), "f")!.TypeExpression?.Type;
+        var typeB = FindVariableDeclaration(parser.Parse(srcB, "b.cs", smB, typeCache: sharedCache), "g")!.TypeExpression?.Type;
+        Assert.NotNull(typeA);
+        Assert.NotNull(typeB);
+        Assert.Same(typeA, typeB);
+    }
 }

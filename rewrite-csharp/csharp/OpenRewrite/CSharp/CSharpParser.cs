@@ -29,14 +29,15 @@ public class CSharpParser
     private bool _charsetBomMarked;
 
     public CompilationUnit Parse(string source, string sourcePath = "source.cs",
-        SemanticModel? semanticModel = null, bool charsetBomMarked = false)
+        SemanticModel? semanticModel = null, bool charsetBomMarked = false,
+        Dictionary<ISymbol, JavaType>? typeCache = null)
     {
         _charsetBomMarked = charsetBomMarked;
         var symbols = PreprocessorSourceTransformer.ExtractSymbols(source);
         if (symbols.Count == 0)
-            return ParseSingle(source, sourcePath, semanticModel);
+            return ParseSingle(source, sourcePath, semanticModel, typeCache);
 
-        return ParseMulti(source, sourcePath, semanticModel, symbols);
+        return ParseMulti(source, sourcePath, semanticModel, symbols, typeCache);
     }
 
     /// <summary>
@@ -48,13 +49,14 @@ public class CSharpParser
     /// </summary>
     public CompilationUnit ParseWithConfigurations(string source, string sourcePath,
         SemanticModel? semanticModel, List<HashSet<string>> configSymbolSets,
-        bool charsetBomMarked = false)
+        bool charsetBomMarked = false, Dictionary<ISymbol, JavaType>? typeCache = null)
     {
-        return Parse(source, sourcePath, semanticModel, charsetBomMarked);
+        return Parse(source, sourcePath, semanticModel, charsetBomMarked, typeCache);
     }
 
     private CompilationUnit ParseMultiWithSymbolSets(string source, string sourcePath,
-        SemanticModel? semanticModel, List<HashSet<string>> symbolSets)
+        SemanticModel? semanticModel, List<HashSet<string>> symbolSets,
+        Dictionary<ISymbol, JavaType>? typeCache = null)
     {
         var directiveLines = PreprocessorSourceTransformer.GetDirectivePositions(source);
 
@@ -79,7 +81,7 @@ public class CSharpParser
 
         if (permutations.Count <= 1)
         {
-            return ParseSingle(source, sourcePath, semanticModel);
+            return ParseSingle(source, sourcePath, semanticModel, typeCache);
         }
 
         PreprocessorSourceTransformer.ComputeActiveBranchIndices(directiveLines, permutations);
@@ -100,11 +102,11 @@ public class CSharpParser
                 var compilation = semanticModel.Compilation.ReplaceSyntaxTree(
                     semanticModel.SyntaxTree, syntaxTree);
                 var newSemanticModel = compilation.GetSemanticModel(syntaxTree);
-                cu = ParseSingle(cleanSource, sourcePath, newSemanticModel);
+                cu = ParseSingle(cleanSource, sourcePath, newSemanticModel, typeCache);
             }
             else
             {
-                cu = ParseSingle(cleanSource, sourcePath, null);
+                cu = ParseSingle(cleanSource, sourcePath, null, typeCache);
             }
 
             cu = (CompilationUnit)DirectiveBoundaryInjector.Inject(cu);
@@ -138,12 +140,13 @@ public class CSharpParser
         );
     }
 
-    private CompilationUnit ParseSingle(string source, string sourcePath, SemanticModel? semanticModel)
+    private CompilationUnit ParseSingle(string source, string sourcePath, SemanticModel? semanticModel,
+        Dictionary<ISymbol, JavaType>? typeCache = null)
     {
         if (semanticModel != null)
         {
             var root = semanticModel.SyntaxTree.GetCompilationUnitRoot();
-            var visitor = new CSharpParserVisitor(source, semanticModel, _charsetBomMarked);
+            var visitor = new CSharpParserVisitor(source, semanticModel, _charsetBomMarked, typeCache);
             var cu = visitor.VisitCompilationUnit(root);
             // Override source path since the semantic model's tree has the absolute path
             // from MSBuildWorkspace, but we want the relative path
@@ -161,7 +164,8 @@ public class CSharpParser
     }
 
     private CompilationUnit ParseMulti(string source, string sourcePath,
-        SemanticModel? semanticModel, HashSet<string> symbols)
+        SemanticModel? semanticModel, HashSet<string> symbols,
+        Dictionary<ISymbol, JavaType>? typeCache = null)
     {
         var directiveLines = PreprocessorSourceTransformer.GetDirectivePositions(source);
 
@@ -190,11 +194,11 @@ public class CSharpParser
                 var compilation = semanticModel.Compilation.ReplaceSyntaxTree(
                     semanticModel.SyntaxTree, syntaxTree);
                 var newSemanticModel = compilation.GetSemanticModel(syntaxTree);
-                cu = ParseSingle(cleanSource, sourcePath, newSemanticModel);
+                cu = ParseSingle(cleanSource, sourcePath, newSemanticModel, typeCache);
             }
             else
             {
-                cu = ParseSingle(cleanSource, sourcePath, null);
+                cu = ParseSingle(cleanSource, sourcePath, null, typeCache);
             }
 
             // Convert ghost comments in whitespace to DirectiveBoundaryMarker markers
@@ -254,12 +258,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     private Space _pendingSemicolonSpace = Space.Empty;
 
     public CSharpParserVisitor(string source, SemanticModel? semanticModel = null,
-        bool charsetBomMarked = false)
+        bool charsetBomMarked = false, Dictionary<ISymbol, JavaType>? sharedTypeCache = null)
     {
         _source = source;
         _cursor = 0;
         _semanticModel = semanticModel;
-        _typeMapping = semanticModel != null ? new CSharpTypeMapping(semanticModel) : null;
+        _typeMapping = semanticModel != null ? new CSharpTypeMapping(semanticModel, sharedTypeCache) : null;
         _charsetBomMarked = charsetBomMarked;
     }
 
