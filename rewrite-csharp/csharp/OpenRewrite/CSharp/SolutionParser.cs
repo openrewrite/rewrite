@@ -15,6 +15,7 @@
  */
 using System.Diagnostics;
 using System.Xml.Linq;
+using LibGit2Sharp;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
@@ -718,8 +719,7 @@ public class SolutionParser
     /// <summary>
     /// Returns the set of file paths (from <paramref name="candidatePaths"/>) that are
     /// git-ignored according to the repository rooted at or above <paramref name="rootDir"/>.
-    /// Returns an empty set when git is not available or <paramref name="rootDir"/> is not
-    /// inside a git repository.
+    /// Returns an empty set when <paramref name="rootDir"/> is not inside a git repository.
     /// </summary>
     private static HashSet<string> GetGitIgnoredPaths(string rootDir, IEnumerable<string> candidatePaths)
     {
@@ -729,52 +729,29 @@ public class SolutionParser
 
         try
         {
-            // Check if rootDir is inside a git repo
-            var checkPsi = new ProcessStartInfo("git", "rev-parse --git-dir")
-            {
-                WorkingDirectory = rootDir,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var checkProcess = Process.Start(checkPsi);
-            if (checkProcess == null) return ignored;
-            checkProcess.WaitForExit(5_000);
-            if (checkProcess.ExitCode != 0) return ignored;
+            var gitDir = Repository.Discover(rootDir);
+            if (gitDir == null) return ignored; // Not inside a git repository.
 
-            // Use git check-ignore --stdin to batch-check all candidate paths
-            var psi = new ProcessStartInfo("git", "check-ignore --stdin")
-            {
-                WorkingDirectory = rootDir,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var process = Process.Start(psi);
-            if (process == null) return ignored;
+            using var repo = new Repository(gitDir);
+            var workDir = PathUtil.Canonicalize(repo.Info.WorkingDirectory);
 
-            // Write all paths to stdin, one per line
             foreach (var path in paths)
-                process.StandardInput.WriteLine(path);
-            process.StandardInput.Close();
-
-            // Read ignored paths from stdout
-            var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit(10_000);
-
-            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
-                var trimmed = line.TrimEnd('\r');
-                if (!string.IsNullOrEmpty(trimmed))
-                {
-                    // git check-ignore outputs paths relative to the working directory;
-                    // resolve them to full paths for comparison
-                    var fullPath = Path.GetFullPath(trimmed, rootDir);
-                    ignored.Add(fullPath);
-                }
+                // Evaluate ignore rules against the repo-relative path (forward slashes, as
+                // libgit2 expects), but report the original candidate string so the caller's
+                // membership check matches verbatim.
+                var rel = Path.GetRelativePath(workDir, PathUtil.Canonicalize(path));
+                if (rel.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(rel))
+                    continue; // Outside the working tree — not subject to its ignore rules.
+                rel = rel.Replace('\\', '/');
+
+                // Mirror `git check-ignore`: tracked files are never reported as ignored, even
+                // when an ignore rule would otherwise match them.
+                if (repo.Index[rel] != null)
+                    continue;
+
+                if (repo.Ignore.IsPathIgnored(rel))
+                    ignored.Add(path);
             }
         }
         catch (Exception ex)
