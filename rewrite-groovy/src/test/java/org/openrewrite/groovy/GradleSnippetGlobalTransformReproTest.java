@@ -34,11 +34,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Guards against the failure mode behind "Failed to parse build.gradle at cursor position N" in
  * {@code UpgradeTransitiveDependencyVersion} (and openrewrite/rewrite#7870): a <em>global</em> Groovy AST
- * transformation present on the classpath the parser discovers transformations from rewrites the AST away
- * from the source, breaking the position-coupled {@link GroovyParserVisitor}.
+ * transformation on the classpath rewrites the AST away from the source, breaking the position-coupled
+ * {@link GroovyParserVisitor}.
  *
- * <p>{@code GroovyParser} now disables every discoverable global AST transformation, so parsing is
- * independent of which transformations happen to be on the classpath.
+ * <p>{@code GroovyParser} discovers global AST transformations through a classpath-free loader, so one
+ * registered only on the compile classpath is never discovered and cannot run. This doubles as a guard that
+ * the per-source {@code transformLoader} stays classpath-free: were it to carry the compile classpath again,
+ * the transformation below would run.
  */
 class GradleSnippetGlobalTransformReproTest {
 
@@ -73,9 +75,9 @@ class GradleSnippetGlobalTransformReproTest {
 
         // Before the fix this produced a ParseError: "Failed to parse build.gradle at cursor position N".
         assertThat(parsed).isNotInstanceOf(ParseError.class);
-        // The transformation was discoverable on the classpath but the parser disabled it.
+        // Registered only on the compile classpath, which the classpath-free transformLoader never scans.
         assertThat(InjectClosureStatementTransformation.executed)
-                .as("global AST transformation should have been disabled by GroovyParser")
+                .as("a global AST transformation registered only on the compile classpath must not run")
                 .isFalse();
     }
 
