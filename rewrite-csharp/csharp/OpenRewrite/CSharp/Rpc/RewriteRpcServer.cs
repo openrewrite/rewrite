@@ -17,10 +17,8 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json.Serialization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
@@ -214,11 +212,15 @@ public class RewriteRpcServer
         var requirePrintEqualsInput = true;
         if (request.Options?.TryGetValue("org.openrewrite.requirePrintEqualsInput", out var val) == true)
         {
-            // StreamJsonRpc with Newtonsoft.Json may deliver values as JToken wrappers
-            if (val is JToken jt)
-                requirePrintEqualsInput = jt.Value<bool>();
-            else
-                requirePrintEqualsInput = Convert.ToBoolean(val);
+            // SystemTextJsonFormatter delivers object-typed option values as JsonElement.
+            requirePrintEqualsInput = val switch
+            {
+                JsonElement { ValueKind: JsonValueKind.True } => true,
+                JsonElement { ValueKind: JsonValueKind.False } => false,
+                JsonElement { ValueKind: JsonValueKind.String } je => bool.Parse(je.GetString()!),
+                JsonElement je => Convert.ToBoolean(je.ToString()),
+                _ => Convert.ToBoolean(val),
+            };
         }
 
         var solution = await solutionParser.LoadAsync(path, CancellationToken.None);
@@ -541,20 +543,32 @@ public class RewriteRpcServer
         var beforeCount = _marketplace.AllRecipes().Count;
         string? version = null;
 
-        if (request.Recipes is string path)
+        // SystemTextJsonFormatter deserializes the object-typed Recipes payload to a JsonElement:
+        // a JSON string is a local assembly path; a JSON object describes a NuGet package.
+        var recipesString = request.Recipes switch
+        {
+            string s => s,
+            JsonElement { ValueKind: JsonValueKind.String } je => je.GetString(),
+            _ => null,
+        };
+        var recipesObject = request.Recipes is JsonElement { ValueKind: JsonValueKind.Object } obj
+            ? (JsonElement?)obj
+            : null;
+
+        if (recipesString != null)
         {
             // Local assembly path
-            var absolutePath = Path.GetFullPath(path);
+            var absolutePath = Path.GetFullPath(recipesString);
             var context = new PluginLoadContext(absolutePath);
             var assembly = context.LoadFromAssemblyPath(absolutePath);
             CheckVersionCompatibility(assembly);
             ActivateAssembly(assembly);
         }
-        else if (request.Recipes is JObject packageObj)
+        else if (recipesObject is { } packageObj)
         {
-            var packageName = packageObj["packageName"]?.ToString()
+            var packageName = (packageObj.TryGetProperty("packageName", out var pn) ? pn.GetString() : null)
                               ?? throw new ArgumentException("Missing packageName in recipes object");
-            version = packageObj["version"]?.ToString();
+            version = packageObj.TryGetProperty("version", out var v) ? v.GetString() : null;
 
             if (File.Exists(packageName))
             {
@@ -1235,13 +1249,15 @@ public class RewriteRpcServer
         using var inputStream = Console.OpenStandardInput();
         using var outputStream = Console.OpenStandardOutput();
 
-        // Configure JSON serialization to match Java expectations:
-        // - camelCase property names
-        // - string enum values (not integers)
-        var formatter = new JsonMessageFormatter();
-        formatter.JsonSerializer.ContractResolver = new CamelCasePropertyNamesContractResolver();
-        formatter.JsonSerializer.Converters.Add(new StringEnumConverter());
-        formatter.JsonSerializer.NullValueHandling = NullValueHandling.Ignore;
+        // Stream the JSON-RPC envelope with System.Text.Json (Utf8JsonWriter/Utf8JsonReader)
+        // instead of Newtonsoft's JToken-DOM formatter. The wire format stays JSON and matches
+        // Java's expectations (camelCase property names, string enum values, omitted nulls) via
+        // the shared RpcJson.Options. See RpcJson for why this is far cheaper on the .NET side
+        // (no per-message DOM, no per-value converter scan under lock, far less GC pressure).
+        var formatter = new SystemTextJsonFormatter
+        {
+            JsonSerializerOptions = RpcJson.Options,
+        };
 
         var handler = new HeaderDelimitedMessageHandler(outputStream, inputStream, formatter);
         using var jsonRpc = new StringErrorDataJsonRpc(handler);
@@ -1630,7 +1646,7 @@ public class Precondition
 public class GenerateRequest
 {
     public string Id { get; set; } = "";
-    [JsonProperty("p")]
+    [JsonPropertyName("p")]
     public string? P { get; set; }
 }
 
@@ -1642,13 +1658,13 @@ public class GenerateResponse
 
 public class VisitRequest
 {
-    [JsonProperty("visitor")]
+    [JsonPropertyName("visitor")]
     public string VisitorName { get; set; } = "";
     public string? SourceFileType { get; set; }
     public string TreeId { get; set; } = "";
-    [JsonProperty("p")]
+    [JsonPropertyName("p")]
     public string? PId { get; set; }
-    [JsonProperty("cursor")]
+    [JsonPropertyName("cursor")]
     public List<string>? CursorIds { get; set; }
 }
 
@@ -1661,9 +1677,9 @@ public class BatchVisitRequest
 {
     public string SourceFileType { get; set; } = "";
     public string TreeId { get; set; } = "";
-    [JsonProperty("p")]
+    [JsonPropertyName("p")]
     public string? PId { get; set; }
-    [JsonProperty("cursor")]
+    [JsonPropertyName("cursor")]
     public List<string>? CursorIds { get; set; }
     public List<BatchVisitItem> Visitors { get; set; } = new();
 }
