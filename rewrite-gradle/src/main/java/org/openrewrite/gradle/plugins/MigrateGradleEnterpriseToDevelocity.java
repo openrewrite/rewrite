@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static java.util.Collections.singletonList;
+import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -245,7 +246,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
             G.CompilationUnit cu = GradleParser.builder().build()
                     .parseInputs(singletonList(
                             Parser.Input.fromString(Paths.get("settings.gradle"), ge.toString())), null, ctx)
-                    .map(G.CompilationUnit.class::cast)
+                    .map(requireParsed(G.CompilationUnit.class))
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
 
@@ -264,7 +265,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
             G.CompilationUnit cu = GradleParser.builder().build()
                     .parseInputs(singletonList(
                             Parser.Input.fromString(Paths.get("settings.gradle"), ge.toString())), null, ctx)
-                    .map(G.CompilationUnit.class::cast)
+                    .map(requireParsed(G.CompilationUnit.class))
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
 

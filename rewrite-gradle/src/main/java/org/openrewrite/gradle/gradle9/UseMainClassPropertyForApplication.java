@@ -29,6 +29,8 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 
+import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UseMainClassPropertyForApplication extends Recipe {
@@ -110,7 +112,7 @@ public class UseMainClassPropertyForApplication extends Recipe {
                     Statement statement = GradleParser.builder().build()
                             .parseInputs(Collections.singletonList(
                                     Parser.Input.fromString(Paths.get("build.gradle.kts"), snippet)), null, ctx)
-                            .map(K.CompilationUnit.class::cast)
+                            .map(requireParsed(K.CompilationUnit.class))
                             .findFirst()
                             .orElseThrow(() -> new IllegalStateException("Could not parse application block"))
                             .getStatements()
@@ -119,7 +121,7 @@ public class UseMainClassPropertyForApplication extends Recipe {
                 }
                 return ((J) GradleParser.builder().build()
                         .parse(ctx, snippet)
-                        .map(G.CompilationUnit.class::cast)
+                        .map(requireParsed(G.CompilationUnit.class))
                         .findFirst()
                         .orElseThrow(() -> new IllegalStateException("Could not parse application block"))
                         .getStatements()
