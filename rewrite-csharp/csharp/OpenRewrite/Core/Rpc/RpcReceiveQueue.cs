@@ -16,7 +16,6 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using Newtonsoft.Json.Linq;
 using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
@@ -392,9 +391,9 @@ public class RpcReceiveQueue
 
     /// <summary>
     /// Deserializes a non-codec object that was sent inline in the ADD message.
-    /// The value is typically a JObject from Newtonsoft.Json deserialization.
+    /// The value is typically a JsonElement from System.Text.Json deserialization.
     /// </summary>
-    private static T DeserializeInline<T>(string javaTypeName, object value)
+    internal static T DeserializeInline<T>(string javaTypeName, object value)
     {
         var type = FromJavaTypeName(javaTypeName) ?? typeof(T);
 
@@ -410,17 +409,18 @@ public class RpcReceiveQueue
         // LstProvenance, BuildTool, etc. added by the mod CLI).
         if ((type.IsInterface || type.IsAbstract) && typeof(Marker).IsAssignableFrom(type))
         {
-            if (value is JObject jobj)
+            if (value is JsonElement je && je.ValueKind == JsonValueKind.Object)
             {
-                var idToken = jobj["id"];
-                var id = idToken != null ? Guid.Parse(idToken.ToString()) : Guid.NewGuid();
+                var id = je.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String
+                    ? Guid.Parse(idProp.GetString()!)
+                    : Guid.NewGuid();
                 return (T)(object)new UnknownMarker(id);
             }
             return (T)(object)new UnknownMarker(Guid.NewGuid());
         }
 
-        if (value is JObject jobjNormal)
-            return (T)jobjNormal.ToObject(type)!;
+        if (value is JsonElement jeNormal)
+            return (T)jeNormal.Deserialize(type, RpcJson.Options)!;
 
         if (value is T t)
             return t;
