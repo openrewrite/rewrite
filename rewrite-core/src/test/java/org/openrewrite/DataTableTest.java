@@ -25,6 +25,7 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -170,6 +171,38 @@ class DataTableTest implements RewriteTest {
     }
 
     @Test
+    void dataTableDescriptorsDeriveFromCachedDescriptorAndWalkTreeOnce() {
+        Recipe leaf = toRecipe();
+        new TableC(leaf);
+
+        // A chain of nested composites, deep enough that an O(n^2) re-walk would be obvious.
+        Recipe top = leaf;
+        int depth = 6;
+        for (int i = 0; i < depth; i++) {
+            top = new CountingComposite(List.of(top));
+        }
+
+        CountingComposite.recipeListCalls.set(0);
+        List<DataTableDescriptor> descriptors = top.getDataTableDescriptors();
+
+        // The leaf's data table propagates all the way up.
+        assertThat(descriptors).extracting(DataTableDescriptor::getName).contains(TableC.class.getName());
+
+        // Each composite contributes exactly one getRecipeList() call: the tree is walked once,
+        // not once per nesting level. This is what makes a per-class/static introspection cache
+        // unnecessary.
+        assertThat(CountingComposite.recipeListCalls.get()).isEqualTo(depth);
+
+        // getDataTableDescriptors() is just a view over the cached descriptor.
+        assertThat(top.getDataTableDescriptors()).isEqualTo(top.getDescriptor().getDataTables());
+
+        // Repeated descriptor loads on the same instance do not re-walk the tree.
+        top.getDataTableDescriptors();
+        top.getDescriptor();
+        assertThat(CountingComposite.recipeListCalls.get()).isEqualTo(depth);
+    }
+
+    @Test
     void recipeUsedInPreconditionDoesNotEmitDataTableRows() {
         Recipe preconditionRecipe = toRecipe(r -> new PlainTextVisitor<>() {
             final WordTable wordTable = new WordTable(r);
@@ -201,6 +234,36 @@ class DataTableTest implements RewriteTest {
               .containsExactly("main")),
           text("test", "changed")
         );
+    }
+
+    /**
+     * A composite recipe that counts how many times {@link #getRecipeList()} is invoked, so tests
+     * can assert the recipe tree is walked once per descriptor rather than once per nesting level.
+     */
+    static class CountingComposite extends Recipe {
+        static final AtomicInteger recipeListCalls = new AtomicInteger();
+
+        private final List<Recipe> children;
+
+        CountingComposite(List<Recipe> children) {
+            this.children = children;
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "Counting composite";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Counts the number of getRecipeList() invocations.";
+        }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            recipeListCalls.incrementAndGet();
+            return children;
+        }
     }
 
     @JsonIgnoreType
