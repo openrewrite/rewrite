@@ -131,6 +131,8 @@ public class GroovyParser implements Parser {
         //    re-opening classpath JARs. Sharing one loader warms the JVM's per-loader class table once and
         //    reuses it. This is safe because parsing stops at CANONICALIZATION and never defines script classes
         //    into the loader (its script source cache stays empty), and GroovyClassLoader is parallel-capable.
+        //    It is a NegativeCachingGroovyClassLoader so that the many never-resolving lookups Groovy's resolver
+        //    makes (one per candidate package-prefix) do not re-scan the whole classpath on every probe.
         //
         // Both must outlive the lazily-consumed stream returned below, so they are closed via the stream's
         // onClose handler (for try-with-resources consumers) and otherwise released by GC once the consumed
@@ -138,7 +140,7 @@ public class GroovyParser implements Parser {
         // after parsing never affects results.
         GroovyClassLoader transformLoader = new GroovyClassLoader(getClass().getClassLoader());
         disableGlobalAstTransformations(configuration, transformLoader);
-        GroovyClassLoader classLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration, true);
+        GroovyClassLoader classLoader = new NegativeCachingGroovyClassLoader(getClass().getClassLoader(), configuration);
 
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         return StreamSupport.stream(sources.spliterator(), false)
