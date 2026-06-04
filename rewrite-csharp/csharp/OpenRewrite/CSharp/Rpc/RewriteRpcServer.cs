@@ -1024,11 +1024,32 @@ public class RewriteRpcServer
             var prop = recipeType.GetProperty(key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
             if (prop != null && prop.CanWrite)
             {
-                var convertedValue = Convert.ChangeType(value, prop.PropertyType);
-                prop.SetValue(recipe, convertedValue);
+                prop.SetValue(recipe, ConvertOptionValue(value, prop.PropertyType));
             }
         }
         return recipe;
+    }
+
+    /// <summary>
+    /// Coerce a recipe option value received over the wire to its target property type.
+    /// The streaming <c>SystemTextJsonFormatter</c> deserializes <c>object</c>-typed values
+    /// to <see cref="JsonElement"/>, which is not <see cref="IConvertible"/> — so a plain
+    /// <see cref="Convert.ChangeType(object?, Type)"/> throws. Deserialize the fragment
+    /// straight to the property type instead. A non-<see cref="JsonElement"/> value (an
+    /// in-process call or a test passing a direct CLR value) keeps the prior conversion.
+    /// </summary>
+    private static object? ConvertOptionValue(object? value, Type targetType)
+    {
+        if (value is JsonElement element)
+        {
+            return element.Deserialize(targetType, RpcJson.Options);
+        }
+        if (value is null || targetType.IsInstanceOfType(value))
+        {
+            return value;
+        }
+        var conversionType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        return Convert.ChangeType(value, conversionType);
     }
 
     [JsonRpcMethod("Visit", UseSingleObjectParameterDeserialization = true)]
