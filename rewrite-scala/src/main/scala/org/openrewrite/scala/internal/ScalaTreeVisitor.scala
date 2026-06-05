@@ -8137,12 +8137,39 @@ class ScalaTreeVisitor(
     case po: untpd.PostfixOp if po.op != null && po.op.name.toString == "*" =>
       visitRepeatedType(po)
     case tuple: untpd.Tuple => visitTupleType(tuple)
+    case parens: untpd.Parens => visitParenthesizedType(parens)
     case _ =>
       visitTree(tpt) match {
         case tt: TypeTree => tt
         case id: J.Identifier => id
         case _ => null
       }
+  }
+
+  /**
+   * Build a `J.ParenthesizedTypeTree` for a parenthesized type (e.g. `(Int)` or
+   * `(Int => Unit)` as a return type or ascription). Scala 3's parser wraps such a
+   * type in `untpd.Parens`, which in an expression position becomes `J.Parentheses`;
+   * in a type position we must keep it a `TypeTree` so the parentheses aren't dropped.
+   */
+  private def visitParenthesizedType(parens: untpd.Parens): J.ParenthesizedTypeTree = {
+    val prefix = extractPrefix(parens.span)
+    val beforeOpenParen = sourceBefore("(")
+    val inner = visitTypeTree(parens.t)
+    val afterInner = sourceBefore(")")
+    val parenthesized = new J.Parentheses[TypeTree](
+      Tree.randomId(),
+      beforeOpenParen,
+      Markers.EMPTY,
+      JRightPadded.build(inner).withAfter(afterInner)
+    )
+    new J.ParenthesizedTypeTree(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      Collections.emptyList(),
+      parenthesized
+    )
   }
 
   /**
