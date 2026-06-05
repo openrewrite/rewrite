@@ -141,6 +141,27 @@ class GitProvenanceTest {
     }
 
     @Test
+    void excludeCommittersMatchesIncludingPath(@TempDir Path projectDir) throws Exception {
+        try (Git ignored = initGitWithOneCommit(projectDir)) {
+            GitProvenance withCommitters = GitProvenance.fromProjectDirectory(projectDir, null, null, true);
+            GitProvenance withoutCommitters = GitProvenance.fromProjectDirectory(projectDir, null, null, false);
+
+            assertThat(withCommitters).isNotNull();
+            assertThat(withoutCommitters).isNotNull();
+
+            // origin/branch/change are identical whether or not committers are walked
+            assertThat(withoutCommitters.getOrigin()).isEqualTo(withCommitters.getOrigin());
+            assertThat(withoutCommitters.getBranch()).isEqualTo(withCommitters.getBranch());
+            assertThat(withoutCommitters.getChange()).isEqualTo(withCommitters.getChange());
+
+            // the including path actually walks history and finds the commit author
+            assertThat(withCommitters.getCommitters()).isNotEmpty();
+            // the opt-out path skips the walk and returns an empty list
+            assertThat(withoutCommitters.getCommitters()).isEmpty();
+        }
+    }
+
+    @Test
     void detachedHead(@TempDir Path projectDir) throws Exception {
         try (Git git = initGitWithOneCommit(projectDir)) {
             git.checkout().setName(git.getRepository().resolve(Constants.HEAD).getName()).call();
