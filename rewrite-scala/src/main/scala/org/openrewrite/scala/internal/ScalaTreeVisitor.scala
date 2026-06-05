@@ -4663,11 +4663,7 @@ class ScalaTreeVisitor(
         case ta: Trees.TypeApply[?] => hasTripleQ(ta.fun)
         case _ => false
       }
-      hasTripleQ(block.expr) || {
-        // Catch-all: check any tree containing ???
-        val exprStr = try { block.expr.show } catch { case _: Exception => try { block.expr.toString } catch { case _: Exception => "" } }
-        exprStr.contains("???")
-      } || (block.expr.span.exists && {
+      hasTripleQ(block.expr) || (block.expr.span.exists && {
         val s = block.expr.span.start - offsetAdjustment
         s < 0 || s >= source.length
       })
@@ -4684,16 +4680,14 @@ class ScalaTreeVisitor(
       }
     }
     if (!block.expr.isEmpty && !isSyntheticExpr) {
-      // Visit the expression and check if it's a synthetic ???
+      // Visit the expression and check if it's a synthetic ??? that slipped through.
+      // Detect structurally (a `Predef.???`-style field access), never by string-matching
+      // the printed output — user code such as the string literal `"???"` is not synthetic.
       val exprResult = visitTree(block.expr)
-      val resultText = try {
-        if (exprResult != null) exprResult.print(new org.openrewrite.Cursor(null, exprResult)) else ""
-      } catch { case _: Exception => "" }
-      val isSyntheticResult = resultText.contains("???") || resultText.contains("Predef") || resultText.contains("$qmark") ||
-        (exprResult.isInstanceOf[J.FieldAccess] && {
-          val fa = exprResult.asInstanceOf[J.FieldAccess]
-          fa.getSimpleName == "???" || fa.getSimpleName == "$qmark$qmark$qmark"
-        })
+      val isSyntheticResult = exprResult.isInstanceOf[J.FieldAccess] && {
+        val fa = exprResult.asInstanceOf[J.FieldAccess]
+        fa.getSimpleName == "???" || fa.getSimpleName == "$qmark$qmark$qmark"
+      }
       if (isSyntheticResult) {
         // Synthetic ??? slipped through — skip it
       } else exprResult match {
