@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,12 @@
  */
 using OpenRewrite.Core;
 
-namespace OpenRewrite.CSharp.Recipes;
+namespace OpenRewrite.CSharp;
 
-public class CsprojRecipeActivator : IRecipeActivator
+public class CoreCSharpRecipeActivator : IRecipeActivator
 {
     public void Activate(RecipeMarketplace marketplace)
     {
-        marketplace.InstallAssembly(typeof(CsprojRecipeActivator).Assembly);
+        marketplace.InstallAssembly(typeof(CoreCSharpRecipeActivator).Assembly);
     }
 }

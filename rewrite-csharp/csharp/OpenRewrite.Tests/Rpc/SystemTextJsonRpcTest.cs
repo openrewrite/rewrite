@@ -17,7 +17,6 @@ using System.Text.Json;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.CSharp.Rpc;
-using OpenRewrite.Xml.Recipes;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Tests.Rpc;
@@ -68,15 +67,16 @@ public class SystemTextJsonRpcTest
     [Fact]
     public async Task PrepareRecipe_WithJsonElementStringOptions_AppliesValues()
     {
+        var recipe = new StringOptionRecipe();
         var marketplace = new RecipeMarketplace();
-        marketplace.Install(new ChangeXmlCharData());
+        marketplace.Install(recipe);
         var server = new RewriteRpcServer(marketplace);
 
         // SystemTextJsonFormatter deserializes object-typed option values to JsonElement,
         // which is exactly the shape PrepareRecipe receives over the wire.
         var request = new PrepareRecipeRequest
         {
-            Id = "OpenRewrite.Xml.Recipes.ChangeXmlCharData",
+            Id = recipe.Name,
             Options = new Dictionary<string, object?>
             {
                 ["OldText"] = JsonSerializer.SerializeToElement("original", RpcJson.Options),
@@ -132,6 +132,20 @@ public class SystemTextJsonRpcTest
 
         [Option(DisplayName = "Label", Description = "A string option")]
         public string Label { get; set; } = "";
+
+        public override ITreeVisitor<ExecutionContext> GetVisitor() => ITreeVisitor<ExecutionContext>.Noop();
+    }
+
+    private class StringOptionRecipe : OpenRewrite.Core.Recipe
+    {
+        public override string DisplayName => "String option recipe";
+        public override string Description => "Recipe with string options for wire-format conversion testing.";
+
+        [Option(DisplayName = "Old text", Description = "Text to replace")]
+        public string OldText { get; set; } = "";
+
+        [Option(DisplayName = "New text", Description = "Replacement text")]
+        public string NewText { get; set; } = "";
 
         public override ITreeVisitor<ExecutionContext> GetVisitor() => ITreeVisitor<ExecutionContext>.Noop();
     }

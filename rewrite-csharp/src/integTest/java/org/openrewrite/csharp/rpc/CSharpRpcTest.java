@@ -438,7 +438,7 @@ class CSharpRpcTest implements RewriteTest {
                 null, null, null);
         RecipeMarketplace marketplace = CSharpRewriteRpc.getOrStart().getMarketplace(bundle);
         assertThat(marketplace).isNotNull();
-        // XML recipes are registered via XmlRecipeActivator
+        // Core C# recipes are registered via CoreCSharpRecipeActivator
         assertThat(marketplace.getAllRecipes()).isNotEmpty();
     }
 

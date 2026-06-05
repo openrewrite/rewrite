@@ -1559,6 +1559,39 @@ public class CategoryDescriptorDto
     public string? Description { get; set; }
 }
 
+/// <summary>
+/// Reads <c>estimatedEffortPerOccurrence</c> from either the Java wire shape (a
+/// JSON number of seconds) or the C# wire shape (an ISO-8601 duration string),
+/// normalizing both to an ISO-8601 string. Writes the ISO-8601 string, which
+/// the Java peer's Jackson Duration deserializer accepts.
+/// </summary>
+public sealed class DurationWireConverter : JsonConverter<string?>
+{
+    public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.Null:
+                return null;
+            case JsonTokenType.String:
+                return reader.GetString();
+            case JsonTokenType.Number:
+                return System.Xml.XmlConvert.ToString(TimeSpan.FromSeconds(reader.GetDouble()));
+            default:
+                reader.Skip();
+                return null;
+        }
+    }
+
+    public override void Write(Utf8JsonWriter writer, string? value, JsonSerializerOptions options)
+    {
+        if (value is null)
+            writer.WriteNullValue();
+        else
+            writer.WriteStringValue(value);
+    }
+}
+
 public class RecipeDescriptorDto
 {
     public string Name { get; set; } = "";
@@ -1566,6 +1599,12 @@ public class RecipeDescriptorDto
     public string InstanceName { get; set; } = "";
     public string Description { get; set; } = "";
     public HashSet<string> Tags { get; set; } = [];
+
+    // The Java peer serializes the recipe's estimatedEffortPerOccurrence
+    // (a Duration) as a JSON number of seconds, while the C# side emits it as
+    // an ISO-8601 duration string. Accept either on read so System.Text.Json's
+    // strict number/string handling doesn't fail descriptor deserialization.
+    [JsonConverter(typeof(DurationWireConverter))]
     public string? EstimatedEffortPerOccurrence { get; set; }
     public List<OptionDescriptorDto> Options { get; set; } = [];
     public List<RecipeDescriptorDto> Preconditions { get; set; } = [];
