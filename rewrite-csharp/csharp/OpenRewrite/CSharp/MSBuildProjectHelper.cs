@@ -51,7 +51,7 @@ public static class MSBuildProjectHelper
     /// MSBuildProject marker no longer reflects on-disk state. Call this from
     /// any visitor after it mutates a project file (independent of whether the
     /// visitor reattests immediately or defers to a trailing
-    /// <see cref="Recipes.EnsureCsprojAttestation"/>).
+    /// <c>EnsureCsprojAttestation</c>).
     /// </summary>
     public static void MarkAttestationStale(ExecutionContext ctx, string sourcePath)
     {
