@@ -260,6 +260,19 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    void newClassWithInterpolatedStringArgOnNewLine() {
+        rewriteRun(
+          scala(
+            """
+            val n = 1
+            val x = new RuntimeException(
+              s"value: $n")
+            """
+          )
+        );
+    }
+
+    @Test
     void newClassFirstArgIsIfElseOnNewLine() {
         rewriteRun(
           scala(
