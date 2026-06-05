@@ -180,7 +180,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             List<JavaType.FullyQualified> classpath = sourceSet.map(JavaSourceSet::getClasspath).orElse(emptyList());
             boolean classpathDirty = p instanceof ExecutionContext && JavaSourceSet.isDirty((ExecutionContext) p, cu);
 
-            List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath, classpathDirty);
+            List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath, classpathDirty, sourceSet.orElse(null));
 
             if (member != null && typeReference.isPresent()) {
                 cu = (JavaSourceFile) new ShortenFullyQualifiedMemberReferences(typeReference.get()).visit(cu, p);

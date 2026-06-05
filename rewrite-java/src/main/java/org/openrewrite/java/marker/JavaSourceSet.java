@@ -22,6 +22,7 @@ import io.github.classgraph.ScanResult;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.Value;
@@ -45,6 +46,7 @@ import java.util.function.Function;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
@@ -81,6 +83,19 @@ public class JavaSourceSet implements SourceSet {
     @ToString.Exclude
     transient @Nullable JavaTypeFactory typeFactory;
 
+    /**
+     * Classpath types grouped by package name, built lazily from a single walk of
+     * {@link #classpath} the first time {@link #typesInPackage(String)} is called and cached for
+     * the lifetime of this instance. As a Lombok lazy getter it is thread-safe and excluded from
+     * serialization, {@code equals}/{@code hashCode}, {@code toString}, and the {@code with*}
+     * methods, so a source set produced by {@link #withClasspath} rebuilds the index for its new
+     * classpath rather than reusing a stale one.
+     */
+    @JsonIgnore
+    @ToString.Exclude
+    @Getter(value = AccessLevel.PRIVATE, lazy = true)
+    private final Map<String, List<JavaType.FullyQualified>> typesByPackage = buildTypesByPackage();
+
     public JavaSourceSet(UUID id, String name,
                          List<JavaType.FullyQualified> classpath,
                          Map<String, List<JavaType.FullyQualified>> gavToTypes) {
@@ -97,6 +112,23 @@ public class JavaSourceSet implements SourceSet {
         this.classpath = classpath;
         this.gavToTypes = gavToTypes;
         this.typeFactory = typeFactory;
+    }
+
+    /**
+     * @param packageName a package name (e.g. {@code "java.util"})
+     * @return the classpath types declared directly in {@code packageName}, or an empty list when
+     * none. Implemented as a single classpath walk grouped by package.
+     */
+    public List<JavaType.FullyQualified> typesInPackage(String packageName) {
+        return getTypesByPackage().getOrDefault(packageName, emptyList());
+    }
+
+    private Map<String, List<JavaType.FullyQualified>> buildTypesByPackage() {
+        Map<String, List<JavaType.FullyQualified>> index = new HashMap<>();
+        for (JavaType.FullyQualified fqn : classpath) {
+            index.computeIfAbsent(fqn.getPackageName(), k -> new ArrayList<>()).add(fqn);
+        }
+        return index;
     }
 
     /**
