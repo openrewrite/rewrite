@@ -414,6 +414,35 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void parenthesizedReturnType() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(x: Int): (Int => Unit) = {
+                    _ => ()
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void parenthesizedReturnTypeWithExtraSpaces() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f  :  (  Int  ) = 1
+                  def g: ( ( Int ) ) = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void functionTypeAsDefaultParameter() {
         rewriteRun(
             scala(
