@@ -1973,20 +1973,7 @@ class ScalaTreeVisitor(
       visitTree(arg) match {
         case expr: Expression =>
           // Apply the prefix space to the expression
-          val exprWithPrefix = expr match {
-            case lit: J.Literal => lit.withPrefix(argPrefix)
-            case id: J.Identifier => id.withPrefix(argPrefix)
-            case mi: J.MethodInvocation => mi.withPrefix(argPrefix)
-            case na: J.NewArray => na.withPrefix(argPrefix)
-            case bin: J.Binary => bin.withPrefix(argPrefix)
-            case aa: J.ArrayAccess => aa.withPrefix(argPrefix)
-            case fa: J.FieldAccess => fa.withPrefix(argPrefix)
-            case paren: J.Parentheses[_] => paren.withPrefix(argPrefix)
-            case unknown: J.Unknown => unknown.withPrefix(argPrefix)
-            case nc: J.NewClass => nc.withPrefix(argPrefix)
-            case asg: J.Assignment => asg.withPrefix(argPrefix)
-            case _ => expr
-          }
+          val exprWithPrefix: Expression = expr.withPrefix(argPrefix)
 
           // For the last arg, capture trailing whitespace before ')'.
           val afterSpace = if (i == app.args.size - 1) {
