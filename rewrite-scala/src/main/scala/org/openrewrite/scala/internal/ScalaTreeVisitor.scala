@@ -7245,6 +7245,7 @@ class ScalaTreeVisitor(
         val guardResult = visitTree(caseDef.guard)
         guardResult match {
           case expr: Expression => guard = expr
+          case j: J => guard = new S.StatementExpression(Tree.randomId(), j)
           case _ =>
         }
         val arrowPos = positionOfNext("=>", cursor)

@@ -231,6 +231,24 @@ class MatchTest implements RewriteTest {
     }
 
     @Test
+    void matchWithBlockGuard() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def handle(x: Any): String = x match {
+                case s: String if {
+                      s.nonEmpty
+                    } => s
+                case _ => "empty"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void matchWithGuardComment() {
         rewriteRun(
           scala(
