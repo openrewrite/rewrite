@@ -125,7 +125,10 @@ public class JavaSourceSet implements SourceSet {
 
     private Map<String, List<JavaType.FullyQualified>> buildTypesByPackage() {
         Map<String, List<JavaType.FullyQualified>> index = new HashMap<>();
-        for (JavaType.FullyQualified fqn : classpath) {
+        // Read through getClasspath(), not the `classpath` field: subclasses (e.g. a lazily
+        // hydrating proxy) leave the field empty and serve the real classpath only via the
+        // overridden getter. The lazy getter runs after construction, so the override is in place.
+        for (JavaType.FullyQualified fqn : getClasspath()) {
             index.computeIfAbsent(fqn.getPackageName(), k -> new ArrayList<>()).add(fqn);
         }
         return index;
