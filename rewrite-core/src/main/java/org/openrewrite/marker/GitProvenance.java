@@ -195,6 +195,26 @@ public class GitProvenance extends Reference implements Marker {
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir,
                                                                @Nullable BuildEnvironment environment,
                                                                GitRemote.@Nullable Parser gitRemoteParser) {
+        return fromProjectDirectory(projectDir, environment, gitRemoteParser, true);
+    }
+
+    /**
+     * @param projectDir       The project directory.
+     * @param environment      In detached head scenarios, the branch is best
+     *                         determined from a {@link BuildEnvironment} marker if possible.
+     * @param gitRemoteParser  Parses the remote url into a {@link GitRemote}. Custom remotes can be registered to it,
+     *                         or a default with known git hosting services can be used.
+     * @param includeCommitters When {@code false}, skips the unbounded walk over the entire commit history that
+     *                          {@link #getCommitters()} otherwise requires, yielding an empty committers list. Callers
+     *                          that only consume origin/branch/change can opt out to avoid that cost. Everything else
+     *                          (origin, branch, change, autocrlf, eol, remote) is unaffected, so the resulting marker
+     *                          is otherwise identical to the committer-including path.
+     * @return A marker containing git provenance information.
+     */
+    public static @Nullable GitProvenance fromProjectDirectory(Path projectDir,
+                                                               @Nullable BuildEnvironment environment,
+                                                               GitRemote.@Nullable Parser gitRemoteParser,
+                                                               boolean includeCommitters) {
         if (gitRemoteParser == null) {
             gitRemoteParser = new GitRemote.Parser();
         }
@@ -205,7 +225,7 @@ public class GitProvenance extends Reference implements Marker {
                     String branch = jenkinsBuildEnvironment.getLocalBranch() != null ?
                             jenkinsBuildEnvironment.getLocalBranch() :
                             localBranchName(repository, jenkinsBuildEnvironment.getBranch());
-                    return fromGitConfig(repository, branch, getChangeset(repository), gitRemoteParser);
+                    return fromGitConfig(repository, branch, getChangeset(repository), gitRemoteParser, includeCommitters);
                 } catch (IllegalArgumentException | GitAPIException e) {
                     // Silently ignore if the project directory is not a git repository
                     printRequireGitDirOrWorkTreeException(e);
@@ -217,18 +237,18 @@ public class GitProvenance extends Reference implements Marker {
                 File gitDir = new RepositoryBuilder().findGitDir(projectDir.toFile()).getGitDir();
                 if (gitDir != null && gitDir.exists()) {
                     //it has been cloned with --depth > 0
-                    return fromGitConfig(projectDir, gitRemoteParser);
+                    return fromGitConfig(projectDir, gitRemoteParser, includeCommitters);
                 } else {
                     //there is not .git config
                     try {
                         return environment.buildGitProvenance();
                     } catch (IncompleteGitConfigException e) {
-                        return fromGitConfig(projectDir, gitRemoteParser);
+                        return fromGitConfig(projectDir, gitRemoteParser, includeCommitters);
                     }
                 }
             }
         } else {
-            return fromGitConfig(projectDir, gitRemoteParser);
+            return fromGitConfig(projectDir, gitRemoteParser, includeCommitters);
         }
     }
 
@@ -238,14 +258,14 @@ public class GitProvenance extends Reference implements Marker {
         }
     }
 
-    private static @Nullable GitProvenance fromGitConfig(Path projectDir, GitRemote.Parser gitRemoteParser) {
+    private static @Nullable GitProvenance fromGitConfig(Path projectDir, GitRemote.Parser gitRemoteParser, boolean includeCommitters) {
         String branch = null;
         try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
             String changeset = getChangeset(repository);
             if (!repository.getBranch().equals(changeset)) {
                 branch = repository.getBranch();
             }
-            return fromGitConfig(repository, branch, changeset, gitRemoteParser);
+            return fromGitConfig(repository, branch, changeset, gitRemoteParser, includeCommitters);
         } catch (IllegalArgumentException e) {
             printRequireGitDirOrWorkTreeException(e);
             return null;
@@ -254,7 +274,7 @@ public class GitProvenance extends Reference implements Marker {
         }
     }
 
-    private static @Nullable GitProvenance fromGitConfig(Repository repository, @Nullable String branch, @Nullable String changeset, GitRemote.Parser gitRemoteParser) {
+    private static @Nullable GitProvenance fromGitConfig(Repository repository, @Nullable String branch, @Nullable String changeset, GitRemote.Parser gitRemoteParser, boolean includeCommitters) {
         if (repository.isBare()) {
             return null;
         }
@@ -270,7 +290,7 @@ public class GitProvenance extends Reference implements Marker {
         }
         return new GitProvenance(randomId(), remoteOriginUrl, branch, changeset,
                 getAutocrlf(repository), getEOF(repository),
-                getCommitters(repository), remote);
+                includeCommitters ? getCommitters(repository) : emptyList(), remote);
     }
 
     static @Nullable String resolveBranchFromGitConfig(Repository repository) {
