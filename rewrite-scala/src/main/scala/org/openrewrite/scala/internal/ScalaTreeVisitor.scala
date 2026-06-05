@@ -698,13 +698,24 @@ class ScalaTreeVisitor(
         val spaceBeforeUnderscore = if (postfixOp.od.span.exists && postfixOp.op.span.exists) {
           val odEnd = postfixOp.od.span.end - offsetAdjustment
           val opStart = postfixOp.op.span.start - offsetAdjustment
-          if (odEnd < opStart && odEnd >= 0 && opStart <= source.length) {
-            Space.format(source, odEnd, opStart)
+          if (odEnd >= 0 && opStart <= source.length) {
+            val underscoreStart = indexOfNextNonWhitespace(opStart)
+            val operandEnd =
+              if (odEnd < underscoreStart) {
+                odEnd
+              } else {
+                source.lastIndexWhere(c => !Character.isWhitespace(c), underscoreStart - 1) + 1
+              }
+            if (operandEnd <= underscoreStart && underscoreStart < source.length && source.charAt(underscoreStart) == '_') {
+              Space.format(source, operandEnd, underscoreStart)
+            } else {
+              Space.EMPTY
+            }
           } else {
-            Space.SINGLE_SPACE
+            Space.EMPTY
           }
         } else {
-          Space.SINGLE_SPACE
+          Space.EMPTY
         }
         
         // Create a member reference
