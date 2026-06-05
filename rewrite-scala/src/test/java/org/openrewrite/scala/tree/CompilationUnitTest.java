@@ -130,6 +130,19 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Test
+    void nestedBlockComment() {
+        // Scala block comments nest, so the first */ only closes the inner comment.
+        rewriteRun(
+          scala(
+            """
+            /* outer /* inner */ still outer */
+            class Foo
+            """
+          )
+        );
+    }
+
+    @Test
     void withDocComment() {
         rewriteRun(
           scala(
