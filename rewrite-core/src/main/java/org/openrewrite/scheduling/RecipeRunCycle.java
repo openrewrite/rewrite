@@ -36,6 +36,7 @@ import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RpcRecipe;
 import org.openrewrite.rpc.request.BatchVisit;
@@ -332,7 +333,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     // otherwise the BatchVisit RPC fails on the remote side and the resulting
                     // exception gets attached to the source as a Markup$Error, falsely marking
                     // the file as modified.
-                    if (currentRpc.getLanguages().contains(src.getClass().getName())) {
+                    // Use the canonical (codec-registered) source file type rather than the raw
+                    // runtime class name: under lazy-deserialization LSTs the runtime class is a
+                    // generated proxy (e.g. GeneratedTreeProxies$Lazy_xml_tree_xml_document) that
+                    // is absent from the remote's declared languages, which would otherwise skip
+                    // every batched edit on that file. canonicalSourceFileType walks the proxy's
+                    // supertype chain to the registered type (e.g. Xml$Document).
+                    if (currentRpc.getLanguages().contains(
+                            DynamicDispatchRpcCodec.canonicalSourceFileType(src.getClass()))) {
                         RpcRecipe rpcRecipe = (RpcRecipe) recipe;
                         // Evaluate the precondition locally before batching. The non-batch
                         // path runs the precondition via getVisitor()'s Preconditions.check
