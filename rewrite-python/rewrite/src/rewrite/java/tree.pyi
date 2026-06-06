@@ -2,14 +2,14 @@
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, List, Optional
+from typing import Any, ClassVar, List, Optional, Generic
 from typing_extensions import Self
 from uuid import UUID
 import weakref
 
+from rewrite.utils import replace_if_changed
 from enum import Enum
 from pathlib import Path
-from . import extensions as extensions
 from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
 
 from .support_types import (
@@ -1500,6 +1500,8 @@ class MethodDeclaration(Statement, TypedTree):
     @property
     def parameters(self) -> List[Statement]: ...
     @property
+    def dimensions_after_name(self) -> List[JLeftPadded[Space]]: ...
+    @property
     def throws(self) -> Optional[List[NameTree]]: ...
     @property
     def body(self) -> Optional[Block]: ...
@@ -1514,6 +1516,7 @@ class MethodDeclaration(Statement, TypedTree):
     @property
     def annotations(self) -> AnnotationsHelper: ...
 
+    def with_dimensions_after_name(self, dimensions_after_name: List[JLeftPadded[Space]]) -> MethodDeclaration: ...
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
 @dataclass(frozen=True)

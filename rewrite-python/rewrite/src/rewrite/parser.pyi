@@ -2,7 +2,7 @@
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, List, Optional, TypeVar, Generic
+from typing import Any, ClassVar, List, Optional, Callable, IO, Iterable, TypeVar, Generic
 from typing_extensions import Self
 from uuid import UUID
 import weakref

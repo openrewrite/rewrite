@@ -2,7 +2,7 @@
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, List, Optional, TypeVar, Generic
+from typing import Any, ClassVar, List, Optional, Callable, Dict, Type, TypeVar, Generic
 from typing_extensions import Self
 from uuid import UUID
 import weakref
@@ -16,6 +16,13 @@ class Marker(ABC):
     def id(self) -> UUID: ...
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str: ...
     def replace(self, **kwargs: Any) -> 'Marker': ...
+
+class Markup(Marker, ABC):
+    @property
+    def message(self) -> str: ...
+    @property
+    def detail(self) -> Optional[str]: ...
+    def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str: ...
 
 @dataclass(frozen=True)
 class Markers:
@@ -50,6 +57,68 @@ class SearchResult(Marker):
     @property
     def description(self) -> Optional[str]: ...
 
+    def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str: ...
+
+@dataclass(frozen=True)
+class MarkupWarn(Markup):
+    _id: UUID
+    _message: str
+    _detail: Optional[str] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def message(self) -> str: ...
+    @property
+    def detail(self) -> Optional[str]: ...
+
+@dataclass(frozen=True)
+class MarkupError(Markup):
+    _id: UUID
+    _message: str
+    _detail: Optional[str] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def message(self) -> str: ...
+    @property
+    def detail(self) -> Optional[str]: ...
+
+@dataclass(frozen=True)
+class MarkupInfo(Markup):
+    _id: UUID
+    _message: str
+    _detail: Optional[str] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def message(self) -> str: ...
+    @property
+    def detail(self) -> Optional[str]: ...
+
+@dataclass(frozen=True)
+class MarkupDebug(Markup):
+    _id: UUID
+    _message: str
+    _detail: Optional[str] = ...
+
+    def replace(self, **kwargs: Any) -> Self: ...
+
+    @property
+    def id(self) -> UUID: ...
+    @property
+    def message(self) -> str: ...
+    @property
+    def detail(self) -> Optional[str]: ...
+
 @dataclass(frozen=True)
 class UnknownJavaMarker(Marker):
     _id: UUID
@@ -68,7 +137,7 @@ class ParseExceptionResult(Marker):
     _parser_type: str
     _exception_type: str
     _message: str
-    _tree_type: Optional[str]
+    _tree_type: Optional[str] = ...
 
     def replace(self, **kwargs: Any) -> Self: ...
 
