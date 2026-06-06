@@ -532,6 +532,17 @@ class PythonTypeMapping:
                     return result
             return _UNKNOWN
 
+        elif kind == 'typeForm':
+            # PEP 747 TypeForm[T] (ty-types >= 0.0.44): a type expression used
+            # as a runtime value. Resolve through to the wrapped type argument,
+            # mirroring how `subclassOf` resolves to its base.
+            type_arg_id = descriptor.get('typeArgument')
+            if type_arg_id is not None:
+                result = self._resolve_type(type_arg_id)
+                if result is not None:
+                    return result
+            return _UNKNOWN
+
         elif kind == 'newType':
             name = descriptor.get('name', '')
             if name:
@@ -1069,6 +1080,12 @@ class PythonTypeMapping:
             base_id = descriptor.get('base')
             if base_id is not None:
                 return self._resolve_declaring_type(base_id)
+            return None
+
+        elif kind == 'typeForm':
+            type_arg_id = descriptor.get('typeArgument')
+            if type_arg_id is not None:
+                return self._resolve_declaring_type(type_arg_id)
             return None
 
         elif kind == 'newType':

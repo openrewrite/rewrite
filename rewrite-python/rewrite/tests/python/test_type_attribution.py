@@ -2292,3 +2292,90 @@ class TestMethodDeclarationResultType:
             assert t is md.method_type.return_type
         finally:
             _cleanup_parse(tmpdir, client)
+
+
+class TestTypeFormDescriptor:
+    """Unit tests for the ty-types 0.0.44 `typeForm` descriptor kind.
+
+    PEP 747 `TypeForm[T]` values (a type expression used as a runtime value,
+    e.g. ``x: TypeForm[str] = str``) are surfaced by ty-types >= 0.0.44 as a
+    first-class ``typeForm`` descriptor carrying a ``typeArgument`` reference,
+    rather than the older ``other`` fallback. Like ``subclassOf`` (``type[X]``),
+    the descriptor resolves through to its wrapped argument.
+
+    Use mock descriptors so the logic is exercised without the ty-types CLI.
+    End-to-end tests against real source live in TestTypeFormIntegration below.
+    """
+
+    def test_type_form_resolves_to_primitive_type_argument(self):
+        """`TypeForm[str]` resolves through to its `typeArgument` (str)."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[3] = {'kind': 'instance', 'className': 'str'}
+        mapping._type_registry[10] = {
+            'kind': 'typeForm', 'display': 'TypeForm[str]', 'typeArgument': 3,
+        }
+        result = mapping._resolve_type(10)
+        assert result is JavaType.Primitive.String
+
+    def test_type_form_resolves_to_class_type_argument(self):
+        """`TypeForm[MyClass]` resolves through to the wrapped class type."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[5] = {
+            'kind': 'classLiteral', 'className': 'MyClass', 'moduleName': 'mymod',
+        }
+        mapping._type_registry[11] = {
+            'kind': 'typeForm', 'display': 'TypeForm[MyClass]', 'typeArgument': 5,
+        }
+        result = mapping._resolve_type(11)
+        assert isinstance(result, JavaType.FullyQualified)
+        assert result.fully_qualified_name == 'mymod.MyClass'
+
+    def test_type_form_declaring_type_resolves_to_type_argument(self):
+        """Declaring-type resolution unwraps `typeForm` to its argument too,
+        mirroring `subclassOf`."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[5] = {
+            'kind': 'instance', 'className': 'MyClass', 'moduleName': 'mymod',
+        }
+        mapping._type_registry[11] = {
+            'kind': 'typeForm', 'display': 'TypeForm[MyClass]', 'typeArgument': 5,
+        }
+        result = mapping._resolve_declaring_type(11)
+        assert result is not None
+        assert result.fully_qualified_name == 'mymod.MyClass'
+
+    def test_type_form_without_type_argument_is_unknown(self):
+        """A `typeForm` descriptor lacking `typeArgument` degrades to Unknown
+        rather than raising."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[12] = {'kind': 'typeForm', 'display': 'TypeForm[?]'}
+        result = mapping._resolve_type(12)
+        assert isinstance(result, JavaType.Unknown)
+
+
+@requires_ty_types_cli
+class TestTypeFormIntegration:
+    """End-to-end tests exercising ty-types 0.0.44 TypeForm output.
+
+    Requires ty-types >= 0.0.44, which surfaces PEP 747 `TypeForm[T]` as a
+    first-class `typeForm` descriptor whose `typeArgument` is the wrapped type
+    (for `TypeForm[str]`, an `instance` of `str`). Without the `typeForm`
+    handling in type_mapping this regresses to Unknown on 0.0.44; with it, the
+    reference resolves to `str`. CLIs predating the TypeForm variant infer the
+    reference as the `str` *class* instead, so this assertion is version-gated
+    (same contract as the ParamSpec/Concatenate integration tests).
+    """
+
+    def test_type_form_value_resolves_to_type_argument(self):
+        """Reading a `TypeForm[str]` value resolves to its wrapped `str`."""
+        source = '''from typing_extensions import TypeForm
+string_form: TypeForm[str] = str
+ref = string_form
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            ref = tree.body[2].value  # `string_form` on the RHS of `ref = string_form`
+            result = mapping.type(ref)
+            assert result is JavaType.Primitive.String
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)

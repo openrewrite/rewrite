@@ -23,7 +23,7 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "more_itertools>=10.0.0",
-    "ty-types>=0.0.39",  # Type inference CLI for Python type attribution
+    "ty-types>=0.0.44",  # Type inference CLI for Python type attribution
     "parso>=0.7.1,<0.8",  # Python 2/3 parser with CST support (0.8+ dropped Python 2.7 grammar)
 ]
 
