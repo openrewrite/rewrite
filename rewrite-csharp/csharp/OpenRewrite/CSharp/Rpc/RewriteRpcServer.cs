@@ -50,6 +50,13 @@ public class RewriteRpcServer
     private readonly ConcurrentDictionary<string, Recipe> _preparedRecipes = new();
     private readonly ConcurrentDictionary<string, object?> _recipeAccumulators = new();
     private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
+
+    /// <summary>
+    /// Per-ExecutionContext data table output configuration sent by the orchestrator via
+    /// <c>ConfigureDataTables</c>, so rows produced by recipes are written to the orchestrator's
+    /// <c>datatables/</c> directory instead of an unread in-memory store.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, ConfigureDataTablesRequest> _dataTableConfigs = new();
     private string? _recipesProjectDir;
     private JsonRpc? _jsonRpc;
     private DotNetBuildContext? _buildContext;
@@ -1052,6 +1059,19 @@ public class RewriteRpcServer
         return Convert.ChangeType(value, conversionType);
     }
 
+    [JsonRpcMethod("ConfigureDataTables", UseSingleObjectParameterDeserialization = true)]
+    public ConfigureDataTablesResponse ConfigureDataTables(ConfigureDataTablesRequest request)
+    {
+        if (request.PId == null)
+            return new ConfigureDataTablesResponse { Configured = false };
+
+        _dataTableConfigs[request.PId] = request;
+        // If the context already exists (e.g. config arrived after a prior visit), install now.
+        if (_executionContexts.TryGetValue(request.PId, out var existing))
+            InstallDataTableStore(existing, request);
+        return new ConfigureDataTablesResponse { Configured = true };
+    }
+
     [JsonRpcMethod("Visit", UseSingleObjectParameterDeserialization = true)]
     public async Task<VisitResponse> Visit(VisitRequest request)
     {
@@ -1433,12 +1453,37 @@ public class RewriteRpcServer
         // reattestation (MSBuildProjectHelper) can materialize build files
         _buildContext?.StoreIn(ctx);
 
+        // If the orchestrator told us where to write data tables for this context, install a
+        // CsvDataTableStore so recipe InsertRow calls stream to the shared datatables directory.
+        if (pId != null && _dataTableConfigs.TryGetValue(pId, out var config))
+            InstallDataTableStore(ctx, config);
+
         if (pId != null)
         {
             _executionContexts[pId] = ctx;
             _localObjects[pId] = ctx;
         }
         return ctx;
+    }
+
+    private static void InstallDataTableStore(ExecutionContext ctx, ConfigureDataTablesRequest config)
+    {
+        var prefix = ZipColumns(config.PrefixColumnNames, config.PrefixColumnValues);
+        var suffix = ZipColumns(config.SuffixColumnNames, config.SuffixColumnValues);
+        var store = new CsvDataTableStore(config.OutputDir, config.FileExtension ?? ".csv", prefix, suffix);
+        ctx.PutMessage(DataTable<object>.DataTableStoreKey, store);
+    }
+
+    private static IReadOnlyList<KeyValuePair<string, string>> ZipColumns(
+        IReadOnlyList<string>? names, IReadOnlyList<string>? values)
+    {
+        if (names == null || values == null)
+            return [];
+        var count = Math.Min(names.Count, values.Count);
+        var result = new List<KeyValuePair<string, string>>(count);
+        for (var i = 0; i < count; i++)
+            result.Add(new KeyValuePair<string, string>(names[i], values[i]));
+        return result;
     }
 
     /// <summary>
@@ -1738,6 +1783,23 @@ public class VisitRequest
 public class VisitResponse
 {
     public bool Modified { get; set; }
+}
+
+public class ConfigureDataTablesRequest
+{
+    [JsonPropertyName("pId")]
+    public string? PId { get; set; }
+    public string OutputDir { get; set; } = "";
+    public string? FileExtension { get; set; }
+    public List<string>? PrefixColumnNames { get; set; }
+    public List<string>? PrefixColumnValues { get; set; }
+    public List<string>? SuffixColumnNames { get; set; }
+    public List<string>? SuffixColumnValues { get; set; }
+}
+
+public class ConfigureDataTablesResponse
+{
+    public bool Configured { get; set; }
 }
 
 public class BatchVisitRequest

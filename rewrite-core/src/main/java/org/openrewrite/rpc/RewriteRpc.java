@@ -42,6 +42,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -92,6 +93,12 @@ public class RewriteRpc {
     final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
 
     private @Nullable List<String> remoteLanguages;
+
+    /**
+     * ExecutionContext ids for which a {@link ConfigureDataTables} message has already been
+     * sent to this peer, so the (constant per run) data table output config is sent at most once.
+     */
+    private final Set<String> configuredDataTablePIds = ConcurrentHashMap.newKeySet();
 
     /**
      * Creates a new RPC interface that can be used to communicate with a remote.
@@ -282,6 +289,43 @@ public class RewriteRpc {
         remoteLanguages = null;
     }
 
+    /**
+     * Whether this peer can be told (via {@link ConfigureDataTables}) to write the data tables
+     * its recipes produce into the orchestrator's {@code datatables/} directory. Overridden to
+     * {@code true} by peers that implement the {@code ConfigureDataTables} RPC method; the default
+     * is {@code false} so that peers without it never receive an unsupported call.
+     */
+    protected boolean supportsDataTableConfig() {
+        return false;
+    }
+
+    /**
+     * Send the (constant per run) data table output configuration to the remote peer the first
+     * time we visit with a given {@link ExecutionContext}, so that data tables the peer's recipes
+     * produce are written alongside ours. No-op unless the peer {@linkplain #supportsDataTableConfig()
+     * supports it} and the context is backed by a {@link CsvDataTableStore}.
+     */
+    private <P> void ensureDataTablesConfigured(String pId, P p) {
+        if (!supportsDataTableConfig() || !(p instanceof ExecutionContext) ||
+            !configuredDataTablePIds.add(pId)) {
+            return;
+        }
+        DataTableStore store = DataTableExecutionContextView.view((ExecutionContext) p).getDataTableStore();
+        if (!(store instanceof CsvDataTableStore)) {
+            return;
+        }
+        CsvDataTableStore csv = (CsvDataTableStore) store;
+        send("ConfigureDataTables", new ConfigureDataTables(
+                pId,
+                csv.getOutputDir().toAbsolutePath().toString(),
+                csv.getFileExtension(),
+                new ArrayList<>(csv.getPrefixColumns().keySet()),
+                new ArrayList<>(csv.getPrefixColumns().values()),
+                new ArrayList<>(csv.getSuffixColumns().keySet()),
+                new ArrayList<>(csv.getSuffixColumns().values())
+        ), ConfigureDataTablesResponse.class);
+    }
+
     public <P> @Nullable Tree visit(SourceFile sourceFile, String visitorName, P p) {
         return visit(sourceFile, visitorName, p, null);
     }
@@ -291,6 +335,7 @@ public class RewriteRpc {
         localObjects.put(tree.getId().toString(), tree);
 
         String pId = maybeUnwrapExecutionContext(p);
+        ensureDataTablesConfigured(pId, p);
         List<String> cursorIds = getCursorIds(cursor);
 
         String sourceFileType = DynamicDispatchRpcCodec.canonicalSourceFileType(
@@ -311,6 +356,7 @@ public class RewriteRpc {
         localObjects.put(treeId, tree);
 
         String pId = maybeUnwrapExecutionContext(p);
+        ensureDataTablesConfigured(pId, p);
         List<String> cursorIds = getCursorIds(cursor);
 
         String sourceFileType = DynamicDispatchRpcCodec.canonicalSourceFileType(

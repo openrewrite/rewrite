@@ -166,6 +166,35 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
         }
     }
 
+    /**
+     * The directory CSV files are written into. Exposed so the RPC layer can tell a remote
+     * peer where to write its own data tables.
+     */
+    public Path getOutputDir() {
+        return outputDir;
+    }
+
+    /**
+     * The file extension (including dot) written files use, e.g. {@code .csv} or {@code .csv.gz}.
+     */
+    public String getFileExtension() {
+        return fileExtension;
+    }
+
+    /**
+     * Static columns prepended to every row (e.g. repository metadata), in insertion order.
+     */
+    public Map<String, String> getPrefixColumns() {
+        return prefixColumns;
+    }
+
+    /**
+     * Static columns appended to every row (e.g. organization), in insertion order.
+     */
+    public Map<String, String> getSuffixColumns() {
+        return suffixColumns;
+    }
+
     private static OutputStream defaultOutputStream(Path path) {
         try {
             return Files.newOutputStream(path, StandardOpenOption.CREATE, StandardOpenOption.APPEND);

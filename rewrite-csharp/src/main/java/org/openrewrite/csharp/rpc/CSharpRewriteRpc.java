@@ -65,6 +65,16 @@ public class CSharpRewriteRpc extends RewriteRpc {
         this.process = process;
     }
 
+    /**
+     * The C# RPC server implements the {@code ConfigureDataTables} method, so data tables
+     * produced by C#-authored recipes are written into the orchestrator's {@code datatables/}
+     * directory rather than being lost in the peer's in-memory store.
+     */
+    @Override
+    protected boolean supportsDataTableConfig() {
+        return true;
+    }
+
     public static @Nullable CSharpRewriteRpc get() {
         return MANAGER.get();
     }
