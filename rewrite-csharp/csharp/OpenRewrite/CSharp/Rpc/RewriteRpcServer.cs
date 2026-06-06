@@ -670,20 +670,36 @@ public class RewriteRpcServer
             </Project>
             """);
 
-        // Add local NuGet feed as a package source if it exists, so that
-        // locally-published SDK snapshots are discovered alongside nuget.org
-        var localFeed = Path.Combine(
+        // Add local directory-based NuGet feeds so locally-published SDK/recipe
+        // snapshots are discovered. We only *add* sources here and deliberately do
+        // NOT declare nuget.org: dotnet merges this project-level nuget.config with
+        // the user- and machine-level configuration, so the environment's already
+        // configured default feed (which may be an internal mirror rather than
+        // nuget.org in networks that block it) is preserved and combined with these
+        // local feeds. Hardcoding nuget.org here would break such environments.
+        var localFeeds = new List<(string Key, string Path)>();
+
+        var defaultLocalFeed = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".nuget", "local-feed");
-        if (Directory.Exists(localFeed))
+        if (Directory.Exists(defaultLocalFeed))
+            localFeeds.Add(("local-feed", defaultLocalFeed));
+
+        // Allow an arbitrary additional feed directory to be supplied out-of-band.
+        var envFeed = Environment.GetEnvironmentVariable("LOCAL_NUGET_FEED");
+        if (!string.IsNullOrWhiteSpace(envFeed) && Directory.Exists(envFeed))
+            localFeeds.Add(("local-feed-env", Path.GetFullPath(envFeed)));
+
+        if (localFeeds.Count > 0)
         {
+            var sources = string.Join(Environment.NewLine,
+                localFeeds.Select(f => $"    <add key=\"{f.Key}\" value=\"{f.Path}\" />"));
             var nugetConfig = Path.Combine(_recipesProjectDir, "nuget.config");
             File.WriteAllText(nugetConfig, $"""
                 <?xml version="1.0" encoding="utf-8"?>
                 <configuration>
                   <packageSources>
-                    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-                    <add key="local-feed" value="{localFeed}" />
+                {sources}
                   </packageSources>
                 </configuration>
                 """);
