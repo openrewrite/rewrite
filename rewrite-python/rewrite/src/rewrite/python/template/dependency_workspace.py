@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import logging
 import os
@@ -37,7 +38,9 @@ if sys.platform == "win32":
             try:
                 msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
                 return
-            except OSError:
+            except OSError as exc:
+                if exc.errno not in (errno.EACCES, errno.EDEADLK):
+                    raise
                 continue
 else:
     import fcntl
