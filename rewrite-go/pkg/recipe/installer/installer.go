@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"text/template"
 
@@ -189,6 +190,10 @@ func (inst *Installer) loadRecipes(modulePath, activatePkg string, registry *rec
 	}
 
 	helperBin := filepath.Join(helperDir, "helper")
+	if runtime.GOOS == "windows" {
+		// `go build -o` appends .exe on Windows; match it so exec.Command finds the binary.
+		helperBin += ".exe"
+	}
 	cmd := exec.Command("go", "build", "-o", helperBin, ".")
 	cmd.Dir = helperDir
 	cmd.Env = append(os.Environ(), "GO111MODULE=on")
