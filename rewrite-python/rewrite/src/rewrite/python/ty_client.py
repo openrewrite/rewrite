@@ -24,8 +24,10 @@ cross-file deduplication.
 from __future__ import annotations
 
 import json
+import os
 import select
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -74,12 +76,44 @@ class TyTypesClient:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                env=self._subprocess_env(),
             )
         except FileNotFoundError:
             self._process = None
             raise RuntimeError(
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
+
+    @staticmethod
+    def _subprocess_env(base_env: Optional[Dict[str, str]] = None,
+                        prefix: Optional[str] = None,
+                        base_prefix: Optional[str] = None) -> Dict[str, str]:
+        """Build the environment for the ty-types subprocess.
+
+        ty-types resolves a project's third-party packages by discovering the
+        active Python environment, primarily via ``VIRTUAL_ENV``. When the
+        interpreter running the parse is itself a virtual environment but
+        ``VIRTUAL_ENV`` is not exported — e.g. tests launched through an
+        absolute interpreter path rather than an activated venv — ty would fall
+        back to a bare environment and resolve imports like ``pydantic`` to
+        ``Unknown``. Point ty at the running interpreter's environment so those
+        imports (and the supertypes reachable through them) resolve.
+
+        An explicitly set ``VIRTUAL_ENV`` is always respected and never
+        overridden. The interpreter checks (``prefix``/``base_prefix``) are
+        injectable to keep this unit-testable.
+        """
+        env = dict(os.environ if base_env is None else base_env)
+        prefix = sys.prefix if prefix is None else prefix
+        base_prefix = sys.base_prefix if base_prefix is None else base_prefix
+
+        # Only when we are inside a virtual environment (prefix differs from the
+        # base interpreter) and the caller hasn't already pinned an environment.
+        if 'VIRTUAL_ENV' not in env and prefix != base_prefix:
+            env['VIRTUAL_ENV'] = prefix
+            bin_dir = os.path.join(prefix, 'Scripts' if os.name == 'nt' else 'bin')
+            env['PATH'] = bin_dir + os.pathsep + env.get('PATH', '')
+        return env
 
     @staticmethod
     def _find_binary() -> Optional[Path]:

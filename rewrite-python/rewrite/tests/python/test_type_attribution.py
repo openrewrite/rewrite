@@ -33,6 +33,9 @@ from rewrite.java import JavaType
 # Import type mapping modules
 from rewrite.python.type_mapping import PythonTypeMapping, compute_source_line_data
 from rewrite.python.ty_client import TyTypesClient
+from rewrite.python._parser_visitor import ParserVisitor
+from rewrite.python.visitor import PythonVisitor
+from rewrite.java.tree import MethodInvocation, ClassDeclaration
 
 
 def _ty_types_cli_available() -> bool:
@@ -2062,3 +2065,230 @@ class TestCyclicTypeResolution:
         supertype = getattr(type_pair, '_supertype', None)
         assert supertype is not type_pair, \
             "Pair has itself as its own supertype — would cause StackOverflowError in Java"
+
+
+def _parse_with_types(files: dict, main_filename: str = 'm.py'):
+    """Parse ``main_filename`` with type attribution enabled.
+
+    Sibling modules in ``files`` are written into the same workspace so ty can
+    resolve cross-module references. Returns ``(cu, tmpdir, client)``; the
+    caller must call :func:`_cleanup_parse`.
+    """
+    tmpdir = tempfile.mkdtemp()
+    for name, src in files.items():
+        with open(os.path.join(tmpdir, name), 'w') as f:
+            f.write(src)
+    client = TyTypesClient()
+    client.initialize(tmpdir)
+    main_src = files[main_filename]
+    main_path = os.path.join(tmpdir, main_filename)
+    cu = ParserVisitor(main_src, main_path, client).visit_Module(ast.parse(main_src))
+    return cu, tmpdir, client
+
+
+def _cleanup_parse(tmpdir, client):
+    """Helper: tear down resources from :func:`_parse_with_types`."""
+    client.shutdown()
+    import shutil
+    shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def _collect_method_invocations(cu) -> list:
+    """Collect all J.MethodInvocation nodes in a parsed tree."""
+    found: list = []
+
+    class _Collector(PythonVisitor):
+        def visit_method_invocation(self, mi, p):
+            found.append(mi)
+            return super().visit_method_invocation(mi, p)
+
+    _Collector().visit(cu, None)
+    return found
+
+
+def _collect_class_declarations(cu) -> dict:
+    """Collect J.ClassDeclaration nodes in a parsed tree, keyed by simple name."""
+    found: dict = {}
+
+    class _Collector(PythonVisitor):
+        def visit_class_declaration(self, cd, p):
+            found[cd.name.simple_name] = cd
+            return super().visit_class_declaration(cd, p)
+
+    _Collector().visit(cu, None)
+    return found
+
+
+@requires_ty_types_cli
+class TestMethodInvocationResultType:
+    """J.MethodInvocation.type must reflect the callee's return type.
+
+    Mirrors the Java contract where ``J.MethodInvocation.getType()`` returns
+    ``methodType == null ? null : methodType.getReturnType()``. Without this,
+    receivers like ``get_user().attr`` are untyped and recipes cannot reason
+    about the result of a call.
+    """
+
+    def test_method_invocation_type_is_return_type(self):
+        src = (
+            "class Widget:\n"
+            "    pass\n"
+            "\n"
+            "def make_widget() -> Widget:\n"
+            "    return Widget()\n"
+            "\n"
+            "w = make_widget()\n"
+        )
+        cu, tmpdir, client = _parse_with_types({'m.py': src})
+        try:
+            make = [c for c in _collect_method_invocations(cu)
+                    if c.name.simple_name == 'make_widget']
+            assert make, "expected a make_widget() invocation in the tree"
+            t = make[0].type
+            assert t is not None, \
+                "MethodInvocation.type must reflect the method's return type, not None"
+            assert isinstance(t, JavaType.Class)
+            assert t.fully_qualified_name == 'm.Widget'
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    def test_method_invocation_type_matches_method_return_type(self):
+        """The derived ``type`` equals the underlying ``method_type.return_type``."""
+        src = (
+            "class Widget:\n"
+            "    pass\n"
+            "\n"
+            "def make_widget() -> Widget:\n"
+            "    return Widget()\n"
+            "\n"
+            "w = make_widget()\n"
+        )
+        cu, tmpdir, client = _parse_with_types({'m.py': src})
+        try:
+            make = [c for c in _collect_method_invocations(cu)
+                    if c.name.simple_name == 'make_widget']
+            assert make
+            mi = make[0]
+            assert mi.method_type is not None
+            assert mi.type is mi.method_type.return_type
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestSupertypeChainResolution:
+    """A subclass chain must be walkable across module boundaries.
+
+    ty-types (>= 0.0.39) surfaces a base class as a classLiteral with its real
+    fully-qualified name even when the base lives in another module, so
+    ``ClassDeclaration.type`` carries a resolved ``_supertype`` chain rather
+    than dead-ending at ``JavaType.Unknown``.
+    """
+
+    def test_cross_module_supertype_chain(self):
+        base = "class Base:\n    pass\n"
+        main = (
+            "from basemod import Base\n"
+            "\n"
+            "class Mid(Base):\n"
+            "    pass\n"
+            "\n"
+            "class Leaf(Mid):\n"
+            "    pass\n"
+        )
+        cu, tmpdir, client = _parse_with_types(
+            {'basemod.py': base, 'm.py': main}, main_filename='m.py')
+        try:
+            classes = _collect_class_declarations(cu)
+
+            mid = classes['Mid'].type
+            assert isinstance(mid, JavaType.Class)
+            assert isinstance(mid._supertype, JavaType.FullyQualified)
+            assert not isinstance(mid._supertype, JavaType.Unknown), \
+                "cross-module base must resolve to a real class, not Unknown"
+            assert mid._supertype.fully_qualified_name == 'basemod.Base'
+
+            leaf = classes['Leaf'].type
+            assert isinstance(leaf, JavaType.Class)
+            assert leaf._supertype.fully_qualified_name == 'm.Mid'
+            # Transitive: Leaf -> Mid -> Base, crossing the module boundary.
+            grand = leaf._supertype._supertype
+            assert grand is not None
+            assert grand.fully_qualified_name == 'basemod.Base'
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+
+class TestSubprocessEnvironment:
+    """TyTypesClient must point ty-types at the running interpreter's
+    environment so third-party imports (and their supertypes) resolve, rather
+    than relying on an activated venv being present in the ambient environment.
+    """
+
+    def test_injects_virtualenv_when_in_venv_and_unset(self):
+        env = TyTypesClient._subprocess_env(
+            base_env={'PATH': '/usr/bin'},
+            prefix='/proj/.venv',
+            base_prefix='/usr',
+        )
+        assert env['VIRTUAL_ENV'] == '/proj/.venv'
+        # The venv's bin dir is prepended so ty discovers the right interpreter.
+        assert env['PATH'].split(os.pathsep)[0] == os.path.join('/proj/.venv', 'bin')
+        assert '/usr/bin' in env['PATH']
+
+    def test_respects_existing_virtualenv(self):
+        env = TyTypesClient._subprocess_env(
+            base_env={'VIRTUAL_ENV': '/already/set', 'PATH': '/usr/bin'},
+            prefix='/proj/.venv',
+            base_prefix='/usr',
+        )
+        # An explicitly chosen environment must never be overridden.
+        assert env['VIRTUAL_ENV'] == '/already/set'
+        assert env['PATH'] == '/usr/bin'
+
+    def test_no_injection_outside_venv(self):
+        env = TyTypesClient._subprocess_env(
+            base_env={'PATH': '/usr/bin'},
+            prefix='/usr',
+            base_prefix='/usr',
+        )
+        # Not a virtual environment — leave discovery to ty's defaults.
+        assert 'VIRTUAL_ENV' not in env
+        assert env['PATH'] == '/usr/bin'
+
+
+@requires_ty_types_cli
+class TestMethodDeclarationResultType:
+    """J.MethodDeclaration.type must reflect the declared return type
+    (mirrors Java J.MethodDeclaration.getType() == methodType.returnType)."""
+
+    def test_method_declaration_type_is_return_type(self):
+        src = (
+            "class Widget:\n"
+            "    pass\n"
+            "\n"
+            "def make_widget() -> Widget:\n"
+            "    return Widget()\n"
+        )
+        cu, tmpdir, client = _parse_with_types({'m.py': src})
+        try:
+            decls = []
+
+            class _Collector(PythonVisitor):
+                def visit_method_declaration(self, md, p):
+                    decls.append(md)
+                    return super().visit_method_declaration(md, p)
+
+            _Collector().visit(cu, None)
+            make = [d for d in decls if d.name.simple_name == 'make_widget']
+            assert make, "expected a make_widget() declaration in the tree"
+            md = make[0]
+            assert md.method_type is not None
+            t = md.type
+            assert t is not None, \
+                "MethodDeclaration.type must reflect the declared return type, not None"
+            assert isinstance(t, JavaType.Class)
+            assert t.fully_qualified_name == 'm.Widget'
+            assert t is md.method_type.return_type
+        finally:
+            _cleanup_parse(tmpdir, client)
