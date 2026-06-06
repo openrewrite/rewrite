@@ -25,6 +25,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.GitRemote;
+import org.openrewrite.marker.GitProvenance.CommitHistory;
 import org.openrewrite.jgit.api.Git;
 import org.openrewrite.jgit.api.errors.GitAPIException;
 import org.openrewrite.jgit.lib.Constants;
@@ -41,6 +42,7 @@ import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -141,10 +143,10 @@ class GitProvenanceTest {
     }
 
     @Test
-    void excludeCommittersMatchesIncludingPath(@TempDir Path projectDir) throws Exception {
+    void noneSkipsWalkButMatchesCheapFields(@TempDir Path projectDir) throws Exception {
         try (Git ignored = initGitWithOneCommit(projectDir)) {
-            GitProvenance withCommitters = GitProvenance.fromProjectDirectory(projectDir, null, null, true);
-            GitProvenance withoutCommitters = GitProvenance.fromProjectDirectory(projectDir, null, null, false);
+            GitProvenance withCommitters = GitProvenance.fromProjectDirectory(projectDir, null, null, CommitHistory.full());
+            GitProvenance withoutCommitters = GitProvenance.fromProjectDirectory(projectDir, null, null, CommitHistory.none());
 
             assertThat(withCommitters).isNotNull();
             assertThat(withoutCommitters).isNotNull();
@@ -154,11 +156,105 @@ class GitProvenanceTest {
             assertThat(withoutCommitters.getBranch()).isEqualTo(withCommitters.getBranch());
             assertThat(withoutCommitters.getChange()).isEqualTo(withCommitters.getChange());
 
-            // the including path actually walks history and finds the commit author
+            // the full path actually walks history and finds the commit author
             assertThat(withCommitters.getCommitters()).isNotEmpty();
-            // the opt-out path skips the walk and returns an empty list
-            assertThat(withoutCommitters.getCommitters()).isEmpty();
+            // none() skips the walk; committers is null ("not computed"), not an empty list
+            assertThat(withoutCommitters.getCommitters()).isNull();
         }
+    }
+
+    @Test
+    void commitHistoryBoundsScopeAndDetail(@TempDir Path projectDir) throws Exception {
+        try (Git ignored = initGitWithOneCommit(projectDir)) {
+            // lastCommits keeps the walk bounded but still yields the committer with per-day detail
+            GitProvenance lastCommit = GitProvenance.fromProjectDirectory(projectDir, null, null, CommitHistory.lastCommits(1));
+            assertThat(lastCommit.getCommitters()).isNotEmpty();
+            assertThat(lastCommit.getCommitters().get(0).getCommitsByDay()).isNotEmpty();
+
+            // identities() walks but retains only name/email, with no per-day breakdown
+            GitProvenance identities = GitProvenance.fromProjectDirectory(projectDir, null, null, CommitHistory.identities());
+            assertThat(identities.getCommitters()).isNotEmpty();
+            assertThat(identities.getCommitters().get(0).getCommitsByDay()).isEmpty();
+
+            // since() prunes the walk at the cutoff: a future cutoff yields a walked-but-empty list (not null)
+            GitProvenance sinceFuture = GitProvenance.fromProjectDirectory(projectDir, null, null,
+              CommitHistory.since(LocalDate.now().plusDays(1)));
+            assertThat(sinceFuture.getCommitters()).isEmpty();
+
+            // a past cutoff still includes the commit
+            GitProvenance sincePast = GitProvenance.fromProjectDirectory(projectDir, null, null,
+              CommitHistory.since(LocalDate.now().minusDays(1)));
+            assertThat(sincePast.getCommitters()).isNotEmpty();
+        }
+    }
+
+    @Test
+    void linkedWorktree(@TempDir Path projectDir) throws Exception {
+        // The shaded JGit cannot open a linked worktree's private gitdir, so GitProvenance opens the
+        // shared common repository and recovers the worktree's branch/HEAD from its own gitdir.
+        Path mainDir = projectDir.resolve("main");
+        Files.createDirectories(mainDir);
+        String commit;
+        try (Git git = Git.init().setDirectory(mainDir.toFile()).setInitialBranch("main").call()) {
+            Files.writeString(mainDir.resolve("test.txt"), "hi");
+            git.add().addFilepattern("*").call();
+            commit = git.commit().setMessage("init").setSign(false).call().getName();
+            git.branchCreate().setName("feature").call();
+            git.remoteAdd().setName("origin").setUri(new URIish("git@github.com:openrewrite/doesnotexist.git")).call();
+        }
+
+        // Hand-build the linked-worktree layout that `git worktree add` would create.
+        Path wtPrivate = mainDir.resolve(".git").resolve("worktrees").resolve("wt");
+        Files.createDirectories(wtPrivate);
+        Path worktreeDir = projectDir.resolve("wt");
+        Files.createDirectories(worktreeDir);
+        Files.writeString(worktreeDir.resolve(".git"), "gitdir: " + wtPrivate.toAbsolutePath() + "\n");
+        Files.writeString(wtPrivate.resolve("HEAD"), "ref: refs/heads/feature\n");
+        Files.writeString(wtPrivate.resolve("commondir"), "../..\n");
+        Files.writeString(wtPrivate.resolve("gitdir"), worktreeDir.resolve(".git").toAbsolutePath() + "\n");
+
+        GitProvenance withCommitters = GitProvenance.fromProjectDirectory(worktreeDir, null, null, CommitHistory.full());
+        assertThat(withCommitters).isNotNull();
+        // the worktree's own branch and HEAD, not the main checkout's
+        assertThat(withCommitters.getBranch()).isEqualTo("feature");
+        assertThat(withCommitters.getChange()).isEqualTo(commit);
+        // origin comes from the shared config, and the walk reaches the shared objects
+        assertThat(withCommitters.getOrigin()).isEqualTo("git@github.com:openrewrite/doesnotexist.git");
+        assertThat(withCommitters.getCommitters()).isNotEmpty();
+
+        // none() still resolves the cheap fields on a worktree, skipping only the walk
+        GitProvenance none = GitProvenance.fromProjectDirectory(worktreeDir, null, null, CommitHistory.none());
+        assertThat(none.getBranch()).isEqualTo("feature");
+        assertThat(none.getChange()).isEqualTo(commit);
+        assertThat(none.getCommitters()).isNull();
+    }
+
+    @Test
+    void detachedHeadLinkedWorktree(@TempDir Path projectDir) throws Exception {
+        Path mainDir = projectDir.resolve("main");
+        Files.createDirectories(mainDir);
+        String commit;
+        try (Git git = Git.init().setDirectory(mainDir.toFile()).setInitialBranch("main").call()) {
+            Files.writeString(mainDir.resolve("test.txt"), "hi");
+            git.add().addFilepattern("*").call();
+            commit = git.commit().setMessage("init").setSign(false).call().getName();
+        }
+
+        Path wtPrivate = mainDir.resolve(".git").resolve("worktrees").resolve("wt");
+        Files.createDirectories(wtPrivate);
+        Path worktreeDir = projectDir.resolve("wt");
+        Files.createDirectories(worktreeDir);
+        Files.writeString(worktreeDir.resolve(".git"), "gitdir: " + wtPrivate.toAbsolutePath() + "\n");
+        Files.writeString(wtPrivate.resolve("HEAD"), commit + "\n"); // detached: a raw sha, not a ref
+        Files.writeString(wtPrivate.resolve("commondir"), "../..\n");
+        Files.writeString(wtPrivate.resolve("gitdir"), worktreeDir.resolve(".git").toAbsolutePath() + "\n");
+
+        GitProvenance gp = GitProvenance.fromProjectDirectory(worktreeDir, null, null, CommitHistory.full());
+        assertThat(gp).isNotNull();
+        // detached HEAD has no branch, and crucially must NOT report the common checkout's "main"
+        assertThat(gp.getBranch()).isNull();
+        assertThat(gp.getChange()).isEqualTo(commit);
+        assertThat(gp.getCommitters()).isNotEmpty();
     }
 
     @Test
