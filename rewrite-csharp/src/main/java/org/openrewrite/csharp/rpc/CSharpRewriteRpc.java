@@ -454,6 +454,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
 
         private void installTool(Path dotnetPath, String version, Path toolPath) {
+            Path installCwd = null;
             try {
                 Files.createDirectories(toolPath);
 
@@ -466,18 +467,40 @@ public class CSharpRewriteRpc extends RewriteRpc {
                         "--ignore-failed-sources"
                 ));
 
-                // When the tool package exists in the NuGet global cache (e.g. from publishToMavenLocal),
-                // add it as a source so the install can resolve it without remote feeds
-                Path globalCachePath = Paths.get(System.getProperty("user.home"),
-                        ".nuget", "packages", NUGET_PACKAGE_ID.toLowerCase(), version);
-                if (Files.isDirectory(globalCachePath)) {
-                    installCmd.addAll(Arrays.asList("--add-source", globalCachePath.toString()));
+                // Resolve the feed that provides the tool package itself. LOCAL_NUGET_FEED, when
+                // set, takes precedence; otherwise default to the NuGet global packages cache,
+                // where publishToMavenLocal lands the tool package.
+                String localFeedOverride = environment.get("LOCAL_NUGET_FEED");
+                if (localFeedOverride == null) {
+                    localFeedOverride = System.getenv("LOCAL_NUGET_FEED");
+                }
+                Path localFeed;
+                boolean addLocalFeed;
+                if (localFeedOverride != null && !localFeedOverride.isEmpty()) {
+                    localFeed = Paths.get(localFeedOverride);
+                    addLocalFeed = true;
+                } else {
+                    localFeed = Paths.get(System.getProperty("user.home"),
+                            ".nuget", "packages", NUGET_PACKAGE_ID.toLowerCase(), version);
+                    addLocalFeed = Files.isDirectory(localFeed);
+                }
+                if (addLocalFeed) {
+                    installCmd.addAll(Arrays.asList("--add-source",
+                            localFeed.toAbsolutePath().normalize().toString()));
                 }
 
                 ProcessBuilder pb = new ProcessBuilder(installCmd);
-                if (workingDirectory != null) {
-                    pb.directory(workingDirectory.toFile());
-                }
+                // Run from a fresh, empty directory whose ancestors hold no nuget.config. This
+                // lets NuGet's own config discovery pick up the user/machine-level global
+                // configuration (which applies regardless of working directory, and may span
+                // multiple files) while skipping any repo-level nuget.config that would otherwise
+                // be discovered up the working-directory hierarchy — such a config could <clear/>
+                // global sources or enable <packageSourceMapping> that rejects --add-source with
+                // "The --add-source option cannot be combined with package source mapping". We
+                // delegate to NuGet's discovery rather than locating the global config ourselves,
+                // since its path is convention, not a stable contract.
+                installCwd = Files.createTempDirectory("rewrite-csharp-tool-install");
+                pb.directory(installCwd.toFile());
                 pb.environment().putAll(environment);
                 pb.redirectErrorStream(true);
                 Process process = pb.start();
@@ -494,6 +517,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Interrupted while installing " + NUGET_PACKAGE_ID + "@" + version, e);
+            } finally {
+                if (installCwd != null) {
+                    try {
+                        Files.deleteIfExists(installCwd);
+                    } catch (IOException ignored) {
+                        // Best effort: the temp directory is empty and harmless if it lingers.
+                    }
+                }
             }
         }
     }
