@@ -90,6 +90,17 @@ from rewrite.python.add_import import AddImport, AddImportOptions, maybe_add_imp
 from rewrite.python.remove_import import RemoveImport, RemoveImportOptions, maybe_remove_import
 from rewrite.python.method_matcher import MethodMatcher
 
+# Type-comparison helpers
+from rewrite.python.type_utils import (
+    is_assignable_to,
+    is_of_type,
+    is_of_class_type,
+    is_string,
+    is_object,
+    as_fully_qualified,
+    fully_qualified_names_are_equal,
+)
+
 # Precondition helpers (delegate to Java via RPC)
 from rewrite.python.preconditions import (
     has_source_path,
@@ -183,6 +194,14 @@ __all__ = [
     "maybe_remove_import",
     # Method matching
     "MethodMatcher",
+    # Type-comparison helpers
+    "is_assignable_to",
+    "is_of_type",
+    "is_of_class_type",
+    "is_string",
+    "is_object",
+    "as_fully_qualified",
+    "fully_qualified_names_are_equal",
     # Precondition helpers
     "has_source_path",
     "uses_method",
