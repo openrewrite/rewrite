@@ -31,6 +31,18 @@ func writeGoMod(t *testing.T, contents string) string {
 	return dir
 }
 
+func TestHelperBinaryPath(t *testing.T) {
+	for _, tc := range []struct{ goos, want string }{
+		{"windows", filepath.Join("ws", "helper") + ".exe"},
+		{"linux", filepath.Join("ws", "helper")},
+		{"darwin", filepath.Join("ws", "helper")},
+	} {
+		if got := helperBinaryPath("ws", tc.goos); got != tc.want {
+			t.Errorf("helperBinaryPath(ws, %q) = %q, want %q", tc.goos, got, tc.want)
+		}
+	}
+}
+
 func TestReadResolvedVersion_DirectRequireInBlock(t *testing.T) {
 	// given
 	goMod := `module example.com/workspace
