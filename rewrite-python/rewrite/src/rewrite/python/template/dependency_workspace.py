@@ -16,14 +16,34 @@
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import logging
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from typing import Dict, Tuple
+
+# Cross-platform exclusive file lock. POSIX has fcntl.flock; Windows has neither
+# fcntl nor flock, so fall back to msvcrt byte-range locking there.
+if sys.platform == "win32":
+    import msvcrt
+
+    def _lock_exclusive(lock_file) -> None:
+        # msvcrt.LK_LOCK retries internally for ~10s before raising; loop so we
+        # block as long as needed (a uv sync can exceed that window).
+        while True:
+            try:
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+                return
+            except OSError:
+                continue
+else:
+    import fcntl
+
+    def _lock_exclusive(lock_file) -> None:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +196,7 @@ class DependencyWorkspace:
         # across uv sync is intentional — only one process should build the same
         # workspace at a time.
         with open(lock_path, "w") as lock_file:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            _lock_exclusive(lock_file)
 
             # Another holder may have built it while we waited for the lock.
             if cls._is_valid(final_dir):
