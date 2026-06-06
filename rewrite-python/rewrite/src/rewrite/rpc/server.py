@@ -723,7 +723,12 @@ def _pip_install_recipe_package(package_name: str, version: Optional[str], targe
     import subprocess
 
     target_dir.mkdir(parents=True, exist_ok=True)
-    spec = f"{package_name}=={version}" if version else package_name
+    # Accept a full PEP 440 specifier (">=1.0", "~=1.4", "==1.0", …). A bare
+    # version (no comparator) defaults to an exact "==" match.
+    if version:
+        spec = f"{package_name}{version}" if version[0] in "=<>!~" else f"{package_name}=={version}"
+    else:
+        spec = package_name
     cmd = [sys.executable, "-m", "pip", "install", "--target", str(target_dir), spec]
     logger.info(f"pip install: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
