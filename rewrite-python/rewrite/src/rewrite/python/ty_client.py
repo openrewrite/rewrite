@@ -47,11 +47,25 @@ class TyTypesClient:
             result = client.get_types("/path/to/file.py")
     """
 
-    def __init__(self):
+    def __init__(self, virtual_env: Optional[str] = None):
+        """Create a client and start the ``ty-types --serve`` subprocess.
+
+        Args:
+            virtual_env: Optional path to a virtual environment whose
+                ``site-packages`` ty-types should use to resolve the project's
+                third-party dependencies. When provided it is exported as
+                ``VIRTUAL_ENV`` to the subprocess and takes precedence over the
+                running interpreter's ``sys.prefix`` fallback. The normal parse
+                path uses this to point ty-types at a dependency workspace built
+                from the project's ``pyproject.toml`` so that supertypes reaching
+                into installed dependencies (e.g. ``class User(BaseModel)``)
+                resolve.
+        """
         self._process: Optional[subprocess.Popen] = None
         self._request_id: int = 0
         self._initialized = False
         self._project_root: Optional[str] = None
+        self._virtual_env: Optional[str] = str(virtual_env) if virtual_env else None
 
         self._start_process()
 
@@ -76,7 +90,7 @@ class TyTypesClient:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env=self._subprocess_env(),
+                env=self._subprocess_env(virtual_env=self._virtual_env),
             )
         except FileNotFoundError:
             self._process = None
@@ -87,32 +101,51 @@ class TyTypesClient:
     @staticmethod
     def _subprocess_env(base_env: Optional[Dict[str, str]] = None,
                         prefix: Optional[str] = None,
-                        base_prefix: Optional[str] = None) -> Dict[str, str]:
+                        base_prefix: Optional[str] = None,
+                        virtual_env: Optional[str] = None) -> Dict[str, str]:
         """Build the environment for the ty-types subprocess.
 
         ty-types resolves a project's third-party packages by discovering the
-        active Python environment, primarily via ``VIRTUAL_ENV``. When the
-        interpreter running the parse is itself a virtual environment but
-        ``VIRTUAL_ENV`` is not exported — e.g. tests launched through an
-        absolute interpreter path rather than an activated venv — ty would fall
-        back to a bare environment and resolve imports like ``pydantic`` to
-        ``Unknown``. Point ty at the running interpreter's environment so those
-        imports (and the supertypes reachable through them) resolve.
+        active Python environment, primarily via ``VIRTUAL_ENV``.
 
-        An explicitly set ``VIRTUAL_ENV`` is always respected and never
-        overridden. The interpreter checks (``prefix``/``base_prefix``) are
-        injectable to keep this unit-testable.
+        Precedence:
+
+        1. An explicit ``virtual_env`` (a dependency workspace built from the
+           project's ``pyproject.toml``) is exported as ``VIRTUAL_ENV`` and wins
+           over everything else. This is the normal parse path: the interpreter
+           running the parse (e.g. the CLI's RPC server) does not have the
+           project's dependencies installed, so ty must be pointed at a venv that
+           does, otherwise imports like ``pydantic`` — and the supertypes
+           reachable through them — resolve to ``Unknown``.
+        2. Otherwise, an inherited ``VIRTUAL_ENV`` is respected.
+        3. Otherwise, when the interpreter running the parse is itself a virtual
+           environment (``prefix`` differs from ``base_prefix``) — e.g. tests
+           launched through an absolute interpreter path rather than an activated
+           venv — fall back to that interpreter's environment.
+
+        The interpreter checks (``prefix``/``base_prefix``) and ``virtual_env``
+        are injectable to keep this unit-testable.
         """
         env = dict(os.environ if base_env is None else base_env)
+
+        def _point_at(venv: str) -> None:
+            env['VIRTUAL_ENV'] = venv
+            bin_dir = os.path.join(venv, 'Scripts' if os.name == 'nt' else 'bin')
+            env['PATH'] = bin_dir + os.pathsep + env.get('PATH', '')
+
+        # 1. Explicit dependency workspace venv takes precedence, overriding any
+        #    inherited VIRTUAL_ENV (which would point at the parser's own env).
+        if virtual_env:
+            _point_at(virtual_env)
+            return env
+
         prefix = sys.prefix if prefix is None else prefix
         base_prefix = sys.base_prefix if base_prefix is None else base_prefix
 
-        # Only when we are inside a virtual environment (prefix differs from the
-        # base interpreter) and the caller hasn't already pinned an environment.
+        # 2./3. Only when the caller hasn't already pinned an environment and we
+        #       are inside a virtual environment.
         if 'VIRTUAL_ENV' not in env and prefix != base_prefix:
-            env['VIRTUAL_ENV'] = prefix
-            bin_dir = os.path.join(prefix, 'Scripts' if os.name == 'nt' else 'bin')
-            env['PATH'] = bin_dir + os.pathsep + env.get('PATH', '')
+            _point_at(prefix)
         return env
 
     @staticmethod

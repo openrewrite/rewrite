@@ -425,6 +425,12 @@ def handle_parse(params: dict) -> List[str]:
     # Absent for older clients; absent or unknown keys are silently ignored.
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
+    # Path to a virtual environment with the project's dependencies installed,
+    # provisioned and forwarded by the caller (the CLI build step in production;
+    # a test/template helper in-repo). Points ty-types at the deps so supertypes
+    # reaching into third-party packages resolve (e.g. a first-party class
+    # extending pydantic.BaseModel). The handler never provisions deps itself.
+    dependency_path = params.get('dependencyPath')
     results = []
 
     # If no relativeTo provided, try to infer from absolute input paths
@@ -442,7 +448,9 @@ def handle_parse(params: dict) -> List[str]:
     tmpdir = None
     try:
         from rewrite.python.ty_client import TyTypesClient
-        ty_client = TyTypesClient()
+        # Point ty-types at the caller-provisioned dependency environment (if any)
+        # so supertypes reaching into third-party packages resolve.
+        ty_client = TyTypesClient(virtual_env=dependency_path)
         if relative_to:
             ty_client.initialize(relative_to)
         else:
@@ -505,6 +513,8 @@ def handle_parse_project(params: dict) -> List[dict]:
     # Per-request explicit override (mirror of the Parse RPC options carrier).
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
+    # Caller-provisioned dependency environment for ty-types (see handle_parse).
+    dependency_path = params.get('dependencyPath')
 
     # Resolve project-level language version once for the whole walk; each
     # file may still override it via in-source signals inside parse_python_source.
@@ -516,7 +526,9 @@ def handle_parse_project(params: dict) -> List[dict]:
     ty_client = None
     try:
         from rewrite.python.ty_client import TyTypesClient
-        ty_client = TyTypesClient()
+        # Point ty-types at the caller-provisioned dependency environment (if any)
+        # so supertypes reaching into third-party packages resolve.
+        ty_client = TyTypesClient(virtual_env=dependency_path)
         ty_client.initialize(project_path)
     except (ImportError, RuntimeError):
         pass

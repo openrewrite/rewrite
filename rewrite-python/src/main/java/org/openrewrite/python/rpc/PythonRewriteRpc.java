@@ -144,7 +144,7 @@ public class PythonRewriteRpc extends RewriteRpc {
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parseProject(Path projectPath, ExecutionContext ctx) {
-        return parseProject(projectPath, null, null, ctx);
+        return parseProject(projectPath, ParseProjectOptions.builder().build(), ctx);
     }
 
     /**
@@ -155,9 +155,13 @@ public class PythonRewriteRpc extends RewriteRpc {
      * @param exclusions  Optional glob patterns to exclude from parsing
      * @param ctx         Execution context for parsing
      * @return Stream of parsed source files
+     * @deprecated Use {@link #parseProject(Path, ParseProjectOptions, ExecutionContext)} instead.
      */
+    @Deprecated
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, ExecutionContext ctx) {
-        return parseProject(projectPath, exclusions, null, ctx);
+        return parseProject(projectPath, ParseProjectOptions.builder()
+                .exclusions(exclusions)
+                .build(), ctx);
     }
 
     /**
@@ -169,8 +173,31 @@ public class PythonRewriteRpc extends RewriteRpc {
      * @param relativeTo  Optional path to make source file paths relative to
      * @param ctx         Execution context for parsing
      * @return Stream of parsed source files
+     * @deprecated Use {@link #parseProject(Path, ParseProjectOptions, ExecutionContext)} instead.
      */
+    @Deprecated
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
+        return parseProject(projectPath, ParseProjectOptions.builder()
+                .exclusions(exclusions)
+                .relativeTo(relativeTo)
+                .build(), ctx);
+    }
+
+    /**
+     * Parses an entire Python project directory.
+     * Discovers and parses all relevant source files.
+     *
+     * @param projectPath Path to the project directory to parse
+     * @param options     Optional parsing inputs — exclusions, relativeTo, and the caller-provisioned
+     *                    dependency environment; see {@link ParseProjectOptions}. This is the only
+     *                    overload that accepts a {@code dependencyPath}.
+     * @param ctx         Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parseProject(Path projectPath, ParseProjectOptions options, ExecutionContext ctx) {
+        @Nullable List<String> exclusions = options.getExclusions();
+        @Nullable Path relativeTo = options.getRelativeTo();
+        @Nullable Path dependencyPath = options.getDependencyPath();
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         Stream<SourceFile> rpcStream = StreamSupport.stream(new Spliterator<SourceFile>() {
@@ -181,7 +208,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, dependencyPath), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
