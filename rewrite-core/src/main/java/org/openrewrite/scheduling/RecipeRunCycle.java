@@ -37,6 +37,7 @@ import org.openrewrite.table.SourcesFileResults;
 
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.rpc.RewriteRpc;
+import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RpcRecipe;
 import org.openrewrite.rpc.request.BatchVisit;
 import org.openrewrite.rpc.request.BatchVisitResponse;
@@ -332,7 +333,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     // otherwise the BatchVisit RPC fails on the remote side and the resulting
                     // exception gets attached to the source as a Markup$Error, falsely marking
                     // the file as modified.
-                    if (currentRpc.getLanguages().contains(src.getClass().getName())) {
+                    //
+                    // Compare against the canonical source file type, not the raw class name:
+                    // lazily-loaded LSTs (e.g. the Moderne CLI's V3 format) hand the scheduler
+                    // generated subclasses of the real tree type, whose getClass().getName() is
+                    // the subclass name. getLanguages() reports canonical type names (the same
+                    // ones used as the RPC sourceFileType), so a raw name comparison never
+                    // matches for those, silently dropping every batched recipe but the last.
+                    if (currentRpc.getLanguages().contains(DynamicDispatchRpcCodec.canonicalSourceFileType(src.getClass()))) {
                         RpcRecipe rpcRecipe = (RpcRecipe) recipe;
                         // Evaluate the precondition locally before batching. The non-batch
                         // path runs the precondition via getVisitor()'s Preconditions.check
@@ -479,7 +487,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         SourceFile fetched;
         if (anyModified) {
             // Fetch final tree state from remote
-            fetched = rpc.getObject(originalBefore.getId().toString(), originalBefore.getClass().getName());
+            fetched = rpc.getObject(originalBefore.getId().toString(), DynamicDispatchRpcCodec.canonicalSourceFileType(originalBefore.getClass()));
         } else {
             fetched = source;
         }
