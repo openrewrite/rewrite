@@ -228,7 +228,10 @@ export class ParseProject {
                             : await projectParser.buildAutodetectMarker(parsedFiles.map(p => p.sourceFile));
 
                         for (const {sourceFile, filePath} of parsedFiles) {
-                            if (!inSubset(filePath)) {
+                            // Compute the relative path once; it's both the subset-match key and the
+                            // response sourcePath. (`subset` is defined here — see the guard above.)
+                            const relativePath = path.relative(relativeTo, filePath);
+                            if (!subset.has(toForwardSlashes(relativePath))) {
                                 continue;
                             }
                             const id = randomId();
@@ -247,7 +250,7 @@ export class ParseProject {
                             resultItems.push({
                                 id,
                                 sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit", // break cycle
-                                sourcePath: path.relative(relativeTo, filePath)
+                                sourcePath: relativePath
                             });
                         }
                     } else if (discovered.jsFiles.length > 0) {
