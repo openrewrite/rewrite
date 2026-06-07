@@ -54,7 +54,19 @@ export class ParseProject {
          * If not specified, paths are relative to projectPath.
          * Use this when parsing a subdirectory but wanting paths relative to the repository root.
          */
-        private readonly relativeTo?: string
+        private readonly relativeTo?: string,
+        /**
+         * Optional subset of files to serialize and return, identified by their source path relative to
+         * `relativeTo` (or `projectPath` when not set), normalized to forward slashes. When omitted the
+         * whole project is returned. When present the whole project is still discovered and type-checked,
+         * but only these files are serialized and returned.
+         */
+        private readonly files?: string[],
+        /**
+         * Forward-compatibility carrier for additional, as-yet-undefined parsing options. Reserved for a
+         * future optimization (e.g. true incremental re-parsing); currently ignored by the server.
+         */
+        private readonly options?: Record<string, unknown>
     ) {}
 
     static handle(
@@ -82,6 +94,31 @@ export class ParseProject {
                     const projectParser = new ProjectParser(projectPath, {exclusions});
                     const discovered = await projectParser.discoverFiles();
                     const prettierLoader = await projectParser.createPrettierLoader();
+
+                    // Optional subset of files to serialize and return. When provided, the whole project is
+                    // still discovered and (for JS/TS) type-checked so types resolve exactly as in a full
+                    // parse, but only the files in this set are returned. Entries and response sourcePaths
+                    // share the same base (relativeTo, else projectPath) and are normalized to "/". A subset
+                    // entry that discovery wouldn't have parsed simply matches nothing.
+                    const toForwardSlashes = (p: string) => p.split(/[\\/]/).join("/");
+                    const subset = request.files != null
+                        ? new Set(request.files.map(toForwardSlashes))
+                        : undefined;
+                    const inSubset = (absolutePath: string): boolean =>
+                        !subset || subset.has(toForwardSlashes(path.relative(relativeTo, absolutePath)));
+
+                    // For everything except JS/TS there is no cross-file type context, so we can restrict
+                    // discovery to the subset up front. JS/TS files are intentionally left whole here and
+                    // filtered at serialization time below (see the jsFiles block) to preserve type context.
+                    if (subset) {
+                        discovered.packageJsonFiles = discovered.packageJsonFiles.filter(inSubset);
+                        discovered.lockFiles.json = discovered.lockFiles.json.filter(inSubset);
+                        discovered.lockFiles.yaml = discovered.lockFiles.yaml.filter(inSubset);
+                        discovered.lockFiles.text = discovered.lockFiles.text.filter(inSubset);
+                        discovered.jsonFiles = discovered.jsonFiles.filter(inSubset);
+                        discovered.yamlFiles = discovered.yamlFiles.filter(inSubset);
+                        discovered.textFiles = discovered.textFiles.filter(inSubset);
+                    }
 
                     const resultItems: ParseProjectResponseItem[] = [];
                     const ctx = new ExecutionContext();
@@ -166,7 +203,54 @@ export class ParseProject {
                     }
 
                     // Parse JavaScript/TypeScript source files
-                    if (discovered.jsFiles.length > 0) {
+                    if (discovered.jsFiles.length > 0 && subset) {
+                        // Subset mode: parse the WHOLE project for type context (a single TypeScript program
+                        // over every JS/TS file), but serialize and return only the files in the subset.
+                        //
+                        // We eagerly drain the parser into an array keyed by file path so we can pick the
+                        // subset out by path. The full-project branch below relies on the parse generator
+                        // being consumed in lockstep with resultItems, which no longer holds once non-subset
+                        // files are skipped — hence the separate, eager handling here.
+                        const parser = Parsers.createParser("javascript", {ctx, relativeTo});
+                        const detection = await prettierLoader.detectPrettier();
+
+                        const parsedFiles: { sourceFile: SourceFile, filePath: string }[] = [];
+                        let fileIndex = 0;
+                        for await (const sourceFile of parser.parse(...discovered.jsFiles)) {
+                            parsedFiles.push({sourceFile, filePath: discovered.jsFiles[fileIndex++]});
+                        }
+
+                        // Without Prettier we sample parsed files to build an Autodetect marker. We've parsed
+                        // the whole project here, so the sample is still project-wide; buildAutodetectMarker
+                        // falls back to defaults if the sample is empty rather than crashing.
+                        const autodetectMarker = detection.available
+                            ? undefined
+                            : await projectParser.buildAutodetectMarker(parsedFiles.map(p => p.sourceFile));
+
+                        for (const {sourceFile, filePath} of parsedFiles) {
+                            if (!inSubset(filePath)) {
+                                continue;
+                            }
+                            const id = randomId();
+                            localObjects.set(id, async (newId: string) => {
+                                let markers = sourceFile.markers;
+                                if (detection.available) {
+                                    const prettierMarker = await prettierLoader.getConfigMarker(filePath);
+                                    if (prettierMarker) {
+                                        markers = replaceMarkerByKind(markers, prettierMarker);
+                                    }
+                                } else {
+                                    markers = replaceMarkerByKind(markers, autodetectMarker!);
+                                }
+                                return {...sourceFile, id: newId, markers};
+                            });
+                            resultItems.push({
+                                id,
+                                sourceFileType: "org.openrewrite.javascript.tree.JS$CompilationUnit", // break cycle
+                                sourcePath: path.relative(relativeTo, filePath)
+                            });
+                        }
+                    } else if (discovered.jsFiles.length > 0) {
                         const parser = Parsers.createParser("javascript", {
                             ctx,
                             relativeTo

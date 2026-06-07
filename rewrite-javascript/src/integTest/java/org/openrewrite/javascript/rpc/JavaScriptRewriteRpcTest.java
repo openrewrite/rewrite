@@ -30,6 +30,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.style.Autodetect;
+import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.rpc.request.Print;
@@ -432,6 +433,83 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         assertThat(paths)
           .containsExactlyInAnyOrder("package.json", "index.js")
           .noneMatch(p -> p.contains("vendor"));
+    }
+
+    @Test
+    void parseProjectSubset(@TempDir Path projectDir) throws Exception {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+        Files.writeString(projectDir.resolve("math.ts"), """
+          export function add(a: number, b: number): number {
+              return a + b;
+          }
+          """);
+        Files.writeString(projectDir.resolve("app.ts"), """
+          import {add} from "./math";
+          const result = add(1, 2);
+          """);
+
+        // Full parse establishes the baseline: which path app.ts gets and how add(...) resolves.
+        List<SourceFile> full = client()
+          .parseProject(projectDir, new InMemoryExecutionContext())
+          .toList();
+
+        SourceFile fullApp = full.stream()
+          .filter(sf -> sf.getSourcePath().toString().equals("app.ts"))
+          .findFirst().orElseThrow();
+        JavaType.Method fullAddType = findAddInvocationType(fullApp);
+        assertThat(fullAddType).as("add(...) should resolve to a method type in a full parse").isNotNull();
+
+        // Subset parse: ask for only app.ts. The whole project is still loaded for typing.
+        List<SourceFile> subset = client()
+          .parseProject(projectDir, ParseProjectOptions.builder()
+            .files(List.of("app.ts"))
+            .build(), new InMemoryExecutionContext())
+          .toList();
+
+        // (a) Only app.ts is returned — not package.json, not the unchanged math.ts.
+        assertThat(subset).hasSize(1);
+        SourceFile subsetApp = subset.get(0);
+        assertThat(subsetApp).isInstanceOf(JS.CompilationUnit.class);
+
+        // (b) Its sourcePath matches the full-parse path exactly.
+        assertThat(subsetApp.getSourcePath()).isEqualTo(fullApp.getSourcePath());
+
+        // (c) Types that resolve in a full parse still resolve in the subset parse — proving the whole
+        // project (math.ts) was loaded for type context even though it was not returned.
+        JavaType.Method subsetAddType = findAddInvocationType(subsetApp);
+        assertThat(subsetAddType).as("add(...) should still resolve in a subset parse").isNotNull();
+        assertThat(subsetAddType.toString()).isEqualTo(fullAddType.toString());
+    }
+
+    @Test
+    void parseProjectSubsetWithUnknownFileYieldsNothing(@TempDir Path projectDir) throws Exception {
+        Files.writeString(projectDir.resolve("index.ts"), "const x = 1;");
+
+        // A subset entry that discovery wouldn't have parsed (missing/excluded/not a source file)
+        // simply matches nothing rather than erroring.
+        List<SourceFile> subset = client()
+          .parseProject(projectDir, ParseProjectOptions.builder()
+            .files(List.of("does-not-exist.ts"))
+            .build(), new InMemoryExecutionContext())
+          .toList();
+
+        assertThat(subset).isEmpty();
+    }
+
+    private static JavaType.Method findAddInvocationType(SourceFile sf) {
+        JavaType.Method[] found = new JavaType.Method[1];
+        new JavaScriptIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                if ("add".equals(method.getSimpleName())) {
+                    found[0] = method.getMethodType();
+                }
+                return super.visitMethodInvocation(method, p);
+            }
+        }.visit(sf, 0);
+        return found[0];
     }
 
     @Test

@@ -21,6 +21,7 @@ import org.openrewrite.rpc.request.RpcRequest;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 /**
  * RPC request to parse an entire JavaScript/TypeScript project.
@@ -48,17 +49,47 @@ class ParseProject implements RpcRequest {
     @Nullable
     Path relativeTo;
 
+    /**
+     * Optional subset of files to serialize and return, identified by their source path relative to
+     * {@link #relativeTo} (or {@link #projectPath} when {@code relativeTo} is {@code null}), normalized
+     * to forward slashes.
+     * <p>
+     * When {@code null} the whole project is returned (the default, original behavior). When non-{@code null}
+     * the server still loads and type-checks the entire project for full type context, but only returns the
+     * files in this set.
+     */
+    @Nullable
+    List<String> files;
+
+    /**
+     * Forward-compatibility carrier for additional, as-yet-undefined parsing options. Frozen into the
+     * wire shape now — but unused — so that a future optimization (e.g. true incremental re-parsing) can
+     * be threaded through without a second breaking change to the request type. Always {@code null} today.
+     */
+    @Nullable
+    Map<String, Object> options;
+
     ParseProject(Path projectPath) {
-        this(projectPath, null, null);
+        this(projectPath, null, null, null, null);
     }
 
     ParseProject(Path projectPath, @Nullable List<String> exclusions) {
-        this(projectPath, exclusions, null);
+        this(projectPath, exclusions, null, null, null);
     }
 
     ParseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo) {
+        this(projectPath, exclusions, relativeTo, null, null);
+    }
+
+    ParseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, @Nullable List<String> files) {
+        this(projectPath, exclusions, relativeTo, files, null);
+    }
+
+    ParseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, @Nullable List<String> files, @Nullable Map<String, Object> options) {
         this.projectPath = projectPath;
         this.exclusions = exclusions;
         this.relativeTo = relativeTo;
+        this.files = files;
+        this.options = options;
     }
 }
