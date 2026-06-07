@@ -548,22 +548,25 @@ class PythonTypeMapping:
             return _UNKNOWN
 
         elif kind == 'subclassOf':
+            # `subclassOf X` is ty's representation of `type[X]`: a *class
+            # object*, not an instance of X. Model it as `type[X]` so it stays
+            # distinct from an instance of X (see _make_class_object_type).
             base_id = descriptor.get('base')
             if base_id is not None:
                 result = self._resolve_type(base_id)
                 if result is not None:
-                    return result
+                    return self._make_class_object_type(result)
             return _UNKNOWN
 
         elif kind == 'typeForm':
-            # PEP 747 TypeForm[T] (ty-types >= 0.0.44): a type expression used
-            # as a runtime value. Resolve through to the wrapped type argument,
-            # mirroring how `subclassOf` resolves to its base.
+            # PEP 747 TypeForm[T] (ty-types >= 0.0.44): a type expression used as
+            # a runtime value. Like `subclassOf` (`type[X]`), the value is the
+            # type T, not an instance of T, so wrap it as a class object.
             type_arg_id = descriptor.get('typeArgument')
             if type_arg_id is not None:
                 result = self._resolve_type(type_arg_id)
                 if result is not None:
-                    return result
+                    return self._make_class_object_type(result)
             return _UNKNOWN
 
         elif kind == 'newType':
@@ -1314,6 +1317,22 @@ class PythonTypeMapping:
                 if name:
                     names.append(name)
         return names
+
+    def _make_class_object_type(self, base: JavaType) -> JavaType:
+        """Wrap a resolved type ``X`` as the class-object type ``type[X]``.
+
+        A value of type ``type[X]`` (ty's ``subclassOf X``, and PEP 747
+        ``TypeForm[X]``) is the *class* ``X`` itself, not an instance of ``X``.
+        It is modelled as a :class:`JavaType.Parameterized` over ``type`` with
+        ``X`` as its sole type parameter — mirroring how ``list[X]`` is modelled
+        — so that ``is_assignable_to(X, type[X])`` is ``False`` (the raw name is
+        ``type``, not ``X``) while the wrapped ``X`` remains recoverable via
+        ``type_parameters[0]`` for attribute/classmethod resolution.
+        """
+        param = JavaType.Parameterized()
+        param._type = self._create_class_type('type')
+        param._type_parameters = [base]
+        return param
 
     def _create_class_type(self, fqn: str) -> JavaType.Class:
         """Create a JavaType.Class from a fully qualified name."""

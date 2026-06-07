@@ -2294,6 +2294,98 @@ class TestMethodDeclarationResultType:
             _cleanup_parse(tmpdir, client)
 
 
+class TestSubclassOfDescriptor:
+    """Unit tests for the ty-types `subclassOf` descriptor kind (``type[X]``).
+
+    ty surfaces a *class object* ``type[X]`` as a ``subclassOf`` descriptor whose
+    ``base`` is ``X``. A value of this type is the class ``X`` itself, NOT an
+    instance of ``X``, so it must resolve to a representation distinct from an
+    instance of ``X``: a ``JavaType.Parameterized`` over ``type`` carrying ``X``
+    as its sole type parameter (mirroring how ``list[X]`` is modelled). This
+    keeps ``is_assignable_to(X, type[X])`` False while leaving the wrapped class
+    recoverable through ``type_parameters[0]``.
+
+    Use mock descriptors so the logic is exercised without the ty-types CLI.
+    End-to-end tests against real source live in TestClassObjectTypeAttribution.
+    """
+
+    def test_subclass_of_resolves_to_parameterized_type_over_base(self):
+        """``type[M]`` resolves to ``Parameterized`` over ``type`` with ``M``."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[5] = {
+            'kind': 'classLiteral', 'className': 'M', 'moduleName': 'mymod',
+        }
+        mapping._type_registry[10] = {
+            'kind': 'subclassOf', 'display': 'type[M]', 'base': 5,
+        }
+        result = mapping._resolve_type(10)
+        assert isinstance(result, JavaType.Parameterized)
+        assert result.type.fully_qualified_name == 'type'
+        assert result.type_parameters is not None
+        assert len(result.type_parameters) == 1
+        wrapped = result.type_parameters[0]
+        assert isinstance(wrapped, JavaType.FullyQualified)
+        assert wrapped.fully_qualified_name == 'mymod.M'
+
+    def test_subclass_of_not_assignable_to_base_instance(self):
+        """A ``type[M]`` value is NOT assignable to the instance type ``M``."""
+        from rewrite.python.type_utils import is_assignable_to
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[5] = {
+            'kind': 'classLiteral', 'className': 'M', 'moduleName': 'mymod',
+        }
+        mapping._type_registry[10] = {'kind': 'subclassOf', 'base': 5}
+        result = mapping._resolve_type(10)
+        assert not is_assignable_to('mymod.M', result)
+
+    def test_subclass_of_assignable_to_type(self):
+        """A ``type[M]`` value IS assignable to ``type``."""
+        from rewrite.python.type_utils import is_assignable_to
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[5] = {
+            'kind': 'classLiteral', 'className': 'M', 'moduleName': 'mymod',
+        }
+        mapping._type_registry[10] = {'kind': 'subclassOf', 'base': 5}
+        result = mapping._resolve_type(10)
+        assert is_assignable_to('type', result)
+
+    def test_instance_is_assignable_to_base(self):
+        """Contrast: an *instance* of ``M`` stays assignable to ``M``."""
+        from rewrite.python.type_utils import is_assignable_to
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[5] = {
+            'kind': 'classLiteral', 'className': 'M', 'moduleName': 'mymod',
+        }
+        mapping._type_registry[6] = {
+            'kind': 'instance', 'className': 'M', 'moduleName': 'mymod', 'classId': 5,
+        }
+        result = mapping._resolve_type(6)
+        assert is_assignable_to('mymod.M', result)
+
+    def test_subclass_of_without_base_is_unknown(self):
+        """A ``subclassOf`` descriptor lacking ``base`` degrades to Unknown."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[12] = {'kind': 'subclassOf', 'display': 'type[?]'}
+        result = mapping._resolve_type(12)
+        assert isinstance(result, JavaType.Unknown)
+
+    def test_subclass_of_declaring_type_resolves_to_base(self):
+        """The declaring-type path resolves ``type[M]`` through to ``M``.
+
+        A classmethod/attribute reached through a ``type[M]`` value is declared
+        on ``M`` (or its metaclass), so the declaring type must remain ``M`` — a
+        ``FullyQualified``, not the ``type`` wrapper.
+        """
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[5] = {
+            'kind': 'instance', 'className': 'M', 'moduleName': 'mymod',
+        }
+        mapping._type_registry[10] = {'kind': 'subclassOf', 'base': 5}
+        result = mapping._resolve_declaring_type(10)
+        assert result is not None
+        assert result.fully_qualified_name == 'mymod.M'
+
+
 class TestTypeFormDescriptor:
     """Unit tests for the ty-types 0.0.44 `typeForm` descriptor kind.
 
@@ -2301,24 +2393,29 @@ class TestTypeFormDescriptor:
     e.g. ``x: TypeForm[str] = str``) are surfaced by ty-types >= 0.0.44 as a
     first-class ``typeForm`` descriptor carrying a ``typeArgument`` reference,
     rather than the older ``other`` fallback. Like ``subclassOf`` (``type[X]``),
-    the descriptor resolves through to its wrapped argument.
+    a ``TypeForm[T]`` value is the *type* ``T`` used as a value, not an instance
+    of ``T``, so it resolves to a class-object representation: a
+    ``Parameterized`` over ``type`` wrapping ``T`` (the wrapped argument stays
+    recoverable through ``type_parameters[0]``).
 
     Use mock descriptors so the logic is exercised without the ty-types CLI.
     End-to-end tests against real source live in TestTypeFormIntegration below.
     """
 
-    def test_type_form_resolves_to_primitive_type_argument(self):
-        """`TypeForm[str]` resolves through to its `typeArgument` (str)."""
+    def test_type_form_resolves_to_class_object_over_primitive_argument(self):
+        """`TypeForm[str]` resolves to a class object wrapping its argument (str)."""
         mapping = PythonTypeMapping("", file_path=None)
         mapping._type_registry[3] = {'kind': 'instance', 'className': 'str'}
         mapping._type_registry[10] = {
             'kind': 'typeForm', 'display': 'TypeForm[str]', 'typeArgument': 3,
         }
         result = mapping._resolve_type(10)
-        assert result is JavaType.Primitive.String
+        assert isinstance(result, JavaType.Parameterized)
+        assert result.type.fully_qualified_name == 'type'
+        assert result.type_parameters == [JavaType.Primitive.String]
 
-    def test_type_form_resolves_to_class_type_argument(self):
-        """`TypeForm[MyClass]` resolves through to the wrapped class type."""
+    def test_type_form_resolves_to_class_object_over_class_argument(self):
+        """`TypeForm[MyClass]` wraps the resolved class type as a class object."""
         mapping = PythonTypeMapping("", file_path=None)
         mapping._type_registry[5] = {
             'kind': 'classLiteral', 'className': 'MyClass', 'moduleName': 'mymod',
@@ -2327,8 +2424,10 @@ class TestTypeFormDescriptor:
             'kind': 'typeForm', 'display': 'TypeForm[MyClass]', 'typeArgument': 5,
         }
         result = mapping._resolve_type(11)
-        assert isinstance(result, JavaType.FullyQualified)
-        assert result.fully_qualified_name == 'mymod.MyClass'
+        assert isinstance(result, JavaType.Parameterized)
+        assert result.type.fully_qualified_name == 'type'
+        assert result.type_parameters is not None
+        assert result.type_parameters[0].fully_qualified_name == 'mymod.MyClass'
 
     def test_type_form_declaring_type_resolves_to_type_argument(self):
         """Declaring-type resolution unwraps `typeForm` to its argument too,
@@ -2366,8 +2465,8 @@ class TestTypeFormIntegration:
     (same contract as the ParamSpec/Concatenate integration tests).
     """
 
-    def test_type_form_value_resolves_to_type_argument(self):
-        """Reading a `TypeForm[str]` value resolves to its wrapped `str`."""
+    def test_type_form_value_resolves_to_class_object_over_argument(self):
+        """Reading a `TypeForm[str]` value resolves to a class object wrapping `str`."""
         source = '''from typing_extensions import TypeForm
 string_form: TypeForm[str] = str
 ref = string_form
@@ -2376,9 +2475,138 @@ ref = string_form
         try:
             ref = tree.body[2].value  # `string_form` on the RHS of `ref = string_form`
             result = mapping.type(ref)
-            assert result is JavaType.Primitive.String
+            assert isinstance(result, JavaType.Parameterized)
+            assert result.type.fully_qualified_name == 'type'
+            assert result.type_parameters == [JavaType.Primitive.String]
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
+
+
+@requires_ty_types_cli
+class TestClassObjectTypeAttribution:
+    """End-to-end: a ``type[X]`` class object must be distinct from an instance.
+
+    A parameter ``c: type[M]`` is a *class object*; a parameter ``inst: M`` is an
+    *instance*. Before the fix both resolved to the identical ``JavaType.Class``
+    for ``M``, so recipes could not tell class access from instance access (e.g.
+    ``ReplaceModelFieldsInstanceAccess`` rewrote class access ``settings_cls.``
+    ``model_fields`` as if it were an instance). After the fix only the instance
+    is assignable to ``M``; the class object is assignable to ``type`` instead,
+    with ``M`` still recoverable.
+
+    First-party only — no third-party dependency environment required.
+    """
+
+    _SOURCE = (
+        "class M:\n"
+        "    x: int = 0\n"
+        "\n"
+        "def via_type_param(c: type[M]):\n"
+        "    return c\n"
+        "\n"
+        "def via_instance_param(inst: M):\n"
+        "    return inst\n"
+    )
+
+    @staticmethod
+    def _collect_ident_types(cu, name):
+        from rewrite.java.tree import Identifier
+        collected = []
+
+        class _Collector(PythonVisitor):
+            def visit_identifier(self, ident: Identifier, p):
+                if ident.simple_name == name and ident.type is not None:
+                    collected.append(ident.type)
+                return super().visit_identifier(ident, p)
+
+        _Collector().visit(cu, None)
+        return collected
+
+    def test_type_param_is_class_object_not_instance(self):
+        from rewrite.python.type_utils import is_assignable_to
+        cu, tmpdir, client = _parse_with_types({'m.py': self._SOURCE}, 'm.py')
+        try:
+            c_types = self._collect_ident_types(cu, 'c')
+            inst_types = self._collect_ident_types(cu, 'inst')
+            assert c_types, "no typed `c` identifier found in parsed LST"
+            assert inst_types, "no typed `inst` identifier found in parsed LST"
+
+            # The instance parameter IS assignable to M.
+            assert all(is_assignable_to('m.M', t) for t in inst_types), \
+                "an instance of M must be assignable to M"
+            # The class-object parameter is NOT assignable to the instance type M …
+            assert not any(is_assignable_to('m.M', t) for t in c_types), \
+                "a type[M] class object must NOT be assignable to instance type M"
+            # … but IS assignable to `type`.
+            assert all(is_assignable_to('type', t) for t in c_types), \
+                "a type[M] class object must be assignable to `type`"
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    def test_type_param_wrapped_class_recoverable(self):
+        cu, tmpdir, client = _parse_with_types({'m.py': self._SOURCE}, 'm.py')
+        try:
+            c_types = self._collect_ident_types(cu, 'c')
+            param = next((t for t in c_types if isinstance(t, JavaType.Parameterized)), None)
+            assert param is not None, "type[M] must resolve to a Parameterized type"
+            assert param.type.fully_qualified_name == 'type'
+            assert param.type_parameters and len(param.type_parameters) == 1
+            assert param.type_parameters[0].fully_qualified_name == 'm.M'
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    def test_classmethod_reached_through_type_param_resolves(self):
+        """A classmethod reached via a ``type[M]`` value resolves to ``M``.
+
+        Requirement 2: the wrapped class stays usable — the declaring-type path
+        attributes ``c.make()`` to a method declared on ``M``, not on ``type``.
+        """
+        source = (
+            "class M:\n"
+            "    @classmethod\n"
+            "    def make(cls) -> 'M':\n"
+            "        return cls()\n"
+            "\n"
+            "def use(c: type[M]):\n"
+            "    return c.make()\n"
+        )
+        cu, tmpdir, client = _parse_with_types({'m.py': source}, 'm.py')
+        try:
+            calls = [mi for mi in _collect_method_invocations(cu)
+                     if mi.name.simple_name == 'make']
+            assert calls, "expected a c.make() invocation in the tree"
+            mt = calls[0].method_type
+            assert mt is not None, \
+                "a classmethod reached through type[M] must still resolve"
+            assert mt.declaring_type is not None
+            # Declared on the class M (its FQN), not on the `type` wrapper.
+            fqn = mt.declaring_type.fully_qualified_name
+            assert fqn in ('m.M', 'M'), fqn
+            assert fqn != 'type'
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    def test_classmethod_cls_param_unchanged(self):
+        """The implicit ``cls`` of a @classmethod stays a class object.
+
+        ty already treats ``cls`` as a class object (not assignable to the
+        instance type); the fix must not regress that to instance assignability.
+        """
+        from rewrite.python.type_utils import is_assignable_to
+        source = (
+            "class M:\n"
+            "    @classmethod\n"
+            "    def make(cls):\n"
+            "        return cls\n"
+        )
+        cu, tmpdir, client = _parse_with_types({'m.py': source}, 'm.py')
+        try:
+            cls_types = self._collect_ident_types(cu, 'cls')
+            assert cls_types, "no typed `cls` identifier found in parsed LST"
+            assert not any(is_assignable_to('m.M', t) for t in cls_types), \
+                "the classmethod `cls` is a class object, not an instance of M"
+        finally:
+            _cleanup_parse(tmpdir, client)
 
 
 def _uv_available() -> bool:
