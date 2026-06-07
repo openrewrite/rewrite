@@ -2379,3 +2379,256 @@ ref = string_form
             assert result is JavaType.Primitive.String
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
+
+
+def _uv_available() -> bool:
+    import shutil
+    return shutil.which('uv') is not None
+
+
+requires_uv = pytest.mark.skipif(
+    not _uv_available(),
+    reason="uv is not installed (needed to build a dependency workspace)"
+)
+
+
+class TestSubprocessEnvVirtualEnv:
+    """Unit tests for TyTypesClient._subprocess_env explicit virtual_env handling.
+
+    The normal CLI parse path resolves a project's third-party dependencies into
+    a cached workspace venv and points ty-types at it via ``virtual_env``. An
+    explicit ``virtual_env`` must win over both the running interpreter's
+    ``sys.prefix`` fallback and any inherited ``VIRTUAL_ENV``.
+    """
+
+    def test_explicit_virtual_env_is_set_and_on_path(self):
+        env = TyTypesClient._subprocess_env(
+            base_env={'PATH': '/usr/bin'},
+            virtual_env='/tmp/ws/.venv',
+        )
+        assert env['VIRTUAL_ENV'] == '/tmp/ws/.venv'
+        bin_dir = os.path.join('/tmp/ws/.venv', 'Scripts' if os.name == 'nt' else 'bin')
+        assert env['PATH'].split(os.pathsep)[0] == bin_dir
+
+    def test_explicit_virtual_env_overrides_inherited(self):
+        env = TyTypesClient._subprocess_env(
+            base_env={'PATH': '/usr/bin', 'VIRTUAL_ENV': '/inherited/.venv'},
+            virtual_env='/tmp/ws/.venv',
+        )
+        assert env['VIRTUAL_ENV'] == '/tmp/ws/.venv'
+
+    def test_explicit_virtual_env_overrides_sys_prefix_fallback(self):
+        # Even when the running interpreter looks like a venv (prefix != base),
+        # an explicit virtual_env takes precedence over the sys.prefix fallback.
+        env = TyTypesClient._subprocess_env(
+            base_env={'PATH': '/usr/bin'},
+            prefix='/some/dev/.venv',
+            base_prefix='/usr',
+            virtual_env='/tmp/ws/.venv',
+        )
+        assert env['VIRTUAL_ENV'] == '/tmp/ws/.venv'
+
+    def test_no_virtual_env_keeps_existing_sys_prefix_behavior(self):
+        env = TyTypesClient._subprocess_env(
+            base_env={'PATH': '/usr/bin'},
+            prefix='/dev/.venv',
+            base_prefix='/usr',
+        )
+        assert env['VIRTUAL_ENV'] == '/dev/.venv'
+
+
+class TestDependencyPathForwarding:
+    """The parse RPC handlers forward the caller-supplied dependency path to
+    ty-types via ``TyTypesClient(virtual_env=...)`` and do NOT provision a
+    dependency environment themselves.
+
+    Provisioning is the caller's responsibility — the CLI build step for a
+    ``mod build``, or the test/template helper in-repo — and the path is handed
+    to the handler explicitly as the ``dependencyPath`` request option. This
+    keeps the handler a pure consumer with a single injection seam, and lets
+    unit tests point ty-types at a workspace they built themselves (overriding
+    the build convention) instead of relying on an in-handler auto-build.
+    """
+
+    _captured: list = []
+
+    class _StubTyClient:
+        def __init__(self, virtual_env=None):
+            TestDependencyPathForwarding._captured.append(virtual_env)
+
+        def initialize(self, project_root):
+            return True
+
+        @property
+        def is_available(self):
+            # False so PythonTypeMapping skips real type lookups: we only care
+            # which virtual_env the handler constructed the client with.
+            return False
+
+        def get_types(self, *args, **kwargs):
+            return None
+
+        def shutdown(self):
+            pass
+
+    @pytest.fixture(autouse=True)
+    def _patch_client(self, monkeypatch):
+        import rewrite.python.ty_client as ty_mod
+        TestDependencyPathForwarding._captured = []
+        monkeypatch.setattr(ty_mod, 'TyTypesClient',
+                            TestDependencyPathForwarding._StubTyClient)
+        yield
+
+    def test_handle_parse_forwards_dependency_path(self, tmp_path):
+        from rewrite.rpc import server
+        (tmp_path / "m.py").write_text("x = 1\n")
+        server.handle_parse({
+            "inputs": [str(tmp_path / "m.py")],
+            "relativeTo": str(tmp_path),
+            "dependencyPath": "/deps/proj/.venv",
+        })
+        assert self._captured == ["/deps/proj/.venv"]
+
+    def test_handle_parse_project_forwards_dependency_path(self, tmp_path):
+        from rewrite.rpc import server
+        (tmp_path / "m.py").write_text("x = 1\n")
+        server.handle_parse_project({
+            "projectPath": str(tmp_path),
+            "dependencyPath": "/deps/proj/.venv",
+        })
+        assert self._captured == ["/deps/proj/.venv"]
+
+    def test_handle_parse_without_dependency_path_does_not_auto_provision(self, tmp_path, monkeypatch):
+        # A pyproject.toml with dependencies present must NOT trigger an
+        # in-handler dependency build when no dependencyPath is forwarded.
+        # Stub the workspace builder so that, if the handler ever reached for it,
+        # we'd capture a non-None venv (failing the assert) — without running uv.
+        import importlib
+        from rewrite.rpc import server
+        autows = tmp_path / "autows"
+        (autows / ".venv").mkdir(parents=True)
+        dw_mod = importlib.import_module("rewrite.python.template.dependency_workspace")
+        monkeypatch.setattr(
+            dw_mod.DependencyWorkspace,
+            "get_or_create_from_pyproject",
+            staticmethod(lambda content: str(autows)),
+        )
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname = "x"\nversion = "0"\ndependencies = ["pydantic"]\n')
+        (tmp_path / "m.py").write_text("x = 1\n")
+        server.handle_parse({
+            "inputs": [str(tmp_path / "m.py")],
+            "relativeTo": str(tmp_path),
+        })
+        assert self._captured == [None]
+
+
+@requires_ty_types_cli
+@requires_uv
+class TestExternalSupertypeResolutionInParsePath:
+    """The normal parse path must resolve first-party classes' supertypes that
+    come from installed third-party dependencies (e.g. ``class User(BaseModel)``
+    where ``BaseModel`` is ``pydantic``), even when the interpreter running the
+    parse does NOT have those dependencies installed.
+
+    This is the CLI ``mod build`` scenario: the RPC server runs on an
+    interpreter that has only ``openrewrite`` + ``ty-types`` installed (not the
+    project's deps), and the project directory has no ``.venv``. The parse path
+    must build a dependency workspace from the project's ``pyproject.toml`` so
+    ty-types can resolve ``pydantic`` and surface ``User``'s supertype.
+
+    NOTE: this test is only meaningful when ``pydantic`` is NOT importable in
+    the test interpreter; otherwise ty-types would resolve it ambiently.
+    """
+
+    _SOURCE = (
+        "from pydantic import BaseModel\n"
+        "\n"
+        "\n"
+        "class User(BaseModel):\n"
+        "    name: str\n"
+        "\n"
+        "    def field_names(self):\n"
+        "        return list(self.model_fields.keys())\n"
+    )
+    _PYPROJECT = (
+        "[project]\n"
+        'name = "tyrepro"\n'
+        'version = "0.0.0"\n'
+        'requires-python = ">=3.10"\n'
+        'dependencies = ["pydantic>=2.11"]\n'
+    )
+
+    @pytest.fixture(autouse=True)
+    def _skip_if_pydantic_ambient(self):
+        try:
+            import pydantic  # noqa: F401
+            pytest.skip("pydantic is importable in the test interpreter; "
+                        "ty-types would resolve it ambiently, masking the fix")
+        except ImportError:
+            pass
+
+    def _dependency_venv(self):
+        # The caller (here, the test; in production, the CLI build step) builds
+        # the dependency environment and forwards its path. The handler itself
+        # never provisions.
+        from rewrite.python.template.dependency_workspace import DependencyWorkspace
+        workspace = DependencyWorkspace.get_or_create_from_pyproject(self._PYPROJECT)
+        return os.path.join(workspace, ".venv")
+
+    def _parse_project(self, tmp_path, dependency_path):
+        from rewrite.rpc import server
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        (proj / "pyproject.toml").write_text(self._PYPROJECT)
+        (proj / "models.py").write_text(self._SOURCE)
+        params = {
+            "inputs": [str(proj / "models.py")],
+            "relativeTo": str(proj),
+        }
+        if dependency_path is not None:
+            params["dependencyPath"] = dependency_path
+        ids = server.handle_parse(params)
+        assert ids, "handle_parse returned no results"
+        return server.local_objects[ids[0]]
+
+    def _collect_self_types(self, cu):
+        from rewrite.java.tree import Identifier
+        collected = []
+
+        class _Collector(PythonVisitor):
+            def visit_identifier(self, ident: Identifier, p):
+                if ident.simple_name == 'self':
+                    collected.append(ident.type)
+                return super().visit_identifier(ident, p)
+
+        _Collector().visit(cu, None)
+        return collected
+
+    def test_self_receiver_is_assignable_to_basemodel(self, tmp_path):
+        from rewrite.python.type_utils import is_assignable_to
+        cu = self._parse_project(tmp_path, self._dependency_venv())
+        self_types = self._collect_self_types(cu)
+        assert self_types, "no `self` identifiers found in parsed LST"
+        assert any(
+            is_assignable_to("pydantic.main.BaseModel", t) for t in self_types
+        ), (
+            "the `self` receiver's type does not resolve as a subclass of "
+            "pydantic.main.BaseModel; the first-party class supertype was not "
+            "populated from the forwarded dependency environment"
+        )
+
+    def test_without_dependency_path_supertype_is_not_resolved(self, tmp_path):
+        # No dependency path forwarded → the handler must not provision pydantic
+        # itself, so ty-types cannot resolve the external base class and the
+        # `self` receiver does not resolve as a BaseModel subclass.
+        from rewrite.python.type_utils import is_assignable_to
+        cu = self._parse_project(tmp_path, None)
+        self_types = self._collect_self_types(cu)
+        assert self_types, "no `self` identifiers found in parsed LST"
+        assert not any(
+            is_assignable_to("pydantic.main.BaseModel", t) for t in self_types
+        ), (
+            "without a forwarded dependency path the parser must not auto-provision "
+            "pydantic, so the supertype must not resolve to BaseModel"
+        )
