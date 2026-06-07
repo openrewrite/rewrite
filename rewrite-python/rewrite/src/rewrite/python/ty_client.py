@@ -67,6 +67,26 @@ class TyTypesClient:
         self._project_root: Optional[str] = None
         self._virtual_env: Optional[str] = str(virtual_env) if virtual_env else None
 
+        # Cumulative type table for the lifetime of this ``--serve`` session.
+        #
+        # ty's ``--serve`` session deduplicates type descriptors: each type is
+        # emitted in full exactly once, in the first ``getTypes`` response that
+        # references it, and later responses reference it by id only. When a
+        # whole project is parsed through one shared session (see
+        # ``handle_parse_project``), a type first seen in an earlier file (e.g.
+        # ``pydantic.BaseModel``) is therefore absent from later files'
+        # responses. Because each file builds its own per-file registry, those
+        # later files could not resolve such cross-file references — supertypes
+        # of first-party classes silently degraded to ``Unknown``.
+        #
+        # Accumulating every descriptor here, keyed by ty's session-stable type
+        # ids, lets per-file mappings fall back to the cumulative table for any
+        # id missing from their own response, restoring resolution while keeping
+        # ty's dedup performance benefit. It is reset whenever a new session
+        # starts (a fresh client, or ``initialize`` with a different root) so no
+        # state leaks across unrelated parses.
+        self.session_types: Dict[int, Dict[str, Any]] = {}
+
         self._start_process()
 
     def __enter__(self) -> TyTypesClient:
@@ -224,6 +244,9 @@ class TyTypesClient:
 
         if self._initialized:
             self.shutdown()
+            # A different project root means a brand-new ty session whose type
+            # ids start over; drop the accumulated table so ids don't collide.
+            self.session_types.clear()
             self._start_process()
 
         result = self._send_request("initialize", {"projectRoot": project_root})
@@ -246,11 +269,21 @@ class TyTypesClient:
         """
         if not self._initialized:
             return None
-        return self._send_request(
+        result = self._send_request(
             "getTypes",
             {"file": file_path, "includeDisplay": include_display},
             timeout=timeout,
         )
+        if result:
+            # Fold this response's type table into the cumulative session table.
+            # Keys are stringified ids in the JSON payload; ty keeps ids stable
+            # across the session, and each descriptor is emitted in full only on
+            # first sight, so ``setdefault`` preserves that full descriptor.
+            types = result.get('types')
+            if types:
+                for type_id_str, descriptor in types.items():
+                    self.session_types.setdefault(int(type_id_str), descriptor)
+        return result
 
     @property
     def is_available(self) -> bool:

@@ -159,6 +159,16 @@ class PythonTypeMapping:
         self._declaring_cycle_placeholders: Dict[int, JavaType.Class] = {}
         self._class_literal_index: Dict[str, int] = {}  # className -> classLiteral type_id
 
+        # Cumulative, session-wide type table shared by every file parsed through
+        # the same ty ``--serve`` session. ty deduplicates descriptors across a
+        # session, so a type first seen in an earlier file is omitted from later
+        # files' responses; this table restores those descriptors as a fallback
+        # (see TyTypesClient.session_types and _build_index back-fill).
+        self._session_types: Dict[int, Dict[str, Any]] = (
+            ty_client.session_types if ty_client is not None
+            and hasattr(ty_client, 'session_types') else {}
+        )
+
         # Fetch all types in one batch call
         if ty_client is not None:
             try:
@@ -261,6 +271,19 @@ class PythonTypeMapping:
                 cn = descriptor.get('className', '')
                 if cn:
                     self._class_literal_index[cn] = tid
+
+        # Back-fill descriptors that this file's response omitted because ty's
+        # shared --serve session already emitted them for an earlier file. The
+        # session table is keyed by ty's session-stable ids, so a referenced id
+        # absent from this file's registry resolves through the cumulative table.
+        # File-local descriptors take precedence (setdefault) — they are the
+        # authoritative, full descriptors for types this file is the first to see.
+        for tid, descriptor in self._session_types.items():
+            if self._type_registry.setdefault(tid, descriptor) is descriptor and \
+                    descriptor.get('kind') == 'classLiteral':
+                cn = descriptor.get('className', '')
+                if cn:
+                    self._class_literal_index.setdefault(cn, tid)
 
     def _lookup_type_id(self, node: ast.AST) -> Optional[int]:
         """Look up a node's type ID by converting AST position to byte offset.

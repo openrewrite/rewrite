@@ -2632,3 +2632,117 @@ class TestExternalSupertypeResolutionInParsePath:
             "without a forwarded dependency path the parser must not auto-provision "
             "pydantic, so the supertype must not resolve to BaseModel"
         )
+
+
+@requires_ty_types_cli
+@requires_uv
+class TestProjectParseSupertypeAcrossFiles:
+    """Multi-file project parse path, exactly as the CLI's ``mod build`` uses it.
+
+    ``mod build`` calls ``rpc.parseProject`` -> ``handle_parse_project``, which
+    parses every ``.py`` file in the project through a SINGLE shared ty-types
+    session. ty's ``--serve`` session emits each type descriptor only once per
+    session, so a type first seen in an earlier file (e.g. ``pydantic.BaseModel``)
+    is not re-sent in a later file's ``getTypes`` response. Because the parser
+    builds a fresh per-file type registry, a first-party class in any file but the
+    first loses its third-party supertype, and ``self`` stops resolving as a
+    ``BaseModel`` subclass.
+
+    Two peer model files make the failure order-independent: whichever file ty
+    processes second drops its base, so requiring BOTH to resolve fails regardless
+    of the directory walk order. This is the gap that single-file ``handle_parse``
+    tests (see ``TestExternalSupertypeResolutionInParsePath``) cannot catch,
+    because a fresh session per parse never triggers the dedup.
+    """
+
+    _PYPROJECT = (
+        "[project]\n"
+        'name = "tyrepro"\n'
+        'version = "0.0.0"\n'
+        'requires-python = ">=3.10"\n'
+        'dependencies = ["pydantic>=2.11"]\n'
+    )
+    _A = (
+        "from pydantic import BaseModel\n"
+        "\n"
+        "\n"
+        "class A(BaseModel):\n"
+        "    x: int\n"
+        "\n"
+        "    def fa(self):\n"
+        "        return self.model_fields\n"
+    )
+    _B = (
+        "from pydantic import BaseModel\n"
+        "\n"
+        "\n"
+        "class B(BaseModel):\n"
+        "    y: int\n"
+        "\n"
+        "    def fb(self):\n"
+        "        return self.model_fields\n"
+    )
+
+    @pytest.fixture(autouse=True)
+    def _skip_if_pydantic_ambient(self):
+        try:
+            import pydantic  # noqa: F401
+            pytest.skip("pydantic is importable in the test interpreter; "
+                        "ty-types would resolve it ambiently, masking the bug")
+        except ImportError:
+            pass
+
+    def _dependency_venv(self):
+        from rewrite.python.template.dependency_workspace import DependencyWorkspace
+        workspace = DependencyWorkspace.get_or_create_from_pyproject(self._PYPROJECT)
+        return os.path.join(workspace, ".venv")
+
+    def _self_types(self, cu):
+        from rewrite.java.tree import Identifier
+        collected = []
+
+        class _Collector(PythonVisitor):
+            def visit_identifier(self, ident: Identifier, p):
+                if ident.simple_name == 'self':
+                    collected.append(ident.type)
+                return super().visit_identifier(ident, p)
+
+        _Collector().visit(cu, None)
+        return collected
+
+    def test_supertype_resolves_in_every_file_of_a_project(self, tmp_path):
+        from rewrite.rpc import server
+        from rewrite.python.type_utils import is_assignable_to
+
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        (proj / "pyproject.toml").write_text(self._PYPROJECT)
+        (proj / "a.py").write_text(self._A)
+        (proj / "b.py").write_text(self._B)
+
+        items = server.handle_parse_project({
+            "projectPath": str(proj),
+            "relativeTo": str(proj),
+            "dependencyPath": self._dependency_venv(),
+        })
+        assert items, "handle_parse_project returned no results"
+
+        by_name = {}
+        for it in items:
+            obj = server.local_objects[it["id"]]
+            sp = getattr(obj, "source_path", None)
+            if sp:
+                by_name[os.path.basename(str(sp))] = obj
+
+        for fname in ("a.py", "b.py"):
+            cu = by_name.get(fname)
+            assert cu is not None, f"{fname} missing from parse results"
+            self_types = self._self_types(cu)
+            assert self_types, f"no `self` identifiers found in {fname}"
+            assert all(
+                is_assignable_to("pydantic.main.BaseModel", t) for t in self_types
+            ), (
+                f"`self` in {fname} did not resolve as a pydantic.main.BaseModel "
+                "subclass; the shared ty-types session dropped the supertype "
+                "descriptor for a file parsed after the first"
+            )
