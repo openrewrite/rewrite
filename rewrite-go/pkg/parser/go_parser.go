@@ -1229,8 +1229,10 @@ func (ctx *parseContext) mapExprStmt(stmt *ast.ExprStmt) java.Statement {
 	return nil
 }
 
-// mapIfStmt maps an if statement, including optional init: `if init; cond { }`.
-func (ctx *parseContext) mapIfStmt(stmt *ast.IfStmt) *java.If {
+// mapIfStmt maps an if statement. A plain `if cond { }` maps to java.If
+// (mirroring J.If); an init clause (`if x := f(); cond { }`) wraps that java.If
+// in a golang.StatementWithInit, which J.If has no slot for.
+func (ctx *parseContext) mapIfStmt(stmt *ast.IfStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("if"))
 
 	var init *java.RightPadded[java.Statement]
@@ -1264,18 +1266,49 @@ func (ctx *parseContext) mapIfStmt(stmt *ast.IfStmt) *java.If {
 		}
 	}
 
-	return &java.If{
+	innerPrefix := prefix
+	if init != nil {
+		innerPrefix = java.EmptySpace
+	}
+	return wrapWithInit(prefix, init, &java.If{
 		ID:        uuid.New(),
-		Prefix:    prefix,
-		Init:      init,
-		Condition: cond,
+		Prefix:    innerPrefix,
+		Condition: controlParentheses(cond),
 		Then:      body,
 		ElsePart:  elsePart,
+	})
+}
+
+// controlParentheses wraps a bare condition in a synthetic ControlParentheses,
+// mirroring how Java models an `if` condition. Go has no parens there, so the
+// wrapper carries no whitespace of its own (it lives on the inner element) and
+// the printer emits only the inner expression.
+func controlParentheses(inner java.Expression) *java.ControlParentheses {
+	return &java.ControlParentheses{
+		ID:      uuid.New(),
+		Markers: java.Markers{ID: uuid.New()},
+		Tree:    java.RightPadded[java.Expression]{Element: inner},
 	}
 }
 
-// mapSwitchStmt maps a switch statement.
-func (ctx *parseContext) mapSwitchStmt(stmt *ast.SwitchStmt) *java.Switch {
+// wrapWithInit wraps an inner if/switch in a golang.StatementWithInit when an
+// init clause is present, moving the keyword prefix onto the wrapper and
+// leaving the inner statement prefix-less. With no init it returns inner as-is.
+func wrapWithInit(prefix java.Space, init *java.RightPadded[java.Statement], inner java.Statement) java.Statement {
+	if init == nil {
+		return inner
+	}
+	return &golang.StatementWithInit{
+		ID:        uuid.New(),
+		Prefix:    prefix,
+		Init:      *init,
+		Statement: inner,
+	}
+}
+
+// mapSwitchStmt maps a switch statement. A plain switch maps to java.Switch
+// (mirroring J.Switch); an init clause wraps it in a golang.StatementWithInit.
+func (ctx *parseContext) mapSwitchStmt(stmt *ast.SwitchStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("switch"))
 
 	var init *java.RightPadded[java.Statement]
@@ -1300,13 +1333,16 @@ func (ctx *parseContext) mapSwitchStmt(stmt *ast.SwitchStmt) *java.Switch {
 
 	body := ctx.mapBlockStmt(stmt.Body)
 
-	return &java.Switch{
+	innerPrefix := prefix
+	if init != nil {
+		innerPrefix = java.EmptySpace
+	}
+	return wrapWithInit(prefix, init, &java.Switch{
 		ID:     uuid.New(),
-		Prefix: prefix,
-		Init:   init,
+		Prefix: innerPrefix,
 		Tag:    tag,
 		Body:   body,
-	}
+	})
 }
 
 // mapCaseClause maps a case or default clause.
@@ -1426,7 +1462,8 @@ func (ctx *parseContext) mapCommClause(clause *ast.CommClause) *golang.CommClaus
 
 // mapTypeSwitchStmt maps a type switch statement.
 // Uses Switch with TypeSwitchGuard marker. The assign/guard becomes the tag.
-func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) *java.Switch {
+// An init clause wraps the Switch in a golang.StatementWithInit.
+func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("switch"))
 
 	var init *java.RightPadded[java.Statement]
@@ -1463,17 +1500,20 @@ func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) *java.Switc
 
 	body := ctx.mapBlockStmt(stmt.Body)
 
-	return &java.Switch{
+	innerPrefix := prefix
+	if init != nil {
+		innerPrefix = java.EmptySpace
+	}
+	return wrapWithInit(prefix, init, &java.Switch{
 		ID:     uuid.New(),
-		Prefix: prefix,
+		Prefix: innerPrefix,
 		Markers: java.Markers{
 			ID:      uuid.New(),
 			Entries: []java.Marker{golang.TypeSwitchGuard{Ident: uuid.New()}},
 		},
-		Init: init,
 		Tag:  tag,
 		Body: body,
-	}
+	})
 }
 
 // mapEmptyStmt maps an empty statement (bare semicolons).

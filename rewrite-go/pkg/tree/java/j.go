@@ -338,17 +338,19 @@ func (n *Return) WithMarkers(markers Markers) *Return {
 	return &c
 }
 
-// If represents an if statement.
-// In Go, if can have an init statement: `if init; cond { }`.
+// If represents an if statement. Mirrors Java's J.If exactly: the condition is a
+// ControlParentheses (as in Java) whose inner element is the bare Go condition —
+// Go has no parens, so the wrapper carries no whitespace of its own and the
+// printer emits only the inner element. Go's optional init clause
+// (`if x := f(); cond {}`) has no slot here — it lives on a wrapping
+// golang.StatementWithInit instead.
 type If struct {
-	ID          uuid.UUID
-	Prefix      Space
-	Markers     Markers
-	Init        *RightPadded[Statement] // nil if no init; After = space before `;`
-	Condition   Expression
-	ConditionCP *ControlParentheses // cached ControlParentheses from RPC round-trip
-	Then        *Block
-	ElsePart    *RightPadded[J] // nil if no else clause
+	ID        uuid.UUID
+	Prefix    Space
+	Markers   Markers
+	Condition *ControlParentheses
+	Then      *Block
+	ElsePart  *RightPadded[J] // nil if no else clause
 }
 
 func (*If) IsTree()      {}
@@ -367,7 +369,7 @@ func (n *If) WithMarkers(markers Markers) *If {
 	return &c
 }
 
-func (n *If) WithCondition(condition Expression) *If {
+func (n *If) WithCondition(condition *ControlParentheses) *If {
 	c := *n
 	c.Condition = condition
 	return &c
@@ -814,12 +816,13 @@ func (n *ForEachControl) WithMarkers(markers Markers) *ForEachControl {
 	return &c
 }
 
-// Switch represents a switch statement.
+// Switch represents a switch statement. Mirrors Java's J.Switch: a selector tag
+// and the case block. Go's optional init clause (`switch x := f(); x {}`) has no
+// slot here — it lives on a wrapping golang.StatementWithInit instead.
 type Switch struct {
 	ID      uuid.UUID
 	Prefix  Space
 	Markers Markers
-	Init    *RightPadded[Statement]  // optional init statement; After = space after semicolon
 	Tag     *RightPadded[Expression] // optional tag expression; After = space before {
 	Body    *Block                   // contains Case statements
 }

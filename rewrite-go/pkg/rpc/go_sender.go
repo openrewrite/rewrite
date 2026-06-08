@@ -461,6 +461,15 @@ func (s *GoSender) VisitGoMethodDeclaration(md *golang.MethodDeclaration, p any)
 	return md
 }
 
+func (s *GoSender) VisitStatementWithInit(swi *golang.StatementWithInit, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(swi, func(v any) any { return v.(*golang.StatementWithInit).Init },
+		func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(swi, func(v any) any { return v.(*golang.StatementWithInit).Statement },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return swi
+}
+
 func (s *GoSender) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(cc, func(v any) any { return v.(*golang.CommClause).Comm },

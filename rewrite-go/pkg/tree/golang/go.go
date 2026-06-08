@@ -279,7 +279,7 @@ func (n *Slice) WithMarkers(markers java.Markers) *Slice {
 // length) keep using java.ArrayType, which mirrors Java's variable-length array.
 type ArrayType struct {
 	ID          uuid.UUID
-	Prefix      java.Space                        // space before `[`
+	Prefix      java.Space // space before `[`
 	Markers     java.Markers
 	Length      java.RightPadded[java.Expression] // Element = `N` (Prefix = space after `[`), After = space before `]`
 	ElementType java.Expression                   // element type `T` (Prefix = space after `]`)
@@ -752,6 +752,38 @@ func (n *MethodDeclaration) WithPrefix(prefix java.Space) *MethodDeclaration {
 }
 
 func (n *MethodDeclaration) WithMarkers(markers java.Markers) *MethodDeclaration {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// StatementWithInit carries the optional init clause Go allows before the
+// condition of an `if` or the tag of a `switch`: `if x := f(); cond {}` or
+// `switch x := f(); x {}`. It wraps the inner java.If / java.Switch (which —
+// mirroring Java's J.If / J.Switch — has no slot for an init statement) and
+// holds that statement. `if`/`switch` without an init stay a bare
+// java.If / java.Switch. The wrapper owns the prefix (whitespace before the
+// keyword); the inner statement is otherwise prefix-less and keeps its own
+// markers (e.g. the type-switch guard or select markers on a Switch).
+type StatementWithInit struct {
+	ID        uuid.UUID
+	Prefix    java.Space
+	Markers   java.Markers
+	Init      java.RightPadded[java.Statement] // the SimpleStmt; After = space before `;`
+	Statement java.Statement                   // the inner java.If or java.Switch
+}
+
+func (*StatementWithInit) IsTree()      {}
+func (*StatementWithInit) IsJ()         {}
+func (*StatementWithInit) IsStatement() {}
+
+func (n *StatementWithInit) WithPrefix(prefix java.Space) *StatementWithInit {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *StatementWithInit) WithMarkers(markers java.Markers) *StatementWithInit {
 	c := *n
 	c.Markers = markers
 	return &c

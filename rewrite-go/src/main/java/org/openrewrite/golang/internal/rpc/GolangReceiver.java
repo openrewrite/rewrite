@@ -230,6 +230,13 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitStatementWithInit(Go.StatementWithInit statementWithInit, RpcReceiveQueue q) {
+        return statementWithInit
+                .getPadding().withInit(q.receive(statementWithInit.getPadding().getInit(), el -> visitRightPadded(el, q)))
+                .withStatement(q.receive(statementWithInit.getStatement(), el -> (Statement) visitNonNull(el, q)));
+    }
+
+    @Override
     public J visitCommClause(Go.CommClause commClause, RpcReceiveQueue q) {
         return commClause
                 .withComm(q.receive(commClause.getComm(), el -> (Statement) visitNonNull(el, q)))

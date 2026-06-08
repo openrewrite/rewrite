@@ -136,9 +136,6 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 		return c.matchExpressionRightPaddedList(p.Expressions, cand.Expressions)
 	case *java.If:
 		cand := candidate.(*java.If)
-		if !c.matchOptionalRightPaddedStmt(p.Init, cand.Init) {
-			return false
-		}
 		if !c.matchNode(p.Condition, cand.Condition) {
 			return false
 		}
@@ -146,6 +143,12 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 			return false
 		}
 		return c.matchOptionalRightPaddedJ(p.ElsePart, cand.ElsePart)
+	case *golang.StatementWithInit:
+		cand := candidate.(*golang.StatementWithInit)
+		if !c.matchNode(p.Init.Element, cand.Init.Element) {
+			return false
+		}
+		return c.matchNode(p.Statement, cand.Statement)
 	case *java.Else:
 		cand := candidate.(*java.Else)
 		return c.matchNode(cand.Body.Element, p.Body.Element)
@@ -243,9 +246,6 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 		return c.matchNode(p.Iterable, cand.Iterable)
 	case *java.Switch:
 		cand := candidate.(*java.Switch)
-		if !c.matchOptionalRightPaddedStmt(p.Init, cand.Init) {
-			return false
-		}
 		if !c.matchOptionalRightPaddedExpr(p.Tag, cand.Tag) {
 			return false
 		}
