@@ -90,6 +90,8 @@ func setPrefix(j java.J, prefix java.Space) java.J {
 		return n.WithPrefix(prefix)
 	case *java.If:
 		return n.WithPrefix(prefix)
+	case *golang.MethodDeclaration:
+		return n.WithPrefix(prefix)
 	case *java.MethodDeclaration:
 		return n.WithPrefix(prefix)
 	case *java.VariableDeclarations:

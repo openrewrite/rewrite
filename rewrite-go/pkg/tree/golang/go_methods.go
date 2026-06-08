@@ -202,6 +202,18 @@ func (n *Return) WithID(id uuid.UUID) java.J {
 func (n *Return) GetPrefix() java.Space    { return n.Prefix }
 func (n *Return) GetMarkers() java.Markers { return n.Markers }
 
+func (n *MethodDeclaration) GetID() uuid.UUID { return n.ID }
+func (n *MethodDeclaration) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *MethodDeclaration) GetPrefix() java.Space    { return n.Prefix }
+func (n *MethodDeclaration) GetMarkers() java.Markers { return n.Markers }
+
 func (n *PointerType) GetID() uuid.UUID { return n.ID }
 func (n *PointerType) WithID(id uuid.UUID) java.J {
 	if n.ID == id {

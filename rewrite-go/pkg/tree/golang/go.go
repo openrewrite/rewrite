@@ -651,6 +651,37 @@ func (n *Return) WithMarkers(markers java.Markers) *Return {
 	return &c
 }
 
+// MethodDeclaration represents a Go method declaration carrying a receiver:
+// `func (s *Service) Run() {}`. It wraps the inner java.MethodDeclaration (which
+// holds the name, parameters, return type and body) and adds the receiver, for
+// which java.MethodDeclaration — mirroring Java's J.MethodDeclaration — has no
+// slot. Free functions, interface methods and function literals stay as a bare
+// java.MethodDeclaration. The wrapper is transparent for printing: its own
+// Prefix is empty and the inner Declaration keeps the whitespace before `func`.
+type MethodDeclaration struct {
+	ID          uuid.UUID
+	Prefix      java.Space
+	Markers     java.Markers
+	Receiver    java.Container[java.Statement] // `(s *Service)` between `func` and the name
+	Declaration *java.MethodDeclaration
+}
+
+func (*MethodDeclaration) IsTree()      {}
+func (*MethodDeclaration) IsJ()         {}
+func (*MethodDeclaration) IsStatement() {}
+
+func (n *MethodDeclaration) WithPrefix(prefix java.Space) *MethodDeclaration {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *MethodDeclaration) WithMarkers(markers java.Markers) *MethodDeclaration {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 // CommClause represents a communication clause in a select statement.
 // `case <-ch:` or `case ch <- val:` or `case v := <-ch:` or `default:`.
 type CommClause struct {

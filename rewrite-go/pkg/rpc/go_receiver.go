@@ -451,6 +451,15 @@ func (r *GoReceiver) VisitGoReturn(ret *golang.Return, p any) java.J {
 	return ret
 }
 
+func (r *GoReceiver) VisitGoMethodDeclaration(md *golang.MethodDeclaration, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *md // shallow copy to avoid mutating remoteObjects baseline
+	md = &c
+	md.Receiver = receiveContainer[java.Statement](r, q, md.Receiver)
+	md.Declaration = receiveValue(q, md.Declaration, func(e *java.MethodDeclaration) any { return r.Visit(e, q) })
+	return md
+}
+
 func (r *GoReceiver) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *cc // shallow copy to avoid mutating remoteObjects baseline

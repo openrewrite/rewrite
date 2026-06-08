@@ -155,6 +155,9 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 			return false
 		}
 		return c.matchOptionalNode(p.Body, cand.Body)
+	case *golang.MethodDeclaration:
+		cand := candidate.(*golang.MethodDeclaration)
+		return c.matchNode(p.Declaration, cand.Declaration)
 	case *java.VariableDeclarations:
 		cand := candidate.(*java.VariableDeclarations)
 		if !c.matchOptionalExpression(p.TypeExpr, cand.TypeExpr) {

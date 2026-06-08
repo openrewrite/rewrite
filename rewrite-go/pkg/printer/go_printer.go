@@ -223,22 +223,32 @@ func (p *GoPrinter) VisitAssignment(assign *java.Assignment, param any) java.J {
 
 func (p *GoPrinter) VisitMethodDeclaration(md *java.MethodDeclaration, param any) java.J {
 	out := param.(*PrintOutputCapture)
+	// A method with a receiver is wrapped in a golang.MethodDeclaration, which
+	// owns the prefix (J.MethodDeclaration has no receiver slot). When wrapped,
+	// the prefix and the receiver `(s *Service)` come from that parent; the
+	// inner declaration's own prefix is empty.
+	wrapper, wrapped := p.methodDeclarationWrapper()
+	prefix := md.Prefix
+	if wrapped {
+		prefix = wrapper.Prefix
+	}
 	// Each leading annotation emits as a `//<name>[ <args>]` line. The
 	// annotation's Prefix supplies the whitespace before `//` (newline
 	// + indent for non-first directives). The newline that follows the
-	// last directive lives on md.Prefix below.
+	// last directive lives on the prefix below.
 	for _, ann := range md.LeadingAnnotations {
 		p.visitSpace(ann.Prefix, out)
 		out.Append("//")
 		p.printDirectiveBody(ann, out)
 	}
-	p.beforeSyntax(md.Prefix, md.Markers, out)
+	p.beforeSyntax(prefix, md.Markers, out)
 	isInterfaceMethod := java.FindMarker[golang.InterfaceMethod](md.Markers) != nil
 	if !isInterfaceMethod {
 		out.Append("func")
 	}
-	if md.Receiver != nil {
-		p.printParamList(*md.Receiver, out)
+	if wrapped {
+		// receiver printed between `func` and the name
+		p.printParamList(wrapper.Receiver, out)
 	}
 	if md.Name.Name != "" {
 		p.Visit(md.Name, out)
@@ -255,6 +265,28 @@ func (p *GoPrinter) VisitMethodDeclaration(md *java.MethodDeclaration, param any
 	}
 	p.afterSyntax(md.Markers, out)
 	return md
+}
+
+// VisitGoMethodDeclaration prints a method declaration with a receiver. The
+// wrapper owns the prefix and the receiver, but both are emitted by the inner
+// declaration's VisitMethodDeclaration (which sources them via the cursor),
+// keeping the receiver correctly positioned between `func` and the name and the
+// prefix after any leading `//go:` directives. So this just visits the inner.
+func (p *GoPrinter) VisitGoMethodDeclaration(md *golang.MethodDeclaration, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.Visit(md.Declaration, out)
+	return md
+}
+
+// methodDeclarationWrapper returns the golang.MethodDeclaration directly
+// wrapping the J.MethodDeclaration currently being printed, if any.
+func (p *GoPrinter) methodDeclarationWrapper() (*golang.MethodDeclaration, bool) {
+	c := p.Cursor()
+	if c == nil || c.Parent() == nil {
+		return nil, false
+	}
+	wrapper, ok := c.Parent().Value().(*golang.MethodDeclaration)
+	return wrapper, ok
 }
 
 func (p *GoPrinter) VisitTypeParameters(tps *java.TypeParameters, param any) java.J {

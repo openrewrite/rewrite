@@ -248,7 +248,7 @@ func (s *JavaSender) VisitMethodDeclaration(md *java.MethodDeclaration, p any) j
 	// Go's MethodDeclaration maps to parts of Java's MethodDeclaration
 	// Java sends: leadingAnnotations, modifiers, typeParameters, returnTypeExpression,
 	//   name annotations, name, parameters, dimensionsAfterName, throws, body, defaultValue, methodType
-	// Go: receiver, name, parameters, returnType, body, methodType
+	// A method receiver lives on the wrapping Go$MethodDeclaration, not here.
 
 	// leadingAnnotations (`//go:` directives modeled as J.Annotation)
 	q.GetAndSendList(md,

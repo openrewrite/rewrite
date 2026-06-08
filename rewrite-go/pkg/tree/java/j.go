@@ -549,8 +549,7 @@ type MethodDeclaration struct {
 	ID                 uuid.UUID
 	Prefix             Space
 	Markers            Markers
-	LeadingAnnotations []*Annotation         // `//go:noinline` / `//go:nosplit` etc. on funcs
-	Receiver           *Container[Statement] // nil for free functions; `(r *Type)` receiver
+	LeadingAnnotations []*Annotation // `//go:noinline` / `//go:nosplit` etc. on funcs
 	Name               *Identifier
 	TypeParameters     *TypeParameters      // nil for non-generic functions; `[T any]` declaration-site type params
 	Parameters         Container[Statement] // parameter list in parentheses
