@@ -1176,13 +1176,14 @@ func (n *FieldAccess) WithTarget(target Expression) *FieldAccess {
 
 // MethodInvocation represents a function or method call like `f(args)`.
 type MethodInvocation struct {
-	ID         uuid.UUID
-	Prefix     Space
-	Markers    Markers
-	Select     *RightPadded[Expression] // nil for free functions
-	Name       *Identifier
-	Arguments  Container[Expression]
-	MethodType *JavaTypeMethod // the method type being invoked (nullable)
+	ID             uuid.UUID
+	Prefix         Space
+	Markers        Markers
+	Select         *RightPadded[Expression] // nil for free functions
+	TypeParameters *Container[Expression]   // explicit call-site type arguments, e.g. `[int]` in `Map[int](42)`; nil otherwise
+	Name           *Identifier
+	Arguments      Container[Expression]
+	MethodType     *JavaTypeMethod // the method type being invoked (nullable)
 }
 
 func (*MethodInvocation) IsTree()       {}
@@ -1205,6 +1206,12 @@ func (n *MethodInvocation) WithMarkers(markers Markers) *MethodInvocation {
 func (n *MethodInvocation) WithName(name *Identifier) *MethodInvocation {
 	c := *n
 	c.Name = name
+	return &c
+}
+
+func (n *MethodInvocation) WithTypeParameters(typeParameters *Container[Expression]) *MethodInvocation {
+	c := *n
+	c.TypeParameters = typeParameters
 	return &c
 }
 

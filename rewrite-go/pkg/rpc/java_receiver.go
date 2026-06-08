@@ -219,8 +219,8 @@ func (r *JavaReceiver) VisitMethodInvocation(mi *java.MethodInvocation, p any) j
 	} else {
 		mi.Select = nil
 	}
-	// typeParameters (nil for Go)
-	q.Receive(nil, nil)
+	// typeParameters (explicit call-site type args; nullable container)
+	mi.TypeParameters = receivePointerContainer[java.Expression](r, q, mi.TypeParameters)
 	// name
 	mi.Name = receiveValue(q, mi.Name, func(e *java.Identifier) any { return r.Visit(e, q) })
 	// arguments

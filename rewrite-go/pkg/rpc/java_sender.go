@@ -538,8 +538,15 @@ func (s *JavaSender) VisitMethodInvocation(mi *java.MethodInvocation, p any) jav
 		}
 		return *sel
 	}, func(v any) { sendRightPadded(s, v, q) })
-	// typeParameters (nil for Go)
-	q.GetAndSend(mi, func(_ any) any { return nil }, nil)
+	// typeParameters (explicit call-site type args, e.g. `[int]` in `Map[int](42)`;
+	// nullable container — dereference so sendContainer sees a value Container)
+	q.GetAndSend(mi, func(v any) any {
+		tp := v.(*java.MethodInvocation).TypeParameters
+		if tp == nil {
+			return nil
+		}
+		return *tp
+	}, func(v any) { sendContainer(s, v, q) })
 	// name
 	q.GetAndSend(mi, func(v any) any { return v.(*java.MethodInvocation).Name },
 		func(v any) { s.Visit(v.(java.Tree), q) })

@@ -128,6 +128,10 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 		Defs:       make(map[*ast.Ident]types.Object),
 		Uses:       make(map[*ast.Ident]types.Object),
 		Selections: make(map[*ast.SelectorExpr]*types.Selection),
+		// Instances records identifiers denoting generic functions/types that are
+		// instantiated with explicit type arguments, e.g. the `Map` in `Map[int]`.
+		// Used to distinguish generic instantiation from ordinary indexing.
+		Instances: make(map[*ast.Ident]types.Instance),
 	}
 	conf := types.Config{
 		Importer: gp.Importer,
@@ -1862,7 +1866,33 @@ func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) java.Expression {
 
 // mapCallExpr maps a function/method call.
 func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
-	fun := ctx.mapExpr(expr.Fun)
+	// `Map[int](42)` / `Pair[K, V](...)`: the callee is a generic function (or
+	// type) instantiated with explicit type arguments. Go reuses *ast.IndexExpr
+	// for both this and ordinary indexing (`funcs[0]()`), so disambiguate via the
+	// type checker's Instances set before treating `[...]` as type arguments.
+	// The callee X is mapped first, then the bracketed type args, matching the
+	// positional cursor's left-to-right order.
+	calleeAst := expr.Fun
+	var typeParams *java.Container[java.Expression]
+	var fun java.Expression
+	switch f := expr.Fun.(type) {
+	case *ast.IndexExpr:
+		if ctx.isGenericInstantiation(f.X) {
+			calleeAst = f.X
+			fun = ctx.mapExpr(f.X)
+			typeParams = ctx.mapTypeArgsSingle(f)
+		} else {
+			fun = ctx.mapExpr(expr.Fun)
+		}
+	case *ast.IndexListExpr:
+		// Multiple bracketed args are only ever a generic instantiation; `a[i, j]`
+		// is not valid Go indexing.
+		calleeAst = f.X
+		fun = ctx.mapExpr(f.X)
+		typeParams = ctx.mapTypeArgsMulti(f)
+	default:
+		fun = ctx.mapExpr(expr.Fun)
+	}
 
 	var sel *java.RightPadded[java.Expression]
 	var name *java.Identifier
@@ -1945,16 +1975,18 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 	}
 
 	mi := &java.MethodInvocation{
-		ID:        uuid.New(),
-		Prefix:    java.EmptySpace,
-		Markers:   markers,
-		Select:    sel,
-		Name:      name,
-		Arguments: java.Container[java.Expression]{Before: argsBefore, Elements: argElements},
+		ID:             uuid.New(),
+		Prefix:         java.EmptySpace,
+		Markers:        markers,
+		Select:         sel,
+		TypeParameters: typeParams,
+		Name:           name,
+		Arguments:      java.Container[java.Expression]{Before: argsBefore, Elements: argElements},
 	}
 
-	// Type attribution for method invocation
-	if selExpr, ok := expr.Fun.(*ast.SelectorExpr); ok {
+	// Type attribution for method invocation. For a generic call `Map[int](...)`
+	// calleeAst is the underlying callee (`Map`), not the IndexExpr.
+	if selExpr, ok := calleeAst.(*ast.SelectorExpr); ok {
 		if selection, ok := ctx.typeInfo.Selections[selExpr]; ok {
 			mi.MethodType = ctx.mapper.mapSelectionToMethod(selection)
 		} else if obj, ok := ctx.typeInfo.Uses[selExpr.Sel]; ok {
@@ -1963,7 +1995,7 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 				mi.MethodType = ctx.mapper.mapMethodObject(fn)
 			}
 		}
-	} else if ident, ok := expr.Fun.(*ast.Ident); ok {
+	} else if ident, ok := calleeAst.(*ast.Ident); ok {
 		if obj, ok := ctx.typeInfo.Uses[ident]; ok {
 			if fn, ok := obj.(*types.Func); ok {
 				mi.MethodType = ctx.mapper.mapMethodObject(fn)
@@ -1972,6 +2004,35 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 	}
 
 	return mi
+}
+
+// isGenericInstantiation reports whether x — the operand of an *ast.IndexExpr
+// used as a call target — denotes a generic function or type being instantiated
+// with explicit type arguments (e.g. `Map` in `Map[int](42)`), as opposed to a
+// value being indexed (e.g. `funcs` in `funcs[0]()`). It relies on the type
+// checker's Instances set, which records exactly those generic-instantiation
+// identifiers.
+func (ctx *parseContext) isGenericInstantiation(x ast.Expr) bool {
+	id := instanceIdent(x)
+	if id == nil {
+		return false
+	}
+	_, ok := ctx.typeInfo.Instances[id]
+	return ok
+}
+
+// instanceIdent returns the identifier that types.Info.Instances would key on
+// for a generic-instantiation operand: the identifier itself for a bare name
+// (`Map`), or the selector's field for a qualified name (`pkg.Map`).
+func instanceIdent(x ast.Expr) *ast.Ident {
+	switch e := x.(type) {
+	case *ast.Ident:
+		return e
+	case *ast.SelectorExpr:
+		return e.Sel
+	default:
+		return nil
+	}
 }
 
 // mapSelectorExpr maps a selector expression (e.g., pkg.Name).
@@ -2265,19 +2326,25 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) java.Expression {
 // e.g. `JSONArray[string]`, producing a J.ParameterizedType.
 func (ctx *parseContext) mapParameterizedType(expr *ast.IndexExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
+	return &java.ParameterizedType{
+		ID:             uuid.New(),
+		Clazz:          target,
+		TypeParameters: ctx.mapTypeArgsSingle(expr),
+	}
+}
+
+// mapTypeArgsSingle consumes the `[T]` of a single-type-arg generic
+// instantiation and returns the type-argument container. The caller must have
+// already consumed everything up to (but not including) the `[`.
+func (ctx *parseContext) mapTypeArgsSingle(expr *ast.IndexExpr) *java.Container[java.Expression] {
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
 	typeArg := ctx.mapTypeExpr(expr.Index)
 	rbrackPrefix := ctx.prefix(expr.Rbrack)
 	ctx.skip(1) // "]"
-
-	return &java.ParameterizedType{
-		ID:    uuid.New(),
-		Clazz: target,
-		TypeParameters: &java.Container[java.Expression]{
-			Before:   lbrackPrefix,
-			Elements: []java.RightPadded[java.Expression]{{Element: typeArg, After: rbrackPrefix}},
-		},
+	return &java.Container[java.Expression]{
+		Before:   lbrackPrefix,
+		Elements: []java.RightPadded[java.Expression]{{Element: typeArg, After: rbrackPrefix}},
 	}
 }
 
@@ -2285,6 +2352,17 @@ func (ctx *parseContext) mapParameterizedType(expr *ast.IndexExpr) java.Expressi
 // e.g. `Store[string, any]`, producing a J.ParameterizedType.
 func (ctx *parseContext) mapParameterizedTypeMulti(expr *ast.IndexListExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
+	return &java.ParameterizedType{
+		ID:             uuid.New(),
+		Clazz:          target,
+		TypeParameters: ctx.mapTypeArgsMulti(expr),
+	}
+}
+
+// mapTypeArgsMulti consumes the `[T, U, ...]` of a multi-type-arg generic
+// instantiation and returns the type-argument container. The caller must have
+// already consumed everything up to (but not including) the `[`.
+func (ctx *parseContext) mapTypeArgsMulti(expr *ast.IndexListExpr) *java.Container[java.Expression] {
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
 
@@ -2305,13 +2383,9 @@ func (ctx *parseContext) mapParameterizedTypeMulti(expr *ast.IndexListExpr) java
 	}
 	ctx.skip(1) // "]"
 
-	return &java.ParameterizedType{
-		ID:    uuid.New(),
-		Clazz: target,
-		TypeParameters: &java.Container[java.Expression]{
-			Before:   lbrackPrefix,
-			Elements: elements,
-		},
+	return &java.Container[java.Expression]{
+		Before:   lbrackPrefix,
+		Elements: elements,
 	}
 }
 
