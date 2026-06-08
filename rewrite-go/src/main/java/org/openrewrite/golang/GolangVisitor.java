@@ -254,6 +254,15 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return t;
     }
 
+    public J visitDeclarationBlock(Go.DeclarationBlock declarationBlock, P p) {
+        Go.DeclarationBlock d = declarationBlock;
+        d = d.withPrefix(visitSpace(d.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withLeadingAnnotations(ListUtils.map(d.getLeadingAnnotations(), a -> visitAndCast(a, p)));
+        d = d.getPadding().withSpecs(visitContainer(d.getPadding().getSpecs(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return d;
+    }
+
     public J visitMultiAssignment(Go.MultiAssignment multiAssignment, P p) {
         Go.MultiAssignment m = multiAssignment;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

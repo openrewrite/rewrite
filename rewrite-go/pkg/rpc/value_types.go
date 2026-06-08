@@ -50,6 +50,7 @@ func init() {
 	RegisterValueType(reflect.TypeOf((*golang.Union)(nil)), "org.openrewrite.golang.tree.Go$Union")
 	RegisterValueType(reflect.TypeOf((*golang.UnderlyingType)(nil)), "org.openrewrite.golang.tree.Go$UnderlyingType")
 	RegisterValueType(reflect.TypeOf((*golang.TypeDecl)(nil)), "org.openrewrite.golang.tree.Go$TypeDecl")
+	RegisterValueType(reflect.TypeOf((*golang.DeclarationBlock)(nil)), "org.openrewrite.golang.tree.Go$DeclarationBlock")
 	RegisterValueType(reflect.TypeOf((*golang.MultiAssignment)(nil)), "org.openrewrite.golang.tree.Go$MultiAssignment")
 	RegisterValueType(reflect.TypeOf((*golang.Return)(nil)), "org.openrewrite.golang.tree.Go$Return")
 	RegisterValueType(reflect.TypeOf((*golang.CommClause)(nil)), "org.openrewrite.golang.tree.Go$CommClause")

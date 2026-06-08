@@ -194,6 +194,14 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitDeclarationBlock(Go.DeclarationBlock declarationBlock, RpcReceiveQueue q) {
+        return declarationBlock
+                .withLeadingAnnotations(q.receiveList(declarationBlock.getLeadingAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
+                .withKind(q.receiveAndGet(declarationBlock.getKind(), v -> Go.DeclKind.valueOf((String) v)))
+                .getPadding().withSpecs(q.receive(declarationBlock.getPadding().getSpecs(), el -> visitContainer(el, q)));
+    }
+
+    @Override
     public J visitMultiAssignment(Go.MultiAssignment multiAssignment, RpcReceiveQueue q) {
         return multiAssignment
                 .getPadding().withVariables(q.receiveList(multiAssignment.getPadding().getVariables(), v -> visitRightPadded(v, q)))

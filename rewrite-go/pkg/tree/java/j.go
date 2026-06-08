@@ -1210,8 +1210,8 @@ func (n *MethodInvocation) WithName(name *Identifier) *MethodInvocation {
 }
 
 // VariableDeclarations represents one or more variable declarations.
-// For grouped declarations `var ( ... )` or `const ( ... )`, Specs is non-nil and
-// Variables/TypeExpr are unused.
+// Grouped declarations `var ( ... )` / `const ( ... )` are modeled by
+// golang.DeclarationBlock, whose elements are single VariableDeclarations.
 type VariableDeclarations struct {
 	ID                 uuid.UUID
 	Prefix             Space
@@ -1220,7 +1220,6 @@ type VariableDeclarations struct {
 	TypeExpr           Expression                         // the declared type (nil if inferred)
 	Varargs            *Space                             // non-nil for variadic params (`...T`); holds prefix of `...`
 	Variables          []RightPadded[*VariableDeclarator] // the declared variables
-	Specs              *Container[Statement]              // non-nil for grouped `var ( ... )`; Before = space before `(`
 }
 
 func (*VariableDeclarations) IsTree()      {}

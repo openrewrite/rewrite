@@ -398,6 +398,36 @@ func (r *GoReceiver) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 	return td
 }
 
+func (r *GoReceiver) VisitDeclarationBlock(db *golang.DeclarationBlock, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *db // shallow copy to avoid mutating remoteObjects baseline
+	db = &c
+	// leadingAnnotations
+	beforeAnns := make([]any, len(db.LeadingAnnotations))
+	for i, a := range db.LeadingAnnotations {
+		beforeAnns[i] = a
+	}
+	afterAnns := q.ReceiveList(beforeAnns, func(v any) any { return r.Visit(v.(java.Tree), q) })
+	if afterAnns != nil {
+		db.LeadingAnnotations = make([]*java.Annotation, 0, len(afterAnns))
+		for _, a := range afterAnns {
+			if a != nil {
+				db.LeadingAnnotations = append(db.LeadingAnnotations, a.(*java.Annotation))
+			}
+		}
+	}
+	// kind
+	kindStr := receiveScalar[string](q, "")
+	switch kindStr {
+	case "CONST":
+		db.Kind = golang.DeclConst
+	case "VAR":
+		db.Kind = golang.DeclVar
+	}
+	db.Specs = receivePointerContainer[java.Statement](r, q, db.Specs)
+	return db
+}
+
 func (r *GoReceiver) VisitMultiAssignment(ma *golang.MultiAssignment, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *ma // shallow copy to avoid mutating remoteObjects baseline
