@@ -411,6 +411,15 @@ func (s *GoSender) VisitGoReturn(ret *golang.Return, p any) java.J {
 	return ret
 }
 
+func (s *GoSender) VisitGoMethodDeclaration(md *golang.MethodDeclaration, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(md, func(v any) any { return v.(*golang.MethodDeclaration).Receiver },
+		func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(md, func(v any) any { return v.(*golang.MethodDeclaration).Declaration },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return md
+}
+
 func (s *GoSender) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(cc, func(v any) any { return v.(*golang.CommClause).Comm },

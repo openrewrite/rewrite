@@ -614,8 +614,11 @@ func (ctx *parseContext) mapTypeSpec(spec *ast.TypeSpec, prefix java.Space) *gol
 	}
 }
 
-// mapFuncDecl maps a function declaration.
-func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) *java.MethodDeclaration {
+// mapFuncDecl maps a function declaration. Free functions map to a bare
+// java.MethodDeclaration (mirroring J.MethodDeclaration); methods carrying a
+// receiver (`func (s *Service) Run()`) wrap that declaration in a
+// golang.MethodDeclaration, since J.MethodDeclaration has no receiver slot.
+func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) java.Statement {
 	prefix := ctx.prefixAndSkip(decl.Pos(), len("func"))
 	leadingAnns, prefix := extractDirectives(prefix)
 
@@ -639,7 +642,6 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) *java.MethodDeclaration
 		ID:                 uuid.New(),
 		Prefix:             prefix,
 		LeadingAnnotations: leadingAnns,
-		Receiver:           receiver,
 		Name:               name,
 		TypeParameters:     typeParams,
 		Parameters:         params,
@@ -651,6 +653,20 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) *java.MethodDeclaration
 	if obj, ok := ctx.typeInfo.Defs[decl.Name]; ok && obj != nil {
 		if fn, ok := obj.(*types.Func); ok {
 			md.MethodType = ctx.mapper.mapMethodObject(fn)
+		}
+	}
+
+	if receiver != nil {
+		// The prefix (whitespace before `func`, after any `//go:` directives)
+		// belongs on the outermost node, so it moves to the wrapper; the inner
+		// declaration keeps its leading directives but is otherwise prefix-less.
+		declPrefix := md.Prefix
+		md.Prefix = java.EmptySpace
+		return &golang.MethodDeclaration{
+			ID:          uuid.New(),
+			Prefix:      declPrefix,
+			Receiver:    *receiver,
+			Declaration: md,
 		}
 	}
 

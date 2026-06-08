@@ -245,6 +245,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitMultiAssignment(n, p)
 	case *golang.Return:
 		return v.self().VisitGoReturn(n, p)
+	case *golang.MethodDeclaration:
+		return v.self().VisitGoMethodDeclaration(n, p)
 	case *golang.CommClause:
 		return v.self().VisitCommClause(n, p)
 	case *golang.Unary:
@@ -338,6 +340,7 @@ type VisitorI interface {
 	VisitInterfaceType(it *golang.InterfaceType, p any) java.J
 	VisitMultiAssignment(ma *golang.MultiAssignment, p any) java.J
 	VisitGoReturn(ret *golang.Return, p any) java.J
+	VisitGoMethodDeclaration(md *golang.MethodDeclaration, p any) java.J
 	VisitCommClause(cc *golang.CommClause, p any) java.J
 	VisitGoUnary(u *golang.Unary, p any) java.J
 	VisitGoBinary(b *golang.Binary, p any) java.J
@@ -521,12 +524,6 @@ func (v *GoVisitor) VisitMethodDeclaration(md *java.MethodDeclaration, p any) ja
 		}
 		md = md.WithLeadingAnnotations(anns)
 	}
-	if md.Receiver != nil {
-		recv := *md.Receiver
-		recv.Before = v.self().VisitSpace(recv.Before, p)
-		recv.Elements = visitRightPaddedList(v, recv.Elements, p)
-		md.Receiver = &recv
-	}
 	md = md.WithName(visitAndCast[*java.Identifier](v, md.Name, p))
 	if md.TypeParameters != nil {
 		md = md.WithTypeParameters(visitAndCast[*java.TypeParameters](v, md.TypeParameters, p))
@@ -540,6 +537,16 @@ func (v *GoVisitor) VisitMethodDeclaration(md *java.MethodDeclaration, p any) ja
 		md = md.WithBody(visitAndCast[*java.Block](v, md.Body, p))
 	}
 	return md
+}
+
+func (v *GoVisitor) VisitGoMethodDeclaration(md *golang.MethodDeclaration, p any) java.J {
+	c := *md
+	c.Prefix = v.self().VisitSpace(c.Prefix, p)
+	c.Markers = v.visitMarkers(c.Markers, p)
+	c.Receiver.Before = v.self().VisitSpace(c.Receiver.Before, p)
+	c.Receiver.Elements = visitRightPaddedList(v, c.Receiver.Elements, p)
+	c.Declaration = visitAndCast[*java.MethodDeclaration](v, c.Declaration, p)
+	return &c
 }
 
 func (v *GoVisitor) VisitTypeParameters(tps *java.TypeParameters, p any) java.J {

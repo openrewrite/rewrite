@@ -1809,6 +1809,86 @@ public interface Go extends J {
     }
 
     // ---------------------------------------------------------------
+    // MethodDeclaration (func (s *Service) Run() {}) — method with receiver
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class MethodDeclaration implements Go, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JContainer<Statement> receiver;
+
+        public List<Statement> getReceiver() {
+            return receiver.getElements();
+        }
+
+        public Go.MethodDeclaration withReceiver(List<Statement> receiver) {
+            return getPadding().withReceiver(JContainer.withElements(this.receiver, receiver));
+        }
+
+        @With
+        @Getter
+        J.MethodDeclaration declaration;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitGoMethodDeclaration(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.MethodDeclaration t;
+
+            public JContainer<Statement> getReceiver() {
+                return t.receiver;
+            }
+
+            public Go.MethodDeclaration withReceiver(JContainer<Statement> receiver) {
+                return t.receiver == receiver ? t : new Go.MethodDeclaration(t.padding, t.id, t.prefix, t.markers, receiver, t.declaration);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
     // CommClause (case <-ch: ... in select)
     // ---------------------------------------------------------------
 

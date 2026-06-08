@@ -232,6 +232,50 @@ class GoRpcPrintRoundTripIntegTest {
     }
 
     @Test
+    void methodReceiverSurvivesDeserialization() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                type Service struct {
+                }
+
+                func (s *Service) Run() {
+                }
+                """);
+    }
+
+    @Test
+    void valueReceiverWithParamsAndReturn() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                type Service struct {
+                }
+
+                func (s Service) Add(a int, b int) int {
+                \treturn a + b
+                }
+                """);
+    }
+
+    @Test
+    void receiverMethodWithMultiValueReturn() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                type Service struct {
+                }
+
+                func (s *Service) Run() (int, error) {
+                \treturn 0, nil
+                }
+                """);
+    }
+
+    @Test
     void addressOfAndVariadicSpread() {
         assertPrintsUnchangedAfterReset(
                 "package main\n" +

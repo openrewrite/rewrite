@@ -203,6 +203,13 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitGoMethodDeclaration(Go.MethodDeclaration methodDeclaration, RpcSendQueue q) {
+        q.getAndSend(methodDeclaration, m -> m.getPadding().getReceiver(), el -> visitContainer(el, q));
+        q.getAndSend(methodDeclaration, Go.MethodDeclaration::getDeclaration, el -> visit(el, q));
+        return methodDeclaration;
+    }
+
+    @Override
     public J visitCommClause(Go.CommClause commClause, RpcSendQueue q) {
         q.getAndSend(commClause, Go.CommClause::getComm, el -> visit(el, q));
         q.getAndSend(commClause, Go.CommClause::getColon, space -> visitSpace(space, q));
