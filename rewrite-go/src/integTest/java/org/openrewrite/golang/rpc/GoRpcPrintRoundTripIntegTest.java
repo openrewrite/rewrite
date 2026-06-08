@@ -232,6 +232,34 @@ class GoRpcPrintRoundTripIntegTest {
     }
 
     @Test
+    void ifWithInitClauseSurvivesDeserialization() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f() {
+                \tif err := g(); err != nil {
+                \t} else {
+                \t}
+                }
+                """);
+    }
+
+    @Test
+    void switchWithInitClauseSurvivesDeserialization() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f() {
+                \tswitch x := g(); x {
+                \tcase 1:
+                \t}
+                }
+                """);
+    }
+
+    @Test
     void methodReceiverSurvivesDeserialization() {
         assertPrintsUnchangedAfterReset(
                 """

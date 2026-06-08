@@ -249,6 +249,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitGoReturn(n, p)
 	case *golang.MethodDeclaration:
 		return v.self().VisitGoMethodDeclaration(n, p)
+	case *golang.StatementWithInit:
+		return v.self().VisitStatementWithInit(n, p)
 	case *golang.CommClause:
 		return v.self().VisitCommClause(n, p)
 	case *golang.Unary:
@@ -344,6 +346,7 @@ type VisitorI interface {
 	VisitMultiAssignment(ma *golang.MultiAssignment, p any) java.J
 	VisitGoReturn(ret *golang.Return, p any) java.J
 	VisitGoMethodDeclaration(md *golang.MethodDeclaration, p any) java.J
+	VisitStatementWithInit(s *golang.StatementWithInit, p any) java.J
 	VisitCommClause(cc *golang.CommClause, p any) java.J
 	VisitGoUnary(u *golang.Unary, p any) java.J
 	VisitGoBinary(b *golang.Binary, p any) java.J
@@ -473,13 +476,7 @@ func (v *GoVisitor) VisitGoReturn(ret *golang.Return, p any) java.J {
 func (v *GoVisitor) VisitIf(ifStmt *java.If, p any) java.J {
 	ifStmt = ifStmt.WithPrefix(v.self().VisitSpace(ifStmt.Prefix, p))
 	ifStmt = ifStmt.WithMarkers(v.visitMarkers(ifStmt.Markers, p))
-	if ifStmt.Init != nil {
-		init := *ifStmt.Init
-		init.Element = v.self().Visit(init.Element, p).(java.Statement)
-		init.After = v.self().VisitSpace(init.After, p)
-		ifStmt.Init = &init
-	}
-	ifStmt = ifStmt.WithCondition(visitExpression(v, ifStmt.Condition, p))
+	ifStmt = ifStmt.WithCondition(visitAndCast[*java.ControlParentheses](v, ifStmt.Condition, p))
 	ifStmt = ifStmt.WithThen(visitAndCast[*java.Block](v, ifStmt.Then, p))
 	if ifStmt.ElsePart != nil {
 		ep := *ifStmt.ElsePart
@@ -549,6 +546,16 @@ func (v *GoVisitor) VisitGoMethodDeclaration(md *golang.MethodDeclaration, p any
 	c.Receiver.Before = v.self().VisitSpace(c.Receiver.Before, p)
 	c.Receiver.Elements = visitRightPaddedList(v, c.Receiver.Elements, p)
 	c.Declaration = visitAndCast[*java.MethodDeclaration](v, c.Declaration, p)
+	return &c
+}
+
+func (v *GoVisitor) VisitStatementWithInit(s *golang.StatementWithInit, p any) java.J {
+	c := *s
+	c.Prefix = v.self().VisitSpace(c.Prefix, p)
+	c.Markers = v.visitMarkers(c.Markers, p)
+	c.Init.Element = v.self().Visit(c.Init.Element, p).(java.Statement)
+	c.Init.After = v.self().VisitSpace(c.Init.After, p)
+	c.Statement = v.self().Visit(c.Statement, p).(java.Statement)
 	return &c
 }
 

@@ -275,6 +275,8 @@ func getLeadingPrefix(j java.J) java.Space {
 		return n.Prefix
 	case *golang.MethodDeclaration:
 		return n.Prefix
+	case *golang.StatementWithInit:
+		return n.Prefix
 	case *java.MethodDeclaration:
 		return n.Prefix
 	case *java.VariableDeclarations:

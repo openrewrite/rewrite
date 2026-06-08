@@ -424,24 +424,9 @@ func (r *JavaReceiver) VisitIf(i *java.If, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *i // shallow copy to avoid mutating remoteObjects baseline
 	i = &c
-	// ifCondition - Java sends ControlParentheses; cache it for future round-trips
-	var beforeCP any
-	if i.ConditionCP != nil {
-		beforeCP = i.ConditionCP
-	} else if i.Condition != nil {
-		beforeCP = &java.ControlParentheses{
-			ID:      uuid.New(),
-			Markers: java.Markers{ID: uuid.New()},
-			Tree:    java.RightPadded[java.Expression]{Element: i.Condition},
-		}
-	}
-	if cpResult := q.Receive(beforeCP, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
-		if cp, ok := cpResult.(*java.ControlParentheses); ok {
-			i.ConditionCP = cp
-			i.Condition = cp.Tree.Element
-		} else {
-			i.Condition = cpResult.(java.Expression)
-		}
+	// ifCondition - Java sends a ControlParentheses; store it directly (matches J.If)
+	if cpResult := q.Receive(i.Condition, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
+		i.Condition = cpResult.(*java.ControlParentheses)
 	}
 	// thenPart - Java sends RightPadded<Statement> wrapping the Block
 	if thenResult := q.Receive(nil, func(v any) any { return receiveRightPadded(r, q, v) }); thenResult != nil {

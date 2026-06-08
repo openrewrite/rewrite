@@ -188,14 +188,29 @@ func (p *GoPrinter) VisitGoReturn(ret *golang.Return, param any) java.J {
 
 func (p *GoPrinter) VisitIf(ifStmt *java.If, param any) java.J {
 	out := param.(*PrintOutputCapture)
-	p.beforeSyntax(ifStmt.Prefix, ifStmt.Markers, out)
+	// An `if` with an init clause is wrapped in a golang.StatementWithInit, which
+	// owns the prefix and the init statement (java.If has no init slot). When
+	// wrapped, the prefix and `<init>;` are sourced from that parent and emitted
+	// between `if` and the condition.
+	wrapper, wrapped := p.statementWithInitWrapper()
+	prefix := ifStmt.Prefix
+	if wrapped {
+		prefix = wrapper.Prefix
+	}
+	p.beforeSyntax(prefix, ifStmt.Markers, out)
 	out.Append("if")
-	if ifStmt.Init != nil {
-		p.Visit(ifStmt.Init.Element, out)
-		p.visitSpace(ifStmt.Init.After, out)
+	if wrapped {
+		p.Visit(wrapper.Init.Element, out)
+		p.visitSpace(wrapper.Init.After, out)
 		out.Append(";")
 	}
-	p.Visit(ifStmt.Condition, out)
+	// The condition is a ControlParentheses (matching J.If), but Go has no parens,
+	// so emit only its inner element. The wrapper's own spaces are empty for
+	// parsed Go; print them for robustness against Java-side edits.
+	cond := ifStmt.Condition
+	p.visitSpace(cond.Prefix, out)
+	p.Visit(cond.Tree.Element, out)
+	p.visitSpace(cond.Tree.After, out)
 	p.Visit(ifStmt.Then, out)
 	if ifStmt.ElsePart != nil {
 		p.visitSpace(ifStmt.ElsePart.After, out)
@@ -286,6 +301,28 @@ func (p *GoPrinter) methodDeclarationWrapper() (*golang.MethodDeclaration, bool)
 		return nil, false
 	}
 	wrapper, ok := c.Parent().Value().(*golang.MethodDeclaration)
+	return wrapper, ok
+}
+
+// VisitStatementWithInit prints an if/switch carrying an init clause. The
+// wrapper owns the prefix and the init statement, but both are emitted by the
+// inner statement's VisitIf/VisitSwitch (which source them via the cursor),
+// keeping `<init>;` correctly positioned between the keyword and the condition.
+// So this just visits the inner statement.
+func (p *GoPrinter) VisitStatementWithInit(s *golang.StatementWithInit, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.Visit(s.Statement, out)
+	return s
+}
+
+// statementWithInitWrapper returns the golang.StatementWithInit directly
+// wrapping the if/switch currently being printed, if any.
+func (p *GoPrinter) statementWithInitWrapper() (*golang.StatementWithInit, bool) {
+	c := p.Cursor()
+	if c == nil || c.Parent() == nil {
+		return nil, false
+	}
+	wrapper, ok := c.Parent().Value().(*golang.StatementWithInit)
 	return wrapper, ok
 }
 
@@ -527,15 +564,23 @@ func (p *GoPrinter) VisitImport(imp *java.Import, param any) java.J {
 
 func (p *GoPrinter) VisitSwitch(sw *java.Switch, param any) java.J {
 	out := param.(*PrintOutputCapture)
-	p.beforeSyntax(sw.Prefix, sw.Markers, out)
+	// A `switch` with an init clause is wrapped in a golang.StatementWithInit
+	// (java.Switch has no init slot); when wrapped, the prefix and `<init>;` come
+	// from that parent. `select` has no init, so it is never wrapped.
+	wrapper, wrapped := p.statementWithInitWrapper()
+	prefix := sw.Prefix
+	if wrapped {
+		prefix = wrapper.Prefix
+	}
+	p.beforeSyntax(prefix, sw.Markers, out)
 	if java.FindMarker[golang.SelectStmt](sw.Markers) != nil {
 		out.Append("select")
 	} else {
 		out.Append("switch")
 	}
-	if sw.Init != nil {
-		p.Visit(sw.Init.Element, out)
-		p.visitSpace(sw.Init.After, out)
+	if wrapped {
+		p.Visit(wrapper.Init.Element, out)
+		p.visitSpace(wrapper.Init.After, out)
 		out.Append(";")
 	}
 	if sw.Tag != nil {

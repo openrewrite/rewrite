@@ -172,20 +172,9 @@ func (s *JavaSender) VisitReturn(r *java.Return, p any) java.J {
 
 func (s *JavaSender) VisitIf(i *java.If, p any) java.J {
 	q := p.(*SendQueue)
-	// ifCondition - reuse cached ControlParentheses if available, otherwise create new
-	q.GetAndSend(i, func(v any) any {
-		ifNode := v.(*java.If)
-		if ifNode.ConditionCP != nil {
-			cp := *ifNode.ConditionCP
-			cp.Tree = java.RightPadded[java.Expression]{Element: ifNode.Condition, After: cp.Tree.After}
-			return &cp
-		}
-		return &java.ControlParentheses{
-			ID:      uuid.New(),
-			Markers: java.Markers{ID: uuid.New()},
-			Tree:    java.RightPadded[java.Expression]{Element: ifNode.Condition, After: java.EmptySpace},
-		}
-	}, func(v any) { s.Visit(v.(java.Tree), q) })
+	// ifCondition - the condition is already a ControlParentheses, matching J.If
+	q.GetAndSend(i, func(v any) any { return v.(*java.If).Condition },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// thenPart (right-padded)
 	q.GetAndSend(i, func(v any) any {
 		return java.RightPadded[java.Statement]{

@@ -1974,6 +1974,86 @@ public interface Go extends J {
     }
 
     // ---------------------------------------------------------------
+    // StatementWithInit (if/switch x := f(); ...) — init clause carrier
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class StatementWithInit implements Go, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JRightPadded<Statement> init;
+
+        public Statement getInit() {
+            return init.getElement();
+        }
+
+        public Go.StatementWithInit withInit(Statement init) {
+            return getPadding().withInit(this.init.withElement(init));
+        }
+
+        @With
+        @Getter
+        Statement statement;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitStatementWithInit(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.StatementWithInit t;
+
+            public JRightPadded<Statement> getInit() {
+                return t.init;
+            }
+
+            public Go.StatementWithInit withInit(JRightPadded<Statement> init) {
+                return t.init == init ? t : new Go.StatementWithInit(t.padding, t.id, t.prefix, t.markers, init, t.statement);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
     // CommClause (case <-ch: ... in select)
     // ---------------------------------------------------------------
 

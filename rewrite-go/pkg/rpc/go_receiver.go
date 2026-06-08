@@ -490,6 +490,17 @@ func (r *GoReceiver) VisitGoMethodDeclaration(md *golang.MethodDeclaration, p an
 	return md
 }
 
+func (r *GoReceiver) VisitStatementWithInit(swi *golang.StatementWithInit, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *swi // shallow copy to avoid mutating remoteObjects baseline
+	swi = &c
+	if result := q.Receive(swi.Init, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		swi.Init = coerceToStatementRP(result)
+	}
+	swi.Statement = receiveValue(q, swi.Statement, func(e java.Statement) any { return r.Visit(e, q) })
+	return swi
+}
+
 func (r *GoReceiver) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *cc // shallow copy to avoid mutating remoteObjects baseline
