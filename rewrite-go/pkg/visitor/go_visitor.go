@@ -586,6 +586,12 @@ func (v *GoVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java
 		mi.Select = &sel
 	}
 	mi = mi.WithName(visitAndCast[*java.Identifier](v, mi.Name, p))
+	if mi.TypeParameters != nil {
+		tp := *mi.TypeParameters
+		tp.Before = v.self().VisitSpace(tp.Before, p)
+		tp.Elements = visitRightPaddedList(v, tp.Elements, p)
+		mi.TypeParameters = &tp
+	}
 	mi.Arguments.Before = v.self().VisitSpace(mi.Arguments.Before, p)
 	mi.Arguments.Elements = visitRightPaddedList(v, mi.Arguments.Elements, p)
 	return mi

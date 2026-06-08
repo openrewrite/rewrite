@@ -335,6 +335,18 @@ func (p *GoPrinter) VisitMethodInvocation(mi *java.MethodInvocation, param any) 
 	if mi.Name.Name != "" {
 		p.Visit(mi.Name, out)
 	}
+	if mi.TypeParameters != nil {
+		p.visitSpace(mi.TypeParameters.Before, out)
+		out.Append("[")
+		for i, rp := range mi.TypeParameters.Elements {
+			p.Visit(rp.Element, out)
+			p.visitSpace(rp.After, out)
+			if i < len(mi.TypeParameters.Elements)-1 {
+				out.Append(",")
+			}
+		}
+		out.Append("]")
+	}
 	p.visitSpace(mi.Arguments.Before, out)
 	out.Append("(")
 	tc := java.FindMarker[golang.TrailingComma](mi.Markers)
