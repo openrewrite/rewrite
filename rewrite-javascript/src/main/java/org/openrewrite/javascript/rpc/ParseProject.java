@@ -50,21 +50,23 @@ class ParseProject implements RpcRequest {
     Path relativeTo;
 
     /**
-     * Optional subset of files to serialize and return, identified by their source path relative to
-     * {@link #relativeTo} (or {@link #projectPath} when {@code relativeTo} is {@code null}), normalized
-     * to forward slashes.
+     * The incremental "changed files" channel (see {@code ParseProjectOptions#files}): the subset of source
+     * files to serialize and return, relative to {@link #relativeTo} (or {@link #projectPath} when
+     * {@code relativeTo} is {@code null}), normalized to forward slashes.
      * <p>
-     * When {@code null} the whole project is returned (the default, original behavior). When non-{@code null}
-     * the server still loads and type-checks the entire project for full type context, but only returns the
-     * files in this set.
+     * {@code null} = a full parse of the whole project (the default, original behavior). Non-{@code null} =
+     * the server still loads and type-checks the entire project for full type context, but returns only this
+     * set. The caller decides full vs. incremental and escalates to a full parse on configuration-input
+     * changes; the server never auto-upgrades.
      */
     @Nullable
     List<String> files;
 
     /**
-     * Forward-compatibility carrier for additional, as-yet-undefined parsing options. Frozen into the
-     * wire shape now — but unused — so that a future optimization (e.g. true incremental re-parsing) can
-     * be threaded through without a second breaking change to the request type. Always {@code null} today.
+     * Forward-compatibility carrier for additional, as-yet-undefined parsing options — reserved, today
+     * always {@code null} and ignored by the server. Frozen into the wire shape now so a future addition
+     * (e.g. stateful-session control or true-incremental re-parsing hints) needs no second breaking change
+     * to the request type.
      */
     @Nullable
     Map<String, Object> options;

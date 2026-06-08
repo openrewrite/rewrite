@@ -56,15 +56,17 @@ export class ParseProject {
          */
         private readonly relativeTo?: string,
         /**
-         * Optional subset of files to serialize and return, identified by their source path relative to
-         * `relativeTo` (or `projectPath` when not set), normalized to forward slashes. When omitted the
-         * whole project is returned. When present the whole project is still discovered and type-checked,
-         * but only these files are serialized and returned.
+         * The incremental "changed files" channel: the subset of source files to serialize and return,
+         * relative to `relativeTo` (or `projectPath` when not set), normalized to forward slashes.
+         * Omitted/`undefined` = a full parse of the whole project. When present, the whole project is still
+         * discovered and type-checked (so types resolve as in a full parse) but only these files are
+         * returned. The caller decides full vs. incremental and escalates to a full parse when a
+         * configuration input changes; the server never auto-upgrades an incremental request to a full one.
          */
         private readonly files?: string[],
         /**
-         * Forward-compatibility carrier for additional, as-yet-undefined parsing options. Reserved for a
-         * future optimization (e.g. true incremental re-parsing); currently ignored by the server.
+         * Forward-compatibility carrier for additional, as-yet-undefined parsing options — reserved for a
+         * future stateful-session / true-incremental optimization; currently ignored by the server.
          */
         private readonly options?: Record<string, unknown>
     ) {}
