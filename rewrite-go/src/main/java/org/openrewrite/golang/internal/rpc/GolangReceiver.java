@@ -309,29 +309,37 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
                 iterable = new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY);
             }
 
-            // Build a synthetic VariableDeclarations to represent key/value
-            J.Identifier varName;
-            if (key != null && key.getElement() instanceof J.Identifier) {
-                varName = (J.Identifier) key.getElement();
+            JRightPadded<Statement> varPadded;
+            if (key == null) {
+                // Keyless `for range expr` — no loop variable. Represent the
+                // absent variable with J.Empty so the round trip stays keyless
+                // instead of synthesizing a `_ :=`. GolangSender sends key=null
+                // for any non-VariableDeclarations variable.
+                @SuppressWarnings("unchecked")
+                JRightPadded<Statement> empty = (JRightPadded<Statement>) (JRightPadded<?>)
+                        JRightPadded.build(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY));
+                varPadded = empty;
             } else {
-                varName = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                        Collections.emptyList(), "_", null, null);
+                // Build a synthetic VariableDeclarations to represent the key.
+                J.Identifier varName = key.getElement() instanceof J.Identifier ?
+                        (J.Identifier) key.getElement() :
+                        new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                                Collections.emptyList(), "_", null, null);
+
+                J.VariableDeclarations.NamedVariable namedVar = new J.VariableDeclarations.NamedVariable(
+                        Tree.randomId(), varName.getPrefix(), varName.getMarkers(),
+                        varName.withPrefix(Space.EMPTY), Collections.emptyList(), null, null);
+
+                J.VariableDeclarations varDecls = new J.VariableDeclarations(
+                        Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                        Collections.emptyList(), Collections.emptyList(), null,
+                        null, Collections.emptyList(),
+                        Collections.singletonList(JRightPadded.build(namedVar)));
+
+                @SuppressWarnings("unchecked")
+                JRightPadded<Statement> built = (JRightPadded<Statement>) (JRightPadded<?>) JRightPadded.build(varDecls).withAfter(key.getAfter());
+                varPadded = built;
             }
-
-            J.VariableDeclarations.NamedVariable namedVar = new J.VariableDeclarations.NamedVariable(
-                    Tree.randomId(), varName.getPrefix(), varName.getMarkers(),
-                    varName.withPrefix(Space.EMPTY), Collections.emptyList(), null, null);
-
-            J.VariableDeclarations varDecls = new J.VariableDeclarations(
-                    Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                    Collections.emptyList(), Collections.emptyList(), null,
-                    null, Collections.emptyList(),
-                    Collections.singletonList(JRightPadded.build(namedVar)));
-
-            Space afterVar = key != null ? key.getAfter() : Space.EMPTY;
-
-            @SuppressWarnings("unchecked")
-            JRightPadded<Statement> varPadded = (JRightPadded<Statement>) (JRightPadded<?>) JRightPadded.build(varDecls).withAfter(afterVar);
             return control
                     .getPadding().withVariable(varPadded)
                     .getPadding().withIterable(JRightPadded.build(iterable));

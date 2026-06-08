@@ -119,6 +119,36 @@ class GoRpcPrintRoundTripIntegTest {
     }
 
     @Test
+    void chainedMethodCallInsideErrorCheckBlock() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func handle(err error) {
+                \tif err != nil {
+                \t\tlogger.Error().Err(err).Msg("Cannot retrieve data")
+                \t}
+                }
+                """);
+    }
+
+    @Test
+    void errorCheckBlockNestedInForLoop() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func handle(items []int, err error) {
+                \tfor range items {
+                \t\tif err != nil {
+                \t\t\tlogger.Error().Err(err).Msg("Cannot retrieve data")
+                \t\t}
+                \t}
+                }
+                """);
+    }
+
+    @Test
     void stringConcatAndCompoundAssign() {
         assertPrintsUnchangedAfterReset(
                 "package main\n" +
