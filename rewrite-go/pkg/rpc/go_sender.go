@@ -212,6 +212,15 @@ func (s *GoSender) VisitKeyValue(kv *golang.KeyValue, p any) java.J {
 	return kv
 }
 
+func (s *GoSender) VisitGoArrayType(at *golang.ArrayType, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(at, func(v any) any { return v.(*golang.ArrayType).Length },
+		func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(at, func(v any) any { return v.(*golang.ArrayType).ElementType },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return at
+}
+
 func (s *GoSender) VisitSlice(sl *golang.Slice, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(sl, func(v any) any { return v.(*golang.Slice).Indexed },

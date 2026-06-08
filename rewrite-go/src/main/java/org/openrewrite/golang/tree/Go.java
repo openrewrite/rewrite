@@ -856,6 +856,103 @@ public interface Go extends J {
     }
 
     // ---------------------------------------------------------------
+    // ArrayType ([N]T) — fixed-size array with an inline length expression
+    // ---------------------------------------------------------------
+
+    /**
+     * A fixed-size array type {@code [N]T} (e.g. {@code [5]int}, {@code [...]int{...}}).
+     * The length {@code N} is an inline constant expression that {@link J.ArrayType}
+     * (mirroring Java, which has no length in array types) cannot hold. Slices
+     * {@code []T} have no length and keep using {@link J.ArrayType}.
+     */
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ArrayType implements Go, Expression, TypeTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JRightPadded<Expression> length;
+
+        public Expression getLength() {
+            return length.getElement();
+        }
+
+        public Go.ArrayType withLength(Expression length) {
+            return getPadding().withLength(this.length.withElement(length));
+        }
+
+        @With
+        @Getter
+        Expression elementType;
+
+        @Override
+        public @Nullable JavaType getType() {
+            return null;
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            //noinspection unchecked
+            return (T) this;
+        }
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitGoArrayType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.ArrayType t;
+
+            public JRightPadded<Expression> getLength() {
+                return t.length;
+            }
+
+            public Go.ArrayType withLength(JRightPadded<Expression> length) {
+                return t.length == length ? t : new Go.ArrayType(t.padding, t.id, t.prefix, t.markers, length, t.elementType);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
     // MapType (map[K]V)
     // ---------------------------------------------------------------
 

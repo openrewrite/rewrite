@@ -203,7 +203,10 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 		return c.matchNode(p.Index.Element, cand.Index.Element)
 	case *java.ArrayType:
 		cand := candidate.(*java.ArrayType)
-		if !c.matchOptionalExpression(p.Length, cand.Length) {
+		return c.matchNode(p.ElementType, cand.ElementType)
+	case *golang.ArrayType:
+		cand := candidate.(*golang.ArrayType)
+		if !c.matchNode(p.Length.Element, cand.Length.Element) {
 			return false
 		}
 		return c.matchNode(p.ElementType, cand.ElementType)

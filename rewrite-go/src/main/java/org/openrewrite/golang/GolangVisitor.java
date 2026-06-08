@@ -145,6 +145,15 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return s;
     }
 
+    public J visitGoArrayType(Go.ArrayType arrayType, P p) {
+        Go.ArrayType a = arrayType;
+        a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        a = a.getPadding().withLength(visitRightPadded(a.getPadding().getLength(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
+        a = a.withElementType((Expression) visitAndCast(a.getElementType(), p));
+        return a;
+    }
+
     public J visitMapType(Go.MapType mapType, P p) {
         Go.MapType m = mapType;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
