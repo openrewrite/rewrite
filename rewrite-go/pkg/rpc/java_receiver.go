@@ -416,26 +416,7 @@ func (r *JavaReceiver) VisitReturn(ret *java.Return, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *ret
 	ret = &c
-	var beforeExpr any
-	if len(ret.Expressions) > 0 {
-		beforeExpr = ret.Expressions[0].Element
-	}
-	if result := q.Receive(beforeExpr, func(v any) any { return r.Visit(v.(java.Tree), q) }); result != nil {
-		expr := result.(java.Expression)
-		if len(ret.Expressions) > 0 {
-			ret.Expressions[0] = java.RightPadded[java.Expression]{
-				Element: expr,
-				After:   ret.Expressions[0].After,
-				Markers: ret.Expressions[0].Markers,
-			}
-		} else {
-			ret.Expressions = []java.RightPadded[java.Expression]{
-				{Element: expr},
-			}
-		}
-	} else if beforeExpr != nil {
-		ret.Expressions = nil
-	}
+	ret.Expression = receiveValue(q, ret.Expression, func(e java.Expression) any { return r.Visit(e, q) })
 	return ret
 }
 

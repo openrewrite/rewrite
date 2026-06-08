@@ -220,6 +220,18 @@ class GoRpcPrintRoundTripIntegTest {
     }
 
     @Test
+    void multiValueReturnSurvivesDeserialization() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func retrieve() (int, error) {
+                \treturn 0, nil
+                }
+                """);
+    }
+
+    @Test
     void addressOfAndVariadicSpread() {
         assertPrintsUnchangedAfterReset(
                 "package main\n" +

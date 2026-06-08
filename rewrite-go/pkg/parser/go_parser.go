@@ -1023,8 +1023,10 @@ func (ctx *parseContext) mapStmt(stmt ast.Stmt) java.Statement {
 	}
 }
 
-// mapReturnStmt maps a return statement.
-func (ctx *parseContext) mapReturnStmt(stmt *ast.ReturnStmt) *java.Return {
+// mapReturnStmt maps a return statement. Zero- and single-value returns map to
+// java.Return (mirroring Java's J.Return); multi-value returns (`return 0, nil`)
+// map to golang.Return, just as multi-value assignments map to MultiAssignment.
+func (ctx *parseContext) mapReturnStmt(stmt *ast.ReturnStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("return"))
 
 	var exprs []java.RightPadded[java.Expression]
@@ -1041,7 +1043,15 @@ func (ctx *parseContext) mapReturnStmt(stmt *ast.ReturnStmt) *java.Return {
 		exprs = append(exprs, java.RightPadded[java.Expression]{Element: mapped, After: after})
 	}
 
-	return &java.Return{ID: uuid.New(), Prefix: prefix, Expressions: exprs}
+	if len(exprs) > 1 {
+		return &golang.Return{ID: uuid.New(), Prefix: prefix, Expressions: exprs}
+	}
+
+	var single java.Expression
+	if len(exprs) == 1 {
+		single = exprs[0].Element
+	}
+	return &java.Return{ID: uuid.New(), Prefix: prefix, Expression: single}
 }
 
 // mapAssignStmt maps an assignment statement.

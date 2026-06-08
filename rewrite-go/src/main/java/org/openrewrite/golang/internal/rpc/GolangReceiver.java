@@ -202,6 +202,12 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitGoReturn(Go.Return aReturn, RpcReceiveQueue q) {
+        return aReturn
+                .getPadding().withExpressions(q.receiveList(aReturn.getPadding().getExpressions(), v -> visitRightPadded(v, q)));
+    }
+
+    @Override
     public J visitCommClause(Go.CommClause commClause, RpcReceiveQueue q) {
         return commClause
                 .withComm(q.receive(commClause.getComm(), el -> (Statement) visitNonNull(el, q)))
