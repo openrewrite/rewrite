@@ -241,6 +241,17 @@ func (r *GoReceiver) VisitKeyValue(kv *golang.KeyValue, p any) java.J {
 	return kv
 }
 
+func (r *GoReceiver) VisitGoArrayType(at *golang.ArrayType, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *at // shallow copy to avoid mutating remoteObjects baseline
+	at = &c
+	if result := q.Receive(at.Length, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		at.Length = coerceToExpressionRP(result)
+	}
+	at.ElementType = receiveValue(q, at.ElementType, func(e java.Expression) any { return r.Visit(e, q) })
+	return at
+}
+
 func (r *GoReceiver) VisitSlice(sl *golang.Slice, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *sl // shallow copy to avoid mutating remoteObjects baseline

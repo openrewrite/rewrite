@@ -105,6 +105,18 @@ class GoRpcPrintRoundTripIntegTest {
     }
 
     @Test
+    void fixedSizeArrayTypeKeepsLength() {
+        // Go.ArrayType carries the inline length `5` across the wire; if it were
+        // dropped this would print `[]int`.
+        assertPrintsUnchangedAfterReset(
+                "package main\n" +
+                "\n" +
+                "func process(data [5]int) [3]string {\n" +
+                "\treturn [3]string{}\n" +
+                "}\n");
+    }
+
+    @Test
     void blockBodyStatementsKeepWhitespace() {
         assertPrintsUnchangedAfterReset(
                 "package main\n" +
