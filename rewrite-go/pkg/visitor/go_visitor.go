@@ -153,6 +153,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitMethodInvocation(n, p)
 	case *java.VariableDeclarations:
 		return v.self().VisitVariableDeclarations(n, p)
+	case *golang.DeclarationBlock:
+		return v.self().VisitDeclarationBlock(n, p)
 	case *java.VariableDeclarator:
 		return v.self().VisitVariableDeclarator(n, p)
 	case *java.Import:
@@ -294,6 +296,7 @@ type VisitorI interface {
 	VisitFieldAccess(fa *java.FieldAccess, p any) java.J
 	VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J
 	VisitVariableDeclarations(vd *java.VariableDeclarations, p any) java.J
+	VisitDeclarationBlock(db *golang.DeclarationBlock, p any) java.J
 	VisitVariableDeclarator(vd *java.VariableDeclarator, p any) java.J
 	VisitImport(imp *java.Import, p any) java.J
 	VisitUnary(unary *java.Unary, p any) java.J
@@ -616,13 +619,30 @@ func (v *GoVisitor) VisitVariableDeclarations(vd *java.VariableDeclarations, p a
 		vd.TypeExpr = visitExpression(v, vd.TypeExpr, p)
 	}
 	vd.Variables = visitRightPaddedList(v, vd.Variables, p)
-	if vd.Specs != nil {
-		specs := *vd.Specs
+	return vd
+}
+
+func (v *GoVisitor) VisitDeclarationBlock(db *golang.DeclarationBlock, p any) java.J {
+	db = db.WithPrefix(v.self().VisitSpace(db.Prefix, p))
+	db = db.WithMarkers(v.visitMarkers(db.Markers, p))
+	if len(db.LeadingAnnotations) > 0 {
+		anns := make([]*java.Annotation, 0, len(db.LeadingAnnotations))
+		for _, a := range db.LeadingAnnotations {
+			visited := v.self().Visit(a, p)
+			if visited == nil {
+				continue
+			}
+			anns = append(anns, visited.(*java.Annotation))
+		}
+		db = db.WithLeadingAnnotations(anns)
+	}
+	if db.Specs != nil {
+		specs := *db.Specs
 		specs.Before = v.self().VisitSpace(specs.Before, p)
 		specs.Elements = visitRightPaddedList(v, specs.Elements, p)
-		vd.Specs = &specs
+		db.Specs = &specs
 	}
-	return vd
+	return db
 }
 
 func (v *GoVisitor) VisitVariableDeclarator(vd *java.VariableDeclarator, p any) java.J {

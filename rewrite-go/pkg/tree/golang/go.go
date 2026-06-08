@@ -558,6 +558,53 @@ func (n *TypeDecl) WithTypeParameters(tps *java.TypeParameters) *TypeDecl {
 	return &c
 }
 
+// DeclKind is the keyword introducing a grouped declaration block.
+type DeclKind int
+
+const (
+	DeclVar   DeclKind = iota // var ( ... )
+	DeclConst                 // const ( ... )
+)
+
+// DeclarationBlock represents a grouped (parenthesized) declaration:
+//
+//	var   ( ... )
+//	const ( ... )
+//
+// The block owns the keyword (Kind); each element of Specs is a single
+// java.VariableDeclarations carrying its own variables/type/initializer.
+// There is no Java J equivalent — grouping is Go-specific.
+type DeclarationBlock struct {
+	ID                 uuid.UUID
+	Prefix             java.Space
+	Markers            java.Markers
+	LeadingAnnotations []*java.Annotation              // `//go:` directives preceding the block
+	Kind               DeclKind                        // var or const
+	Specs              *java.Container[java.Statement] // the grouped declarations; Before = space before `(`
+}
+
+func (*DeclarationBlock) IsTree()      {}
+func (*DeclarationBlock) IsJ()         {}
+func (*DeclarationBlock) IsStatement() {}
+
+func (n *DeclarationBlock) WithPrefix(prefix java.Space) *DeclarationBlock {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *DeclarationBlock) WithMarkers(markers java.Markers) *DeclarationBlock {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *DeclarationBlock) WithLeadingAnnotations(anns []*java.Annotation) *DeclarationBlock {
+	c := *n
+	c.LeadingAnnotations = anns
+	return &c
+}
+
 // ShortVarDecl is a marker on Assignment indicating `:=` instead of `=`.
 type ShortVarDecl struct {
 	Ident uuid.UUID

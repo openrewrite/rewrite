@@ -366,6 +366,38 @@ func (s *GoSender) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 	return td
 }
 
+func (s *GoSender) VisitDeclarationBlock(db *golang.DeclarationBlock, p any) java.J {
+	q := p.(*SendQueue)
+	// leadingAnnotations (`//go:` directives modeled as J.Annotation)
+	q.GetAndSendList(db,
+		func(v any) []any {
+			anns := v.(*golang.DeclarationBlock).LeadingAnnotations
+			result := make([]any, len(anns))
+			for i, a := range anns {
+				result[i] = a
+			}
+			return result
+		},
+		func(v any) any { return extractID(v) },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	// kind (enum name)
+	q.GetAndSend(db, func(v any) any {
+		if v.(*golang.DeclarationBlock).Kind == golang.DeclConst {
+			return "CONST"
+		}
+		return "VAR"
+	}, nil)
+	// Specs — dereference pointer so sendContainer gets a value type
+	q.GetAndSend(db, func(v any) any {
+		sp := v.(*golang.DeclarationBlock).Specs
+		if sp == nil {
+			return nil
+		}
+		return *sp
+	}, func(v any) { sendContainer(s, v, q) })
+	return db
+}
+
 func (s *GoSender) VisitMultiAssignment(ma *golang.MultiAssignment, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSendList(ma,

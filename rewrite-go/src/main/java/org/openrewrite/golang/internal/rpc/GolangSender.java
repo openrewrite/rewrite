@@ -189,6 +189,14 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitDeclarationBlock(Go.DeclarationBlock declarationBlock, RpcSendQueue q) {
+        q.getAndSendList(declarationBlock, Go.DeclarationBlock::getLeadingAnnotations, Tree::getId, a -> visit(a, q));
+        q.getAndSend(declarationBlock, d -> d.getKind().name());
+        q.getAndSend(declarationBlock, d -> d.getPadding().getSpecs(), el -> visitContainer(el, q));
+        return declarationBlock;
+    }
+
+    @Override
     public J visitMultiAssignment(Go.MultiAssignment multiAssignment, RpcSendQueue q) {
         q.getAndSendList(multiAssignment, m -> m.getPadding().getVariables(), v -> v.getElement().getId(), v -> visitRightPadded(v, q));
         q.getAndSend(multiAssignment, m -> m.getPadding().getOperator(), el -> visitLeftPadded(el, q));

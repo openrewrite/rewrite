@@ -960,6 +960,11 @@ public interface Go extends J {
         RECV_ONLY   // <-chan T
     }
 
+    enum DeclKind {
+        VAR,    // var ( ... )
+        CONST   // const ( ... )
+    }
+
     // ---------------------------------------------------------------
     // PointerType (*T)
     // ---------------------------------------------------------------
@@ -1620,6 +1625,86 @@ public interface Go extends J {
 
             public Go.TypeDecl withSpecs(@Nullable JContainer<Statement> specs) {
                 return t.specs == specs ? t : new Go.TypeDecl(t.padding, t.id, t.prefix, t.markers, t.leadingAnnotations, t.name, t.typeParameters, t.assign, t.definition, specs);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // DeclarationBlock (var ( ... ) / const ( ... ))
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class DeclarationBlock implements Go, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        List<J.Annotation> leadingAnnotations;
+
+        @With
+        @Getter
+        DeclKind kind;
+
+        JContainer<Statement> specs;
+
+        public List<Statement> getSpecs() {
+            return specs.getElements();
+        }
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitDeclarationBlock(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.DeclarationBlock t;
+
+            public JContainer<Statement> getSpecs() {
+                return t.specs;
+            }
+
+            public Go.DeclarationBlock withSpecs(JContainer<Statement> specs) {
+                return t.specs == specs ? t : new Go.DeclarationBlock(t.padding, t.id, t.prefix, t.markers, t.leadingAnnotations, t.kind, specs);
             }
         }
     }

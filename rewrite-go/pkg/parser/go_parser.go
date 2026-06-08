@@ -443,19 +443,18 @@ func (ctx *parseContext) mapVarConstDecl(decl *ast.GenDecl) java.Statement {
 		})
 	}
 
-	var markerEntries []java.Marker
-	if keyword == "var" {
-		markerEntries = append(markerEntries, golang.VarKeyword{Ident: uuid.New()})
-	} else if keyword == "const" {
-		markerEntries = append(markerEntries, golang.ConstDecl{Ident: uuid.New()})
+	kind := golang.DeclVar
+	if keyword == "const" {
+		kind = golang.DeclConst
 	}
 
 	specs := &java.Container[java.Statement]{Before: lparenPrefix, Elements: elements}
-	return &java.VariableDeclarations{
+	return &golang.DeclarationBlock{
 		ID:                 uuid.New(),
 		Prefix:             prefix,
-		Markers:            java.Markers{ID: uuid.New(), Entries: markerEntries},
+		Markers:            java.Markers{ID: uuid.New()},
 		LeadingAnnotations: leadingAnns,
+		Kind:               kind,
 		Specs:              specs,
 	}
 }

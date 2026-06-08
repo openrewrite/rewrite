@@ -411,19 +411,6 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *java.VariableDeclarations, par
 		}
 	}
 
-	if vd.Specs != nil {
-		// Grouped: var ( ... ) or const ( ... )
-		p.visitSpace(vd.Specs.Before, out)
-		out.Append("(")
-		for _, rp := range vd.Specs.Elements {
-			p.Visit(rp.Element, out)
-			p.visitSpace(rp.After, out)
-		}
-		out.Append(")")
-		p.afterSyntax(vd.Markers, out)
-		return vd
-	}
-
 	// Go order: keyword name[, name]... type [= value]
 	// Print variable names first (without initializers)
 	for i, v := range vd.Variables {
@@ -478,6 +465,33 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *java.VariableDeclarations, par
 	}
 	p.afterSyntax(vd.Markers, out)
 	return vd
+}
+
+func (p *GoPrinter) VisitDeclarationBlock(db *golang.DeclarationBlock, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	// Leading `//go:` directives, emitted before the var/const keyword.
+	for _, ann := range db.LeadingAnnotations {
+		p.visitSpace(ann.Prefix, out)
+		out.Append("//")
+		p.printDirectiveBody(ann, out)
+	}
+	p.beforeSyntax(db.Prefix, db.Markers, out)
+	if db.Kind == golang.DeclConst {
+		out.Append("const")
+	} else {
+		out.Append("var")
+	}
+	if db.Specs != nil {
+		p.visitSpace(db.Specs.Before, out)
+		out.Append("(")
+		for _, rp := range db.Specs.Elements {
+			p.Visit(rp.Element, out)
+			p.visitSpace(rp.After, out)
+		}
+		out.Append(")")
+	}
+	p.afterSyntax(db.Markers, out)
+	return db
 }
 
 func (p *GoPrinter) VisitVariableDeclarator(vd *java.VariableDeclarator, param any) java.J {
