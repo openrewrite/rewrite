@@ -243,6 +243,33 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         }, false);
     }
 
+    /**
+     * Computes the build descriptor for a repository (or partition) root: the independent
+     * projects (workspace-aware), their source sets, config-input watch-set, and parser
+     * settings. The JavaScript analog of "invoke the build tool"; it does not parse sources.
+     * <p>
+     * v1 is read-only — no dependency install is performed.
+     *
+     * @param repositoryRoot Path to the repository (or partition) root to analyze
+     * @return The discovered projects and their descriptors
+     */
+    public PrebuildResult prebuild(Path repositoryRoot) {
+        return prebuild(repositoryRoot, null, null);
+    }
+
+    /**
+     * Computes the build descriptor for a repository (or partition) root.
+     *
+     * @param repositoryRoot Path to the repository (or partition) root to analyze
+     * @param exclusions     Optional glob patterns to exclude from discovery
+     * @param relativeTo     Optional base for all returned paths. If not specified, paths are
+     *                       relative to {@code repositoryRoot}.
+     * @return The discovered projects and their descriptors
+     */
+    public PrebuildResult prebuild(Path repositoryRoot, @Nullable List<String> exclusions, @Nullable Path relativeTo) {
+        return send("Prebuild", new Prebuild(repositoryRoot, exclusions, relativeTo), PrebuildResult.class);
+    }
+
     public static Builder builder() {
         return new Builder();
     }

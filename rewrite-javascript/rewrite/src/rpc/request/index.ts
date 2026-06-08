@@ -18,6 +18,7 @@ export * from "./get-object";
 export * from "./get-marketplace";
 export * from "./parse";
 export * from "./parse-project";
+export * from "./prebuild";
 export * from "./prepare-recipe";
 export * from "./print";
 export * from "./visit";

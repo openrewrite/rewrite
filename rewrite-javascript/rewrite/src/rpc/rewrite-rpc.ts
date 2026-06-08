@@ -27,6 +27,7 @@ import {
     toMarketplace,
     Parse,
     ParseProject,
+    Prebuild,
     PrepareRecipe,
     PrepareRecipeResponse,
     Print,
@@ -97,6 +98,7 @@ export class RewriteRpc {
         PrepareRecipe.handle(this.connection, marketplace, preparedRecipes, options.metricsCsv);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
         ParseProject.handle(this.connection, this.localObjects, options.metricsCsv);
+        Prebuild.handle(this.connection, options.metricsCsv);
         Print.handle(this.connection, getObject, options.logger, options.metricsCsv);
         InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", marketplace, options.logger, options.metricsCsv);
 

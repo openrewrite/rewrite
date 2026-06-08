@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.style.Autodetect;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marketplace.RecipeBundle;
@@ -432,6 +433,57 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         assertThat(paths)
           .containsExactlyInAnyOrder("package.json", "index.js")
           .noneMatch(p -> p.contains("vendor"));
+    }
+
+    @Test
+    void prebuild(@TempDir Path repoDir) throws Exception {
+        // npm workspace root with a shared base tsconfig and lock file
+        Files.writeString(repoDir.resolve("package.json"), """
+          {"name": "root", "private": true, "workspaces": ["packages/*"]}
+          """);
+        Files.writeString(repoDir.resolve("package-lock.json"), "{}");
+        Files.writeString(repoDir.resolve("tsconfig.base.json"), """
+          {"compilerOptions": {"strict": true}}
+          """);
+
+        // workspace member "app" with a tsconfig extending the root base + main/test files
+        Files.createDirectories(repoDir.resolve("packages/app/src"));
+        Files.writeString(repoDir.resolve("packages/app/package.json"), """
+          {"name": "app"}
+          """);
+        Files.writeString(repoDir.resolve("packages/app/tsconfig.json"), """
+          {"extends": "../../tsconfig.base.json"}
+          """);
+        Files.writeString(repoDir.resolve("packages/app/src/index.ts"), "export const x = 1;");
+        Files.writeString(repoDir.resolve("packages/app/src/index.test.ts"), "test('x', () => {});");
+
+        PrebuildResult result = client().prebuild(repoDir);
+
+        // One project: the workspace member, not the root manager
+        assertThat(result.getProjects()).hasSize(1);
+        PrebuildResult.ProjectDescriptor app = result.getProjects().get(0);
+        assertThat(app.getPath()).isEqualTo("packages/app");
+        assertThat(app.getPackageManager()).isEqualTo(NodeResolutionResult.PackageManager.Npm);
+        assertThat(app.getResolution()).isNull();
+
+        // Watch-set: own package.json, the shared root lock file, tsconfig + its extended base
+        assertThat(app.getConfigInputs()).contains(
+          "packages/app/package.json",
+          "package-lock.json",
+          "packages/app/tsconfig.json",
+          "tsconfig.base.json");
+
+        // main + test source sets, both carrying the project's tsconfig path
+        assertThat(app.getSourceSets())
+          .extracting(PrebuildResult.SourceSetDescriptor::getName)
+          .containsExactly("main", "test");
+        for (PrebuildResult.SourceSetDescriptor sourceSet : app.getSourceSets()) {
+            assertThat(sourceSet.getParserSettings().getTsconfigPath())
+              .isEqualTo("packages/app/tsconfig.json");
+        }
+        PrebuildResult.SourceSetDescriptor test = app.getSourceSets().stream()
+          .filter(s -> s.getName().equals("test")).findFirst().orElseThrow();
+        assertThat(test.getIncludes()).contains("**/*.test.*");
     }
 
     @Test
