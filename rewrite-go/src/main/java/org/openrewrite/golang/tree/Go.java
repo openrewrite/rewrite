@@ -1733,6 +1733,82 @@ public interface Go extends J {
     }
 
     // ---------------------------------------------------------------
+    // Return (return a, b) — multi-value return
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class Return implements Go, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        List<JRightPadded<Expression>> expressions;
+
+        public List<Expression> getExpressions() {
+            return JRightPadded.getElements(expressions);
+        }
+
+        public Go.Return withExpressions(List<Expression> expressions) {
+            return getPadding().withExpressions(JRightPadded.withElements(this.expressions, expressions));
+        }
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitGoReturn(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Go.Return t;
+
+            public List<JRightPadded<Expression>> getExpressions() {
+                return t.expressions;
+            }
+
+            public Go.Return withExpressions(List<JRightPadded<Expression>> expressions) {
+                return t.expressions == expressions ? t : new Go.Return(t.padding, t.id, t.prefix, t.markers, expressions);
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
     // CommClause (case <-ch: ... in select)
     // ---------------------------------------------------------------
 

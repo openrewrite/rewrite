@@ -164,6 +164,17 @@ func (p *GoPrinter) VisitReturn(ret *java.Return, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(ret.Prefix, ret.Markers, out)
 	out.Append("return")
+	if ret.Expression != nil {
+		p.Visit(ret.Expression, out)
+	}
+	p.afterSyntax(ret.Markers, out)
+	return ret
+}
+
+func (p *GoPrinter) VisitGoReturn(ret *golang.Return, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ret.Prefix, ret.Markers, out)
+	out.Append("return")
 	for i, rp := range ret.Expressions {
 		p.Visit(rp.Element, out)
 		p.visitSpace(rp.After, out)

@@ -395,6 +395,22 @@ func (s *GoSender) VisitMultiAssignment(ma *golang.MultiAssignment, p any) java.
 	return ma
 }
 
+func (s *GoSender) VisitGoReturn(ret *golang.Return, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSendList(ret,
+		func(v any) []any {
+			exprs := v.(*golang.Return).Expressions
+			result := make([]any, len(exprs))
+			for i, e := range exprs {
+				result[i] = e
+			}
+			return result
+		},
+		func(v any) any { return containerElementID(v) },
+		func(v any) { sendRightPadded(s, v, q) })
+	return ret
+}
+
 func (s *GoSender) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(cc, func(v any) any { return v.(*golang.CommClause).Comm },

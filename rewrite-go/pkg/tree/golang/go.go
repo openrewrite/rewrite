@@ -624,6 +624,33 @@ func (n *MultiAssignment) WithMarkers(markers java.Markers) *MultiAssignment {
 	return &c
 }
 
+// Return represents a Go return statement carrying more than one value:
+// `return 0, nil`. Single- and zero-value returns map to java.Return, mirroring
+// how single assignments map to java.Assignment and multi-value assignments to
+// MultiAssignment.
+type Return struct {
+	ID          uuid.UUID
+	Prefix      java.Space
+	Markers     java.Markers
+	Expressions []java.RightPadded[java.Expression] // returned values; After = space before comma
+}
+
+func (*Return) IsTree()      {}
+func (*Return) IsJ()         {}
+func (*Return) IsStatement() {}
+
+func (n *Return) WithPrefix(prefix java.Space) *Return {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Return) WithMarkers(markers java.Markers) *Return {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 // CommClause represents a communication clause in a select statement.
 // `case <-ch:` or `case ch <- val:` or `case v := <-ch:` or `default:`.
 type CommClause struct {

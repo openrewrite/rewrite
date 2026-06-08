@@ -312,12 +312,14 @@ func (n *Block) WithEnd(end Space) *Block {
 	return &c
 }
 
-// Return represents a return statement.
+// Return represents a return statement. Mirrors Java's J.Return: a single,
+// nullable returned expression. Go return statements with more than one value
+// map to golang.Return instead.
 type Return struct {
-	ID          uuid.UUID
-	Prefix      Space
-	Markers     Markers
-	Expressions []RightPadded[Expression]
+	ID         uuid.UUID
+	Prefix     Space
+	Markers    Markers
+	Expression Expression // nil for a naked `return`
 }
 
 func (*Return) IsTree()      {}

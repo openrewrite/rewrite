@@ -261,6 +261,15 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
+    public J visitGoReturn(Go.Return aReturn, P p) {
+        Go.Return r = aReturn;
+        r = r.withPrefix(visitSpace(r.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.getPadding().withExpressions(ListUtils.map(r.getPadding().getExpressions(),
+                el -> visitRightPadded(el, JRightPadded.Location.LANGUAGE_EXTENSION, p)));
+        return r;
+    }
+
     public J visitCommClause(Go.CommClause commClause, P p) {
         Go.CommClause c = commClause;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

@@ -243,6 +243,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitInterfaceType(n, p)
 	case *golang.MultiAssignment:
 		return v.self().VisitMultiAssignment(n, p)
+	case *golang.Return:
+		return v.self().VisitGoReturn(n, p)
 	case *golang.CommClause:
 		return v.self().VisitCommClause(n, p)
 	case *golang.Unary:
@@ -335,6 +337,7 @@ type VisitorI interface {
 	VisitStructType(st *golang.StructType, p any) java.J
 	VisitInterfaceType(it *golang.InterfaceType, p any) java.J
 	VisitMultiAssignment(ma *golang.MultiAssignment, p any) java.J
+	VisitGoReturn(ret *golang.Return, p any) java.J
 	VisitCommClause(cc *golang.CommClause, p any) java.J
 	VisitGoUnary(u *golang.Unary, p any) java.J
 	VisitGoBinary(b *golang.Binary, p any) java.J
@@ -447,8 +450,18 @@ func (v *GoVisitor) VisitBlock(block *java.Block, p any) java.J {
 func (v *GoVisitor) VisitReturn(ret *java.Return, p any) java.J {
 	ret = ret.WithPrefix(v.self().VisitSpace(ret.Prefix, p))
 	ret = ret.WithMarkers(v.visitMarkers(ret.Markers, p))
-	ret.Expressions = visitRightPaddedExpressionList(v, ret.Expressions, p)
+	if ret.Expression != nil {
+		ret.Expression = visitAndCast[java.Expression](v, ret.Expression, p)
+	}
 	return ret
+}
+
+func (v *GoVisitor) VisitGoReturn(ret *golang.Return, p any) java.J {
+	c := *ret
+	c.Prefix = v.self().VisitSpace(c.Prefix, p)
+	c.Markers = v.visitMarkers(c.Markers, p)
+	c.Expressions = visitRightPaddedExpressionList(v, c.Expressions, p)
+	return &c
 }
 
 func (v *GoVisitor) VisitIf(ifStmt *java.If, p any) java.J {

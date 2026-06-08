@@ -130,6 +130,9 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 		return c.matchStatementList(p.Statements, cand.Statements)
 	case *java.Return:
 		cand := candidate.(*java.Return)
+		return c.matchNode(p.Expression, cand.Expression)
+	case *golang.Return:
+		cand := candidate.(*golang.Return)
 		return c.matchExpressionRightPaddedList(p.Expressions, cand.Expressions)
 	case *java.If:
 		cand := candidate.(*java.If)

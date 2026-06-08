@@ -433,6 +433,24 @@ func (r *GoReceiver) VisitMultiAssignment(ma *golang.MultiAssignment, p any) jav
 	return ma
 }
 
+func (r *GoReceiver) VisitGoReturn(ret *golang.Return, p any) java.J {
+	q := p.(*ReceiveQueue)
+	c := *ret // shallow copy to avoid mutating remoteObjects baseline
+	ret = &c
+	beforeExprs := make([]any, len(ret.Expressions))
+	for i, e := range ret.Expressions {
+		beforeExprs[i] = e
+	}
+	afterExprs := q.ReceiveList(beforeExprs, func(v any) any { return receiveRightPadded(r, q, v) })
+	if afterExprs != nil {
+		ret.Expressions = make([]java.RightPadded[java.Expression], len(afterExprs))
+		for i, v := range afterExprs {
+			ret.Expressions[i] = coerceToExpressionRP(v)
+		}
+	}
+	return ret
+}
+
 func (r *GoReceiver) VisitCommClause(cc *golang.CommClause, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *cc // shallow copy to avoid mutating remoteObjects baseline

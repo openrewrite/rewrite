@@ -163,15 +163,10 @@ func (s *JavaSender) VisitBlock(b *java.Block, p any) java.J {
 
 func (s *JavaSender) VisitReturn(r *java.Return, p any) java.J {
 	q := p.(*SendQueue)
-	// Java's J.Return has a single expression; Go has multiple
-	// The first expression maps to J.Return.expression
-	q.GetAndSend(r, func(v any) any {
-		exprs := v.(*java.Return).Expressions
-		if len(exprs) > 0 {
-			return exprs[0].Element
-		}
-		return nil
-	}, func(v any) { s.Visit(v.(java.Tree), q) })
+	// Mirrors Java's J.Return: a single, nullable expression. Multi-value Go
+	// returns are golang.Return, handled by GoSender.VisitGoReturn.
+	q.GetAndSend(r, func(v any) any { return v.(*java.Return).Expression },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return r
 }
 

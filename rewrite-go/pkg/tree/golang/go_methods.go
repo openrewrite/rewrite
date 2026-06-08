@@ -190,6 +190,18 @@ func (n *MultiAssignment) WithID(id uuid.UUID) java.J {
 func (n *MultiAssignment) GetPrefix() java.Space    { return n.Prefix }
 func (n *MultiAssignment) GetMarkers() java.Markers { return n.Markers }
 
+func (n *Return) GetID() uuid.UUID { return n.ID }
+func (n *Return) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *Return) GetPrefix() java.Space    { return n.Prefix }
+func (n *Return) GetMarkers() java.Markers { return n.Markers }
+
 func (n *PointerType) GetID() uuid.UUID { return n.ID }
 func (n *PointerType) WithID(id uuid.UUID) java.J {
 	if n.ID == id {
