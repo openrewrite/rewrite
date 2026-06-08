@@ -227,6 +227,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitStatementExpression(n, p)
 	case *golang.PointerType:
 		return v.self().VisitPointerType(n, p)
+	case *golang.ArrayType:
+		return v.self().VisitGoArrayType(n, p)
 	case *golang.Channel:
 		return v.self().VisitChannel(n, p)
 	case *golang.FuncType:
@@ -320,6 +322,7 @@ type VisitorI interface {
 	VisitEmpty(empty *java.Empty, p any) java.J
 	VisitAnnotation(ann *java.Annotation, p any) java.J
 	VisitArrayType(at *java.ArrayType, p any) java.J
+	VisitGoArrayType(at *golang.ArrayType, p any) java.J
 	VisitParentheses(paren *java.Parentheses, p any) java.J
 	VisitTypeCast(tc *java.TypeCast, p any) java.J
 	VisitControlParentheses(cp *java.ControlParentheses, p any) java.J
@@ -904,10 +907,16 @@ func (v *GoVisitor) VisitArrayType(at *java.ArrayType, p any) java.J {
 	at = at.WithPrefix(v.self().VisitSpace(at.Prefix, p))
 	at = at.WithMarkers(v.visitMarkers(at.Markers, p))
 	at.Dimension.Before = v.self().VisitSpace(at.Dimension.Before, p)
-	if at.Length != nil {
-		at.Length = visitExpression(v, at.Length, p)
-	}
 	at.Dimension.Element = v.self().VisitSpace(at.Dimension.Element, p)
+	at.ElementType = visitExpression(v, at.ElementType, p)
+	return at
+}
+
+func (v *GoVisitor) VisitGoArrayType(at *golang.ArrayType, p any) java.J {
+	at = at.WithPrefix(v.self().VisitSpace(at.Prefix, p))
+	at = at.WithMarkers(v.visitMarkers(at.Markers, p))
+	at.Length.Element = visitExpression(v, at.Length.Element, p)
+	at.Length.After = v.self().VisitSpace(at.Length.After, p)
 	at.ElementType = visitExpression(v, at.ElementType, p)
 	return at
 }

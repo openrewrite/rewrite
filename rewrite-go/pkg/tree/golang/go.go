@@ -273,6 +273,34 @@ func (n *Slice) WithMarkers(markers java.Markers) *Slice {
 	return &c
 }
 
+// ArrayType represents a fixed-size array type: `[N]T` (e.g. `[5]int`,
+// `[...]int{...}`). The length `N` is an inline constant expression that has no
+// equivalent in Java's J.ArrayType, so it cannot fit there. Slices `[]T` (no
+// length) keep using java.ArrayType, which mirrors Java's variable-length array.
+type ArrayType struct {
+	ID          uuid.UUID
+	Prefix      java.Space // space before `[`
+	Markers     java.Markers
+	Length      java.RightPadded[java.Expression] // Element = `N` (Prefix = space after `[`), After = space before `]`
+	ElementType java.Expression                   // element type `T` (Prefix = space after `]`)
+}
+
+func (*ArrayType) IsTree()       {}
+func (*ArrayType) IsJ()          {}
+func (*ArrayType) IsExpression() {}
+
+func (n *ArrayType) WithPrefix(prefix java.Space) *ArrayType {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ArrayType) WithMarkers(markers java.Markers) *ArrayType {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 // MapType represents a map type expression: `map[K]V`.
 type MapType struct {
 	ID          uuid.UUID

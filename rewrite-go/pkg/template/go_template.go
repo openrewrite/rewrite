@@ -291,6 +291,8 @@ func getLeadingPrefix(j java.J) java.Space {
 		return getLeadingPrefix(n.Indexed)
 	case *java.ArrayType:
 		return n.Prefix
+	case *golang.ArrayType:
+		return n.Prefix
 	case *java.ForLoop:
 		return n.Prefix
 	case *java.ForEachLoop:

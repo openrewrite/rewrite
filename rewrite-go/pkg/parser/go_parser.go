@@ -2353,11 +2353,22 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) java.Expression {
 
 	elt := ctx.mapTypeExpr(expr.Elt)
 
+	// Fixed-size arrays `[N]T` carry an inline length expression that
+	// java.ArrayType (mirroring J.ArrayType) cannot hold; use golang.ArrayType.
+	// Slices `[]T` have no length and map to java.ArrayType.
+	if length != nil {
+		return &golang.ArrayType{
+			ID:          uuid.New(),
+			Prefix:      prefix,
+			Length:      java.RightPadded[java.Expression]{Element: length, After: closePrefix},
+			ElementType: elt,
+		}
+	}
+
 	return &java.ArrayType{
 		ID:          uuid.New(),
 		Prefix:      prefix,
 		Dimension:   java.LeftPadded[java.Space]{Element: closePrefix},
-		Length:      length,
 		ElementType: elt,
 	}
 }

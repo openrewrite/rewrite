@@ -119,6 +119,13 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitGoArrayType(Go.ArrayType arrayType, RpcReceiveQueue q) {
+        return arrayType
+                .getPadding().withLength(q.receive(arrayType.getPadding().getLength(), el -> visitRightPadded(el, q)))
+                .withElementType(q.receive(arrayType.getElementType(), expr -> (Expression) visitNonNull(expr, q)));
+    }
+
+    @Override
     public J visitMapType(Go.MapType mapType, RpcReceiveQueue q) {
         return mapType
                 .withOpenBracket(q.receive(mapType.getOpenBracket(), space -> visitSpace(space, q)))

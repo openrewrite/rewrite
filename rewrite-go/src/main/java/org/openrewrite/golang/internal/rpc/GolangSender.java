@@ -114,6 +114,13 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitGoArrayType(Go.ArrayType arrayType, RpcSendQueue q) {
+        q.getAndSend(arrayType, a -> a.getPadding().getLength(), el -> visitRightPadded(el, q));
+        q.getAndSend(arrayType, Go.ArrayType::getElementType, el -> visit(el, q));
+        return arrayType;
+    }
+
+    @Override
     public J visitMapType(Go.MapType mapType, RpcSendQueue q) {
         q.getAndSend(mapType, Go.MapType::getOpenBracket, space -> visitSpace(space, q));
         q.getAndSend(mapType, m -> m.getPadding().getKey(), el -> visitRightPadded(el, q));

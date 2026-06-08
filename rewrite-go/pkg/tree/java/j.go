@@ -1283,13 +1283,14 @@ func (n *VariableDeclarator) WithName(name *Identifier) *VariableDeclarator {
 	return &c
 }
 
-// ArrayType represents an array or slice type like `[]T`, `[N]T`.
+// ArrayType represents a variable-length array (slice) type like `[]T`.
+// Mirrors Java's J.ArrayType, which has no length slot. Go's fixed-size arrays
+// `[N]T` carry an inline length expression and map to golang.ArrayType instead.
 type ArrayType struct {
 	ID          uuid.UUID
 	Prefix      Space
 	Markers     Markers
-	Dimension   LeftPadded[Space] // Before = space before `[`, Element = space inside brackets before `]`; for `[N]T`, the length expr is stored separately
-	Length      Expression        // nil for slices (`[]T`), non-nil for arrays (`[N]T`)
+	Dimension   LeftPadded[Space] // Before = space before `[`, Element = space inside brackets before `]`
 	ElementType Expression        // the element type
 	Type        JavaType          // the array type (nullable)
 }

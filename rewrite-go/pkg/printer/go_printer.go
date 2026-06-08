@@ -941,10 +941,19 @@ func (p *GoPrinter) VisitArrayType(at *java.ArrayType, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(at.Prefix, at.Markers, out)
 	out.Append("[")
-	if at.Length != nil {
-		p.Visit(at.Length, out)
-	}
 	p.visitSpace(at.Dimension.Element, out)
+	out.Append("]")
+	p.Visit(at.ElementType, out)
+	p.afterSyntax(at.Markers, out)
+	return at
+}
+
+func (p *GoPrinter) VisitGoArrayType(at *golang.ArrayType, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(at.Prefix, at.Markers, out)
+	out.Append("[")
+	p.Visit(at.Length.Element, out)
+	p.visitSpace(at.Length.After, out)
 	out.Append("]")
 	p.Visit(at.ElementType, out)
 	p.afterSyntax(at.Markers, out)
