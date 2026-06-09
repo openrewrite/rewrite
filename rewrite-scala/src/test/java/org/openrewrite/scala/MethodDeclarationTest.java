@@ -538,6 +538,18 @@ class MethodDeclarationTest implements RewriteTest {
                 )
             );
         }
+
+        @Test
+        void multipleAnonymousParameters() {
+            rewriteRun(
+                scala(
+                    """
+                    object Test:
+                      def foo(using Me, Perf): Int = 1
+                    """
+                )
+            );
+        }
     }
 
     @Nested
