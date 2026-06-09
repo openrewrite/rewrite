@@ -1847,21 +1847,7 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 	prefix := ctx.prefix(lit.Pos())
 	ctx.skip(len(lit.Value))
 
-	var kind java.LiteralKind
-	switch lit.Kind {
-	case token.INT:
-		kind = java.IntLiteral
-	case token.FLOAT:
-		kind = java.FloatLiteral
-	case token.STRING:
-		kind = java.StringLiteral
-	case token.CHAR:
-		kind = java.CharLiteral
-	default:
-		kind = java.StringLiteral
-	}
-
-	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Kind: kind, Value: lit.Value, Source: lit.Value}
+	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: lit.Value, Source: lit.Value}
 
 	// Type attribution for literal
 	if tv, ok := ctx.typeInfo.Types[lit]; ok {
@@ -2867,7 +2853,6 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 						ID:     uuid.New(),
 						Source: p.QuotedValue,
 						Value:  p.UnquotedValue,
-						Kind:   java.StringLiteral,
 					}},
 				},
 			},
@@ -2977,7 +2962,6 @@ func buildDirectiveAnnotation(name, args string, prefix java.Space) *java.Annota
 					ID:     uuid.New(),
 					Source: args,
 					Value:  args,
-					Kind:   java.StringLiteral,
 				}},
 			},
 		}

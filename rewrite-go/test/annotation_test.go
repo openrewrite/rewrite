@@ -43,7 +43,6 @@ func newJSONTagAnnotation(key, value string) *java.Annotation {
 					ID:     uuid.New(),
 					Source: `"` + value + `"`,
 					Value:  value,
-					Kind:   java.StringLiteral,
 				}},
 			},
 		},
