@@ -324,63 +324,6 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
         }
 
         @Override
-        public J visitForEachControl(J.ForEachLoop.Control control, RpcReceiveQueue q) {
-            // Go sends: key (right-padded), value (right-padded), operator (left-padded string), iterable
-            // Read these and construct a valid ForEachLoop.Control
-
-            // key (right-padded Expression, nullable)
-            @SuppressWarnings({"unchecked", "rawtypes"})
-            JRightPadded<Expression> key = (JRightPadded<Expression>) ((RpcReceiveQueue) q).receive(
-                    null, (java.util.function.UnaryOperator) el -> visitRightPadded((JRightPadded<?>) el, q));
-            // value (right-padded Expression, nullable)
-            @SuppressWarnings({"unchecked", "rawtypes"})
-            JRightPadded<Expression> value = (JRightPadded<Expression>) ((RpcReceiveQueue) q).receive(
-                    null, (java.util.function.UnaryOperator) el -> visitRightPadded((JRightPadded<?>) el, q));
-            // operator (left-padded string - AssignOp, skip it)
-            q.receive(null);
-            // iterable (Expression)
-            Expression iterable = q.receive(null, el -> (Expression) visitNonNull(el, q));
-            if (iterable == null) {
-                iterable = new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY);
-            }
-
-            JRightPadded<Statement> varPadded;
-            if (key == null) {
-                // Keyless `for range expr` — no loop variable. Represent the
-                // absent variable with J.Empty so the round trip stays keyless
-                // instead of synthesizing a `_ :=`. GolangSender sends key=null
-                // for any non-VariableDeclarations variable.
-                @SuppressWarnings("unchecked")
-                JRightPadded<Statement> empty = (JRightPadded<Statement>) (JRightPadded<?>)
-                        JRightPadded.build(new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY));
-                varPadded = empty;
-            } else {
-                // Build a synthetic VariableDeclarations to represent the key.
-                J.Identifier varName = key.getElement() instanceof J.Identifier ?
-                        (J.Identifier) key.getElement() :
-                        new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                                Collections.emptyList(), "_", null, null);
-
-                J.VariableDeclarations.NamedVariable namedVar = new J.VariableDeclarations.NamedVariable(
-                        Tree.randomId(), varName.getPrefix(), varName.getMarkers(),
-                        varName.withPrefix(Space.EMPTY), Collections.emptyList(), null, null);
-
-                J.VariableDeclarations varDecls = new J.VariableDeclarations(
-                        Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                        Collections.emptyList(), Collections.emptyList(), null,
-                        null, Collections.emptyList(),
-                        Collections.singletonList(JRightPadded.build(namedVar)));
-
-                @SuppressWarnings("unchecked")
-                JRightPadded<Statement> built = (JRightPadded<Statement>) (JRightPadded<?>) JRightPadded.build(varDecls).withAfter(key.getAfter());
-                varPadded = built;
-            }
-            return control
-                    .getPadding().withVariable(varPadded)
-                    .getPadding().withIterable(JRightPadded.build(iterable));
-        }
-
-        @Override
         public J visitImport(J.Import importStmt, RpcReceiveQueue q) {
             importStmt = importStmt.getPadding().withStatic(
                     q.receive(importStmt.getPadding().getStatic(), s -> visitLeftPadded(s, q)));

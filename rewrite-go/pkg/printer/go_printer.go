@@ -680,23 +680,13 @@ func (p *GoPrinter) VisitForEachLoop(forEach *java.ForEachLoop, param any) java.
 func (p *GoPrinter) VisitForEachControl(control *java.ForEachControl, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(control.Prefix, control.Markers, out)
-	if control.Key != nil {
-		p.Visit(control.Key.Element, out)
-		p.visitSpace(control.Key.After, out)
-		if control.Value != nil {
-			out.Append(",")
-			p.Visit(control.Value.Element, out)
-			p.visitSpace(control.Value.After, out)
-		}
-		if control.Operator.Element == java.AssignOpDefine {
-			out.Append(":=")
-		} else {
-			out.Append("=")
-		}
-		p.visitSpace(control.Operator.Before, out)
-	}
+	// Variable prints the target list and `:=`/`=` operator (or nothing for a
+	// J.Empty keyless range); the MultiAssignment owns the operator spelling.
+	p.Visit(control.Variable.Element, out)
+	p.visitSpace(control.Variable.After, out)
 	out.Append("range")
-	p.Visit(control.Iterable, out)
+	p.Visit(control.Iterable.Element, out)
+	p.visitSpace(control.Iterable.After, out)
 	p.afterSyntax(control.Markers, out)
 	return control
 }

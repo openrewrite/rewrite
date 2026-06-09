@@ -760,20 +760,10 @@ func (v *GoVisitor) VisitForEachLoop(forEach *java.ForEachLoop, p any) java.J {
 func (v *GoVisitor) VisitForEachControl(control *java.ForEachControl, p any) java.J {
 	control = control.WithPrefix(v.self().VisitSpace(control.Prefix, p))
 	control = control.WithMarkers(v.visitMarkers(control.Markers, p))
-	if control.Key != nil {
-		key := *control.Key
-		key.Element = visitExpression(v, key.Element, p)
-		key.After = v.self().VisitSpace(key.After, p)
-		control.Key = &key
-	}
-	if control.Value != nil {
-		value := *control.Value
-		value.Element = visitExpression(v, value.Element, p)
-		value.After = v.self().VisitSpace(value.After, p)
-		control.Value = &value
-	}
-	control.Operator.Before = v.self().VisitSpace(control.Operator.Before, p)
-	control.Iterable = visitExpression(v, control.Iterable, p)
+	control.Variable.Element = visitAndCast[java.Statement](v, control.Variable.Element, p)
+	control.Variable.After = v.self().VisitSpace(control.Variable.After, p)
+	control.Iterable.Element = visitExpression(v, control.Iterable.Element, p)
+	control.Iterable.After = v.self().VisitSpace(control.Iterable.After, p)
 	return control
 }
 

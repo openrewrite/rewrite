@@ -329,4 +329,85 @@ class GoRpcPrintRoundTripIntegTest {
                 "\treturn &T{Name: dst[0]}\n" +
                 "}\n");
     }
+
+    /**
+     * for-range headers carry up to two loop targets plus a {@code :=}/{@code =}
+     * operator. These live in the {@code Variable} slot of J.ForEachLoop.Control
+     * as a Go MultiAssignment (the {@code :=} vs {@code =} is a ShortVarDecl
+     * marker), so the full head must survive the wire. Before that mapping the
+     * Java side could hold only a single loop variable and always re-emitted
+     * {@code :=}, so {@code for k, v = range} came back as {@code for k := range}.
+     */
+    @Test
+    void forRangeKeylessSurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f(items []int) {
+                \tfor range items {
+                \t}
+                }
+                """);
+    }
+
+    @Test
+    void forRangeTwoVarsDefineSurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f(items []int) {
+                \tfor k, v := range items {
+                \t\t_ = k
+                \t\t_ = v
+                \t}
+                }
+                """);
+    }
+
+    @Test
+    void forRangeBlankKeySurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f(items []int) {
+                \tfor _, v := range items {
+                \t\t_ = v
+                \t}
+                }
+                """);
+    }
+
+    @Test
+    void forRangeTwoVarsAssignSurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f(items []int) {
+                \tvar k, v int
+                \tfor k, v = range items {
+                \t}
+                \t_ = k
+                \t_ = v
+                }
+                """);
+    }
+
+    @Test
+    void forRangeArbitraryLhsAssignSurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f(items []int, m map[int]int) {
+                \tvar v int
+                \tfor m[0], v = range items {
+                \t}
+                \t_ = v
+                }
+                """);
+    }
 }

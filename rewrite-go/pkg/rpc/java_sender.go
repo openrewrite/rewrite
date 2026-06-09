@@ -384,28 +384,11 @@ func (s *JavaSender) VisitForEachLoop(f *java.ForEachLoop, p any) java.J {
 
 func (s *JavaSender) VisitForEachControl(fc *java.ForEachControl, p any) java.J {
 	q := p.(*SendQueue)
-	// Go sends: key (right-padded), value (right-padded), operator (left-padded string), iterable
-	// Java GolangReceiver override reads this format
-	q.GetAndSend(fc, func(v any) any {
-		k := v.(*java.ForEachControl).Key
-		if k == nil {
-			return nil
-		}
-		return *k
-	}, func(v any) { sendRightPadded(s, v, q) })
-	q.GetAndSend(fc, func(v any) any {
-		val := v.(*java.ForEachControl).Value
-		if val == nil {
-			return nil
-		}
-		return *val
-	}, func(v any) { sendRightPadded(s, v, q) })
-	q.GetAndSend(fc, func(v any) any {
-		op := v.(*java.ForEachControl).Operator
-		return java.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
-	}, func(v any) { sendLeftPadded(s, v, q) })
+	// Mirrors J.ForEachLoop.Control: variable (right-padded), iterable (right-padded).
+	q.GetAndSend(fc, func(v any) any { return v.(*java.ForEachControl).Variable },
+		func(v any) { sendRightPadded(s, v, q) })
 	q.GetAndSend(fc, func(v any) any { return v.(*java.ForEachControl).Iterable },
-		func(v any) { s.Visit(v.(java.Tree), q) })
+		func(v any) { sendRightPadded(s, v, q) })
 	return fc
 }
 

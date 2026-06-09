@@ -1621,53 +1621,61 @@ func (ctx *parseContext) mapRangeStmt(stmt *ast.RangeStmt) *java.ForEachLoop {
 	control := java.ForEachControl{ID: uuid.New()}
 
 	if stmt.Key != nil {
-		// Has key variable
-		key := ctx.mapExpr(stmt.Key)
+		// `for [k [, v]] :=|= range expr {}` — the target list and the `:=`/`=`
+		// operator are carried by a golang.MultiAssignment (mirroring how Go's
+		// general multi-assignment is modeled), so this ForEachControl stays a
+		// faithful mirror of Java's J.ForEachLoop.Control.
+		var targets []java.RightPadded[java.Expression]
+		key := ctx.mapExpr(stmt.Key) // prefix = space after "for"
 
 		if stmt.Value != nil {
-			// for k, v := range expr {}
-			// Key.After captures comma space
+			// for k, v ...: key.After captures the space before the comma
 			commaOffset := ctx.findNext(',')
 			var keyAfter java.Space
 			if commaOffset >= 0 {
 				keyAfter = ctx.prefix(ctx.file.Pos(commaOffset))
 				ctx.skip(1) // ","
 			}
-			keyRP := java.RightPadded[java.Expression]{Element: key, After: keyAfter}
-			control.Key = &keyRP
-
-			value := ctx.mapExpr(stmt.Value)
-			// Value.After captures space before operator
-			opPrefix := ctx.prefix(stmt.TokPos)
-			valueRP := java.RightPadded[java.Expression]{Element: value, After: opPrefix}
-			control.Value = &valueRP
+			targets = append(targets, java.RightPadded[java.Expression]{Element: key, After: keyAfter})
+			value := ctx.mapExpr(stmt.Value) // prefix = space after comma
+			targets = append(targets, java.RightPadded[java.Expression]{Element: value})
 		} else {
-			// for k := range expr {} — no value
-			opPrefix := ctx.prefix(stmt.TokPos)
-			keyRP := java.RightPadded[java.Expression]{Element: key, After: opPrefix}
-			control.Key = &keyRP
+			targets = append(targets, java.RightPadded[java.Expression]{Element: key})
 		}
 
-		// Parse operator (:= or =)
-		var op java.AssignOp
-		if stmt.Tok == token.DEFINE {
-			op = java.AssignOpDefine
-		} else {
-			op = java.AssignOpEquals
-		}
+		// Operator: space before `:=`/`=`; the := vs = distinction is the
+		// ShortVarDecl marker, exactly as for general Go assignments.
+		opPrefix := ctx.prefix(stmt.TokPos)
 		ctx.skip(len(stmt.Tok.String()))
+		var markers java.Markers
+		if stmt.Tok == token.DEFINE {
+			markers = java.Markers{
+				ID:      uuid.New(),
+				Entries: []java.Marker{golang.ShortVarDecl{Ident: uuid.New()}},
+			}
+		}
 
-		// Space between operator and "range"
+		assign := &golang.MultiAssignment{
+			ID:        uuid.New(),
+			Markers:   markers,
+			Variables: targets,
+			Operator:  java.LeftPadded[java.Space]{Before: opPrefix},
+		}
+
+		// Space between operator and "range" lives on Variable.After.
 		rangePrefix := ctx.prefix(stmt.Range)
-		control.Operator = java.LeftPadded[java.AssignOp]{Before: rangePrefix, Element: op}
+		control.Variable = java.RightPadded[java.Statement]{Element: assign, After: rangePrefix}
 	} else {
-		// for range expr {} — no variable
-		control.Prefix = ctx.prefix(stmt.Range)
+		// `for range expr {}` — no loop target; J.Empty fills the Variable slot.
+		// Variable.After holds the space between "for" and "range".
+		rangePrefix := ctx.prefix(stmt.Range)
+		empty := &java.Empty{ID: uuid.New()}
+		control.Variable = java.RightPadded[java.Statement]{Element: empty, After: rangePrefix}
 	}
 	ctx.skip(len("range"))
 
-	iterable := ctx.mapExpr(stmt.X)
-	control.Iterable = iterable
+	iterable := ctx.mapExpr(stmt.X) // prefix = space after "range"
+	control.Iterable = java.RightPadded[java.Expression]{Element: iterable}
 
 	body := ctx.mapBlockStmt(stmt.Body)
 
