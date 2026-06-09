@@ -294,6 +294,18 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void qualifiedAnnotationName() {
+        rewriteRun(
+            scala(
+                """
+                @scala.annotation.implicitNotFound("msg")
+                trait Foo[T]
+                """
+            )
+        );
+    }
+
+    @Test
     void annotationOnOwnLineBeforeImplicitVal() {
         rewriteRun(
             scala(
