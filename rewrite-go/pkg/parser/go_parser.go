@@ -25,6 +25,7 @@ import (
 	"go/token"
 	"go/types"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -1081,11 +1082,13 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 		// equivalent → golang.AssignmentOperation.
 		if stmt.Tok == token.AND_NOT_ASSIGN {
 			lhs := ctx.mapExpr(stmt.Lhs[0])
+			prefix, lhs := hoistLeftPrefix(lhs)
 			opPrefix := ctx.prefix(stmt.TokPos)
 			ctx.skip(len(stmt.Tok.String()))
 			rhs := ctx.mapExpr(stmt.Rhs[0])
 			return &golang.AssignmentOperation{
 				ID:         uuid.New(),
+				Prefix:     prefix,
 				Variable:   lhs,
 				Operator:   java.LeftPadded[golang.AssignmentOperator]{Before: opPrefix, Element: golang.AssignAndNot},
 				Assignment: rhs,
@@ -1093,11 +1096,13 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 		}
 		if op, ok := mapAssignmentOp(stmt.Tok); ok {
 			lhs := ctx.mapExpr(stmt.Lhs[0])
+			prefix, lhs := hoistLeftPrefix(lhs)
 			opPrefix := ctx.prefix(stmt.TokPos)
 			ctx.skip(len(stmt.Tok.String()))
 			rhs := ctx.mapExpr(stmt.Rhs[0])
 			return &java.AssignmentOperation{
 				ID:         uuid.New(),
+				Prefix:     prefix,
 				Variable:   lhs,
 				Operator:   java.LeftPadded[java.AssignmentOperator]{Before: opPrefix, Element: op},
 				Assignment: rhs,
@@ -1108,8 +1113,12 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 	// Multi-value assignment: x, y = 1, 2 or x, y := f()
 	if len(stmt.Lhs) > 1 || len(stmt.Rhs) > 1 {
 		var lhsExprs []java.RightPadded[java.Expression]
+		var prefix java.Space
 		for i, expr := range stmt.Lhs {
 			mapped := ctx.mapExpr(expr)
+			if i == 0 {
+				prefix, mapped = hoistLeftPrefix(mapped)
+			}
 			var after java.Space
 			if i < len(stmt.Lhs)-1 {
 				commaOffset := ctx.findNext(',')
@@ -1148,6 +1157,7 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 
 		return &golang.MultiAssignment{
 			ID:        uuid.New(),
+			Prefix:    prefix,
 			Markers:   markers,
 			Variables: lhsExprs,
 			Operator:  java.LeftPadded[java.Space]{Before: opPrefix},
@@ -1157,6 +1167,7 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 
 	// Single assignment: x = 1 or x := 1
 	lhs := ctx.mapExpr(stmt.Lhs[0])
+	prefix, lhs := hoistLeftPrefix(lhs)
 	opPrefix := ctx.prefix(stmt.TokPos)
 	ctx.skip(len(stmt.Tok.String()))
 	rhs := ctx.mapExpr(stmt.Rhs[0])
@@ -1171,7 +1182,7 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 
 	return &java.Assignment{
 		ID:       uuid.New(),
-		Prefix:   java.EmptySpace,
+		Prefix:   prefix,
 		Markers:  markers,
 		Variable: lhs,
 		Value:    java.LeftPadded[java.Expression]{Before: opPrefix, Element: rhs},
@@ -1550,6 +1561,9 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 		// 3-clause for: for [init]; [cond]; [post] {}
 		if stmt.Init != nil {
 			init := ctx.mapStmt(stmt.Init)
+			// The whitespace after "for" is read onto the init clause; hoist it
+			// onto the control so it stays attached to the outermost element.
+			control.Prefix, init = hoistLeftPrefix(init)
 			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
 			var after java.Space
 			if semicolonOffset >= 0 {
@@ -1599,6 +1613,7 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 	} else if stmt.Cond != nil {
 		// Condition-only: for cond {}
 		cond := ctx.mapExpr(stmt.Cond)
+		control.Prefix, cond = hoistLeftPrefix(cond)
 		condRP := java.RightPadded[java.Expression]{Element: cond}
 		control.Condition = &condRP
 	}
@@ -1690,6 +1705,10 @@ func (ctx *parseContext) mapRangeStmt(stmt *ast.RangeStmt) *java.ForEachLoop {
 // mapIncDecStmt maps an increment/decrement statement (x++ or x--).
 func (ctx *parseContext) mapIncDecStmt(stmt *ast.IncDecStmt) *java.Unary {
 	operand := ctx.mapExpr(stmt.X)
+	// Postfix operator: the operand is printed first and reads the leading
+	// whitespace; hoist it onto the Unary so it stays attached to the outermost
+	// element. The operator prefix captures the space between operand and ++/--.
+	prefix, operand := hoistLeftPrefix(operand)
 	opPrefix := ctx.prefix(stmt.TokPos)
 	ctx.skip(len(stmt.Tok.String()))
 
@@ -1700,10 +1719,9 @@ func (ctx *parseContext) mapIncDecStmt(stmt *ast.IncDecStmt) *java.Unary {
 		op = java.PostDecrement
 	}
 
-	// For postfix operators, the operand carries its own prefix (space before expression).
-	// The Unary's prefix is empty; operator prefix captures space between operand and ++/--.
 	return &java.Unary{
 		ID:       uuid.New(),
+		Prefix:   prefix,
 		Operator: java.LeftPadded[java.UnaryOperator]{Before: opPrefix, Element: op},
 		Operand:  operand,
 	}
@@ -1726,11 +1744,13 @@ func (ctx *parseContext) mapDeferStmt(stmt *ast.DeferStmt) *golang.Defer {
 // mapSendStmt maps a channel send statement `ch <- value`.
 func (ctx *parseContext) mapSendStmt(stmt *ast.SendStmt) *golang.Send {
 	ch := ctx.mapExpr(stmt.Chan)
+	prefix, ch := hoistLeftPrefix(ch)
 	arrowPrefix := ctx.prefix(stmt.Arrow)
 	ctx.skip(2) // "<-"
 	value := ctx.mapExpr(stmt.Value)
 	return &golang.Send{
 		ID:      uuid.New(),
+		Prefix:  prefix,
 		Channel: ch,
 		Arrow:   java.LeftPadded[java.Expression]{Before: arrowPrefix, Element: value},
 	}
@@ -1865,9 +1885,35 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 	return l
 }
 
+// hoistLeftPrefix detaches the leading whitespace from a node's first child
+// so it can be attached to the enclosing (outermost) element instead, per the
+// OpenRewrite convention that whitespace belongs to the outermost element.
+// It returns the removed prefix and the child with an empty prefix.
+func hoistLeftPrefix[T java.J](node T) (java.Space, T) {
+	prefix := node.GetPrefix()
+	if prefix.Whitespace == "" && len(prefix.Comments) == 0 {
+		return java.EmptySpace, node
+	}
+	m := reflect.ValueOf(node).MethodByName("WithPrefix")
+	if !m.IsValid() {
+		return java.EmptySpace, node
+	}
+	results := m.Call([]reflect.Value{reflect.ValueOf(java.EmptySpace)})
+	if len(results) == 0 {
+		return prefix, node
+	}
+	if r, ok := results[0].Interface().(T); ok {
+		return prefix, r
+	}
+	return prefix, node
+}
+
 // mapBinaryExpr maps a binary expression.
 func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) java.Expression {
 	left := ctx.mapExpr(expr.X)
+	// The whitespace before the whole expression is read onto the left operand;
+	// hoist it onto the Binary so it stays attached to the outermost element.
+	prefix, left := hoistLeftPrefix(left)
 	opPrefix := ctx.prefix(expr.OpPos)
 	op := mapBinaryOp(expr.Op)
 	ctx.skip(len(expr.Op.String()))
@@ -1877,6 +1923,7 @@ func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) java.Expression {
 	if expr.Op == token.AND_NOT {
 		return &golang.Binary{
 			ID:       uuid.New(),
+			Prefix:   prefix,
 			Left:     left,
 			Operator: java.LeftPadded[golang.BinaryOperator]{Before: opPrefix, Element: golang.BinAndNot},
 			Right:    right,
@@ -1885,6 +1932,7 @@ func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) java.Expression {
 
 	b := &java.Binary{
 		ID:       uuid.New(),
+		Prefix:   prefix,
 		Left:     left,
 		Operator: java.LeftPadded[java.BinaryOperator]{Before: opPrefix, Element: op},
 		Right:    right,
@@ -1927,6 +1975,11 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 	default:
 		fun = ctx.mapExpr(expr.Fun)
 	}
+
+	// The whitespace before the call is read onto the callee; hoist it off so it
+	// can live on the invocation (the outermost element). Done before decomposing
+	// the callee into Select/Name so a FieldAccess callee's own prefix isn't lost.
+	miPrefix, fun := hoistLeftPrefix(fun)
 
 	var sel *java.RightPadded[java.Expression]
 	var name *java.Identifier
@@ -2010,7 +2063,7 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 
 	mi := &java.MethodInvocation{
 		ID:             uuid.New(),
-		Prefix:         java.EmptySpace,
+		Prefix:         miPrefix,
 		Markers:        markers,
 		Select:         sel,
 		TypeParameters: typeParams,
@@ -2082,8 +2135,10 @@ func (ctx *parseContext) mapSelectorExpr(expr *ast.SelectorExpr) *java.FieldAcce
 
 	sel := ctx.mapIdent(expr.Sel)
 
+	prefix, target := hoistLeftPrefix(target)
 	fa := &java.FieldAccess{
 		ID:     uuid.New(),
+		Prefix: prefix,
 		Target: target,
 		Name:   java.LeftPadded[*java.Identifier]{Before: dotPrefix, Element: sel},
 	}
@@ -2157,8 +2212,12 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 // mapCompositeLit maps a composite literal (e.g., Type{elem1, elem2}).
 func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression {
 	var typeExpr java.Expression
+	var prefix java.Space
 	if expr.Type != nil {
 		typeExpr = ctx.mapTypeExpr(expr.Type)
+		// Hoist the leading whitespace off the type onto the composite so it
+		// stays attached to the outermost element.
+		prefix, typeExpr = hoistLeftPrefix(typeExpr)
 	}
 	lbracePrefix := ctx.prefix(expr.Lbrace)
 	ctx.skip(1) // "{"
@@ -2212,6 +2271,7 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression
 
 	return &golang.Composite{
 		ID:       uuid.New(),
+		Prefix:   prefix,
 		Markers:  compMarkers,
 		TypeExpr: typeExpr,
 		Elements: java.Container[java.Expression]{Before: lbracePrefix, Elements: elements},
@@ -2298,7 +2358,11 @@ func (ctx *parseContext) mapTypeExpr(expr ast.Expr) java.Expression {
 func (ctx *parseContext) mapUnionType(expr *ast.BinaryExpr) *golang.Union {
 	var terms []java.RightPadded[java.Expression]
 	ctx.appendUnionTerms(expr, &terms)
-	return &golang.Union{ID: uuid.New(), Types: terms}
+	var prefix java.Space
+	if len(terms) > 0 {
+		prefix, terms[0].Element = hoistLeftPrefix(terms[0].Element)
+	}
+	return &golang.Union{ID: uuid.New(), Prefix: prefix, Types: terms}
 }
 
 func (ctx *parseContext) appendUnionTerms(expr ast.Expr, terms *[]java.RightPadded[java.Expression]) {
@@ -2371,8 +2435,10 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) java.Expression {
 // e.g. `JSONArray[string]`, producing a J.ParameterizedType.
 func (ctx *parseContext) mapParameterizedType(expr *ast.IndexExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
+	prefix, target := hoistLeftPrefix(target)
 	return &java.ParameterizedType{
 		ID:             uuid.New(),
+		Prefix:         prefix,
 		Clazz:          target,
 		TypeParameters: ctx.mapTypeArgsSingle(expr),
 	}
@@ -2397,8 +2463,10 @@ func (ctx *parseContext) mapTypeArgsSingle(expr *ast.IndexExpr) *java.Container[
 // e.g. `Store[string, any]`, producing a J.ParameterizedType.
 func (ctx *parseContext) mapParameterizedTypeMulti(expr *ast.IndexListExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
+	prefix, target := hoistLeftPrefix(target)
 	return &java.ParameterizedType{
 		ID:             uuid.New(),
+		Prefix:         prefix,
 		Clazz:          target,
 		TypeParameters: ctx.mapTypeArgsMulti(expr),
 	}
@@ -2437,6 +2505,7 @@ func (ctx *parseContext) mapTypeArgsMulti(expr *ast.IndexListExpr) *java.Contain
 // mapIndexExpr maps an index expression like `a[i]` or `m[key]`.
 func (ctx *parseContext) mapIndexExpr(expr *ast.IndexExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
+	prefix, target := hoistLeftPrefix(target)
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
 	index := ctx.mapExpr(expr.Index)
@@ -2445,6 +2514,7 @@ func (ctx *parseContext) mapIndexExpr(expr *ast.IndexExpr) java.Expression {
 
 	return &java.ArrayAccess{
 		ID:      uuid.New(),
+		Prefix:  prefix,
 		Indexed: target,
 		Dimension: &java.ArrayDimension{
 			ID:     uuid.New(),
@@ -2457,6 +2527,7 @@ func (ctx *parseContext) mapIndexExpr(expr *ast.IndexExpr) java.Expression {
 // mapIndexListExpr maps a multi-index expression like `Map[int, string]` (generic instantiation).
 func (ctx *parseContext) mapIndexListExpr(expr *ast.IndexListExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
+	prefix, target := hoistLeftPrefix(target)
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
 
@@ -2479,6 +2550,7 @@ func (ctx *parseContext) mapIndexListExpr(expr *ast.IndexListExpr) java.Expressi
 
 	return &golang.IndexList{
 		ID:      uuid.New(),
+		Prefix:  prefix,
 		Target:  target,
 		Indices: java.Container[java.Expression]{Before: lbrackPrefix, Elements: elements},
 	}
@@ -2566,6 +2638,7 @@ func (ctx *parseContext) mapKeyValueExpr(expr *ast.KeyValueExpr) java.Expression
 // mapSliceExpr maps a slice expression like `a[low:high]` or `a[low:high:max]`.
 func (ctx *parseContext) mapSliceExpr(expr *ast.SliceExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
+	prefix, target := hoistLeftPrefix(target)
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
 
@@ -2610,6 +2683,7 @@ func (ctx *parseContext) mapSliceExpr(expr *ast.SliceExpr) java.Expression {
 
 	return &golang.Slice{
 		ID:           uuid.New(),
+		Prefix:       prefix,
 		Indexed:      target,
 		OpenBracket:  lbrackPrefix,
 		Low:          java.RightPadded[java.Expression]{Element: low, After: colon1Prefix},
@@ -2755,8 +2829,10 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *java.Block
 		if len(field.Names) == 0 {
 			// Embedded type (e.g., `io.Reader` in struct)
 			typeExpr := ctx.mapTypeExpr(field.Type)
+			prefix, typeExpr := hoistLeftPrefix(typeExpr)
 			vd := &java.VariableDeclarations{
 				ID:       uuid.New(),
+				Prefix:   prefix,
 				TypeExpr: typeExpr,
 				Variables: []java.RightPadded[*java.VariableDeclarator]{
 					{Element: &java.VariableDeclarator{ID: uuid.New(), Name: &java.Identifier{ID: uuid.New()}}},
@@ -2770,8 +2846,12 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *java.Block
 		} else {
 			// Named field(s): `X int` or `X, Y int`
 			var vars []java.RightPadded[*java.VariableDeclarator]
+			var vdPrefix java.Space
 			for j, fieldName := range field.Names {
 				nameIdent := ctx.mapIdent(fieldName)
+				if j == 0 {
+					vdPrefix, nameIdent = hoistLeftPrefix(nameIdent)
+				}
 				var nameAfter java.Space
 				if j < len(field.Names)-1 {
 					commaOffset := ctx.findNext(',')
@@ -2788,6 +2868,7 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *java.Block
 			typeExpr := ctx.mapTypeExpr(field.Type)
 			vd := &java.VariableDeclarations{
 				ID:        uuid.New(),
+				Prefix:    vdPrefix,
 				TypeExpr:  typeExpr,
 				Variables: vars,
 			}
@@ -3057,8 +3138,10 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 		if len(field.Names) == 0 {
 			// Embedded interface type (e.g., `io.Reader`)
 			typeExpr := ctx.mapTypeExpr(field.Type)
+			prefix, typeExpr := hoistLeftPrefix(typeExpr)
 			vd := &java.VariableDeclarations{
 				ID:       uuid.New(),
+				Prefix:   prefix,
 				TypeExpr: typeExpr,
 				Variables: []java.RightPadded[*java.VariableDeclarator]{
 					{Element: &java.VariableDeclarator{ID: uuid.New(), Name: &java.Identifier{ID: uuid.New()}}},
@@ -3068,13 +3151,15 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Bl
 		} else {
 			// Method signature: `Name(params) returnType`
 			name := ctx.mapIdent(field.Names[0])
+			namePrefix, name := hoistLeftPrefix(name)
 			funcType := field.Type.(*ast.FuncType)
 			params := ctx.mapFieldListAsParams(funcType.Params)
 			returnType := ctx.mapReturnType(funcType.Results)
 
 			md := &java.MethodDeclaration{
-				ID:   uuid.New(),
-				Name: name,
+				ID:     uuid.New(),
+				Prefix: namePrefix,
+				Name:   name,
 				Markers: java.Markers{
 					Entries: []java.Marker{golang.InterfaceMethod{Ident: uuid.New()}},
 				},
