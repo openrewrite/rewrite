@@ -13,37 +13,105 @@
 # limitations under the License.
 
 """
-Infrastructure for calling Java recipes from Python via RPC.
+Referencing and delegating to recipes hosted on another peer over RPC.
 
-This module provides the ability for Python recipes to delegate to Java recipes,
-similar to how JavaScript recipes can call Java recipes. This enables Python
-recipes to leverage the full Java recipe ecosystem, including recipes like
-ChangeType, ChangeMethodName, etc.
+The public surface is :class:`RpcRecipe` — a reference to a recipe reached over
+the RPC bridge (today: a Java recipe on the JVM), usable as an entry in a
+composite's ``recipe_list()`` (see its docstring). This lets Python recipes
+leverage the full Java recipe ecosystem (``ChangeType``, ``ChangeMethodName``,
+etc.) without reimplementing them.
 
-Example:
-    from rewrite.rpc.java_recipe import JavaRecipe
-
-    class MyPythonRecipe(Recipe):
-        def __init__(self):
-            self._java_recipe = None
-
-        async def editor(self):
-            if self._java_recipe is None:
-                self._java_recipe = await prepare_java_recipe(
-                    "org.openrewrite.java.ChangeType",
-                    {"oldFullyQualifiedTypeName": "ast.Num", "newFullyQualifiedTypeName": "ast.Constant"}
-                )
-            return JavaRecipeVisitor(self._java_recipe)
+``prepare_java_recipe`` + ``JavaRecipeVisitor`` + ``PreparedJavaRecipe`` are the
+lower-level helpers that splice a Java recipe's *edit* visitor in over RPC. They
+are used internally by :meth:`RpcRecipe.editor` (the Python-host face) and are no
+longer called directly by any recipe.
 """
 
 import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
+from rewrite.recipe import Recipe
 from rewrite.tree import Tree
 from rewrite.visitor import TreeVisitor
 
 logger = logging.getLogger(__name__)
+
+
+class RpcRecipe(Recipe):
+    """A reference to a recipe reached over the RPC bridge, usable as an entry
+    in a composite's ``recipe_list()``.
+
+    This lets a pure-composite Python recipe (one that overrides only
+    ``recipe_list()`` and has no ``editor()`` of its own) include a recipe that
+    is implemented on another peer (today: a Java recipe on the JVM),
+    identified by its fully-qualified id. Options are passed as kwargs using the
+    target recipe's own option names, verbatim — no name translation — so they
+    round-trip to any ecosystem (e.g. a Java recipe's camelCase
+    ``oldFullyQualifiedTypeName``)::
+
+        class UpgradePydantic(Recipe):
+            @property
+            def name(self):
+                return "io.moderne.example.UpgradePydantic"
+
+            def recipe_list(self):
+                return [
+                    ReplacePopulateByNameWithValidateByName(),  # Python recipe
+                    RpcRecipe("org.openrewrite.python.UpgradeDependencyVersion",
+                              packageName="pydantic", newVersion=">=2.11.0"),
+                ]
+
+    The reference carries only an id + options, and the framework resolves it
+    according to who orchestrates the run — the same author-written
+    ``RpcRecipe`` has two faces:
+
+      * **JVM hosts**: when the JVM materializes the composite over RPC and
+        round-trips ``PrepareRecipe`` for this child's id, the Python peer
+        answers with a ``delegatesTo`` response carrying the id + options (see
+        ``handle_prepare_recipe`` in ``rpc/server.py``). The JVM instantiates
+        the real recipe natively, running its full lifecycle — including
+        ``ScanningRecipe`` scan+edit phases and non-Python source files such as
+        ``pyproject.toml``. ``editor()`` is never called in this mode (the
+        server short-circuits to ``delegatesTo`` first).
+
+      * **Python hosts**: when Python orchestrates the run in-process,
+        ``editor()`` splices the target recipe's *edit* visitor in over RPC
+        (via :func:`prepare_java_recipe`). This is single-pass over the shared
+        Python/Java LST — it does not run a ``ScanningRecipe``'s scan phase or
+        touch non-Python files; a full scan+generate proxy (the mirror of
+        ``RpcRecipe`` on the Java and JavaScript sides) is future work.
+    """
+
+    def __init__(self, name: str, **options: Any):
+        self._name = name
+        # ``java_recipe_name`` / ``delegates_to_options`` are the (internal)
+        # attribute names the server's delegatesTo production reads; see
+        # ``handle_prepare_recipe`` in ``rpc/server.py``. The over-the-wire
+        # delegatesTo payload is the ecosystem-neutral ``{recipeName, options}``.
+        self.java_recipe_name = name
+        self.delegates_to_options: Dict[str, Any] = dict(options)
+        self._prepared: Optional["PreparedJavaRecipe"] = None
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def display_name(self) -> str:
+        return self._name
+
+    @property
+    def description(self) -> str:
+        return f"Delegates over RPC to the recipe `{self._name}`."
+
+    def editor(self) -> TreeVisitor[Tree, Any]:
+        # Python-host face: splice the target recipe's edit visitor in over RPC.
+        # Never reached when the JVM orchestrates (the server short-circuits to
+        # delegatesTo before editor() is introspected).
+        if self._prepared is None:
+            self._prepared = prepare_java_recipe(self._name, self.delegates_to_options)
+        return JavaRecipeVisitor(self._prepared)
 
 
 @dataclass
