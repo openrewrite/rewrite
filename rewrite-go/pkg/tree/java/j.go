@@ -68,25 +68,23 @@ func (n *Identifier) WithFieldType(ft *JavaTypeVariable) *Identifier {
 
 // Literal represents a literal value (string, number, boolean, etc.).
 type Literal struct {
-	ID      uuid.UUID
-	Prefix  Space
-	Markers Markers
-	Kind    LiteralKind
-	Value   any
-	Source  string   // the original source text of the literal
-	Type    JavaType // the type of this literal (nullable)
+	ID             uuid.UUID
+	Prefix         Space
+	Markers        Markers
+	Value          any
+	Source         string          // the original source text of the literal
+	UnicodeEscapes []UnicodeEscape // mirrors J.Literal.unicodeEscapes; typically empty for Go
+	Type           JavaType        // the type of this literal (nullable)
 }
 
-type LiteralKind int
-
-const (
-	BoolLiteral LiteralKind = iota
-	IntLiteral
-	FloatLiteral
-	StringLiteral
-	CharLiteral
-	NilLiteral
-)
+// UnicodeEscape mirrors J.Literal.UnicodeEscape: an escaped code point and
+// the index into the value source where it occurs. Go does not currently
+// produce these, but the field exists to keep Literal symmetric with the
+// Java model for RPC round-tripping.
+type UnicodeEscape struct {
+	ValueSourceIndex int
+	CodePoint        string
+}
 
 func (*Literal) IsTree()       {}
 func (*Literal) IsJ()          {}

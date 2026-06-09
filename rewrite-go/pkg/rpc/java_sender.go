@@ -17,6 +17,8 @@
 package rpc
 
 import (
+	"strconv"
+
 	"github.com/google/uuid"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -115,8 +117,25 @@ func (s *JavaSender) VisitLiteral(lit *java.Literal, p any) java.J {
 	q.GetAndSend(lit, func(v any) any { return v.(*java.Literal).Value }, nil)
 	// valueSource (source text)
 	q.GetAndSend(lit, func(v any) any { return v.(*java.Literal).Source }, nil)
-	// unicodeEscapes (empty for Go)
-	q.GetAndSendList(lit, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	// unicodeEscapes (typically empty for Go)
+	q.GetAndSendList(lit,
+		func(v any) []any {
+			escapes := v.(*java.Literal).UnicodeEscapes
+			result := make([]any, len(escapes))
+			for i, e := range escapes {
+				result[i] = e
+			}
+			return result
+		},
+		func(v any) any {
+			e := v.(java.UnicodeEscape)
+			return strconv.Itoa(e.ValueSourceIndex) + e.CodePoint
+		},
+		func(v any) {
+			e := v.(java.UnicodeEscape)
+			q.GetAndSend(e, func(x any) any { return x.(java.UnicodeEscape).ValueSourceIndex }, nil)
+			q.GetAndSend(e, func(x any) any { return x.(java.UnicodeEscape).CodePoint }, nil)
+		})
 	// type (as ref)
 	q.GetAndSend(lit, func(v any) any { return AsRef(v.(*java.Literal).Type) },
 		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })

@@ -130,8 +130,26 @@ func (r *JavaReceiver) VisitLiteral(lit *java.Literal, p any) java.J {
 	lit.Value = q.Receive(lit.Value, nil)
 	// valueSource
 	lit.Source = receiveScalar[string](q, lit.Source)
-	// unicodeEscapes (empty for Go)
-	q.ReceiveList(nil, nil)
+	// unicodeEscapes (typically empty for Go)
+	before := make([]any, len(lit.UnicodeEscapes))
+	for i, e := range lit.UnicodeEscapes {
+		before[i] = e
+	}
+	after := q.ReceiveList(before, func(v any) any {
+		e, _ := v.(java.UnicodeEscape)
+		e.ValueSourceIndex = receiveScalar[int](q, e.ValueSourceIndex)
+		e.CodePoint = receiveScalar[string](q, e.CodePoint)
+		return e
+	})
+	if after != nil {
+		escapes := make([]java.UnicodeEscape, len(after))
+		for i, v := range after {
+			escapes[i] = v.(java.UnicodeEscape)
+		}
+		lit.UnicodeEscapes = escapes
+	} else {
+		lit.UnicodeEscapes = nil
+	}
 	// type (as ref)
 	lit.Type = r.receiveType(lit.Type, q)
 	return lit
