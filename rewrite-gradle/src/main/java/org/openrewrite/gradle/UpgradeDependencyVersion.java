@@ -243,8 +243,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     // Resolve the new version if needed
                     if (!acc.gaToNewVersion.containsKey(ga)) {
                         try {
-                            String newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                    .select(ga, "dependencyManagement", UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
+                            String newVersion;
+                            if (entry.getVersion() != null) {
+                                GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), entry.getVersion());
+                                newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                        .select(gav, "dependencyManagement", UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
+                            } else {
+                                newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                        .select(ga, "dependencyManagement", UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
+                            }
                             acc.gaToNewVersion.put(ga, newVersion);
                         } catch (MavenDownloadingException e) {
                             acc.gaToNewVersion.put(ga, e);
