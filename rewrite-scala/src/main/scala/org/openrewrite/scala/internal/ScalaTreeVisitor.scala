@@ -569,26 +569,35 @@ class ScalaTreeVisitor(
     
     // Extract the annotation type and arguments
     // Handle both direct Select(New(...), <init>) and TypeApply(Select(New(...), <init>), types)
-    def extractAnnotationType(fun: Trees.Tree[?]): Option[Trees.Ident[?]] = fun match {
+    def extractAnnotationTypeTree(fun: Trees.Tree[?]): Option[Trees.Tree[?]] = fun match {
       case sel: Trees.Select[?] if sel.name.toString == "<init>" =>
         sel.qualifier match {
-          case newTree: Trees.New[?] => newTree.tpt match {
-            case id: Trees.Ident[?] => Some(id)
-            case _ => None
-          }
+          case newTree: Trees.New[?] => Some(newTree.tpt)
           case _ => None
         }
-      case ta: Trees.TypeApply[?] => extractAnnotationType(ta.fun)
+      case ta: Trees.TypeApply[?] => extractAnnotationTypeTree(ta.fun)
       case _ => None
     }
-    val annotationType = extractAnnotationType(app.fun) match {
-      case Some(id) => id
+    val tpt = extractAnnotationTypeTree(app.fun) match {
+      case Some(t) => t
       case None => return visitUnknown(app)
     }
     val args = app.args
-    
-    // Create the annotation type
-    val annotTypeTree = ident(annotationType.name.toString)
+
+    // Create the annotation type: an Ident for a simple name (@deprecated) or a
+    // Select chain for a qualified name (@scala.annotation.implicitNotFound).
+    val annotTypeTree: NameTree = tpt match {
+      case id: Trees.Ident[?] => ident(id.name.toString)
+      case sel: Trees.Select[?] =>
+        // Qualified name: skip the leading '@', then map the Select chain to a J.FieldAccess.
+        val selStart = Math.max(0, sel.span.start - offsetAdjustment)
+        if (selStart > cursor) cursor = selStart
+        visitTree(sel) match {
+          case nt: NameTree => nt
+          case _ => return visitUnknown(app)
+        }
+      case _ => return visitUnknown(app)
+    }
     
     // Advance cursor past "@AnnotName(" before visiting arguments
     if (args.nonEmpty && args.head.span.exists) {
