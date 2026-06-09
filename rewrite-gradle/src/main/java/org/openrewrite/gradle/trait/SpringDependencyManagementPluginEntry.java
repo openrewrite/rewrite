@@ -59,7 +59,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
 
     String group;
     Set<String> artifacts; //As dependencySet can have multiple Entry invocations
-    String version;
+    @Nullable String version;
 
     public SpringDependencyManagementPluginEntry withGroupArtifactVersion(DependencyMatcher matcher, @Nullable String newGroup, @Nullable String newArtifact, @Nullable String newVersion, @Nullable String versionPattern, MavenMetadataFailures metadataFailures, ExecutionContext ctx) {
         GradleProject gradleProject = getGradleProject();
