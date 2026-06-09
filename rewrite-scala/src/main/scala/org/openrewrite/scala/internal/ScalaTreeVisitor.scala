@@ -4619,8 +4619,17 @@ class ScalaTreeVisitor(
       visitResult match {
         case null => // Skip null statements (e.g., package declarations)
         case stmt: Statement =>
-          // Extract trailing space after this statement
-          val statEnd = Math.max(0, stat.span.end - offsetAdjustment)
+          // Extract trailing space after this statement.
+          // A procedure-syntax method (method-level OmitBraces marker) has an
+          // unreliable dotty span end — it overshoots the real closing `}` because
+          // of the synthetic `???` body the parser substitutes. `reparseProcedureBody`
+          // already advanced the cursor to just past the real `}`, so trust the cursor
+          // here; otherwise the whitespace/comments before the next statement are lost.
+          val isProcedureMethod = stmt match {
+            case md: J.MethodDeclaration => md.getMarkers.findFirst(classOf[OmitBraces]).isPresent
+            case _ => false
+          }
+          val statEnd = if (isProcedureMethod) cursor else Math.max(0, stat.span.end - offsetAdjustment)
           val nextStart = if (i < block.stats.length - 1) {
             Math.max(0, block.stats(i + 1).span.start - offsetAdjustment)
           } else if (!block.expr.isEmpty) {
@@ -5916,16 +5925,14 @@ class ScalaTreeVisitor(
     val adjustedEnd = Math.max(0, dd.span.end - offsetAdjustment)
     var isProcedureSyntax = false
 
-    // Detect procedure syntax and nested braces
+    // Procedure syntax (`def f(...) { ... }`) is detected when the body `{` is
+    // reached before any method-body `=`. The scan skips parameter clauses and
+    // type parameter lists so a default value (`x: Int = 0`) or a function-type
+    // parameter (`g: () => Unit`) isn't mistaken for the method-body `=`.
+    // Note: nested braces (def foo = { { ... } }) are flattened by the compiler;
+    // the AST has one block, so the inner braces are lost in the round-trip.
     if (adjustedStart < adjustedEnd && adjustedEnd <= source.length) {
-      val defSource = source.substring(adjustedStart, adjustedEnd)
-      val braceIdx = positionOfNextIn(defSource, "{", 0)
-      val equalsIdx = positionOfNextIn(defSource, "=", 0)
-      if (braceIdx >= 0 && (equalsIdx < 0 || equalsIdx > braceIdx)) {
-        isProcedureSyntax = true
-      }
-      // Note: nested braces (def foo = { { ... } }) are flattened by the compiler
-      // The AST has one block, so the inner braces are lost in the round-trip
+      isProcedureSyntax = bodyOpensWithBrace(adjustedStart, adjustedEnd)
     }
 
     // Detect parameterless methods (def name: Type = ...) — no parens in source.
@@ -8577,6 +8584,35 @@ class ScalaTreeVisitor(
       }
     }
     if (depth == 0) i else -1
+  }
+
+  /** Scans a `def` header in `source[start, end)` and returns true when the method
+   *  body is introduced by `{` (Scala 2 procedure syntax) rather than `=`. Balanced
+   *  `(...)`/`[...]` groups are skipped via {@code positionOfMatchingClose} so an `=`
+   *  inside a parameter clause (a default value, or the `=` of a `=>` function-type
+   *  parameter) is not mistaken for the method-body `=`. Comments are skipped too. */
+  private def bodyOpensWithBrace(start: Int, end: Int): Boolean = {
+    var i = start
+    var inLineComment = false
+    var inBlockComment = false
+    while (i < end) {
+      val c = source.charAt(i)
+      if (inLineComment) {
+        if (c == '\n') inLineComment = false
+        i += 1
+      } else if (inBlockComment) {
+        if (c == '*' && i + 1 < end && source.charAt(i + 1) == '/') { inBlockComment = false; i += 2 }
+        else i += 1
+      } else if (c == '/' && i + 1 < end && source.charAt(i + 1) == '/') { inLineComment = true; i += 2 }
+      else if (c == '/' && i + 1 < end && source.charAt(i + 1) == '*') { inBlockComment = true; i += 2 }
+      else if (c == '(' || c == '[') {
+        val close = positionOfMatchingClose(c, if (c == '(') ')' else ']', i + 1)
+        i = if (close >= 0) close + 1 else end
+      } else if (c == '{') return true
+      else if (c == '=') return false
+      else i += 1
+    }
+    false
   }
 
   /**

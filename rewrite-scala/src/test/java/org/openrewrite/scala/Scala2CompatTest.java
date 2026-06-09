@@ -68,6 +68,41 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
+    void procedureSyntaxWithDefaultParam() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def greet(name: String = "world") {
+                    println(name)
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void statementAfterProcedureSyntaxMethod() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def outer(): Unit = {
+                    def inner() {
+                      println(1)
+                    }
+
+                    // call it
+                    inner()
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void uninitializedVar() {
         rewriteRun(
             scala(
