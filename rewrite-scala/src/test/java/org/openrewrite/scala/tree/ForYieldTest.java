@@ -133,4 +133,38 @@ class ForYieldTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void anonymousGivenBinding() {
+        rewriteRun(
+          scala(
+            """
+              object Test:
+                def foo =
+                  for
+                    user <- List(1)
+                    given Int = user
+                    y <- List(2)
+                  yield y
+              """
+          )
+        );
+    }
+
+    @Test
+    void namedGivenBinding() {
+        rewriteRun(
+          scala(
+            """
+              object Test:
+                def foo =
+                  for
+                    user <- List(1)
+                    given ord: String = user.toString
+                    y <- List(2)
+                  yield y
+              """
+          )
+        );
+    }
 }

@@ -7879,7 +7879,11 @@ class ScalaTreeVisitor(
 
     var lhs: J = null
     if (kind != S.For.Enumerator.Kind.Guard) {
-      lhs = visitTree(lhsTree)
+      if (kind == S.For.Enumerator.Kind.Assignment && isGivenEnumeratorPat(lhsTree)) {
+        lhs = buildGivenEnumeratorLhs(lhsTree)
+      } else {
+        lhs = visitTree(lhsTree)
+      }
     }
 
     val rhsStart = Math.max(0, rhsTree.span.start - offsetAdjustment)
@@ -7940,6 +7944,91 @@ class ScalaTreeVisitor(
     val enumerator = new S.For.Enumerator(Tree.randomId(), enumPrefix, Markers.EMPTY,
       kind, lhs, beforeOp, rhs)
     new JRightPadded(enumerator, after, rpMarkers)
+  }
+
+  /** True when this GenAlias pattern is a `given` enumerator (`given T = e` / `given x: T = e`). */
+  private def isGivenEnumeratorPat(pat: Trees.Tree[?]): Boolean = {
+    if (pat == null || !pat.span.exists) return false
+    val start = Math.max(0, pat.span.start - offsetAdjustment)
+    val kw = "given"
+    if (start + kw.length > source.length || !source.regionMatches(start, kw, 0, kw.length)) return false
+    val after = start + kw.length
+    after >= source.length || !Character.isJavaIdentifierPart(source.charAt(after))
+  }
+
+  /**
+   * Build the left-hand side of a `given` for-comprehension enumerator. Dotty models
+   *   `given T = e`     as Bind(`_`, Typed(`_`, T))
+   *   `given x: T = e`  as Typed(Bind(x, _), T)
+   * Neither is an at-binding, so visitBind would mangle the `given` keyword. Map the
+   * anonymous form to S.AnonymousGiven and the named form to a J.VariableDeclarations
+   * carrying the Given marker — matching how top-level givens are modeled. The `= e`
+   * part is emitted by the enclosing enumerator, so no initializer is attached here.
+   * Cursor must sit at the start of the `given` keyword on entry.
+   */
+  private def buildGivenEnumeratorLhs(pat: Trees.Tree[?]): J = {
+    cursor += "given".length
+    // Locate the type tree regardless of the (anonymous vs named) dotty shape.
+    val tpt: Trees.Tree[?] = pat match {
+      case bind: Trees.Bind[?] if bind.body.isInstanceOf[Trees.Typed[?]] =>
+        bind.body.asInstanceOf[Trees.Typed[?]].tpt
+      case typed: Trees.Typed[?] => typed.tpt
+      case bind: Trees.Bind[?] => bind.body
+      case _ => pat
+    }
+    val tptStart = Math.max(0, tpt.span.start - offsetAdjustment)
+    // dotty marks the binding name as `_` even when named, so read the name (if any) from
+    // source: a colon between `given` and the type signals the named form `given x: T`.
+    val region = if (cursor < tptStart && tptStart <= source.length) source.substring(cursor, tptStart) else ""
+    val colonIdx = region.indexOf(':')
+
+    if (colonIdx < 0) {
+      val typePrefix = if (region.nonEmpty) Space.format(region) else Space.SINGLE_SPACE
+      val typeExpr = visitGivenEnumeratorType(tpt, typePrefix)
+      updateCursor(pat.span.end)
+      new S.AnonymousGiven(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+        new util.ArrayList[J.Annotation](), new util.ArrayList[J.Modifier](), typeExpr, null)
+    } else {
+      val nameRegion = region.substring(0, colonIdx)
+      val leadWs = nameRegion.takeWhile(_.isWhitespace)
+      val rest = nameRegion.drop(leadWs.length)
+      val nameStr = rest.takeWhile(c => !c.isWhitespace)
+      val trailWs = rest.drop(nameStr.length)
+      val afterColonStr = region.substring(colonIdx + 1)
+      val afterKeyword = if (leadWs.isEmpty) Space.SINGLE_SPACE else Space.format(leadWs)
+      val beforeColon = if (trailWs.isEmpty) Space.EMPTY else Space.format(trailWs)
+      val afterColon = if (afterColonStr.isEmpty) Space.SINGLE_SPACE else Space.format(afterColonStr)
+
+      val typeExpr = visitGivenEnumeratorType(tpt, afterColon)
+      updateCursor(pat.span.end)
+
+      val namedVariable = new J.VariableDeclarations.NamedVariable(
+        Tree.randomId(), afterKeyword, Markers.EMPTY, ident(nameStr), Collections.emptyList(), null, null)
+      val modifiers = new util.ArrayList[J.Modifier]()
+      modifiers.add(new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+        null, J.Modifier.Type.Final, Collections.emptyList()))
+      val markers = Markers.build(Collections.singletonList(
+        org.openrewrite.scala.marker.Given(Tree.randomId())))
+      val varargs: Space = if (beforeColon != Space.EMPTY) beforeColon else null
+      new J.VariableDeclarations(Tree.randomId(), Space.EMPTY, markers,
+        new util.ArrayList[J.Annotation](), modifiers, typeExpr, varargs,
+        Collections.emptyList(), Collections.singletonList(JRightPadded.build(namedVariable)))
+    }
+  }
+
+  /** Visit a given enumerator's type at `tpt`, using the supplied prefix. Cursor jumps to the type. */
+  private def visitGivenEnumeratorType(tpt: Trees.Tree[?], typePrefix: Space): TypeTree = {
+    val typeStart = Math.max(0, tpt.span.start - offsetAdjustment)
+    cursor = typeStart
+    val savedCursor = cursor
+    val visited = visitTypeTree(tpt)
+    if (visited != null) visited.withPrefix(typePrefix).asInstanceOf[TypeTree]
+    else {
+      cursor = savedCursor
+      val tText = extractSource(tpt.span)
+      updateCursor(tpt.span.end)
+      ident(tText, typePrefix).asInstanceOf[TypeTree]
+    }
   }
 
   /** Common parser for ForDo (complex) and ForYield. */
