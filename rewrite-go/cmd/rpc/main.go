@@ -2086,19 +2086,22 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if err != nil {
 			continue
 		}
-		gm, err := goparser.ParseGoModFile(modPath, string(data))
+		// Relativize before building the LST so the GoMod's own SourcePath
+		// matches the response item (and the compilation units) — the Java
+		// side reads SourcePath off the serialized object, not the item.
+		sourcePath := modPath
+		if req.RelativeTo != nil && *req.RelativeTo != "" {
+			if rel, err := filepath.Rel(*req.RelativeTo, modPath); err == nil {
+				sourcePath = rel
+			}
+		}
+		gm, err := goparser.ParseGoModFile(sourcePath, string(data))
 		if err != nil {
 			s.logger.Printf("ParseProject: skip go.mod LST %s: %v", modPath, err)
 			continue
 		}
 		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
 			gm.Markers.Entries = append(gm.Markers.Entries, *m.mrr)
-		}
-		sourcePath := modPath
-		if req.RelativeTo != nil && *req.RelativeTo != "" {
-			if rel, err := filepath.Rel(*req.RelativeTo, modPath); err == nil {
-				sourcePath = rel
-			}
 		}
 		id := gm.Ident.String()
 		s.localObjects[id] = gm
