@@ -219,11 +219,15 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 	case *java.FieldAccess:
 		return n.Type
 	case *java.TypeCast:
-		return n.Type
+		if n.Clazz != nil {
+			return TypeOfExpression(n.Clazz.Tree.Element)
+		}
 	case *java.ArrayAccess:
 		return n.Type
 	case *java.Parentheses:
-		return n.Type
+		return TypeOfExpression(n.Tree.Element)
+	case *java.ControlParentheses:
+		return TypeOfExpression(n.Tree.Element)
 	case *java.MethodInvocation:
 		if n.MethodType != nil {
 			return n.MethodType.ReturnType
