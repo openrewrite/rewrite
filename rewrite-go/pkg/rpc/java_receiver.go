@@ -558,32 +558,14 @@ func (r *JavaReceiver) VisitForEachControl(fc *java.ForEachControl, p any) java.
 	q := p.(*ReceiveQueue)
 	c := *fc // shallow copy to avoid mutating remoteObjects baseline
 	fc = &c
-	// key (right-padded, nullable)
-	var beforeKey any
-	if fc.Key != nil {
-		beforeKey = *fc.Key
+	// variable (right-padded Statement)
+	if result := q.Receive(fc.Variable, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		fc.Variable = coerceToStatementRP(result)
 	}
-	if result := q.Receive(beforeKey, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
-		rp := coerceToExpressionRP(result)
-		fc.Key = &rp
-	} else {
-		fc.Key = nil
+	// iterable (right-padded Expression)
+	if result := q.Receive(fc.Iterable, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
+		fc.Iterable = coerceToExpressionRP(result)
 	}
-	// value (right-padded, nullable)
-	var beforeValue any
-	if fc.Value != nil {
-		beforeValue = *fc.Value
-	}
-	if result := q.Receive(beforeValue, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
-		rp := coerceToExpressionRP(result)
-		fc.Value = &rp
-	} else {
-		fc.Value = nil
-	}
-	// operator (left-padded AssignOp enum)
-	fc.Operator = receiveLeftPaddedEnum(r, q, fc.Operator, parseAssignOpDefaulting)
-	// iterable
-	fc.Iterable = receiveValue(q, fc.Iterable, func(e java.Expression) any { return r.Visit(e, q) })
 	return fc
 }
 

@@ -749,54 +749,22 @@ func (n *ForEachLoop) WithBody(body *Block) *ForEachLoop {
 	return &c
 }
 
-// ForEachControl holds the variable and iterable of a for-range loop.
-// The "range" keyword is implicit (always present).
+// ForEachControl is a faithful mirror of Java's J.ForEachLoop.Control: it has
+// exactly the same two slots, Variable and Iterable. The "range" keyword (the
+// Go analog of Java's `:` separator) is implicit and always present.
 //
-// Structure: `for` [key] [`,` value] [`:=`|`=`] `range` iterable
-//   - Key and Value may be nil (e.g., `for range expr {}`)
-//   - When Key is non-nil, Operator contains `:=` or `=`
+// Structure: `for` [variable] `range` iterable
+//   - Variable holds the loop target(s). Keyless `for range expr {}` uses a
+//     J.Empty here. One or more targets — together with the `:=`/`=` operator —
+//     are carried by a golang.MultiAssignment (its ShortVarDecl marker encodes
+//     `:=` vs `=`); this keeps all Go-specific structure out of this mirror.
+//   - Variable.After = space before "range".
 type ForEachControl struct {
 	ID       uuid.UUID
 	Prefix   Space
 	Markers  Markers
-	Key      *RightPadded[Expression] // nil for `for range expr`; After = space after key (including comma)
-	Value    *RightPadded[Expression] // nil when no value; After = space before operator
-	Operator LeftPadded[AssignOp]     // `:=` or `=`; Before = space before operator. Unused when Key is nil
-	Iterable Expression               // expression after "range" keyword
-}
-
-// AssignOp distinguishes := from = in assignment contexts.
-type AssignOp int
-
-const (
-	AssignOpEquals AssignOp = iota + 1 // =
-	AssignOpDefine                     // :=
-)
-
-// String returns a string representation of AssignOp for RPC serialization.
-func (op AssignOp) String() string {
-	switch op {
-	case AssignOpEquals:
-		return "Equals"
-	case AssignOpDefine:
-		return "Define"
-	default:
-		return "Equals"
-	}
-}
-
-// ParseAssignOp converts a string to an AssignOp.
-// Accepts both the Go enum names emitted by AssignOp.String() ("Equals", "Define")
-// and the Java-side source-symbol spellings ("=", ":=").
-func ParseAssignOp(s string) AssignOp {
-	switch s {
-	case "Equals", "=":
-		return AssignOpEquals
-	case "Define", ":=":
-		return AssignOpDefine
-	default:
-		return 0 // Unknown
-	}
+	Variable RightPadded[Statement]  // loop target(s); J.Empty when keyless
+	Iterable RightPadded[Expression] // expression after "range" keyword
 }
 
 func (*ForEachControl) IsTree() {}

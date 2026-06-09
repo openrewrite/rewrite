@@ -237,13 +237,8 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 			c.matchNode(p.Body, cand.Body)
 	case *java.ForEachControl:
 		cand := candidate.(*java.ForEachControl)
-		if !c.matchOptionalRightPaddedExpr2(p.Key, cand.Key) {
-			return false
-		}
-		if !c.matchOptionalRightPaddedExpr2(p.Value, cand.Value) {
-			return false
-		}
-		return c.matchNode(p.Iterable, cand.Iterable)
+		return c.matchNode(p.Variable.Element, cand.Variable.Element) &&
+			c.matchNode(p.Iterable.Element, cand.Iterable.Element)
 	case *java.Switch:
 		cand := candidate.(*java.Switch)
 		if !c.matchOptionalRightPaddedExpr(p.Tag, cand.Tag) {
@@ -445,10 +440,6 @@ func (c *patternComparator) matchOptionalRightPaddedExpr(pattern, candidate *jav
 		return false
 	}
 	return c.matchNode(pattern.Element, candidate.Element)
-}
-
-func (c *patternComparator) matchOptionalRightPaddedExpr2(pattern, candidate *java.RightPadded[java.Expression]) bool {
-	return c.matchOptionalRightPaddedExpr(pattern, candidate)
 }
 
 func (c *patternComparator) matchOptionalRightPaddedJ(pattern, candidate *java.RightPadded[java.J]) bool {

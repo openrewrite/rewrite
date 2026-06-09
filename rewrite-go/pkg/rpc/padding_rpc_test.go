@@ -128,56 +128,6 @@ func TestRawCastPanics_LeftPaddedIdentFromExpression(t *testing.T) {
 	})
 }
 
-// ----- Group 3a: ParseAssignOp recognizes Java's source-symbol spellings -----
-
-func TestParseAssignOp(t *testing.T) {
-	cases := []struct {
-		in   string
-		want java.AssignOp
-	}{
-		// Go enum names (what AssignOp.String emits)
-		{"Equals", java.AssignOpEquals},
-		{"Define", java.AssignOpDefine},
-		// Java source-symbol forms (what JavaSender ships)
-		{"=", java.AssignOpEquals},
-		{":=", java.AssignOpDefine},
-		// Unknown spelling: 0 lets the caller fall back deliberately.
-		{"<-", 0},
-		{"", 0},
-	}
-	for _, c := range cases {
-		if got := java.ParseAssignOp(c.in); got != c.want {
-			t.Errorf("ParseAssignOp(%q): want %v, got %v", c.in, c.want, got)
-		}
-	}
-}
-
-// ----- Group 3b: AssignOp slots receive via coerceLeftPaddedEnum + parseAssignOpDefaulting -----
-
-func TestCoerceLeftPaddedEnum_AssignOpFromString(t *testing.T) {
-	// The wire ships the AssignOp as a string; the parser resolves it to the enum.
-	if got := coerceLeftPaddedEnum(java.EmptySpace, ":=", java.Markers{}, parseAssignOpDefaulting); got.Element != java.AssignOpDefine {
-		t.Errorf(":= want AssignOpDefine, got %v", got.Element)
-	}
-	if got := coerceLeftPaddedEnum(java.EmptySpace, "=", java.Markers{}, parseAssignOpDefaulting); got.Element != java.AssignOpEquals {
-		t.Errorf("= want AssignOpEquals, got %v", got.Element)
-	}
-}
-
-func TestCoerceLeftPaddedEnum_AssignOpPreTypedPassThrough(t *testing.T) {
-	// already-typed enum (NO_CHANGE) passes through unchanged.
-	if got := coerceLeftPaddedEnum(java.EmptySpace, java.AssignOpDefine, java.Markers{}, parseAssignOpDefaulting); got.Element != java.AssignOpDefine {
-		t.Errorf("pass-through broke: got %v", got.Element)
-	}
-}
-
-func TestParseAssignOpDefaulting_UnknownSpellingFallsBack(t *testing.T) {
-	// Defense-in-depth: we'd rather emit a possibly-wrong = than crash the recipe.
-	if got := parseAssignOpDefaulting("<-"); got != java.AssignOpEquals {
-		t.Errorf("want fallback to AssignOpEquals, got %v", got)
-	}
-}
-
 // ----- Group 4: coerceRightPaddedTyped[T] element coercion -----
 //
 // receiveContainerTyped[T] builds Container[T] by running each received element
