@@ -19,7 +19,6 @@ package template
 import (
 	"sync"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -157,210 +156,16 @@ func (v *RewriteVisitor) Visit(t java.Tree, p any) java.Tree {
 	return setLeadingPrefix(replaced, getLeadingPrefix(j))
 }
 
-// setLeadingPrefix sets the prefix on the leftmost leaf of the node,
-// mirroring getLeadingPrefix. This ensures compound nodes like
-// MethodInvocation (where the prefix lives on Select, not the root)
-// get the right whitespace.
+// setLeadingPrefix sets the node's own leading whitespace. The parser
+// attaches inter-element whitespace to the outermost element, so the
+// leading prefix lives directly on the node.
 func setLeadingPrefix(j java.J, prefix java.Space) java.J {
-	switch n := j.(type) {
-	case *java.Identifier:
-		return n.WithPrefix(prefix)
-	case *java.Literal:
-		return n.WithPrefix(prefix)
-	case *java.Empty:
-		return n.WithPrefix(prefix)
-	case *java.Binary:
-		return n.WithLeft(setLeadingPrefix(n.Left, prefix).(java.Expression))
-	case *java.Unary:
-		return n.WithPrefix(prefix)
-	case *java.FieldAccess:
-		return n.WithTarget(setLeadingPrefix(n.Target, prefix).(java.Expression))
-	case *java.MethodInvocation:
-		if n.Select != nil {
-			sel := *n.Select
-			sel.Element = setLeadingPrefix(sel.Element, prefix).(java.Expression)
-			return &java.MethodInvocation{
-				ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-				Select: &sel, Name: n.Name, Arguments: n.Arguments, MethodType: n.MethodType,
-			}
-		}
-		return n.WithName(n.Name.WithPrefix(prefix))
-	case *java.Assignment:
-		return n.WithVariable(setLeadingPrefix(n.Variable, prefix).(java.Expression))
-	case *java.AssignmentOperation:
-		return n.WithVariable(setLeadingPrefix(n.Variable, prefix).(java.Expression))
-	case *java.Parentheses:
-		return n.WithPrefix(prefix)
-	case *java.TypeCast:
-		return n.WithPrefix(prefix)
-	case *java.ArrayAccess:
-		return &java.ArrayAccess{
-			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Indexed:   setLeadingPrefix(n.Indexed, prefix).(java.Expression),
-			Dimension: n.Dimension, Type: n.Type,
-		}
-	case *golang.Composite:
-		if n.TypeExpr != nil {
-			return &golang.Composite{
-				ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-				TypeExpr: setLeadingPrefix(n.TypeExpr, prefix).(java.Expression),
-				Elements: n.Elements,
-			}
-		}
-		return n.WithPrefix(prefix)
-	case *golang.Slice:
-		return &golang.Slice{
-			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Indexed:     setLeadingPrefix(n.Indexed, prefix).(java.Expression),
-			OpenBracket: n.OpenBracket, Low: n.Low, High: n.High, Max: n.Max, CloseBracket: n.CloseBracket,
-		}
-	case *golang.IndexList:
-		return &golang.IndexList{
-			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Target:  setLeadingPrefix(n.Target, prefix).(java.Expression),
-			Indices: n.Indices,
-		}
-	case *golang.Send:
-		return &golang.Send{
-			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Channel: setLeadingPrefix(n.Channel, prefix).(java.Expression),
-			Arrow:   n.Arrow,
-		}
-	case *golang.KeyValue:
-		return &golang.KeyValue{
-			ID: n.ID, Prefix: n.Prefix, Markers: n.Markers,
-			Key:   setLeadingPrefix(n.Key, prefix).(java.Expression),
-			Value: n.Value,
-		}
-	default:
-		return setPrefix(j, prefix)
-	}
+	return setPrefix(j, prefix)
 }
 
-// getLeadingPrefix extracts the effective leading whitespace from a node
-// by walking to its leftmost leaf token. This is needed because in the
-// Go LST, compound nodes (Binary, Unary, etc.) may have empty prefixes
-// with the actual leading whitespace on the first child.
+// getLeadingPrefix returns the node's own leading whitespace. The parser
+// attaches inter-element whitespace to the outermost element, so the
+// leading prefix lives directly on the node.
 func getLeadingPrefix(j java.J) java.Space {
-	switch n := j.(type) {
-	case *java.Identifier:
-		return n.Prefix
-	case *java.Literal:
-		return n.Prefix
-	case *java.Empty:
-		return n.Prefix
-	case *java.Binary:
-		// The leading prefix is on the left operand.
-		return getLeadingPrefix(n.Left)
-	case *java.Unary:
-		return n.Prefix
-	case *java.FieldAccess:
-		return getLeadingPrefix(n.Target)
-	case *java.MethodInvocation:
-		if n.Select != nil {
-			return getLeadingPrefix(n.Select.Element)
-		}
-		return getLeadingPrefix(n.Name)
-	case *java.Assignment:
-		return getLeadingPrefix(n.Variable)
-	case *java.AssignmentOperation:
-		return getLeadingPrefix(n.Variable)
-	case *java.Block:
-		return n.Prefix
-	case *java.Return:
-		return n.Prefix
-	case *golang.Return:
-		return n.Prefix
-	case *java.If:
-		return n.Prefix
-	case *golang.MethodDeclaration:
-		return n.Prefix
-	case *golang.StatementWithInit:
-		return n.Prefix
-	case *java.MethodDeclaration:
-		return n.Prefix
-	case *java.VariableDeclarations:
-		return n.Prefix
-	case *java.Parentheses:
-		return n.Prefix
-	case *java.TypeCast:
-		return getLeadingPrefix(n.Expr)
-	case *java.ControlParentheses:
-		return n.Prefix
-	case *java.ArrayAccess:
-		return getLeadingPrefix(n.Indexed)
-	case *java.ArrayType:
-		return n.Prefix
-	case *golang.ArrayType:
-		return n.Prefix
-	case *java.ForLoop:
-		return n.Prefix
-	case *java.ForEachLoop:
-		return n.Prefix
-	case *java.Switch:
-		return n.Prefix
-	case *java.Case:
-		return n.Prefix
-	case *java.Break:
-		return n.Prefix
-	case *java.Continue:
-		return n.Prefix
-	case *java.Label:
-		return n.Prefix
-	case *golang.GoStmt:
-		return n.Prefix
-	case *golang.Defer:
-		return n.Prefix
-	case *golang.Send:
-		return getLeadingPrefix(n.Channel)
-	case *golang.Goto:
-		return n.Prefix
-	case *golang.Fallthrough:
-		return n.Prefix
-	case *golang.Composite:
-		if n.TypeExpr != nil {
-			return getLeadingPrefix(n.TypeExpr)
-		}
-		return n.Prefix
-	case *golang.KeyValue:
-		return getLeadingPrefix(n.Key)
-	case *golang.Slice:
-		return getLeadingPrefix(n.Indexed)
-	case *golang.MapType:
-		return n.Prefix
-	case *golang.Channel:
-		return n.Prefix
-	case *golang.FuncType:
-		return n.Prefix
-	case *golang.StructType:
-		return n.Prefix
-	case *golang.InterfaceType:
-		return n.Prefix
-	case *golang.TypeList:
-		return n.Prefix
-	case *golang.Union:
-		if len(n.Types) > 0 {
-			return getLeadingPrefix(n.Types[0].Element)
-		}
-		return n.Prefix
-	case *golang.UnderlyingType:
-		return n.Prefix
-	case *golang.TypeDecl:
-		return n.Prefix
-	case *golang.MultiAssignment:
-		if len(n.Variables) > 0 {
-			return getLeadingPrefix(n.Variables[0].Element)
-		}
-		return n.Prefix
-	case *golang.CommClause:
-		return n.Prefix
-	case *golang.IndexList:
-		return getLeadingPrefix(n.Target)
-	case *java.Import:
-		return n.Prefix
-	case *golang.CompilationUnit:
-		return n.Prefix
-	default:
-		return java.Space{}
-	}
+	return j.GetPrefix()
 }
