@@ -32,10 +32,8 @@ import (
 //     sits flush against the last statement.
 //   - The first statement of a block has no blank line above it.
 //
-// The first-statement rule reaches through the leftmost spine of the
-// statement node — the parser places inter-statement whitespace on the
-// *leftmost descendant* (Variable.Prefix, not Assignment.Prefix), so
-// transformLeftmostPrefix walks down to find it.
+// The first-statement rule operates on the statement node's own Prefix —
+// the parser attaches inter-statement whitespace to the outermost element.
 type BlankLinesVisitor struct {
 	visitor.GoVisitor
 	stopAfterTracker
@@ -70,12 +68,11 @@ func (v *BlankLinesVisitor) VisitBlock(block *java.Block, p any) java.J {
 	out := v.GoVisitor.VisitBlock(block, p).(*java.Block)
 	out = out.WithEnd(adjustSpace(out.End, stripLeadingBlankLines))
 
-	// Strip any leading blank line above the first statement. The
-	// inter-statement whitespace lives on the statement's leftmost
-	// descendant, so we walk the spine to find it.
+	// Strip any leading blank line above the first statement, whose Prefix
+	// carries the inter-statement whitespace.
 	if len(out.Statements) > 0 && out.Statements[0].Element != nil {
 		first := out.Statements[0]
-		if updated, ok := transformLeftmostPrefix(first.Element, stripLeadingBlankLinesSpace).(java.Statement); ok {
+		if updated, ok := transformPrefix(first.Element, stripLeadingBlankLinesSpace).(java.Statement); ok {
 			first.Element = updated
 			out.Statements[0] = first
 		}
