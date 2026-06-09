@@ -1283,7 +1283,6 @@ type Parentheses struct {
 	Prefix  Space
 	Markers Markers
 	Tree    RightPadded[Expression] // Element = inner expr, After = space before `)`
-	Type    JavaType                // the result type (nullable)
 }
 
 func (*Parentheses) IsTree()       {}
@@ -1309,7 +1308,6 @@ type TypeCast struct {
 	Markers Markers
 	Clazz   *ControlParentheses // the type in parentheses
 	Expr    Expression          // the expression being cast/asserted
-	Type    JavaType            // the result type (nullable)
 }
 
 func (*TypeCast) IsTree()       {}
