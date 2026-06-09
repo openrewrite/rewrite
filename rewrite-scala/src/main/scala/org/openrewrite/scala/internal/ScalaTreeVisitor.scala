@@ -6755,7 +6755,7 @@ class ScalaTreeVisitor(
         } else true
       } else paramSource.contains(rawParamName)
     }
-    val anonymousParam: Boolean = isUsing && !nameInSource
+    val anonymousParam: Boolean = isUsing && (rawParamName.matches("x\\$\\d+") || !nameInSource)
     val (namePrefix, displayParamName, paramNameEnd) =
       if (vd.nameSpan.exists && !anonymousParam) {
         val rawNameStart = Math.max(0, vd.nameSpan.start - offsetAdjustment)
