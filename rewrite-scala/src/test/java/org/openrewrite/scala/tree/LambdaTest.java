@@ -362,4 +362,17 @@ class LambdaTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void underscorePlaceholderInNewInsideBraceBlock() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val r = Option(1).map { new Foo(_) }
+                }
+                """
+            )
+        );
+    }
 }
