@@ -43,6 +43,69 @@ type searchWalker struct {
 	seen map[uuid.UUID]struct{}
 }
 
+// WalkTree performs a reflection-based pre-order DFS over the LST rooted at
+// t, invoking visit on every Tree node encountered (t included). Returning
+// false from visit stops the walk early. Descent transparently crosses
+// pointers, interfaces, slices/arrays, and the RightPadded / LeftPadded /
+// Container wrappers, so callers need not enumerate concrete node shapes.
+//
+// Prefix and Markers fields and uuid.UUID values are skipped — they never
+// hold child trees. This is the shared "real tree walker" used by search
+// preconditions (HasType / HasMethod) that need to inspect every node.
+func WalkTree(t Tree, visit func(Tree) bool) {
+	(&treeWalker{visit: visit}).walk(reflect.ValueOf(t))
+}
+
+type treeWalker struct {
+	visit func(Tree) bool
+	stop  bool
+}
+
+func (w *treeWalker) walk(v reflect.Value) {
+	if w.stop || !v.IsValid() {
+		return
+	}
+	switch v.Kind() {
+	case reflect.Interface:
+		if !v.IsNil() {
+			w.walk(v.Elem())
+		}
+	case reflect.Ptr:
+		if v.IsNil() {
+			return
+		}
+		// LST node types implement Tree on pointer receivers, so a Tree is
+		// always reached as a non-nil pointer. Visiting only here (never in
+		// the Interface case, which unwraps to this same pointer) avoids
+		// double-visiting interface-held nodes.
+		if t, ok := v.Interface().(Tree); ok {
+			if !w.visit(t) {
+				w.stop = true
+				return
+			}
+		}
+		w.walk(v.Elem())
+	case reflect.Struct:
+		for i := 0; i < v.NumField(); i++ {
+			sf := v.Type().Field(i)
+			if !sf.IsExported() || sf.Name == "Prefix" || sf.Name == "Markers" || sf.Type == uuidType {
+				continue
+			}
+			w.walk(v.Field(i))
+			if w.stop {
+				return
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			w.walk(v.Index(i))
+			if w.stop {
+				return
+			}
+		}
+	}
+}
+
 var (
 	treeIface   = reflect.TypeOf((*Tree)(nil)).Elem()
 	markersType = reflect.TypeOf(Markers{})

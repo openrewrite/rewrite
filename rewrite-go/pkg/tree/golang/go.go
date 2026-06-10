@@ -38,6 +38,8 @@ func (*CompilationUnit) IsTree()       {}
 func (*CompilationUnit) IsJ()          {}
 func (*CompilationUnit) IsSourceFile() {}
 
+func (n *CompilationUnit) GetSourcePath() string { return n.SourcePath }
+
 func (n *CompilationUnit) WithPrefix(prefix java.Space) *CompilationUnit {
 	c := *n
 	c.Prefix = prefix

@@ -51,6 +51,8 @@ type GoMod struct {
 func (*GoMod) IsTree()       {}
 func (*GoMod) IsSourceFile() {}
 
+func (n *GoMod) GetSourcePath() string { return n.SourcePath }
+
 func (n *GoMod) WithPrefix(prefix java.Space) *GoMod {
 	c := *n
 	c.Prefix = prefix
