@@ -812,4 +812,17 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multilineParameterListWithTrailingLineComment() {
+        rewriteRun(
+          scala(
+            """
+            def resize(
+                size: Int // either the width or the height! the other one will be preserved
+            ): Url = 1
+            """
+          )
+        );
+    }
 }

@@ -6262,13 +6262,13 @@ class ScalaTreeVisitor(
         jParams.add(new JRightPadded(param.asInstanceOf[J], afterParam, Markers.EMPTY))
       }
 
-      // Find closing paren
+      // Find closing paren — search the full remaining source (comment-aware) so a
+      // long trailing line comment before `)` doesn't push it outside a fixed window.
       val lastParamEnd = if (params.nonEmpty) Math.max(0, params.last.span.end - offsetAdjustment) else cursor
       cursor = Math.max(cursor, lastParamEnd)
       if (cursor < source.length) {
-        val remaining = source.substring(cursor, Math.min(cursor + 50, source.length))
-        val closeParen = positionOfNextIn(remaining, ")", 0)
-        if (closeParen >= 0) cursor = cursor + closeParen + 1
+        val closeParen = positionOfNextIn(source, ")", cursor)
+        if (closeParen >= 0) cursor = closeParen + 1
       }
 
       new J.Lambda.Parameters(Tree.randomId(), parenSpace, Markers.EMPTY, true, jParams)
@@ -6321,9 +6321,8 @@ class ScalaTreeVisitor(
         val lastParamEnd = if (firstList.nonEmpty) Math.max(0, firstList.last.span.end - offsetAdjustment) else cursor
         cursor = Math.max(cursor, lastParamEnd)
         if (cursor < source.length) {
-          val remaining = source.substring(cursor, Math.min(cursor + 50, source.length))
-          val closeParen = positionOfNextIn(remaining, ")", 0)
-          if (closeParen >= 0) cursor = cursor + closeParen + 1
+          val closeParen = positionOfNextIn(source, ")", cursor)
+          if (closeParen >= 0) cursor = closeParen + 1
         }
 
         // Build additional param lists as J.Lambda.Parameters for later wrapping
