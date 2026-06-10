@@ -6927,7 +6927,11 @@ class ScalaTreeVisitor(
             case typed: Trees.Typed[?] =>
               val tpeName = typed.tpt match { case id: Trees.Ident[?] => id.name.toString; case sel: Trees.Select[?] => extractSource(sel.span); case _ => null }
               (bind.name.toString, if (tpeName != null) ident(tpeName, Space.format(" ")) else null)
-            case _ => (bind.name.toString, null)
+            case _ =>
+              // e.g. `e @ (_: A | _: B)` — bind over an Alternative (or other pattern);
+              // preserve the full source so the `@ (...)` part isn't lost on print.
+              val patSource = if (caseDef.pat.span.exists) extractSource(caseDef.pat.span) else ""
+              (if (patSource.nonEmpty) patSource else bind.name.toString, null)
           }
           case typed: Trees.Typed[?] =>
             val name = typed.expr match { case id: Trees.Ident[?] => id.name.toString; case _ => "_" }
@@ -7084,7 +7088,11 @@ class ScalaTreeVisitor(
             case typed: Trees.Typed[?] =>
               val tpeName = typed.tpt match { case id: Trees.Ident[?] => id.name.toString; case sel: Trees.Select[?] => extractSource(sel.span); case _ => null }
               (bind.name.toString, if (tpeName != null) ident(tpeName, Space.format(" ")) else null)
-            case _ => (bind.name.toString, null)
+            case _ =>
+              // e.g. `e @ (_: A | _: B)` — bind over an Alternative (or other pattern);
+              // preserve the full source so the `@ (...)` part isn't lost on print.
+              val patSource = if (caseDef.pat.span.exists) extractSource(caseDef.pat.span) else ""
+              (if (patSource.nonEmpty) patSource else bind.name.toString, null)
           }
           case typed: Trees.Typed[?] =>
             val name = typed.expr match { case id: Trees.Ident[?] => id.name.toString; case _ => "_" }
