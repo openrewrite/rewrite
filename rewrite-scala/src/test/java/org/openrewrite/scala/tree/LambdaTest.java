@@ -77,6 +77,19 @@ class LambdaTest implements RewriteTest {
     }
 
     @Test
+    void underscoreLambdaParameterWithParameterizedType() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val f = { (_: List[String]) => () }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void lambdaWithUnderscoreMethodCall() {
         rewriteRun(
             scala(
@@ -310,6 +323,53 @@ class LambdaTest implements RewriteTest {
                   list.collect /* x */ {
                     case y => y
                   }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void spaceBeforeColonOnLambdaParameter() {
+        rewriteRun(scala("val f = (x : Int) => x"));
+    }
+
+    @Test
+    void underscorePlaceholderLambdaWithNestedLambdaInBody() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val xs: List[List[Int]] = Nil
+                  xs.map(_.filter(f => f > 0))
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void blockArgumentWithImplicitParam() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  List(1).foreach { implicit session =>
+                    println(session)
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void underscorePlaceholderInNewInsideBraceBlock() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val r = Option(1).map { new Foo(_) }
                 }
                 """
             )

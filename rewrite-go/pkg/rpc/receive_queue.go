@@ -20,7 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/google/uuid"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 var defaultReceiver = NewGoReceiver()
@@ -81,6 +82,21 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 			before = msg.Value
 		} else {
 			before = newObj(*msg.ValueType)
+			// Hydrate GenericMarker.Data from the inline value when the
+			// sender shipped a codec-less marker as `{ADD, valueType, value=map}`
+			// (matches what every other language's send queue does). Without
+			// this, the marker's fields would be silently dropped.
+			if gm, ok := before.(java.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
+				if dataMap, ok := msg.Value.(map[string]any); ok {
+					gm.Data = dataMap
+					if idStr, ok := dataMap["id"].(string); ok {
+						if parsed, err := uuid.Parse(idStr); err == nil {
+							gm.Ident = parsed
+						}
+					}
+					before = gm
+				}
+			}
 		}
 		if ref != nil {
 			// Store before deserialization to handle cycles
@@ -89,11 +105,19 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		// Intentional fall-through to CHANGE
 		fallthrough
 	case Change:
+		// If the receiver has no baseline `before` but the sender provided a
+		// concrete type, materialize a fresh instance so the codec/onChange
+		// can populate its sub-fields. Without this, callers that pass
+		// before=nil drop every sub-field message of a CHANGE-typed object,
+		// silently desyncing the wire.
+		if isNilValue(before) && msg.ValueType != nil {
+			before = newObj(*msg.ValueType)
+		}
 		var after any
 		if onChange != nil {
 			after = onChange(before)
 		} else if !isNilValue(before) && getValueType(before) != nil {
-			if t, ok := before.(tree.Tree); ok {
+			if t, ok := before.(java.Tree); ok {
 				after = defaultReceiver.Visit(t, q)
 			} else {
 				after = before
@@ -123,6 +147,69 @@ func (q *ReceiveQueue) ReceiveAndGet(before any, mapping func(any) any) any {
 		return mapping(after)
 	}
 	return after
+}
+
+// Typed free-function wrappers around Receive. The Java/TS/Python receivers expose a
+// generic q.receive(before, onChange) that returns the value already typed; Go forbids
+// type-parameterized methods, so the typed layer lives in these free functions instead.
+
+// receiveValue receives a field that needs a deserialization closure, returning the
+// typed value directly (the zero value — nil for pointer/interface T — on delete) so
+// call sites are a single branch-free assignment.
+//
+// onChange receives the prior value already typed as T (receiveValue does the inbound
+// cast once) and returns the deserialized value; its result is narrowed back to T here,
+// so closure bodies need no casts, e.g.:
+//
+//	gs.Expr = receiveValue(q, gs.Expr, func(e java.Expression) any { return r.Visit(e, q) })
+//	b.End   = receiveValue(q, b.End,   func(s java.Space) any { return receiveSpace(s, q) })
+//
+// Semantics mirror Java's RpcReceiveQueue.receive: NO_CHANGE returns `before`, DELETE
+// returns the zero value (nil for the pointer/interface T of nullable fields — Java's
+// `return null`), ADD/CHANGE returns the deserialized value. Receive yields nil only on
+// DELETE or a nil `before`, so the zero return never produces a bogus empty value for the
+// mandatory value-typed fields (which are never deleted).
+func receiveValue[T any](q *ReceiveQueue, before T, onChange func(T) any) T {
+	result := q.Receive(before, func(v any) any { return onChange(v.(T)) })
+	if result == nil {
+		var zero T
+		return zero
+	}
+	return result.(T)
+}
+
+// receiveScalar receives a simple leaf value (no nested deserialization, hence a nil
+// onChange) and applies convertTo to bridge JSON's numeric/string representations.
+func receiveScalar[T any](q *ReceiveQueue, before T) T {
+	result := q.Receive(before, nil)
+	if result == nil {
+		var zero T
+		return zero
+	}
+	return convertTo[T](result)
+}
+
+// convertTo converts a value to the desired type, handling JSON number conversions.
+func convertTo[T any](v any) T {
+	if t, ok := v.(T); ok {
+		return t
+	}
+	// Handle float64 -> int64 conversion (common with JSON)
+	var zero T
+	switch any(zero).(type) {
+	case int64:
+		switch n := v.(type) {
+		case float64:
+			return any(int64(n)).(T)
+		case int:
+			return any(int64(n)).(T)
+		}
+	case string:
+		if s, ok := v.(string); ok {
+			return any(s).(T)
+		}
+	}
+	return v.(T)
 }
 
 // ReceiveList reads a list from the queue with position-based tracking.
@@ -197,7 +284,7 @@ func newObj(javaClassName string) any {
 	}
 	// Unknown marker types — create a GenericMarker with JavaType preserved.
 	if strings.Contains(javaClassName, "marker") || strings.Contains(javaClassName, "Marker") {
-		return tree.GenericMarker{JavaType: javaClassName}
+		return java.GenericMarker{JavaType: javaClassName}
 	}
 	panic(fmt.Sprintf("no factory registered for type: %s", javaClassName))
 }

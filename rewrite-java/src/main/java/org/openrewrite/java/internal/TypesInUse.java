@@ -67,6 +67,7 @@ public class TypesInUse {
      */
     @Nullable
     private volatile FqnTrie trie;
+    private volatile boolean implicitPopulated;
 
     /**
      * Per-{@link TypeNameMatcher} memo for {@link #hasTypeMatching}. Lazily allocated; keyed by
@@ -108,9 +109,8 @@ public class TypesInUse {
      * {@link TypeUtils#fullyQualifiedNamesAreEqual(String, String)}.
      */
     public boolean hasType(String fullyQualifiedType, boolean includeImplicit) {
-        // Canonicalize the query so $-form lookups land on the alias path that mirrors the .-form.
         String canonical = fullyQualifiedType.indexOf('$') < 0 ? fullyQualifiedType : fullyQualifiedType.replace('$', '.');
-        return getOrBuildTrie().hasFqn(canonical, includeImplicit);
+        return getOrBuildTrie(includeImplicit).hasFqn(canonical, includeImplicit);
     }
 
     /**
@@ -121,7 +121,7 @@ public class TypesInUse {
      * register {@code com.foo.Outer} as a package).
      */
     public boolean hasTypeInPackage(String packageName, boolean includeImplicit) {
-        return getOrBuildTrie().hasLeafAtDepth(packageName, includeImplicit);
+        return getOrBuildTrie(includeImplicit).hasLeafAtDepth(packageName, includeImplicit);
     }
 
     /**
@@ -131,7 +131,7 @@ public class TypesInUse {
      * trie size.
      */
     public boolean hasTypeInPackageOrSubpackage(String packageName, boolean includeImplicit) {
-        return getOrBuildTrie().hasAnyLeafBelow(packageName, includeImplicit);
+        return getOrBuildTrie(includeImplicit).hasAnyLeafBelow(packageName, includeImplicit);
     }
 
     /**
@@ -149,7 +149,7 @@ public class TypesInUse {
             typeMatchingCache = cache;
         }
         String key = (includeImplicit ? "+" : "-") + matcher;
-        return cache.computeIfAbsent(key, k -> getOrBuildTrie().anyLeafFqn(matcher, includeImplicit));
+        return cache.computeIfAbsent(key, k -> getOrBuildTrie(includeImplicit).anyLeafFqn(matcher, includeImplicit));
     }
 
     /**
@@ -174,18 +174,25 @@ public class TypesInUse {
         return false;
     }
 
-    private FqnTrie getOrBuildTrie() {
+    private FqnTrie getOrBuildTrie(boolean includeImplicit) {
         FqnTrie t = trie;
         if (t == null) {
-            t = buildTrie();
+            t = buildExplicitTrie();
             trie = t;
+        }
+        if (includeImplicit && !implicitPopulated) {
+            populateImplicitPass(t);
         }
         return t;
     }
 
-    private FqnTrie buildTrie() {
+    @SuppressWarnings("deprecation")
+    private FqnTrie getOrBuildTrie() {
+        return getOrBuildTrie(false);
+    }
+
+    private FqnTrie buildExplicitTrie() {
         FqnTrie t = new FqnTrie();
-        // Explicit pass first: types-in-use and imports. Reachable here ⇒ visible without includeImplicit.
         Set<String> visited = new HashSet<>();
         for (JavaType type : typesInUse) {
             JavaType checkType = type instanceof JavaType.Primitive ? type : TypeUtils.asFullyQualified(type);
@@ -197,9 +204,12 @@ public class TypesInUse {
                     : anImport.getQualid().getType();
             walkAssignableTo(TypeUtils.asFullyQualified(target), t, true, visited);
         }
-        // Implicit pass: used methods' declaring/return/parameter types. Only adds FQNs the
-        // explicit pass didn't already reach; if the explicit pass already added an FQN with
-        // explicit=true, the trie's per-bit promotion rules keep that visibility.
+        return t;
+    }
+
+    private synchronized void populateImplicitPass(FqnTrie t) {
+        if (implicitPopulated) return;
+        Set<String> visited = new HashSet<>();
         for (JavaType.Method method : usedMethods) {
             walkAssignableTo(method.getDeclaringType(), t, false, visited);
             walkAssignableTo(method.getReturnType(), t, false, visited);
@@ -207,7 +217,7 @@ public class TypesInUse {
                 walkAssignableTo(pt, t, false, visited);
             }
         }
-        return t;
+        implicitPopulated = true;
     }
 
     /**

@@ -41,3 +41,6 @@ CLAUDE.local.md
 # Moderne CLI
 .moderne/*
 !.moderne/context/
+
+# Kotlin compiler daemon session files
+.kotlin/

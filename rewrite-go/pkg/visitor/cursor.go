@@ -16,23 +16,23 @@
 
 package visitor
 
-import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 
 // Cursor tracks the path from root to the currently visited node and
 // carries a per-frame message map so passes can stash state for
 // ancestors / descendants. Mirrors org.openrewrite.Cursor in Java.
 type Cursor struct {
 	parent   *Cursor
-	value    tree.Tree
+	value    java.Tree
 	messages map[string]any
 }
 
-func NewCursor(parent *Cursor, value tree.Tree) *Cursor {
+func NewCursor(parent *Cursor, value java.Tree) *Cursor {
 	return &Cursor{parent: parent, value: value}
 }
 
 func (c *Cursor) Parent() *Cursor  { return c.parent }
-func (c *Cursor) Value() tree.Tree { return c.value }
+func (c *Cursor) Value() java.Tree { return c.value }
 
 // PutMessage stores a value on this cursor's frame, keyed by name.
 // Mirrors Java Cursor.putMessage(String, Object).
@@ -111,7 +111,7 @@ func (c *Cursor) ComputeMessageIfAbsent(key string, supplier func() any) any {
 // frame. No-op if no ancestor matches. Mirrors Java
 // Cursor.putMessageOnFirstEnclosing(Class, String, Object), generalized
 // to a predicate so callers can match on any type or condition.
-func (c *Cursor) PutMessageOnFirstEnclosing(match func(t tree.Tree) bool, key string, value any) {
+func (c *Cursor) PutMessageOnFirstEnclosing(match func(t java.Tree) bool, key string, value any) {
 	for cur := c; cur != nil; cur = cur.parent {
 		if cur.value != nil && match(cur.value) {
 			cur.PutMessage(key, value)
@@ -124,7 +124,7 @@ func (c *Cursor) PutMessageOnFirstEnclosing(match func(t tree.Tree) bool, key st
 // Returns nil for an empty input. Used by the RPC layer to reconstruct the
 // cursor from a Visit request's `cursor` field (a list of tree IDs whose
 // values have already been fetched in order).
-func BuildChain(values []tree.Tree) *Cursor {
+func BuildChain(values []java.Tree) *Cursor {
 	var c *Cursor
 	for _, v := range values {
 		c = NewCursor(c, v)
@@ -134,7 +134,7 @@ func BuildChain(values []tree.Tree) *Cursor {
 
 // FirstEnclosing walks up the cursor chain to find the first ancestor
 // matching the given type. The cursor itself is not considered — only ancestors.
-func FirstEnclosing[T tree.Tree](c *Cursor) (T, bool) {
+func FirstEnclosing[T java.Tree](c *Cursor) (T, bool) {
 	for cur := c.parent; cur != nil; cur = cur.parent {
 		if v, ok := cur.value.(T); ok {
 			return v, true

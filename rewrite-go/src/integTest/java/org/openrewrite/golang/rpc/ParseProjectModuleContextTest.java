@@ -24,6 +24,8 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.golang.marker.GoResolutionResult;
 import org.openrewrite.golang.tree.Go;
+import org.openrewrite.golang.tree.GoMod;
+import org.openrewrite.text.PlainText;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -108,6 +110,43 @@ class ParseProjectModuleContextTest {
                     .extracting(GoResolutionResult.Require::getModulePath)
                     .contains("github.com/google/uuid");
         }
+    }
+
+    @Test
+    void goModParsedAsGoModNotPlainText() throws Exception {
+        // The project's go.mod must be emitted as a rich GoMod LST, not
+        // plain text, carrying the module's GoResolutionResult marker.
+        write(projectDir.resolve("go.mod"), """
+                module example.com/foo
+
+                go 1.22
+
+                require github.com/google/uuid v1.6.0
+                """);
+        write(projectDir.resolve("main.go"), """
+                package main
+
+                func main() {}
+                """);
+
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        List<SourceFile> sources = rpc.parseProject(projectDir, new InMemoryExecutionContext()).collect(Collectors.toList());
+
+        List<GoMod> goMods = sources.stream()
+                .filter(s -> s instanceof GoMod)
+                .map(s -> (GoMod) s)
+                .collect(Collectors.toList());
+        assertThat(goMods).as("expected the go.mod to be parsed as a GoMod").hasSize(1);
+        assertThat(sources).noneMatch(s -> s instanceof PlainText);
+
+        GoMod goMod = goMods.get(0);
+        assertThat(goMod.getSourcePath().toString().replace('\\', '/')).endsWith("go.mod");
+        GoResolutionResult mrr = goMod.getMarkers().findFirst(GoResolutionResult.class).orElseThrow(
+                () -> new AssertionError("missing GoResolutionResult on go.mod"));
+        assertThat(mrr.getModulePath()).isEqualTo("example.com/foo");
+        assertThat(mrr.getRequires())
+                .extracting(GoResolutionResult.Require::getModulePath)
+                .contains("github.com/google/uuid");
     }
 
     @Test

@@ -25,11 +25,13 @@ import (
 	"go/token"
 	"go/types"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // GoParser parses Go source code into OpenRewrite LST nodes.
@@ -74,7 +76,7 @@ type FileInput struct {
 // Convenience wrapper around ParsePackage for the common one-file case;
 // type attribution that depends on sibling files in the same package
 // won't resolve here. Use ParsePackage when sibling files matter.
-func (gp *GoParser) Parse(sourcePath string, source string) (*tree.CompilationUnit, error) {
+func (gp *GoParser) Parse(sourcePath string, source string) (*golang.CompilationUnit, error) {
 	cus, err := gp.ParsePackage([]FileInput{{Path: sourcePath, Content: source}})
 	if err != nil {
 		return nil, err
@@ -92,7 +94,7 @@ func (gp *GoParser) Parse(sourcePath string, source string) (*tree.CompilationUn
 //
 // All files MUST belong to the same package (same `package` clause).
 // Order in the returned slice matches the input order.
-func (gp *GoParser) ParsePackage(files []FileInput) ([]*tree.CompilationUnit, error) {
+func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, error) {
 	if len(files) == 0 {
 		return nil, nil
 	}
@@ -127,6 +129,10 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*tree.CompilationUnit, er
 		Defs:       make(map[*ast.Ident]types.Object),
 		Uses:       make(map[*ast.Ident]types.Object),
 		Selections: make(map[*ast.SelectorExpr]*types.Selection),
+		// Instances records identifiers denoting generic functions/types that are
+		// instantiated with explicit type arguments, e.g. the `Map` in `Map[int]`.
+		// Used to distinguish generic instantiation from ordinary indexing.
+		Instances: make(map[*ast.Ident]types.Instance),
 	}
 	conf := types.Config{
 		Importer: gp.Importer,
@@ -144,7 +150,7 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*tree.CompilationUnit, er
 	_, _ = conf.Check(pkgName, fset, asts, typeInfo)
 
 	mapper := newTypeMapper()
-	cus := make([]*tree.CompilationUnit, 0, len(files))
+	cus := make([]*golang.CompilationUnit, 0, len(files))
 	for i, f := range files {
 		ctx := &parseContext{
 			src:      []byte(f.Content),
@@ -173,17 +179,17 @@ type parseContext struct {
 
 // prefix extracts the whitespace and comments between the current cursor
 // position and the given token position.
-func (ctx *parseContext) prefix(pos token.Pos) tree.Space {
+func (ctx *parseContext) prefix(pos token.Pos) java.Space {
 	if !pos.IsValid() {
-		return tree.EmptySpace
+		return java.EmptySpace
 	}
 	targetOffset := ctx.file.Offset(pos)
 	if targetOffset <= ctx.cursor || targetOffset > len(ctx.src) {
-		return tree.EmptySpace
+		return java.EmptySpace
 	}
 	raw := string(ctx.src[ctx.cursor:targetOffset])
 	ctx.cursor = targetOffset
-	return tree.ParseSpace(raw)
+	return java.ParseSpace(raw)
 }
 
 // skip advances the cursor past n bytes (for consuming keywords, operators, etc.)
@@ -202,44 +208,44 @@ func (ctx *parseContext) skipTo(pos token.Pos) {
 }
 
 // prefixAndSkip extracts the prefix before pos and advances past length bytes.
-func (ctx *parseContext) prefixAndSkip(pos token.Pos, length int) tree.Space {
+func (ctx *parseContext) prefixAndSkip(pos token.Pos, length int) java.Space {
 	space := ctx.prefix(pos)
 	ctx.skip(length)
 	return space
 }
 
 // mapFile maps an ast.File to a CompilationUnit.
-func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *tree.CompilationUnit {
+func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *golang.CompilationUnit {
 	// "package" keyword
 	prefix := ctx.prefixAndSkip(file.Package, len("package"))
 
 	// Package name identifier
 	pkgName := ctx.mapIdent(file.Name)
-	paddedPkgName := tree.RightPadded[*tree.Identifier]{Element: pkgName}
+	paddedPkgName := java.RightPadded[*java.Identifier]{Element: pkgName}
 
 	// Imports
-	var imports *tree.Container[*tree.Import]
+	var imports *java.Container[*java.Import]
 	imports = ctx.mapImports(file)
 
 	// Top-level declarations (functions, types, vars, consts - excluding imports)
-	var stmts []tree.RightPadded[tree.Statement]
+	var stmts []java.RightPadded[java.Statement]
 	for _, decl := range file.Decls {
 		if gd, ok := decl.(*ast.GenDecl); ok && gd.Tok == token.IMPORT {
 			continue
 		}
 		stmt := ctx.mapDecl(decl)
 		if stmt != nil {
-			stmts = append(stmts, tree.RightPadded[tree.Statement]{Element: stmt})
+			stmts = append(stmts, java.RightPadded[java.Statement]{Element: stmt})
 		}
 	}
 
 	// EOF
-	eof := tree.EmptySpace
+	eof := java.EmptySpace
 	if ctx.cursor < len(ctx.src) {
-		eof = tree.ParseSpace(string(ctx.src[ctx.cursor:]))
+		eof = java.ParseSpace(string(ctx.src[ctx.cursor:]))
 	}
 
-	return &tree.CompilationUnit{
+	return &golang.CompilationUnit{
 		ID:          uuid.New(),
 		Prefix:      prefix,
 		SourcePath:  sourcePath,
@@ -252,7 +258,7 @@ func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *tree.Compil
 
 // mapImports maps all import declarations in the file into a single Container.
 // Go allows multiple import blocks; subsequent blocks are tracked via ImportBlock markers.
-func (ctx *parseContext) mapImports(file *ast.File) *tree.Container[*tree.Import] {
+func (ctx *parseContext) mapImports(file *ast.File) *java.Container[*java.Import] {
 	// Collect all import GenDecls in order.
 	var importDecls []*ast.GenDecl
 	for _, decl := range file.Decls {
@@ -264,8 +270,8 @@ func (ctx *parseContext) mapImports(file *ast.File) *tree.Container[*tree.Import
 		return nil
 	}
 
-	var elements []tree.RightPadded[*tree.Import]
-	var containerMarkers tree.Markers
+	var elements []java.RightPadded[*java.Import]
+	var containerMarkers java.Markers
 	prevGrouped := false
 
 	// First import block: captured into Container.Before and Container.Markers
@@ -276,10 +282,10 @@ func (ctx *parseContext) mapImports(file *ast.File) *tree.Container[*tree.Import
 		prevGrouped = true
 		openParenPrefix := ctx.prefix(first.Lparen)
 		ctx.skip(1) // skip "("
-		containerMarkers = tree.Markers{
+		containerMarkers = java.Markers{
 			ID: uuid.New(),
-			Entries: []tree.Marker{
-				tree.GroupedImport{Ident: uuid.New(), Before: openParenPrefix},
+			Entries: []java.Marker{
+				golang.GroupedImport{Ident: uuid.New(), Before: openParenPrefix},
 			},
 		}
 	}
@@ -287,7 +293,7 @@ func (ctx *parseContext) mapImports(file *ast.File) *tree.Container[*tree.Import
 	for _, spec := range first.Specs {
 		is := spec.(*ast.ImportSpec)
 		imp := ctx.mapImportSpec(is)
-		elements = append(elements, tree.RightPadded[*tree.Import]{Element: imp})
+		elements = append(elements, java.RightPadded[*java.Import]{Element: imp})
 	}
 
 	if first.Lparen.IsValid() {
@@ -296,8 +302,8 @@ func (ctx *parseContext) mapImports(file *ast.File) *tree.Container[*tree.Import
 		if len(elements) > 0 {
 			elements[len(elements)-1].After = closeParen
 		} else if len(closeParen.Comments) > 0 {
-			elements = append(elements, tree.RightPadded[*tree.Import]{
-				Element: &tree.Import{ID: uuid.New(), Qualid: &tree.Empty{ID: uuid.New()}},
+			elements = append(elements, java.RightPadded[*java.Import]{
+				Element: &java.Import{ID: uuid.New(), Qualid: &java.Empty{ID: uuid.New()}},
 				After:   closeParen,
 			})
 		}
@@ -307,13 +313,13 @@ func (ctx *parseContext) mapImports(file *ast.File) *tree.Container[*tree.Import
 	for _, importDecl := range importDecls[1:] {
 		blockBefore := ctx.prefixAndSkip(importDecl.Pos(), len("import"))
 		grouped := importDecl.Lparen.IsValid()
-		var groupedBefore tree.Space
+		var groupedBefore java.Space
 		if grouped {
 			groupedBefore = ctx.prefix(importDecl.Lparen)
 			ctx.skip(1) // skip "("
 		}
 
-		importBlockMarker := tree.ImportBlock{
+		importBlockMarker := golang.ImportBlock{
 			Ident:         uuid.New(),
 			ClosePrevious: prevGrouped,
 			Before:        blockBefore,
@@ -328,12 +334,12 @@ func (ctx *parseContext) mapImports(file *ast.File) *tree.Container[*tree.Import
 			if len(importDecl.Specs) > 0 {
 				elements[len(elements)-1].After = closeParen
 			} else if len(closeParen.Comments) > 0 {
-				imp := &tree.Import{ID: uuid.New(), Qualid: &tree.Empty{ID: uuid.New()}}
-				imp.Markers = tree.Markers{
+				imp := &java.Import{ID: uuid.New(), Qualid: &java.Empty{ID: uuid.New()}}
+				imp.Markers = java.Markers{
 					ID:      uuid.New(),
-					Entries: []tree.Marker{importBlockMarker},
+					Entries: []java.Marker{importBlockMarker},
 				}
-				elements = append(elements, tree.RightPadded[*tree.Import]{
+				elements = append(elements, java.RightPadded[*java.Import]{
 					Element: imp,
 					After:   closeParen,
 				})
@@ -342,44 +348,44 @@ func (ctx *parseContext) mapImports(file *ast.File) *tree.Container[*tree.Import
 		prevGrouped = grouped
 	}
 
-	container := tree.Container[*tree.Import]{Before: before, Elements: elements, Markers: containerMarkers}
+	container := java.Container[*java.Import]{Before: before, Elements: elements, Markers: containerMarkers}
 	return &container
 }
 
 // mapImportBlockSpecs maps the specs of a subsequent import block, attaching
 // the ImportBlock marker to the first spec's Import node.
-func (ctx *parseContext) mapImportBlockSpecs(decl *ast.GenDecl, elements *[]tree.RightPadded[*tree.Import], marker tree.ImportBlock) {
+func (ctx *parseContext) mapImportBlockSpecs(decl *ast.GenDecl, elements *[]java.RightPadded[*java.Import], marker golang.ImportBlock) {
 	for j, spec := range decl.Specs {
 		is := spec.(*ast.ImportSpec)
 		imp := ctx.mapImportSpec(is)
 		if j == 0 {
-			imp.Markers = tree.Markers{
+			imp.Markers = java.Markers{
 				ID:      uuid.New(),
-				Entries: []tree.Marker{marker},
+				Entries: []java.Marker{marker},
 			}
 		}
-		*elements = append(*elements, tree.RightPadded[*tree.Import]{Element: imp})
+		*elements = append(*elements, java.RightPadded[*java.Import]{Element: imp})
 	}
 }
 
 // mapImportSpec maps a single import spec.
-func (ctx *parseContext) mapImportSpec(spec *ast.ImportSpec) *tree.Import {
+func (ctx *parseContext) mapImportSpec(spec *ast.ImportSpec) *java.Import {
 	prefix := ctx.prefix(spec.Pos())
 
-	var alias *tree.LeftPadded[*tree.Identifier]
+	var alias *java.LeftPadded[*java.Identifier]
 	if spec.Name != nil {
 		ident := ctx.mapIdent(spec.Name)
-		lp := tree.LeftPadded[*tree.Identifier]{Element: ident}
+		lp := java.LeftPadded[*java.Identifier]{Element: ident}
 		alias = &lp
 	}
 
 	path := ctx.mapBasicLit(spec.Path)
 
-	return &tree.Import{ID: uuid.New(), Prefix: prefix, Qualid: path, Alias: alias}
+	return &java.Import{ID: uuid.New(), Prefix: prefix, Qualid: path, Alias: alias}
 }
 
 // mapDecl maps a top-level declaration.
-func (ctx *parseContext) mapDecl(decl ast.Decl) tree.Statement {
+func (ctx *parseContext) mapDecl(decl ast.Decl) java.Statement {
 	switch d := decl.(type) {
 	case *ast.FuncDecl:
 		return ctx.mapFuncDecl(d)
@@ -391,7 +397,7 @@ func (ctx *parseContext) mapDecl(decl ast.Decl) tree.Statement {
 }
 
 // mapGenDecl maps a general declaration (var, const, type).
-func (ctx *parseContext) mapGenDecl(decl *ast.GenDecl) tree.Statement {
+func (ctx *parseContext) mapGenDecl(decl *ast.GenDecl) java.Statement {
 	switch decl.Tok {
 	case token.VAR, token.CONST:
 		return ctx.mapVarConstDecl(decl)
@@ -403,7 +409,7 @@ func (ctx *parseContext) mapGenDecl(decl *ast.GenDecl) tree.Statement {
 }
 
 // mapVarConstDecl maps `var x int`, `var x = 5`, `const x = 5`, etc.
-func (ctx *parseContext) mapVarConstDecl(decl *ast.GenDecl) tree.Statement {
+func (ctx *parseContext) mapVarConstDecl(decl *ast.GenDecl) java.Statement {
 	prefix := ctx.prefix(decl.Pos())
 	leadingAnns, prefix := extractDirectives(prefix)
 	keyword := decl.Tok.String()
@@ -421,13 +427,13 @@ func (ctx *parseContext) mapVarConstDecl(decl *ast.GenDecl) tree.Statement {
 	lparenPrefix := ctx.prefix(decl.Lparen)
 	ctx.skip(1) // "("
 
-	var elements []tree.RightPadded[tree.Statement]
+	var elements []java.RightPadded[java.Statement]
 	for _, s := range decl.Specs {
 		spec := s.(*ast.ValueSpec)
 		innerPrefix := ctx.prefix(spec.Pos())
 		vd := ctx.mapValueSpec(spec, innerPrefix, keyword)
-		vd.Markers.Entries = append(vd.Markers.Entries, tree.GroupedSpec{Ident: uuid.New()})
-		elements = append(elements, tree.RightPadded[tree.Statement]{Element: vd})
+		vd.Markers.Entries = append(vd.Markers.Entries, golang.GroupedSpec{Ident: uuid.New()})
+		elements = append(elements, java.RightPadded[java.Statement]{Element: vd})
 	}
 
 	rparenPrefix := ctx.prefix(decl.Rparen)
@@ -436,54 +442,53 @@ func (ctx *parseContext) mapVarConstDecl(decl *ast.GenDecl) tree.Statement {
 	if len(elements) > 0 {
 		elements[len(elements)-1].After = rparenPrefix
 	} else if len(rparenPrefix.Comments) > 0 {
-		elements = append(elements, tree.RightPadded[tree.Statement]{
-			Element: &tree.Empty{ID: uuid.New()},
+		elements = append(elements, java.RightPadded[java.Statement]{
+			Element: &java.Empty{ID: uuid.New()},
 			After:   rparenPrefix,
 		})
 	}
 
-	var markerEntries []tree.Marker
-	if keyword == "var" {
-		markerEntries = append(markerEntries, tree.VarKeyword{Ident: uuid.New()})
-	} else if keyword == "const" {
-		markerEntries = append(markerEntries, tree.ConstDecl{Ident: uuid.New()})
+	kind := golang.DeclVar
+	if keyword == "const" {
+		kind = golang.DeclConst
 	}
 
-	specs := &tree.Container[tree.Statement]{Before: lparenPrefix, Elements: elements}
-	return &tree.VariableDeclarations{
+	specs := &java.Container[java.Statement]{Before: lparenPrefix, Elements: elements}
+	return &golang.DeclarationBlock{
 		ID:                 uuid.New(),
 		Prefix:             prefix,
-		Markers:            tree.Markers{ID: uuid.New(), Entries: markerEntries},
+		Markers:            java.Markers{ID: uuid.New()},
 		LeadingAnnotations: leadingAnns,
+		Kind:               kind,
 		Specs:              specs,
 	}
 }
 
 // mapValueSpec maps a single var/const spec.
-func (ctx *parseContext) mapValueSpec(spec *ast.ValueSpec, prefix tree.Space, keyword string) *tree.VariableDeclarations {
+func (ctx *parseContext) mapValueSpec(spec *ast.ValueSpec, prefix java.Space, keyword string) *java.VariableDeclarations {
 	// Source order: keyword name[, name]... [type] [= value]
 	// Map names first (they appear first in source after keyword)
 	// Handle commas between multiple names
-	var nameIdents []*tree.Identifier
-	var nameAfters []tree.Space
+	var nameIdents []*java.Identifier
+	var nameAfters []java.Space
 	for i, name := range spec.Names {
 		nameIdents = append(nameIdents, ctx.mapIdent(name))
 		if i < len(spec.Names)-1 {
 			// Capture space before comma and skip comma
 			commaOff := ctx.findNext(',')
-			var after tree.Space
+			var after java.Space
 			if commaOff >= 0 {
 				after = ctx.prefix(ctx.file.Pos(commaOff))
 				ctx.skip(1) // ","
 			}
 			nameAfters = append(nameAfters, after)
 		} else {
-			nameAfters = append(nameAfters, tree.Space{})
+			nameAfters = append(nameAfters, java.Space{})
 		}
 	}
 
 	// Then type (appears after name in source)
-	var typeExpr tree.Expression
+	var typeExpr java.Expression
 	if spec.Type != nil {
 		typeExpr = ctx.mapTypeExpr(spec.Type)
 	}
@@ -491,11 +496,11 @@ func (ctx *parseContext) mapValueSpec(spec *ast.ValueSpec, prefix tree.Space, ke
 	// Then initializers (after type and `=` in source)
 	// In Go, multi-value declarations use a single `=` followed by comma-separated values:
 	//   var a, b = val1, val2
-	var variables []tree.RightPadded[*tree.VariableDeclarator]
+	var variables []java.RightPadded[*java.VariableDeclarator]
 	for i, nameIdent := range nameIdents {
-		var init *tree.LeftPadded[tree.Expression]
+		var init *java.LeftPadded[java.Expression]
 		if i < len(spec.Values) {
-			var sepPrefix tree.Space
+			var sepPrefix java.Space
 			if i == 0 {
 				eqOff := ctx.findNext('=')
 				if eqOff >= 0 {
@@ -510,30 +515,30 @@ func (ctx *parseContext) mapValueSpec(spec *ast.ValueSpec, prefix tree.Space, ke
 				}
 			}
 			val := ctx.mapExpr(spec.Values[i])
-			lp := tree.LeftPadded[tree.Expression]{Before: sepPrefix, Element: val}
+			lp := java.LeftPadded[java.Expression]{Before: sepPrefix, Element: val}
 			init = &lp
 		}
 
-		vd := &tree.VariableDeclarator{
+		vd := &java.VariableDeclarator{
 			ID:          uuid.New(),
 			Name:        nameIdent,
 			Initializer: init,
 		}
-		variables = append(variables, tree.RightPadded[*tree.VariableDeclarator]{Element: vd, After: nameAfters[i]})
+		variables = append(variables, java.RightPadded[*java.VariableDeclarator]{Element: vd, After: nameAfters[i]})
 	}
 
-	var markerEntries []tree.Marker
+	var markerEntries []java.Marker
 	if keyword == "var" {
-		markerEntries = append(markerEntries, tree.VarKeyword{Ident: uuid.New()})
+		markerEntries = append(markerEntries, golang.VarKeyword{Ident: uuid.New()})
 	} else if keyword == "const" {
-		markerEntries = append(markerEntries, tree.ConstDecl{Ident: uuid.New()})
+		markerEntries = append(markerEntries, golang.ConstDecl{Ident: uuid.New()})
 	}
-	var markers tree.Markers
+	var markers java.Markers
 	if len(markerEntries) > 0 {
-		markers = tree.Markers{ID: uuid.New(), Entries: markerEntries}
+		markers = java.Markers{ID: uuid.New(), Entries: markerEntries}
 	}
 
-	return &tree.VariableDeclarations{
+	return &java.VariableDeclarations{
 		ID:        uuid.New(),
 		Prefix:    prefix,
 		Markers:   markers,
@@ -543,7 +548,7 @@ func (ctx *parseContext) mapValueSpec(spec *ast.ValueSpec, prefix tree.Space, ke
 }
 
 // mapTypeDecl maps a `type Name ...` declaration.
-func (ctx *parseContext) mapTypeDecl(decl *ast.GenDecl) tree.Statement {
+func (ctx *parseContext) mapTypeDecl(decl *ast.GenDecl) java.Statement {
 	prefix := ctx.prefixAndSkip(decl.Pos(), len("type"))
 	leadingAnns, prefix := extractDirectives(prefix)
 
@@ -558,13 +563,13 @@ func (ctx *parseContext) mapTypeDecl(decl *ast.GenDecl) tree.Statement {
 	lparenPrefix := ctx.prefix(decl.Lparen)
 	ctx.skip(1) // "("
 
-	var elements []tree.RightPadded[tree.Statement]
+	var elements []java.RightPadded[java.Statement]
 	for _, s := range decl.Specs {
 		spec := s.(*ast.TypeSpec)
 		innerPrefix := ctx.prefix(spec.Pos())
 		td := ctx.mapTypeSpec(spec, innerPrefix)
-		td.Markers.Entries = append(td.Markers.Entries, tree.GroupedSpec{Ident: uuid.New()})
-		elements = append(elements, tree.RightPadded[tree.Statement]{Element: td})
+		td.Markers.Entries = append(td.Markers.Entries, golang.GroupedSpec{Ident: uuid.New()})
+		elements = append(elements, java.RightPadded[java.Statement]{Element: td})
 	}
 
 	rparenPrefix := ctx.prefix(decl.Rparen)
@@ -573,14 +578,14 @@ func (ctx *parseContext) mapTypeDecl(decl *ast.GenDecl) tree.Statement {
 	if len(elements) > 0 {
 		elements[len(elements)-1].After = rparenPrefix
 	} else if len(rparenPrefix.Comments) > 0 {
-		elements = append(elements, tree.RightPadded[tree.Statement]{
-			Element: &tree.Empty{ID: uuid.New()},
+		elements = append(elements, java.RightPadded[java.Statement]{
+			Element: &java.Empty{ID: uuid.New()},
 			After:   rparenPrefix,
 		})
 	}
 
-	specs := &tree.Container[tree.Statement]{Before: lparenPrefix, Elements: elements}
-	return &tree.TypeDecl{
+	specs := &java.Container[java.Statement]{Before: lparenPrefix, Elements: elements}
+	return &golang.TypeDecl{
 		ID:                 uuid.New(),
 		Prefix:             prefix,
 		LeadingAnnotations: leadingAnns,
@@ -589,54 +594,60 @@ func (ctx *parseContext) mapTypeDecl(decl *ast.GenDecl) tree.Statement {
 }
 
 // mapTypeSpec maps a single type spec: `type Name Type` or `type Name = Type`.
-func (ctx *parseContext) mapTypeSpec(spec *ast.TypeSpec, prefix tree.Space) *tree.TypeDecl {
+func (ctx *parseContext) mapTypeSpec(spec *ast.TypeSpec, prefix java.Space) *golang.TypeDecl {
 	name := ctx.mapIdent(spec.Name)
+	typeParams := ctx.mapTypeParams(spec.TypeParams)
 
-	var assign *tree.LeftPadded[tree.Space]
+	var assign *java.LeftPadded[java.Space]
 	if spec.Assign.IsValid() {
 		eqPrefix := ctx.prefix(spec.Assign)
 		ctx.skip(1) // "="
-		lp := tree.LeftPadded[tree.Space]{Before: eqPrefix}
+		lp := java.LeftPadded[java.Space]{Before: eqPrefix}
 		assign = &lp
 	}
 
 	def := ctx.mapTypeExpr(spec.Type)
 
-	return &tree.TypeDecl{
-		ID:         uuid.New(),
-		Prefix:     prefix,
-		Name:       name,
-		Assign:     assign,
-		Definition: def,
+	return &golang.TypeDecl{
+		ID:             uuid.New(),
+		Prefix:         prefix,
+		Name:           name,
+		TypeParameters: typeParams,
+		Assign:         assign,
+		Definition:     def,
 	}
 }
 
-// mapFuncDecl maps a function declaration.
-func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) *tree.MethodDeclaration {
+// mapFuncDecl maps a function declaration. Free functions map to a bare
+// java.MethodDeclaration (mirroring J.MethodDeclaration); methods carrying a
+// receiver (`func (s *Service) Run()`) wrap that declaration in a
+// golang.MethodDeclaration, since J.MethodDeclaration has no receiver slot.
+func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) java.Statement {
 	prefix := ctx.prefixAndSkip(decl.Pos(), len("func"))
 	leadingAnns, prefix := extractDirectives(prefix)
 
-	var receiver *tree.Container[tree.Statement]
+	var receiver *java.Container[java.Statement]
 	if decl.Recv != nil && len(decl.Recv.List) > 0 {
 		recv := ctx.mapFieldListAsParams(decl.Recv)
 		receiver = &recv
 	}
 
 	name := ctx.mapIdent(decl.Name)
+	typeParams := ctx.mapTypeParams(decl.Type.TypeParams)
 	params := ctx.mapFieldListAsParams(decl.Type.Params)
 	returnType := ctx.mapReturnType(decl.Type.Results)
 
-	var body *tree.Block
+	var body *java.Block
 	if decl.Body != nil {
 		body = ctx.mapBlockStmt(decl.Body)
 	}
 
-	md := &tree.MethodDeclaration{
+	md := &java.MethodDeclaration{
 		ID:                 uuid.New(),
 		Prefix:             prefix,
 		LeadingAnnotations: leadingAnns,
-		Receiver:           receiver,
 		Name:               name,
+		TypeParameters:     typeParams,
 		Parameters:         params,
 		ReturnType:         returnType,
 		Body:               body,
@@ -649,13 +660,84 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) *tree.MethodDeclaration
 		}
 	}
 
+	if receiver != nil {
+		// The prefix (whitespace before `func`, after any `//go:` directives)
+		// belongs on the outermost node, so it moves to the wrapper; the inner
+		// declaration keeps its leading directives but is otherwise prefix-less.
+		declPrefix := md.Prefix
+		md.Prefix = java.EmptySpace
+		return &golang.MethodDeclaration{
+			ID:          uuid.New(),
+			Prefix:      declPrefix,
+			Receiver:    *receiver,
+			Declaration: md,
+		}
+	}
+
 	return md
+}
+
+// mapTypeParams maps a declaration-site type parameter list `[...]` (Go 1.18+
+// generics) to a J.TypeParameters. Returns nil when there are no type
+// parameters. Go groups names sharing a constraint into one field, e.g.
+// `[T, U any]`; each name becomes its own J.TypeParameter and only the last
+// name in a group carries the shared constraint as its single bound.
+func (ctx *parseContext) mapTypeParams(fl *ast.FieldList) *java.TypeParameters {
+	if fl == nil || len(fl.List) == 0 {
+		return nil
+	}
+	before := ctx.prefix(fl.Opening)
+	ctx.skip(1) // "["
+
+	type unit struct {
+		name     *ast.Ident
+		field    *ast.Field
+		hasBound bool
+	}
+	var units []unit
+	for _, field := range fl.List {
+		for j := range field.Names {
+			units = append(units, unit{name: field.Names[j], field: field, hasBound: j == len(field.Names)-1})
+		}
+	}
+
+	var elements []java.RightPadded[java.J]
+	for i, u := range units {
+		tp := &java.TypeParameter{ID: uuid.New(), Name: ctx.mapIdent(u.name)}
+		if u.hasBound {
+			constraint := ctx.mapTypeExpr(u.field.Type)
+			tp.Bounds = &java.Container[java.Expression]{
+				Elements: []java.RightPadded[java.Expression]{{Element: constraint}},
+			}
+		}
+		var after java.Space
+		if i < len(units)-1 {
+			commaOffset := ctx.findNext(',')
+			if commaOffset >= 0 {
+				after = ctx.prefix(ctx.file.Pos(commaOffset))
+				ctx.skip(1) // ","
+			}
+		}
+		elements = append(elements, java.RightPadded[java.J]{Element: tp, After: after})
+	}
+
+	closePrefix := ctx.prefix(fl.Closing)
+	ctx.skip(1) // "]"
+	if len(elements) > 0 {
+		elements[len(elements)-1].After = closePrefix
+	}
+
+	return &java.TypeParameters{
+		ID:             uuid.New(),
+		Prefix:         before,
+		TypeParameters: elements,
+	}
 }
 
 // mapReturnType maps function return types.
 // Returns nil for no return, a single Expression for one type, or a TypeList for multiple.
 // Handles both unnamed `(int, error)` and named `(n int, err error)` returns.
-func (ctx *parseContext) mapReturnType(results *ast.FieldList) tree.Expression {
+func (ctx *parseContext) mapReturnType(results *ast.FieldList) java.Expression {
 	if results == nil || len(results.List) == 0 {
 		return nil
 	}
@@ -666,19 +748,19 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) tree.Expression {
 		before := ctx.prefix(results.Opening)
 		ctx.skip(1) // "("
 
-		var elements []tree.RightPadded[tree.Statement]
+		var elements []java.RightPadded[java.Statement]
 		for i, field := range results.List {
 			if len(field.Names) == 0 {
 				// Unnamed return: just a type expression
 				typeExpr := ctx.mapTypeExpr(field.Type)
-				vd := &tree.VariableDeclarations{
+				vd := &java.VariableDeclarations{
 					ID:       uuid.New(),
 					TypeExpr: typeExpr,
-					Variables: []tree.RightPadded[*tree.VariableDeclarator]{
-						{Element: &tree.VariableDeclarator{ID: uuid.New(), Name: &tree.Identifier{ID: uuid.New()}}},
+					Variables: []java.RightPadded[*java.VariableDeclarator]{
+						{Element: &java.VariableDeclarator{ID: uuid.New(), Name: &java.Identifier{ID: uuid.New()}}},
 					},
 				}
-				var after tree.Space
+				var after java.Space
 				if i < len(results.List)-1 {
 					commaOffset := ctx.findNext(',')
 					if commaOffset >= 0 {
@@ -686,13 +768,13 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) tree.Expression {
 						ctx.skip(1) // ","
 					}
 				}
-				elements = append(elements, tree.RightPadded[tree.Statement]{Element: vd, After: after})
+				elements = append(elements, java.RightPadded[java.Statement]{Element: vd, After: after})
 			} else {
 				// Named return(s): `n int` or `x, y int`
-				var vars []tree.RightPadded[*tree.VariableDeclarator]
+				var vars []java.RightPadded[*java.VariableDeclarator]
 				for j, fieldName := range field.Names {
 					nameIdent := ctx.mapIdent(fieldName)
-					var nameAfter tree.Space
+					var nameAfter java.Space
 					if j < len(field.Names)-1 {
 						commaOffset := ctx.findNext(',')
 						if commaOffset >= 0 {
@@ -700,18 +782,18 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) tree.Expression {
 							ctx.skip(1) // ","
 						}
 					}
-					vars = append(vars, tree.RightPadded[*tree.VariableDeclarator]{
-						Element: &tree.VariableDeclarator{ID: uuid.New(), Name: nameIdent},
+					vars = append(vars, java.RightPadded[*java.VariableDeclarator]{
+						Element: &java.VariableDeclarator{ID: uuid.New(), Name: nameIdent},
 						After:   nameAfter,
 					})
 				}
 				typeExpr := ctx.mapTypeExpr(field.Type)
-				vd := &tree.VariableDeclarations{
+				vd := &java.VariableDeclarations{
 					ID:        uuid.New(),
 					TypeExpr:  typeExpr,
 					Variables: vars,
 				}
-				var after tree.Space
+				var after java.Space
 				if i < len(results.List)-1 {
 					commaOffset := ctx.findNext(',')
 					if commaOffset >= 0 {
@@ -719,7 +801,7 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) tree.Expression {
 						ctx.skip(1) // ","
 					}
 				}
-				elements = append(elements, tree.RightPadded[tree.Statement]{Element: vd, After: after})
+				elements = append(elements, java.RightPadded[java.Statement]{Element: vd, After: after})
 			}
 		}
 
@@ -730,9 +812,9 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) tree.Expression {
 			elements[len(elements)-1].After = closePrefix
 		}
 
-		return &tree.TypeList{
+		return &golang.TypeList{
 			ID:    uuid.New(),
-			Types: tree.Container[tree.Statement]{Before: before, Elements: elements},
+			Types: java.Container[java.Statement]{Before: before, Elements: elements},
 		}
 	}
 
@@ -743,29 +825,29 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) tree.Expression {
 // mapFieldListAsParams maps function parameters.
 // Handles named (x int), unnamed (int), and grouped (a, b int) parameters.
 // Each ast.Field becomes one VariableDeclarations (possibly with multiple names).
-func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[tree.Statement] {
+func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[java.Statement] {
 	before := ctx.prefix(fl.Opening)
 	ctx.skip(1) // "("
 
-	var elements []tree.RightPadded[tree.Statement]
+	var elements []java.RightPadded[java.Statement]
 	for i, field := range fl.List {
 		if len(field.Names) == 0 {
 			// Unnamed parameter: just a type expression (e.g., `int` in `func(int)`)
 			typeExpr := ctx.mapTypeExpr(field.Type)
-			var varargs *tree.Space
-			if u, ok := typeExpr.(*tree.Unary); ok && u.Operator.Element == tree.Spread {
-				varargs = &u.Prefix
-				typeExpr = u.Operand
+			var varargs *java.Space
+			if vrd, ok := typeExpr.(*golang.Variadic); ok && !vrd.Postfix {
+				varargs = &vrd.Prefix
+				typeExpr = vrd.Element
 			}
-			vd := &tree.VariableDeclarations{
+			vd := &java.VariableDeclarations{
 				ID:       uuid.New(),
 				TypeExpr: typeExpr,
 				Varargs:  varargs,
-				Variables: []tree.RightPadded[*tree.VariableDeclarator]{
-					{Element: &tree.VariableDeclarator{ID: uuid.New(), Name: &tree.Identifier{ID: uuid.New()}}},
+				Variables: []java.RightPadded[*java.VariableDeclarator]{
+					{Element: &java.VariableDeclarator{ID: uuid.New(), Name: &java.Identifier{ID: uuid.New()}}},
 				},
 			}
-			var after tree.Space
+			var after java.Space
 			if i < len(fl.List)-1 {
 				commaOffset := ctx.findNext(',')
 				if commaOffset >= 0 {
@@ -773,14 +855,14 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 					ctx.skip(1) // ","
 				}
 			}
-			elements = append(elements, tree.RightPadded[tree.Statement]{Element: vd, After: after})
+			elements = append(elements, java.RightPadded[java.Statement]{Element: vd, After: after})
 		} else {
 			// Named parameter(s): `a int` or `a, b int` (grouped names sharing a type)
 			// Map all names first (source order), then the shared type
-			var vars []tree.RightPadded[*tree.VariableDeclarator]
+			var vars []java.RightPadded[*java.VariableDeclarator]
 			for j, fieldName := range field.Names {
 				nameIdent := ctx.mapIdent(fieldName)
-				var nameAfter tree.Space
+				var nameAfter java.Space
 				if j < len(field.Names)-1 {
 					commaOffset := ctx.findNext(',')
 					if commaOffset >= 0 {
@@ -788,26 +870,26 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 						ctx.skip(1) // ","
 					}
 				}
-				vars = append(vars, tree.RightPadded[*tree.VariableDeclarator]{
-					Element: &tree.VariableDeclarator{ID: uuid.New(), Name: nameIdent},
+				vars = append(vars, java.RightPadded[*java.VariableDeclarator]{
+					Element: &java.VariableDeclarator{ID: uuid.New(), Name: nameIdent},
 					After:   nameAfter,
 				})
 			}
 
 			typeExpr := ctx.mapTypeExpr(field.Type)
-			var varargs *tree.Space
-			if u, ok := typeExpr.(*tree.Unary); ok && u.Operator.Element == tree.Spread {
-				varargs = &u.Prefix
-				typeExpr = u.Operand
+			var varargs *java.Space
+			if vrd, ok := typeExpr.(*golang.Variadic); ok && !vrd.Postfix {
+				varargs = &vrd.Prefix
+				typeExpr = vrd.Element
 			}
-			vd := &tree.VariableDeclarations{
+			vd := &java.VariableDeclarations{
 				ID:        uuid.New(),
 				TypeExpr:  typeExpr,
 				Varargs:   varargs,
 				Variables: vars,
 			}
 
-			var after tree.Space
+			var after java.Space
 			if i < len(fl.List)-1 {
 				commaOffset := ctx.findNext(',')
 				if commaOffset >= 0 {
@@ -815,11 +897,11 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 					ctx.skip(1) // ","
 				}
 			}
-			elements = append(elements, tree.RightPadded[tree.Statement]{Element: vd, After: after})
+			elements = append(elements, java.RightPadded[java.Statement]{Element: vd, After: after})
 		}
 	}
 
-	var markers tree.Markers
+	var markers java.Markers
 	if len(elements) > 0 {
 		trailingCommaOff := ctx.findNextBefore(',', int(fl.Closing)-ctx.file.Base())
 		if trailingCommaOff >= 0 {
@@ -827,9 +909,9 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 			ctx.skip(1) // ","
 			commaAfter := ctx.prefix(fl.Closing)
 			ctx.skip(1) // ")"
-			markers = tree.Markers{
+			markers = java.Markers{
 				ID: uuid.New(),
-				Entries: []tree.Marker{tree.TrailingComma{
+				Entries: []java.Marker{golang.TrailingComma{
 					Ident:  uuid.New(),
 					Before: commaBefore,
 					After:  commaAfter,
@@ -844,14 +926,14 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 		closeParen := ctx.prefix(fl.Closing)
 		ctx.skip(1) // ")"
 		if !closeParen.IsEmpty() {
-			elements = append(elements, tree.RightPadded[tree.Statement]{
-				Element: &tree.Empty{ID: uuid.New()},
+			elements = append(elements, java.RightPadded[java.Statement]{
+				Element: &java.Empty{ID: uuid.New()},
 				After:   closeParen,
 			})
 		}
 	}
 
-	return tree.Container[tree.Statement]{Before: before, Elements: elements, Markers: markers}
+	return java.Container[java.Statement]{Before: before, Elements: elements, Markers: markers}
 }
 
 // mapBlockStmt maps a block statement.
@@ -863,17 +945,17 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 // as RightPadded.After, mark the entry with a Semicolon marker, and
 // advance the cursor past the `;`. The Block printer emits `;` when
 // the marker is present.
-func (ctx *parseContext) mapBlockStmt(block *ast.BlockStmt) *tree.Block {
+func (ctx *parseContext) mapBlockStmt(block *ast.BlockStmt) *java.Block {
 	prefix := ctx.prefix(block.Lbrace)
 	ctx.skip(1) // "{"
 
-	var stmts []tree.RightPadded[tree.Statement]
+	var stmts []java.RightPadded[java.Statement]
 	for i, stmt := range block.List {
 		mapped := ctx.mapStmt(stmt)
 		if mapped == nil {
 			continue
 		}
-		rp := tree.RightPadded[tree.Statement]{Element: mapped}
+		rp := java.RightPadded[java.Statement]{Element: mapped}
 
 		// Detect inline `;` separator. Go inserts implicit semicolons
 		// at end-of-line, so a literal `;` between two statements only
@@ -900,7 +982,7 @@ func (ctx *parseContext) mapBlockStmt(block *ast.BlockStmt) *tree.Block {
 			if semiOffset >= 0 {
 				rp.After = ctx.prefix(ctx.file.Pos(semiOffset))
 				ctx.skip(1) // consume ";"
-				rp.Markers = tree.AddMarker(rp.Markers, tree.NewSemicolon())
+				rp.Markers = java.AddMarker(rp.Markers, golang.NewSemicolon())
 			}
 		}
 
@@ -910,11 +992,11 @@ func (ctx *parseContext) mapBlockStmt(block *ast.BlockStmt) *tree.Block {
 	end := ctx.prefix(block.Rbrace)
 	ctx.skip(1) // "}"
 
-	return &tree.Block{ID: uuid.New(), Prefix: prefix, Statements: stmts, End: end}
+	return &java.Block{ID: uuid.New(), Prefix: prefix, Statements: stmts, End: end}
 }
 
 // mapStmt maps a statement.
-func (ctx *parseContext) mapStmt(stmt ast.Stmt) tree.Statement {
+func (ctx *parseContext) mapStmt(stmt ast.Stmt) java.Statement {
 	switch s := stmt.(type) {
 	case *ast.ReturnStmt:
 		return ctx.mapReturnStmt(s)
@@ -961,14 +1043,16 @@ func (ctx *parseContext) mapStmt(stmt ast.Stmt) tree.Statement {
 	}
 }
 
-// mapReturnStmt maps a return statement.
-func (ctx *parseContext) mapReturnStmt(stmt *ast.ReturnStmt) *tree.Return {
+// mapReturnStmt maps a return statement. Zero- and single-value returns map to
+// java.Return (mirroring Java's J.Return); multi-value returns (`return 0, nil`)
+// map to golang.Return, just as multi-value assignments map to MultiAssignment.
+func (ctx *parseContext) mapReturnStmt(stmt *ast.ReturnStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("return"))
 
-	var exprs []tree.RightPadded[tree.Expression]
+	var exprs []java.RightPadded[java.Expression]
 	for i, expr := range stmt.Results {
 		mapped := ctx.mapExpr(expr)
-		var after tree.Space
+		var after java.Space
 		if i < len(stmt.Results)-1 {
 			commaOffset := ctx.findNext(',')
 			if commaOffset >= 0 {
@@ -976,25 +1060,51 @@ func (ctx *parseContext) mapReturnStmt(stmt *ast.ReturnStmt) *tree.Return {
 				ctx.skip(1) // ","
 			}
 		}
-		exprs = append(exprs, tree.RightPadded[tree.Expression]{Element: mapped, After: after})
+		exprs = append(exprs, java.RightPadded[java.Expression]{Element: mapped, After: after})
 	}
 
-	return &tree.Return{ID: uuid.New(), Prefix: prefix, Expressions: exprs}
+	if len(exprs) > 1 {
+		return &golang.Return{ID: uuid.New(), Prefix: prefix, Expressions: exprs}
+	}
+
+	var single java.Expression
+	if len(exprs) == 1 {
+		single = exprs[0].Element
+	}
+	return &java.Return{ID: uuid.New(), Prefix: prefix, Expression: single}
 }
 
 // mapAssignStmt maps an assignment statement.
-func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) tree.Statement {
+func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) java.Statement {
 	// Check for compound assignment operators (+=, -=, etc.) — always single LHS/RHS
 	if len(stmt.Lhs) == 1 && len(stmt.Rhs) == 1 {
-		if op, ok := mapAssignmentOp(stmt.Tok); ok {
+		// Go's `&^=` (bit-clear assign) has no J.AssignmentOperation.Type
+		// equivalent → golang.AssignmentOperation.
+		if stmt.Tok == token.AND_NOT_ASSIGN {
 			lhs := ctx.mapExpr(stmt.Lhs[0])
+			prefix, lhs := hoistLeftPrefix(lhs)
 			opPrefix := ctx.prefix(stmt.TokPos)
 			ctx.skip(len(stmt.Tok.String()))
 			rhs := ctx.mapExpr(stmt.Rhs[0])
-			return &tree.AssignmentOperation{
+			return &golang.AssignmentOperation{
 				ID:         uuid.New(),
+				Prefix:     prefix,
 				Variable:   lhs,
-				Operator:   tree.LeftPadded[tree.AssignmentOperator]{Before: opPrefix, Element: op},
+				Operator:   java.LeftPadded[golang.AssignmentOperator]{Before: opPrefix, Element: golang.AssignAndNot},
+				Assignment: rhs,
+			}
+		}
+		if op, ok := mapAssignmentOp(stmt.Tok); ok {
+			lhs := ctx.mapExpr(stmt.Lhs[0])
+			prefix, lhs := hoistLeftPrefix(lhs)
+			opPrefix := ctx.prefix(stmt.TokPos)
+			ctx.skip(len(stmt.Tok.String()))
+			rhs := ctx.mapExpr(stmt.Rhs[0])
+			return &java.AssignmentOperation{
+				ID:         uuid.New(),
+				Prefix:     prefix,
+				Variable:   lhs,
+				Operator:   java.LeftPadded[java.AssignmentOperator]{Before: opPrefix, Element: op},
 				Assignment: rhs,
 			}
 		}
@@ -1002,10 +1112,14 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) tree.Statement {
 
 	// Multi-value assignment: x, y = 1, 2 or x, y := f()
 	if len(stmt.Lhs) > 1 || len(stmt.Rhs) > 1 {
-		var lhsExprs []tree.RightPadded[tree.Expression]
+		var lhsExprs []java.RightPadded[java.Expression]
+		var prefix java.Space
 		for i, expr := range stmt.Lhs {
 			mapped := ctx.mapExpr(expr)
-			var after tree.Space
+			if i == 0 {
+				prefix, mapped = hoistLeftPrefix(mapped)
+			}
+			var after java.Space
 			if i < len(stmt.Lhs)-1 {
 				commaOffset := ctx.findNext(',')
 				if commaOffset >= 0 {
@@ -1013,16 +1127,16 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) tree.Statement {
 					ctx.skip(1) // ","
 				}
 			}
-			lhsExprs = append(lhsExprs, tree.RightPadded[tree.Expression]{Element: mapped, After: after})
+			lhsExprs = append(lhsExprs, java.RightPadded[java.Expression]{Element: mapped, After: after})
 		}
 
 		opPrefix := ctx.prefix(stmt.TokPos)
 		ctx.skip(len(stmt.Tok.String()))
 
-		var rhsExprs []tree.RightPadded[tree.Expression]
+		var rhsExprs []java.RightPadded[java.Expression]
 		for i, expr := range stmt.Rhs {
 			mapped := ctx.mapExpr(expr)
-			var after tree.Space
+			var after java.Space
 			if i < len(stmt.Rhs)-1 {
 				commaOffset := ctx.findNext(',')
 				if commaOffset >= 0 {
@@ -1030,80 +1144,82 @@ func (ctx *parseContext) mapAssignStmt(stmt *ast.AssignStmt) tree.Statement {
 					ctx.skip(1) // ","
 				}
 			}
-			rhsExprs = append(rhsExprs, tree.RightPadded[tree.Expression]{Element: mapped, After: after})
+			rhsExprs = append(rhsExprs, java.RightPadded[java.Expression]{Element: mapped, After: after})
 		}
 
-		var markers tree.Markers
+		var markers java.Markers
 		if stmt.Tok == token.DEFINE {
-			markers = tree.Markers{
+			markers = java.Markers{
 				ID:      uuid.New(),
-				Entries: []tree.Marker{tree.ShortVarDecl{Ident: uuid.New()}},
+				Entries: []java.Marker{golang.ShortVarDecl{Ident: uuid.New()}},
 			}
 		}
 
-		return &tree.MultiAssignment{
+		return &golang.MultiAssignment{
 			ID:        uuid.New(),
+			Prefix:    prefix,
 			Markers:   markers,
 			Variables: lhsExprs,
-			Operator:  tree.LeftPadded[tree.Space]{Before: opPrefix},
+			Operator:  java.LeftPadded[java.Space]{Before: opPrefix},
 			Values:    rhsExprs,
 		}
 	}
 
 	// Single assignment: x = 1 or x := 1
 	lhs := ctx.mapExpr(stmt.Lhs[0])
+	prefix, lhs := hoistLeftPrefix(lhs)
 	opPrefix := ctx.prefix(stmt.TokPos)
 	ctx.skip(len(stmt.Tok.String()))
 	rhs := ctx.mapExpr(stmt.Rhs[0])
 
-	var markers tree.Markers
+	var markers java.Markers
 	if stmt.Tok == token.DEFINE {
-		markers = tree.Markers{
+		markers = java.Markers{
 			ID:      uuid.New(),
-			Entries: []tree.Marker{tree.ShortVarDecl{Ident: uuid.New()}},
+			Entries: []java.Marker{golang.ShortVarDecl{Ident: uuid.New()}},
 		}
 	}
 
-	return &tree.Assignment{
+	return &java.Assignment{
 		ID:       uuid.New(),
-		Prefix:   tree.EmptySpace,
+		Prefix:   prefix,
 		Markers:  markers,
 		Variable: lhs,
-		Value:    tree.LeftPadded[tree.Expression]{Before: opPrefix, Element: rhs},
+		Value:    java.LeftPadded[java.Expression]{Before: opPrefix, Element: rhs},
 	}
 }
 
-func mapAssignmentOp(tok token.Token) (tree.AssignmentOperator, bool) {
+func mapAssignmentOp(tok token.Token) (java.AssignmentOperator, bool) {
 	switch tok {
 	case token.ADD_ASSIGN:
-		return tree.AddAssign, true
+		return java.AddAssign, true
 	case token.SUB_ASSIGN:
-		return tree.SubAssign, true
+		return java.SubAssign, true
 	case token.MUL_ASSIGN:
-		return tree.MulAssign, true
+		return java.MulAssign, true
 	case token.QUO_ASSIGN:
-		return tree.DivAssign, true
+		return java.DivAssign, true
 	case token.REM_ASSIGN:
-		return tree.ModAssign, true
+		return java.ModAssign, true
 	case token.AND_ASSIGN:
-		return tree.AndAssign, true
+		return java.AndAssign, true
 	case token.OR_ASSIGN:
-		return tree.OrAssign, true
+		return java.OrAssign, true
 	case token.XOR_ASSIGN:
-		return tree.XorAssign, true
+		return java.XorAssign, true
 	case token.SHL_ASSIGN:
-		return tree.ShlAssign, true
+		return java.ShlAssign, true
 	case token.SHR_ASSIGN:
-		return tree.ShrAssign, true
+		return java.ShrAssign, true
 	case token.AND_NOT_ASSIGN:
-		return tree.AndNotAssign, true
+		return java.AndNotAssign, true
 	default:
 		return 0, false
 	}
 }
 
 // mapDeclStmt maps a declaration statement inside a function body.
-func (ctx *parseContext) mapDeclStmt(stmt *ast.DeclStmt) tree.Statement {
+func (ctx *parseContext) mapDeclStmt(stmt *ast.DeclStmt) java.Statement {
 	switch d := stmt.Decl.(type) {
 	case *ast.GenDecl:
 		return ctx.mapGenDecl(d)
@@ -1113,38 +1229,40 @@ func (ctx *parseContext) mapDeclStmt(stmt *ast.DeclStmt) tree.Statement {
 }
 
 // mapExprStmt maps an expression statement.
-func (ctx *parseContext) mapExprStmt(stmt *ast.ExprStmt) tree.Statement {
+func (ctx *parseContext) mapExprStmt(stmt *ast.ExprStmt) java.Statement {
 	expr := ctx.mapExpr(stmt.X)
 	if expr == nil {
 		return nil
 	}
-	if s, ok := expr.(tree.Statement); ok {
+	if s, ok := expr.(java.Statement); ok {
 		return s
 	}
 	return nil
 }
 
-// mapIfStmt maps an if statement, including optional init: `if init; cond { }`.
-func (ctx *parseContext) mapIfStmt(stmt *ast.IfStmt) *tree.If {
+// mapIfStmt maps an if statement. A plain `if cond { }` maps to java.If
+// (mirroring J.If); an init clause (`if x := f(); cond { }`) wraps that java.If
+// in a golang.StatementWithInit, which J.If has no slot for.
+func (ctx *parseContext) mapIfStmt(stmt *ast.IfStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("if"))
 
-	var init *tree.RightPadded[tree.Statement]
+	var init *java.RightPadded[java.Statement]
 	if stmt.Init != nil {
 		initStmt := ctx.mapStmt(stmt.Init)
 		semicolonOffset := ctx.findNext(';')
-		var after tree.Space
+		var after java.Space
 		if semicolonOffset >= 0 {
 			after = ctx.prefix(ctx.file.Pos(semicolonOffset))
 			ctx.skip(1) // ";"
 		}
-		rp := tree.RightPadded[tree.Statement]{Element: initStmt, After: after}
+		rp := java.RightPadded[java.Statement]{Element: initStmt, After: after}
 		init = &rp
 	}
 
 	cond := ctx.mapExpr(stmt.Cond)
 	body := ctx.mapBlockStmt(stmt.Body)
 
-	var elsePart *tree.RightPadded[tree.J]
+	var elsePart *java.RightPadded[java.J]
 	if stmt.Else != nil {
 		// Find the `else` keyword between the closing `}` of Then and the start of Else
 		elseOff := ctx.findNextString("else")
@@ -1153,69 +1271,103 @@ func (ctx *parseContext) mapIfStmt(stmt *ast.IfStmt) *tree.If {
 			ctx.skip(len("else"))
 			elseBody := ctx.mapStmt(stmt.Else)
 			if elseBody != nil {
-				rp := tree.RightPadded[tree.J]{Element: elseBody, After: elsePrefix}
+				rp := java.RightPadded[java.J]{Element: elseBody, After: elsePrefix}
 				elsePart = &rp
 			}
 		}
 	}
 
-	return &tree.If{
+	innerPrefix := prefix
+	if init != nil {
+		innerPrefix = java.EmptySpace
+	}
+	return wrapWithInit(prefix, init, &java.If{
 		ID:        uuid.New(),
-		Prefix:    prefix,
-		Init:      init,
-		Condition: cond,
+		Prefix:    innerPrefix,
+		Condition: controlParentheses(cond),
 		Then:      body,
 		ElsePart:  elsePart,
+	})
+}
+
+// controlParentheses wraps a bare condition in a synthetic ControlParentheses,
+// mirroring how Java models an `if` condition. Go has no parens there, so the
+// wrapper carries no whitespace of its own (it lives on the inner element) and
+// the printer emits only the inner expression.
+func controlParentheses(inner java.Expression) *java.ControlParentheses {
+	return &java.ControlParentheses{
+		ID:      uuid.New(),
+		Markers: java.Markers{ID: uuid.New()},
+		Tree:    java.RightPadded[java.Expression]{Element: inner},
 	}
 }
 
-// mapSwitchStmt maps a switch statement.
-func (ctx *parseContext) mapSwitchStmt(stmt *ast.SwitchStmt) *tree.Switch {
+// wrapWithInit wraps an inner if/switch in a golang.StatementWithInit when an
+// init clause is present, moving the keyword prefix onto the wrapper and
+// leaving the inner statement prefix-less. With no init it returns inner as-is.
+func wrapWithInit(prefix java.Space, init *java.RightPadded[java.Statement], inner java.Statement) java.Statement {
+	if init == nil {
+		return inner
+	}
+	return &golang.StatementWithInit{
+		ID:        uuid.New(),
+		Prefix:    prefix,
+		Init:      *init,
+		Statement: inner,
+	}
+}
+
+// mapSwitchStmt maps a switch statement. A plain switch maps to java.Switch
+// (mirroring J.Switch); an init clause wraps it in a golang.StatementWithInit.
+func (ctx *parseContext) mapSwitchStmt(stmt *ast.SwitchStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("switch"))
 
-	var init *tree.RightPadded[tree.Statement]
+	var init *java.RightPadded[java.Statement]
 	if stmt.Init != nil {
 		initStmt := ctx.mapStmt(stmt.Init)
 		semicolonOffset := ctx.findNext(';')
-		var after tree.Space
+		var after java.Space
 		if semicolonOffset >= 0 {
 			after = ctx.prefix(ctx.file.Pos(semicolonOffset))
 			ctx.skip(1) // ";"
 		}
-		rp := tree.RightPadded[tree.Statement]{Element: initStmt, After: after}
+		rp := java.RightPadded[java.Statement]{Element: initStmt, After: after}
 		init = &rp
 	}
 
-	var tag *tree.RightPadded[tree.Expression]
+	var tag *java.RightPadded[java.Expression]
 	if stmt.Tag != nil {
 		tagExpr := ctx.mapExpr(stmt.Tag)
-		rp := tree.RightPadded[tree.Expression]{Element: tagExpr}
+		rp := java.RightPadded[java.Expression]{Element: tagExpr}
 		tag = &rp
 	}
 
 	body := ctx.mapBlockStmt(stmt.Body)
 
-	return &tree.Switch{
-		ID:      uuid.New(),
-		Prefix:  prefix,
-		Init:    init,
-		Tag:     tag,
-		Body:    body,
+	innerPrefix := prefix
+	if init != nil {
+		innerPrefix = java.EmptySpace
 	}
+	return wrapWithInit(prefix, init, &java.Switch{
+		ID:     uuid.New(),
+		Prefix: innerPrefix,
+		Tag:    tag,
+		Body:   body,
+	})
 }
 
 // mapCaseClause maps a case or default clause.
-func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *tree.Case {
+func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *java.Case {
 	prefix := ctx.prefix(clause.Pos())
 
-	var exprs tree.Container[tree.Expression]
+	var exprs java.Container[java.Expression]
 	if len(clause.List) > 0 {
 		// case expr1, expr2:
 		ctx.skip(len("case"))
-		var elements []tree.RightPadded[tree.Expression]
+		var elements []java.RightPadded[java.Expression]
 		for i, expr := range clause.List {
 			mapped := ctx.mapExpr(expr)
-			var after tree.Space
+			var after java.Space
 			if i < len(clause.List)-1 {
 				commaOffset := ctx.findNext(',')
 				if commaOffset >= 0 {
@@ -1223,9 +1375,9 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *tree.Case {
 					ctx.skip(1) // ","
 				}
 			}
-			elements = append(elements, tree.RightPadded[tree.Expression]{Element: mapped, After: after})
+			elements = append(elements, java.RightPadded[java.Expression]{Element: mapped, After: after})
 		}
-		exprs = tree.Container[tree.Expression]{Elements: elements}
+		exprs = java.Container[java.Expression]{Elements: elements}
 	} else {
 		// default:
 		ctx.skip(len("default"))
@@ -1233,7 +1385,7 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *tree.Case {
 
 	// Skip the colon
 	colonOffset := ctx.findNext(':')
-	var colonPrefix tree.Space
+	var colonPrefix java.Space
 	if colonOffset >= 0 {
 		colonPrefix = ctx.prefix(ctx.file.Pos(colonOffset))
 		ctx.skip(1) // ":"
@@ -1248,15 +1400,15 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *tree.Case {
 	}
 
 	// Body statements
-	var body []tree.RightPadded[tree.Statement]
+	var body []java.RightPadded[java.Statement]
 	for _, stmt := range clause.Body {
 		mapped := ctx.mapStmt(stmt)
 		if mapped != nil {
-			body = append(body, tree.RightPadded[tree.Statement]{Element: mapped})
+			body = append(body, java.RightPadded[java.Statement]{Element: mapped})
 		}
 	}
 
-	return &tree.Case{
+	return &java.Case{
 		ID:          uuid.New(),
 		Prefix:      prefix,
 		Expressions: exprs,
@@ -1265,26 +1417,26 @@ func (ctx *parseContext) mapCaseClause(clause *ast.CaseClause) *tree.Case {
 }
 
 // mapSelectStmt maps a select statement, reusing Switch+Case with SelectStmt marker.
-func (ctx *parseContext) mapSelectStmt(stmt *ast.SelectStmt) *tree.Switch {
+func (ctx *parseContext) mapSelectStmt(stmt *ast.SelectStmt) *java.Switch {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("select"))
 	body := ctx.mapBlockStmt(stmt.Body)
 
-	return &tree.Switch{
+	return &java.Switch{
 		ID:     uuid.New(),
 		Prefix: prefix,
-		Markers: tree.Markers{
+		Markers: java.Markers{
 			ID:      uuid.New(),
-			Entries: []tree.Marker{tree.SelectStmt{Ident: uuid.New()}},
+			Entries: []java.Marker{golang.SelectStmt{Ident: uuid.New()}},
 		},
 		Body: body,
 	}
 }
 
 // mapCommClause maps a communication clause in a select statement.
-func (ctx *parseContext) mapCommClause(clause *ast.CommClause) *tree.CommClause {
+func (ctx *parseContext) mapCommClause(clause *ast.CommClause) *golang.CommClause {
 	prefix := ctx.prefix(clause.Pos())
 
-	var comm tree.Statement
+	var comm java.Statement
 	if clause.Comm != nil {
 		// case <-ch: or case ch <- val: or case v := <-ch:
 		ctx.skip(len("case"))
@@ -1296,21 +1448,21 @@ func (ctx *parseContext) mapCommClause(clause *ast.CommClause) *tree.CommClause 
 
 	// Skip the colon
 	colonOffset := ctx.findNext(':')
-	var colonPrefix tree.Space
+	var colonPrefix java.Space
 	if colonOffset >= 0 {
 		colonPrefix = ctx.prefix(ctx.file.Pos(colonOffset))
 		ctx.skip(1)
 	}
 
-	var body []tree.RightPadded[tree.Statement]
+	var body []java.RightPadded[java.Statement]
 	for _, stmt := range clause.Body {
 		mapped := ctx.mapStmt(stmt)
 		if mapped != nil {
-			body = append(body, tree.RightPadded[tree.Statement]{Element: mapped})
+			body = append(body, java.RightPadded[java.Statement]{Element: mapped})
 		}
 	}
 
-	return &tree.CommClause{
+	return &golang.CommClause{
 		ID:     uuid.New(),
 		Prefix: prefix,
 		Comm:   comm,
@@ -1321,70 +1473,74 @@ func (ctx *parseContext) mapCommClause(clause *ast.CommClause) *tree.CommClause 
 
 // mapTypeSwitchStmt maps a type switch statement.
 // Uses Switch with TypeSwitchGuard marker. The assign/guard becomes the tag.
-func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) *tree.Switch {
+// An init clause wraps the Switch in a golang.StatementWithInit.
+func (ctx *parseContext) mapTypeSwitchStmt(stmt *ast.TypeSwitchStmt) java.Statement {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("switch"))
 
-	var init *tree.RightPadded[tree.Statement]
+	var init *java.RightPadded[java.Statement]
 	if stmt.Init != nil {
 		initStmt := ctx.mapStmt(stmt.Init)
 		semicolonOffset := ctx.findNext(';')
-		var after tree.Space
+		var after java.Space
 		if semicolonOffset >= 0 {
 			after = ctx.prefix(ctx.file.Pos(semicolonOffset))
 			ctx.skip(1)
 		}
-		rp := tree.RightPadded[tree.Statement]{Element: initStmt, After: after}
+		rp := java.RightPadded[java.Statement]{Element: initStmt, After: after}
 		init = &rp
 	}
 
 	// The assign is `x.(type)` (ExprStmt) or `v := x.(type)` (AssignStmt)
-	var tag *tree.RightPadded[tree.Expression]
+	var tag *java.RightPadded[java.Expression]
 	switch a := stmt.Assign.(type) {
 	case *ast.ExprStmt:
 		// `x.(type)` — map the inner expression directly
 		expr := ctx.mapExpr(a.X)
 		if expr != nil {
-			rp := tree.RightPadded[tree.Expression]{Element: expr}
+			rp := java.RightPadded[java.Expression]{Element: expr}
 			tag = &rp
 		}
 	case *ast.AssignStmt:
 		// `v := x.(type)` — map as assignment (which is also an Expression-like construct here)
 		assignStmt := ctx.mapAssignStmt(a)
-		if expr, ok := assignStmt.(tree.Expression); ok {
-			rp := tree.RightPadded[tree.Expression]{Element: expr}
+		if expr, ok := assignStmt.(java.Expression); ok {
+			rp := java.RightPadded[java.Expression]{Element: expr}
 			tag = &rp
 		}
 	}
 
 	body := ctx.mapBlockStmt(stmt.Body)
 
-	return &tree.Switch{
+	innerPrefix := prefix
+	if init != nil {
+		innerPrefix = java.EmptySpace
+	}
+	return wrapWithInit(prefix, init, &java.Switch{
 		ID:     uuid.New(),
-		Prefix: prefix,
-		Markers: tree.Markers{
+		Prefix: innerPrefix,
+		Markers: java.Markers{
 			ID:      uuid.New(),
-			Entries: []tree.Marker{tree.TypeSwitchGuard{Ident: uuid.New()}},
+			Entries: []java.Marker{golang.TypeSwitchGuard{Ident: uuid.New()}},
 		},
-		Init: init,
 		Tag:  tag,
 		Body: body,
-	}
+	})
 }
 
 // mapEmptyStmt maps an empty statement (bare semicolons).
-func (ctx *parseContext) mapEmptyStmt(stmt *ast.EmptyStmt) *tree.Empty {
+func (ctx *parseContext) mapEmptyStmt(stmt *ast.EmptyStmt) *java.Empty {
 	prefix := ctx.prefix(stmt.Pos())
 	if !stmt.Implicit {
 		ctx.skip(1) // explicit ";"
 	}
-	return &tree.Empty{ID: uuid.New(), Prefix: prefix}
+	return &java.Empty{ID: uuid.New(), Prefix: prefix}
 }
 
 // mapForStmt maps a for statement (classic 3-clause, condition-only, or infinite).
-func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *tree.ForLoop {
+func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *java.ForLoop {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("for"))
 
-	control := tree.ForControl{ID: uuid.New()}
+	control := java.ForControl{ID: uuid.New()}
 
 	// Determine if this is a 3-clause for (has semicolons) or a simple for cond / for {}
 	// Go's AST normalizes `for ; cond; {}` to Init=nil, Post=nil, same as `for cond {}`.
@@ -1405,63 +1561,67 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *tree.ForLoop {
 		// 3-clause for: for [init]; [cond]; [post] {}
 		if stmt.Init != nil {
 			init := ctx.mapStmt(stmt.Init)
+			// The whitespace after "for" is read onto the init clause; hoist it
+			// onto the control so it stays attached to the outermost element.
+			control.Prefix, init = hoistLeftPrefix(init)
 			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
-			var after tree.Space
+			var after java.Space
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
 				ctx.skip(1) // skip ";"
 			}
-			initRP := tree.RightPadded[tree.Statement]{Element: init, After: after}
+			initRP := java.RightPadded[java.Statement]{Element: init, After: after}
 			control.Init = &initRP
 		} else {
 			// No init but semicolons present: `for ; cond; post {}`
 			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
-			var after tree.Space
+			var after java.Space
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
 				ctx.skip(1) // skip ";"
 			}
-			initRP := tree.RightPadded[tree.Statement]{Element: &tree.Empty{ID: uuid.New()}, After: after}
+			initRP := java.RightPadded[java.Statement]{Element: &java.Empty{ID: uuid.New()}, After: after}
 			control.Init = &initRP
 		}
 
 		if stmt.Cond != nil {
 			cond := ctx.mapExpr(stmt.Cond)
 			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
-			after := tree.EmptySpace
+			after := java.EmptySpace
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
 				ctx.skip(1) // skip ";"
 			}
-			condRP := tree.RightPadded[tree.Expression]{Element: cond, After: after}
+			condRP := java.RightPadded[java.Expression]{Element: cond, After: after}
 			control.Condition = &condRP
 		} else {
 			semicolonOffset := ctx.findNextPositionOf(';', bodyStart)
-			after := tree.EmptySpace
+			after := java.EmptySpace
 			if semicolonOffset >= 0 {
 				after = ctx.prefix(ctx.file.Pos(semicolonOffset))
 				ctx.skip(1) // skip ";"
 			}
-			emptyRP := tree.RightPadded[tree.Expression]{Element: &tree.Empty{ID: uuid.New()}, After: after}
+			emptyRP := java.RightPadded[java.Expression]{Element: &java.Empty{ID: uuid.New()}, After: after}
 			control.Condition = &emptyRP
 		}
 
 		if stmt.Post != nil {
 			post := ctx.mapStmt(stmt.Post)
-			postRP := tree.RightPadded[tree.Statement]{Element: post}
+			postRP := java.RightPadded[java.Statement]{Element: post}
 			control.Update = &postRP
 		}
 	} else if stmt.Cond != nil {
 		// Condition-only: for cond {}
 		cond := ctx.mapExpr(stmt.Cond)
-		condRP := tree.RightPadded[tree.Expression]{Element: cond}
+		control.Prefix, cond = hoistLeftPrefix(cond)
+		condRP := java.RightPadded[java.Expression]{Element: cond}
 		control.Condition = &condRP
 	}
 	// else: infinite loop, all nil
 
 	body := ctx.mapBlockStmt(stmt.Body)
 
-	return &tree.ForLoop{
+	return &java.ForLoop{
 		ID:      uuid.New(),
 		Prefix:  prefix,
 		Control: control,
@@ -1470,63 +1630,71 @@ func (ctx *parseContext) mapForStmt(stmt *ast.ForStmt) *tree.ForLoop {
 }
 
 // mapRangeStmt maps a for-range statement.
-func (ctx *parseContext) mapRangeStmt(stmt *ast.RangeStmt) *tree.ForEachLoop {
+func (ctx *parseContext) mapRangeStmt(stmt *ast.RangeStmt) *java.ForEachLoop {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("for"))
 
-	control := tree.ForEachControl{ID: uuid.New()}
+	control := java.ForEachControl{ID: uuid.New()}
 
 	if stmt.Key != nil {
-		// Has key variable
-		key := ctx.mapExpr(stmt.Key)
+		// `for [k [, v]] :=|= range expr {}` — the target list and the `:=`/`=`
+		// operator are carried by a golang.MultiAssignment (mirroring how Go's
+		// general multi-assignment is modeled), so this ForEachControl stays a
+		// faithful mirror of Java's J.ForEachLoop.Control.
+		var targets []java.RightPadded[java.Expression]
+		key := ctx.mapExpr(stmt.Key) // prefix = space after "for"
 
 		if stmt.Value != nil {
-			// for k, v := range expr {}
-			// Key.After captures comma space
+			// for k, v ...: key.After captures the space before the comma
 			commaOffset := ctx.findNext(',')
-			var keyAfter tree.Space
+			var keyAfter java.Space
 			if commaOffset >= 0 {
 				keyAfter = ctx.prefix(ctx.file.Pos(commaOffset))
 				ctx.skip(1) // ","
 			}
-			keyRP := tree.RightPadded[tree.Expression]{Element: key, After: keyAfter}
-			control.Key = &keyRP
-
-			value := ctx.mapExpr(stmt.Value)
-			// Value.After captures space before operator
-			opPrefix := ctx.prefix(stmt.TokPos)
-			valueRP := tree.RightPadded[tree.Expression]{Element: value, After: opPrefix}
-			control.Value = &valueRP
+			targets = append(targets, java.RightPadded[java.Expression]{Element: key, After: keyAfter})
+			value := ctx.mapExpr(stmt.Value) // prefix = space after comma
+			targets = append(targets, java.RightPadded[java.Expression]{Element: value})
 		} else {
-			// for k := range expr {} — no value
-			opPrefix := ctx.prefix(stmt.TokPos)
-			keyRP := tree.RightPadded[tree.Expression]{Element: key, After: opPrefix}
-			control.Key = &keyRP
+			targets = append(targets, java.RightPadded[java.Expression]{Element: key})
 		}
 
-		// Parse operator (:= or =)
-		var op tree.AssignOp
-		if stmt.Tok == token.DEFINE {
-			op = tree.AssignOpDefine
-		} else {
-			op = tree.AssignOpEquals
-		}
+		// Operator: space before `:=`/`=`; the := vs = distinction is the
+		// ShortVarDecl marker, exactly as for general Go assignments.
+		opPrefix := ctx.prefix(stmt.TokPos)
 		ctx.skip(len(stmt.Tok.String()))
+		var markers java.Markers
+		if stmt.Tok == token.DEFINE {
+			markers = java.Markers{
+				ID:      uuid.New(),
+				Entries: []java.Marker{golang.ShortVarDecl{Ident: uuid.New()}},
+			}
+		}
 
-		// Space between operator and "range"
+		assign := &golang.MultiAssignment{
+			ID:        uuid.New(),
+			Markers:   markers,
+			Variables: targets,
+			Operator:  java.LeftPadded[java.Space]{Before: opPrefix},
+		}
+
+		// Space between operator and "range" lives on Variable.After.
 		rangePrefix := ctx.prefix(stmt.Range)
-		control.Operator = tree.LeftPadded[tree.AssignOp]{Before: rangePrefix, Element: op}
+		control.Variable = java.RightPadded[java.Statement]{Element: assign, After: rangePrefix}
 	} else {
-		// for range expr {} — no variable
-		control.Prefix = ctx.prefix(stmt.Range)
+		// `for range expr {}` — no loop target; J.Empty fills the Variable slot.
+		// Variable.After holds the space between "for" and "range".
+		rangePrefix := ctx.prefix(stmt.Range)
+		empty := &java.Empty{ID: uuid.New()}
+		control.Variable = java.RightPadded[java.Statement]{Element: empty, After: rangePrefix}
 	}
 	ctx.skip(len("range"))
 
-	iterable := ctx.mapExpr(stmt.X)
-	control.Iterable = iterable
+	iterable := ctx.mapExpr(stmt.X) // prefix = space after "range"
+	control.Iterable = java.RightPadded[java.Expression]{Element: iterable}
 
 	body := ctx.mapBlockStmt(stmt.Body)
 
-	return &tree.ForEachLoop{
+	return &java.ForEachLoop{
 		ID:      uuid.New(),
 		Prefix:  prefix,
 		Control: control,
@@ -1535,100 +1703,105 @@ func (ctx *parseContext) mapRangeStmt(stmt *ast.RangeStmt) *tree.ForEachLoop {
 }
 
 // mapIncDecStmt maps an increment/decrement statement (x++ or x--).
-func (ctx *parseContext) mapIncDecStmt(stmt *ast.IncDecStmt) *tree.Unary {
+func (ctx *parseContext) mapIncDecStmt(stmt *ast.IncDecStmt) *java.Unary {
 	operand := ctx.mapExpr(stmt.X)
+	// Postfix operator: the operand is printed first and reads the leading
+	// whitespace; hoist it onto the Unary so it stays attached to the outermost
+	// element. The operator prefix captures the space between operand and ++/--.
+	prefix, operand := hoistLeftPrefix(operand)
 	opPrefix := ctx.prefix(stmt.TokPos)
 	ctx.skip(len(stmt.Tok.String()))
 
-	var op tree.UnaryOperator
+	var op java.UnaryOperator
 	if stmt.Tok == token.INC {
-		op = tree.PostIncrement
+		op = java.PostIncrement
 	} else {
-		op = tree.PostDecrement
+		op = java.PostDecrement
 	}
 
-	// For postfix operators, the operand carries its own prefix (space before expression).
-	// The Unary's prefix is empty; operator prefix captures space between operand and ++/--.
-	return &tree.Unary{
+	return &java.Unary{
 		ID:       uuid.New(),
-		Operator: tree.LeftPadded[tree.UnaryOperator]{Before: opPrefix, Element: op},
+		Prefix:   prefix,
+		Operator: java.LeftPadded[java.UnaryOperator]{Before: opPrefix, Element: op},
 		Operand:  operand,
 	}
 }
 
 // mapGoStmt maps a `go expr` statement.
-func (ctx *parseContext) mapGoStmt(stmt *ast.GoStmt) *tree.GoStmt {
+func (ctx *parseContext) mapGoStmt(stmt *ast.GoStmt) *golang.GoStmt {
 	prefix := ctx.prefixAndSkip(stmt.Go, len("go"))
 	expr := ctx.mapExpr(stmt.Call)
-	return &tree.GoStmt{ID: uuid.New(), Prefix: prefix, Expr: expr}
+	return &golang.GoStmt{ID: uuid.New(), Prefix: prefix, Expr: expr}
 }
 
 // mapDeferStmt maps a `defer expr` statement.
-func (ctx *parseContext) mapDeferStmt(stmt *ast.DeferStmt) *tree.Defer {
+func (ctx *parseContext) mapDeferStmt(stmt *ast.DeferStmt) *golang.Defer {
 	prefix := ctx.prefixAndSkip(stmt.Defer, len("defer"))
 	expr := ctx.mapExpr(stmt.Call)
-	return &tree.Defer{ID: uuid.New(), Prefix: prefix, Expr: expr}
+	return &golang.Defer{ID: uuid.New(), Prefix: prefix, Expr: expr}
 }
 
 // mapSendStmt maps a channel send statement `ch <- value`.
-func (ctx *parseContext) mapSendStmt(stmt *ast.SendStmt) *tree.Send {
+func (ctx *parseContext) mapSendStmt(stmt *ast.SendStmt) *golang.Send {
 	ch := ctx.mapExpr(stmt.Chan)
+	prefix, ch := hoistLeftPrefix(ch)
 	arrowPrefix := ctx.prefix(stmt.Arrow)
 	ctx.skip(2) // "<-"
 	value := ctx.mapExpr(stmt.Value)
-	return &tree.Send{
+	return &golang.Send{
 		ID:      uuid.New(),
+		Prefix:  prefix,
 		Channel: ch,
-		Arrow:   tree.LeftPadded[tree.Expression]{Before: arrowPrefix, Element: value},
+		Arrow:   java.LeftPadded[java.Expression]{Before: arrowPrefix, Element: value},
 	}
 }
 
 // mapBranchStmt maps break, continue, goto, fallthrough.
-func (ctx *parseContext) mapBranchStmt(stmt *ast.BranchStmt) tree.Statement {
+func (ctx *parseContext) mapBranchStmt(stmt *ast.BranchStmt) java.Statement {
 	switch stmt.Tok {
 	case token.BREAK:
 		prefix := ctx.prefixAndSkip(stmt.TokPos, len("break"))
-		var label *tree.Identifier
+		var label *java.Identifier
 		if stmt.Label != nil {
 			label = ctx.mapIdent(stmt.Label)
 		}
-		return &tree.Break{ID: uuid.New(), Prefix: prefix, Label: label}
+		return &java.Break{ID: uuid.New(), Prefix: prefix, Label: label}
 	case token.CONTINUE:
 		prefix := ctx.prefixAndSkip(stmt.TokPos, len("continue"))
-		var label *tree.Identifier
+		var label *java.Identifier
 		if stmt.Label != nil {
 			label = ctx.mapIdent(stmt.Label)
 		}
-		return &tree.Continue{ID: uuid.New(), Prefix: prefix, Label: label}
+		return &java.Continue{ID: uuid.New(), Prefix: prefix, Label: label}
 	case token.GOTO:
 		prefix := ctx.prefixAndSkip(stmt.TokPos, len("goto"))
 		label := ctx.mapIdent(stmt.Label)
-		return &tree.Goto{ID: uuid.New(), Prefix: prefix, Label: label}
+		return &golang.Goto{ID: uuid.New(), Prefix: prefix, Label: label}
 	case token.FALLTHROUGH:
 		prefix := ctx.prefixAndSkip(stmt.TokPos, len("fallthrough"))
-		return &tree.Fallthrough{ID: uuid.New(), Prefix: prefix}
+		return &golang.Fallthrough{ID: uuid.New(), Prefix: prefix}
 	default:
 		return nil
 	}
 }
 
 // mapLabeledStmt maps a labeled statement `label: stmt`.
-func (ctx *parseContext) mapLabeledStmt(stmt *ast.LabeledStmt) *tree.Label {
+func (ctx *parseContext) mapLabeledStmt(stmt *ast.LabeledStmt) *java.Label {
 	prefix := ctx.prefix(stmt.Label.Pos())
 	name := ctx.mapIdent(stmt.Label)
 	colonPrefix := ctx.prefix(stmt.Colon)
 	ctx.skip(1) // ":"
 	body := ctx.mapStmt(stmt.Stmt)
-	return &tree.Label{
+	return &java.Label{
 		ID:        uuid.New(),
 		Prefix:    prefix,
-		Name:      tree.RightPadded[*tree.Identifier]{Element: name, After: colonPrefix},
+		Name:      java.RightPadded[*java.Identifier]{Element: name, After: colonPrefix},
 		Statement: body,
 	}
 }
 
 // mapExpr maps an expression.
-func (ctx *parseContext) mapExpr(expr ast.Expr) tree.Expression {
+func (ctx *parseContext) mapExpr(expr ast.Expr) java.Expression {
 	switch e := expr.(type) {
 	case *ast.Ident:
 		return ctx.mapIdent(e)
@@ -1680,10 +1853,10 @@ func (ctx *parseContext) mapExpr(expr ast.Expr) tree.Expression {
 }
 
 // mapIdent maps an identifier.
-func (ctx *parseContext) mapIdent(ident *ast.Ident) *tree.Identifier {
+func (ctx *parseContext) mapIdent(ident *ast.Ident) *java.Identifier {
 	prefix := ctx.prefix(ident.Pos())
 	ctx.skip(len(ident.Name))
-	id := &tree.Identifier{ID: uuid.New(), Prefix: prefix, Name: ident.Name}
+	id := &java.Identifier{ID: uuid.New(), Prefix: prefix, Name: ident.Name}
 
 	// Type attribution: look up in Defs first, then Uses
 	if obj, ok := ctx.typeInfo.Defs[ident]; ok && obj != nil {
@@ -1698,25 +1871,11 @@ func (ctx *parseContext) mapIdent(ident *ast.Ident) *tree.Identifier {
 }
 
 // mapBasicLit maps a basic literal (string, int, float, etc.)
-func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *tree.Literal {
+func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 	prefix := ctx.prefix(lit.Pos())
 	ctx.skip(len(lit.Value))
 
-	var kind tree.LiteralKind
-	switch lit.Kind {
-	case token.INT:
-		kind = tree.IntLiteral
-	case token.FLOAT:
-		kind = tree.FloatLiteral
-	case token.STRING:
-		kind = tree.StringLiteral
-	case token.CHAR:
-		kind = tree.CharLiteral
-	default:
-		kind = tree.StringLiteral
-	}
-
-	l := &tree.Literal{ID: uuid.New(), Prefix: prefix, Kind: kind, Value: lit.Value, Source: lit.Value}
+	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: lit.Value, Source: lit.Value}
 
 	// Type attribution for literal
 	if tv, ok := ctx.typeInfo.Types[lit]; ok {
@@ -1726,18 +1885,56 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *tree.Literal {
 	return l
 }
 
+// hoistLeftPrefix detaches the leading whitespace from a node's first child
+// so it can be attached to the enclosing (outermost) element instead, per the
+// OpenRewrite convention that whitespace belongs to the outermost element.
+// It returns the removed prefix and the child with an empty prefix.
+func hoistLeftPrefix[T java.J](node T) (java.Space, T) {
+	prefix := node.GetPrefix()
+	if prefix.Whitespace == "" && len(prefix.Comments) == 0 {
+		return java.EmptySpace, node
+	}
+	m := reflect.ValueOf(node).MethodByName("WithPrefix")
+	if !m.IsValid() {
+		return java.EmptySpace, node
+	}
+	results := m.Call([]reflect.Value{reflect.ValueOf(java.EmptySpace)})
+	if len(results) == 0 {
+		return prefix, node
+	}
+	if r, ok := results[0].Interface().(T); ok {
+		return prefix, r
+	}
+	return prefix, node
+}
+
 // mapBinaryExpr maps a binary expression.
-func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) *tree.Binary {
+func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) java.Expression {
 	left := ctx.mapExpr(expr.X)
+	// The whitespace before the whole expression is read onto the left operand;
+	// hoist it onto the Binary so it stays attached to the outermost element.
+	prefix, left := hoistLeftPrefix(left)
 	opPrefix := ctx.prefix(expr.OpPos)
 	op := mapBinaryOp(expr.Op)
 	ctx.skip(len(expr.Op.String()))
 	right := ctx.mapExpr(expr.Y)
 
-	b := &tree.Binary{
+	// Go's `&^` (bit clear) has no J.Binary.Type equivalent → golang.Binary.
+	if expr.Op == token.AND_NOT {
+		return &golang.Binary{
+			ID:       uuid.New(),
+			Prefix:   prefix,
+			Left:     left,
+			Operator: java.LeftPadded[golang.BinaryOperator]{Before: opPrefix, Element: golang.BinAndNot},
+			Right:    right,
+		}
+	}
+
+	b := &java.Binary{
 		ID:       uuid.New(),
+		Prefix:   prefix,
 		Left:     left,
-		Operator: tree.LeftPadded[tree.BinaryOperator]{Before: opPrefix, Element: op},
+		Operator: java.LeftPadded[java.BinaryOperator]{Before: opPrefix, Element: op},
 		Right:    right,
 	}
 
@@ -1750,44 +1947,76 @@ func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) *tree.Binary {
 }
 
 // mapCallExpr maps a function/method call.
-func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) tree.Expression {
-	fun := ctx.mapExpr(expr.Fun)
+func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
+	// `Map[int](42)` / `Pair[K, V](...)`: the callee is a generic function (or
+	// type) instantiated with explicit type arguments. Go reuses *ast.IndexExpr
+	// for both this and ordinary indexing (`funcs[0]()`), so disambiguate via the
+	// type checker's Instances set before treating `[...]` as type arguments.
+	// The callee X is mapped first, then the bracketed type args, matching the
+	// positional cursor's left-to-right order.
+	calleeAst := expr.Fun
+	var typeParams *java.Container[java.Expression]
+	var fun java.Expression
+	switch f := expr.Fun.(type) {
+	case *ast.IndexExpr:
+		if ctx.isGenericInstantiation(f.X) {
+			calleeAst = f.X
+			fun = ctx.mapExpr(f.X)
+			typeParams = ctx.mapTypeArgsSingle(f)
+		} else {
+			fun = ctx.mapExpr(expr.Fun)
+		}
+	case *ast.IndexListExpr:
+		// Multiple bracketed args are only ever a generic instantiation; `a[i, j]`
+		// is not valid Go indexing.
+		calleeAst = f.X
+		fun = ctx.mapExpr(f.X)
+		typeParams = ctx.mapTypeArgsMulti(f)
+	default:
+		fun = ctx.mapExpr(expr.Fun)
+	}
 
-	var sel *tree.RightPadded[tree.Expression]
-	var name *tree.Identifier
+	// The whitespace before the call is read onto the callee; hoist it off so it
+	// can live on the invocation (the outermost element). Done before decomposing
+	// the callee into Select/Name so a FieldAccess callee's own prefix isn't lost.
+	miPrefix, fun := hoistLeftPrefix(fun)
+
+	var sel *java.RightPadded[java.Expression]
+	var name *java.Identifier
 
 	switch f := fun.(type) {
-	case *tree.FieldAccess:
-		selRP := tree.RightPadded[tree.Expression]{Element: f.Target, After: f.Name.Before}
+	case *java.FieldAccess:
+		selRP := java.RightPadded[java.Expression]{Element: f.Target, After: f.Name.Before}
 		sel = &selRP
 		name = f.Name.Element
-	case *tree.Identifier:
+	case *java.Identifier:
 		name = f
 	default:
 		// Callee is a complex expression (func literal, parenthesized, etc.)
 		// Store it as Select with empty Name
-		selRP := tree.RightPadded[tree.Expression]{Element: fun}
+		selRP := java.RightPadded[java.Expression]{Element: fun}
 		sel = &selRP
-		name = &tree.Identifier{ID: uuid.New()}
+		name = &java.Identifier{ID: uuid.New()}
 	}
 
 	argsBefore := ctx.prefix(expr.Lparen)
 	ctx.skip(1) // "("
 
-	var argElements []tree.RightPadded[tree.Expression]
+	var argElements []java.RightPadded[java.Expression]
 	for i, arg := range expr.Args {
 		mapped := ctx.mapExpr(arg)
 		// Handle variadic spread: last arg with `...`
 		if expr.Ellipsis.IsValid() && i == len(expr.Args)-1 {
 			ellipsisPrefix := ctx.prefix(expr.Ellipsis)
 			ctx.skip(3) // "..."
-			mapped = &tree.Unary{
-				ID:       uuid.New(),
-				Operator: tree.LeftPadded[tree.UnaryOperator]{Before: ellipsisPrefix, Element: tree.SpreadPostfix},
-				Operand:  mapped,
+			mapped = &golang.Variadic{
+				ID:      uuid.New(),
+				Element: mapped,
+				Dots:    ellipsisPrefix,
+				Postfix: true,
 			}
 		}
-		after := tree.EmptySpace
+		after := java.EmptySpace
 		if i < len(expr.Args)-1 {
 			commaOffset := ctx.findNext(',')
 			if commaOffset >= 0 {
@@ -1795,11 +2024,11 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) tree.Expression {
 				ctx.skip(1) // ","
 			}
 		}
-		argElements = append(argElements, tree.RightPadded[tree.Expression]{Element: mapped, After: after})
+		argElements = append(argElements, java.RightPadded[java.Expression]{Element: mapped, After: after})
 	}
 
 	// Check for trailing comma before closing paren
-	var markers tree.Markers
+	var markers java.Markers
 	if len(argElements) > 0 {
 		// Look for a comma between current position and closing paren
 		trailingCommaOff := ctx.findNextBefore(',', int(expr.Rparen)-ctx.file.Base())
@@ -1808,9 +2037,9 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) tree.Expression {
 			ctx.skip(1) // ","
 			commaAfter := ctx.prefix(expr.Rparen)
 			ctx.skip(1) // ")"
-			markers = tree.Markers{
+			markers = java.Markers{
 				ID: uuid.New(),
-				Entries: []tree.Marker{tree.TrailingComma{
+				Entries: []java.Marker{golang.TrailingComma{
 					Ident:  uuid.New(),
 					Before: commaBefore,
 					After:  commaAfter,
@@ -1825,24 +2054,26 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) tree.Expression {
 		closePrefix := ctx.prefix(expr.Rparen)
 		ctx.skip(1) // ")"
 		if len(closePrefix.Comments) > 0 {
-			argElements = append(argElements, tree.RightPadded[tree.Expression]{
-				Element: &tree.Empty{ID: uuid.New()},
+			argElements = append(argElements, java.RightPadded[java.Expression]{
+				Element: &java.Empty{ID: uuid.New()},
 				After:   closePrefix,
 			})
 		}
 	}
 
-	mi := &tree.MethodInvocation{
-		ID:        uuid.New(),
-		Prefix:    tree.EmptySpace,
-		Markers:   markers,
-		Select:    sel,
-		Name:      name,
-		Arguments: tree.Container[tree.Expression]{Before: argsBefore, Elements: argElements},
+	mi := &java.MethodInvocation{
+		ID:             uuid.New(),
+		Prefix:         miPrefix,
+		Markers:        markers,
+		Select:         sel,
+		TypeParameters: typeParams,
+		Name:           name,
+		Arguments:      java.Container[java.Expression]{Before: argsBefore, Elements: argElements},
 	}
 
-	// Type attribution for method invocation
-	if selExpr, ok := expr.Fun.(*ast.SelectorExpr); ok {
+	// Type attribution for method invocation. For a generic call `Map[int](...)`
+	// calleeAst is the underlying callee (`Map`), not the IndexExpr.
+	if selExpr, ok := calleeAst.(*ast.SelectorExpr); ok {
 		if selection, ok := ctx.typeInfo.Selections[selExpr]; ok {
 			mi.MethodType = ctx.mapper.mapSelectionToMethod(selection)
 		} else if obj, ok := ctx.typeInfo.Uses[selExpr.Sel]; ok {
@@ -1851,7 +2082,7 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) tree.Expression {
 				mi.MethodType = ctx.mapper.mapMethodObject(fn)
 			}
 		}
-	} else if ident, ok := expr.Fun.(*ast.Ident); ok {
+	} else if ident, ok := calleeAst.(*ast.Ident); ok {
 		if obj, ok := ctx.typeInfo.Uses[ident]; ok {
 			if fn, ok := obj.(*types.Func); ok {
 				mi.MethodType = ctx.mapper.mapMethodObject(fn)
@@ -1862,12 +2093,41 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) tree.Expression {
 	return mi
 }
 
+// isGenericInstantiation reports whether x — the operand of an *ast.IndexExpr
+// used as a call target — denotes a generic function or type being instantiated
+// with explicit type arguments (e.g. `Map` in `Map[int](42)`), as opposed to a
+// value being indexed (e.g. `funcs` in `funcs[0]()`). It relies on the type
+// checker's Instances set, which records exactly those generic-instantiation
+// identifiers.
+func (ctx *parseContext) isGenericInstantiation(x ast.Expr) bool {
+	id := instanceIdent(x)
+	if id == nil {
+		return false
+	}
+	_, ok := ctx.typeInfo.Instances[id]
+	return ok
+}
+
+// instanceIdent returns the identifier that types.Info.Instances would key on
+// for a generic-instantiation operand: the identifier itself for a bare name
+// (`Map`), or the selector's field for a qualified name (`pkg.Map`).
+func instanceIdent(x ast.Expr) *ast.Ident {
+	switch e := x.(type) {
+	case *ast.Ident:
+		return e
+	case *ast.SelectorExpr:
+		return e.Sel
+	default:
+		return nil
+	}
+}
+
 // mapSelectorExpr maps a selector expression (e.g., pkg.Name).
-func (ctx *parseContext) mapSelectorExpr(expr *ast.SelectorExpr) *tree.FieldAccess {
+func (ctx *parseContext) mapSelectorExpr(expr *ast.SelectorExpr) *java.FieldAccess {
 	target := ctx.mapExpr(expr.X)
 
 	dotOffset := ctx.findNext('.')
-	var dotPrefix tree.Space
+	var dotPrefix java.Space
 	if dotOffset >= 0 {
 		dotPrefix = ctx.prefix(ctx.file.Pos(dotOffset))
 		ctx.skip(1) // "."
@@ -1875,10 +2135,12 @@ func (ctx *parseContext) mapSelectorExpr(expr *ast.SelectorExpr) *tree.FieldAcce
 
 	sel := ctx.mapIdent(expr.Sel)
 
-	fa := &tree.FieldAccess{
+	prefix, target := hoistLeftPrefix(target)
+	fa := &java.FieldAccess{
 		ID:     uuid.New(),
+		Prefix: prefix,
 		Target: target,
-		Name:   tree.LeftPadded[*tree.Identifier]{Before: dotPrefix, Element: sel},
+		Name:   java.LeftPadded[*java.Identifier]{Before: dotPrefix, Element: sel},
 	}
 
 	// Type attribution for selector (field access or method access)
@@ -1893,52 +2155,77 @@ func (ctx *parseContext) mapSelectorExpr(expr *ast.SelectorExpr) *tree.FieldAcce
 }
 
 // mapUnaryExpr maps a unary expression.
-func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) tree.Expression {
+func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) java.Expression {
 	prefix := ctx.prefix(expr.OpPos)
 	ctx.skip(len(expr.Op.String()))
 	operand := ctx.mapExpr(expr.X)
 
-	var op tree.UnaryOperator
+	// Go-specific operators (&, *, <-) have no J.Unary.Type equivalent, so they
+	// map to golang.Unary; the rest stay as java.Unary so recipes can treat them
+	// uniformly with other languages.
 	switch expr.Op {
-	case token.SUB:
-		op = tree.Negate
-	case token.NOT:
-		op = tree.Not
-	case token.XOR:
-		op = tree.BitwiseNot
 	case token.MUL:
-		op = tree.Deref
+		return &golang.Unary{
+			ID:         uuid.New(),
+			Prefix:     prefix,
+			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Indirection},
+			Expression: operand,
+		}
 	case token.AND:
-		op = tree.AddressOf
+		return &golang.Unary{
+			ID:         uuid.New(),
+			Prefix:     prefix,
+			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.AddressOf},
+			Expression: operand,
+		}
 	case token.ARROW:
-		op = tree.Receive
-	case token.ADD:
-		op = tree.Positive
-	case token.TILDE:
-		op = tree.Tilde
+		return &golang.Unary{
+			ID:         uuid.New(),
+			Prefix:     prefix,
+			Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Receive},
+			Expression: operand,
+		}
 	}
 
-	return &tree.Unary{
+	var op java.UnaryOperator
+	switch expr.Op {
+	case token.SUB:
+		op = java.Negate
+	case token.NOT:
+		op = java.Not
+	case token.XOR:
+		op = java.BitwiseNot
+	case token.ADD:
+		op = java.Positive
+	case token.TILDE:
+		op = java.Tilde
+	}
+
+	return &java.Unary{
 		ID:       uuid.New(),
 		Prefix:   prefix,
-		Operator: tree.LeftPadded[tree.UnaryOperator]{Element: op},
+		Operator: java.LeftPadded[java.UnaryOperator]{Element: op},
 		Operand:  operand,
 	}
 }
 
 // mapCompositeLit maps a composite literal (e.g., Type{elem1, elem2}).
-func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) tree.Expression {
-	var typeExpr tree.Expression
+func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) java.Expression {
+	var typeExpr java.Expression
+	var prefix java.Space
 	if expr.Type != nil {
 		typeExpr = ctx.mapTypeExpr(expr.Type)
+		// Hoist the leading whitespace off the type onto the composite so it
+		// stays attached to the outermost element.
+		prefix, typeExpr = hoistLeftPrefix(typeExpr)
 	}
 	lbracePrefix := ctx.prefix(expr.Lbrace)
 	ctx.skip(1) // "{"
 
-	var elements []tree.RightPadded[tree.Expression]
+	var elements []java.RightPadded[java.Expression]
 	for i, elt := range expr.Elts {
 		mapped := ctx.mapExpr(elt)
-		var after tree.Space
+		var after java.Space
 		if i < len(expr.Elts)-1 {
 			commaOffset := ctx.findNext(',')
 			if commaOffset >= 0 {
@@ -1946,11 +2233,11 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) tree.Expression
 				ctx.skip(1) // ","
 			}
 		}
-		elements = append(elements, tree.RightPadded[tree.Expression]{Element: mapped, After: after})
+		elements = append(elements, java.RightPadded[java.Expression]{Element: mapped, After: after})
 	}
 
 	// Check for trailing comma before closing brace
-	var compMarkers tree.Markers
+	var compMarkers java.Markers
 	if len(elements) > 0 {
 		trailingCommaOff := ctx.findNextBefore(',', int(expr.Rbrace)-ctx.file.Base())
 		if trailingCommaOff >= 0 {
@@ -1958,9 +2245,9 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) tree.Expression
 			ctx.skip(1) // ","
 			commaAfter := ctx.prefix(expr.Rbrace)
 			ctx.skip(1) // "}"
-			compMarkers = tree.Markers{
+			compMarkers = java.Markers{
 				ID: uuid.New(),
-				Entries: []tree.Marker{tree.TrailingComma{
+				Entries: []java.Marker{golang.TrailingComma{
 					Ident:  uuid.New(),
 					Before: commaBefore,
 					After:  commaAfter,
@@ -1975,67 +2262,69 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) tree.Expression
 		closePrefix := ctx.prefix(expr.Rbrace)
 		ctx.skip(1) // "}"
 		if len(closePrefix.Comments) > 0 {
-			elements = append(elements, tree.RightPadded[tree.Expression]{
-				Element: &tree.Empty{ID: uuid.New()},
+			elements = append(elements, java.RightPadded[java.Expression]{
+				Element: &java.Empty{ID: uuid.New()},
 				After:   closePrefix,
 			})
 		}
 	}
 
-	return &tree.Composite{
-		ID:        uuid.New(),
-		Markers:   compMarkers,
-		TypeExpr:  typeExpr,
-		Elements:  tree.Container[tree.Expression]{Before: lbracePrefix, Elements: elements},
+	return &golang.Composite{
+		ID:       uuid.New(),
+		Prefix:   prefix,
+		Markers:  compMarkers,
+		TypeExpr: typeExpr,
+		Elements: java.Container[java.Expression]{Before: lbracePrefix, Elements: elements},
 	}
 }
 
 // mapParenExpr maps a parenthesized expression.
-func (ctx *parseContext) mapParenExpr(expr *ast.ParenExpr) tree.Expression {
+func (ctx *parseContext) mapParenExpr(expr *ast.ParenExpr) java.Expression {
 	prefix := ctx.prefix(expr.Lparen)
 	ctx.skip(1) // "("
 	inner := ctx.mapExpr(expr.X)
 	closePrefix := ctx.prefix(expr.Rparen)
 	ctx.skip(1) // ")"
 
-	return &tree.Parentheses{
+	return &java.Parentheses{
 		ID:     uuid.New(),
 		Prefix: prefix,
-		Tree:   tree.RightPadded[tree.Expression]{Element: inner, After: closePrefix},
+		Tree:   java.RightPadded[java.Expression]{Element: inner, After: closePrefix},
 	}
 }
 
-// mapStarExpr maps a star expression (pointer type or dereference).
-func (ctx *parseContext) mapStarExpr(expr *ast.StarExpr) tree.Expression {
+// mapStarExpr maps a star expression in value context as a pointer dereference
+// (`*p`). Go's `*` has no J.Unary.Type equivalent, so it maps to golang.Unary.
+func (ctx *parseContext) mapStarExpr(expr *ast.StarExpr) java.Expression {
 	prefix := ctx.prefix(expr.Star)
 	ctx.skip(1) // "*"
 	operand := ctx.mapExpr(expr.X)
 
-	return &tree.Unary{
-		ID:       uuid.New(),
-		Prefix:   prefix,
-		Operator: tree.LeftPadded[tree.UnaryOperator]{Element: tree.Deref},
-		Operand:  operand,
+	return &golang.Unary{
+		ID:         uuid.New(),
+		Prefix:     prefix,
+		Operator:   java.LeftPadded[golang.UnaryOperator]{Element: golang.Indirection},
+		Expression: operand,
 	}
 }
 
 // mapPointerType maps a star expression in a type context as a pointer type.
-func (ctx *parseContext) mapPointerType(expr *ast.StarExpr) tree.Expression {
+func (ctx *parseContext) mapPointerType(expr *ast.StarExpr) java.Expression {
 	prefix := ctx.prefix(expr.Star)
 	ctx.skip(1) // "*"
 	elem := ctx.mapTypeExpr(expr.X)
 
-	return &tree.PointerType{
-		ID:      uuid.New(),
-		Prefix:  prefix,
-		Elem:    elem,
+	return &golang.PointerType{
+		ID:     uuid.New(),
+		Prefix: prefix,
+		Elem:   elem,
 	}
 }
 
 // mapTypeExpr maps an expression that is known to be in a type position.
 // It delegates to mapExpr but overrides StarExpr to produce PointerType
 // and IndexExpr to produce ParameterizedType (generic instantiation).
-func (ctx *parseContext) mapTypeExpr(expr ast.Expr) tree.Expression {
+func (ctx *parseContext) mapTypeExpr(expr ast.Expr) java.Expression {
 	switch e := expr.(type) {
 	case *ast.StarExpr:
 		return ctx.mapPointerType(e)
@@ -2043,23 +2332,77 @@ func (ctx *parseContext) mapTypeExpr(expr ast.Expr) tree.Expression {
 		return ctx.mapParameterizedType(e)
 	case *ast.IndexListExpr:
 		return ctx.mapParameterizedTypeMulti(e)
+	case *ast.BinaryExpr:
+		// A `|` in a type position is a type-set union constraint
+		// (e.g. `~int | ~int8`), not a bitwise-or value expression.
+		if e.Op == token.OR {
+			return ctx.mapUnionType(e)
+		}
+		return ctx.mapExpr(expr)
+	case *ast.UnaryExpr:
+		// `~T` is an approximation element; `~` only ever appears in a
+		// type-constraint position in Go.
+		if e.Op == token.TILDE {
+			return ctx.mapUnderlyingType(e)
+		}
+		return ctx.mapExpr(expr)
 	default:
 		return ctx.mapExpr(expr)
 	}
 }
 
+// mapUnionType maps a type-set union constraint such as `~int | ~int8 | ~int16`
+// to a golang.Union. Go parses `a | b | c` as a left-associative tree
+// `((a | b) | c)`; this flattens it into source-ordered terms, recording
+// the space before each `|` as the preceding term's After.
+func (ctx *parseContext) mapUnionType(expr *ast.BinaryExpr) *golang.Union {
+	var terms []java.RightPadded[java.Expression]
+	ctx.appendUnionTerms(expr, &terms)
+	var prefix java.Space
+	if len(terms) > 0 {
+		prefix, terms[0].Element = hoistLeftPrefix(terms[0].Element)
+	}
+	return &golang.Union{ID: uuid.New(), Prefix: prefix, Types: terms}
+}
+
+func (ctx *parseContext) appendUnionTerms(expr ast.Expr, terms *[]java.RightPadded[java.Expression]) {
+	if be, ok := expr.(*ast.BinaryExpr); ok && be.Op == token.OR {
+		ctx.appendUnionTerms(be.X, terms)
+		// Space before this `|` belongs to the preceding term's After.
+		opPrefix := ctx.prefix(be.OpPos)
+		ctx.skip(1) // "|"
+		(*terms)[len(*terms)-1].After = opPrefix
+		*terms = append(*terms, java.RightPadded[java.Expression]{Element: ctx.mapTypeExpr(be.Y)})
+		return
+	}
+	*terms = append(*terms, java.RightPadded[java.Expression]{Element: ctx.mapTypeExpr(expr)})
+}
+
+// mapUnderlyingType maps an approximation element `~T` to a
+// golang.UnderlyingType. The space before `~` is the node's Prefix; any
+// space between `~` and the type is carried by the element's own Prefix.
+func (ctx *parseContext) mapUnderlyingType(expr *ast.UnaryExpr) *golang.UnderlyingType {
+	prefix := ctx.prefix(expr.OpPos)
+	ctx.skip(1) // "~"
+	return &golang.UnderlyingType{
+		ID:      uuid.New(),
+		Prefix:  prefix,
+		Element: ctx.mapTypeExpr(expr.X),
+	}
+}
+
 // mapArrayType maps an array/slice type expression like `[]string` or `[5]int`.
-func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) tree.Expression {
+func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) java.Expression {
 	prefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
 
-	var length tree.Expression
+	var length java.Expression
 	if expr.Len != nil {
 		length = ctx.mapExpr(expr.Len)
 	}
 
 	// Find the `]`
-	var closePrefix tree.Space
+	var closePrefix java.Space
 	rbrackOff := ctx.findNext(']')
 	if rbrackOff >= 0 {
 		closePrefix = ctx.prefix(ctx.file.Pos(rbrackOff))
@@ -2068,46 +2411,78 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) tree.Expression {
 
 	elt := ctx.mapTypeExpr(expr.Elt)
 
-	return &tree.ArrayType{
+	// Fixed-size arrays `[N]T` carry an inline length expression that
+	// java.ArrayType (mirroring J.ArrayType) cannot hold; use golang.ArrayType.
+	// Slices `[]T` have no length and map to java.ArrayType.
+	if length != nil {
+		return &golang.ArrayType{
+			ID:          uuid.New(),
+			Prefix:      prefix,
+			Length:      java.RightPadded[java.Expression]{Element: length, After: closePrefix},
+			ElementType: elt,
+		}
+	}
+
+	return &java.ArrayType{
 		ID:          uuid.New(),
 		Prefix:      prefix,
-		Dimension:   tree.LeftPadded[tree.Space]{Element: closePrefix},
-		Length:      length,
+		Dimension:   java.LeftPadded[java.Space]{Element: closePrefix},
 		ElementType: elt,
 	}
 }
 
 // mapParameterizedType maps a single-type-arg generic instantiation in a type position,
 // e.g. `JSONArray[string]`, producing a J.ParameterizedType.
-func (ctx *parseContext) mapParameterizedType(expr *ast.IndexExpr) tree.Expression {
+func (ctx *parseContext) mapParameterizedType(expr *ast.IndexExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
+	prefix, target := hoistLeftPrefix(target)
+	return &java.ParameterizedType{
+		ID:             uuid.New(),
+		Prefix:         prefix,
+		Clazz:          target,
+		TypeParameters: ctx.mapTypeArgsSingle(expr),
+	}
+}
+
+// mapTypeArgsSingle consumes the `[T]` of a single-type-arg generic
+// instantiation and returns the type-argument container. The caller must have
+// already consumed everything up to (but not including) the `[`.
+func (ctx *parseContext) mapTypeArgsSingle(expr *ast.IndexExpr) *java.Container[java.Expression] {
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
 	typeArg := ctx.mapTypeExpr(expr.Index)
 	rbrackPrefix := ctx.prefix(expr.Rbrack)
 	ctx.skip(1) // "]"
-
-	return &tree.ParameterizedType{
-		ID:    uuid.New(),
-		Clazz: target,
-		TypeParameters: &tree.Container[tree.Expression]{
-			Before:   lbrackPrefix,
-			Elements: []tree.RightPadded[tree.Expression]{{Element: typeArg, After: rbrackPrefix}},
-		},
+	return &java.Container[java.Expression]{
+		Before:   lbrackPrefix,
+		Elements: []java.RightPadded[java.Expression]{{Element: typeArg, After: rbrackPrefix}},
 	}
 }
 
 // mapParameterizedTypeMulti maps a multi-type-arg generic instantiation in a type position,
 // e.g. `Store[string, any]`, producing a J.ParameterizedType.
-func (ctx *parseContext) mapParameterizedTypeMulti(expr *ast.IndexListExpr) tree.Expression {
+func (ctx *parseContext) mapParameterizedTypeMulti(expr *ast.IndexListExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
+	prefix, target := hoistLeftPrefix(target)
+	return &java.ParameterizedType{
+		ID:             uuid.New(),
+		Prefix:         prefix,
+		Clazz:          target,
+		TypeParameters: ctx.mapTypeArgsMulti(expr),
+	}
+}
+
+// mapTypeArgsMulti consumes the `[T, U, ...]` of a multi-type-arg generic
+// instantiation and returns the type-argument container. The caller must have
+// already consumed everything up to (but not including) the `[`.
+func (ctx *parseContext) mapTypeArgsMulti(expr *ast.IndexListExpr) *java.Container[java.Expression] {
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
 
-	var elements []tree.RightPadded[tree.Expression]
+	var elements []java.RightPadded[java.Expression]
 	for i, idx := range expr.Indices {
 		mapped := ctx.mapTypeExpr(idx)
-		var after tree.Space
+		var after java.Space
 		if i < len(expr.Indices)-1 {
 			commaOffset := ctx.findNext(',')
 			if commaOffset >= 0 {
@@ -2117,50 +2492,49 @@ func (ctx *parseContext) mapParameterizedTypeMulti(expr *ast.IndexListExpr) tree
 		} else {
 			after = ctx.prefix(expr.Rbrack)
 		}
-		elements = append(elements, tree.RightPadded[tree.Expression]{Element: mapped, After: after})
+		elements = append(elements, java.RightPadded[java.Expression]{Element: mapped, After: after})
 	}
 	ctx.skip(1) // "]"
 
-	return &tree.ParameterizedType{
-		ID:    uuid.New(),
-		Clazz: target,
-		TypeParameters: &tree.Container[tree.Expression]{
-			Before:   lbrackPrefix,
-			Elements: elements,
-		},
+	return &java.Container[java.Expression]{
+		Before:   lbrackPrefix,
+		Elements: elements,
 	}
 }
 
 // mapIndexExpr maps an index expression like `a[i]` or `m[key]`.
-func (ctx *parseContext) mapIndexExpr(expr *ast.IndexExpr) tree.Expression {
+func (ctx *parseContext) mapIndexExpr(expr *ast.IndexExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
+	prefix, target := hoistLeftPrefix(target)
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
 	index := ctx.mapExpr(expr.Index)
 	rbrackPrefix := ctx.prefix(expr.Rbrack)
 	ctx.skip(1) // "]"
 
-	return &tree.ArrayAccess{
+	return &java.ArrayAccess{
 		ID:      uuid.New(),
+		Prefix:  prefix,
 		Indexed: target,
-		Dimension: &tree.ArrayDimension{
+		Dimension: &java.ArrayDimension{
 			ID:     uuid.New(),
 			Prefix: lbrackPrefix,
-			Index:  tree.RightPadded[tree.Expression]{Element: index, After: rbrackPrefix},
+			Index:  java.RightPadded[java.Expression]{Element: index, After: rbrackPrefix},
 		},
 	}
 }
 
 // mapIndexListExpr maps a multi-index expression like `Map[int, string]` (generic instantiation).
-func (ctx *parseContext) mapIndexListExpr(expr *ast.IndexListExpr) tree.Expression {
+func (ctx *parseContext) mapIndexListExpr(expr *ast.IndexListExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
+	prefix, target := hoistLeftPrefix(target)
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
 
-	var elements []tree.RightPadded[tree.Expression]
+	var elements []java.RightPadded[java.Expression]
 	for i, idx := range expr.Indices {
 		mapped := ctx.mapExpr(idx)
-		var after tree.Space
+		var after java.Space
 		if i < len(expr.Indices)-1 {
 			commaOffset := ctx.findNext(',')
 			if commaOffset >= 0 {
@@ -2170,23 +2544,24 @@ func (ctx *parseContext) mapIndexListExpr(expr *ast.IndexListExpr) tree.Expressi
 		} else {
 			after = ctx.prefix(expr.Rbrack)
 		}
-		elements = append(elements, tree.RightPadded[tree.Expression]{Element: mapped, After: after})
+		elements = append(elements, java.RightPadded[java.Expression]{Element: mapped, After: after})
 	}
 	ctx.skip(1) // "]"
 
-	return &tree.IndexList{
+	return &golang.IndexList{
 		ID:      uuid.New(),
+		Prefix:  prefix,
 		Target:  target,
-		Indices: tree.Container[tree.Expression]{Before: lbrackPrefix, Elements: elements},
+		Indices: java.Container[java.Expression]{Before: lbrackPrefix, Elements: elements},
 	}
 }
 
 // mapTypeAssertExpr maps a type assertion `x.(T)`.
-func (ctx *parseContext) mapTypeAssertExpr(expr *ast.TypeAssertExpr) tree.Expression {
+func (ctx *parseContext) mapTypeAssertExpr(expr *ast.TypeAssertExpr) java.Expression {
 	x := ctx.mapExpr(expr.X)
 	// dot before (
 	dotOff := ctx.findNext('.')
-	var dotPrefix tree.Space
+	var dotPrefix java.Space
 	if dotOff >= 0 {
 		dotPrefix = ctx.prefix(ctx.file.Pos(dotOff))
 		ctx.skip(1) // "."
@@ -2194,45 +2569,45 @@ func (ctx *parseContext) mapTypeAssertExpr(expr *ast.TypeAssertExpr) tree.Expres
 	lparenPrefix := ctx.prefix(expr.Lparen)
 	ctx.skip(1) // "("
 
-	var typeExpr tree.Expression
+	var typeExpr java.Expression
 	if expr.Type != nil {
 		typeExpr = ctx.mapTypeExpr(expr.Type)
 	} else {
 		// type switch: x.(type)
 		typePrefix := ctx.prefix(expr.Lparen + 1)
 		ctx.skip(len("type"))
-		typeExpr = &tree.Identifier{ID: uuid.New(), Prefix: typePrefix, Name: "type"}
+		typeExpr = &java.Identifier{ID: uuid.New(), Prefix: typePrefix, Name: "type"}
 	}
 
 	rparenPrefix := ctx.prefix(expr.Rparen)
 	ctx.skip(1) // ")"
 
-	clazz := &tree.ControlParentheses{
+	clazz := &java.ControlParentheses{
 		ID:     uuid.New(),
 		Prefix: lparenPrefix,
-		Tree:   tree.RightPadded[tree.Expression]{Element: typeExpr, After: rparenPrefix},
+		Tree:   java.RightPadded[java.Expression]{Element: typeExpr, After: rparenPrefix},
 	}
 
 	_ = dotPrefix // dot is between Expr and Clazz; stored in Expr's suffix isn't ideal
 	// We'll use prefix of the type cast for the dot
-	return &tree.TypeCast{
-		ID:    uuid.New(),
+	return &java.TypeCast{
+		ID:     uuid.New(),
 		Prefix: dotPrefix,
-		Clazz: clazz,
-		Expr:  x,
+		Clazz:  clazz,
+		Expr:   x,
 	}
 }
 
 // mapFuncLit maps a function literal (closure).
-func (ctx *parseContext) mapFuncLit(expr *ast.FuncLit) tree.Expression {
+func (ctx *parseContext) mapFuncLit(expr *ast.FuncLit) java.Expression {
 	prefix := ctx.prefixAndSkip(expr.Type.Func, len("func"))
 	params := ctx.mapFieldListAsParams(expr.Type.Params)
 	returnType := ctx.mapReturnType(expr.Type.Results)
 	body := ctx.mapBlockStmt(expr.Body)
 
-	md := &tree.MethodDeclaration{
+	md := &java.MethodDeclaration{
 		ID:         uuid.New(),
-		Name:       &tree.Identifier{ID: uuid.New(), Name: ""},
+		Name:       &java.Identifier{ID: uuid.New(), Name: ""},
 		Parameters: params,
 		ReturnType: returnType,
 		Body:       body,
@@ -2240,7 +2615,7 @@ func (ctx *parseContext) mapFuncLit(expr *ast.FuncLit) tree.Expression {
 	// Wrap in StatementExpression so the MethodDeclaration (a Statement) can
 	// appear in expression contexts like return statements, assignments, and
 	// call arguments.
-	return &tree.StatementExpression{
+	return &golang.StatementExpression{
 		ID:        uuid.New(),
 		Prefix:    prefix,
 		Statement: md,
@@ -2248,47 +2623,48 @@ func (ctx *parseContext) mapFuncLit(expr *ast.FuncLit) tree.Expression {
 }
 
 // mapKeyValueExpr maps a key:value expression in composite literals.
-func (ctx *parseContext) mapKeyValueExpr(expr *ast.KeyValueExpr) tree.Expression {
+func (ctx *parseContext) mapKeyValueExpr(expr *ast.KeyValueExpr) java.Expression {
 	key := ctx.mapExpr(expr.Key)
 	colonPrefix := ctx.prefix(expr.Colon)
 	ctx.skip(1) // ":"
 	value := ctx.mapExpr(expr.Value)
-	return &tree.KeyValue{
+	return &golang.KeyValue{
 		ID:    uuid.New(),
 		Key:   key,
-		Value: tree.LeftPadded[tree.Expression]{Before: colonPrefix, Element: value},
+		Value: java.LeftPadded[java.Expression]{Before: colonPrefix, Element: value},
 	}
 }
 
 // mapSliceExpr maps a slice expression like `a[low:high]` or `a[low:high:max]`.
-func (ctx *parseContext) mapSliceExpr(expr *ast.SliceExpr) tree.Expression {
+func (ctx *parseContext) mapSliceExpr(expr *ast.SliceExpr) java.Expression {
 	target := ctx.mapExpr(expr.X)
+	prefix, target := hoistLeftPrefix(target)
 	lbrackPrefix := ctx.prefix(expr.Lbrack)
 	ctx.skip(1) // "["
 
-	var low tree.Expression
+	var low java.Expression
 	if expr.Low != nil {
 		low = ctx.mapExpr(expr.Low)
 	} else {
-		low = &tree.Empty{ID: uuid.New()}
+		low = &java.Empty{ID: uuid.New()}
 	}
 
 	colon1Off := ctx.findNext(':')
-	var colon1Prefix tree.Space
+	var colon1Prefix java.Space
 	if colon1Off >= 0 {
 		colon1Prefix = ctx.prefix(ctx.file.Pos(colon1Off))
 		ctx.skip(1)
 	}
 
-	var high tree.Expression
+	var high java.Expression
 	if expr.High != nil {
 		high = ctx.mapExpr(expr.High)
 	} else {
-		high = &tree.Empty{ID: uuid.New()}
+		high = &java.Empty{ID: uuid.New()}
 	}
 
-	var max tree.Expression
-	var colon2Prefix tree.Space
+	var max java.Expression
+	var colon2Prefix java.Space
 	if expr.Slice3 {
 		colon2Off := ctx.findNext(':')
 		if colon2Off >= 0 {
@@ -2298,29 +2674,30 @@ func (ctx *parseContext) mapSliceExpr(expr *ast.SliceExpr) tree.Expression {
 		if expr.Max != nil {
 			max = ctx.mapExpr(expr.Max)
 		} else {
-			max = &tree.Empty{ID: uuid.New()}
+			max = &java.Empty{ID: uuid.New()}
 		}
 	}
 
 	rbrackPrefix := ctx.prefix(expr.Rbrack)
 	ctx.skip(1) // "]"
 
-	return &tree.Slice{
+	return &golang.Slice{
 		ID:           uuid.New(),
+		Prefix:       prefix,
 		Indexed:      target,
 		OpenBracket:  lbrackPrefix,
-		Low:          tree.RightPadded[tree.Expression]{Element: low, After: colon1Prefix},
-		High:         tree.RightPadded[tree.Expression]{Element: high, After: colon2Prefix},
+		Low:          java.RightPadded[java.Expression]{Element: low, After: colon1Prefix},
+		High:         java.RightPadded[java.Expression]{Element: high, After: colon2Prefix},
 		Max:          max,
 		CloseBracket: rbrackPrefix,
 	}
 }
 
 // mapMapType maps a map type expression like `map[K]V`.
-func (ctx *parseContext) mapMapType(expr *ast.MapType) tree.Expression {
+func (ctx *parseContext) mapMapType(expr *ast.MapType) java.Expression {
 	prefix := ctx.prefixAndSkip(expr.Map, len("map"))
 	lbrackOff := ctx.findNext('[')
-	var lbrackPrefix tree.Space
+	var lbrackPrefix java.Space
 	if lbrackOff >= 0 {
 		lbrackPrefix = ctx.prefix(ctx.file.Pos(lbrackOff))
 		ctx.skip(1) // "["
@@ -2329,74 +2706,74 @@ func (ctx *parseContext) mapMapType(expr *ast.MapType) tree.Expression {
 	}
 	key := ctx.mapTypeExpr(expr.Key)
 	rbrackOff := ctx.findNext(']')
-	var rbrackPrefix tree.Space
+	var rbrackPrefix java.Space
 	if rbrackOff >= 0 {
 		rbrackPrefix = ctx.prefix(ctx.file.Pos(rbrackOff))
 		ctx.skip(1)
 	}
 	value := ctx.mapTypeExpr(expr.Value)
 
-	return &tree.MapType{
+	return &golang.MapType{
 		ID:          uuid.New(),
 		Prefix:      prefix,
 		OpenBracket: lbrackPrefix,
-		Key:         tree.RightPadded[tree.Expression]{Element: key, After: rbrackPrefix},
+		Key:         java.RightPadded[java.Expression]{Element: key, After: rbrackPrefix},
 		Value:       value,
 	}
 }
 
 // mapChanType maps a channel type expression.
-func (ctx *parseContext) mapChanType(expr *ast.ChanType) tree.Expression {
+func (ctx *parseContext) mapChanType(expr *ast.ChanType) java.Expression {
 	prefix := ctx.prefix(expr.Begin)
-	var markers tree.Markers
+	var markers java.Markers
 
-	var dir tree.ChanDir
+	var dir golang.ChanDir
 	switch expr.Dir {
 	case ast.SEND:
-		dir = tree.ChanSendOnly
+		dir = golang.ChanSendOnly
 		ctx.skip(len("chan"))
 		arrowOff := ctx.findNext('<')
-		var dirMarkerBefore tree.Space
+		var dirMarkerBefore java.Space
 		if arrowOff >= 0 {
 			dirMarkerBefore = ctx.prefix(ctx.file.Pos(arrowOff))
 			ctx.cursor = arrowOff
 		}
 		ctx.skip(2) // "<-"
 		if !dirMarkerBefore.IsEmpty() {
-			markers = tree.Markers{
+			markers = java.Markers{
 				ID: uuid.New(),
-				Entries: []tree.Marker{tree.ChanDirMarker{
+				Entries: []java.Marker{golang.ChanDirMarker{
 					Ident:  uuid.New(),
 					Before: dirMarkerBefore,
 				}},
 			}
 		}
 	case ast.RECV:
-		dir = tree.ChanRecvOnly
+		dir = golang.ChanRecvOnly
 		ctx.skip(2) // "<-"
 		chanOff := ctx.findNext('c')
-		var dirMarkerBefore tree.Space
+		var dirMarkerBefore java.Space
 		if chanOff >= 0 && chanOff+4 <= len(ctx.src) && string(ctx.src[chanOff:chanOff+4]) == "chan" {
 			dirMarkerBefore = ctx.prefix(ctx.file.Pos(chanOff))
 			ctx.cursor = chanOff
 		}
 		ctx.skip(len("chan"))
 		if !dirMarkerBefore.IsEmpty() {
-			markers = tree.Markers{
+			markers = java.Markers{
 				ID: uuid.New(),
-				Entries: []tree.Marker{tree.ChanDirMarker{
+				Entries: []java.Marker{golang.ChanDirMarker{
 					Ident:  uuid.New(),
 					Before: dirMarkerBefore,
 				}},
 			}
 		}
 	default:
-		dir = tree.ChanBidi
+		dir = golang.ChanBidi
 		ctx.skip(len("chan"))
 	}
 
 	value := ctx.mapTypeExpr(expr.Value)
-	return &tree.Channel{
+	return &golang.Channel{
 		ID:      uuid.New(),
 		Prefix:  prefix,
 		Markers: markers,
@@ -2406,12 +2783,12 @@ func (ctx *parseContext) mapChanType(expr *ast.ChanType) tree.Expression {
 }
 
 // mapFuncType maps a function type expression like `func(int) string`.
-func (ctx *parseContext) mapFuncType(expr *ast.FuncType) tree.Expression {
+func (ctx *parseContext) mapFuncType(expr *ast.FuncType) java.Expression {
 	prefix := ctx.prefixAndSkip(expr.Func, len("func"))
 	params := ctx.mapFieldListAsParams(expr.Params)
 	returnType := ctx.mapReturnType(expr.Results)
 
-	return &tree.FuncType{
+	return &golang.FuncType{
 		ID:         uuid.New(),
 		Prefix:     prefix,
 		Parameters: params,
@@ -2420,10 +2797,10 @@ func (ctx *parseContext) mapFuncType(expr *ast.FuncType) tree.Expression {
 }
 
 // mapInterfaceType maps an interface type expression: `interface { methods }`.
-func (ctx *parseContext) mapInterfaceType(expr *ast.InterfaceType) tree.Expression {
+func (ctx *parseContext) mapInterfaceType(expr *ast.InterfaceType) java.Expression {
 	prefix := ctx.prefixAndSkip(expr.Interface, len("interface"))
 	body := ctx.mapFieldListAsInterfaceBody(expr.Methods)
-	return &tree.InterfaceType{
+	return &golang.InterfaceType{
 		ID:     uuid.New(),
 		Prefix: prefix,
 		Body:   body,
@@ -2431,10 +2808,10 @@ func (ctx *parseContext) mapInterfaceType(expr *ast.InterfaceType) tree.Expressi
 }
 
 // mapStructType maps a struct type expression: `struct { fields }`.
-func (ctx *parseContext) mapStructType(expr *ast.StructType) tree.Expression {
+func (ctx *parseContext) mapStructType(expr *ast.StructType) java.Expression {
 	prefix := ctx.prefixAndSkip(expr.Struct, len("struct"))
 	body := ctx.mapFieldListAsStructBody(expr.Fields)
-	return &tree.StructType{
+	return &golang.StructType{
 		ID:     uuid.New(),
 		Prefix: prefix,
 		Body:   body,
@@ -2443,33 +2820,39 @@ func (ctx *parseContext) mapStructType(expr *ast.StructType) tree.Expression {
 
 // mapFieldListAsStructBody maps a struct's field list to a Block.
 // Each field becomes a VariableDeclarations statement.
-func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *tree.Block {
+func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *java.Block {
 	blockPrefix := ctx.prefix(fl.Opening)
 	ctx.skip(1) // "{"
 
-	var stmts []tree.RightPadded[tree.Statement]
+	var stmts []java.RightPadded[java.Statement]
 	for _, field := range fl.List {
 		if len(field.Names) == 0 {
 			// Embedded type (e.g., `io.Reader` in struct)
 			typeExpr := ctx.mapTypeExpr(field.Type)
-			vd := &tree.VariableDeclarations{
+			prefix, typeExpr := hoistLeftPrefix(typeExpr)
+			vd := &java.VariableDeclarations{
 				ID:       uuid.New(),
+				Prefix:   prefix,
 				TypeExpr: typeExpr,
-				Variables: []tree.RightPadded[*tree.VariableDeclarator]{
-					{Element: &tree.VariableDeclarator{ID: uuid.New(), Name: &tree.Identifier{ID: uuid.New()}}},
+				Variables: []java.RightPadded[*java.VariableDeclarator]{
+					{Element: &java.VariableDeclarator{ID: uuid.New(), Name: &java.Identifier{ID: uuid.New()}}},
 				},
 			}
 			// Map struct tag if present
 			if field.Tag != nil {
 				ctx.mapStructTag(vd, field.Tag)
 			}
-			stmts = append(stmts, tree.RightPadded[tree.Statement]{Element: vd})
+			stmts = append(stmts, java.RightPadded[java.Statement]{Element: vd})
 		} else {
 			// Named field(s): `X int` or `X, Y int`
-			var vars []tree.RightPadded[*tree.VariableDeclarator]
+			var vars []java.RightPadded[*java.VariableDeclarator]
+			var vdPrefix java.Space
 			for j, fieldName := range field.Names {
 				nameIdent := ctx.mapIdent(fieldName)
-				var nameAfter tree.Space
+				if j == 0 {
+					vdPrefix, nameIdent = hoistLeftPrefix(nameIdent)
+				}
+				var nameAfter java.Space
 				if j < len(field.Names)-1 {
 					commaOffset := ctx.findNext(',')
 					if commaOffset >= 0 {
@@ -2477,14 +2860,15 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *tree.Block
 						ctx.skip(1) // ","
 					}
 				}
-				vars = append(vars, tree.RightPadded[*tree.VariableDeclarator]{
-					Element: &tree.VariableDeclarator{ID: uuid.New(), Name: nameIdent},
+				vars = append(vars, java.RightPadded[*java.VariableDeclarator]{
+					Element: &java.VariableDeclarator{ID: uuid.New(), Name: nameIdent},
 					After:   nameAfter,
 				})
 			}
 			typeExpr := ctx.mapTypeExpr(field.Type)
-			vd := &tree.VariableDeclarations{
+			vd := &java.VariableDeclarations{
 				ID:        uuid.New(),
+				Prefix:    vdPrefix,
 				TypeExpr:  typeExpr,
 				Variables: vars,
 			}
@@ -2492,14 +2876,14 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *tree.Block
 			if field.Tag != nil {
 				ctx.mapStructTag(vd, field.Tag)
 			}
-			stmts = append(stmts, tree.RightPadded[tree.Statement]{Element: vd})
+			stmts = append(stmts, java.RightPadded[java.Statement]{Element: vd})
 		}
 	}
 
 	end := ctx.prefix(fl.Closing)
 	ctx.skip(1) // "}"
 
-	return &tree.Block{ID: uuid.New(), Prefix: blockPrefix, Statements: stmts, End: end}
+	return &java.Block{ID: uuid.New(), Prefix: blockPrefix, Statements: stmts, End: end}
 }
 
 // mapStructTag parses a struct field tag literal into a sequence of
@@ -2519,7 +2903,7 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *tree.Block
 //     `  json:"x"  `) is dropped — gofmt produces zero inner padding,
 //     so this only affects hand-typed weird input. Roundtrip on
 //     gofmt'd input is exact.
-func (ctx *parseContext) mapStructTag(vd *tree.VariableDeclarations, tag *ast.BasicLit) {
+func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.BasicLit) {
 	outerPrefix := ctx.prefix(tag.Pos())
 	ctx.skip(len(tag.Value))
 
@@ -2537,28 +2921,27 @@ func (ctx *parseContext) mapStructTag(vd *tree.VariableDeclarations, tag *ast.Ba
 		return
 	}
 
-	annotations := make([]*tree.Annotation, len(pairs))
+	annotations := make([]*java.Annotation, len(pairs))
 	for i, p := range pairs {
-		var annPrefix tree.Space
+		var annPrefix java.Space
 		if i == 0 {
 			annPrefix = outerPrefix
 		} else {
-			annPrefix = tree.Space{Whitespace: p.PrefixWS}
+			annPrefix = java.Space{Whitespace: p.PrefixWS}
 		}
-		annotations[i] = &tree.Annotation{
+		annotations[i] = &java.Annotation{
 			ID:     uuid.New(),
 			Prefix: annPrefix,
-			AnnotationType: &tree.Identifier{
+			AnnotationType: &java.Identifier{
 				ID:   uuid.New(),
 				Name: p.Key,
 			},
-			Arguments: &tree.Container[tree.Expression]{
-				Elements: []tree.RightPadded[tree.Expression]{
-					{Element: &tree.Literal{
+			Arguments: &java.Container[java.Expression]{
+				Elements: []java.RightPadded[java.Expression]{
+					{Element: &java.Literal{
 						ID:     uuid.New(),
 						Source: p.QuotedValue,
 						Value:  p.UnquotedValue,
-						Kind:   tree.StringLiteral,
 					}},
 				},
 			},
@@ -2576,7 +2959,7 @@ func (ctx *parseContext) mapStructTag(vd *tree.VariableDeclarations, tag *ast.Ba
 // Used by the parser at top-level decl entry points (func, type,
 // var/const) to populate `LeadingAnnotations` and shrink the decl's
 // own Prefix to the whitespace between last directive and keyword.
-func extractDirectives(s tree.Space) (anns []*tree.Annotation, residual tree.Space) {
+func extractDirectives(s java.Space) (anns []*java.Annotation, residual java.Space) {
 	if len(s.Comments) == 0 {
 		return nil, s
 	}
@@ -2584,21 +2967,21 @@ func extractDirectives(s tree.Space) (anns []*tree.Annotation, residual tree.Spa
 	i := 0
 	for i < len(s.Comments) {
 		c := s.Comments[i]
-		if c.Kind != tree.LineComment {
+		if c.Kind != java.LineComment {
 			break
 		}
 		name, args, ok := parseDirective(c.Text)
 		if !ok {
 			break
 		}
-		anns = append(anns, buildDirectiveAnnotation(name, args, tree.Space{Whitespace: pendingPrefixWS}))
+		anns = append(anns, buildDirectiveAnnotation(name, args, java.Space{Whitespace: pendingPrefixWS}))
 		pendingPrefixWS = c.Suffix
 		i++
 	}
 	if len(anns) == 0 {
 		return nil, s
 	}
-	residual = tree.Space{
+	residual = java.Space{
 		Whitespace: pendingPrefixWS,
 		Comments:   s.Comments[i:],
 	}
@@ -2651,24 +3034,23 @@ func isDirectivePrefix(p string) bool {
 	return false
 }
 
-func buildDirectiveAnnotation(name, args string, prefix tree.Space) *tree.Annotation {
-	ann := &tree.Annotation{
+func buildDirectiveAnnotation(name, args string, prefix java.Space) *java.Annotation {
+	ann := &java.Annotation{
 		ID:     uuid.New(),
 		Prefix: prefix,
-		AnnotationType: &tree.Identifier{
+		AnnotationType: &java.Identifier{
 			ID:   uuid.New(),
 			Name: name,
 		},
 	}
 	if args != "" {
-		ann.Arguments = &tree.Container[tree.Expression]{
-			Before: tree.Space{Whitespace: " "},
-			Elements: []tree.RightPadded[tree.Expression]{
-				{Element: &tree.Literal{
+		ann.Arguments = &java.Container[java.Expression]{
+			Before: java.Space{Whitespace: " "},
+			Elements: []java.RightPadded[java.Expression]{
+				{Element: &java.Literal{
 					ID:     uuid.New(),
 					Source: args,
 					Value:  args,
-					Kind:   tree.StringLiteral,
 				}},
 			},
 		}
@@ -2747,60 +3129,65 @@ func parseStructTagPairs(tag string) []structTagPair {
 
 // mapFieldListAsInterfaceBody maps an interface's method list to a Block.
 // Each method becomes a MethodDeclaration (no body) or embedded type reference.
-func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *tree.Block {
+func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *java.Block {
 	blockPrefix := ctx.prefix(fl.Opening)
 	ctx.skip(1) // "{"
 
-	var stmts []tree.RightPadded[tree.Statement]
+	var stmts []java.RightPadded[java.Statement]
 	for _, field := range fl.List {
 		if len(field.Names) == 0 {
 			// Embedded interface type (e.g., `io.Reader`)
 			typeExpr := ctx.mapTypeExpr(field.Type)
-			vd := &tree.VariableDeclarations{
+			prefix, typeExpr := hoistLeftPrefix(typeExpr)
+			vd := &java.VariableDeclarations{
 				ID:       uuid.New(),
+				Prefix:   prefix,
 				TypeExpr: typeExpr,
-				Variables: []tree.RightPadded[*tree.VariableDeclarator]{
-					{Element: &tree.VariableDeclarator{ID: uuid.New(), Name: &tree.Identifier{ID: uuid.New()}}},
+				Variables: []java.RightPadded[*java.VariableDeclarator]{
+					{Element: &java.VariableDeclarator{ID: uuid.New(), Name: &java.Identifier{ID: uuid.New()}}},
 				},
 			}
-			stmts = append(stmts, tree.RightPadded[tree.Statement]{Element: vd})
+			stmts = append(stmts, java.RightPadded[java.Statement]{Element: vd})
 		} else {
 			// Method signature: `Name(params) returnType`
 			name := ctx.mapIdent(field.Names[0])
+			namePrefix, name := hoistLeftPrefix(name)
 			funcType := field.Type.(*ast.FuncType)
 			params := ctx.mapFieldListAsParams(funcType.Params)
 			returnType := ctx.mapReturnType(funcType.Results)
 
-			md := &tree.MethodDeclaration{
-				ID:   uuid.New(),
-				Name: name,
-				Markers: tree.Markers{
-					Entries: []tree.Marker{tree.InterfaceMethod{Ident: uuid.New()}},
+			md := &java.MethodDeclaration{
+				ID:     uuid.New(),
+				Prefix: namePrefix,
+				Name:   name,
+				Markers: java.Markers{
+					Entries: []java.Marker{golang.InterfaceMethod{Ident: uuid.New()}},
 				},
 				Parameters: params,
 				ReturnType: returnType,
 				// Body is nil — interface method has no body
 			}
-			stmts = append(stmts, tree.RightPadded[tree.Statement]{Element: md})
+			stmts = append(stmts, java.RightPadded[java.Statement]{Element: md})
 		}
 	}
 
 	end := ctx.prefix(fl.Closing)
 	ctx.skip(1) // "}"
 
-	return &tree.Block{ID: uuid.New(), Prefix: blockPrefix, Statements: stmts, End: end}
+	return &java.Block{ID: uuid.New(), Prefix: blockPrefix, Statements: stmts, End: end}
 }
 
-// mapEllipsis maps `...T` in function parameters.
-func (ctx *parseContext) mapEllipsis(expr *ast.Ellipsis) tree.Expression {
+// mapEllipsis maps `...T` in function parameters (prefix variadic form).
+func (ctx *parseContext) mapEllipsis(expr *ast.Ellipsis) java.Expression {
 	prefix := ctx.prefix(expr.Ellipsis)
 	ctx.skip(3) // "..."
 	elt := ctx.mapTypeExpr(expr.Elt)
-	return &tree.Unary{
-		ID:       uuid.New(),
-		Prefix:   prefix,
-		Operator: tree.LeftPadded[tree.UnaryOperator]{Element: tree.Spread},
-		Operand:  elt,
+	return &golang.Variadic{
+		ID:      uuid.New(),
+		Prefix:  prefix,
+		Element: elt,
+		Dots:    java.EmptySpace,
+		Postfix: false,
 	}
 }
 
@@ -2814,48 +3201,48 @@ func (ctx *parseContext) findNextFrom(ch byte, from int) int {
 	return -1
 }
 
-func mapBinaryOp(op token.Token) tree.BinaryOperator {
+func mapBinaryOp(op token.Token) java.BinaryOperator {
 	switch op {
 	case token.ADD:
-		return tree.Add
+		return java.Add
 	case token.SUB:
-		return tree.Subtract
+		return java.Subtract
 	case token.MUL:
-		return tree.Multiply
+		return java.Multiply
 	case token.QUO:
-		return tree.Divide
+		return java.Divide
 	case token.REM:
-		return tree.Modulo
+		return java.Modulo
 	case token.EQL:
-		return tree.Equal
+		return java.Equal
 	case token.NEQ:
-		return tree.NotEqual
+		return java.NotEqual
 	case token.LSS:
-		return tree.LessThan
+		return java.LessThan
 	case token.LEQ:
-		return tree.LessThanOrEqual
+		return java.LessThanOrEqual
 	case token.GTR:
-		return tree.GreaterThan
+		return java.GreaterThan
 	case token.GEQ:
-		return tree.GreaterThanOrEqual
+		return java.GreaterThanOrEqual
 	case token.LAND:
-		return tree.LogicalAnd
+		return java.LogicalAnd
 	case token.LOR:
-		return tree.LogicalOr
+		return java.LogicalOr
 	case token.AND:
-		return tree.BitwiseAnd
+		return java.BitwiseAnd
 	case token.OR:
-		return tree.BitwiseOr
+		return java.BitwiseOr
 	case token.XOR:
-		return tree.BitwiseXor
+		return java.BitwiseXor
 	case token.SHL:
-		return tree.LeftShift
+		return java.LeftShift
 	case token.SHR:
-		return tree.RightShift
+		return java.RightShift
 	case token.AND_NOT:
-		return tree.AndNot
+		return java.AndNot
 	default:
-		return tree.Add
+		return java.Add
 	}
 }
 

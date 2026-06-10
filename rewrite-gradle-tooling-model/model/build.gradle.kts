@@ -67,7 +67,17 @@ val testManifestTask = tasks.register("testManifest") {
     inputs.files(pluginLocalTestClasspath)
     outputs.file(testManifestFile)
     doLast {
-        testManifestFile.get().asFile.writeText(pluginLocalTestClasspath.files.joinToString(separator = "\n") { it.absolutePath })
+        testManifestFile.get().asFile.writeText(
+            pluginLocalTestClasspath.files
+                // Exclude the build's own gradle-api jar (under "generated-gradle-jars"). It leaks in
+                // via `implementation(gradleApi())` on the plugin, but the embedded Gradle build that
+                // applies the plugin already provides its own Gradle API to init scripts. Injecting the
+                // build-time Gradle's gradle-api into an older embedded Gradle's initscript classpath
+                // breaks classpath instrumentation when the two target different Java bytecode versions
+                // (e.g. Gradle 9.5's gradle-api has Java 25 / v69 classes the embedded Gradle can't read).
+                .filter { !it.absolutePath.contains("generated-gradle-jars") }
+                .joinToString(separator = "\n") { it.absolutePath }
+        )
     }
 }
 

@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.style.NamedStyles;
@@ -55,6 +56,35 @@ class OrderImportsTest implements RewriteTest {
               import java.util.*;
               import java.util.regex.Pattern;
               """
+          )
+        );
+    }
+
+    @Test
+    void doNotFoldIntoStarWhenSourceSetIsDirty() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        markSourceSetDirty(ctx, "demo");
+        rewriteRun(
+          spec -> spec.executionContext(ctx),
+          mavenProject("demo",
+            java(
+              """
+                import java.util.List;
+                import java.util.ArrayList;
+                import java.util.regex.Pattern;
+                import java.util.Objects;
+                import java.util.Set;
+                import java.util.Map;
+                """,
+              """
+                import java.util.ArrayList;
+                import java.util.List;
+                import java.util.Map;
+                import java.util.Objects;
+                import java.util.Set;
+                import java.util.regex.Pattern;
+                """
+            )
           )
         );
     }

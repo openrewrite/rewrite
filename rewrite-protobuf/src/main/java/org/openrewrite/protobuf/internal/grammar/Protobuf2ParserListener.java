@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-protobuf/src/main/antlr/Protobuf2Parser.g4 by ANTLR 4.13.2
+// Generated from rewrite-protobuf/src/main/antlr/Protobuf2Parser.g4 by ANTLR 4.13.2
 package org.openrewrite.protobuf.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -162,6 +162,16 @@ public interface Protobuf2ParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitMessageField(Protobuf2Parser.MessageFieldContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link Protobuf2Parser#group}.
+	 * @param ctx the parse tree
+	 */
+	void enterGroup(Protobuf2Parser.GroupContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link Protobuf2Parser#group}.
+	 * @param ctx the parse tree
+	 */
+	void exitGroup(Protobuf2Parser.GroupContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link Protobuf2Parser#messageBody}.
 	 * @param ctx the parse tree

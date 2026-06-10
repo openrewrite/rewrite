@@ -114,6 +114,13 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitGoArrayType(Go.ArrayType arrayType, RpcSendQueue q) {
+        q.getAndSend(arrayType, a -> a.getPadding().getLength(), el -> visitRightPadded(el, q));
+        q.getAndSend(arrayType, Go.ArrayType::getElementType, el -> visit(el, q));
+        return arrayType;
+    }
+
+    @Override
     public J visitMapType(Go.MapType mapType, RpcSendQueue q) {
         q.getAndSend(mapType, Go.MapType::getOpenBracket, space -> visitSpace(space, q));
         q.getAndSend(mapType, m -> m.getPadding().getKey(), el -> visitRightPadded(el, q));
@@ -166,13 +173,34 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitUnion(Go.Union union, RpcSendQueue q) {
+        q.getAndSendList(union, u -> u.getPadding().getTypes(), t -> t.getElement().getId(), t -> visitRightPadded(t, q));
+        return union;
+    }
+
+    @Override
+    public J visitUnderlyingType(Go.UnderlyingType underlyingType, RpcSendQueue q) {
+        q.getAndSend(underlyingType, Go.UnderlyingType::getElement, el -> visit(el, q));
+        return underlyingType;
+    }
+
+    @Override
     public J visitTypeDecl(Go.TypeDecl typeDecl, RpcSendQueue q) {
         q.getAndSendList(typeDecl, Go.TypeDecl::getLeadingAnnotations, Tree::getId, a -> visit(a, q));
         q.getAndSend(typeDecl, Go.TypeDecl::getName, el -> visit(el, q));
+        q.getAndSend(typeDecl, Go.TypeDecl::getTypeParameters, el -> visit(el, q));
         q.getAndSend(typeDecl, t -> t.getPadding().getAssign(), el -> visitLeftPadded(el, q));
         q.getAndSend(typeDecl, Go.TypeDecl::getDefinition, el -> visit(el, q));
         q.getAndSend(typeDecl, t -> t.getPadding().getSpecs(), el -> visitContainer(el, q));
         return typeDecl;
+    }
+
+    @Override
+    public J visitDeclarationBlock(Go.DeclarationBlock declarationBlock, RpcSendQueue q) {
+        q.getAndSendList(declarationBlock, Go.DeclarationBlock::getLeadingAnnotations, Tree::getId, a -> visit(a, q));
+        q.getAndSend(declarationBlock, d -> d.getKind().name());
+        q.getAndSend(declarationBlock, d -> d.getPadding().getSpecs(), el -> visitContainer(el, q));
+        return declarationBlock;
     }
 
     @Override
@@ -181,6 +209,26 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
         q.getAndSend(multiAssignment, m -> m.getPadding().getOperator(), el -> visitLeftPadded(el, q));
         q.getAndSendList(multiAssignment, m -> m.getPadding().getValues(), v -> v.getElement().getId(), v -> visitRightPadded(v, q));
         return multiAssignment;
+    }
+
+    @Override
+    public J visitGoReturn(Go.Return aReturn, RpcSendQueue q) {
+        q.getAndSendList(aReturn, r -> r.getPadding().getExpressions(), v -> v.getElement().getId(), v -> visitRightPadded(v, q));
+        return aReturn;
+    }
+
+    @Override
+    public J visitGoMethodDeclaration(Go.MethodDeclaration methodDeclaration, RpcSendQueue q) {
+        q.getAndSend(methodDeclaration, m -> m.getPadding().getReceiver(), el -> visitContainer(el, q));
+        q.getAndSend(methodDeclaration, Go.MethodDeclaration::getDeclaration, el -> visit(el, q));
+        return methodDeclaration;
+    }
+
+    @Override
+    public J visitStatementWithInit(Go.StatementWithInit statementWithInit, RpcSendQueue q) {
+        q.getAndSend(statementWithInit, s -> s.getPadding().getInit(), el -> visitRightPadded(el, q));
+        q.getAndSend(statementWithInit, Go.StatementWithInit::getStatement, el -> visit(el, q));
+        return statementWithInit;
     }
 
     @Override
@@ -196,6 +244,37 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
         q.getAndSend(indexList, Go.IndexList::getTarget, el -> visit(el, q));
         q.getAndSend(indexList, i -> i.getPadding().getIndices(), el -> visitContainer(el, q));
         return indexList;
+    }
+
+    @Override
+    public J visitGoUnary(Go.Unary unary, RpcSendQueue q) {
+        q.getAndSend(unary, u -> u.getPadding().getOperator(), op -> visitLeftPadded(op, q));
+        q.getAndSend(unary, Go.Unary::getExpression, el -> visit(el, q));
+        return unary;
+    }
+
+    @Override
+    public J visitGoBinary(Go.Binary binary, RpcSendQueue q) {
+        q.getAndSend(binary, Go.Binary::getLeft, el -> visit(el, q));
+        q.getAndSend(binary, b -> b.getPadding().getOperator(), op -> visitLeftPadded(op, q));
+        q.getAndSend(binary, Go.Binary::getRight, el -> visit(el, q));
+        return binary;
+    }
+
+    @Override
+    public J visitGoAssignmentOperation(Go.AssignmentOperation assignOp, RpcSendQueue q) {
+        q.getAndSend(assignOp, Go.AssignmentOperation::getVariable, el -> visit(el, q));
+        q.getAndSend(assignOp, a -> a.getPadding().getOperator(), op -> visitLeftPadded(op, q));
+        q.getAndSend(assignOp, Go.AssignmentOperation::getAssignment, el -> visit(el, q));
+        return assignOp;
+    }
+
+    @Override
+    public J visitGoVariadic(Go.Variadic variadic, RpcSendQueue q) {
+        q.getAndSend(variadic, Go.Variadic::getElement, el -> visit(el, q));
+        q.getAndSend(variadic, Go.Variadic::getDots, space -> visitSpace(space, q));
+        q.getAndSend(variadic, Go.Variadic::isPostfix);
+        return variadic;
     }
 
     // Delegation methods to JavaSender for RPC-specific visit methods
@@ -233,31 +312,6 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
-        }
-
-        @Override
-        public J visitForEachControl(J.ForEachLoop.Control control, RpcSendQueue q) {
-            // Send in Go's format: key (right-padded), value (right-padded), operator (left-padded string), iterable
-            // Extract key identifier from variable declarations
-            Statement varStmt = control.getVariable();
-            JRightPadded<Expression> key = null;
-            if (varStmt instanceof J.VariableDeclarations) {
-                J.VariableDeclarations varDecls = (J.VariableDeclarations) varStmt;
-                if (!varDecls.getVariables().isEmpty()) {
-                    J.VariableDeclarations.NamedVariable nv = varDecls.getVariables().get(0);
-                    key = JRightPadded.<Expression>build(nv.getName()).withAfter(control.getPadding().getVariable().getAfter());
-                }
-            }
-            final JRightPadded<Expression> finalKey = key;
-            // key
-            q.getAndSend(control, c -> finalKey, el -> visitRightPadded(el, q));
-            // value (null for Go's single-variable range)
-            q.getAndSend(control, c -> (JRightPadded<Expression>) null, el -> visitRightPadded(el, q));
-            // operator (left-padded string - ":=")
-            q.getAndSend(control, c -> JLeftPadded.build(":=").withBefore(Space.EMPTY));
-            // iterable
-            q.getAndSend(control, c -> c.getIterable(), el -> visit(el, q));
-            return control;
         }
 
         @Override

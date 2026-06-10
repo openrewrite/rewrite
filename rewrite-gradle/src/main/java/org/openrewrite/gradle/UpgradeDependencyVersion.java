@@ -33,6 +33,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -131,6 +132,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         Map<GroupArtifact, @Nullable Object> gaToNewVersion = new HashMap<>();
 
         Map<String, Map<GroupArtifact, Set<String>>> configurationPerGAPerModule = new HashMap<>();
+
+        /**
+         * Cache of {@code safeUpdatedVersion} verdicts keyed by variable name. Populated when a
+         * {@code GradleProject} is available (build.gradle visit phase) and consumed by paths that
+         * do not have repository context (e.g. {@code gradle.properties}). A {@code null} value
+         * means the variable cannot be safely bumped; absence means the verdict is not yet known.
+         */
+        Map<String, @Nullable String> safeVariableVerdict = new HashMap<>();
     }
 
     @Override
@@ -234,8 +243,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     // Resolve the new version if needed
                     if (!acc.gaToNewVersion.containsKey(ga)) {
                         try {
-                            String newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                    .select(ga, "dependencyManagement", UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
+                            String newVersion;
+                            if (entry.getVersion() != null) {
+                                GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), entry.getVersion());
+                                newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                        .select(gav, "dependencyManagement", UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
+                            } else {
+                                newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                        .select(ga, "dependencyManagement", UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
+                            }
                             acc.gaToNewVersion.put(ga, newVersion);
                         } catch (MavenDownloadingException e) {
                             acc.gaToNewVersion.put(ga, e);
@@ -408,11 +424,19 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     /**
      * Returns the agreed-upon resolved version when it is safe to update the shared variable,
-     * or null otherwise. A variable can only be updated when every dependency using it is
-     * targeted by the recipe's matcher AND every targeted dependency resolves to the same
-     * concrete version. Otherwise the matched dependency is detached to a literal version
-     * via {@code updateDependency} and the variable is left untouched so other neighbours
-     * sharing it stay on a working version.
+     * or null otherwise. The check has two phases:
+     * <ol>
+     *   <li>Agreement among targeted users: every dependency matched by the recipe must resolve
+     *       to the same concrete version.</li>
+     *   <li>Resolution for untargeted neighbours: the agreed version must be published for every
+     *       dependency that shares the variable but is not matched by the recipe. This protects
+     *       the original concern of PR #7491 (don't bump a shared variable to a version that does
+     *       not exist for one of its sharers) while restoring pre-#7491 GString preservation
+     *       whenever the bump is safe.</li>
+     * </ol>
+     * When the verdict cannot be computed because no {@code GradleProject} is available (e.g.
+     * the {@code gradle.properties} visitor path), the previously-cached verdict from the
+     * build.gradle visit is consulted instead.
      */
     private @Nullable String safeUpdatedVersion(
             String varName,
@@ -426,10 +450,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         }
         DependencyVersionSelector selector = null;
         String agreedVersion = null;
+        List<Map.Entry<GroupArtifact, Set<String>>> untargetedNeighbours = new ArrayList<>();
         for (Map.Entry<GroupArtifact, Set<String>> entry : usages.entrySet()) {
             GroupArtifact ga = entry.getKey();
             if (!dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
-                return null;
+                untargetedNeighbours.add(entry);
+                continue;
             }
             Object cached = acc.gaToNewVersion.get(ga);
             if (cached instanceof Exception) {
@@ -461,7 +487,53 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return null;
             }
         }
-        return agreedVersion;
+        if (agreedVersion == null) {
+            return null;
+        }
+        if (untargetedNeighbours.isEmpty()) {
+            return agreedVersion;
+        }
+        if (gradleProject == null) {
+            // No repos available; defer to the cached verdict produced by the build.gradle visit.
+            if (acc.safeVariableVerdict.containsKey(varName)) {
+                String verdict = acc.safeVariableVerdict.get(varName);
+                return agreedVersion.equals(verdict) ? agreedVersion : null;
+            }
+            return null;
+        }
+        boolean publishedForAllNeighbours = isVersionPublishedForAll(agreedVersion, untargetedNeighbours, gradleProject, ctx);
+        acc.safeVariableVerdict.put(varName, publishedForAllNeighbours ? agreedVersion : null);
+        return publishedForAllNeighbours ? agreedVersion : null;
+    }
+
+    /**
+     * Returns {@code true} only when {@code agreedVersion} is listed in the Maven metadata of every
+     * untargeted neighbour. Any unresolvable metadata or missing version disqualifies the bump and
+     * causes the caller to fall back to the detach-to-literal path.
+     */
+    private boolean isVersionPublishedForAll(
+            String agreedVersion,
+            List<Map.Entry<GroupArtifact, Set<String>>> untargetedNeighbours,
+            GradleProject gradleProject,
+            ExecutionContext ctx) {
+        MavenPomDownloader downloader = new MavenPomDownloader(ctx);
+        for (Map.Entry<GroupArtifact, Set<String>> entry : untargetedNeighbours) {
+            GroupArtifact ga = entry.getKey();
+            Set<String> configs = entry.getValue();
+            String configName = configs == null ? null : configs.stream().findFirst().orElse(null);
+            List<MavenRepository> repos = "classpath".equals(configName) ?
+                    gradleProject.getBuildscript().getMavenRepositories() :
+                    gradleProject.getMavenRepositories();
+            try {
+                MavenMetadata metadata = metadataFailures.insertRows(ctx, () -> downloader.downloadMetadata(ga, null, repos));
+                if (!metadata.getVersioning().getVersions().contains(agreedVersion)) {
+                    return false;
+                }
+            } catch (MavenDownloadingException e) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @RequiredArgsConstructor
@@ -488,13 +560,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         @Override
         public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
-                JavaSourceFile sourceFile = (JavaSourceFile) tree;
+                JavaSourceFile original = (JavaSourceFile) tree;
                 noLongerManaged = null;
                 newlyManaged = null;
-                gradleProject = sourceFile.getMarkers().findFirst(GradleProject.class)
+                gradleProject = original.getMarkers().findFirst(GradleProject.class)
                         .orElse(null);
-                sourceFile = applyPluginProvidedDependencies(sourceFile, ctx);
-                return super.visit(sourceFile, ctx);
+                JavaSourceFile sourceFile = applyPluginProvidedDependencies(original, ctx);
+                JavaSourceFile result = (JavaSourceFile) super.visit(sourceFile, ctx);
+                if (result != original && gradleProject != null) {
+                    JavaSourceSet.markDirty(ctx, gradleProject.getProjectName());
+                }
+                return result;
             }
             return super.visit(tree, ctx);
         }

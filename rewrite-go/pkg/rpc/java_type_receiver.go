@@ -17,7 +17,7 @@
 package rpc
 
 import (
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -36,82 +36,61 @@ func NewJavaTypeReceiver() *JavaTypeReceiver {
 }
 
 // VisitAnnotation mirrors JavaTypeReceiver.visitAnnotation
-func (r *JavaTypeReceiver) VisitAnnotation(a *tree.JavaTypeAnnotation, p any) tree.JavaType {
+func (r *JavaTypeReceiver) VisitAnnotation(a *java.JavaTypeAnnotation, p any) java.JavaType {
 	q := p.(*ReceiveQueue)
-	cc := *a
-	a = &cc
-	a.Type = receiveAsType[*tree.JavaTypeClass](r, q, a.Type)
+	a.Type = receiveAsFullyQualified(r, q, a.Type)
 	a.Values = r.receiveAnnotationElementValueList(q, a.Values)
 	return a
 }
 
 func (r *JavaTypeReceiver) receiveAnnotationElementValueList(
-	q *ReceiveQueue, before []tree.JavaTypeAnnotationElementValue,
-) []tree.JavaTypeAnnotationElementValue {
+	q *ReceiveQueue, before []java.JavaTypeAnnotationElementValue,
+) []java.JavaTypeAnnotationElementValue {
 	beforeAny := elementValueSlice(before)
 	afterAny := q.ReceiveList(beforeAny, func(v any) any {
-		return r.receiveAnnotationElementValue(q, v.(tree.JavaTypeAnnotationElementValue))
+		return r.receiveAnnotationElementValue(q, v.(java.JavaTypeAnnotationElementValue))
 	})
 	if afterAny == nil {
 		return nil
 	}
-	out := make([]tree.JavaTypeAnnotationElementValue, len(afterAny))
+	out := make([]java.JavaTypeAnnotationElementValue, len(afterAny))
 	for i, v := range afterAny {
-		out[i] = v.(tree.JavaTypeAnnotationElementValue)
+		out[i] = v.(java.JavaTypeAnnotationElementValue)
 	}
 	return out
 }
 
 func (r *JavaTypeReceiver) receiveAnnotationElementValue(
-	q *ReceiveQueue, v tree.JavaTypeAnnotationElementValue,
-) tree.JavaTypeAnnotationElementValue {
-	element := receiveAsType[tree.JavaType](r, q, v.GetElement())
+	q *ReceiveQueue, v java.JavaTypeAnnotationElementValue,
+) java.JavaTypeAnnotationElementValue {
 	switch ev := v.(type) {
-	case *tree.JavaTypeAnnotationArrayElementValue:
+	case *java.JavaTypeAnnotationArrayElementValue:
+		ev.Element = receiveAsType[java.JavaType](r, q, ev.Element)
 		// Constant values arrive as whatever the JSON-RPC layer deserialized;
 		// numeric subtype and char/string distinctions are not preserved.
-		constantValues := q.ReceiveList(ev.ConstantValues, nil)
-		refValues := receiveTypeList(r, q, ev.ReferenceValues)
-		return &tree.JavaTypeAnnotationArrayElementValue{
-			Element:         element,
-			ConstantValues:  constantValues,
-			ReferenceValues: refValues,
-		}
+		ev.ConstantValues = q.ReceiveList(ev.ConstantValues, nil)
+		ev.ReferenceValues = receiveTypeList(r, q, ev.ReferenceValues)
+		return ev
+	case *java.JavaTypeAnnotationSingleElementValue:
+		ev.Element = receiveAsType[java.JavaType](r, q, ev.Element)
+		ev.ConstantValue = q.Receive(ev.ConstantValue, nil)
+		ev.ReferenceValue = receiveAsType[java.JavaType](r, q, ev.ReferenceValue)
+		return ev
 	default:
-		var sev *tree.JavaTypeAnnotationSingleElementValue
-		if s, ok := v.(*tree.JavaTypeAnnotationSingleElementValue); ok {
-			sev = s
-		}
-		var beforeConstant any
-		var beforeRef tree.JavaType
-		if sev != nil {
-			beforeConstant = sev.ConstantValue
-			beforeRef = sev.ReferenceValue
-		}
-		constantValue := q.Receive(beforeConstant, nil)
-		refValue := receiveAsType[tree.JavaType](r, q, beforeRef)
-		return &tree.JavaTypeAnnotationSingleElementValue{
-			Element:        element,
-			ConstantValue:  constantValue,
-			ReferenceValue: refValue,
-		}
+		return v
 	}
 }
 
 // VisitMultiCatch mirrors JavaTypeReceiver.visitMultiCatch
-func (r *JavaTypeReceiver) VisitMultiCatch(mc *tree.JavaTypeMultiCatch, p any) tree.JavaType {
+func (r *JavaTypeReceiver) VisitMultiCatch(mc *java.JavaTypeMultiCatch, p any) java.JavaType {
 	q := p.(*ReceiveQueue)
-	cc := *mc
-	mc = &cc
 	mc.ThrowableTypes = receiveTypeList(r, q, mc.ThrowableTypes)
 	return mc
 }
 
 // VisitIntersection mirrors JavaTypeReceiver.visitIntersection
-func (r *JavaTypeReceiver) VisitIntersection(is *tree.JavaTypeIntersection, p any) tree.JavaType {
+func (r *JavaTypeReceiver) VisitIntersection(is *java.JavaTypeIntersection, p any) java.JavaType {
 	q := p.(*ReceiveQueue)
-	cc := *is
-	is = &cc
 	is.Bounds = receiveTypeList(r, q, is.Bounds)
 	return is
 }
@@ -119,38 +98,44 @@ func (r *JavaTypeReceiver) VisitIntersection(is *tree.JavaTypeIntersection, p an
 // VisitClass mirrors JavaTypeReceiver.visitClass field order:
 // flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype, owningClass,
 // annotations, interfaces, members, methods
-func (r *JavaTypeReceiver) VisitClass(c *tree.JavaTypeClass, p any) tree.JavaType {
+func (r *JavaTypeReceiver) VisitClass(c *java.JavaTypeClass, p any) java.JavaType {
 	q := p.(*ReceiveQueue)
-	cc := *c
-	c = &cc
+	r.receiveClassFields(c, q)
+	return c
+}
+
+// VisitShallowClass mirrors VisitClass — Java's ShallowClass extends Class
+// and uses the same field set; the discriminator is the wire valueType.
+func (r *JavaTypeReceiver) VisitShallowClass(sc *java.JavaTypeShallowClass, p any) java.JavaType {
+	q := p.(*ReceiveQueue)
+	r.receiveClassFields(&sc.JavaTypeClass, q)
+	return sc
+}
+
+func (r *JavaTypeReceiver) receiveClassFields(c *java.JavaTypeClass, q *ReceiveQueue) {
 	c.FlagsBitMap = receiveScalar[int64](q, c.FlagsBitMap)
 	c.Kind = receiveScalar[string](q, c.Kind)
 	c.FullyQualifiedName = receiveScalar[string](q, c.FullyQualifiedName)
 	c.TypeParameters = receiveTypeList(r, q, c.TypeParameters)
-	c.Supertype = receiveAsType[*tree.JavaTypeClass](r, q, c.Supertype)
-	c.OwningClass = receiveAsType[*tree.JavaTypeClass](r, q, c.OwningClass)
+	c.Supertype = receiveAsFullyQualified(r, q, c.Supertype)
+	c.OwningClass = receiveAsFullyQualified(r, q, c.OwningClass)
 	c.Annotations = receiveClassList(r, q, c.Annotations)
 	c.Interfaces = receiveClassList(r, q, c.Interfaces)
 	c.Members = receiveVariableList(r, q, c.Members)
 	c.Methods = receiveMethodList(r, q, c.Methods)
-	return c
 }
 
 // VisitParameterized mirrors JavaTypeReceiver.visitParameterized
-func (r *JavaTypeReceiver) VisitParameterized(pt *tree.JavaTypeParameterized, p any) tree.JavaType {
+func (r *JavaTypeReceiver) VisitParameterized(pt *java.JavaTypeParameterized, p any) java.JavaType {
 	q := p.(*ReceiveQueue)
-	cc := *pt
-	pt = &cc
-	pt.Type = receiveAsType[*tree.JavaTypeClass](r, q, pt.Type)
+	pt.Type = receiveAsFullyQualified(r, q, pt.Type)
 	pt.TypeParameters = receiveTypeList(r, q, pt.TypeParameters)
 	return pt
 }
 
 // VisitGenericTypeVariable mirrors JavaTypeReceiver.visitGenericTypeVariable
-func (r *JavaTypeReceiver) VisitGenericTypeVariable(g *tree.JavaTypeGenericTypeVariable, p any) tree.JavaType {
+func (r *JavaTypeReceiver) VisitGenericTypeVariable(g *java.JavaTypeGenericTypeVariable, p any) java.JavaType {
 	q := p.(*ReceiveQueue)
-	cc := *g
-	g = &cc
 	g.Name = receiveScalar[string](q, g.Name)
 	g.Variance = receiveScalar[string](q, g.Variance)
 	g.Bounds = receiveTypeList(r, q, g.Bounds)
@@ -158,20 +143,16 @@ func (r *JavaTypeReceiver) VisitGenericTypeVariable(g *tree.JavaTypeGenericTypeV
 }
 
 // VisitArray mirrors JavaTypeReceiver.visitArray
-func (r *JavaTypeReceiver) VisitArray(a *tree.JavaTypeArray, p any) tree.JavaType {
+func (r *JavaTypeReceiver) VisitArray(a *java.JavaTypeArray, p any) java.JavaType {
 	q := p.(*ReceiveQueue)
-	cc := *a
-	a = &cc
-	a.ElemType = receiveAsType[tree.JavaType](r, q, a.ElemType)
+	a.ElemType = receiveAsType[java.JavaType](r, q, a.ElemType)
 	a.Annotations = receiveClassList(r, q, a.Annotations)
 	return a
 }
 
 // VisitPrimitive mirrors JavaTypeReceiver.visitPrimitive
-func (r *JavaTypeReceiver) VisitPrimitive(pr *tree.JavaTypePrimitive, p any) tree.JavaType {
+func (r *JavaTypeReceiver) VisitPrimitive(pr *java.JavaTypePrimitive, p any) java.JavaType {
 	q := p.(*ReceiveQueue)
-	cc := *pr
-	pr = &cc
 	pr.Keyword = receiveScalar[string](q, pr.Keyword)
 	return pr
 }
@@ -179,14 +160,12 @@ func (r *JavaTypeReceiver) VisitPrimitive(pr *tree.JavaTypePrimitive, p any) tre
 // VisitMethod mirrors JavaTypeReceiver.visitMethod field order:
 // declaringType, name, flagsBitMap, returnType, parameterNames, parameterTypes,
 // thrownExceptions, annotations, defaultValue, declaredFormalTypeNames
-func (r *JavaTypeReceiver) VisitMethod(m *tree.JavaTypeMethod, p any) tree.JavaType {
+func (r *JavaTypeReceiver) VisitMethod(m *java.JavaTypeMethod, p any) java.JavaType {
 	q := p.(*ReceiveQueue)
-	cc := *m
-	m = &cc
-	m.DeclaringType = receiveAsType[*tree.JavaTypeClass](r, q, m.DeclaringType)
+	m.DeclaringType = receiveAsFullyQualified(r, q, m.DeclaringType)
 	m.Name = receiveScalar[string](q, m.Name)
 	m.FlagsBitMap = receiveScalar[int64](q, m.FlagsBitMap)
-	m.ReturnType = receiveAsType[tree.JavaType](r, q, m.ReturnType)
+	m.ReturnType = receiveAsType[java.JavaType](r, q, m.ReturnType)
 	m.ParameterNames = receiveStringList(q, m.ParameterNames)
 	m.ParameterTypes = receiveTypeList(r, q, m.ParameterTypes)
 	m.ThrownExceptions = receiveTypeList(r, q, m.ThrownExceptions)
@@ -197,55 +176,19 @@ func (r *JavaTypeReceiver) VisitMethod(m *tree.JavaTypeMethod, p any) tree.JavaT
 }
 
 // VisitVariable mirrors JavaTypeReceiver.visitVariable
-func (r *JavaTypeReceiver) VisitVariable(v *tree.JavaTypeVariable, p any) tree.JavaType {
+func (r *JavaTypeReceiver) VisitVariable(v *java.JavaTypeVariable, p any) java.JavaType {
 	q := p.(*ReceiveQueue)
-	cc := *v
-	v = &cc
 	v.Name = receiveScalar[string](q, v.Name)
-	v.Owner = receiveAsType[tree.JavaType](r, q, v.Owner)
-	v.Type = receiveAsType[tree.JavaType](r, q, v.Type)
+	v.Owner = receiveAsType[java.JavaType](r, q, v.Owner)
+	v.Type = receiveAsType[java.JavaType](r, q, v.Type)
 	v.Annotations = receiveClassList(r, q, v.Annotations)
 	return v
 }
 
-// receiveScalar receives a simple value from the queue.
-func receiveScalar[T any](q *ReceiveQueue, before T) T {
-	result := q.Receive(before, nil)
-	if result == nil {
-		var zero T
-		return zero
-	}
-	// Handle numeric type conversions from JSON
-	return convertTo[T](result)
-}
-
-// convertTo converts a value to the desired type, handling JSON number conversions.
-func convertTo[T any](v any) T {
-	if t, ok := v.(T); ok {
-		return t
-	}
-	// Handle float64 -> int64 conversion (common with JSON)
-	var zero T
-	switch any(zero).(type) {
-	case int64:
-		switch n := v.(type) {
-		case float64:
-			return any(int64(n)).(T)
-		case int:
-			return any(int64(n)).(T)
-		}
-	case string:
-		if s, ok := v.(string); ok {
-			return any(s).(T)
-		}
-	}
-	return v.(T)
-}
-
 // receiveAsType receives a ref-tracked type from the queue.
-func receiveAsType[T tree.JavaType](r *JavaTypeReceiver, q *ReceiveQueue, before T) T {
+func receiveAsType[T java.JavaType](r *JavaTypeReceiver, q *ReceiveQueue, before T) T {
 	result := q.Receive(before, func(v any) any {
-		return r.Visit(v.(tree.JavaType), q)
+		return r.Visit(v.(java.JavaType), q)
 	})
 	if result == nil {
 		var zero T
@@ -260,68 +203,90 @@ func receiveAsType[T tree.JavaType](r *JavaTypeReceiver, q *ReceiveQueue, before
 }
 
 // receiveTypeList receives a list of JavaTypes from the queue.
-func receiveTypeList(r *JavaTypeReceiver, q *ReceiveQueue, before []tree.JavaType) []tree.JavaType {
+func receiveTypeList(r *JavaTypeReceiver, q *ReceiveQueue, before []java.JavaType) []java.JavaType {
 	beforeAny := javaTypeSlice(before)
 	afterAny := q.ReceiveList(beforeAny, func(v any) any {
-		return r.Visit(v.(tree.JavaType), q)
+		return r.Visit(v.(java.JavaType), q)
 	})
 	if afterAny == nil {
 		return nil
 	}
-	result := make([]tree.JavaType, len(afterAny))
+	result := make([]java.JavaType, len(afterAny))
 	for i, v := range afterAny {
-		result[i] = v.(tree.JavaType)
+		result[i] = v.(java.JavaType)
 	}
 	return result
 }
 
-// receiveClassList receives a list of *JavaTypeClass from the queue.
-func receiveClassList(r *JavaTypeReceiver, q *ReceiveQueue, before []*tree.JavaTypeClass) []*tree.JavaTypeClass {
+// receiveClassList receives a list of FullyQualified class types from the
+// queue. The element type is widened (vs. concrete *JavaTypeClass) so
+// that JavaType$ShallowClass payloads keep their wire identity through
+// the round-trip.
+func receiveClassList(r *JavaTypeReceiver, q *ReceiveQueue, before []java.FullyQualified) []java.FullyQualified {
 	beforeAny := classSlice(before)
 	afterAny := q.ReceiveList(beforeAny, func(v any) any {
-		return r.Visit(v.(tree.JavaType), q)
+		return r.Visit(v.(java.JavaType), q)
 	})
 	if afterAny == nil {
 		return nil
 	}
-	result := make([]*tree.JavaTypeClass, len(afterAny))
+	result := make([]java.FullyQualified, len(afterAny))
 	for i, v := range afterAny {
-		if cls, ok := v.(*tree.JavaTypeClass); ok {
-			result[i] = cls
+		if fq, ok := v.(java.FullyQualified); ok {
+			result[i] = fq
 		}
-		// Unknown types are skipped (nil in the list)
+		// Unknown / non-fully-qualified types are skipped (nil in the list)
 	}
 	return result
+}
+
+// receiveAsFullyQualified receives a class-typed JavaType (Class or
+// ShallowClass) and preserves its concrete identity.
+func receiveAsFullyQualified(r *JavaTypeReceiver, q *ReceiveQueue, before java.FullyQualified) java.FullyQualified {
+	var beforeAny any
+	if before != nil {
+		beforeAny = before
+	}
+	result := q.Receive(beforeAny, func(v any) any {
+		return r.Visit(v.(java.JavaType), q)
+	})
+	if result == nil {
+		return nil
+	}
+	if fq, ok := result.(java.FullyQualified); ok {
+		return fq
+	}
+	return nil
 }
 
 // receiveVariableList receives a list of *JavaTypeVariable from the queue.
-func receiveVariableList(r *JavaTypeReceiver, q *ReceiveQueue, before []*tree.JavaTypeVariable) []*tree.JavaTypeVariable {
+func receiveVariableList(r *JavaTypeReceiver, q *ReceiveQueue, before []*java.JavaTypeVariable) []*java.JavaTypeVariable {
 	beforeAny := variableSlice(before)
 	afterAny := q.ReceiveList(beforeAny, func(v any) any {
-		return r.Visit(v.(tree.JavaType), q)
+		return r.Visit(v.(java.JavaType), q)
 	})
 	if afterAny == nil {
 		return nil
 	}
-	result := make([]*tree.JavaTypeVariable, len(afterAny))
+	result := make([]*java.JavaTypeVariable, len(afterAny))
 	for i, v := range afterAny {
-		result[i] = v.(*tree.JavaTypeVariable)
+		result[i] = v.(*java.JavaTypeVariable)
 	}
 	return result
 }
 
 // receiveMethodList receives a list of *JavaTypeMethod from the queue.
-func receiveMethodList(r *JavaTypeReceiver, q *ReceiveQueue, before []*tree.JavaTypeMethod) []*tree.JavaTypeMethod {
+func receiveMethodList(r *JavaTypeReceiver, q *ReceiveQueue, before []*java.JavaTypeMethod) []*java.JavaTypeMethod {
 	beforeAny := methodSlice(before)
 	afterAny := q.ReceiveList(beforeAny, func(v any) any {
-		return r.Visit(v.(tree.JavaType), q)
+		return r.Visit(v.(java.JavaType), q)
 	})
 	if afterAny == nil {
 		return nil
 	}
-	result := make([]*tree.JavaTypeMethod, len(afterAny))
+	result := make([]*java.JavaTypeMethod, len(afterAny))
 	for i, v := range afterAny {
-		result[i] = v.(*tree.JavaTypeMethod)
+		result[i] = v.(*java.JavaTypeMethod)
 	}
 	return result
 }

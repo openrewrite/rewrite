@@ -214,6 +214,16 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     }
 
     @Override
+    public S.InterpolatedString visitInterpolatedString(S.InterpolatedString interpolatedString, P p) {
+        return (S.InterpolatedString) super.visitInterpolatedString(interpolatedString, p);
+    }
+
+    @Override
+    public S.Interpolation visitInterpolation(S.Interpolation interpolation, P p) {
+        return (S.Interpolation) super.visitInterpolation(interpolation, p);
+    }
+
+    @Override
     public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, P p) {
         return (J.InstanceOf) super.visitInstanceOf(instanceOf, p);
     }

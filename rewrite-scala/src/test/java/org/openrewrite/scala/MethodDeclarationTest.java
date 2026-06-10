@@ -168,12 +168,46 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void methodWithVarargsParameter() {
+        rewriteRun(
+            scala(
+                """
+                object A {
+                  def foo(x: Int, more: String*): Int = x
+                }
+                object B {
+                  def foo(args: String*): Int = args.size
+                }
+                object C {
+                  def foo(args: Array[String]*): Int = 0
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void methodWithDefaultParameter() {
         rewriteRun(
             scala(
                 """
                 object Test {
                   def greet(name: String = "World"): Unit = println(s"Hello, $name")
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void scala2MacroImplementation() {
+        rewriteRun(
+            scala(
+                """
+                import scala.language.experimental.macros
+
+                class C {
+                  def q: T = macro macroimpl.M.f
                 }
                 """
             )
@@ -265,6 +299,50 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void qualifiedContextBound() {
+        rewriteRun(
+            scala(
+                """
+                object pkg {
+                  trait Zero[A]
+                }
+                object Test {
+                  def f[A: pkg.Zero](x: A): A = x
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void curriedParamsWithDefaults() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo(name: String)(insert: String = null, targetSchema: String = null): Unit = {
+                    println(insert)
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void tripleCurriedParamList() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(a: Int)(b: Int)(c: Int): Int = a + b + c
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void curriedMethodParameterTypeNoSpaceAfterColon() {
         rewriteRun(
             scala(
@@ -320,6 +398,62 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void functionTypes() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def make1(): Int => Int = x => x + 1
+                  def make2(): () => Int = () => 42
+                  def make3(): (Int, String) => Boolean = (i, s) => s.length == i
+                  def apply(f: Int => Int, x: Int): Int = f(x)
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void parenthesizedReturnType() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(x: Int): (Int => Unit) = {
+                    _ => ()
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void parenthesizedReturnTypeWithExtraSpaces() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f  :  (  Int  ) = 1
+                  def g: ( ( Int ) ) = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void functionTypeAsDefaultParameter() {
+        rewriteRun(
+            scala(
+                """
+                case class C(f: Int => Boolean = _ => false)
+                """
+            )
+        );
+    }
+
+    @Test
     void implicitInSecondParamList() {
         rewriteRun(
             scala(
@@ -330,6 +464,92 @@ class MethodDeclarationTest implements RewriteTest {
                 """
             )
         );
+    }
+
+    @Nested
+    class Using implements RewriteTest {
+
+        @Test
+        void inSecondParamList() {
+            rewriteRun(
+                scala(
+                    """
+                    object Test {
+                      def apply(obj: String)(using c: Int): String = obj
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void inFirstParamList() {
+            rewriteRun(
+                scala(
+                    """
+                    object Test {
+                      def apply(using c: Int): String = c.toString
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void inThirdParamListSingleLine() {
+            rewriteRun(
+                scala(
+                    """
+                    trait BSONHandler[T]
+                    object Test {
+                      def valueMapHandler[K, V](mapping: Map[K, V])(toKey: V => K)(using keyHandler: BSONHandler[K]): BSONHandler[V] = new BSONHandler[V] {}
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void inThirdParamListMultiline() {
+            rewriteRun(
+                scala(
+                    """
+                    trait BSONHandler[T]
+                    object Test {
+                      def valueMapHandler[K, V](mapping: Map[K, V])(toKey: V => K)(using
+                          keyHandler: BSONHandler[K]
+                      ): BSONHandler[V] = new BSONHandler[V] {}
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void anonymousParameter() {
+            rewriteRun(
+                scala(
+                    """
+                    trait Ord[T]
+                    object Test {
+                      def sort[T](xs: List[T])(using Ord[T]): List[T] = xs
+                    }
+                    """
+                )
+            );
+        }
+
+        @Test
+        void multipleAnonymousParameters() {
+            rewriteRun(
+                scala(
+                    """
+                    object Test:
+                      def foo(using Me, Perf): Int = 1
+                    """
+                )
+            );
+        }
     }
 
     @Nested
@@ -386,5 +606,271 @@ class MethodDeclarationTest implements RewriteTest {
                 )
             );
         }
+
+        @Test
+        void extensionBracelessIndentedBody() {
+            rewriteRun(
+                scala(
+                    """
+                    extension (s: String)
+                      def shout: String = s.toUpperCase
+                      def whisper: String = s.toLowerCase
+                    """
+                )
+            );
+        }
+    }
+
+    @Test
+    void parameterlessDef() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo: Int = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void parameterlessDefInTrait() {
+        rewriteRun(
+            scala(
+                """
+                trait T {
+                  def bar: String
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void parameterlessDefWithTypeParameter() {
+        rewriteRun(
+            scala(
+                """
+                trait T {
+                  def underlying[A]: A
+                  def empty[A]: List[A] = Nil
+                  def nil[A] = List.empty[A]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void spaceBeforeEqualsWithNoSpaceAfter() {
+        rewriteRun(scala("def f(): Unit ={ }"));
+    }
+
+    @Test
+    void spaceBeforeColonOnMethodParameter() {
+        rewriteRun(scala("def f(map : Int): Int = 1"));
+    }
+
+    @Test
+    void auxiliaryConstructors() {
+        rewriteRun(
+            scala(
+                """
+                class DelegatingToPrimary(a: Int) {
+                  def this() = this(0)
+                }
+
+                class WithParams(a: Int, b: Int) {
+                  def this(x: Int) = this(x, 0)
+                }
+
+                class Chained(a: Int, b: Int) {
+                  def this(x: Int) = this(x, 0)
+                  def this() = this(0)
+                }
+
+                class WithBlockBody(a: Int) {
+                  def this() = {
+                    this(0)
+                    println("init")
+                  }
+                }
+
+                class WithPrivate(a: Int) {
+                  private def this() = this(0)
+                }
+
+                class WithAnnotation(a: Int) {
+                  @deprecated def this() = this(0)
+                }
+
+                case class CaseClass(a: Int, b: Int) {
+                  def this() = this(0, 0)
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // buildKeywordMethodInvocation — this(...) auxiliary constructor close paren in line comment
+        rewriteRun(
+          scala(
+            """
+              class C(val x: Int) {
+                def this() = this(0 // )
+                )
+              }
+              """
+          )
+        );
+        // reparseProcedureBody — `{` in block comment before procedure body
+        rewriteRun(
+          scala(
+            """
+              class C {
+                def foo() /* { */ {
+                  println("x")
+                }
+              }
+              """
+          )
+        );
+        // visitDefDefImpl — type parameter close bracket in block comment
+        rewriteRun(
+          scala(
+            """
+              def f[T /* ] */](x: T): T = x
+              """
+          )
+        );
+        // visitDefDefImpl — parameter list close paren in line comment
+        rewriteRun(
+          scala(
+            """
+              def f(x: Int // )
+              ): Int = x
+              """
+          )
+        );
+        // visitExtMethods — extension method close paren in block comment
+        rewriteRun(
+          scala(
+            """
+              extension (x: Int /* ) */ ) {
+                def doubled: Int = x * 2
+              }
+              """
+          )
+        );
+        // visitTypeParameter — context bound colon in block comment
+        rewriteRun(
+          scala(
+            """
+              def f[A /* : */ : Ordering](x: A): A = x
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchCaseSingleLineWithDefault() {
+        rewriteRun(
+          scala(
+            """
+            def f(default: => String): String =
+              try "x"
+              catch case _: Exception => default
+            """
+          )
+        );
+    }
+
+    @Test
+    void tryCatchCaseSingleLineWithThrow() {
+        rewriteRun(
+          scala(
+            """
+            def f: String =
+              try "x"
+              catch case e: Exception => throw e
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedParameterListsOnSeparateLines() {
+        rewriteRun(
+          scala(
+            """
+            def f(a: Int)
+                (b: Int): Int = a + b
+            """
+          )
+        );
+    }
+
+    @Test
+    void multilineParameterListWithTrailingLineComment() {
+        rewriteRun(
+          scala(
+            """
+            def resize(
+                size: Int // either the width or the height! the other one will be preserved
+            ): Url = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedParameterListWithTrailingLineComment() {
+        rewriteRun(
+          scala(
+            """
+            def f(a: Int)(
+                b: Int // either the width or the height! the other one will be preserved
+            ): Int = a + b
+            """
+          )
+        );
+    }
+
+    @Test
+    void longLineCommentBeforeParameterList() {
+        rewriteRun(
+          scala(
+            """
+            def resize // either the width or the height! the other one will be preserved
+            (size: Int): Int = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void emptyParameterListWithInteriorLineComment() {
+        rewriteRun(
+          scala(
+            """
+            def resize( // either the width or the height! the other one will be preserved
+            ): Int = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void emptyParameterListWithInteriorBlockComment() {
+        rewriteRun(
+          scala(
+            """
+            def resize(/* nothing here */): Int = 1
+            """
+          )
+        );
     }
 }

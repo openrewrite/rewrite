@@ -139,6 +139,17 @@ public interface RewriteTest extends SourceSpecs {
         spec.recipe(Recipe.noop());
     }
 
+    /**
+     * Class-level default {@link RewriteRunner}. Override (or via {@code @ExtendWith})
+     * to run every {@code rewriteRun} call in this class through a non-default backend
+     * — typically a moderne-cli runner that stages the test's sources to a temp dir,
+     * invokes the CLI, and translates the result back into a {@link RecipeRun}.
+     * Per-call overrides via {@link RecipeSpec#runner(RewriteRunner)} take precedence.
+     */
+    default RewriteRunner runner() {
+        return RewriteRunner.IN_PROCESS;
+    }
+
     default void rewriteRun(SourceSpecs... sourceSpecs) {
         rewriteRun(spec -> {
         }, sourceSpecs);
@@ -433,12 +444,13 @@ public interface RewriteTest extends SourceSpecs {
         recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
                 .setValidateCursorAcyclic(TypeValidation.before(testMethodSpec, testClassSpec).cursorAcyclic())
                 .setValidateImmutableExecutionContext(TypeValidation.before(testMethodSpec, testClassSpec).immutableExecutionContext());
-        RecipeRun recipeRun = recipe.run(
-                lss,
-                recipeCtx,
-                cycles,
-                expectedCyclesThatMakeChanges + 1
-        );
+        RewriteRunner runner = testMethodSpec.getRunner() != null ? testMethodSpec.getRunner() :
+                testClassSpec.getRunner() != null ? testClassSpec.getRunner() :
+                        runner();
+        RewriteRunner.Context runnerContext = new RewriteRunner.Context(
+                lss, runnableSourceFiles, recipeCtx, cycles, expectedCyclesThatMakeChanges,
+                Arrays.asList(sourceSpecs), testClassSpec, testMethodSpec);
+        RecipeRun recipeRun = runner.run(recipe, runnerContext);
 
         for (Consumer<RecipeRun> afterRecipe : testClassSpec.afterRecipes) {
             afterRecipe.accept(recipeRun);

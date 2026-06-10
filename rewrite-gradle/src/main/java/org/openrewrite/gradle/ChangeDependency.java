@@ -30,6 +30,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
@@ -282,6 +283,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         if (changeManagedDependency == null || changeManagedDependency) {
                             doAfterVisit(new ChangeManagedDependency(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern).getVisitor());
                         }
+                        JavaSourceSet.markDirty(ctx, sourceFile);
                     }
 
                     return super.visit(sourceFile, ctx);

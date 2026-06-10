@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -120,7 +119,7 @@ class UvLockParserTest {
     }
 
     @Test
-    void findLockFileInSameDirectory(@TempDir Path tempDir) throws IOException {
+    void findLockFileInSameDirectory(@TempDir Path tempDir) throws Exception {
         Path lockFile = tempDir.resolve("uv.lock");
         Files.write(lockFile, "version = 1\n".getBytes());
 
@@ -129,7 +128,7 @@ class UvLockParserTest {
     }
 
     @Test
-    void findLockFileInParentDirectory(@TempDir Path tempDir) throws IOException {
+    void findLockFileInParentDirectory(@TempDir Path tempDir) throws Exception {
         Path lockFile = tempDir.resolve("uv.lock");
         Files.write(lockFile, "version = 1\n".getBytes());
 
@@ -141,7 +140,7 @@ class UvLockParserTest {
     }
 
     @Test
-    void findLockFileRespectsResourceBoundary(@TempDir Path tempDir) throws IOException {
+    void findLockFileRespectsResourceBoundary(@TempDir Path tempDir) throws Exception {
         // Lock file above boundary should not be found
         Path lockFile = tempDir.resolve("uv.lock");
         Files.write(lockFile, "version = 1\n".getBytes());
@@ -162,13 +161,13 @@ class UvLockParserTest {
     }
 
     @Test
-    void hasAlternativeLockFileDetectsPoetryLock(@TempDir Path tempDir) throws IOException {
+    void hasAlternativeLockFileDetectsPoetryLock(@TempDir Path tempDir) throws Exception {
         Files.write(tempDir.resolve("poetry.lock"), "".getBytes());
         assertThat(UvLockParser.hasAlternativeLockFile(tempDir, null)).isTrue();
     }
 
     @Test
-    void hasAlternativeLockFileDetectsPdmLock(@TempDir Path tempDir) throws IOException {
+    void hasAlternativeLockFileDetectsPdmLock(@TempDir Path tempDir) throws Exception {
         Files.write(tempDir.resolve("pdm.lock"), "".getBytes());
         assertThat(UvLockParser.hasAlternativeLockFile(tempDir, null)).isTrue();
     }
@@ -179,7 +178,7 @@ class UvLockParserTest {
     }
 
     @Test
-    void hasAlternativeLockFileWalksUpToParent(@TempDir Path tempDir) throws IOException {
+    void hasAlternativeLockFileWalksUpToParent(@TempDir Path tempDir) throws Exception {
         Files.write(tempDir.resolve("poetry.lock"), "".getBytes());
         Path subDir = tempDir.resolve("subproject");
         Files.createDirectories(subDir);
@@ -187,7 +186,7 @@ class UvLockParserTest {
     }
 
     @Test
-    void hasAlternativeLockFileRespectsBoundary(@TempDir Path tempDir) throws IOException {
+    void hasAlternativeLockFileRespectsBoundary(@TempDir Path tempDir) throws Exception {
         Files.write(tempDir.resolve("poetry.lock"), "".getBytes());
         Path boundary = tempDir.resolve("boundary");
         Files.createDirectories(boundary);

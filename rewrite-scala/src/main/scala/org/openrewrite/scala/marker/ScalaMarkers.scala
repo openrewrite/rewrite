@@ -115,3 +115,39 @@ case class PackageSemicolon(id: UUID) extends Marker {
   override def getId(): UUID = id
   override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
 }
+
+/**
+ * Marks a Scala 3 `given` declaration. Applied to:
+ * - `J.VariableDeclarations` for named given aliases (`given x: Int = 42`)
+ *   and named given instances with `with` bodies (`given x: Foo with { ... }`).
+ * - `J.MethodDeclaration` for method-shaped given aliases
+ *   (`given listOrd[T](using Ord[T]): Ord[List[T]] = ...`).
+ *
+ * The printer uses this to emit `given` in place of `val`/`def`.
+ */
+case class Given(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * Marks a `J.VariableDeclarations.NamedVariable` whose name is synthesized by the
+ * Scala compiler and does not appear in source. The printer omits the name.
+ * Used for anonymous `using` parameters (`def f(using Ord[T])`).
+ */
+case class OmitName(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}
+
+/**
+ * Captures additional constructor parameter lists for a Scala 3 class declared
+ * with curried constructor params, e.g. `class C(a: Int)(using Executor)`.
+ * The J.ClassDeclaration's `primaryConstructor` JContainer only models the first
+ * list; this marker holds the verbatim source text of the remaining lists so the
+ * printer can re-emit them after the first `)`. Includes the surrounding parens.
+ */
+case class ExtraConstructorParamLists(id: UUID, text: String) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
+}

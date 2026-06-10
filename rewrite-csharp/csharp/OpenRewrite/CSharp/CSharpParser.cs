@@ -29,14 +29,15 @@ public class CSharpParser
     private bool _charsetBomMarked;
 
     public CompilationUnit Parse(string source, string sourcePath = "source.cs",
-        SemanticModel? semanticModel = null, bool charsetBomMarked = false)
+        SemanticModel? semanticModel = null, bool charsetBomMarked = false,
+        Dictionary<ISymbol, JavaType>? typeCache = null)
     {
         _charsetBomMarked = charsetBomMarked;
         var symbols = PreprocessorSourceTransformer.ExtractSymbols(source);
         if (symbols.Count == 0)
-            return ParseSingle(source, sourcePath, semanticModel);
+            return ParseSingle(source, sourcePath, semanticModel, typeCache);
 
-        return ParseMulti(source, sourcePath, semanticModel, symbols);
+        return ParseMulti(source, sourcePath, semanticModel, symbols, typeCache);
     }
 
     /// <summary>
@@ -48,13 +49,14 @@ public class CSharpParser
     /// </summary>
     public CompilationUnit ParseWithConfigurations(string source, string sourcePath,
         SemanticModel? semanticModel, List<HashSet<string>> configSymbolSets,
-        bool charsetBomMarked = false)
+        bool charsetBomMarked = false, Dictionary<ISymbol, JavaType>? typeCache = null)
     {
-        return Parse(source, sourcePath, semanticModel, charsetBomMarked);
+        return Parse(source, sourcePath, semanticModel, charsetBomMarked, typeCache);
     }
 
     private CompilationUnit ParseMultiWithSymbolSets(string source, string sourcePath,
-        SemanticModel? semanticModel, List<HashSet<string>> symbolSets)
+        SemanticModel? semanticModel, List<HashSet<string>> symbolSets,
+        Dictionary<ISymbol, JavaType>? typeCache = null)
     {
         var directiveLines = PreprocessorSourceTransformer.GetDirectivePositions(source);
 
@@ -79,7 +81,7 @@ public class CSharpParser
 
         if (permutations.Count <= 1)
         {
-            return ParseSingle(source, sourcePath, semanticModel);
+            return ParseSingle(source, sourcePath, semanticModel, typeCache);
         }
 
         PreprocessorSourceTransformer.ComputeActiveBranchIndices(directiveLines, permutations);
@@ -100,11 +102,11 @@ public class CSharpParser
                 var compilation = semanticModel.Compilation.ReplaceSyntaxTree(
                     semanticModel.SyntaxTree, syntaxTree);
                 var newSemanticModel = compilation.GetSemanticModel(syntaxTree);
-                cu = ParseSingle(cleanSource, sourcePath, newSemanticModel);
+                cu = ParseSingle(cleanSource, sourcePath, newSemanticModel, typeCache);
             }
             else
             {
-                cu = ParseSingle(cleanSource, sourcePath, null);
+                cu = ParseSingle(cleanSource, sourcePath, null, typeCache);
             }
 
             cu = (CompilationUnit)DirectiveBoundaryInjector.Inject(cu);
@@ -138,12 +140,13 @@ public class CSharpParser
         );
     }
 
-    private CompilationUnit ParseSingle(string source, string sourcePath, SemanticModel? semanticModel)
+    private CompilationUnit ParseSingle(string source, string sourcePath, SemanticModel? semanticModel,
+        Dictionary<ISymbol, JavaType>? typeCache = null)
     {
         if (semanticModel != null)
         {
             var root = semanticModel.SyntaxTree.GetCompilationUnitRoot();
-            var visitor = new CSharpParserVisitor(source, semanticModel, _charsetBomMarked);
+            var visitor = new CSharpParserVisitor(source, semanticModel, _charsetBomMarked, typeCache);
             var cu = visitor.VisitCompilationUnit(root);
             // Override source path since the semantic model's tree has the absolute path
             // from MSBuildWorkspace, but we want the relative path
@@ -161,7 +164,8 @@ public class CSharpParser
     }
 
     private CompilationUnit ParseMulti(string source, string sourcePath,
-        SemanticModel? semanticModel, HashSet<string> symbols)
+        SemanticModel? semanticModel, HashSet<string> symbols,
+        Dictionary<ISymbol, JavaType>? typeCache = null)
     {
         var directiveLines = PreprocessorSourceTransformer.GetDirectivePositions(source);
 
@@ -190,11 +194,11 @@ public class CSharpParser
                 var compilation = semanticModel.Compilation.ReplaceSyntaxTree(
                     semanticModel.SyntaxTree, syntaxTree);
                 var newSemanticModel = compilation.GetSemanticModel(syntaxTree);
-                cu = ParseSingle(cleanSource, sourcePath, newSemanticModel);
+                cu = ParseSingle(cleanSource, sourcePath, newSemanticModel, typeCache);
             }
             else
             {
-                cu = ParseSingle(cleanSource, sourcePath, null);
+                cu = ParseSingle(cleanSource, sourcePath, null, typeCache);
             }
 
             // Convert ghost comments in whitespace to DirectiveBoundaryMarker markers
@@ -254,12 +258,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     private Space _pendingSemicolonSpace = Space.Empty;
 
     public CSharpParserVisitor(string source, SemanticModel? semanticModel = null,
-        bool charsetBomMarked = false)
+        bool charsetBomMarked = false, Dictionary<ISymbol, JavaType>? sharedTypeCache = null)
     {
         _source = source;
         _cursor = 0;
         _semanticModel = semanticModel;
-        _typeMapping = semanticModel != null ? new CSharpTypeMapping(semanticModel) : null;
+        _typeMapping = semanticModel != null ? new CSharpTypeMapping(semanticModel, sharedTypeCache) : null;
         _charsetBomMarked = charsetBomMarked;
     }
 
@@ -310,25 +314,18 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         // Leading directives go into the first non-empty printed list so the printer
         // emits them before any real content (print order: externs → usings → members)
-        if (leadingDirectives.Count > 0)
+        if (leadingDirectives.Count > 0 && node.Externs.Count > 0)
         {
-            var leadingTarget = node.Externs.Count > 0 ? externAliases : null;
-            // if target is null, defer to usingDirectives (declared below) or members
-            if (leadingTarget != null)
-            {
-                foreach (var d in leadingDirectives)
-                    leadingTarget.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
-                leadingDirectives.Clear();
-            }
-            else if (node.Usings.Count == 0)
-            {
-                // No externs, no usings — put in members
-                foreach (var d in leadingDirectives)
-                    members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
-                leadingDirectives.Clear();
-            }
-            // else: leadingDirectives remain, will be prepended to usingDirectives below
+            // externAliases is the first list the printer emits, so leading directives belong
+            // ahead of the extern aliases when any exist.
+            foreach (var d in leadingDirectives)
+                externAliases.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
+            leadingDirectives.Clear();
         }
+        // Otherwise leadingDirectives remain and are prepended to usingDirectives below. The
+        // usings list prints before attributeLists and members, so a top-of-file directive
+        // (e.g. "#pragma warning disable" ahead of an "[assembly: ...]" attribute) keeps its
+        // position even when there are no usings.
 
         foreach (var externAlias in node.Externs)
         {
@@ -1449,17 +1446,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         else if (node.ExpressionBody != null)
         {
             // Expression-bodied method: syntactic sugar for a single return statement
-            var arrowPrefix = ExtractSpaceBefore(node.ExpressionBody.ArrowToken);
-            _cursor = node.ExpressionBody.ArrowToken.Span.End;
-            var expr = (Expression)Visit(node.ExpressionBody.Expression)!;
-
-            var returnStmt = new Return(Guid.NewGuid(), Space.Empty, Markers.Empty, expr);
-            body = new Block(Guid.NewGuid(), arrowPrefix, Markers.Empty,
-                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
-                [new JRightPadded<Statement>(returnStmt, Space.Empty, Markers.Empty)],
-                Space.Empty);
-
-            _cursor = node.SemicolonToken.Span.End;
+            body = BuildExpressionBodiedBlock(node.ExpressionBody, node.SemicolonToken);
         }
         else if (node.SemicolonToken != default)
         {
@@ -1493,6 +1480,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             returnType,
             name,
             paramsContainer,
+            [], // DimensionsAfterName
             null, // Throws
             body,
             null, // DefaultValue
@@ -1619,17 +1607,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         Markers methodMarkers = Markers.Empty;
         if (node.ExpressionBody != null)
         {
-            var arrowPrefix = ExtractSpaceBefore(node.ExpressionBody.ArrowToken);
-            _cursor = node.ExpressionBody.ArrowToken.Span.End;
-            var expr = (Expression)Visit(node.ExpressionBody.Expression)!;
-
-            var returnStmt = new Return(Guid.NewGuid(), Space.Empty, Markers.Empty, expr);
-            body = new Block(Guid.NewGuid(), arrowPrefix, Markers.Empty,
-                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
-                [new JRightPadded<Statement>(returnStmt, Space.Empty, Markers.Empty)],
-                Space.Empty);
-
-            _cursor = node.SemicolonToken.Span.End;
+            body = BuildExpressionBodiedBlock(node.ExpressionBody, node.SemicolonToken);
             methodMarkers = Markers.Build([new ExpressionBodied(Guid.NewGuid())]);
         }
         else if (node.Body != null)
@@ -1651,6 +1629,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null, // ReturnTypeExpression (constructors have none)
             name,
             paramsContainer,
+            [], // DimensionsAfterName
             null, // Throws
             body,
             defaultValue,
@@ -1709,15 +1688,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         Markers methodMarkers = Markers.Empty;
         if (node.ExpressionBody != null)
         {
-            var arrowPrefix = ExtractSpaceBefore(node.ExpressionBody.ArrowToken);
-            _cursor = node.ExpressionBody.ArrowToken.Span.End;
-            var expr = (Expression)Visit(node.ExpressionBody.Expression)!;
-            var returnStmt = new Return(Guid.NewGuid(), Space.Empty, Markers.Empty, expr);
-            body = new Block(Guid.NewGuid(), arrowPrefix, Markers.Empty,
-                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
-                [new JRightPadded<Statement>(returnStmt, Space.Empty, Markers.Empty)],
-                Space.Empty);
-            _cursor = node.SemicolonToken.Span.End;
+            body = BuildExpressionBodiedBlock(node.ExpressionBody, node.SemicolonToken);
             methodMarkers = Markers.Build([new ExpressionBodied(Guid.NewGuid())]);
         }
         else if (node.Body != null)
@@ -1735,6 +1706,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null, // TypeParameters
             null, // ReturnTypeExpression (destructors have none)
             name, paramsContainer,
+            [], // DimensionsAfterName
             null, // Throws
             body,
             null, // DefaultValue
@@ -2075,17 +2047,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         else if (node.ExpressionBody != null)
         {
             // Expression-bodied operator: => expr;
-            var arrowPrefix = ExtractSpaceBefore(node.ExpressionBody.ArrowToken);
-            _cursor = node.ExpressionBody.ArrowToken.Span.End;
-            var expr = (Expression)Visit(node.ExpressionBody.Expression)!;
-
-            var returnStmt = new Return(Guid.NewGuid(), Space.Empty, Markers.Empty, expr);
-            body = new Block(Guid.NewGuid(), arrowPrefix, Markers.Empty,
-                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
-                [new JRightPadded<Statement>(returnStmt, Space.Empty, Markers.Empty)],
-                Space.Empty);
-
-            _cursor = node.SemicolonToken.Span.End;
+            body = BuildExpressionBodiedBlock(node.ExpressionBody, node.SemicolonToken);
         }
         else
         {
@@ -2344,9 +2306,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         }
         else if (node.SemicolonToken != default)
         {
-            // Auto-implemented accessor - consume the semicolon
-            SkipTo(node.SemicolonToken.SpanStart);
-            SkipToken(node.SemicolonToken);
+            // Auto-implemented accessor (e.g. "get;" or "get ;"). Roslyn has no node for the
+            // implicit body; we model it as J.Empty so the whitespace between the keyword and
+            // the trailing ';' has a home. ExpressionBody.Element being Empty is the signal to
+            // the printer to emit ';' without '=>'.
+            var emptyPrefix = ExtractSpaceBefore(node.SemicolonToken);
+            _cursor = node.SemicolonToken.Span.End;
+            expressionBody = new JLeftPadded<Expression>(
+                Space.Empty,
+                new Empty(Guid.NewGuid(), emptyPrefix, Markers.Empty));
         }
 
         return new AccessorDeclaration(
@@ -2887,15 +2855,17 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var isPrefix = ExtractSpaceBefore(node.IsKeyword);
         _cursor = node.IsKeyword.Span.End;
 
-        // Visit the right-hand pattern
-        var pattern = Visit(node.Pattern)!;
+        // Visit the right-hand pattern. Use VisitPatternAsExpression so declaration patterns
+        // (which produce Statements) get wrapped, and parenthesized patterns (J.Parentheses<Expression>)
+        // are accepted via the Expression-typed IsPattern.Pattern field.
+        var pattern = VisitPatternAsExpression(node.Pattern);
 
         return new IsPattern(
             Guid.NewGuid(),
             prefix,
             Markers.Empty,
             expression,
-            new JLeftPadded<Pattern>(isPrefix, (Pattern)pattern)
+            new JLeftPadded<Expression>(isPrefix, pattern)
         );
     }
 
@@ -5940,8 +5910,10 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     {
         var prefix = ExtractPrefix(node);
 
-        // If parameter has no type, return just an identifier
-        if (node.Type == null)
+        // If parameter has no type and no modifiers, return just an identifier.
+        // Lambda parameters can carry modifiers without a type (e.g. "(ref reader) => ..."),
+        // so those must fall through to the VariableDeclarations path to preserve the modifier.
+        if (node.Type == null && node.Modifiers.Count == 0)
         {
             _cursor = node.Identifier.Span.End;
             var lambdaParamVarType = _typeMapping?.VariableType(node);
@@ -5966,8 +5938,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             modifiers.Add(CreateModifier(modPrefix, mod));
         }
 
-        // Parse the type
-        var typeExpr = VisitType(node.Type);
+        // Parse the type (may be null for modifier-only lambda parameters like "ref reader")
+        var typeExpr = node.Type != null ? VisitType(node.Type) : null;
 
         // Parse the parameter name
         var namePrefix = ExtractSpaceBefore(node.Identifier);
@@ -6547,25 +6519,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             // x?.b.c - member access chain (without further ?.)
             var segment = ParseConditionalAccessSegment(targetExpr, operatorSpace, whenMemberAccess);
-            return segment switch
-            {
-                FieldAccess fa => fa.WithPrefix(prefix),
-                MethodInvocation mi => mi.WithPrefix(prefix),
-                ArrayAccess aa => aa.WithPrefix(prefix),
-                _ => segment
-            };
+            return ApplyConditionalAccessPrefix(segment, prefix);
         }
         else if (node.WhenNotNull is ElementAccessExpressionSyntax elementAccess)
         {
             // x?.Items[0] - member access followed by indexer in null-conditional chain
             var segment = ParseConditionalAccessSegment(targetExpr, operatorSpace, elementAccess);
-            return segment switch
-            {
-                FieldAccess fa => fa.WithPrefix(prefix),
-                MethodInvocation mi => mi.WithPrefix(prefix),
-                ArrayAccess aa => aa.WithPrefix(prefix),
-                _ => segment
-            };
+            return ApplyConditionalAccessPrefix(segment, prefix);
         }
         else if (node.WhenNotNull is ConditionalAccessExpressionSyntax innerConditional)
         {
@@ -6650,15 +6610,23 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // For all other WhenNotNull patterns, delegate to the general segment parser
         {
             var segment = ParseConditionalAccessSegment(targetExpr, operatorSpace, node.WhenNotNull);
-            return segment switch
-            {
-                FieldAccess fa => fa.WithPrefix(prefix),
-                MethodInvocation mi => mi.WithPrefix(prefix),
-                ArrayAccess aa => aa.WithPrefix(prefix),
-                _ => segment
-            };
+            return ApplyConditionalAccessPrefix(segment, prefix);
         }
     }
+
+    // Re-applies the outer ConditionalAccessExpression's prefix to the segment returned by
+    // ParseConditionalAccessSegment. The segment was built with Space.Empty prefix because
+    // the actual leading whitespace lives on the outer ConditionalAccessExpression.
+    private static Expression ApplyConditionalAccessPrefix(Expression segment, Space prefix) => segment switch
+    {
+        FieldAccess fa => fa.WithPrefix(prefix),
+        MethodInvocation mi => mi.WithPrefix(prefix),
+        ArrayAccess aa => aa.WithPrefix(prefix),
+        Assignment a => a.WithPrefix(prefix),
+        AssignmentOperation aop => aop.WithPrefix(prefix),
+        CsUnary cu => cu.WithPrefix(prefix),
+        _ => segment
+    };
 
     /// <summary>
     /// Helper method to parse a null-conditional element access (x?[0]).
@@ -6914,13 +6882,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             // Terminal chain like ?.b.c at end
             var segment = ParseConditionalAccessSegment(target, operatorSpace, terminalMemberAccess);
-            return segment switch
-            {
-                FieldAccess fa => fa.WithPrefix(prefix),
-                MethodInvocation mi => mi.WithPrefix(prefix),
-                ArrayAccess aa => aa.WithPrefix(prefix),
-                _ => segment
-            };
+            return ApplyConditionalAccessPrefix(segment, prefix);
         }
         else if (whenNotNull is ConditionalAccessExpressionSyntax innerConditional)
         {
@@ -6998,13 +6960,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // delegate to the general segment parser
         {
             var segment = ParseConditionalAccessSegment(target, operatorSpace, whenNotNull);
-            return segment switch
-            {
-                FieldAccess fa => fa.WithPrefix(prefix),
-                MethodInvocation mi => mi.WithPrefix(prefix),
-                ArrayAccess aa => aa.WithPrefix(prefix),
-                _ => segment
-            };
+            return ApplyConditionalAccessPrefix(segment, prefix);
         }
     }
 
@@ -7730,6 +7686,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null,    // ReturnType (constructors don't have return types)
             methodName,
             paramsContainer,
+            [],      // DimensionsAfterName
             null,    // Throws
             null,    // Body
             null,    // DefaultValue
@@ -8395,17 +8352,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         }
         else if (node.ExpressionBody != null)
         {
-            var arrowPrefix = ExtractSpaceBefore(node.ExpressionBody.ArrowToken);
-            _cursor = node.ExpressionBody.ArrowToken.Span.End;
-            var expr = (Expression)Visit(node.ExpressionBody.Expression)!;
-
-            var returnStmt = new Return(Guid.NewGuid(), Space.Empty, Markers.Empty, expr);
-            body = new Block(Guid.NewGuid(), arrowPrefix, Markers.Empty,
-                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
-                [new JRightPadded<Statement>(returnStmt, Space.Empty, Markers.Empty)],
-                Space.Empty);
-
-            _cursor = node.SemicolonToken.Span.End;
+            body = BuildExpressionBodiedBlock(node.ExpressionBody, node.SemicolonToken);
         }
 
         return new MethodDeclaration(
@@ -8420,6 +8367,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             returnType,
             name,
             paramsContainer,
+            [], // DimensionsAfterName
             null, // Throws
             body,
             null, // DefaultValue
@@ -9017,17 +8965,22 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
     private Statement? ParsePragmaDirective(Space prefix, string afterKeyword)
     {
+        // Whitespace between "#pragma" and the next keyword (e.g. the two spaces in "#pragma  warning").
+        var keywordSpacing = Space.Format(afterKeyword[..(afterKeyword.Length - afterKeyword.TrimStart().Length)]);
         var rest = afterKeyword.TrimStart();
 
         if (rest.StartsWith("checksum"))
         {
             var arguments = rest[8..]; // text after "checksum"
-            return new PragmaChecksumDirective(Guid.NewGuid(), prefix, Markers.Empty, arguments);
+            return new PragmaChecksumDirective(Guid.NewGuid(), prefix, Markers.Empty, keywordSpacing, arguments);
         }
 
         if (!rest.StartsWith("warning")) return null;
 
-        rest = rest[7..].TrimStart(); // skip "warning"
+        rest = rest[7..]; // skip "warning" (keep trailing whitespace to capture action spacing)
+        // Whitespace between "warning" and the action keyword (e.g. "warning  disable").
+        var actionSpacing = Space.Format(rest[..(rest.Length - rest.TrimStart().Length)]);
+        rest = rest.TrimStart();
 
         PragmaWarningAction action;
         string afterAction;
@@ -9061,12 +9014,16 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             }
         }
 
-        return new PragmaWarningDirective(Guid.NewGuid(), prefix, Markers.Empty, action, codes);
+        return new PragmaWarningDirective(Guid.NewGuid(), prefix, Markers.Empty, action, codes, keywordSpacing, actionSpacing);
     }
 
     private NullableDirective ParseNullableDirective(Space prefix, string afterKeyword, string hashSpacing = "")
     {
+        // Preserve the original whitespace between "nullable" and the setting keyword
+        // (e.g. "  " in "#nullable  enable") so the LST round-trips byte-for-byte.
         var trimmed = afterKeyword.TrimStart();
+        var keywordSpacing = afterKeyword[..(afterKeyword.Length - trimmed.Length)];
+        if (keywordSpacing.Length == 0) keywordSpacing = " ";
 
         // Extract setting keyword
         var settingEnd = 0;
@@ -9104,7 +9061,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Capture any trailing comment (e.g., "// TODO: Fix this")
         var trailingComment = target != null ? remainder : (remainder.Length > 0 && settingEnd > 0 ? remainder : "");
 
-        return new NullableDirective(Guid.NewGuid(), prefix, Markers.Empty, setting, target, hashSpacing, trailingComment);
+        return new NullableDirective(Guid.NewGuid(), prefix, Markers.Empty, setting, target, hashSpacing, trailingComment, keywordSpacing);
     }
 
     private DefineDirective ParseDefineDirective(Space prefix, string afterKeyword)
@@ -9543,6 +9500,30 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             SyntaxKind.LogicalAndExpression => Binary.OperatorType.And,
             _ => throw new InvalidOperationException($"Unsupported binary operator: {kind}")
         };
+    }
+
+    /// <summary>
+    /// Builds the synthetic Block used to model an expression-bodied member ("=&gt; expr;").
+    /// The space (and any comment trivia) between the expression and the terminating semicolon
+    /// is captured as the "After" of the wrapped Return statement so the LST round-trips. The
+    /// cursor is advanced past the semicolon.
+    /// </summary>
+    private Block BuildExpressionBodiedBlock(ArrowExpressionClauseSyntax expressionBody, SyntaxToken semicolonToken)
+    {
+        var arrowPrefix = ExtractSpaceBefore(expressionBody.ArrowToken);
+        _cursor = expressionBody.ArrowToken.Span.End;
+        var expr = (Expression)Visit(expressionBody.Expression)!;
+
+        // Trivia between the expression and the ';' (e.g. a trailing comment) lives in the
+        // After space of the wrapped Return so it is not lost when round-tripping.
+        var beforeSemicolon = ExtractSpaceBefore(semicolonToken);
+        _cursor = semicolonToken.Span.End;
+
+        var returnStmt = new Return(Guid.NewGuid(), Space.Empty, Markers.Empty, expr);
+        return new Block(Guid.NewGuid(), arrowPrefix, Markers.Empty,
+            new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+            [new JRightPadded<Statement>(returnStmt, beforeSemicolon, Markers.Empty)],
+            Space.Empty);
     }
 
     /// <summary>

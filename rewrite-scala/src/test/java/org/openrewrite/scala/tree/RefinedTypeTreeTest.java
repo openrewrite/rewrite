@@ -47,4 +47,16 @@ class RefinedTypeTreeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitRefinedTypeTree — `{` in block comment before refinement body
+        rewriteRun(
+          scala(
+            """
+              type T = AnyRef /* { */ { def f: Int }
+              """
+          )
+        );
+    }
 }

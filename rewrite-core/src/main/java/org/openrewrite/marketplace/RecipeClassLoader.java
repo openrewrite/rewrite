@@ -36,8 +36,22 @@ import static java.util.Collections.emptyList;
 public class RecipeClassLoader extends URLClassLoader {
     private final ClassLoader parent;
 
+    // Classes whose FQN collides with a {@link #PARENT_DELEGATED_PREFIXES} entry by
+    // accident — `org.openrewrite.RecipeBuilder` etc. all `startsWith("org.openrewrite.Recipe")`
+    // — but which are Kotlin recipe-DSL internals that must resolve through the recipe-jar's
+    // classloader. Without this exclusion the lambda receivers (child-loaded `EditScope`,
+    // `ScanScope`, etc.) and the anonymous `Recipe` synthesized inside `RecipeBuilder.build()`
+    // (parent-loaded) end up on different loaders, producing a `ClassCastException` on the
+    // first `getVisitor()` call. See moderneinc/moderne-cli#3949.
+    private static final Set<String> NON_DELEGATED_CLASSES = new HashSet<>(Arrays.asList(
+            "org.openrewrite.RecipeBuilder",
+            "org.openrewrite.RecipeDsl",
+            "org.openrewrite.RecipeDslKt"
+    ));
+
     // Core OpenRewrite types that must be loaded from parent (from Moderne's RecipeClassLoader)
     private static final List<String> PARENT_DELEGATED_PREFIXES = Arrays.asList(
+            "org.openrewrite.AbstractRecipe",
             "org.openrewrite.Column",
             "org.openrewrite.Cursor",
             "org.openrewrite.DelegatingExecutionContext",
@@ -69,6 +83,7 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.internal",
             "org.openrewrite.marker",
             "org.openrewrite.scheduling",
+            "org.openrewrite.semver",
             "org.openrewrite.style",
             "org.openrewrite.template",
             "org.openrewrite.trait",
@@ -86,9 +101,10 @@ public class RecipeClassLoader extends URLClassLoader {
             "org.openrewrite.java.TypeNameMatcher",
             "org.openrewrite.java.internal.TypesInUse",
             "org.openrewrite.java.TypeNameMatcher",
-            // Cursor-message wiring (TYPE_FACTORY_PROVIDER_KEY) passes a Provider
-            // implementation across the recipe/parent classloader boundary; the
-            // interface must be shared so the cast in JavaTemplateParser succeeds.
+            // JavaSourceSet#getTypeFactory crosses the recipe/parent classloader
+            // boundary when JavaTemplate reads it from the enclosing source file's
+            // marker; the interface must be shared so the cast in JavaTemplateParser
+            // succeeds.
             "org.openrewrite.java.internal.JavaTypeFactory",
             "org.openrewrite.maven.MavenDownloadingException",
             "org.openrewrite.maven.MavenDownloadingExceptions",
@@ -179,8 +195,30 @@ public class RecipeClassLoader extends URLClassLoader {
             }
         }
 
-        // SLF4J and Jackson should always be from parent
-        if (className.startsWith("org.slf4j") || className.startsWith("com.fasterxml.jackson")) {
+        // Force child-load for Kotlin recipe-DSL types that would otherwise be caught by
+        // a coarse `org.openrewrite.Recipe*` prefix match below. Recipe authors compile
+        // their `recipe { … }` lambdas against the bundled rewrite-kotlin version; the
+        // receiver-type linkage and the in-builder `EditScope()` construction must agree
+        // on which `Class<?>` they resolve to. Covers nested anonymous classes
+        // (`RecipeBuilder$buildSimpleRecipe$1`, etc.).
+        if (NON_DELEGATED_CLASSES.contains(className)) {
+            return false;
+        }
+        for (String cls : NON_DELEGATED_CLASSES) {
+            if (className.startsWith(cls + "$")) {
+                return false;
+            }
+        }
+
+        // SLF4J, Jackson, and the Kotlin runtime should always come from the parent.
+        // Why kotlin: if both the parent and a recipe jar ship kotlin-stdlib, types like
+        // kotlin.jvm.functions.Function1 get defined by both loaders. When Jackson (loaded
+        // from parent) interacts with jackson-module-kotlin (typically bundled in the recipe
+        // jar), the JVM raises a LinkageError on loader-constraint violations.
+        // See moderneinc/customer-requests#2372.
+        if (className.startsWith("org.slf4j") ||
+            className.startsWith("com.fasterxml.jackson") ||
+            className.startsWith("kotlin.")) {
             return true;
         }
 

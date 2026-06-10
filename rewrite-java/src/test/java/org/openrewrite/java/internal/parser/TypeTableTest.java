@@ -38,6 +38,7 @@ import javax.tools.ToolProvider;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.FileVisitResult;
@@ -46,6 +47,7 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.jar.JarEntry;
@@ -898,6 +900,65 @@ class TypeTableTest implements RewriteTest {
             } finally {
                 Thread.currentThread().setContextClassLoader(originalTccl);
             }
+        }
+    }
+
+    @Nested
+    class ConcurrentJarWriteTests {
+
+        /**
+         * Regression test for the Windows cross-JVM race introduced in #7528: when multiple
+         * test JVMs share the user's classpath cache, two JVMs may both produce a temp jar
+         * and try to publish it to the same path. With ATOMIC_MOVE + REPLACE_EXISTING,
+         * the second move can fail on Windows with AccessDeniedException if the target
+         * is held open by the first JVM. Here we simulate a fresh JVM by clearing the
+         * in-process {@code jarByArtifact} map between two reads — the second read must
+         * tolerate the target jar already being on disk.
+         */
+        @Test
+        void secondReadToleratesExistingJar() throws Exception {
+            //language=java
+            String source = """
+                package com.example;
+
+                public class SimpleClass {
+                    public static final String VALUE = "hello";
+                }
+                """;
+            Path classFile = compileToClassFile(source, "com.example.SimpleClass");
+            Path jarFile = createJarFromClasses("simple.jar", classFile);
+
+            try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
+                writer.jar("com.example", "simple", "1.0").write(jarFile);
+            }
+
+            // First read: writes the jar to the classpath cache directory.
+            Path firstLoaded = new TypeTable(ctx, tsv.toUri().toURL(), List.of("simple"))
+                    .load("simple");
+            assertThat(firstLoaded).isNotNull();
+            assertThat(Files.exists(firstLoaded)).isTrue();
+
+            // Simulate a fresh JVM by clearing the in-process map. The jar remains on disk.
+            clearJarByArtifact();
+
+            // Second read: must not fail when the target jar already exists on disk.
+            Path secondLoaded = new TypeTable(ctx, tsv.toUri().toURL(), List.of("simple"))
+                    .load("simple");
+            assertThat(secondLoaded).isNotNull();
+            assertThat(Files.exists(secondLoaded)).isTrue();
+
+            // No stray temp files were left behind in the artifact directory.
+            try (var entries = Files.list(secondLoaded.getParent())) {
+                assertThat(entries.map(p -> p.getFileName().toString()))
+                        .noneMatch(name -> name.endsWith(".tmp"));
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        private void clearJarByArtifact() throws Exception {
+            Field f = TypeTable.class.getDeclaredField("jarByArtifact");
+            f.setAccessible(true);
+            ((Map<?, ?>) f.get(null)).clear();
         }
     }
 

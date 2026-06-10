@@ -1155,13 +1155,23 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         VisitSpace(accessor.Kind.Before, p);
         p.Append(GetAccessorKindString(accessor.Kind.Element));
 
-        // Print expression body, block body, or semicolon
+        // Print expression body, block body, or auto-implemented semicolon.
+        // For auto-impl, ExpressionBody.Element is J.Empty; its Prefix carries any
+        // whitespace between the keyword and the trailing ';' (e.g. "get ;").
         if (accessor.ExpressionBody != null)
         {
-            VisitSpace(accessor.ExpressionBody.Before, p);
-            p.Append("=>");
-            Visit(accessor.ExpressionBody.Element, p);
-            p.Append(';');
+            if (accessor.ExpressionBody.Element is Empty)
+            {
+                Visit(accessor.ExpressionBody.Element, p);
+                p.Append(';');
+            }
+            else
+            {
+                VisitSpace(accessor.ExpressionBody.Before, p);
+                p.Append("=>");
+                Visit(accessor.ExpressionBody.Element, p);
+                p.Append(';');
+            }
         }
         else if (accessor.Body != null)
         {
@@ -1169,6 +1179,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         }
         else
         {
+            // Legacy fallback for LSTs created before the J.Empty change.
             p.Append(';');
         }
 
@@ -1554,6 +1565,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             VisitSpace(method.Body.Prefix, p);
             p.Append("=>");
             Visit(returnStmt.Expression, p);
+            // Trivia between the expression and ';' (e.g. a trailing comment) is held in After.
+            VisitSpace(method.Body.Statements[0].After, p);
             p.Append(';');
         }
         else if (method.Body != null && method.Body.Markers.FindFirst<Semicolon>() != null)
@@ -3004,8 +3017,13 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitPragmaWarningDirective(PragmaWarningDirective pragmaWarningDirective, PrintOutputCapture<P> p)
     {
         BeforeSyntax(pragmaWarningDirective, p);
-        p.Append("#pragma warning");
-        p.Append(pragmaWarningDirective.Action == PragmaWarningAction.Disable ? " disable" : " restore");
+        p.Append("#pragma");
+        // Preserve the original inter-keyword whitespace (e.g. "#pragma  warning"); fall back to a
+        // single space for LSTs constructed without it so output stays valid.
+        VisitSpace(pragmaWarningDirective.KeywordSpacing.IsEmpty ? Space.SingleSpace : pragmaWarningDirective.KeywordSpacing, p);
+        p.Append("warning");
+        VisitSpace(pragmaWarningDirective.ActionSpacing.IsEmpty ? Space.SingleSpace : pragmaWarningDirective.ActionSpacing, p);
+        p.Append(pragmaWarningDirective.Action == PragmaWarningAction.Disable ? "disable" : "restore");
         VisitRightPadded(pragmaWarningDirective.WarningCodes, ",", p);
         AfterSyntax(pragmaWarningDirective, p);
         return pragmaWarningDirective;
@@ -3014,7 +3032,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitPragmaChecksumDirective(PragmaChecksumDirective pragmaChecksumDirective, PrintOutputCapture<P> p)
     {
         BeforeSyntax(pragmaChecksumDirective, p);
-        p.Append("#pragma checksum");
+        p.Append("#pragma");
+        VisitSpace(pragmaChecksumDirective.KeywordSpacing.IsEmpty ? Space.SingleSpace : pragmaChecksumDirective.KeywordSpacing, p);
+        p.Append("checksum");
         p.Append(pragmaChecksumDirective.Arguments);
         AfterSyntax(pragmaChecksumDirective, p);
         return pragmaChecksumDirective;
@@ -3026,7 +3046,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         p.Append('#');
         p.Append(nullableDirective.HashSpacing);
         p.Append("nullable");
-        p.Append(' ');
+        p.Append(nullableDirective.KeywordSpacing);
         p.Append(nullableDirective.Setting.ToString().ToLower());
         if (nullableDirective.Target != null)
         {
@@ -3763,6 +3783,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             VisitSpace(operatorDeclaration.Body.Prefix, p);
             p.Append("=>");
             Visit(opReturnStmt.Expression, p);
+            VisitSpace(operatorDeclaration.Body.Statements[0].After, p);
             p.Append(';');
         }
         else

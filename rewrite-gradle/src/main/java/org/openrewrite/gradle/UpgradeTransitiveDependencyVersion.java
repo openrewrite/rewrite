@@ -61,6 +61,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Preconditions.not;
 import static org.openrewrite.gradle.UpgradeDependencyVersion.getGradleProjectKey;
+import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
 
 @SuppressWarnings("GroovyAssignabilityCheck")
 @Incubating(since = "8.18.0")
@@ -634,7 +635,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                 //language=groovy
                                 "dependencies {\n" +
                                 "}\n", false, ctx)
-                                .map(G.CompilationUnit.class::cast)
+                                .map(requireParsed(G.CompilationUnit.class))
                                 .map(parsed -> (J.MethodInvocation) parsed.getStatements().get(0))
                                 .orElseThrow(() -> new IllegalStateException("Unable to parse dependencies block"))
                                 .withPrefix(Space.format("\n\n"));
@@ -652,7 +653,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                 //language=kotlin
                                 "dependencies {\n" +
                                 "}\n", true, ctx)
-                                .map(K.CompilationUnit.class::cast)
+                                .map(requireParsed(K.CompilationUnit.class))
                                 .map(parsed -> (J.Block) parsed.getStatements().get(0))
                                 .map(block -> (J.MethodInvocation) block.getStatements().get(0))
                                 .map(m -> m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
@@ -987,7 +988,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             J.MethodInvocation constraint;
             if (!isKotlinDsl) {
                 constraint = parseAsGradle(because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET_GROOVY : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_GROOVY, false, ctx)
-                        .map(G.CompilationUnit.class::cast)
+                        .map(requireParsed(G.CompilationUnit.class))
                         .map(it -> (J.MethodInvocation) it.getStatements().get(1))
                         .map(dependenciesMethod -> (J.Lambda) dependenciesMethod.getArguments().get(0))
                         .map(dependenciesClosure -> (J.Block) dependenciesClosure.getBody())
@@ -1019,7 +1020,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
             } else {
                 constraint = parseAsGradle(because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET_KOTLIN : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_KOTLIN, true, ctx)
-                        .map(K.CompilationUnit.class::cast)
+                        .map(requireParsed(K.CompilationUnit.class))
                         .map(it -> (J.Block) it.getStatements().get(0))
                         .map(it -> (J.MethodInvocation) it.getStatements().get(1))
                         .map(dependenciesMethod -> (J.Lambda) dependenciesMethod.getArguments().get(0))
@@ -1183,7 +1184,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             J.Lambda becauseArg;
             if (!isKotlinDsl) {
                 becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_GROOVY, false, ctx)
-                        .map(G.CompilationUnit.class::cast)
+                        .map(requireParsed(G.CompilationUnit.class))
                         .map(cu -> (J.MethodInvocation) cu.getStatements().get(1))
                         .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
                         .map(dependenciesClosure -> ((J.Block) dependenciesClosure.getBody()).getStatements().get(0))
@@ -1204,7 +1205,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
             } else {
                 becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_KOTLIN, true, ctx)
-                        .map(K.CompilationUnit.class::cast)
+                        .map(requireParsed(K.CompilationUnit.class))
                         .map(cu -> (J.Block) cu.getStatements().get(0))
                         .map(block -> (J.MethodInvocation) block.getStatements().get(1))
                         .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))

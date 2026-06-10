@@ -2684,6 +2684,16 @@ class MethodDeclaration(Statement, TypedTree):
         return self._parameters.elements
 
 
+    _dimensions_after_name: List[JLeftPadded[Space]]
+
+    @property
+    def dimensions_after_name(self) -> List[JLeftPadded[Space]]:
+        return self._dimensions_after_name
+
+    def with_dimensions_after_name(self, dimensions_after_name: List[JLeftPadded[Space]]) -> MethodDeclaration:
+        return self if dimensions_after_name is self._dimensions_after_name else replace(self, _dimensions_after_name=dimensions_after_name)
+
+
     _throws: Optional[JContainer[NameTree]]
 
     @property
@@ -2710,6 +2720,11 @@ class MethodDeclaration(Statement, TypedTree):
     @property
     def method_type(self) -> Optional[JavaType.Method]:
         return self._method_type
+
+    @property
+    def type(self) -> Optional[JavaType]:
+        # Mirrors J.MethodDeclaration.getType(): the declared return type.
+        return self._method_type.return_type if self._method_type is not None else None
 
 
     @dataclass
@@ -2878,6 +2893,12 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
     @property
     def method_type(self) -> Optional[JavaType.Method]:
         return self._method_type
+
+    @property
+    def type(self) -> Optional[JavaType]:
+        # Mirrors J.MethodInvocation.getType(): the expression type of a call is
+        # the declared return type of the invoked method.
+        return self._method_type.return_type if self._method_type is not None else None
 
 
     @dataclass
@@ -3250,6 +3271,14 @@ class NewClass(Statement, TypedTree, MethodCall):
     @property
     def constructor_type(self) -> Optional[JavaType.Method]:
         return self._constructor_type
+
+    @property
+    def type(self) -> Optional[JavaType]:
+        # Mirrors J.NewClass.getType(): the constructed type (constructor's
+        # return type). The Python parser models constructor calls as
+        # MethodInvocation, so this is reached only for NewClass nodes received
+        # over RPC from the Java side.
+        return self._constructor_type.return_type if self._constructor_type is not None else None
 
 
     @dataclass

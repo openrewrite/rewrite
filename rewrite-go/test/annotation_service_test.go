@@ -24,8 +24,8 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	recipes "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -35,7 +35,7 @@ import (
 // DoAfterVisit) to mutate.
 
 func TestAnnotationService_Registered(t *testing.T) {
-	svc := recipe.Service[*golang.AnnotationService](nil)
+	svc := recipe.Service[*recipes.AnnotationService](nil)
 	if svc == nil {
 		t.Fatal("expected AnnotationService to be registered")
 	}
@@ -44,7 +44,7 @@ func TestAnnotationService_Registered(t *testing.T) {
 func TestAnnotationService_IsAnnotatedWith_StructTag(t *testing.T) {
 	src := "package main\n\ntype User struct {\n\tName string `json:\"name\"`\n}\n"
 	field := parseStructAndFindField(t, src, "Name")
-	svc := &golang.AnnotationService{}
+	svc := &recipes.AnnotationService{}
 	if !svc.IsAnnotatedWith(field, "json") {
 		t.Errorf("expected struct field with json tag to match \"json\"")
 	}
@@ -56,7 +56,7 @@ func TestAnnotationService_IsAnnotatedWith_StructTag(t *testing.T) {
 func TestAnnotationService_IsAnnotatedWith_Directive(t *testing.T) {
 	src := "package main\n\n//go:noinline\nfunc slow() {}\n"
 	md := parseAndFindMethod(t, src, "slow")
-	svc := &golang.AnnotationService{}
+	svc := &recipes.AnnotationService{}
 	if !svc.IsAnnotatedWith(md, "go:noinline") {
 		t.Errorf("expected method with go:noinline to match")
 	}
@@ -65,7 +65,7 @@ func TestAnnotationService_IsAnnotatedWith_Directive(t *testing.T) {
 func TestAnnotationService_IsAnnotatedWith_WildcardPrefix(t *testing.T) {
 	src := "package main\n\n//go:noinline\n//go:nosplit\nfunc slow() {}\n"
 	md := parseAndFindMethod(t, src, "slow")
-	svc := &golang.AnnotationService{}
+	svc := &recipes.AnnotationService{}
 	if !svc.IsAnnotatedWith(md, "go:*") {
 		t.Errorf("expected method with go: directives to match \"go:*\"")
 	}
@@ -80,13 +80,13 @@ func TestAnnotationService_IsAnnotatedWith_WildcardPrefix(t *testing.T) {
 func TestAnnotationService_FindAnnotations(t *testing.T) {
 	src := "package main\n\ntype User struct {\n\tEmail string `json:\"email\" db:\"email_address\" validate:\"required\"`\n}\n"
 	field := parseStructAndFindField(t, src, "Email")
-	svc := &golang.AnnotationService{}
+	svc := &recipes.AnnotationService{}
 
 	jsonAnns := svc.FindAnnotations(field, "json")
 	if len(jsonAnns) != 1 {
 		t.Fatalf("expected 1 json annotation, got %d", len(jsonAnns))
 	}
-	if v, _ := jsonAnns[0].Arguments.Elements[0].Element.(*tree.Literal).Value.(string); v != "email" {
+	if v, _ := jsonAnns[0].Arguments.Elements[0].Element.(*java.Literal).Value.(string); v != "email" {
 		t.Errorf("json value: got %q, want \"email\"", v)
 	}
 }
@@ -94,7 +94,7 @@ func TestAnnotationService_FindAnnotations(t *testing.T) {
 func TestAnnotationService_AllAnnotations_ViaCursor(t *testing.T) {
 	src := "package main\n\n//go:noinline\nfunc slow() {}\n"
 	md := parseAndFindMethod(t, src, "slow")
-	svc := &golang.AnnotationService{}
+	svc := &recipes.AnnotationService{}
 
 	// Build a cursor positioned AT the MethodDeclaration.
 	c := buildCursor(md)
@@ -102,7 +102,7 @@ func TestAnnotationService_AllAnnotations_ViaCursor(t *testing.T) {
 	if len(anns) != 1 {
 		t.Fatalf("AllAnnotations: got %d, want 1", len(anns))
 	}
-	if anns[0].AnnotationType.(*tree.Identifier).Name != "go:noinline" {
+	if anns[0].AnnotationType.(*java.Identifier).Name != "go:noinline" {
 		t.Errorf("annotation: got %+v", anns[0].AnnotationType)
 	}
 }
@@ -114,18 +114,18 @@ func TestAnnotationService_AddAnnotationVisitor_OnFunc(t *testing.T) {
 		t.Fatalf("parse error: %v", err)
 	}
 
-	svc := &golang.AnnotationService{}
-	ann := &tree.Annotation{
+	svc := &recipes.AnnotationService{}
+	ann := &java.Annotation{
 		ID:             uuid.New(),
-		Prefix:         tree.Space{Whitespace: "\n"},
-		AnnotationType: &tree.Identifier{ID: uuid.New(), Name: "go:noinline"},
+		Prefix:         java.Space{Whitespace: "\n"},
+		AnnotationType: &java.Identifier{ID: uuid.New(), Name: "go:noinline"},
 	}
-	v := svc.AddAnnotationVisitor(func(t tree.Tree) bool {
-		md, ok := t.(*tree.MethodDeclaration)
+	v := svc.AddAnnotationVisitor(func(t java.Tree) bool {
+		md, ok := t.(*java.MethodDeclaration)
 		return ok && md.Name != nil && md.Name.Name == "slow"
 	}, ann)
 
-	out := v.Visit(cu, nil).(tree.Tree)
+	out := v.Visit(cu, nil).(java.Tree)
 
 	want := "package main\n\n//go:noinline\nfunc slow() { _ = 1 }\n"
 	if got := printer.Print(out); got != want {
@@ -141,9 +141,9 @@ func TestAnnotationService_RemoveAnnotationVisitor(t *testing.T) {
 		t.Fatalf("parse error: %v", err)
 	}
 
-	svc := &golang.AnnotationService{}
+	svc := &recipes.AnnotationService{}
 	v := svc.RemoveAnnotationVisitor("go:nosplit")
-	out := v.Visit(cu, nil).(tree.Tree)
+	out := v.Visit(cu, nil).(java.Tree)
 
 	want := "package main\n\n//go:noinline\nfunc slow() {}\n"
 	if got := printer.Print(out); got != want {
@@ -155,11 +155,11 @@ func TestAnnotationService_Matches_ViaCursor(t *testing.T) {
 	src := "package main\n\n//go:noinline\nfunc slow() {}\n"
 	md := parseAndFindMethod(t, src, "slow")
 	c := buildCursor(md)
-	svc := &golang.AnnotationService{}
-	if !svc.Matches(c, golang.NewAnnotationMatcher("go:noinline")) {
+	svc := &recipes.AnnotationService{}
+	if !svc.Matches(c, recipes.NewAnnotationMatcher("go:noinline")) {
 		t.Error("expected matcher \"go:noinline\" to match")
 	}
-	if svc.Matches(c, golang.NewAnnotationMatcher("go:nosplit")) {
+	if svc.Matches(c, recipes.NewAnnotationMatcher("go:nosplit")) {
 		t.Error("did not expect matcher \"go:nosplit\" to match")
 	}
 }
@@ -167,6 +167,6 @@ func TestAnnotationService_Matches_ViaCursor(t *testing.T) {
 // buildCursor wraps a node in a single-element cursor for testing
 // AnnotationService.AllAnnotations / Matches without going through the
 // full visitor dispatch.
-func buildCursor(t tree.Tree) *visitor.Cursor {
+func buildCursor(t java.Tree) *visitor.Cursor {
 	return visitor.NewCursor(nil, t)
 }

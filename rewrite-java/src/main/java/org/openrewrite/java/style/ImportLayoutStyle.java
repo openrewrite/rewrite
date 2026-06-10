@@ -37,7 +37,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaStyle;
-import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.Style;
@@ -138,6 +137,13 @@ public class ImportLayoutStyle implements JavaStyle {
     public List<JRightPadded<J.Import>> addImport(List<JRightPadded<J.Import>> originalImports,
                                                   J.Import toAdd, J.@Nullable Package pkg,
                                                   Collection<JavaType.FullyQualified> classpath) {
+        return addImport(originalImports, toAdd, pkg, classpath, false);
+    }
+
+    public List<JRightPadded<J.Import>> addImport(List<JRightPadded<J.Import>> originalImports,
+                                                  J.Import toAdd, J.@Nullable Package pkg,
+                                                  Collection<JavaType.FullyQualified> classpath,
+                                                  boolean classpathDirty) {
         JRightPadded<J.Import> paddedToAdd = new JRightPadded<>(toAdd, Space.EMPTY, Markers.EMPTY);
 
         if (originalImports.isEmpty()) {
@@ -231,7 +237,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
         List<JRightPadded<J.Import>> checkConflicts = new ArrayList<>(originalImports);
         checkConflicts.add(paddedToAdd);
-        boolean isFoldable = new ImportLayoutConflictDetection(classpath, checkConflicts)
+        boolean isFoldable = new ImportLayoutConflictDetection(classpath, checkConflicts, classpathDirty)
                 .isPackageFoldable(packageOrOuterClassName(paddedToAdd));
 
         // Walk both directions from the insertion point, looking for imports that are in the same block and have the
@@ -339,8 +345,12 @@ public class ImportLayoutStyle implements JavaStyle {
      * @return A list of imports that are grouped and ordered.
      */
     public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports, Collection<JavaType.FullyQualified> classpath) {
+        return orderImports(originalImports, classpath, false);
+    }
+
+    public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports, Collection<JavaType.FullyQualified> classpath, boolean classpathDirty) {
         LayoutState layoutState = new LayoutState();
-        ImportLayoutConflictDetection importLayoutConflictDetection = new ImportLayoutConflictDetection(classpath, originalImports);
+        ImportLayoutConflictDetection importLayoutConflictDetection = new ImportLayoutConflictDetection(classpath, originalImports, classpathDirty);
         List<JRightPadded<J.Import>> orderedImports = new ArrayList<>();
 
         List<Block> effectiveLayout = getLayout();
@@ -547,12 +557,18 @@ public class ImportLayoutStyle implements JavaStyle {
     public static class ImportLayoutConflictDetection {
         private final Collection<JavaType.FullyQualified> classpath;
         private final List<JRightPadded<J.Import>> originalImports;
+        private final boolean classpathDirty;
         private final Set<String> jvmClasspathNames = new HashSet<>();
         private @Nullable Set<String> containsClassNameConflict = null;
 
         ImportLayoutConflictDetection(Collection<JavaType.FullyQualified> classpath, List<JRightPadded<J.Import>> originalImports) {
+            this(classpath, originalImports, false);
+        }
+
+        ImportLayoutConflictDetection(Collection<JavaType.FullyQualified> classpath, List<JRightPadded<J.Import>> originalImports, boolean classpathDirty) {
             this.classpath = classpath;
             this.originalImports = originalImports;
+            this.classpathDirty = classpathDirty;
         }
 
         /**
@@ -562,6 +578,11 @@ public class ImportLayoutStyle implements JavaStyle {
          * @return folding the package will not create any namespace conflicts.
          */
         public boolean isPackageFoldable(String packageName) {
+            if (classpathDirty) {
+                // Classpath is known stale after an in-run dependency mutation: refuse to fold into a star
+                // because we cannot prove the fold is unambiguous.
+                return false;
+            }
             if (containsClassNameConflict == null) {
                 containsClassNameConflict = new HashSet<>();
                 setJVMClassNames();
@@ -577,11 +598,6 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         private void setJVMClassNames() {
-            if (classpath instanceof JavaSourceSet.ClasspathIndex) {
-                ((JavaSourceSet.ClasspathIndex) classpath).typesInPackage("java.lang")
-                        .forEach(fqn -> jvmClasspathNames.add(fqn.getClassName()));
-                return;
-            }
             for (JavaType.FullyQualified fqn : classpath) {
                 // first check `getFullyQualifiedName()` to avoid unnecessary allocations
                 if (fqn.getFullyQualifiedName().startsWith("java.lang.") && "java.lang".equals(fqn.getPackageName())) {
@@ -598,27 +614,6 @@ public class ImportLayoutStyle implements JavaStyle {
                 checkPackageForClasses.add(packageOrOuterClassName(anImport));
                 nameToPackages.computeIfAbsent(anImport.getElement().getClassName(), p -> new HashSet<>(3))
                                 .add(anImport.getElement().getPackageName());
-            }
-
-            if (classpath instanceof JavaSourceSet.ClasspathIndex) {
-                JavaSourceSet.ClasspathIndex idx = (JavaSourceSet.ClasspathIndex) classpath;
-                for (String pkgOrFqn : checkPackageForClasses) {
-                    idx.typesInPackage(pkgOrFqn).forEach(t ->
-                            nameToPackages.computeIfAbsent(t.getClassName(), p -> new HashSet<>(3)).add(pkgOrFqn));
-                    idx.findFullyQualified(pkgOrFqn).ifPresent(fq -> {
-                        for (JavaType.Variable member : fq.getMembers()) {
-                            if (member.hasFlags(Flag.Static)) {
-                                nameToPackages.computeIfAbsent(member.getName(), p -> new HashSet<>(3)).add(pkgOrFqn);
-                            }
-                        }
-                        for (JavaType.Method method : fq.getMethods()) {
-                            if (method.hasFlags(Flag.Static)) {
-                                nameToPackages.computeIfAbsent(method.getName(), p -> new HashSet<>(3)).add(pkgOrFqn);
-                            }
-                        }
-                    });
-                }
-                return nameToPackages;
             }
 
             for (JavaType.FullyQualified classGraphFqn : classpath) {

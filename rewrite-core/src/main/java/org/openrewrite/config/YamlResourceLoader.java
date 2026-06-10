@@ -225,7 +225,8 @@ public class YamlResourceLoader implements ResourceLoader {
             if (!recipeResource.containsKey("name") || !recipeName.equals(recipeResource.get("name"))) {
                 continue;
             }
-            return mapToRecipe(recipeResource, EnumSet.copyOf(Arrays.asList(details)));
+            return mapToRecipe(recipeResource,
+                    details.length == 0 ? EnumSet.noneOf(RecipeDetail.class) : EnumSet.copyOf(Arrays.asList(details)));
         }
         try {
             return recipeLoader.apply(recipeName, null);

@@ -120,4 +120,19 @@ class ObjectDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitModuleDef — `{` in line comment before object body
+        rewriteRun(
+            scala(
+                """
+                object Foo // {
+                {
+                  val x = 1
+                }
+                """
+            )
+        );
+    }
 }

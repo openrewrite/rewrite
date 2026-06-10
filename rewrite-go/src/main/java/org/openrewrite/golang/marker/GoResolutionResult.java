@@ -35,8 +35,7 @@ import static java.util.Collections.emptyList;
  * Metadata parsed from a Go module's go.mod (and optionally go.sum) file.
  * Attached as a {@link Marker} to a PlainText document representing the go.mod file.
  * <p>
- * Mirrors {@link org.openrewrite.javascript.marker.NodeResolutionResult} /
- * {@link org.openrewrite.python.marker.PythonResolutionResult} for cross-language parity.
+ * Mirrors {@code NodeResolutionResult} / {@code PythonResolutionResult} for cross-language parity.
  * <p>
  * Separates requested dependencies (Require) from resolutions (Resolved):
  * <ul>

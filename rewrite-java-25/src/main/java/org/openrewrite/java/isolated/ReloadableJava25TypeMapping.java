@@ -74,19 +74,24 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType intersectionType(Type.IntersectionClassType type, String signature) {
-        return typeFactory.computeIntersection(signature, type, intersection -> {
+        return typeFactory.intersectionFor(signature, () -> {
+            JavaType.Intersection intersection = new JavaType.Intersection(null);
             List<? extends TypeMirror> bounds = type.getBounds();
             List<JavaType> types = new ArrayList<>(bounds.size());
             for (TypeMirror bound : bounds) {
                 types.add(type((Type) bound));
             }
             intersection.unsafeSet(types);
+            return intersection;
         });
     }
 
     private JavaType array(Type type, String signature) {
-        return typeFactory.computeArray(signature, type, arr ->
-                arr.unsafeSet(type(((Type.ArrayType) type).elemtype), null));
+        return typeFactory.arrayFor(signature, () -> {
+            JavaType.Array arr = new JavaType.Array(null, null, null);
+            arr.unsafeSet(type(((Type.ArrayType) type).elemtype), null);
+            return arr;
+        });
     }
 
     /**
@@ -117,7 +122,8 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
         }
         final Tree leafTree = tree;
         final List<Tree> chain = trees;
-        return typeFactory.computeArray(signature, annotatedType, arr -> {
+        return typeFactory.arrayFor(signature, () -> {
+            JavaType.Array arr = new JavaType.Array(null, null, null);
             // chain is innermost-first; build inner Arrays for all but the last (outermost),
             // which is the stub `arr` we'll populate.
             JavaType element = type(leafTree);
@@ -130,6 +136,7 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
             JavaType.@Nullable FullyQualified[] outerAnnos = !chain.isEmpty() && chain.get(chain.size() - 1) instanceof JCTree.JCAnnotatedType
                     ? mapAnnotations(((JCTree.JCAnnotatedType) chain.get(chain.size() - 1)).annotations) : null;
             arr.unsafeSet(element, outerAnnos);
+            return arr;
         });
     }
 
@@ -145,7 +152,7 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType.GenericTypeVariable generic(Type.WildcardType wildcard, String signature) {
-        return typeFactory.computeGenericTypeVariable(signature, "?", INVARIANT, wildcard, gtv -> {
+        return typeFactory.computeGenericTypeVariable(signature, "?", INVARIANT, gtv -> {
             JavaType.GenericTypeVariable.Variance variance;
             List<JavaType> bounds;
 
@@ -181,7 +188,7 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
         } else {
             name = type.tsym.name.toString();
         }
-        return typeFactory.computeGenericTypeVariable(signature, name, INVARIANT, type, gtv -> {
+        return typeFactory.computeGenericTypeVariable(signature, name, INVARIANT, gtv -> {
             List<JavaType> bounds = null;
             if (type.getUpperBound() instanceof Type.IntersectionClassType) {
                 Type.IntersectionClassType intersectionBound = (Type.IntersectionClassType) type.getUpperBound();
@@ -210,81 +217,73 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
         Type.ClassType symType = (Type.ClassType) sym.type;
         String fqn = sym.flatName().toString();
 
-        // The cache may hold a Parameterized under fqn if some other path stored it
-        // there; defer to the underlying Class in that case rather than reconstructing.
-        JavaType.FullyQualified fq = typeFactory.get(fqn);
-        JavaType.Class clazz = fq instanceof JavaType.Parameterized
-                ? (JavaType.Class) ((JavaType.Parameterized) fq).getType()
-                : (JavaType.Class) fq;
-        if (clazz == null) {
+        JavaType.Class clazz = typeFactory.computeClass(fqn, sym.flags_field, getKind(sym), stub -> {
             if (!sym.completer.isTerminal()) {
                 completeClassSymbol(sym);
             }
-            clazz = typeFactory.computeClass(fqn, fqn, sym.flags_field, getKind(sym), sym, stub -> {
-                JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
+            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
 
-                JavaType.FullyQualified owner = null;
-                if (sym.owner instanceof Symbol.ClassSymbol) {
-                    owner = TypeUtils.asFullyQualified(type(sym.owner.type));
+            JavaType.FullyQualified owner = null;
+            if (sym.owner instanceof Symbol.ClassSymbol) {
+                owner = TypeUtils.asFullyQualified(type(sym.owner.type));
+            }
+
+            List<JavaType.FullyQualified> interfaces = null;
+            if (symType.interfaces_field != null) {
+                interfaces = new ArrayList<>(symType.interfaces_field.length());
+                for (com.sun.tools.javac.code.Type iParam : symType.interfaces_field) {
+                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam));
+                    if (javaType != null) {
+                        interfaces.add(javaType);
+                    }
                 }
+            }
 
-                List<JavaType.FullyQualified> interfaces = null;
-                if (symType.interfaces_field != null) {
-                    interfaces = new ArrayList<>(symType.interfaces_field.length());
-                    for (com.sun.tools.javac.code.Type iParam : symType.interfaces_field) {
-                        JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam));
-                        if (javaType != null) {
-                            interfaces.add(javaType);
+            List<JavaType.Variable> fields = null;
+            List<JavaType.Method> methods = null;
+
+            if (sym.members_field != null) {
+                for (Symbol elem : sym.members_field.getSymbols()) {
+                    if (elem instanceof Symbol.VarSymbol &&
+                        (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
+                                             Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
+                        if ("java.lang.String".equals(fqn) && elem.name.toString().equals("serialPersistentFields")) {
+                            // there is a "serialPersistentFields" member within the String class which is used in normal Java
+                            // serialization to customize how the String field is serialized. This field is tripping up Jackson
+                            // serialization and is intentionally filtered to prevent errors.
+                            continue;
+                        }
+
+                        if (fields == null) {
+                            fields = new ArrayList<>();
+                        }
+                        fields.add(variableType(elem, stub));
+                    } else if (elem instanceof Symbol.MethodSymbol &&
+                               (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
+                        if (methods == null) {
+                            methods = new ArrayList<>();
+                        }
+                        Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) elem;
+                        if (!methodSymbol.isStaticOrInstanceInit()) {
+                            methods.add(methodDeclarationType(methodSymbol, stub));
                         }
                     }
                 }
+            }
 
-                List<JavaType.Variable> fields = null;
-                List<JavaType.Method> methods = null;
-
-                if (sym.members_field != null) {
-                    for (Symbol elem : sym.members_field.getSymbols()) {
-                        if (elem instanceof Symbol.VarSymbol &&
-                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
-                                                 Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                            if ("java.lang.String".equals(fqn) && elem.name.toString().equals("serialPersistentFields")) {
-                                // there is a "serialPersistentFields" member within the String class which is used in normal Java
-                                // serialization to customize how the String field is serialized. This field is tripping up Jackson
-                                // serialization and is intentionally filtered to prevent errors.
-                                continue;
-                            }
-
-                            if (fields == null) {
-                                fields = new ArrayList<>();
-                            }
-                            fields.add(variableType(elem, stub));
-                        } else if (elem instanceof Symbol.MethodSymbol &&
-                                   (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
-                            if (methods == null) {
-                                methods = new ArrayList<>();
-                            }
-                            Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) elem;
-                            if (!methodSymbol.isStaticOrInstanceInit()) {
-                                methods.add(methodDeclarationType(methodSymbol, stub));
-                            }
-                        }
-                    }
+            List<JavaType> typeParameters = null;
+            if (symType.typarams_field != null && symType.typarams_field.length() > 0) {
+                typeParameters = new ArrayList<>(symType.typarams_field.length());
+                for (Type tParam : symType.typarams_field) {
+                    typeParameters.add(type(tParam));
                 }
-
-                List<JavaType> typeParameters = null;
-                if (symType.typarams_field != null && symType.typarams_field.length() > 0) {
-                    typeParameters = new ArrayList<>(symType.typarams_field.length());
-                    for (Type tParam : symType.typarams_field) {
-                        typeParameters.add(type(tParam));
-                    }
-                }
-                stub.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
-            });
-        }
+            }
+            stub.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
+        });
 
         if (classType.typarams_field != null && classType.typarams_field.length() > 0) {
             JavaType.Class finalClazz = clazz;
-            return typeFactory.computeParameterized(signature, classType, pt -> {
+            return typeFactory.computeParameterized(signature, pt -> {
                 List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());
                 for (Type tParam : classType.typarams_field) {
                     typeParameters.add(type(tParam));
@@ -382,7 +381,9 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         String signature = signatureBuilder.variableSignature(symbol);
-        return typeFactory.computeVariable(signature, symbol.flags_field, symbol.name.toString(), symbol, variable -> {
+        return typeFactory.variableFor(signature, () -> {
+            JavaType.Variable variable = new JavaType.Variable(
+                    null, symbol.flags_field, symbol.name.toString(), null, null, null);
             JavaType resolvedOwner = owner;
             if (owner == null) {
                 Type type = symbol.owner.type;
@@ -399,6 +400,7 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
             }
 
             variable.unsafeSet(resolvedOwner, type(symbol.type), listAnnotations(symbol));
+            return variable;
         });
     }
 
@@ -456,9 +458,13 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
             }
         }
 
-        return typeFactory.computeMethod(signature, methodSymbol.flags_field,
-                methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
-                paramNames, null, null, methodSymbol, method -> {
+        String[] finalParamNames = paramNames;
+        return typeFactory.methodFor(signature,
+                () -> new JavaType.Method(
+                        null, methodSymbol.flags_field, null,
+                        methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
+                        null, finalParamNames, null, null, null, null, null),
+                method -> {
             JavaType returnType = null;
             List<JavaType> parameterTypes = null;
             List<JavaType> exceptionTypes = null;
@@ -558,11 +564,15 @@ class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
             }
         }
 
-        return typeFactory.computeMethod(signature, methodSymbol.flags_field,
-                methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
-                paramNames, defaultValues,
-                declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0]),
-                methodSymbol, method -> {
+        String[] finalParamNames = paramNames;
+        List<String> finalDefaultValues = defaultValues;
+        String[] finalFormalTypeNames = declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0]);
+        return typeFactory.methodFor(signature,
+                () -> new JavaType.Method(
+                        null, methodSymbol.flags_field, null,
+                        methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
+                        null, finalParamNames, null, null, null, finalDefaultValues, finalFormalTypeNames),
+                method -> {
             Type signatureType = methodSymbol.type instanceof Type.ForAll ?
                     ((Type.ForAll) methodSymbol.type).qtype :
                     methodSymbol.type;

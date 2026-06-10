@@ -37,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.openrewrite.golang.Assertions.go;
@@ -113,6 +114,71 @@ class GolangRecipeIntegTest implements RewriteTest {
     }
 
     /**
+     * Renames an identifier declared inside a grouped {@code const ( ... )}
+     * block. This only works if the grouped declarations (modeled as
+     * Go.DeclarationBlock) round-trip their inner specs to the Java side —
+     * before DeclarationBlock existed the group's contents were not
+     * serialized, so a Java recipe could not see or rename {@code x}.
+     */
+    @Test
+    void renameVarInsideGroupedBlock() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier ident, org.openrewrite.ExecutionContext ctx) {
+                  if ("x".equals(ident.getSimpleName())) {
+                      return ident.withSimpleName("flag");
+                  }
+                  return ident;
+              }
+          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          go(
+            """
+              package main
+
+              const (
+              \tx = 1
+              \ty = 2
+              )
+              """,
+            """
+              package main
+
+              const (
+              \tflag = 1
+              \ty = 2
+              )
+              """
+          )
+        );
+    }
+
+    /**
+     * Grouped {@code var ( ... )} / {@code const ( ... )} blocks survive a
+     * full Java RPC round-trip with no changes (idempotent print).
+     */
+    @Test
+    void groupedDeclarationBlockRoundTrip() {
+        rewriteRun(
+          go(
+            """
+              package main
+
+              var (
+              \ta int
+              \tb = 2
+              )
+
+              const (
+              \tc = 3
+              \td = 4
+              )
+              """
+          )
+        );
+    }
+
+    /**
      * Tests Go-native recipe execution via the full RPC Visit path.
      * The RenameXToFlag recipe has a real Go Editor() that visits identifiers.
      * This exercises: PrepareRecipe → Visit → getObjectFromJava → Go visitor →
@@ -146,6 +212,7 @@ class GolangRecipeIntegTest implements RewriteTest {
         String source = "package main\n\nfunc f() {\n\tvar x = true\n\t_ = x\n}\n";
         SourceFile cu = GolangParser.builder().build()
                 .parse(source).findFirst().orElseThrow();
+        UUID originalId = cu.getId();
 
         // Reset Go RPC state to simulate a fresh session (like CLI's mod run)
         rpc.reset();
@@ -154,6 +221,7 @@ class GolangRecipeIntegTest implements RewriteTest {
         Tree result = recipe.getVisitor().visit(cu, new InMemoryExecutionContext());
         assertThat(result).isNotNull().isInstanceOf(SourceFile.class);
         assertThat(result).isNotSameAs(cu);
+        assertThat(((SourceFile) result).getId()).isEqualTo(originalId);
         String printed = rpc.print((SourceFile) result);
         assertThat(printed).contains("var flag = true").contains("_ = flag");
     }
@@ -186,6 +254,35 @@ class GolangRecipeIntegTest implements RewriteTest {
         assertThat(result).isNotNull().isInstanceOf(SourceFile.class);
         String printed = rpc.print((SourceFile) result);
         assertThat(printed).contains("var flag = true").contains("_ = flag");
+    }
+
+    @Test
+    void selfReferencingMethodSurvivesAddRoundtrip() {
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        String source = """
+          package main
+
+          type Counter struct {
+          \tvalue int
+          }
+
+          func (c *Counter) Inc(x int) {
+          }
+          """;
+        SourceFile cu = GolangParser.builder().build()
+          .parse(source).findFirst().orElseThrow();
+
+        // Force ADD path on Java→Go: Go has no baseline for this tree, so the
+        // entire JavaType graph (incl. the Counter ↔ Inc self-cycle) is sent
+        // as ADD, triggering the receive-side ref cache on the Go side.
+        rpc.reset();
+        var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
+        Tree result = recipe.getVisitor().visit(cu, new InMemoryExecutionContext());
+
+        // Before the fix, this throws
+        // `IllegalArgumentException: No enum constant ... JavaType.FullyQualified.Kind.`
+        // when Java deserializes the returned tree.
+        assertThat(result).isNotNull().isInstanceOf(SourceFile.class);
     }
 
     @Test

@@ -23,8 +23,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
-
+import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ExpressionTypeTreeTest {
@@ -34,7 +33,7 @@ class ExpressionTypeTreeTest {
         J.MethodInvocation mi = new J.MethodInvocation(
                 Tree.randomId(), Space.EMPTY, Markers.EMPTY,
                 null, null,
-                new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, Collections.emptyList(), "foo", null, null),
+                new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "foo", null, null),
                 JContainer.empty(),
                 null
         );
@@ -51,13 +50,13 @@ class ExpressionTypeTreeTest {
     void withTypeOnWrappedMethodDeclaration() {
         J.MethodDeclaration md = new J.MethodDeclaration(
                 Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                Collections.emptyList(), Collections.emptyList(), null,
+                emptyList(), emptyList(), null,
                 null,
                 new J.MethodDeclaration.IdentifierWithAnnotations(
-                        new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, Collections.emptyList(), "bar", null, null),
-                        Collections.emptyList()
+                        new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "bar", null, null),
+                        emptyList()
                 ),
-                JContainer.empty(), null, null, null, null
+                JContainer.empty(), emptyList(), null, null, null, null
         );
         Py.ExpressionTypeTree ett = new Py.ExpressionTypeTree(
                 Tree.randomId(), Space.EMPTY, Markers.EMPTY, md
@@ -72,7 +71,7 @@ class ExpressionTypeTreeTest {
     void withTypeOnWrappedIdentifier() {
         J.Identifier ident = new J.Identifier(
                 Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                Collections.emptyList(), "x", JavaType.Primitive.String, null
+                emptyList(), "x", JavaType.Primitive.String, null
         );
         Py.ExpressionTypeTree ett = new Py.ExpressionTypeTree(
                 Tree.randomId(), Space.EMPTY, Markers.EMPTY, ident

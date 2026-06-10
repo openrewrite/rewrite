@@ -40,7 +40,7 @@ func TestCommentSendsTextCommentValueType(t *testing.T) {
 
 	// then
 	// On the Java side, Comment is an interface and TextComment is the concrete class.
-	// Sending "org.openrewrite.java.tree.Comment" causes InstantiationError
+	// Sending "org.openrewrite.java.java.Comment" causes InstantiationError
 	// because objenesis cannot instantiate an interface.
 	foundTextComment := false
 	for _, msg := range messages {

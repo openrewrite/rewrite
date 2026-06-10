@@ -159,6 +159,16 @@ class PythonTypeMapping:
         self._declaring_cycle_placeholders: Dict[int, JavaType.Class] = {}
         self._class_literal_index: Dict[str, int] = {}  # className -> classLiteral type_id
 
+        # Cumulative, session-wide type table shared by every file parsed through
+        # the same ty ``--serve`` session. ty deduplicates descriptors across a
+        # session, so a type first seen in an earlier file is omitted from later
+        # files' responses; this table restores those descriptors as a fallback
+        # (see TyTypesClient.session_types and _build_index back-fill).
+        self._session_types: Dict[int, Dict[str, Any]] = (
+            ty_client.session_types if ty_client is not None
+            and hasattr(ty_client, 'session_types') else {}
+        )
+
         # Fetch all types in one batch call
         if ty_client is not None:
             try:
@@ -261,6 +271,19 @@ class PythonTypeMapping:
                 cn = descriptor.get('className', '')
                 if cn:
                     self._class_literal_index[cn] = tid
+
+        # Back-fill descriptors that this file's response omitted because ty's
+        # shared --serve session already emitted them for an earlier file. The
+        # session table is keyed by ty's session-stable ids, so a referenced id
+        # absent from this file's registry resolves through the cumulative table.
+        # File-local descriptors take precedence (setdefault) — they are the
+        # authoritative, full descriptors for types this file is the first to see.
+        for tid, descriptor in self._session_types.items():
+            if self._type_registry.setdefault(tid, descriptor) is descriptor and \
+                    descriptor.get('kind') == 'classLiteral':
+                cn = descriptor.get('className', '')
+                if cn:
+                    self._class_literal_index.setdefault(cn, tid)
 
     def _lookup_type_id(self, node: ast.AST) -> Optional[int]:
         """Look up a node's type ID by converting AST position to byte offset.
@@ -525,11 +548,25 @@ class PythonTypeMapping:
             return _UNKNOWN
 
         elif kind == 'subclassOf':
+            # `subclassOf X` is ty's representation of `type[X]`: a *class
+            # object*, not an instance of X. Model it as `type[X]` so it stays
+            # distinct from an instance of X (see _make_class_object_type).
             base_id = descriptor.get('base')
             if base_id is not None:
                 result = self._resolve_type(base_id)
                 if result is not None:
-                    return result
+                    return self._make_class_object_type(result)
+            return _UNKNOWN
+
+        elif kind == 'typeForm':
+            # PEP 747 TypeForm[T] (ty-types >= 0.0.44): a type expression used as
+            # a runtime value. Like `subclassOf` (`type[X]`), the value is the
+            # type T, not an instance of T, so wrap it as a class object.
+            type_arg_id = descriptor.get('typeArgument')
+            if type_arg_id is not None:
+                result = self._resolve_type(type_arg_id)
+                if result is not None:
+                    return self._make_class_object_type(result)
             return _UNKNOWN
 
         elif kind == 'newType':
@@ -548,7 +585,7 @@ class PythonTypeMapping:
         elif kind in ('dynamic', 'never'):
             return _UNKNOWN
 
-        elif kind == 'enumLiteral':
+        elif kind in ('enumLiteral', 'enumComplement'):
             class_name = descriptor.get('className', '')
             class_type = self._create_class_type(class_name)
             class_type._kind = JavaType.FullyQualified.Kind.Enum
@@ -1071,6 +1108,12 @@ class PythonTypeMapping:
                 return self._resolve_declaring_type(base_id)
             return None
 
+        elif kind == 'typeForm':
+            type_arg_id = descriptor.get('typeArgument')
+            if type_arg_id is not None:
+                return self._resolve_declaring_type(type_arg_id)
+            return None
+
         elif kind == 'newType':
             name = descriptor.get('name', '')
             if name:
@@ -1274,6 +1317,22 @@ class PythonTypeMapping:
                 if name:
                     names.append(name)
         return names
+
+    def _make_class_object_type(self, base: JavaType) -> JavaType:
+        """Wrap a resolved type ``X`` as the class-object type ``type[X]``.
+
+        A value of type ``type[X]`` (ty's ``subclassOf X``, and PEP 747
+        ``TypeForm[X]``) is the *class* ``X`` itself, not an instance of ``X``.
+        It is modelled as a :class:`JavaType.Parameterized` over ``type`` with
+        ``X`` as its sole type parameter — mirroring how ``list[X]`` is modelled
+        — so that ``is_assignable_to(X, type[X])`` is ``False`` (the raw name is
+        ``type``, not ``X``) while the wrapped ``X`` remains recoverable via
+        ``type_parameters[0]`` for attribute/classmethod resolution.
+        """
+        param = JavaType.Parameterized()
+        param._type = self._create_class_type('type')
+        param._type_parameters = [base]
+        return param
 
     def _create_class_type(self, fqn: str) -> JavaType.Class:
         """Create a JavaType.Class from a fully qualified name."""

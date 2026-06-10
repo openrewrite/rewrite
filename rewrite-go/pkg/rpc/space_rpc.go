@@ -18,7 +18,8 @@ package rpc
 
 import (
 	"github.com/google/uuid"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // nilableString converts a *string to an any, returning nil if the pointer is nil.
@@ -42,11 +43,11 @@ func emptyAsNil(s string) any {
 
 // sendSpace serializes a Space to the send queue.
 // Matches JavaSender.visitSpace field order: comments (list), whitespace.
-func sendSpace(s tree.Space, q *SendQueue) {
+func sendSpace(s java.Space, q *SendQueue) {
 	// Comments list: id = text + suffix
 	q.GetAndSendList(s,
 		func(v any) []any {
-			sp := v.(tree.Space)
+			sp := v.(java.Space)
 			if sp.Comments == nil {
 				return []any{} // must be empty slice, not nil, so Java gets ADD with empty list
 			}
@@ -57,25 +58,25 @@ func sendSpace(s tree.Space, q *SendQueue) {
 			return result
 		},
 		func(v any) any {
-			c := v.(tree.Comment)
+			c := v.(java.Comment)
 			return c.Text + c.Suffix
 		},
 		func(v any) {
-			c := v.(tree.Comment)
+			c := v.(java.Comment)
 			// multiline, text, suffix, markers (matching JavaSender.visitSpace comment fields)
-			q.GetAndSend(c, func(x any) any { return x.(tree.Comment).Multiline }, nil)
-			q.GetAndSend(c, func(x any) any { return x.(tree.Comment).Text }, nil)
-			q.GetAndSend(c, func(x any) any { return x.(tree.Comment).Suffix }, nil)
+			q.GetAndSend(c, func(x any) any { return x.(java.Comment).Multiline }, nil)
+			q.GetAndSend(c, func(x any) any { return x.(java.Comment).Text }, nil)
+			q.GetAndSend(c, func(x any) any { return x.(java.Comment).Suffix }, nil)
 			// Markers - use codec callback to match Java's Markers codec behavior
-			q.GetAndSend(c, func(x any) any { return x.(tree.Comment).Markers },
-				func(v any) { SendMarkersCodec(v.(tree.Markers), q) })
+			q.GetAndSend(c, func(x any) any { return x.(java.Comment).Markers },
+				func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 		})
 	// Whitespace
-	q.GetAndSend(s, func(v any) any { return v.(tree.Space).Whitespace }, nil)
+	q.GetAndSend(s, func(v any) any { return v.(java.Space).Whitespace }, nil)
 }
 
 // receiveSpace deserializes a Space from the receive queue.
-func receiveSpace(before tree.Space, q *ReceiveQueue) tree.Space {
+func receiveSpace(before java.Space, q *ReceiveQueue) java.Space {
 	// Comments list
 	commentsAny := make([]any, len(before.Comments))
 	for i, c := range before.Comments {
@@ -85,41 +86,41 @@ func receiveSpace(before tree.Space, q *ReceiveQueue) tree.Space {
 		if v == nil {
 			return nil
 		}
-		c := v.(tree.Comment)
+		c := v.(java.Comment)
 		c.Multiline = receiveScalar[bool](q, c.Multiline)
 		c.Text = receiveScalar[string](q, c.Text)
 		c.Suffix = receiveScalar[string](q, c.Suffix)
 		// Markers is sent by Java as a codec-wrapped field (state + sub-fields).
 		// Use q.Receive to consume the state message first.
 		if result := q.Receive(c.Markers, func(v any) any {
-			return receiveMarkersCodec(q, v.(tree.Markers))
+			return receiveMarkersCodec(q, v.(java.Markers))
 		}); result != nil {
-			c.Markers = result.(tree.Markers)
+			c.Markers = result.(java.Markers)
 		}
 		return c
 	})
 
-	var comments []tree.Comment
+	var comments []java.Comment
 	if afterComments != nil {
-		comments = make([]tree.Comment, len(afterComments))
+		comments = make([]java.Comment, len(afterComments))
 		for i, v := range afterComments {
-			comments[i] = v.(tree.Comment)
+			comments[i] = v.(java.Comment)
 		}
 	}
 
 	whitespace := receiveScalar[string](q, before.Whitespace)
-	return tree.Space{Comments: comments, Whitespace: whitespace}
+	return java.Space{Comments: comments, Whitespace: whitespace}
 }
 
 // SendMarkersCodec serializes Markers fields like Java's Markers.rpcSend codec.
 // Sends: ID (uuid string), then marker entries list as ref.
-func SendMarkersCodec(m tree.Markers, q *SendQueue) {
+func SendMarkersCodec(m java.Markers, q *SendQueue) {
 	// ID
-	q.GetAndSend(m, func(v any) any { return v.(tree.Markers).ID.String() }, nil)
+	q.GetAndSend(m, func(v any) any { return v.(java.Markers).ID.String() }, nil)
 	// Entries list (as ref) — matches Java's Markers.rpcSend protocol.
 	q.GetAndSendListAsRef(m,
 		func(v any) []any {
-			markers := v.(tree.Markers)
+			markers := v.(java.Markers)
 			if markers.Entries == nil {
 				return []any{}
 			}
@@ -130,98 +131,161 @@ func SendMarkersCodec(m tree.Markers, q *SendQueue) {
 			return result
 		},
 		func(v any) any {
-			return v.(tree.Marker).ID().String()
+			return v.(java.Marker).ID().String()
 		},
 		func(v any) { sendMarkerCodecFields(v, q) })
+}
+
+// hasGenericMarkerCodec reports whether sendMarkerCodecFields will dispatch
+// sub-field messages for a java.GenericMarker with the given Java FQN.
+// Markers not listed here have no RpcCodec on either side and must travel
+// inline (as the ADD message's Value) so the receiver does not desync waiting
+// for sub-fields that never arrive.
+func hasGenericMarkerCodec(javaType string) bool {
+	switch javaType {
+	case "org.openrewrite.Checksum",
+		"org.openrewrite.FileAttributes",
+		"org.openrewrite.marker.Markup$Error",
+		"org.openrewrite.marker.Markup$Warn",
+		"org.openrewrite.marker.Markup$Info",
+		"org.openrewrite.marker.Markup$Debug",
+		"org.openrewrite.java.marker.OmitBraces",
+		"org.openrewrite.java.marker.OmitParentheses",
+		"org.openrewrite.java.marker.Semicolon",
+		"org.openrewrite.java.marker.NullSafe",
+		"org.openrewrite.java.marker.TrailingComma":
+		return true
+	}
+	return false
 }
 
 // sendMarkerCodecFields sends the sub-fields for markers that implement RpcCodec on the Java side.
 // This must match the field order in each marker's rpcSend method.
 func sendMarkerCodecFields(v any, q *SendQueue) {
 	switch m := v.(type) {
-	case tree.ParseExceptionResult:
+	case java.ParseExceptionResult:
 		// ParseExceptionResult.rpcSend sends: id, parserType, exceptionType, message, treeType
-		q.GetAndSend(m, func(x any) any { return x.(tree.ParseExceptionResult).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.ParseExceptionResult).ParserType }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.ParseExceptionResult).ExceptionType }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.ParseExceptionResult).Message }, nil)
-		q.GetAndSend(m, func(x any) any { return nilableString(x.(tree.ParseExceptionResult).TreeType) }, nil)
-	case tree.SearchResult:
+		q.GetAndSend(m, func(x any) any { return x.(java.ParseExceptionResult).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(java.ParseExceptionResult).ParserType }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(java.ParseExceptionResult).ExceptionType }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(java.ParseExceptionResult).Message }, nil)
+		q.GetAndSend(m, func(x any) any { return nilableString(x.(java.ParseExceptionResult).TreeType) }, nil)
+	case java.SearchResult:
 		// SearchResult.rpcSend sends: id (UUID string), description (nullable string)
-		q.GetAndSend(m, func(x any) any { return x.(tree.SearchResult).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.SearchResult).Description }, nil)
-	case tree.GroupedImport:
+		q.GetAndSend(m, func(x any) any { return x.(java.SearchResult).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(java.SearchResult).Description }, nil)
+	case golang.GroupedImport:
 		// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
-		q.GetAndSend(m, func(x any) any { return x.(tree.GroupedImport).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.GroupedImport).Before.Whitespace }, nil)
-	case tree.ImportBlock:
+		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Before.Whitespace }, nil)
+	case golang.ImportBlock:
 		// ImportBlock.rpcSend sends: id, closePrevious, before, grouped, groupedBefore
-		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).ClosePrevious }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).Before.Whitespace }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).Grouped }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).GroupedBefore.Whitespace }, nil)
-	case tree.ShortVarDecl:
-		q.GetAndSend(m, func(x any) any { return x.(tree.ShortVarDecl).Ident.String() }, nil)
-	case tree.VarKeyword:
-		q.GetAndSend(m, func(x any) any { return x.(tree.VarKeyword).Ident.String() }, nil)
-	case tree.ConstDecl:
-		q.GetAndSend(m, func(x any) any { return x.(tree.ConstDecl).Ident.String() }, nil)
-	case tree.GroupedSpec:
-		q.GetAndSend(m, func(x any) any { return x.(tree.GroupedSpec).Ident.String() }, nil)
-	case tree.InterfaceMethod:
-		q.GetAndSend(m, func(x any) any { return x.(tree.InterfaceMethod).Ident.String() }, nil)
-	case tree.SelectStmt:
-		q.GetAndSend(m, func(x any) any { return x.(tree.SelectStmt).Ident.String() }, nil)
-	case tree.TypeSwitchGuard:
-		q.GetAndSend(m, func(x any) any { return x.(tree.TypeSwitchGuard).Ident.String() }, nil)
-	case tree.StructTag:
+		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).ClosePrevious }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Before.Whitespace }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).Grouped }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.ImportBlock).GroupedBefore.Whitespace }, nil)
+	case golang.ShortVarDecl:
+		q.GetAndSend(m, func(x any) any { return x.(golang.ShortVarDecl).Ident.String() }, nil)
+	case golang.VarKeyword:
+		q.GetAndSend(m, func(x any) any { return x.(golang.VarKeyword).Ident.String() }, nil)
+	case golang.ConstDecl:
+		q.GetAndSend(m, func(x any) any { return x.(golang.ConstDecl).Ident.String() }, nil)
+	case golang.GroupedSpec:
+		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedSpec).Ident.String() }, nil)
+	case golang.InterfaceMethod:
+		q.GetAndSend(m, func(x any) any { return x.(golang.InterfaceMethod).Ident.String() }, nil)
+	case golang.SelectStmt:
+		q.GetAndSend(m, func(x any) any { return x.(golang.SelectStmt).Ident.String() }, nil)
+	case golang.TypeSwitchGuard:
+		q.GetAndSend(m, func(x any) any { return x.(golang.TypeSwitchGuard).Ident.String() }, nil)
+	case golang.StructTag:
 		// StructTag.rpcSend sends: id (UUID string), tag valueSource (string)
-		q.GetAndSend(m, func(x any) any { return x.(tree.StructTag).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.StructTag).Tag.Source }, nil)
-	case tree.TrailingComma:
+		q.GetAndSend(m, func(x any) any { return x.(golang.StructTag).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.StructTag).Tag.Source }, nil)
+	case golang.TrailingComma:
 		// TrailingComma.rpcSend sends: id (UUID string), before whitespace, after whitespace
-		q.GetAndSend(m, func(x any) any { return x.(tree.TrailingComma).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.TrailingComma).Before.Whitespace }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.TrailingComma).After.Whitespace }, nil)
-	case tree.Semicolon:
+		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).Before.Whitespace }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.TrailingComma).After.Whitespace }, nil)
+	case golang.Semicolon:
 		// Semicolon.rpcSend sends: id (UUID string)
-		q.GetAndSend(m, func(x any) any { return x.(tree.Semicolon).Ident.String() }, nil)
-	case tree.GoProject:
+		q.GetAndSend(m, func(x any) any { return x.(golang.Semicolon).Ident.String() }, nil)
+	case golang.GoProject:
 		// GoProject.rpcSend sends: id (UUID string), projectName (string)
-		q.GetAndSend(m, func(x any) any { return x.(tree.GoProject).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.GoProject).ProjectName }, nil)
-	case tree.GoResolutionResult:
+		q.GetAndSend(m, func(x any) any { return x.(golang.GoProject).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(golang.GoProject).ProjectName }, nil)
+	case golang.GoResolutionResult:
 		// Field order mirrors Java's GoResolutionResult#rpcSend exactly;
 		// see go_resolution_result_codec.go for the per-field commentary.
 		sendGoResolutionResult(m, q)
-	case tree.GenericMarker:
+	case java.GenericMarker:
 		// Send codec sub-fields matching what Java expects
 		d := m.Data
 		switch m.JavaType {
 		case "org.openrewrite.Checksum":
-			q.GetAndSend(m, func(_ any) any { if d != nil { return d["algorithm"] }; return "" }, nil)
-			q.GetAndSend(m, func(_ any) any { if d != nil { return d["value"] }; return nil }, nil)
+			q.GetAndSend(m, func(_ any) any {
+				if d != nil {
+					return d["algorithm"]
+				}
+				return ""
+			}, nil)
+			q.GetAndSend(m, func(_ any) any {
+				if d != nil {
+					return d["value"]
+				}
+				return nil
+			}, nil)
 		case "org.openrewrite.FileAttributes":
 			for _, key := range []string{"creationTime", "lastModifiedTime", "lastAccessTime", "isReadable", "isWritable", "isExecutable", "size"} {
 				k := key
-				q.GetAndSend(m, func(_ any) any { if d != nil { return d[k] }; return nil }, nil)
+				q.GetAndSend(m, func(_ any) any {
+					if d != nil {
+						return d[k]
+					}
+					return nil
+				}, nil)
 			}
 		case "org.openrewrite.marker.Markup$Error",
 			"org.openrewrite.marker.Markup$Warn",
 			"org.openrewrite.marker.Markup$Info",
 			"org.openrewrite.marker.Markup$Debug":
 			// Markup inner classes implement RpcCodec: id, message, detail
-			q.GetAndSend(m, func(_ any) any { if d != nil { return d["id"] }; return "" }, nil)
-			q.GetAndSend(m, func(_ any) any { if d != nil { return d["message"] }; return "" }, nil)
-			q.GetAndSend(m, func(_ any) any { if d != nil { return d["detail"] }; return nil }, nil)
+			q.GetAndSend(m, func(_ any) any {
+				if d != nil {
+					return d["id"]
+				}
+				return ""
+			}, nil)
+			q.GetAndSend(m, func(_ any) any {
+				if d != nil {
+					return d["message"]
+				}
+				return ""
+			}, nil)
+			q.GetAndSend(m, func(_ any) any {
+				if d != nil {
+					return d["detail"]
+				}
+				return nil
+			}, nil)
 		case "org.openrewrite.java.marker.OmitBraces",
 			"org.openrewrite.java.marker.OmitParentheses",
 			"org.openrewrite.java.marker.Semicolon":
-			q.GetAndSend(m, func(_ any) any { if d != nil { return d["id"] }; return "" }, nil)
+			q.GetAndSend(m, func(_ any) any {
+				if d != nil {
+					return d["id"]
+				}
+				return ""
+			}, nil)
 		case "org.openrewrite.java.marker.NullSafe",
 			"org.openrewrite.java.marker.TrailingComma":
-			q.GetAndSend(m, func(_ any) any { if d != nil { return d["id"] }; return "" }, nil)
+			q.GetAndSend(m, func(_ any) any {
+				if d != nil {
+					return d["id"]
+				}
+				return ""
+			}, nil)
 			q.GetAndSend(m, func(_ any) any { return nil }, nil) // Space
 		default:
 			// Unknown marker type — no sub-fields to send
@@ -232,7 +296,7 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 }
 
 // receiveMarkersCodec deserializes Markers fields like Java's Markers.rpcReceive codec.
-func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
+func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 	// ID
 	idStr := receiveScalar[string](q, before.ID.String())
 	id := before.ID
@@ -253,7 +317,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 		// Markers that implement RpcCodec on the Java side send sub-fields.
 		// We dispatch based on the concrete Go type created by the factory.
 		switch m := v.(type) {
-		case tree.ParseExceptionResult:
+		case java.ParseExceptionResult:
 			// ParseExceptionResult.rpcReceive: id, parserType, exceptionType, message, treeType
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
@@ -272,7 +336,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				m.TreeType = nil
 			}
 			return m
-		case tree.SearchResult:
+		case java.SearchResult:
 			// SearchResult.rpcSend sends: id (UUID string), description (nullable string)
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
@@ -285,7 +349,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				m.Description = desc.(string)
 			}
 			return m
-		case tree.GroupedImport:
+		case golang.GroupedImport:
 			// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
@@ -294,9 +358,9 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				}
 			}
 			ws := receiveScalar[string](q, m.Before.Whitespace)
-			m.Before = tree.Space{Whitespace: ws}
+			m.Before = java.Space{Whitespace: ws}
 			return m
-		case tree.ImportBlock:
+		case golang.ImportBlock:
 			// ImportBlock.rpcReceive: id, closePrevious, before, grouped, groupedBefore
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
@@ -306,12 +370,12 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 			}
 			m.ClosePrevious = receiveScalar[bool](q, m.ClosePrevious)
 			ws := receiveScalar[string](q, m.Before.Whitespace)
-			m.Before = tree.Space{Whitespace: ws}
+			m.Before = java.Space{Whitespace: ws}
 			m.Grouped = receiveScalar[bool](q, m.Grouped)
 			gbWs := receiveScalar[string](q, m.GroupedBefore.Whitespace)
-			m.GroupedBefore = tree.Space{Whitespace: gbWs}
+			m.GroupedBefore = java.Space{Whitespace: gbWs}
 			return m
-		case tree.ShortVarDecl:
+		case golang.ShortVarDecl:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -319,7 +383,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				}
 			}
 			return m
-		case tree.VarKeyword:
+		case golang.VarKeyword:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -327,7 +391,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				}
 			}
 			return m
-		case tree.ConstDecl:
+		case golang.ConstDecl:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -335,7 +399,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				}
 			}
 			return m
-		case tree.GroupedSpec:
+		case golang.GroupedSpec:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -343,7 +407,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				}
 			}
 			return m
-		case tree.InterfaceMethod:
+		case golang.InterfaceMethod:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -351,7 +415,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				}
 			}
 			return m
-		case tree.SelectStmt:
+		case golang.SelectStmt:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -359,7 +423,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				}
 			}
 			return m
-		case tree.TypeSwitchGuard:
+		case golang.TypeSwitchGuard:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -367,7 +431,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				}
 			}
 			return m
-		case tree.StructTag:
+		case golang.StructTag:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -386,13 +450,13 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				tag.Source = valueSource
 				m.Tag = &tag
 			} else {
-				m.Tag = &tree.Literal{
+				m.Tag = &java.Literal{
 					ID:     uuid.New(),
 					Source: valueSource,
 				}
 			}
 			return m
-		case tree.TrailingComma:
+		case golang.TrailingComma:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -400,11 +464,11 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				}
 			}
 			beforeWs := receiveScalar[string](q, m.Before.Whitespace)
-			m.Before = tree.Space{Whitespace: beforeWs}
+			m.Before = java.Space{Whitespace: beforeWs}
 			afterWs := receiveScalar[string](q, m.After.Whitespace)
-			m.After = tree.Space{Whitespace: afterWs}
+			m.After = java.Space{Whitespace: afterWs}
 			return m
-		case tree.Semicolon:
+		case golang.Semicolon:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -412,7 +476,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				}
 			}
 			return m
-		case tree.GoProject:
+		case golang.GoProject:
 			idStr := receiveScalar[string](q, m.Ident.String())
 			if idStr != "" {
 				if parsed, err := uuid.Parse(idStr); err == nil {
@@ -421,9 +485,9 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 			}
 			m.ProjectName = receiveScalar[string](q, m.ProjectName)
 			return m
-		case tree.GoResolutionResult:
+		case golang.GoResolutionResult:
 			return receiveGoResolutionResult(m, q)
-		case tree.GenericMarker:
+		case java.GenericMarker:
 			// Read codec sub-fields based on the original Java marker type.
 			// Each Java marker's rpcSend sends specific sub-fields that we must consume.
 			switch m.JavaType {
@@ -460,7 +524,7 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				m.Data = map[string]any{
 					"id": receiveScalar[string](q, ""),
 				}
-				q.Receive(nil, func(v any) any { return receiveSpace(v.(tree.Space), q) })
+				q.Receive(nil, func(v any) any { return receiveSpace(v.(java.Space), q) })
 			default:
 				// Unknown marker type — no sub-fields to read.
 				// If this causes queue misalignment, the marker type needs
@@ -471,12 +535,12 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 			return v
 		}
 	})
-	var entries []tree.Marker
+	var entries []java.Marker
 	if afterAny != nil {
-		entries = make([]tree.Marker, len(afterAny))
+		entries = make([]java.Marker, len(afterAny))
 		for i, v := range afterAny {
-			entries[i] = v.(tree.Marker)
+			entries[i] = v.(java.Marker)
 		}
 	}
-	return tree.Markers{ID: id, Entries: entries}
+	return java.Markers{ID: id, Entries: entries}
 }

@@ -56,6 +56,25 @@ class AlternativePatternTest implements RewriteTest {
     }
 
     @Test
+    void boundTypedAlternatives() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                def run(): Unit = {
+                  try {
+                    ()
+                  } catch {
+                    case e @ (_: ClassNotFoundException | _: NoSuchMethodException) =>
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void typedAlternatives() {
         rewriteRun(
           scala(

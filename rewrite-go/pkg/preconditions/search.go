@@ -17,13 +17,23 @@
 package preconditions
 
 import (
-	"path"
+	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/matcher"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
+
+// isSourceFile reports whether t is a source-file root for gating purposes.
+// It duck-types IsSourceFile() rather than asserting java.SourceFile so that
+// non-J roots (e.g. golang.GoMod, which models go.mod and is intentionally
+// not a J node) are still recognized as source files.
+func isSourceFile(t java.Tree) bool {
+	_, ok := t.(interface{ IsSourceFile() })
+	return ok
+}
 
 // IsSourceFileVisitor matches SourceFile trees by path glob.
 //
@@ -38,12 +48,11 @@ func NewIsSourceFile(filePattern string) *IsSourceFileVisitor {
 	return &IsSourceFileVisitor{pattern: filePattern}
 }
 
-func (v *IsSourceFileVisitor) Visit(t tree.Tree, _ any) tree.Tree {
-	sf, ok := t.(tree.SourceFile)
-	if !ok {
+func (v *IsSourceFileVisitor) Visit(t java.Tree, _ any) java.Tree {
+	if !isSourceFile(t) {
 		return t
 	}
-	src := sourceFilePath(sf)
+	src := sourceFilePath(t)
 	if src == "" {
 		return t
 	}
@@ -65,8 +74,8 @@ func NewUsesType(fullyQualifiedType string) *UsesTypeVisitor {
 	return &UsesTypeVisitor{pattern: fullyQualifiedType}
 }
 
-func (v *UsesTypeVisitor) Visit(t tree.Tree, _ any) tree.Tree {
-	if _, ok := t.(tree.SourceFile); !ok {
+func (v *UsesTypeVisitor) Visit(t java.Tree, _ any) java.Tree {
+	if _, ok := t.(java.SourceFile); !ok {
 		return t
 	}
 	if v.treeUsesType(t) {
@@ -75,21 +84,18 @@ func (v *UsesTypeVisitor) Visit(t tree.Tree, _ any) tree.Tree {
 	return t
 }
 
-func (v *UsesTypeVisitor) treeUsesType(t tree.Tree) bool {
+func (v *UsesTypeVisitor) treeUsesType(t java.Tree) bool {
 	found := false
-	walkTree(t, func(node tree.Tree) bool {
-		if found {
-			return false
+	java.WalkTree(t, func(node java.Tree) bool {
+		jt := nodeType(node)
+		if jt == nil {
+			return true
 		}
-		if typed, ok := node.(interface{ GetType() tree.JavaType }); ok {
-			if jt := typed.GetType(); jt != nil {
-				if fq, ok := jt.(tree.FullyQualified); ok {
-					fqn := fq.GetFullyQualifiedName()
-					if fqn != "" && matchTypeGlob(v.pattern, fqn) {
-						found = true
-						return false
-					}
-				}
+		if fq, ok := jt.(java.FullyQualified); ok {
+			fqn := fq.GetFullyQualifiedName()
+			if fqn != "" && matchTypeGlob(v.pattern, fqn) {
+				found = true
+				return false
 			}
 		}
 		return true
@@ -97,8 +103,32 @@ func (v *UsesTypeVisitor) treeUsesType(t tree.Tree) bool {
 	return found
 }
 
+// nodeType extracts the JavaType attribution from a node via its exported
+// "Type" field. LST nodes expose type attribution as a `Type JavaType`
+// field rather than through a common accessor method (mirroring
+// matcher.TypeOfExpression), so we read it reflectively and uniformly
+// across every node shape that carries one.
+func nodeType(node java.Tree) java.JavaType {
+	v := reflect.ValueOf(node)
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return nil
+	}
+	f := v.FieldByName("Type")
+	if !f.IsValid() || !f.CanInterface() {
+		return nil
+	}
+	jt, _ := f.Interface().(java.JavaType)
+	return jt
+}
+
 // UsesMethodVisitor matches files using a specific method, by walking
-// the tree for *tree.MethodInvocation nodes and consulting MethodMatcher.
+// the tree for *java.MethodInvocation nodes and consulting MethodMatcher.
 //
 // Mirrors org.openrewrite.java.search.HasMethod.
 type UsesMethodVisitor struct {
@@ -109,8 +139,8 @@ func NewUsesMethod(methodPattern string) *UsesMethodVisitor {
 	return &UsesMethodVisitor{matcher: matcher.NewMethodMatcher(methodPattern)}
 }
 
-func (v *UsesMethodVisitor) Visit(t tree.Tree, _ any) tree.Tree {
-	if _, ok := t.(tree.SourceFile); !ok {
+func (v *UsesMethodVisitor) Visit(t java.Tree, _ any) java.Tree {
+	if _, ok := t.(java.SourceFile); !ok {
 		return t
 	}
 	if v.treeUsesMethod(t) {
@@ -119,13 +149,10 @@ func (v *UsesMethodVisitor) Visit(t tree.Tree, _ any) tree.Tree {
 	return t
 }
 
-func (v *UsesMethodVisitor) treeUsesMethod(t tree.Tree) bool {
+func (v *UsesMethodVisitor) treeUsesMethod(t java.Tree) bool {
 	found := false
-	walkTree(t, func(node tree.Tree) bool {
-		if found {
-			return false
-		}
-		if mi, ok := node.(*tree.MethodInvocation); ok {
+	java.WalkTree(t, func(node java.Tree) bool {
+		if mi, ok := node.(*java.MethodInvocation); ok {
 			if v.matcher.Matches(mi) {
 				found = true
 				return false
@@ -138,100 +165,53 @@ func (v *UsesMethodVisitor) treeUsesMethod(t tree.Tree) bool {
 
 // markFound returns a sentinel "different tree" so the wrapping
 // CheckVisitor sees a non-identity result and runs the wrapped editor.
-// We use a wrapper struct rather than mutating the original tree to
-// avoid coupling search visitors to the concrete tree type.
-type matchedSourceFile struct {
-	tree.SourceFile
+// We wrap rather than mutate the original tree to avoid coupling search
+// visitors to the concrete tree type; any java.Tree (including non-J
+// roots like golang.GoMod) can be wrapped.
+type matchedTree struct {
+	java.Tree
 }
 
-func markFound(t tree.Tree) tree.Tree {
-	if sf, ok := t.(tree.SourceFile); ok {
-		return &matchedSourceFile{SourceFile: sf}
-	}
-	return t
+func markFound(t java.Tree) java.Tree {
+	return &matchedTree{Tree: t}
 }
 
-// walkTree does a best-effort iterative DFS over a tree. Returns ``false``
-// from ``visit`` to stop walking. Implementation uses pkg/tree's existing
-// SearchWalker if available; otherwise falls back to walking the
-// tree.J interface via reflection-free iteration of known shapes.
+// matchPathGlob matches a path against an Ant-style glob pattern. It mirrors
+// the matching semantics of org.openrewrite.FindSourceFiles:
+//   - "**" matches any number of path segments (crossing "/")
+//   - "*"  matches any run of characters within a single segment
+//   - "?"  matches a single non-separator character
 //
-// For simplicity we delegate to a shared helper that knows how to descend
-// into common LST nodes — see WalkSubtree below.
-func walkTree(root tree.Tree, visit func(tree.Tree) bool) {
-	walker := newSearchWalker(visit)
-	walker.walk(root)
-}
-
-// searchWalker is a minimal iterative walker that knows just enough
-// about the LST to descend into compilation units and statement trees.
-// It intentionally does not duplicate tree/search_walker.go's full
-// machinery — only enough to find type-bearing nodes and method
-// invocations for HasType/HasMethod.
-type searchWalker struct {
-	visit func(tree.Tree) bool
-	stop  bool
-}
-
-func newSearchWalker(visit func(tree.Tree) bool) *searchWalker {
-	return &searchWalker{visit: visit}
-}
-
-func (w *searchWalker) walk(node tree.Tree) {
-	if w.stop || node == nil {
-		return
-	}
-	if !w.visit(node) {
-		w.stop = true
-		return
-	}
-	for _, child := range childrenOf(node) {
-		w.walk(child)
-		if w.stop {
-			return
-		}
-	}
-}
-
-// childrenOf returns immediate child Tree nodes of the given node.
-// Best-effort: uses the SearchWalker shape from pkg/tree where available
-// and falls back to no children for unknown shapes (which means the
-// search visitor returns false negatives for those, but never false
-// positives — safe for a precondition gate).
-func childrenOf(node tree.Tree) []tree.Tree {
-	if hc, ok := node.(interface{ Children() []tree.Tree }); ok {
-		return hc.Children()
-	}
-	return nil
-}
-
-// matchPathGlob matches a path against a glob pattern using Go's
-// path.Match plus a "**" extension for recursive matching.
+// The pattern is translated to an anchored regexp once per call.
 func matchPathGlob(pattern, p string) bool {
-	if strings.Contains(pattern, "**") {
-		// "**/*.go" → match any .go anywhere
-		// We simplify to: split on "**", require all parts to appear in order.
-		parts := strings.Split(pattern, "**")
-		idx := 0
-		for i, part := range parts {
-			if part == "" {
-				continue
+	var b strings.Builder
+	b.WriteByte('^')
+	for i := 0; i < len(pattern); i++ {
+		c := pattern[i]
+		switch c {
+		case '*':
+			if i+1 < len(pattern) && pattern[i+1] == '*' {
+				b.WriteString(".*")
+				i++
+				// Swallow a trailing "/" so "**/x" also matches a bare "x".
+				if i+1 < len(pattern) && pattern[i+1] == '/' {
+					i++
+				}
+			} else {
+				b.WriteString("[^/]*")
 			}
-			// First part must match prefix; intermediate parts can match
-			// anywhere; last part must match suffix.
-			j := strings.Index(p[idx:], strings.Trim(part, "/"))
-			if j < 0 {
-				return false
-			}
-			if i == 0 && j != 0 {
-				return false
-			}
-			idx += j + len(strings.Trim(part, "/"))
+		case '?':
+			b.WriteString("[^/]")
+		case '.', '+', '(', ')', '|', '[', ']', '{', '}', '^', '$', '\\':
+			b.WriteByte('\\')
+			b.WriteByte(c)
+		default:
+			b.WriteByte(c)
 		}
-		return true
 	}
-	matched, err := path.Match(pattern, p)
-	return err == nil && matched
+	b.WriteByte('$')
+	re, err := regexp.Compile(b.String())
+	return err == nil && re.MatchString(p)
 }
 
 // matchTypeGlob matches a fully-qualified type name against a pattern.
@@ -261,13 +241,15 @@ func matchTypeGlob(pattern, fqn string) bool {
 	return true
 }
 
-// sourceFilePath extracts a string path from a SourceFile, falling back
-// to the empty string when none is available.
-func sourceFilePath(sf tree.SourceFile) string {
-	if hp, ok := sf.(interface{ GetSourcePath() string }); ok {
+// sourceFilePath extracts a string path from a source-file root, falling
+// back to the empty string when none is available. It duck-types the
+// path accessor so it works for both J source files (CompilationUnit)
+// and non-J roots (GoMod).
+func sourceFilePath(t java.Tree) string {
+	if hp, ok := t.(interface{ GetSourcePath() string }); ok {
 		return hp.GetSourcePath()
 	}
-	if hp, ok := sf.(interface{ SourcePath() string }); ok {
+	if hp, ok := t.(interface{ SourcePath() string }); ok {
 		return hp.SourcePath()
 	}
 	return ""

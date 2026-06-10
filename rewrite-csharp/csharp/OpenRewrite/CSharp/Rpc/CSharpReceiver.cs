@@ -496,8 +496,11 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitPragmaWarningDirective(PragmaWarningDirective pwd, RpcReceiveQueue q)
     {
         var action = q.ReceiveAndGet(pwd.Action, RpcReceiveQueue.ToEnum<PragmaWarningAction>());
+        var keywordSpacing = q.Receive(pwd.KeywordSpacing, space => VisitSpace(space, q))!;
+        var actionSpacing = q.Receive(pwd.ActionSpacing, space => VisitSpace(space, q))!;
         var warningCodes = q.ReceiveList(pwd.WarningCodes, rp => _delegate.VisitRightPadded(rp, q));
-        return pwd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAction(action).WithWarningCodes(warningCodes!);
+        return pwd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAction(action)
+            .WithWarningCodes(warningCodes!).WithKeywordSpacing(keywordSpacing).WithActionSpacing(actionSpacing);
     }
 
     // ---- NullableDirective ----
@@ -514,9 +517,11 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         };
         var hashSpacing = q.Receive(nd.HashSpacing)!;
         var trailingComment = q.Receive(nd.TrailingComment)!;
+        var keywordSpacing = q.Receive(nd.KeywordSpacing)!;
         return nd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
             .WithSetting(setting).WithTarget(target)
-            .WithHashSpacing(hashSpacing).WithTrailingComment(trailingComment);
+            .WithHashSpacing(hashSpacing).WithTrailingComment(trailingComment)
+            .WithKeywordSpacing(keywordSpacing);
     }
 
     // ---- RegionDirective ----
@@ -566,8 +571,10 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- PragmaChecksumDirective ----
     public override J VisitPragmaChecksumDirective(PragmaChecksumDirective pcd, RpcReceiveQueue q)
     {
+        var keywordSpacing = q.Receive(pcd.KeywordSpacing, space => VisitSpace(space, q))!;
         var arguments = q.Receive<string>(pcd.Arguments);
-        return pcd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithArguments(arguments!);
+        return pcd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
+            .WithKeywordSpacing(keywordSpacing).WithArguments(arguments!);
     }
 
     // ---- LineDirective ----
@@ -1090,6 +1097,31 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         // Make ConsumePreVisit/PopPreVisit accessible to CSharpReceiver
         public new void ConsumePreVisit(J j, RpcReceiveQueue q) => base.ConsumePreVisit(j, q);
         public new void PopPreVisit() => base.PopPreVisit();
+
+        public override Space VisitSpace(Space space, RpcReceiveQueue q)
+        {
+            var comments = q.ReceiveList(space.Comments, c =>
+            {
+                // The Java side decomposes a structured CsDocComment.DocComment tree; the C#
+                // side has no such model, so drain it and re-flatten to a raw XmlDocComment.
+                if (c is StructuredDocComment)
+                {
+                    return CsDocCommentReceiver.ReceiveDocComment(q);
+                }
+                var multiline = q.Receive(c.Multiline);
+                var text = q.Receive(c.Text);
+                var suffix = q.Receive(c.Suffix);
+                // C# Comment doesn't have Markers; consume and discard
+                q.Receive<Markers>(Markers.Empty);
+                if (c is XmlDocComment)
+                {
+                    return new XmlDocComment(text!, suffix!, multiline);
+                }
+                return new TextComment(text!, suffix!, multiline);
+            });
+            var whitespace = q.Receive(space.Whitespace);
+            return space.WithComments(comments!).WithWhitespace(whitespace!);
+        }
 
         public override J? Visit(Tree? tree, RpcReceiveQueue q)
         {

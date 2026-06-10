@@ -21,7 +21,7 @@ import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Phases
 import dotty.tools.dotc.parsing.Parsers
 import dotty.tools.dotc.util.SourceFile
-import dotty.tools.dotc.reporting.{Diagnostic, Reporter, StoreReporter}
+import dotty.tools.dotc.reporting.{Diagnostic, StoreReporter}
 import dotty.tools.dotc.{CompilationUnit, Run, Compiler, Driver}
 import dotty.tools.dotc.config.ScalaSettings
 
@@ -57,11 +57,21 @@ class ScalaCompilerBridge {
     val driver = new ParsingDriver()
     val baseCtx: Context = driver.getInitialContext
 
+    // Buffer diagnostics in-memory so they don't leak to stderr via Dotty's default ConsoleReporter.
+    val storeReporter = new StoreReporter(null)
+
     // Configure source version, output directory, and classpath.
-    given ctx: Context = {
+    val configuredCtx: Context = {
       val fresh = baseCtx.fresh
       // Accept both Scala 2 and Scala 3 syntax (including indentation-based).
       fresh.setSetting(fresh.settings.source, "3.6-migration")
+      // Enable `postfixOps` so the parser emits `PostfixOp` AST nodes for trailing
+      // postfix calls (e.g., `xs filter p list`). Without this, Dotty's parser
+      // silently drops the trailing token rather than emitting an AST node.
+      fresh.setSetting(fresh.settings.language, List(
+        new dotty.tools.dotc.config.Settings.Setting.ChoiceWithHelp[String]("postfixOps", "")
+      ))
+      fresh.setReporter(storeReporter)
       // Send compiler output to a designated dir so .class files don't pollute cwd.
       if (outputDir != null) {
         fresh.setSetting(fresh.settings.outputDir, dotty.tools.io.AbstractFile.getDirectory(outputDir))
@@ -73,6 +83,27 @@ class ScalaCompilerBridge {
       fresh
     }
 
+    // Create the Run up front. Run construction initializes Definitions and
+    // ContextBase state (e.g., `ctx.base.TypeBoundsEmpty`) that the parser
+    // requires when it sees `A with B` types — those go through
+    // `untpd.makeAndType` → `Definitions.andType`, which would NPE on an
+    // uninitialized base. Parsing under `run.runContext` keeps that path safe.
+    //
+    // Run construction requires the Scala stdlib on the classpath (to resolve
+    // `scala.Any`, etc.). Some callers (e.g. ScalaTemplate-style usage that
+    // intentionally narrows the classpath) supply none, so fall back to the
+    // configured base context if Run init fails. Code paths that don't hit
+    // `with` types continue to parse fine; `with` types will fail loudly.
+    val compiler = new Compiler()
+    val (runOpt, parseContext): (Option[Run], Context) =
+      try {
+        val r = compiler.newRun(using configuredCtx)
+        (Some(r), r.runContext)
+      } catch {
+        case _: Throwable => (None, configuredCtx)
+      }
+    given ctx: Context = parseContext
+
     // Phase 1: Parse all sources into CompilationUnits
     val units = new ArrayList[CompilationUnit]()
     val sourceEntries = new ArrayList[SourceEntry]()
@@ -80,79 +111,85 @@ class ScalaCompilerBridge {
     val srcIter = sources.iterator()
     while (srcIter.hasNext) {
       val entry = srcIter.next()
-      val path = entry.path
-      val content = entry.content
+      val parsed = parseOne(entry.path, entry.content)
 
-      // Handle simple expression wrapping
-      val (adjustedContent, needsUnwrap) = if (isSimpleExpression(content)) {
-        (s"object ExprWrapper { val result = $content }", true)
-      } else {
-        (content, false)
-      }
+      results.put(entry.path, buildResult(parsed, new ArrayList[ScalaWarning]()))
 
-      val source = SourceFile.virtual(path, adjustedContent)
-      val unit = CompilationUnit(source)
-
-      // Parse using the parser (this always works)
-      val parser = new Parsers.Parser(source)(using ctx.fresh.setCompilationUnit(unit))
-      val tree = parser.parse()
-
-      // Unwrap if needed
-      val finalTree = if (needsUnwrap && !tree.isEmpty) {
-        extractExpression(tree).getOrElse(tree)
-      } else {
-        tree
-      }
-
-      // Store parse-only result initially
-      results.put(path, ScalaParseResult(finalTree, None, new ArrayList[ScalaWarning](), needsUnwrap, ctx))
-
-      // Track unit for batch type-checking
-      unit.untpdTree = tree
-      units.add(unit)
+      // Track unit for batch type-checking. The *raw* parsed tree (pre-unwrap)
+      // is what the typer needs — it's the form the parser actually produced.
+      parsed.unit.untpdTree = parsed.rawTree
+      units.add(parsed.unit)
       sourceEntries.add(entry)
     }
 
-    // Phase 2: Attempt batch type-checking
-    try {
-      val compiler = new Compiler()
-      val run = compiler.newRun(using ctx)
+    // Phase 2: Attempt batch type-checking (only if we managed to create a Run).
+    runOpt.foreach { run =>
+      try {
+        // Convert to Scala list for the compiler
+        val unitList = {
+          val buf = new ListBuffer[CompilationUnit]()
+          val uIter = units.iterator()
+          while (uIter.hasNext) buf += uIter.next()
+          buf.toList
+        }
 
-      // Convert to Scala list for the compiler
-      val unitList = {
-        val buf = new ListBuffer[CompilationUnit]()
-        val uIter = units.iterator()
-        while (uIter.hasNext) buf += uIter.next()
-        buf.toList
-      }
+        run.compileUnits(unitList)
 
-      run.compileUnits(unitList)
+        // Use the run's context — symbols from tpd.Tree are only valid in this context
+        given runCtx: Context = run.runContext
 
-      // Use the run's context — symbols from tpd.Tree are only valid in this context
-      given runCtx: Context = run.runContext
+        // Extract typed trees per unit
+        for (i <- 0 until units.size()) {
+          val unit = units.get(i)
+          val entry = sourceEntries.get(i)
+          val path = entry.path
+          val existing = results.get(path)
 
-      // Extract typed trees per unit
-      for (i <- 0 until units.size()) {
-        val unit = units.get(i)
-        val entry = sourceEntries.get(i)
-        val path = entry.path
-        val existing = results.get(path)
-
-        try {
-          val typedTree = unit.tpdTree
-          if (typedTree != null && !typedTree.isEmpty) {
-            results.put(path, existing.copy(typedTree = Some(typedTree), context = runCtx))
+          try {
+            val typedTree = unit.tpdTree
+            if (typedTree != null && !typedTree.isEmpty) {
+              results.put(path, existing.copy(typedTree = Some(typedTree), context = runCtx))
+            }
+          } catch {
+            case _: Throwable =>
           }
-        } catch {
-          case _: Throwable =>
+        }
+      } catch {
+        case _: Throwable =>
+          // Batch compilation failed entirely; all units keep typedTree=None
+      }
+    }
+
+    // Drain buffered diagnostics into per-source `warnings` lists so callers
+    // can surface them as ParseWarning markers (and optionally log them).
+    val drained = storeReporter.removeBufferedMessages
+    if (drained.nonEmpty) {
+      val byPath = drained.groupBy(diagnosticSourcePath)
+      val rIter = results.entrySet().iterator()
+      while (rIter.hasNext) {
+        val e = rIter.next()
+        byPath.get(e.getKey).foreach { diags =>
+          val ws = e.getValue.warnings
+          diags.foreach(d => ws.add(toScalaWarning(d)))
         }
       }
-    } catch {
-      case _: Throwable =>
-        // Batch compilation failed entirely; all units keep typedTree=None
     }
 
     results
+  }
+
+  private def diagnosticSourcePath(d: Diagnostic): String =
+    if (d.pos.exists && d.pos.source != null) d.pos.source.path else ""
+
+  private def toScalaWarning(d: Diagnostic): ScalaWarning = {
+    val (line, column) =
+      if (d.pos.exists) (d.pos.line + 1, d.pos.column + 1) else (0, 0)
+    val level = d.level match {
+      case 2 => "error"
+      case 1 => "warning"
+      case _ => "info"
+    }
+    ScalaWarning(d.message, line, column, level)
   }
 
   /**
@@ -160,46 +197,79 @@ class ScalaCompilerBridge {
    * Retained for backward compatibility.
    */
   def parse(path: String, content: String): ScalaParseResult = {
-    // Create a custom reporter to collect warnings
-    val warnings = new ListBuffer[ScalaWarning]()
+    // Buffer diagnostics in-memory so they don't leak to stderr via Dotty's default ConsoleReporter.
+    val storeReporter = new StoreReporter(null)
 
-    // Create our custom driver and get a proper context with Scala 2 compat
+    // Create our custom driver and get a proper context with Scala 2 compat.
+    // Best-effort Run init so `ctx.base` is wired up for `A with B` parsing
+    // (which goes through `Definitions.andType` and NPEs on a bare context);
+    // fall back to the raw context if no Scala stdlib is on the classpath.
     val driver = new ParsingDriver()
-    given Context = {
+    val configuredCtx: Context = {
       val fresh = driver.getInitialContext.fresh
       fresh.setSetting(fresh.settings.source, "3.6-migration")
+      // Enable `postfixOps` so the parser emits `PostfixOp` AST nodes for trailing
+      // postfix calls (e.g., `xs filter p list`). Without this, Dotty's parser
+      // silently drops the trailing token rather than emitting an AST node.
+      fresh.setSetting(fresh.settings.language, List(
+        new dotty.tools.dotc.config.Settings.Setting.ChoiceWithHelp[String]("postfixOps", "")
+      ))
+      fresh.setReporter(storeReporter)
       fresh
     }
-
-    // For simple expressions, wrap in a valid compilation unit
-    val (adjustedContent, needsUnwrap) = if (isSimpleExpression(content)) {
-      (s"object ExprWrapper { val result = $content }", true)
-    } else {
-      (content, false)
+    given Context = try {
+      (new Compiler()).newRun(using configuredCtx).runContext
+    } catch {
+      case _: Throwable => configuredCtx
     }
 
-    // Create source file
-    val source = SourceFile.virtual(path, adjustedContent)
+    val parsed = parseOne(path, content)
 
-    // Parse the source
+    // Drain buffered diagnostics from the reporter so they're surfaced to the caller
+    // instead of being silently dropped (or, with the default reporter, printed to stderr).
+    val javaWarnings = new ArrayList[ScalaWarning]()
+    storeReporter.removeBufferedMessages.foreach(d => javaWarnings.add(toScalaWarning(d)))
+
+    buildResult(parsed, javaWarnings)
+  }
+
+  /**
+   * Pick a wrapping strategy, wrap the content, parse it, and (for the
+   * expression wrapper) unwrap the result. The raw and unwrapped trees are
+   * both returned: the typer wants the raw form (`compileUnits` walks
+   * `unit.untpdTree`), while downstream consumers want the unwrapped form.
+   *
+   * `.sbt` build definitions are sequences of top-level expressions — Dotty
+   * silently drops those at the file level, so we lift the content into an
+   * `object __SbtScript__ { ... }` body where statements are accepted. The
+   * single-line expression wrapper is the pre-existing path used by
+   * recipe/template machinery to coerce bare expressions through the parser.
+   */
+  private def parseOne(path: String, content: String)(using ctx: Context): ParsedUnit = {
+    val wrapping =
+      if (path != null && path.endsWith(".sbt")) Wrapping.ObjectScript
+      else if (isSimpleExpression(content)) Wrapping.Expression
+      else Wrapping.None
+
+    val source = SourceFile.virtual(path, wrapping.wrap(content))
     val unit = CompilationUnit(source)
     val parser = new Parsers.Parser(source)(using ctx.fresh.setCompilationUnit(unit))
+    val rawTree = parser.parse()
 
-    val tree = parser.parse()
-
-    // If we wrapped the expression, extract it
-    val finalTree = if (needsUnwrap && !tree.isEmpty) {
-      extractExpression(tree).getOrElse(tree)
-    } else {
-      tree
+    val finalTree = wrapping match {
+      case Wrapping.Expression if !rawTree.isEmpty => extractExpression(rawTree).getOrElse(rawTree)
+      case _ => rawTree
     }
-
-    // Convert warnings to Java list
-    val javaWarnings = new ArrayList[ScalaWarning]()
-    warnings.foreach(javaWarnings.add)
-
-    ScalaParseResult(finalTree, None, javaWarnings, needsUnwrap, ctx)
+    ParsedUnit(rawTree, finalTree, unit, wrapping)
   }
+
+  private def buildResult(parsed: ParsedUnit, warnings: JList[ScalaWarning])(using ctx: Context): ScalaParseResult =
+    ScalaParseResult(
+      parsed.finalTree, None, warnings,
+      wasWrapped = parsed.wrapping == Wrapping.Expression,
+      wasObjectWrapped = parsed.wrapping == Wrapping.ObjectScript,
+      context = ctx
+    )
 
   private def extractExpression(tree: untpd.Tree)(using Context): Option[untpd.Tree] = tree match {
     case pkgDef: untpd.PackageDef =>
@@ -227,9 +297,14 @@ class ScalaCompilerBridge {
     val declarationPattern = """^\s*(package|import|class|object|trait|def|val|var|type|private|protected|public|final|lazy|implicit|case\s+class|case\s+object)\s""".r
     val startsWithDeclaration = declarationPattern.findFirstIn(trimmed).isDefined
 
+    // A leading `@Ann` (optionally `@Ann(...)`) is a declaration annotation, not an
+    // expression — wrapping it as `val result = @Ann object Foo` produces garbage.
+    val startsWithAnnotation = trimmed.startsWith("@")
+
     !hasMultipleLines &&
     !hasPostfixOperator &&
     !startsWithDeclaration &&
+    !startsWithAnnotation &&
     !trimmed.startsWith("//") &&
     !trimmed.startsWith("/*") &&
     trimmed.nonEmpty
@@ -325,15 +400,59 @@ object ScalaCompilerBridge {
 case class SourceEntry(path: String, content: String)
 
 /**
+ * Output of the bridge's shared parsing path: the raw parsed tree (what Dotty
+ * produced — keeps the wrapper if there was one, needed by the typer), the
+ * unwrapped tree visible to downstream consumers, the underlying Dotty
+ * `CompilationUnit`, and the wrapping strategy that was applied.
+ */
+private[internal] case class ParsedUnit(
+  rawTree: untpd.Tree,
+  finalTree: untpd.Tree,
+  unit: dotty.tools.dotc.CompilationUnit,
+  wrapping: Wrapping
+)
+
+/**
+ * How the bridge transformed the source before parsing.
+ *
+ *  - `None`: passed verbatim.
+ *  - `Expression`: wrapped as `object ExprWrapper { val result = <content> }`
+ *    so a bare expression parses; the result tree is the expression itself.
+ *  - `ObjectScript`: wrapped as `object __SbtScript__ {\n<content>\n}` so a
+ *    sequence of top-level statements parses (used for `.sbt` build files).
+ *    The wrapper is left in the tree; downstream code lifts the body.
+ */
+private[internal] enum Wrapping:
+  case None, Expression, ObjectScript
+
+  def wrap(content: String): String = this match
+    case Wrapping.None => content
+    case Wrapping.Expression => s"object ExprWrapper { val result = $content }"
+    case Wrapping.ObjectScript => s"object __SbtScript__ {\n$content\n}"
+
+/**
  * Result of parsing (and optionally type-checking) a Scala source file.
+ *
+ * @param wasWrapped       true when the bridge wrapped a single-line
+ *                         expression as `object ExprWrapper { val result = ... }`
+ *                         and then unwrapped before returning the tree.
+ * @param wasObjectWrapped true when the bridge wrapped multi-statement content
+ *                         (e.g. a `.sbt` file) as `object __SbtScript__ { ... }`.
+ *                         The wrapper is still present in `tree`; the
+ *                         converter is responsible for lifting its body.
  */
 case class ScalaParseResult(
   tree: untpd.Tree,
   typedTree: Option[tpd.Tree],
   warnings: JList[ScalaWarning],
   wasWrapped: Boolean = false,
+  wasObjectWrapped: Boolean = false,
   context: Context
 )
+
+private[internal] object ScalaParseResultConstants:
+  val ObjectScriptPrefix: String = "object __SbtScript__ {\n"
+  val ObjectScriptWrapperName: String = "__SbtScript__"
 
 /**
  * Represents a warning or error from the Scala compiler.

@@ -15,29 +15,30 @@
  */
 package org.openrewrite.scala.internal
 
-import dotty.tools.dotc.ast.Trees
+import dotty.tools.dotc.ast.{Trees, untpd}
 import dotty.tools.dotc.core.Contexts.*
 import org.openrewrite.Tree
 import org.openrewrite.java.internal.JavaTypeFactory
 import org.openrewrite.java.tree.*
 import org.openrewrite.marker.Markers
 import org.openrewrite.scala.marker.{IndentedSyntax, PackageBraces, PackageSemicolon}
+import org.openrewrite.scala.tree.S
 
 import java.util
-import java.util.{Collections, List as JList, UUID}
+import java.util.{Collections, List as JList}
 
 /**
  * Result of converting a Scala AST to compilation unit components.
+ * Imports (plain `J.Import` and brace-form `S.Import`) are part of
+ * [[statements]] in source order — Scala allows them anywhere a statement
+ * can appear, so there is no separate imports list.
  */
 class CompilationUnitResult(
                              val packageDecl: J.Package,
-                             val imports: JList[J.Import],
                              val statements: JList[Statement],
                              val lastCursorPosition: Int
                            ) {
   def getPackageDecl: J.Package = packageDecl
-
-  def getImports: JList[J.Import] = imports
 
   def getStatements: JList[Statement] = statements
 
@@ -53,19 +54,19 @@ class ScalaASTConverter {
    * Converts a Scala parse result to compilation unit components.
    */
   def convertToCompilationUnit(parseResult: ScalaParseResult, source: String, typeFactory: JavaTypeFactory = null): CompilationUnitResult = {
-    val imports = new util.ArrayList[J.Import]()
     val statements = new util.ArrayList[Statement]()
     var packageDecl: J.Package = null
 
     // Use the context from the parse result (carries type info from batch compilation)
     given Context = if (parseResult.context != null) parseResult.context else dotty.tools.dotc.core.Contexts.NoContext
 
-    // Calculate offset adjustment if content was wrapped
-    val offsetAdjustment = if (parseResult.wasWrapped) {
-      "object ExprWrapper { val result = ".length
-    } else {
-      0
-    }
+    // Calculate offset adjustment if content was wrapped before parsing.
+    // For `.sbt` content wrapped as `object __SbtScript__ { ... }`, spans in
+    // the parsed tree are offset by the wrapper prefix (`object __SbtScript__ {\n`).
+    val offsetAdjustment =
+      if (parseResult.wasObjectWrapped) ScalaParseResultConstants.ObjectScriptPrefix.length
+      else if (parseResult.wasWrapped) "object ExprWrapper { val result = ".length
+      else 0
 
     // Build type mapping from typed tree if available
     val mapping: Option[ScalaTypeMapping] = if (typeFactory != null) {
@@ -80,7 +81,7 @@ class ScalaASTConverter {
     // Check if tree is empty (parse error case)
     if (tree.isEmpty) {
       // Return empty result for parse errors
-      return new CompilationUnitResult(packageDecl, imports, statements, 0)
+      return new CompilationUnitResult(packageDecl, statements, 0)
     }
 
     // Handle different types of top-level trees
@@ -94,24 +95,34 @@ class ScalaASTConverter {
           packageDecl = createPackageDeclaration(pkgDef, visitor)
         }
 
+        // For `.sbt` content the bridge wrapped statements in
+        // `object __SbtScript__ { ... }` so Dotty would accept them at the
+        // file level. Lift the wrapper's body back up here so downstream
+        // visiting sees the original statements as direct children of the
+        // compilation unit. Filter out empty/synthetic trees Dotty may emit
+        // for the object's constructor — those carry no span and would crash
+        // visitUnknown.
+        val rawStats: Seq[Trees.Tree[?]] =
+          if (parseResult.wasObjectWrapped) {
+            pkgDef.stats.collectFirst {
+              case mod: untpd.ModuleDef
+                if mod.name.toString == ScalaParseResultConstants.ObjectScriptWrapperName =>
+                mod.impl.body.filter(s => !s.isEmpty && s.span.exists)
+            }.getOrElse(pkgDef.stats)
+          } else pkgDef.stats
+
         // Process the statements within the package.
         // Sort by source position to ensure source order is preserved —
         // the Dotty parser may reorder brace imports internally.
-        val sortedStats = pkgDef.stats.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
+        val sortedStats = rawStats.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
         sortedStats.foreach {
           case _: Trees.PackageDef[?] =>
           case imp: Trees.Import[?] =>
             val converted = visitor.visitTree(imp)
             converted match {
-              case jImport: J.Import =>
-                imports.add(jImport)
-              case unknown: J.Unknown =>
-                // Complex imports (braces, aliases) that can't map to J.Import.
-                // Add as statements - they'll be interleaved correctly since
-                // both lists are in source order.
-                statements.add(unknown)
+              case stmt: Statement =>
+                statements.add(stmt)
               case null =>
-              case _: J.Empty =>
               case _ =>
             }
           case stat =>
@@ -146,16 +157,11 @@ class ScalaASTConverter {
           }
         }
       case imp: Trees.Import[?] =>
-        // Top-level import - simple ones as J.Import, complex ones as statements
+        // Top-level import (no enclosing package).
         val converted = visitor.visitTree(imp)
         converted match {
-          case jImport: J.Import =>
-            imports.add(jImport)
-          case unknown: J.Unknown =>
-            // Complex imports that we can't map to J.Import yet
-            statements.add(unknown)
+          case stmt: Statement => statements.add(stmt)
           case null => // Skip null returns
-          case _: J.Empty => // Skip empty nodes
           case _ => // Skip non-statements
         }
       case _ =>
@@ -170,7 +176,7 @@ class ScalaASTConverter {
         }
     }
 
-    new CompilationUnitResult(packageDecl, imports, statements, visitor.getCursor)
+    new CompilationUnitResult(packageDecl, statements, visitor.getCursor)
   }
 
   /**
@@ -215,13 +221,13 @@ class ScalaASTConverter {
 
     val markerList = new util.ArrayList[org.openrewrite.marker.Marker]()
     if (hasIndentedColon) {
-      markerList.add(new IndentedSyntax(UUID.randomUUID()))
+      markerList.add(new IndentedSyntax(Tree.randomId()))
     } else if (hasBraces) {
       val beforeBrace = srcText.substring(scanStart, scanIdx)
-      markerList.add(PackageBraces(UUID.randomUUID(), beforeBrace, ""))
+      markerList.add(PackageBraces(Tree.randomId(), beforeBrace, ""))
     }
     if (hasSemicolon) {
-      markerList.add(PackageSemicolon(UUID.randomUUID()))
+      markerList.add(PackageSemicolon(Tree.randomId()))
     }
     val markers = if (markerList.isEmpty) Markers.EMPTY else Markers.build(markerList)
 

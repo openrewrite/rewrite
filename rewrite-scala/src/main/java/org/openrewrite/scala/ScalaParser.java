@@ -53,12 +53,15 @@ public class ScalaParser implements Parser {
 
     private static String derivedRelativePath(String sourceCode) {
         Matcher packageMatcher = PACKAGE_PATTERN.matcher(sourceCode);
-        String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
+        boolean hasPackage = packageMatcher.find();
+        String pkg = hasPackage ? packageMatcher.group(1).replace('.', '/') + "/" : "";
 
         Matcher classMatcher = CLASS_PATTERN.matcher(sourceCode);
-        String simpleName = classMatcher.find() ? classMatcher.group(3) : Long.toString(System.nanoTime());
+        boolean hasClass = classMatcher.find();
+        String simpleName = hasClass ? classMatcher.group(3) : Long.toString(System.nanoTime());
 
-        return pkg + simpleName + ".scala";
+        String extension = (!hasPackage && !hasClass) ? ".sbt" : ".scala";
+        return pkg + simpleName + extension;
     }
 
     @Override
@@ -145,7 +148,8 @@ public class ScalaParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".scala") || path.toString().endsWith(".sc");
+        String s = path.toString();
+        return s.endsWith(".scala") || s.endsWith(".sc") || s.endsWith(".sbt");
     }
 
     @Override
@@ -178,8 +182,6 @@ public class ScalaParser implements Parser {
         @Nullable
         private JavaTypeFactory typeFactory;
 
-        private JavaTypeFactory.@Nullable Provider typeFactoryProvider;
-
         private boolean logCompilationWarningsAndErrors = false;
         private final List<NamedStyles> styles = new ArrayList<>();
 
@@ -193,7 +195,6 @@ public class ScalaParser implements Parser {
             this.artifactNames = base.artifactNames;
             this.typeCache = base.typeCache;
             this.typeFactory = base.typeFactory;
-            this.typeFactoryProvider = base.typeFactoryProvider;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
         }
@@ -235,8 +236,8 @@ public class ScalaParser implements Parser {
         }
 
         /**
-         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} or
-         * {@link #typeFactoryProvider} instead. The cache becomes an implementation
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} instead.
+         * The cache becomes an implementation
          * detail of the default {@link DefaultJavaTypeFactory}.
          */
         @Deprecated
@@ -249,12 +250,6 @@ public class ScalaParser implements Parser {
         @SuppressWarnings("unused")
         public Builder typeFactory(JavaTypeFactory typeFactory) {
             this.typeFactory = typeFactory;
-            return this;
-        }
-
-        @SuppressWarnings("unused")
-        public Builder typeFactoryProvider(JavaTypeFactory.Provider provider) {
-            this.typeFactoryProvider = provider;
             return this;
         }
 
@@ -277,9 +272,6 @@ public class ScalaParser implements Parser {
         public ScalaParser build() {
             Collection<Path> cp = resolvedClasspath();
             JavaTypeFactory factory = typeFactory;
-            if (factory == null && typeFactoryProvider != null) {
-                factory = typeFactoryProvider.create(cp == null ? new ArrayList<>() : new ArrayList<>(cp), null);
-            }
             if (factory == null) {
                 factory = new DefaultJavaTypeFactory(typeCache);
             }

@@ -117,7 +117,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     GradleProject gp;
                     final Map<String, List<ResolvedPom>> platforms = new HashMap<>();
                     final Map<String, List<ResolvedDependency>> directDependencies = new HashMap<>();
-                    final Map<GroupArtifact, String> springPluginManagedDependencies = new HashMap<>();
+                    final Map<GroupArtifact, @Nullable String> springPluginManagedDependencies = new HashMap<>();
 
                     @Override
                     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {

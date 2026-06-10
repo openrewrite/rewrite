@@ -295,12 +295,28 @@ func (p *ProjectImporter) parsePackage(importPath string, files []projectFile) (
 		Defs: make(map[*ast.Ident]types.Object),
 		Uses: make(map[*ast.Ident]types.Object),
 	}
-	// types.Config.Check's first argument becomes the resulting package's
-	// Path() — e.g. "github.com/x/y". This MUST be the full import path,
-	// not just the package name, because mapType sets a method's
-	// DeclaringType.FullyQualifiedName from pkg.Path() at type-mapping
-	// time. With "y" alone, vendored fmt-like methods would resolve to
-	// FQN "y" instead of "github.com/x/y".
-	pkg, _ := conf.Check(importPath, p.fset, asts, info)
+	// The package's Path() — here the full import path, e.g. "github.com/x/y"
+	// — MUST be the full import path, not just the package name, because
+	// mapType sets a method's DeclaringType.FullyQualifiedName from pkg.Path()
+	// at type-mapping time. With "y" alone, vendored fmt-like methods would
+	// resolve to FQN "y" instead of "github.com/x/y".
+	//
+	// Forward-declare the package in the cache BEFORE type-checking it. This
+	// is the standard go/types cycle-breaking pattern: type-checking calls
+	// back into Import for every dependency, so an import cycle
+	// (a -> b -> ... -> a, common in deep graphs like entgo.io/ent) would
+	// otherwise re-enter parsePackage for a path not yet in the cache and
+	// recurse until the goroutine stack overflows. Registering the
+	// not-yet-complete package up front lets the cycle resolve to it on
+	// re-entry instead; go/types tolerates importing an incomplete package
+	// for cycle resolution and completes it once Files returns.
+	//
+	// conf.Check(importPath, ...) is itself exactly NewPackage + NewChecker +
+	// Files; we spell it out only so the package object exists (and is cached)
+	// before the recursive type-check begins. The package name is left empty;
+	// the checker fills it in from the parsed files, same as conf.Check.
+	pkg := types.NewPackage(importPath, "")
+	p.cache[importPath] = pkg
+	_ = types.NewChecker(&conf, p.fset, pkg, info).Files(asts)
 	return pkg, nil
 }

@@ -19,7 +19,7 @@ package format
 import (
 	"strings"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -30,7 +30,7 @@ import (
 // rewrite continuation alignments inside multi-line argument lists),
 // the visitor drives indentation from VisitBlock explicitly:
 //
-//   - For each `Block.Statements[i].Element`, the leftmost leaf's
+//   - For each `Block.Statements[i].Element`, the statement's own
 //     Prefix carries the inter-statement whitespace; we rewrite its
 //     indent (the post-newline portion) to `\t × (depth+1)`.
 //   - `Block.End` (the whitespace before `}`) is re-indented to
@@ -49,13 +49,13 @@ type TabsAndIndentsVisitor struct {
 
 // NewTabsAndIndentsVisitor returns a visitor configured with the given
 // stopAfter bound. Pass nil to format the entire visited tree.
-func NewTabsAndIndentsVisitor(stopAfter tree.Tree) *TabsAndIndentsVisitor {
+func NewTabsAndIndentsVisitor(stopAfter java.Tree) *TabsAndIndentsVisitor {
 	return visitor.Init(&TabsAndIndentsVisitor{
 		stopAfterTracker: stopAfterTracker{stopAfter: stopAfter},
 	})
 }
 
-func (v *TabsAndIndentsVisitor) Visit(t tree.Tree, p any) tree.Tree {
+func (v *TabsAndIndentsVisitor) Visit(t java.Tree, p any) java.Tree {
 	if v.shouldHalt() {
 		return t
 	}
@@ -65,17 +65,17 @@ func (v *TabsAndIndentsVisitor) Visit(t tree.Tree, p any) tree.Tree {
 }
 
 // VisitBlock dispatches the body at depth+1 and re-indents each
-// statement's leftmost-leaf Prefix and the closing-brace `End`.
-func (v *TabsAndIndentsVisitor) VisitBlock(block *tree.Block, p any) tree.J {
+// statement's Prefix and the closing-brace `End`.
+func (v *TabsAndIndentsVisitor) VisitBlock(block *java.Block, p any) java.J {
 	v.depth++
-	stmts := make([]tree.RightPadded[tree.Statement], len(block.Statements))
+	stmts := make([]java.RightPadded[java.Statement], len(block.Statements))
 	for i, rp := range block.Statements {
 		if rp.Element != nil {
-			fixed, _ := transformLeftmostPrefix(rp.Element, v.reindentSpace).(tree.Statement)
+			fixed, _ := transformPrefix(rp.Element, v.reindentSpace).(java.Statement)
 			if fixed != nil {
 				rp.Element = fixed
 			}
-			if next, ok := v.Visit(rp.Element, p).(tree.Statement); ok {
+			if next, ok := v.Visit(rp.Element, p).(java.Statement); ok {
 				rp.Element = next
 			}
 		}
@@ -93,19 +93,19 @@ func (v *TabsAndIndentsVisitor) VisitBlock(block *tree.Block, p any) tree.J {
 // statements at body depth. Also explicitly visits Body so nested
 // blocks inside a case get their own indent fixes (the default
 // GoVisitor.VisitCase doesn't recurse into Body).
-func (v *TabsAndIndentsVisitor) VisitCase(c *tree.Case, p any) tree.J {
+func (v *TabsAndIndentsVisitor) VisitCase(c *java.Case, p any) java.J {
 	v.depth--
 	c = c.WithPrefix(v.reindentSpace(c.Prefix))
 	v.depth++
 
-	body := make([]tree.RightPadded[tree.Statement], len(c.Body))
+	body := make([]java.RightPadded[java.Statement], len(c.Body))
 	for i, rp := range c.Body {
 		if rp.Element != nil {
-			fixed, _ := transformLeftmostPrefix(rp.Element, v.reindentSpace).(tree.Statement)
+			fixed, _ := transformPrefix(rp.Element, v.reindentSpace).(java.Statement)
 			if fixed != nil {
 				rp.Element = fixed
 			}
-			if next, ok := v.Visit(rp.Element, p).(tree.Statement); ok {
+			if next, ok := v.Visit(rp.Element, p).(java.Statement); ok {
 				rp.Element = next
 			}
 		}
@@ -119,7 +119,7 @@ func (v *TabsAndIndentsVisitor) VisitCase(c *tree.Case, p any) tree.J {
 // to `\t × v.depth`. Whitespace without a newline is returned
 // unchanged. The pre-newline portion (which can hold blank lines) is
 // preserved — BlankLinesVisitor handles that.
-func (v *TabsAndIndentsVisitor) reindentSpace(s tree.Space) tree.Space {
+func (v *TabsAndIndentsVisitor) reindentSpace(s java.Space) java.Space {
 	if !strings.Contains(s.Whitespace, "\n") {
 		return s
 	}

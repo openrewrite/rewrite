@@ -24,7 +24,8 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -76,9 +77,9 @@ func TestParseScaffoldExpression(t *testing.T) {
 	if node == nil {
 		t.Fatal("expected non-nil node")
 	}
-	bin, ok := node.(*tree.Binary)
+	bin, ok := node.(*java.Binary)
 	if !ok {
-		t.Fatalf("expected *tree.Binary, got %T", node)
+		t.Fatalf("expected *java.Binary, got %T", node)
 	}
 	if bin.Left == nil || bin.Right == nil {
 		t.Fatal("binary should have left and right")
@@ -97,7 +98,7 @@ func TestPatternMatchIdentifier(t *testing.T) {
 	pat := Expression("x").Build()
 
 	// Find the identifier "x" in the parsed tree
-	var found tree.J
+	var found java.J
 	v := visitor.Init(&identFinder{target: "x", found: &found})
 	v.Visit(cu, nil)
 
@@ -123,7 +124,7 @@ func TestPatternNoMatch(t *testing.T) {
 	pat := Expression("x").Build()
 
 	// Find identifier "y" in the tree
-	var found tree.J
+	var found java.J
 	v := visitor.Init(&identFinder{target: "y", found: &found})
 	v.Visit(cu, nil)
 
@@ -152,7 +153,7 @@ func TestPatternMatchWithCapture(t *testing.T) {
 		Build()
 
 	// Find the binary expression
-	var found tree.J
+	var found java.J
 	v := visitor.Init(&binaryFinder{found: &found})
 	v.Visit(cu, nil)
 
@@ -169,9 +170,9 @@ func TestPatternMatchWithCapture(t *testing.T) {
 	if captured == nil {
 		t.Fatal("expected capture 'expr' to be bound")
 	}
-	lit, ok := captured.(*tree.Literal)
+	lit, ok := captured.(*java.Literal)
 	if !ok {
-		t.Fatalf("expected captured value to be *tree.Literal, got %T", captured)
+		t.Fatalf("expected captured value to be *java.Literal, got %T", captured)
 	}
 	if lit.Source != "1" {
 		t.Errorf("expected captured literal source '1', got %q", lit.Source)
@@ -289,6 +290,42 @@ func TestRewritePreservesFormatting(t *testing.T) {
 	}
 }
 
+func TestPatternMatchGoUnary(t *testing.T) {
+	// given a Go-specific unary (address-of) expression `&b` in the source
+	p := parser.NewGoParser()
+	cu, err := p.Parse("test.go", "package main\n\nfunc f(b int) { g(&b) }\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var found java.J
+	v := visitor.Init(&goUnaryFinder{found: &found})
+	v.Visit(cu, nil)
+	if found == nil {
+		t.Fatal("could not find golang.Unary '&b' in parsed tree")
+	}
+
+	// when matching a pattern that captures the operand of `&<expr>`
+	expr := Expr("expr")
+	pat := Expression(fmt.Sprintf("&%s", expr)).
+		Captures(expr).
+		Build()
+
+	// then the pattern matches (regression: golang.Unary had no comparator case)
+	result := pat.Match(found, nil)
+	if result == nil {
+		t.Fatal("pattern '&<expr>' should match golang.Unary '&b'")
+	}
+	captured := result.Get("expr")
+	if captured == nil {
+		t.Fatal("expected capture 'expr' to be bound")
+	}
+	ident, ok := captured.(*java.Identifier)
+	if !ok || ident.Name != "b" {
+		t.Fatalf("expected captured identifier 'b', got %T %v", captured, captured)
+	}
+}
+
 // --- Test helpers ---
 
 type rewriteRecipeWithVisitor struct {
@@ -296,32 +333,45 @@ type rewriteRecipeWithVisitor struct {
 	visitor recipe.TreeVisitor
 }
 
-func (r *rewriteRecipeWithVisitor) Name() string                { return "test.Rewrite" }
-func (r *rewriteRecipeWithVisitor) DisplayName() string         { return "Test Rewrite" }
-func (r *rewriteRecipeWithVisitor) Description() string         { return "Test rewrite recipe" }
-func (r *rewriteRecipeWithVisitor) Editor() recipe.TreeVisitor  { return r.visitor }
+func (r *rewriteRecipeWithVisitor) Name() string               { return "test.Rewrite" }
+func (r *rewriteRecipeWithVisitor) DisplayName() string        { return "Test Rewrite" }
+func (r *rewriteRecipeWithVisitor) Description() string        { return "Test rewrite recipe" }
+func (r *rewriteRecipeWithVisitor) Editor() recipe.TreeVisitor { return r.visitor }
 
 // identFinder walks the tree to find the first Identifier with the given name.
 type identFinder struct {
 	visitor.GoVisitor
 	target string
-	found  *tree.J
+	found  *java.J
 }
 
-func (v *identFinder) VisitIdentifier(ident *tree.Identifier, p any) tree.J {
+func (v *identFinder) VisitIdentifier(ident *java.Identifier, p any) java.J {
 	if *v.found == nil && ident.Name == v.target {
 		*v.found = ident
 	}
 	return v.GoVisitor.VisitIdentifier(ident, p)
 }
 
+// goUnaryFinder walks the tree to find the first Go-specific Unary expression.
+type goUnaryFinder struct {
+	visitor.GoVisitor
+	found *java.J
+}
+
+func (v *goUnaryFinder) VisitGoUnary(u *golang.Unary, p any) java.J {
+	if *v.found == nil {
+		*v.found = u
+	}
+	return v.GoVisitor.VisitGoUnary(u, p)
+}
+
 // binaryFinder walks the tree to find the first Binary expression.
 type binaryFinder struct {
 	visitor.GoVisitor
-	found *tree.J
+	found *java.J
 }
 
-func (v *binaryFinder) VisitBinary(bin *tree.Binary, p any) tree.J {
+func (v *binaryFinder) VisitBinary(bin *java.Binary, p any) java.J {
 	if *v.found == nil {
 		*v.found = bin
 	}

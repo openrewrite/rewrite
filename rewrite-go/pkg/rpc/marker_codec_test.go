@@ -22,13 +22,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
 // roundTripMarkers serializes `before` via SendMarkersCodec, then feeds the
 // emitted RpcObjectData stream back into a ReceiveQueue and reads it via
 // receiveMarkersCodec. Returns whatever the receiver produced.
-func roundTripMarkers(t *testing.T, before tree.Markers) tree.Markers {
+func roundTripMarkers(t *testing.T, before java.Markers) java.Markers {
 	t.Helper()
 	var messages []RpcObjectData
 	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
@@ -48,21 +49,21 @@ func roundTripMarkers(t *testing.T, before tree.Markers) tree.Markers {
 	})
 	// receiveMarkersCodec expects the receive queue positioned at the
 	// Markers ID slot, matching what SendMarkersCodec emits.
-	return receiveMarkersCodec(recvQ, tree.Markers{})
+	return receiveMarkersCodec(recvQ, java.Markers{})
 }
 
 func TestGoProjectMarkerRoundTrip(t *testing.T) {
 	id := uuid.MustParse("11111111-2222-3333-4444-555555555555")
-	gp := tree.GoProject{Ident: id, ProjectName: "example/foo"}
-	before := tree.Markers{ID: uuid.New(), Entries: []tree.Marker{gp}}
+	gp := golang.GoProject{Ident: id, ProjectName: "example/foo"}
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{gp}}
 
 	after := roundTripMarkers(t, before)
 	if len(after.Entries) != 1 {
 		t.Fatalf("entries: want 1, got %d", len(after.Entries))
 	}
-	got, ok := after.Entries[0].(tree.GoProject)
+	got, ok := after.Entries[0].(golang.GoProject)
 	if !ok {
-		t.Fatalf("entry is %T, want tree.GoProject", after.Entries[0])
+		t.Fatalf("entry is %T, want golang.GoProject", after.Entries[0])
 	}
 	if got.Ident != id {
 		t.Errorf("Ident: want %s, got %s", id, got.Ident)
@@ -74,40 +75,40 @@ func TestGoProjectMarkerRoundTrip(t *testing.T) {
 
 func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
 	id := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-	mrr := tree.GoResolutionResult{
+	mrr := golang.GoResolutionResult{
 		Ident:      id,
 		ModulePath: "example.com/foo",
 		GoVersion:  "1.22",
 		Toolchain:  "go1.22.5",
 		Path:       "/tmp/go.mod",
-		Requires: []tree.GoRequire{
+		Requires: []golang.GoRequire{
 			{ModulePath: "github.com/google/uuid", Version: "v1.6.0"},
 			{ModulePath: "golang.org/x/mod", Version: "v0.35.0", Indirect: true},
 		},
-		Replaces: []tree.GoReplace{
+		Replaces: []golang.GoReplace{
 			{OldPath: "github.com/x/y", NewPath: "../local/y"},
 			{OldPath: "github.com/a/b", OldVersion: "v1.0.0", NewPath: "github.com/forked/b", NewVersion: "v1.0.1"},
 		},
-		Excludes: []tree.GoExclude{
+		Excludes: []golang.GoExclude{
 			{ModulePath: "github.com/bad", Version: "v0.0.1"},
 		},
-		Retracts: []tree.GoRetract{
+		Retracts: []golang.GoRetract{
 			{VersionRange: "v0.0.5", Rationale: "deleted main.go"},
 			{VersionRange: "[v1.0.0, v1.0.5]"},
 		},
-		ResolvedDependencies: []tree.GoResolvedDependency{
+		ResolvedDependencies: []golang.GoResolvedDependency{
 			{ModulePath: "github.com/google/uuid", Version: "v1.6.0", ModuleHash: "h1:abc=", GoModHash: "h1:def="},
 		},
 	}
-	before := tree.Markers{ID: uuid.New(), Entries: []tree.Marker{mrr}}
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}
 
 	after := roundTripMarkers(t, before)
 	if len(after.Entries) != 1 {
 		t.Fatalf("entries: want 1, got %d", len(after.Entries))
 	}
-	got, ok := after.Entries[0].(tree.GoResolutionResult)
+	got, ok := after.Entries[0].(golang.GoResolutionResult)
 	if !ok {
-		t.Fatalf("entry is %T, want tree.GoResolutionResult", after.Entries[0])
+		t.Fatalf("entry is %T, want golang.GoResolutionResult", after.Entries[0])
 	}
 	if !reflect.DeepEqual(mrr, got) {
 		t.Errorf("round-trip mismatch\nbefore: %+v\nafter:  %+v", mrr, got)
@@ -119,19 +120,19 @@ func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
 	// must serialize as empty arrays, not be omitted. After round-trip an
 	// initially-empty list should still be present and empty.
 	id := uuid.MustParse("99999999-0000-0000-0000-000000000000")
-	mrr := tree.GoResolutionResult{
+	mrr := golang.GoResolutionResult{
 		Ident:      id,
 		ModulePath: "example.com/empty",
 		Path:       "go.mod",
-		Requires:   []tree.GoRequire{},
-		Replaces:   []tree.GoReplace{},
-		Excludes:   []tree.GoExclude{},
-		Retracts:   []tree.GoRetract{},
+		Requires:   []golang.GoRequire{},
+		Replaces:   []golang.GoReplace{},
+		Excludes:   []golang.GoExclude{},
+		Retracts:   []golang.GoRetract{},
 	}
-	before := tree.Markers{ID: uuid.New(), Entries: []tree.Marker{mrr}}
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}
 
 	after := roundTripMarkers(t, before)
-	got := after.Entries[0].(tree.GoResolutionResult)
+	got := after.Entries[0].(golang.GoResolutionResult)
 	if got.ModulePath != "example.com/empty" {
 		t.Errorf("ModulePath: want %q, got %q", "example.com/empty", got.ModulePath)
 	}

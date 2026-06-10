@@ -64,4 +64,107 @@ class ForYieldTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void scala3ParenlessForDoIndented() {
+        rewriteRun(
+          scala(
+            """
+              object Test:
+                def f(): Unit =
+                  for i <- 0 to 10 do
+                    println(i)
+              """
+          )
+        );
+    }
+
+    @Test
+    void scala3ParenlessForYieldIndented() {
+        rewriteRun(
+          scala(
+            """
+              object Test:
+                def f(): Seq[Int] =
+                  for i <- 0 to 10
+                  yield i * 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void scala3IndentedForYieldWithTupleGenerator() {
+        rewriteRun(
+          scala(
+            """
+              val result =
+                for
+                  (a, b) <- xs
+                  c <- ys
+                yield c
+              """
+          )
+        );
+    }
+
+    @Test
+    void scala3ParenlessForDoSingleLine() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                for i <- 0 to 10 do println(i)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // buildSFor — `yield` keyword in line comment inside for-comprehension body
+        rewriteRun(
+          scala(
+            """
+              val ys = for { i <- 1 to 3 // yield
+              } yield i
+              """
+          )
+        );
+    }
+
+    @Test
+    void anonymousGivenBinding() {
+        rewriteRun(
+          scala(
+            """
+              object Test:
+                def foo =
+                  for
+                    user <- List(1)
+                    given Int = user
+                    y <- List(2)
+                  yield y
+              """
+          )
+        );
+    }
+
+    @Test
+    void namedGivenBinding() {
+        rewriteRun(
+          scala(
+            """
+              object Test:
+                def foo =
+                  for
+                    user <- List(1)
+                    given ord: String = user.toString
+                    y <- List(2)
+                  yield y
+              """
+          )
+        );
+    }
 }

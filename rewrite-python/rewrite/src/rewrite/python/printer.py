@@ -33,7 +33,11 @@ from rewrite.java import (
 )
 from rewrite.java.markers import Semicolon, TrailingComma, OmitParentheses
 from rewrite.python.support_types import Py
-from rewrite.python.markers import KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline, PrintSyntax, ExecSyntax
+from rewrite.python.markers import (
+    KeywordArguments, KeywordOnlyArguments, Quoted, SuppressNewline,
+    PrintSyntax, ExecSyntax,
+    LegacyNotEqual, RaiseTuple, TupleExceptClause,
+)
 
 if TYPE_CHECKING:
     from rewrite.python import tree as py
@@ -1271,6 +1275,11 @@ class PythonJavaPrinter:
         }
 
         keyword = op_map.get(binary.operator, "")
+        # Python 2 spelling `<>` for NotEqual is recorded via the
+        # LegacyNotEqual marker; emit the legacy operator literally.
+        if (binary.operator == Binary.Type.NotEqual
+                and binary.markers.find_first(LegacyNotEqual) is not None):
+            keyword = "<>"
 
         self._before_syntax(binary, p)
         self.visit(binary.left, p)
@@ -1314,9 +1323,15 @@ class PythonJavaPrinter:
         return case
 
     def visit_catch(self, catch: 'j.Try.Catch', p: PrintOutputCapture) -> J:
-        """Visit a catch clause (except in Python)."""
+        """Visit a catch clause (``except`` in Python).
+
+        Honors the :class:`TupleExceptClause` marker by emitting the Python 2
+        ``except E, e:`` (comma) form instead of the default ``except E as e:``.
+        """
         self._before_syntax(catch, p)
         p.append("except")
+
+        legacy_comma = catch.markers.find_first(TupleExceptClause) is not None
 
         multi_variable = catch.parameter.tree
         self._before_syntax(multi_variable, p)
@@ -1327,7 +1342,10 @@ class PythonJavaPrinter:
             if variable.name.simple_name:
                 self._visit_space(padded_variable.after, p)
                 self._before_syntax(variable, p)
-                p.append("as")
+                if legacy_comma:
+                    p.append(",")
+                else:
+                    p.append("as")
                 self.visit(variable.name, p)
                 self._after_syntax(variable, p)
 
@@ -1690,10 +1708,27 @@ class PythonJavaPrinter:
         return ternary
 
     def visit_throw(self, throw: 'j.Throw', p: PrintOutputCapture) -> J:
-        """Visit a throw statement (raise in Python)."""
+        """Visit a throw statement (``raise`` in Python).
+
+        The Python 2 multi-argument form ``raise E, v[, tb]`` is encoded as
+        a TUPLE CollectionLiteral tagged with :class:`RaiseTuple`; we emit
+        the operands inline (comma-separated, no parens) when that marker
+        is present.
+        """
+        from rewrite.python import tree as py
         self._before_syntax(throw, p)
         p.append("raise")
-        self.visit(throw.exception, p)
+        if (throw.markers.find_first(RaiseTuple) is not None
+                and isinstance(throw.exception, py.CollectionLiteral)
+                and throw.exception.kind == py.CollectionLiteral.Kind.TUPLE):
+            # Print operands inline without the surrounding (...).
+            self._visit_space(throw.exception.prefix, p)
+            elements = throw.exception.padding.elements.padding.elements
+            for i, padded in enumerate(elements):
+                self._visit_right_padded(padded, p,
+                                         "," if i < len(elements) - 1 else "")
+        else:
+            self.visit(throw.exception, p)
         self._after_syntax(throw, p)
         return throw
 

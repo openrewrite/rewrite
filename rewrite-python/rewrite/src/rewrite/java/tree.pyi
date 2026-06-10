@@ -2,14 +2,14 @@
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, List, Optional
+from typing import Any, ClassVar, List, Optional, Generic
 from typing_extensions import Self
 from uuid import UUID
 import weakref
 
+from rewrite.utils import replace_if_changed
 from enum import Enum
 from pathlib import Path
-from . import extensions as extensions
 from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
 
 from .support_types import (
@@ -1471,6 +1471,7 @@ class MethodDeclaration(Statement, TypedTree):
     _name_annotations: List[Annotation]
     _name: Identifier
     _parameters: JContainer[Statement]
+    _dimensions_after_name: List[JLeftPadded[Space]]
     _throws: Optional[JContainer[NameTree]]
     _body: Optional[Block]
     _default_value: Optional[JLeftPadded[Expression]]
@@ -1499,6 +1500,8 @@ class MethodDeclaration(Statement, TypedTree):
     @property
     def parameters(self) -> List[Statement]: ...
     @property
+    def dimensions_after_name(self) -> List[JLeftPadded[Space]]: ...
+    @property
     def throws(self) -> Optional[List[NameTree]]: ...
     @property
     def body(self) -> Optional[Block]: ...
@@ -1507,10 +1510,13 @@ class MethodDeclaration(Statement, TypedTree):
     @property
     def method_type(self) -> Optional[JavaType.Method]: ...
     @property
+    def type(self) -> Optional[JavaType]: ...
+    @property
     def padding(self) -> PaddingHelper: ...
     @property
     def annotations(self) -> AnnotationsHelper: ...
 
+    def with_dimensions_after_name(self, dimensions_after_name: List[JLeftPadded[Space]]) -> MethodDeclaration: ...
     def accept_java(self, v: JavaVisitor[P], p: P) -> J: ...
 
 @dataclass(frozen=True)
@@ -1556,6 +1562,8 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
     def arguments(self) -> List[Expression]: ...
     @property
     def method_type(self) -> Optional[JavaType.Method]: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
     @property
     def padding(self) -> PaddingHelper: ...
 
@@ -1756,6 +1764,8 @@ class NewClass(Statement, TypedTree, MethodCall):
     def body(self) -> Optional[Block]: ...
     @property
     def constructor_type(self) -> Optional[JavaType.Method]: ...
+    @property
+    def type(self) -> Optional[JavaType]: ...
     @property
     def padding(self) -> PaddingHelper: ...
 

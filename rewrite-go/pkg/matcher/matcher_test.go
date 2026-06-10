@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -29,14 +29,14 @@ import (
 func TestGetFullyQualifiedName(t *testing.T) {
 	tests := []struct {
 		name string
-		typ  tree.JavaType
+		typ  java.JavaType
 		want string
 	}{
 		{"nil", nil, ""},
-		{"class", &tree.JavaTypeClass{FullyQualifiedName: "fmt.Stringer"}, "fmt.Stringer"},
-		{"primitive", &tree.JavaTypePrimitive{Keyword: "int"}, "int"},
-		{"parameterized", &tree.JavaTypeParameterized{Type: &tree.JavaTypeClass{FullyQualifiedName: "map"}}, "map"},
-		{"unknown", &tree.JavaTypeUnknown{}, ""},
+		{"class", &java.JavaTypeClass{FullyQualifiedName: "fmt.Stringer"}, "fmt.Stringer"},
+		{"primitive", &java.JavaTypePrimitive{Keyword: "int"}, "int"},
+		{"parameterized", &java.JavaTypeParameterized{Type: &java.JavaTypeClass{FullyQualifiedName: "map"}}, "map"},
+		{"unknown", &java.JavaTypeUnknown{}, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -48,7 +48,7 @@ func TestGetFullyQualifiedName(t *testing.T) {
 }
 
 func TestIsOfClassType(t *testing.T) {
-	cls := &tree.JavaTypeClass{FullyQualifiedName: "time.Time"}
+	cls := &java.JavaTypeClass{FullyQualifiedName: "time.Time"}
 	if !IsOfClassType(cls, "time.Time") {
 		t.Error("expected true for exact match")
 	}
@@ -58,10 +58,10 @@ func TestIsOfClassType(t *testing.T) {
 }
 
 func TestIsAssignableTo(t *testing.T) {
-	stringer := &tree.JavaTypeClass{FullyQualifiedName: "fmt.Stringer"}
-	myType := &tree.JavaTypeClass{
+	stringer := &java.JavaTypeClass{FullyQualifiedName: "fmt.Stringer"}
+	myType := &java.JavaTypeClass{
 		FullyQualifiedName: "main.MyType",
-		Interfaces:         []*tree.JavaTypeClass{stringer},
+		Interfaces:         []java.FullyQualified{stringer},
 	}
 
 	if !IsAssignableTo(myType, "main.MyType") {
@@ -76,34 +76,34 @@ func TestIsAssignableTo(t *testing.T) {
 }
 
 func TestIsError(t *testing.T) {
-	errType := &tree.JavaTypeClass{FullyQualifiedName: "error"}
+	errType := &java.JavaTypeClass{FullyQualifiedName: "error"}
 	if !IsError(errType) {
 		t.Error("expected true for error type")
 	}
-	if IsError(&tree.JavaTypeClass{FullyQualifiedName: "string"}) {
+	if IsError(&java.JavaTypeClass{FullyQualifiedName: "string"}) {
 		t.Error("expected false for non-error type")
 	}
 }
 
 func TestIsString(t *testing.T) {
-	if !IsString(&tree.JavaTypePrimitive{Keyword: "String"}) {
+	if !IsString(&java.JavaTypePrimitive{Keyword: "String"}) {
 		t.Error("expected true for String primitive")
 	}
-	if IsString(&tree.JavaTypePrimitive{Keyword: "int"}) {
+	if IsString(&java.JavaTypePrimitive{Keyword: "int"}) {
 		t.Error("expected false for int")
 	}
 }
 
 func TestAsClass(t *testing.T) {
-	cls := &tree.JavaTypeClass{FullyQualifiedName: "foo.Bar"}
+	cls := &java.JavaTypeClass{FullyQualifiedName: "foo.Bar"}
 	if AsClass(cls) != cls {
 		t.Error("AsClass should return the class directly")
 	}
-	param := &tree.JavaTypeParameterized{Type: cls}
+	param := &java.JavaTypeParameterized{Type: cls}
 	if AsClass(param) != cls {
 		t.Error("AsClass should unwrap parameterized types")
 	}
-	if AsClass(&tree.JavaTypePrimitive{Keyword: "int"}) != nil {
+	if AsClass(&java.JavaTypePrimitive{Keyword: "int"}) != nil {
 		t.Error("AsClass should return nil for non-class types")
 	}
 }
@@ -154,11 +154,11 @@ func TestMethodMatcherParsing(t *testing.T) {
 
 func TestMethodMatcherMatchesAnyArgs(t *testing.T) {
 	mm := NewMethodMatcher("fmt Println(..)")
-	mi := &tree.MethodInvocation{
-		Select: &tree.RightPadded[tree.Expression]{
-			Element: &tree.Identifier{Name: "fmt"},
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "fmt"},
 		},
-		Name: &tree.Identifier{Name: "Println"},
+		Name: &java.Identifier{Name: "Println"},
 	}
 	if !mm.Matches(mi) {
 		t.Error("expected match for fmt.Println with any args")
@@ -167,11 +167,11 @@ func TestMethodMatcherMatchesAnyArgs(t *testing.T) {
 
 func TestMethodMatcherNoMatchWrongName(t *testing.T) {
 	mm := NewMethodMatcher("fmt Println(..)")
-	mi := &tree.MethodInvocation{
-		Select: &tree.RightPadded[tree.Expression]{
-			Element: &tree.Identifier{Name: "fmt"},
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "fmt"},
 		},
-		Name: &tree.Identifier{Name: "Sprintf"},
+		Name: &java.Identifier{Name: "Sprintf"},
 	}
 	if mm.Matches(mi) {
 		t.Error("expected no match for wrong method name")
@@ -180,11 +180,11 @@ func TestMethodMatcherNoMatchWrongName(t *testing.T) {
 
 func TestMethodMatcherNoMatchWrongPackage(t *testing.T) {
 	mm := NewMethodMatcher("fmt Println(..)")
-	mi := &tree.MethodInvocation{
-		Select: &tree.RightPadded[tree.Expression]{
-			Element: &tree.Identifier{Name: "log"},
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "log"},
 		},
-		Name: &tree.Identifier{Name: "Println"},
+		Name: &java.Identifier{Name: "Println"},
 	}
 	if mm.Matches(mi) {
 		t.Error("expected no match for wrong package")
@@ -193,11 +193,11 @@ func TestMethodMatcherNoMatchWrongPackage(t *testing.T) {
 
 func TestMethodMatcherWildcardType(t *testing.T) {
 	mm := NewMethodMatcher("* Sub(..)")
-	mi := &tree.MethodInvocation{
-		Select: &tree.RightPadded[tree.Expression]{
-			Element: &tree.Identifier{Name: "t"},
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "t"},
 		},
-		Name: &tree.Identifier{Name: "Sub"},
+		Name: &java.Identifier{Name: "Sub"},
 	}
 	// With just an identifier "t" as select, DeclaringTypeFQN returns "t"
 	// which matches "*" pattern
@@ -208,13 +208,13 @@ func TestMethodMatcherWildcardType(t *testing.T) {
 
 func TestMethodMatcherWithTypeInfo(t *testing.T) {
 	mm := NewMethodMatcher("fmt Sprintf(..)")
-	fmtType := &tree.JavaTypeClass{FullyQualifiedName: "fmt"}
-	mi := &tree.MethodInvocation{
-		Select: &tree.RightPadded[tree.Expression]{
-			Element: &tree.Identifier{Name: "fmt"},
+	fmtType := &java.JavaTypeClass{FullyQualifiedName: "fmt"}
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{
+			Element: &java.Identifier{Name: "fmt"},
 		},
-		Name: &tree.Identifier{Name: "Sprintf"},
-		MethodType: &tree.JavaTypeMethod{
+		Name: &java.Identifier{Name: "Sprintf"},
+		MethodType: &java.JavaTypeMethod{
 			DeclaringType: fmtType,
 			Name:          "Sprintf",
 		},
@@ -226,8 +226,8 @@ func TestMethodMatcherWithTypeInfo(t *testing.T) {
 
 func TestMethodMatcherMatchesMethod(t *testing.T) {
 	mm := NewMethodMatcher("time.Time Sub(..)")
-	mt := &tree.JavaTypeMethod{
-		DeclaringType: &tree.JavaTypeClass{FullyQualifiedName: "time.Time"},
+	mt := &java.JavaTypeMethod{
+		DeclaringType: &java.JavaTypeClass{FullyQualifiedName: "time.Time"},
 		Name:          "Sub",
 	}
 	if !mm.MatchesMethod(mt) {
@@ -311,12 +311,43 @@ type methodMatcherVisitor struct {
 	counts   map[string]*int
 }
 
-func (v *methodMatcherVisitor) VisitMethodInvocation(mi *tree.MethodInvocation, p any) tree.J {
-	mi = v.GoVisitor.VisitMethodInvocation(mi, p).(*tree.MethodInvocation)
+func (v *methodMatcherVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
+	mi = v.GoVisitor.VisitMethodInvocation(mi, p).(*java.MethodInvocation)
 	for name, matcher := range v.matchers {
 		if matcher.Matches(mi) {
 			*v.counts[name]++
 		}
 	}
 	return mi
+}
+
+// TypeOfExpression for Parentheses and TypeCast must DERIVE the type from the
+// inner expression (mirroring Java's J.Parentheses.getType / J.TypeCast.getType),
+// since neither struct stores a Type field.
+func TestTypeOfExpressionDerivesThroughWrappers(t *testing.T) {
+	// given
+	strType := &java.JavaTypeClass{FullyQualifiedName: "string"}
+	inner := &java.Identifier{Name: "s", Type: strType}
+
+	parens := &java.Parentheses{
+		Tree: java.RightPadded[java.Expression]{Element: inner},
+	}
+	cast := &java.TypeCast{
+		Clazz: &java.ControlParentheses{
+			Tree: java.RightPadded[java.Expression]{Element: inner},
+		},
+		Expr: &java.Identifier{Name: "x"},
+	}
+
+	// when
+	parensType := TypeOfExpression(parens)
+	castType := TypeOfExpression(cast)
+
+	// then
+	if parensType != strType {
+		t.Errorf("Parentheses: got %v, want derived inner type %v", parensType, strType)
+	}
+	if castType != strType {
+		t.Errorf("TypeCast: got %v, want derived Clazz type %v", castType, strType)
+	}
 }

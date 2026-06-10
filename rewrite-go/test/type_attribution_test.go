@@ -21,17 +21,17 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // typeCollector visits a tree and collects identifiers with their types.
 type typeCollector struct {
 	visitor.GoVisitor
-	identTypes map[string]tree.JavaType
+	identTypes map[string]java.JavaType
 }
 
-func (v *typeCollector) VisitIdentifier(ident *tree.Identifier, p any) tree.J {
+func (v *typeCollector) VisitIdentifier(ident *java.Identifier, p any) java.J {
 	if ident.Type != nil {
 		v.identTypes[ident.Name] = ident.Type
 	}
@@ -41,10 +41,10 @@ func (v *typeCollector) VisitIdentifier(ident *tree.Identifier, p any) tree.J {
 // methodTypeCollector visits a tree and collects method declaration types.
 type methodTypeCollector struct {
 	visitor.GoVisitor
-	methodTypes map[string]*tree.JavaTypeMethod
+	methodTypes map[string]*java.JavaTypeMethod
 }
 
-func (v *methodTypeCollector) VisitMethodDeclaration(md *tree.MethodDeclaration, p any) tree.J {
+func (v *methodTypeCollector) VisitMethodDeclaration(md *java.MethodDeclaration, p any) java.J {
 	if md.MethodType != nil && md.Name != nil {
 		v.methodTypes[md.Name.Name] = md.MethodType
 	}
@@ -66,12 +66,12 @@ func main() {
 		t.Fatal(err)
 	}
 
-	v := visitor.Init(&typeCollector{identTypes: make(map[string]tree.JavaType)})
+	v := visitor.Init(&typeCollector{identTypes: make(map[string]java.JavaType)})
 	v.Visit(cu, nil)
 
 	// "x" should be an int type
 	if xType, ok := v.identTypes["x"]; ok {
-		if prim, ok := xType.(*tree.JavaTypePrimitive); ok {
+		if prim, ok := xType.(*java.JavaTypePrimitive); ok {
 			if prim.Keyword != "int" {
 				t.Errorf("expected x to be int, got %s", prim.Keyword)
 			}
@@ -84,7 +84,7 @@ func main() {
 
 	// "y" should be a string type (mapped as Primitive "String")
 	if yType, ok := v.identTypes["y"]; ok {
-		if prim, ok := yType.(*tree.JavaTypePrimitive); ok {
+		if prim, ok := yType.(*java.JavaTypePrimitive); ok {
 			if prim.Keyword != "String" {
 				t.Errorf("expected y to be String, got %s", prim.Keyword)
 			}
@@ -108,7 +108,7 @@ func add(a int, b int) int {
 		t.Fatal(err)
 	}
 
-	v := visitor.Init(&methodTypeCollector{methodTypes: make(map[string]*tree.JavaTypeMethod)})
+	v := visitor.Init(&methodTypeCollector{methodTypes: make(map[string]*java.JavaTypeMethod)})
 	v.Visit(cu, nil)
 
 	addType, ok := v.methodTypes["add"]
@@ -121,12 +121,101 @@ func add(a int, b int) int {
 	if len(addType.ParameterTypes) != 2 {
 		t.Errorf("expected 2 parameters, got %d", len(addType.ParameterTypes))
 	}
-	if ret, ok := addType.ReturnType.(*tree.JavaTypePrimitive); ok {
+	if ret, ok := addType.ReturnType.(*java.JavaTypePrimitive); ok {
 		if ret.Keyword != "int" {
 			t.Errorf("expected return type int, got %s", ret.Keyword)
 		}
 	} else {
 		t.Errorf("expected primitive return type, got %T", addType.ReturnType)
+	}
+}
+
+func TestTypeAttributionMultiReturn(t *testing.T) {
+	// given
+	p := parser.NewGoParser()
+	cu, err := p.Parse("test.go", `package main
+
+func divmod(a int, b int) (int, int) {
+	return a / b, a % b
+}
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	v := visitor.Init(&methodTypeCollector{methodTypes: make(map[string]*java.JavaTypeMethod)})
+	v.Visit(cu, nil)
+
+	// then
+	mt, ok := v.methodTypes["divmod"]
+	if !ok {
+		t.Fatal("no method type for divmod()")
+	}
+	param, ok := mt.ReturnType.(*java.JavaTypeParameterized)
+	if !ok {
+		t.Fatalf("expected parameterized return type, got %T", mt.ReturnType)
+	}
+	if param.Type == nil || param.Type.GetFullyQualifiedName() != "go.tuple" {
+		t.Errorf("expected tuple FQN 'go.tuple', got %+v", param.Type)
+	}
+	if len(param.TypeParameters) != 2 {
+		t.Fatalf("expected 2 tuple type parameters, got %d", len(param.TypeParameters))
+	}
+	for i, tp := range param.TypeParameters {
+		prim, ok := tp.(*java.JavaTypePrimitive)
+		if !ok {
+			t.Errorf("tuple element %d: expected primitive, got %T", i, tp)
+			continue
+		}
+		if prim.Keyword != "int" {
+			t.Errorf("tuple element %d: expected int, got %s", i, prim.Keyword)
+		}
+	}
+}
+
+func TestTypeAttributionMultiReturnHeterogeneous(t *testing.T) {
+	// given
+	p := parser.NewGoParser()
+	cu, err := p.Parse("test.go", `package main
+
+func split() (string, int, bool) {
+	return "x", 1, true
+}
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	v := visitor.Init(&methodTypeCollector{methodTypes: make(map[string]*java.JavaTypeMethod)})
+	v.Visit(cu, nil)
+
+	// then
+	mt, ok := v.methodTypes["split"]
+	if !ok {
+		t.Fatal("no method type for split()")
+	}
+	param, ok := mt.ReturnType.(*java.JavaTypeParameterized)
+	if !ok {
+		t.Fatalf("expected parameterized return type, got %T", mt.ReturnType)
+	}
+	if param.Type == nil || param.Type.GetFullyQualifiedName() != "go.tuple" {
+		t.Errorf("expected tuple FQN 'go.tuple', got %+v", param.Type)
+	}
+	if len(param.TypeParameters) != 3 {
+		t.Fatalf("expected 3 tuple type parameters, got %d", len(param.TypeParameters))
+	}
+	expectedKeywords := []string{"String", "int", "boolean"}
+	for i, want := range expectedKeywords {
+		prim, ok := param.TypeParameters[i].(*java.JavaTypePrimitive)
+		if !ok {
+			t.Errorf("tuple element %d: expected primitive, got %T", i, param.TypeParameters[i])
+			continue
+		}
+		if prim.Keyword != want {
+			t.Errorf("tuple element %d: expected %s, got %s", i, want, prim.Keyword)
+		}
 	}
 }
 

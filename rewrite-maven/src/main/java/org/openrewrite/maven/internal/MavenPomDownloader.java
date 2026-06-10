@@ -27,7 +27,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
@@ -684,7 +683,9 @@ public class MavenPomDownloader {
                                     }
                                 }
                             } catch (HttpSenderResponseException e) {
-                                if (e.getResponseCode() != 404) {
+                                // Some repositories return 401 when no `.module` url is found (eg. virtual repo that is accessed unauthenticated)
+                                // As the retrieval of module is not critical for the pom, we're swallowing if we can reach the other server / it is a timeout.
+                                if (!e.isServerReached() && !e.isClientSideException()) {
                                     throw e;
                                 }
                             }

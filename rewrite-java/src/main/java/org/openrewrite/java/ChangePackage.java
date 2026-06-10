@@ -21,7 +21,6 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.internal.JavaSourceSetCompat;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
@@ -279,10 +278,10 @@ public class ChangePackage extends Recipe {
                 }
 
                 // Expand changed star imports that would create ambiguity with other star imports
-                sf = maybeExpandStarImport(sf, newPackageName, oldPackageName);
+                sf = maybeExpandStarImport(sf, newPackageName, oldPackageName, ctx);
                 if (changingTo != null && !changingTo.equals(newPackageName)) {
                     String oldSubPkg = oldPackageName + changingTo.substring(newPackageName.length());
-                    sf = maybeExpandStarImport(sf, changingTo, oldSubPkg);
+                    sf = maybeExpandStarImport(sf, changingTo, oldSubPkg, ctx);
                 }
                 if (Boolean.TRUE.equals(recursive)) {
                     for (J.Import anImport : sf.getImports()) {
@@ -290,7 +289,7 @@ public class ChangePackage extends Recipe {
                             String pkg = anImport.getPackageName();
                             if (pkg.startsWith(newPackageName + ".")) {
                                 String oldPkg = oldPackageName + pkg.substring(newPackageName.length());
-                                sf = maybeExpandStarImport(sf, pkg, oldPkg);
+                                sf = maybeExpandStarImport(sf, pkg, oldPkg, ctx);
                             }
                         }
                     }
@@ -310,7 +309,7 @@ public class ChangePackage extends Recipe {
          * @param changedPackage the new package name (after rename)
          * @param originalPackage the old package name (before rename), used to find types on classpath
          */
-        private JavaSourceFile maybeExpandStarImport(JavaSourceFile sf, String changedPackage, String originalPackage) {
+        private JavaSourceFile maybeExpandStarImport(JavaSourceFile sf, String changedPackage, String originalPackage, ExecutionContext ctx) {
             J.Import changedStarImport = null;
             Set<String> otherStarPackages = new LinkedHashSet<>();
             for (J.Import anImport : sf.getImports()) {
@@ -328,7 +327,7 @@ public class ChangePackage extends Recipe {
                 return sf;
             }
 
-            if (!hasAmbiguity(sf, changedPackage, originalPackage, otherStarPackages)) {
+            if (!hasAmbiguity(sf, changedPackage, originalPackage, otherStarPackages, ctx)) {
                 return sf;
             }
 
@@ -373,27 +372,31 @@ public class ChangePackage extends Recipe {
          * Checks both the new package name and the original package name, since the
          * classpath may still have types under the old package name.
          */
-        private boolean hasAmbiguity(JavaSourceFile sf, String changedPackage, String originalPackage, Set<String> otherStarPackages) {
+        private boolean hasAmbiguity(JavaSourceFile sf, String changedPackage, String originalPackage, Set<String> otherStarPackages, ExecutionContext ctx) {
+            if (JavaSourceSet.isDirty(ctx, sf)) {
+                // An earlier dependency mutation in this run means the classpath cannot be trusted to
+                // prove non-ambiguity; fall back to the safe path and expand the star.
+                return true;
+            }
             Optional<JavaSourceSet> sourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
             if (!sourceSet.isPresent()) {
                 return false;
             }
-            JavaSourceSet ss = sourceSet.get();
 
             Set<String> typesInChangedPackage = new HashSet<>();
-            JavaSourceSetCompat.classpathTypesInPackage(ss, changedPackage)
-                    .forEach(fq -> typesInChangedPackage.add(fq.getClassName()));
-            if (!changedPackage.equals(originalPackage)) {
-                JavaSourceSetCompat.classpathTypesInPackage(ss, originalPackage)
-                        .forEach(fq -> typesInChangedPackage.add(fq.getClassName()));
-            }
-            if (typesInChangedPackage.isEmpty()) {
-                return false;
+            Set<String> typesInOtherPackages = new HashSet<>();
+            for (JavaType.FullyQualified fq : sourceSet.get().getClasspath()) {
+                String pkg = fq.getPackageName();
+                String className = fq.getClassName();
+                if (pkg.equals(changedPackage) || pkg.equals(originalPackage)) {
+                    typesInChangedPackage.add(className);
+                } else if (otherStarPackages.contains(pkg)) {
+                    typesInOtherPackages.add(className);
+                }
             }
 
-            for (String pkg : otherStarPackages) {
-                if (JavaSourceSetCompat.classpathTypesInPackage(ss, pkg)
-                        .anyMatch(fq -> typesInChangedPackage.contains(fq.getClassName()))) {
+            for (String typeName : typesInChangedPackage) {
+                if (typesInOtherPackages.contains(typeName)) {
                     return true;
                 }
             }
@@ -411,9 +414,10 @@ public class ChangePackage extends Recipe {
             }
             Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
             if (sourceSet.isPresent()) {
-                Optional<JavaType.FullyQualified> hit = JavaSourceSetCompat.findClasspathType(sourceSet.get(), fqn);
-                if (hit.isPresent()) {
-                    return hit.get();
+                for (JavaType.FullyQualified fq : sourceSet.get().getClasspath()) {
+                    if (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fqn)) {
+                        return fq;
+                    }
                 }
             }
             return JavaType.ShallowClass.build(fqn);

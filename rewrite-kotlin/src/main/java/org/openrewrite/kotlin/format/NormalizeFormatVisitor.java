@@ -54,9 +54,13 @@ public class NormalizeFormatVisitor<P> extends KotlinIsoVisitor<P> {
             return c.withLeadingAnnotations(Space.formatFirstPrefix(c.getLeadingAnnotations(), Space.EMPTY));
         }
 
-        if (!c.getModifiers().isEmpty()) {
-            c = concatenatePrefix(c, Space.firstPrefix(c.getModifiers()));
-            return c.withModifiers(Space.formatFirstPrefix(c.getModifiers(), Space.EMPTY));
+        int firstVisible = firstVisibleModifierIndex(c.getModifiers());
+        if (firstVisible >= 0) {
+            J.Modifier m = c.getModifiers().get(firstVisible);
+            c = concatenatePrefix(c, m.getPrefix());
+            List<J.Modifier> updated = ListUtils.map(c.getModifiers(), (i, mod) ->
+                    i == firstVisible ? mod.withPrefix(Space.EMPTY) : mod);
+            return c.withModifiers(updated);
         }
 
         if (!c.getPadding().getKind().getPrefix().isEmpty()) {
@@ -65,6 +69,33 @@ public class NormalizeFormatVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         return c.withName(c.getName().withPrefix(c.getName().getPrefix().withWhitespace(" ")));
+    }
+
+    /**
+     * Find the first modifier that prints something, skipping the synthetic
+     * {@code final} the Kotlin parser inserts on every class/method/property
+     * that doesn't write {@code open} (see
+     * {@code KotlinTreeParserVisitor.buildFinalModifier()}: {@code type=Final,
+     * keyword=null, empty prefix, no annotations}; the printer's
+     * {@code visitModifier} emits nothing for it). Returning the synthetic
+     * would make this visitor "move" an empty prefix onto the class and leave
+     * the real leading whitespace stranded on {@code kind.prefix} — defeating
+     * the whitespace-to-outermost convention.
+     */
+    private static int firstVisibleModifierIndex(List<J.Modifier> modifiers) {
+        for (int i = 0; i < modifiers.size(); i++) {
+            if (!isKotlinSyntheticFinal(modifiers.get(i))) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isKotlinSyntheticFinal(J.Modifier m) {
+        return m.getType() == J.Modifier.Type.Final &&
+                m.getKeyword() == null &&
+                m.getPrefix().getWhitespace().isEmpty() &&
+                m.getAnnotations().isEmpty();
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -81,9 +112,13 @@ public class NormalizeFormatVisitor<P> extends KotlinIsoVisitor<P> {
             return m.withLeadingAnnotations(Space.formatFirstPrefix(m.getLeadingAnnotations(), Space.EMPTY));
         }
 
-        if (!m.getModifiers().isEmpty()) {
-            m = concatenatePrefix(m, Space.firstPrefix(m.getModifiers()));
-            return m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), Space.EMPTY));
+        int firstVisible = firstVisibleModifierIndex(m.getModifiers());
+        if (firstVisible >= 0) {
+            J.Modifier mod = m.getModifiers().get(firstVisible);
+            m = concatenatePrefix(m, mod.getPrefix());
+            List<J.Modifier> updated = ListUtils.map(m.getModifiers(), (i, x) ->
+                    i == firstVisible ? x.withPrefix(Space.EMPTY) : x);
+            return m.withModifiers(updated);
         }
 
         if (m.getAnnotations().getTypeParameters() != null) {
@@ -116,9 +151,13 @@ public class NormalizeFormatVisitor<P> extends KotlinIsoVisitor<P> {
             return v.withLeadingAnnotations(Space.formatFirstPrefix(v.getLeadingAnnotations(), Space.EMPTY));
         }
 
-        if (!v.getModifiers().isEmpty()) {
-            v = concatenatePrefix(v, Space.firstPrefix(v.getModifiers()));
-            return v.withModifiers(Space.formatFirstPrefix(v.getModifiers(), Space.EMPTY));
+        int firstVisible = firstVisibleModifierIndex(v.getModifiers());
+        if (firstVisible >= 0) {
+            J.Modifier mod = v.getModifiers().get(firstVisible);
+            v = concatenatePrefix(v, mod.getPrefix());
+            List<J.Modifier> updated = ListUtils.map(v.getModifiers(), (i, x) ->
+                    i == firstVisible ? x.withPrefix(Space.EMPTY) : x);
+            return v.withModifiers(updated);
         }
 
         return v;

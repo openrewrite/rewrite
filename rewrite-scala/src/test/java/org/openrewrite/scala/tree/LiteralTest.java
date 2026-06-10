@@ -99,6 +99,21 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void stringLiteralContainingTripleQuestionMark() {
+        // The `???` content must not be mistaken for the compiler-synthetic Predef.???
+        // placeholder and dropped from the block's trailing expression.
+        rewriteRun(
+          scala(
+            """
+            val code = {
+              "???"
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void multilineStringLiteral() {
         rewriteRun(
           scala(

@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -73,8 +74,10 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
                 return variableType((FieldNode) type);
             }
         } catch (NoClassDefFoundError e) {
-            // e.getMessage() returns fully qualified name of type that couldn't be found on the classpath
-            return JavaType.ShallowClass.build(e.getMessage());
+            // Linkage failure during ClassNode.getTypeClass() — give up rather
+            // than synthesize a Class from the JVM's implementation-defined
+            // NCDFE message (often a slash-form internal name, not an FQN).
+            return JavaType.Unknown.getInstance();
         }
 
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
@@ -85,8 +88,8 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             JavaType type = reflectionTypeMapping.type(node.getTypeClass());
             return (JavaType.FullyQualified) (type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type);
         } catch (GroovyBugError | NoClassDefFoundError ignored1) {
-            return typeFactory.computeClass(signature, node.getName(), Flag.Public.getBitMask(),
-                    JavaType.Class.Kind.Class, null, stub -> {
+            return typeFactory.computeClass(node.getName(), Flag.Public.getBitMask(),
+                    JavaType.Class.Kind.Class, stub -> {
                 JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(node.getSuperClass()));
                 JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(node.getOuterClass()));
 
@@ -129,7 +132,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     }
 
     private JavaType parameterizedType(ClassNode type, String signature) {
-        return typeFactory.computeParameterized(signature, type, pt -> {
+        return typeFactory.computeParameterized(signature, pt -> {
             JavaType.FullyQualified clazz = classType(type, type.getPlainNodeReference().getName());
 
             List<JavaType> typeParameters = emptyList();
@@ -145,11 +148,13 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     }
 
     private JavaType.Array arrayType(ClassNode array, String signature) {
-        return typeFactory.computeArray(signature, array, arr -> {
+        return typeFactory.arrayFor(signature, () -> {
+            JavaType.Array arr = new JavaType.Array(null, null, null);
             JavaType elemType = array.getComponentType().isUsingGenerics()
                     ? type(array.getComponentType().getGenericsTypes()[0])
                     : type(array.getComponentType());
             arr.unsafeSet(elemType, null);
+            return arr;
         });
     }
 
@@ -159,7 +164,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             return type(g.getType());
         }
 
-        return typeFactory.computeGenericTypeVariable(signature, g.getName(), INVARIANT, g, gtv -> {
+        return typeFactory.computeGenericTypeVariable(signature, g.getName(), INVARIANT, gtv -> {
             JavaType.GenericTypeVariable.Variance variance = INVARIANT;
             List<JavaType> bounds = null;
 
@@ -200,42 +205,39 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             }
         }
 
-        return typeFactory.computeMethod(
-                signature,
-                node.getModifiers(),
-                node instanceof ConstructorNode ? "<constructor>" : node.getName(),
-                paramNames,
-                null,
-                null,
-                node,
+        String[] finalParamNames = paramNames;
+        return typeFactory.methodFor(signature,
+                () -> new JavaType.Method(
+                    null, node.getModifiers(), null,
+                    node instanceof ConstructorNode ? "<constructor>" : node.getName(),
+                    null, finalParamNames, null, null, null, null, null),
                 method -> {
-                    List<JavaType> parameterTypes = null;
-                    if (node.getParameters().length > 0) {
-                        parameterTypes = new ArrayList<>(node.getParameters().length);
-                        for (org.codehaus.groovy.ast.Parameter parameter : node.getParameters()) {
-                            parameterTypes.add(type(parameter.getOriginType()));
-                        }
-                    }
-
-                    List<JavaType> thrownExceptions = null;
-                    if (node.getExceptions() != null) {
-                        for (ClassNode e : node.getExceptions()) {
-                            thrownExceptions = new ArrayList<>(node.getExceptions().length);
-                            JavaType.FullyQualified qualified = TypeUtils.asFullyQualified(type(e));
-                            thrownExceptions.add(qualified);
-                        }
-                    }
-
-                    List<JavaType.FullyQualified> annotations = getAnnotations(node);
-
-                    method.unsafeSet(TypeUtils.asFullyQualified(type(node.getDeclaringClass())),
-                            type(node.getReturnType()),
-                            parameterTypes,
-                            thrownExceptions,
-                            annotations
-                    );
+            List<JavaType> parameterTypes = null;
+            if (node.getParameters().length > 0) {
+                parameterTypes = new ArrayList<>(node.getParameters().length);
+                for (org.codehaus.groovy.ast.Parameter parameter : node.getParameters()) {
+                    parameterTypes.add(type(parameter.getOriginType()));
                 }
-        );
+            }
+
+            List<JavaType> thrownExceptions = null;
+            if (node.getExceptions() != null) {
+                for (ClassNode e : node.getExceptions()) {
+                    thrownExceptions = new ArrayList<>(node.getExceptions().length);
+                    JavaType.FullyQualified qualified = TypeUtils.asFullyQualified(type(e));
+                    thrownExceptions.add(qualified);
+                }
+            }
+
+            List<JavaType.FullyQualified> annotations = getAnnotations(node);
+
+            method.unsafeSet(TypeUtils.asFullyQualified(type(node.getDeclaringClass())),
+                    type(node.getReturnType()),
+                    parameterTypes,
+                    thrownExceptions,
+                    annotations
+            );
+        });
     }
 
     public JavaType.@Nullable Variable variableType(@Nullable FieldNode node) {
@@ -244,9 +246,12 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         }
 
         String signature = signatureBuilder.variableSignature(node);
-        return typeFactory.computeVariable(signature, node.getModifiers(), node.getName(), node, variable -> {
+        return typeFactory.variableFor(signature, () -> {
+            JavaType.Variable variable = new JavaType.Variable(
+                    null, node.getModifiers(), node.getName(), null, null, null);
             List<JavaType.FullyQualified> annotations = getAnnotations(node);
             variable.unsafeSet(type(node.getOwner()), type(node.getType()), annotations);
+            return variable;
         });
     }
 
@@ -263,8 +268,12 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         }
 
         String signature = signatureBuilder.variableSignature(name);
-        return typeFactory.computeVariable(signature, 0, name, null, variable ->
-                variable.unsafeSet(JavaType.Unknown.getInstance(), type, (List<JavaType.FullyQualified>) null));
+        return typeFactory.variableFor(signature, () -> {
+            JavaType.Variable variable = new JavaType.Variable(
+                    null, 0, name, null, null, null);
+            variable.unsafeSet(JavaType.Unknown.getInstance(), type, (List<JavaType.FullyQualified>) null);
+            return variable;
+        });
     }
 
     private @Nullable List<JavaType.FullyQualified> getAnnotations(AnnotatedNode node) {

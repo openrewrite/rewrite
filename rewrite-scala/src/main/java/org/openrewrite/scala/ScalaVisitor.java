@@ -20,8 +20,10 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
@@ -56,7 +58,6 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
             c = c.withPackageDeclaration(visitAndCast(c.getPackageDeclaration(), p));
         }
 
-        c = c.withImports(ListUtils.map(c.getImports(), i -> visitAndCast(i, p)));
         c = c.withStatements(ListUtils.map(c.getStatements(), s -> {
             try {
                 return visitAndCast(s, p);
@@ -93,9 +94,7 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         // Sync changes from the J.CompilationUnit back to S.CompilationUnit
         if (result != tempJcu) {
             List<JRightPadded<J.Import>> newImports = result.getPadding().getImports();
-            if (newImports != c.getPadding().getImports()) {
-                c = (S.CompilationUnit) c.getPadding().withImports(newImports);
-            }
+            c = (S.CompilationUnit) c.getPadding().withImports(newImports);
             if (result.getPrefix() != c.getPrefix()) {
                 c = c.withPrefix(result.getPrefix());
             }
@@ -164,7 +163,44 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         }
         e = (S.Export) temp;
         e = e.withExportClause(visitAndCast(e.getExportClause(), p));
+        if (e.getBeforeBrace() != null) {
+            e = e.withBeforeBrace(visitSpace(e.getBeforeBrace(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (e.getPadding().getSelectors() != null) {
+            e = e.getPadding().withSelectors(visitContainer(e.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        }
         return e;
+    }
+
+    public J visitSImport(S.Import sImport, P p) {
+        S.Import i = sImport;
+        i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(i, p);
+        if (!(temp instanceof S.Import)) {
+            return temp;
+        }
+        i = (S.Import) temp;
+        i = i.getPadding().withQualifier(visitRightPadded(i.getPadding().getQualifier(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
+        i = i.withBeforeBrace(visitSpace(i.getBeforeBrace(), Space.Location.LANGUAGE_EXTENSION, p));
+        i = i.getPadding().withSelectors(visitContainer(i.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return i;
+    }
+
+    public J visitImportSelector(S.ImportSelector selector, P p) {
+        S.ImportSelector s = selector;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        if (s.getGivenType() != null) {
+            s = s.withGivenType(visitAndCast(s.getGivenType(), p));
+        }
+        if (s.getName() != null) {
+            s = s.withName(visitAndCast(s.getName(), p));
+        }
+        if (s.getPadding().getAlias() != null) {
+            s = s.getPadding().withAlias(visitLeftPadded(s.getPadding().getAlias(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        }
+        return s;
     }
 
     public J visitPatternDefinition(S.PatternDefinition patDef, P p) {
@@ -172,6 +208,24 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         pd = pd.withPrefix(visitSpace(pd.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         pd = pd.withMarkers(visitMarkers(pd.getMarkers(), p));
         return pd;
+    }
+
+    public J visitAnonymousGiven(S.AnonymousGiven anonymousGiven, P p) {
+        S.AnonymousGiven g = anonymousGiven;
+        g = g.withPrefix(visitSpace(g.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        g = g.withMarkers(visitMarkers(g.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(g, p);
+        if (!(temp instanceof S.AnonymousGiven)) {
+            return temp;
+        }
+        g = (S.AnonymousGiven) temp;
+        g = g.withLeadingAnnotations(ListUtils.map(g.getLeadingAnnotations(), a -> visitAndCast(a, p)));
+        g = g.withModifiers(ListUtils.map(g.getModifiers(), m -> visitAndCast(m, p)));
+        g = g.withType(visitAndCast(g.getType(), p));
+        if (g.getInitializer() != null) {
+            g = g.withInitializer(visitLeftPadded(g.getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p));
+        }
+        return g;
     }
 
     public J visitFunctionCall(S.FunctionCall functionCall, P p) {
@@ -192,12 +246,71 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return s;
     }
 
+    public J visitRepeatedType(S.RepeatedType repeatedType, P p) {
+        S.RepeatedType r = repeatedType;
+        r = r.withPrefix(visitSpace(r.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withElementType(visitAndCast(r.getElementType(), p));
+        r = r.withBeforeStar(visitSpace(r.getBeforeStar(), Space.Location.LANGUAGE_EXTENSION, p));
+        return r;
+    }
+
+    public J visitSplatExpression(S.SplatExpression splatExpression, P p) {
+        S.SplatExpression s = splatExpression;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withExpression(visitAndCast(s.getExpression(), p));
+        if (s.getBeforeColon() != null) {
+            s = s.withBeforeColon(visitSpace(s.getBeforeColon(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (s.getAfterColon() != null) {
+            s = s.withAfterColon(visitSpace(s.getAfterColon(), Space.Location.LANGUAGE_EXTENSION, p));
+        }
+        s = s.withBeforeStar(visitSpace(s.getBeforeStar(), Space.Location.LANGUAGE_EXTENSION, p));
+        return s;
+    }
+
+    public J visitXmlLiteral(S.XmlLiteral xmlLiteral, P p) {
+        S.XmlLiteral x = xmlLiteral;
+        x = x.withPrefix(visitSpace(x.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        x = x.withMarkers(visitMarkers(x.getMarkers(), p));
+        return x;
+    }
+
     public J visitAlternative(S.Alternative alternative, P p) {
         S.Alternative a = alternative;
         a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
         a = a.getPadding().withPatterns(visitContainer(a.getPadding().getPatterns(), JContainer.Location.LANGUAGE_EXTENSION, p));
         return a;
+    }
+
+    public J visitInterpolatedString(S.InterpolatedString interpolatedString, P p) {
+        S.InterpolatedString i = interpolatedString;
+        i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withInterpolator(visitAndCast(i.getInterpolator(), p));
+        i = i.withParts(ListUtils.map(i.getParts(), e -> visitAndCast(e, p)));
+        return i;
+    }
+
+    public J visitInterpolation(S.Interpolation interpolation, P p) {
+        S.Interpolation i = interpolation;
+        i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.withExpression(visitAndCast(i.getExpression(), p));
+        i = i.withAfterExpression(visitSpace(i.getAfterExpression(), Space.Location.LANGUAGE_EXTENSION, p));
+        return i;
+    }
+
+    public J visitBinding(S.Binding binding, P p) {
+        S.Binding b = binding;
+        b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        b = b.withName(visitAndCast(b.getName(), p));
+        b = b.withBeforeAt(visitSpace(b.getBeforeAt(), Space.Location.LANGUAGE_EXTENSION, p));
+        b = b.withPattern(visitAndCast(b.getPattern(), p));
+        return b;
     }
 
     public J visitQualifiedSuper(S.QualifiedSuper qualifiedSuper, P p) {
@@ -221,6 +334,23 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         a = a.withBeforeColon(visitSpace(a.getBeforeColon(), Space.Location.LANGUAGE_EXTENSION, p));
         a = a.withAnnotation(visitAndCast(a.getAnnotation(), p));
         return a;
+    }
+
+    public J visitFunctionType(S.FunctionType functionType, P p) {
+        S.FunctionType f = functionType;
+        f = f.withPrefix(visitSpace(f.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        f = f.getPadding().withParameters(visitContainer(f.getPadding().getParameters(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        f = f.getPadding().withReturnType(visitLeftPadded(f.getPadding().getReturnType(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        return f;
+    }
+
+    public J visitTupleType(S.TupleType tupleType, P p) {
+        S.TupleType t = tupleType;
+        t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.getPadding().withElements(visitContainer(t.getPadding().getElements(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return t;
     }
 
     public J visitRefinedType(S.RefinedType refinedType, P p) {

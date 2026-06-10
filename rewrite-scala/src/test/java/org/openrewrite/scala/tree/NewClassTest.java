@@ -144,6 +144,24 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    void newClassWithArgumentsAndMixin() {
+        rewriteRun(
+          scala(
+            """
+            class Service(conf: String, client: String)
+            trait Logging
+            object Test {
+              val service = new Service(
+                "conf",
+                "client") with Logging {
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void newClassWithMultiLineArguments() {
         rewriteRun(
           scala(
@@ -206,6 +224,110 @@ class NewClassTest implements RewriteTest {
                 def c(): Int = 3
               }
             }
+            """
+          )
+        );
+    }
+
+    @Test
+    void mixinWithExtraSpaceAroundWith() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              trait A
+              trait B
+              trait C
+              val x = new A  with  B  with  C {}
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void newAnonymousClassBracelessIndentedBody() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val runnable = new Runnable:
+                def run(): Unit = println("Running")
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void newClassWithInterpolatedStringArgOnNewLine() {
+        rewriteRun(
+          scala(
+            """
+            val n = 1
+            val x = new RuntimeException(
+              s"value: $n")
+            """
+          )
+        );
+    }
+
+    @Test
+    void newClassFirstArgIsIfElseOnNewLine() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val x = new Foo(
+                if (cond) 1 else 2,
+                3)
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitNewClassWithArgs — close paren in line comment
+        rewriteRun(
+          scala(
+            """
+            class Foo(val x: Int)
+            val f = new Foo(1 // )
+            )
+            """
+          )
+        );
+        // visitNew — close paren in block comment within non-empty arg list
+        rewriteRun(
+          scala(
+            """
+            class Foo(a: Int, b: Int)
+            val f = new Foo(1 /* ) */, 2)
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedNewClass() {
+        rewriteRun(
+          scala(
+            """
+            val x = new Foo(a)(b)
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedNewClassAsDefBody() {
+        rewriteRun(
+          scala(
+            """
+            def make: Foo =
+              new Foo(0)(f)
             """
           )
         );

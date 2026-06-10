@@ -19,6 +19,7 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -175,11 +176,11 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, ((SourceFile) cu)))
                     .orElse(IntelliJ.importLayout());
 
-            List<JavaType.FullyQualified> classpath = cu.getMarkers().findFirst(JavaSourceSet.class)
-                    .map(JavaSourceSet::getClasspath)
-                    .orElse(emptyList());
+            Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
+            List<JavaType.FullyQualified> classpath = sourceSet.map(JavaSourceSet::getClasspath).orElse(emptyList());
+            boolean classpathDirty = p instanceof ExecutionContext && JavaSourceSet.isDirty((ExecutionContext) p, cu);
 
-            List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath);
+            List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath, classpathDirty);
 
             if (member != null && typeReference.isPresent()) {
                 cu = (JavaSourceFile) new ShortenFullyQualifiedMemberReferences(typeReference.get()).visit(cu, p);

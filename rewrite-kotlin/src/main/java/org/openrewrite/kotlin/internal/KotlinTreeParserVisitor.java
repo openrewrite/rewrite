@@ -1016,6 +1016,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         emptyList()
                 ),
                 params,
+                emptyList(),
                 null,
                 null,
                 null,
@@ -1090,6 +1091,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         lastAnnotations
                 ),
                 params,
+                emptyList(),
                 null,
                 body,
                 null,
@@ -1201,6 +1203,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 null,
                 new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
                 params,
+                emptyList(),
                 null,
                 body,
                 null,
@@ -1867,15 +1870,39 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitBinaryExpression(KtBinaryExpression expression, ExecutionContext data) {
-        assert expression.getLeft() != null;
-        assert expression.getRight() != null;
+        // Collect left-spine of nested binary expressions to process iteratively,
+        // avoiding StackOverflowError on deeply nested expressions (e.g. 2000+ concatenations)
+        List<KtBinaryExpression> spine = new ArrayList<>();
+        KtExpression leftmost = expression;
+        while (leftmost instanceof KtBinaryExpression) {
+            spine.add((KtBinaryExpression) leftmost);
+            leftmost = ((KtBinaryExpression) leftmost).getLeft();
+        }
 
+        // Visit the deepest left operand (not a binary expression)
+        assert leftmost != null;
+        J leftJ = leftmost.accept(this, data);
+
+        // Process each binary expression from innermost to outermost
+        J result = null;
+        for (int i = spine.size() - 1; i >= 0; i--) {
+            KtBinaryExpression binExpr = spine.get(i);
+            assert binExpr.getRight() != null;
+
+            Expression left = convertToExpression(leftJ).withPrefix(Space.EMPTY);
+            result = visitSingleBinaryExpression(binExpr, left, data);
+            leftJ = result;
+        }
+
+        return result;
+    }
+
+    private J visitSingleBinaryExpression(KtBinaryExpression expression, Expression left, ExecutionContext data) {
         KtOperationReferenceExpression operationReference = expression.getOperationReference();
         J.Binary.Type javaBinaryType = mapJBinaryType(operationReference);
         J.AssignmentOperation.Type assignmentOperationType = javaBinaryType == null ? mapAssignmentOperationType(operationReference) : null;
         K.Binary.Type kotlinBinaryType = javaBinaryType == null && assignmentOperationType == null ? mapKBinaryType(operationReference) : null;
 
-        Expression left = convertToExpression(expression.getLeft().accept(this, data)).withPrefix(Space.EMPTY);
         Expression right = convertToExpression((expression.getRight()).accept(this, data))
                 .withPrefix(prefix(expression.getRight()));
         JavaType type = type(expression);
@@ -1922,7 +1949,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             ));
         }
 
-        return mapFunctionCall(expression, data);
+        return mapFunctionCall(expression, left, data);
     }
 
     private J.AssignmentOperation.@Nullable Type mapAssignmentOperationType(KtOperationReferenceExpression operationReference) {
@@ -2744,6 +2771,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 returnTypeExpression,
                 new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
                 params,
+                emptyList(),
                 null,
                 body,
                 null,
@@ -3098,7 +3126,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 x instanceof KtSimpleNameStringTemplateEntry);
 
         if (hasStringTemplateEntry) {
-            String delimiter = expression.getFirstChild().getText();
+            PsiElement openQuote;
+            String prefix;
+            if (expression.getInterpolationPrefix() == null) {
+                openQuote = expression.getFirstChild();
+                prefix = "";
+            } else {
+                openQuote = expression.getFirstChild().getNextSibling();
+                prefix = expression.getInterpolationPrefix().getInterpolationPrefix();
+            }
+            String delimiter = prefix + openQuote.getText();
             List<J> values = new ArrayList<>(entries.length);
 
             for (KtStringTemplateEntry entry : entries) {
@@ -3408,12 +3445,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
     }
 
-    private J.MethodInvocation mapFunctionCall(KtBinaryExpression expression, ExecutionContext data) {
+    private J.MethodInvocation mapFunctionCall(KtBinaryExpression expression, Expression precomputedLeft, ExecutionContext data) {
         Markers markers = Markers.EMPTY
                 .addIfAbsent(new Infix(randomId()))
                 .addIfAbsent(new Extension(randomId()));
 
-        Expression selectExp = convertToExpression(requireNonNull(expression.getLeft()).accept(this, data).withPrefix(prefix(expression.getLeft())));
+        Expression selectExp = precomputedLeft.withPrefix(prefix(expression.getLeft()));
         JRightPadded<Expression> select = padRight(selectExp, Space.EMPTY);
         J.Identifier name = (J.Identifier) expression.getOperationReference().accept(this, data); // createIdentifier(operation, Space.EMPTY, methodInvocationType(expression));
 

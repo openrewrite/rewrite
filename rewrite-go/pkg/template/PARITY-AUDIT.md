@@ -12,7 +12,7 @@ present, what was added in this PR, and what is intentionally deferred.
 |---|---|---|---|
 | Builder | `JavaTemplate.builder(code)` | `template.ExpressionTemplate(code)` / `StatementTemplate(code)` / `TopLevelTemplate(code)` | ✓ shipped (kind-explicit factories preferred over a single overloaded builder) |
 | Build the template | `.build()` | `.Build()` | ✓ shipped |
-| Required imports | `.imports(String...)` | `.Imports(...string)` | ✓ shipped |
+| Parse-context imports | `.imports(String...)` | `.Imports(...string)` | ✓ shipped |
 | Static imports | `.staticImports(String...)` | n/a | not applicable — Go has no static-import concept |
 | Coordinate-based substitution | `.apply(JavaCoordinates, params...)` | `.Apply(cursor, *MatchResult)` | ✓ shipped via match captures (see deferred note below) |
 | Pattern → template rewrite | `JavaIsoVisitor` + `JavaTemplate.apply` per visit | `template.Rewrite(before, after)` returns a `RewriteVisitor` | ✓ shipped (single-call ergonomic that matches and replaces in one step — Go-side delta over Java) |
@@ -84,6 +84,14 @@ For inserting a fresh statement (no before-match):
 ```go
 tmpl := template.StatementTemplate(`fmt.Println("hi")`).Imports("fmt").Build()
 result := tmpl.Apply(cursor, nil)
+```
+
+`Imports(...)` is parse context only, matching `JavaTemplate.imports(...)`.
+Declarative template recipes that should edit source imports must say so
+explicitly:
+
+```go
+template.WithAfter(`strconv.Itoa(#{N})`, template.Imports("strconv"), template.SourceImports("strconv"))
 ```
 
 The Java →  Go porting cheat-sheet:

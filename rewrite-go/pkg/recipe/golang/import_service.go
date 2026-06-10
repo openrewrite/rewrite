@@ -18,6 +18,7 @@ package golang
 
 import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // ImportService exposes the Go-side import-manipulation primitives as
@@ -40,16 +41,57 @@ import (
 //
 //	type myVisitor struct{ visitor.GoVisitor }
 //
-//	func (v *myVisitor) VisitMethodInvocation(mi *tree.MethodInvocation, p any) tree.J {
+//	func (v *myVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J {
 //	    if shouldRewrite(mi) {
 //	        // ...rewrite mi...
-//	        cu := v.Cursor().FirstEnclosing(reflect.TypeOf((*tree.CompilationUnit)(nil)))
+//	        cu := v.Cursor().FirstEnclosing(reflect.TypeOf((*golang.CompilationUnit)(nil)))
 //	        svc := recipe.Service[*golang.ImportService](cu)
 //	        v.DoAfterVisit(svc.AddImportVisitor("fmt", nil, false))
 //	    }
 //	    return mi
 //	}
 type ImportService struct{}
+
+// MaybeAddImport queues an AddImport visitor on v unless an equivalent
+// AddImport is already pending. It mirrors JavaVisitor.maybeAddImport
+// and TypeScript maybeAddImport: the import edit is deferred until the
+// recipe runner drains after-visits.
+func MaybeAddImport(v visitor.AfterVisitsProvider, packagePath string, alias *string, onlyIfReferenced bool) {
+	if v == nil {
+		return
+	}
+	if pending, ok := v.(visitor.PendingAfterVisitsProvider); ok {
+		for _, after := range pending.PendingAfterVisits() {
+			if samePendingAddImport(after, packagePath, alias, onlyIfReferenced) {
+				return
+			}
+		}
+	}
+	v.DoAfterVisit((&AddImport{
+		PackagePath:      packagePath,
+		Alias:            alias,
+		OnlyIfReferenced: onlyIfReferenced,
+	}).Editor())
+}
+
+func samePendingAddImport(after visitor.AfterVisitor, packagePath string, alias *string, onlyIfReferenced bool) bool {
+	v, ok := after.(*addImportVisitor)
+	if !ok || v.cfg == nil {
+		return false
+	}
+	return v.cfg.PackagePath == packagePath &&
+		sameAlias(v.cfg.Alias, alias) &&
+		v.cfg.OnlyIfReferenced == onlyIfReferenced
+}
+
+func sameAlias(a, b *string) bool {
+	switch {
+	case a == nil || b == nil:
+		return a == b
+	default:
+		return *a == *b
+	}
+}
 
 // AddImportVisitor returns a visitor that adds `import [alias] "packagePath"`
 // to the visited compilation unit. No-op if the import is already

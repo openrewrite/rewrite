@@ -108,21 +108,49 @@ export class RewriteRpc {
             }
         )
 
+        // Clears local caches. Captured here so it can close over the
+        // constructor-local `preparedRecipes` while still being callable
+        // from the public `reset()` method on the class.
+        const clearLocalState = () => {
+            this.localObjects.clear();
+            this.localObjectIds.clear();
+            this.remoteObjects.clear();
+            this.remoteRefs.clear();
+            this.localRefs.clear();
+            preparedRecipes.clear();
+            this.remoteLanguages = undefined;
+        };
+        this.clearLocalState = clearLocalState;
+
         this.connection.onRequest(
             new rpc.RequestType0<boolean, Error>("Reset"),
             async () => {
-                this.localObjects.clear();
-                this.localObjectIds.clear();
-                this.remoteObjects.clear();
-                this.remoteRefs.clear();
-                this.localRefs.clear();
-                preparedRecipes.clear();
+                // Inbound Reset only clears local state — never sends a Reset
+                // back to the originator. Mirrors the Java handler in
+                // RewriteRpc.java around line 222.
+                clearLocalState();
                 return true;
             }
         )
 
         RewriteRpc.set(this);
         this.connection.listen();
+    }
+
+    private readonly clearLocalState!: () => void;
+
+    /**
+     * Reset both the remote and local RPC caches. Sends a `Reset` request to the
+     * remote — which clears the remote's state without sending one back — and
+     * then clears local caches. Use this between independent operations (e.g.
+     * between tests) so accumulated objects and prepared recipes don't leak
+     * across boundaries.
+     */
+    async reset(): Promise<void> {
+        await this.connection.sendRequest(
+            new rpc.RequestType0<boolean, Error>("Reset"),
+        );
+        this.clearLocalState();
     }
 
     static set(value: RewriteRpc) {

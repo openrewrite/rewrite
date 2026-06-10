@@ -84,6 +84,40 @@ export class JavaScriptTypeMapping {
     }
 
     /**
+     * Resolve the type of a decorator from the symbol it references, naming it by the decorator's
+     * fully qualified name (e.g. `typeorm.Entity`) rather than the generic function type of the
+     * decorator factory. Decorators are the JavaScript/TypeScript analogue of Java annotations, so
+     * — like {@code J.Annotation} in the Java LST — they are typed as a {@link Type.FullyQualified}
+     * with {@code classKind = Annotation}, which lets recipes match them by fully qualified name.
+     *
+     * @param node the identifier or qualified name naming the decorator (e.g. `Entity` in `@Entity()`)
+     */
+    annotationType(node: ts.Node): Type.FullyQualified | undefined {
+        const symbol = this.checker.getSymbolAtLocation(node);
+        if (!symbol) {
+            return undefined;
+        }
+        const fullyQualifiedName = this.getFullyQualifiedNameFromSymbol(symbol);
+        if (!fullyQualifiedName || fullyQualifiedName === 'unknown') {
+            return undefined;
+        }
+        return {
+            kind: Type.Kind.Class,
+            flags: 0,
+            classKind: Type.Class.Kind.Annotation,
+            fullyQualifiedName,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        } as Type.Class;
+    }
+
+    /**
      * Resolve the declared type of a class / interface / enum / class-expression.
      *
      * Using {@code getTypeAtLocation} on these declaration nodes is unsafe: TypeScript returns
@@ -170,6 +204,49 @@ export class JavaScriptTypeMapping {
             const intrinsicName = (type as any).intrinsicName;
             if (intrinsicName === 'error') {
                 return Type.unknownType;
+            }
+        }
+
+        // A type alias to an intersection or a plain anonymous object (e.g. kafkajs's
+        // `export type Producer = Sender & {...}`, or `export type Consumer = {...}`) loses its name
+        // when TypeScript resolves the structure, leaving an unnamed intersection / `<unknown>`.
+        // TypeScript still records the originating alias via `aliasSymbol`; use it to attribute the
+        // nominal name (e.g. `kafkajs.Producer`) so the type is matchable. Unions keep their
+        // structural Union mapping (recipes rely on it), and mapped / instantiated utility types
+        // (`Partial<T>`, `Record<K, V>`, ...) are intentionally left untouched.
+        if (type.aliasSymbol) {
+            let nameableAlias = !!(type.flags & ts.TypeFlags.Intersection);
+            if (!nameableAlias && (type.flags & ts.TypeFlags.Object)) {
+                const objectFlags = (type as ts.ObjectType).objectFlags;
+                nameableAlias = !!(objectFlags & ts.ObjectFlags.Anonymous) &&
+                    !(objectFlags & ts.ObjectFlags.Mapped) &&
+                    !(objectFlags & ts.ObjectFlags.Instantiated);
+            }
+            if (nameableAlias) {
+                const fullyQualifiedName = this.getFullyQualifiedNameFromSymbol(type.aliasSymbol);
+                if (fullyQualifiedName && fullyQualifiedName !== 'unknown') {
+                    const aliasSignature = this.getSignature(type);
+                    const cached = this.typeCache.get(aliasSignature);
+                    if (cached) {
+                        return cached;
+                    }
+                    const aliasType: Type.Class = {
+                        kind: Type.Kind.Class,
+                        flags: 0,
+                        classKind: Type.Class.Kind.Interface,
+                        fullyQualifiedName,
+                        typeParameters: [],
+                        annotations: [],
+                        interfaces: [],
+                        members: [],
+                        methods: [],
+                        toJSON: function () {
+                            return Type.signature(this);
+                        }
+                    } as Type.Class;
+                    this.typeCache.set(aliasSignature, aliasType);
+                    return aliasType;
+                }
             }
         }
 
@@ -627,22 +704,36 @@ export class JavaScriptTypeMapping {
             return undefined;
         }
 
-        // Remove @types/ prefix and decode DefinitelyTyped scoped package encoding
-        // DefinitelyTyped encodes scoped packages using __ instead of /
-        // Example: @types/testing-library__react -> @testing-library/react
-        if (moduleName.startsWith('@types/')) {
-            moduleName = moduleName.substring('@types/'.length);
-            // Decode __ encoding for scoped packages
-            // testing-library__react -> @testing-library/react
-            if (moduleName.includes('__')) {
-                const parts = moduleName.split('__');
+        return this.normalizePackageName(moduleName);
+    }
+
+    /**
+     * Normalize a node_modules package name to the specifier consumers actually import.
+     *
+     * DefinitelyTyped packages (`@types/<pkg>`) are never importable under that name — the
+     * importable specifier is `<pkg>`, with DefinitelyTyped's `__` scoped-package encoding
+     * decoded back to a `@scope/name` form. Using the importable specifier keeps attributed
+     * fully qualified names consistent regardless of whether a type is reached through a direct
+     * import (which already resolves via the module specifier) or transitively (e.g. a call's
+     * return type), which falls back to the declaration file's `node_modules` path.
+     *
+     * Examples:
+     * - `@types/express-serve-static-core` -> `express-serve-static-core`
+     * - `@types/node`                      -> `node`
+     * - `@types/testing-library__react`    -> `@testing-library/react`
+     */
+    private normalizePackageName(packageName: string): string {
+        if (packageName.startsWith('@types/')) {
+            packageName = packageName.substring('@types/'.length);
+            // Decode __ encoding for scoped packages: testing-library__react -> @testing-library/react
+            if (packageName.includes('__')) {
+                const parts = packageName.split('__');
                 if (parts.length === 2) {
-                    moduleName = `@${parts[0]}/${parts[1]}`;
+                    packageName = `@${parts[0]}/${parts[1]}`;
                 }
             }
         }
-
-        return moduleName;
+        return packageName;
     }
 
     /**
@@ -1144,6 +1235,11 @@ export class JavaScriptTypeMapping {
                     packageName = `${packageName}/${pathParts[1]}`;
                 }
 
+                // Normalize `@types/<pkg>` to the importable specifier `<pkg>` so that types
+                // reached transitively (e.g. a call's return type, resolved via the declaration
+                // file's node_modules path) match the names used for directly imported types.
+                packageName = this.normalizePackageName(packageName);
+
                 // Find the symbol name (everything after the last dot in the original cleaned name)
                 const lastDotIndex = cleanedName.lastIndexOf('.');
                 if (lastDotIndex > 0) {
@@ -1161,11 +1257,66 @@ export class JavaScriptTypeMapping {
             if (this.sourceRoot) {
                 cleanedName = path.relative(this.sourceRoot, cleanedName);
             }
+        } else if (!cleanedName.includes('.') &&
+            (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum))) {
+            // Bare class/interface/enum name whose declaring package was dropped (e.g. `Logger`
+            // from a package that does `export = Logger`). TypeScript's getFullyQualifiedName drops
+            // the package here because the symbol has no `parent`, so the package would otherwise be
+            // lost. Recover it from the symbol's declaration file — but only for genuine module
+            // exports from node_modules. Excluded by construction:
+            //  - namespace/module objects (e.g. the `React` namespace), whose bare name is intentional
+            //    and which are not Class/Interface/Enum symbols;
+            //  - local declarations (extractModuleNameFromPath returns undefined);
+            //  - ambient globals (which are `global.`-qualified, hence not bare).
+            const declarationFile = symbol.declarations?.[0]?.getSourceFile();
+            if (declarationFile && ts.isExternalModule(declarationFile)) {
+                const packageName = this.extractModuleNameFromPath(declarationFile.fileName);
+                if (packageName) {
+                    cleanedName = `${packageName}.${cleanedName}`;
+                }
+            }
+        } else if (cleanedName.includes('.')) {
+            // Namespace-qualified name such as `Bull.Queue` or `request.SuperAgentStatic`, where
+            // the leading segment is the package's internal `export =` namespace rather than the
+            // importable package name. Replace it with the declaring package so the FQN identifies
+            // the package the type actually comes from.
+            //
+            // Preserved as-is:
+            //  - UMD globals (`export as namespace X`, e.g. React, lodash `_`, jQuery `$`): the
+            //    namespace name is the conventional public identifier;
+            //  - `global.*` (TypeScript's marker for ambient globals);
+            //  - namespaces that already match the package name, and any non-node_modules type.
+            const namespaceName = cleanedName.substring(0, cleanedName.indexOf('.'));
+            if (namespaceName !== 'global') {
+                const declarationFile = symbol.declarations?.[0]?.getSourceFile();
+                if (declarationFile && ts.isExternalModule(declarationFile)) {
+                    const packageName = this.extractModuleNameFromPath(declarationFile.fileName);
+                    if (packageName && packageName !== namespaceName &&
+                        !this.isUmdGlobalNamespace(declarationFile, namespaceName)) {
+                        cleanedName = packageName + cleanedName.substring(cleanedName.indexOf('.'));
+                    }
+                }
+            }
         }
 
         return cleanedName.endsWith('Constructor') ?
             cleanedName.substring(0, cleanedName.length - 'Constructor'.length) :
             cleanedName;
+    }
+
+    /**
+     * Whether {@code namespaceName} is exposed as a UMD global from the given declaration file
+     * (e.g. `export as namespace React`). The namespace name of a UMD global is the conventional
+     * public identifier (React, lodash `_`, jQuery `$`) and must be preserved rather than replaced
+     * with the package name.
+     */
+    private isUmdGlobalNamespace(sourceFile: ts.SourceFile, namespaceName: string): boolean {
+        for (const statement of sourceFile.statements) {
+            if (ts.isNamespaceExportDeclaration(statement) && statement.name.text === namespaceName) {
+                return true;
+            }
+        }
+        return false;
     }
 
 

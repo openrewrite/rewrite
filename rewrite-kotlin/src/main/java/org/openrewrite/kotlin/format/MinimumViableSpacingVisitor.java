@@ -314,7 +314,11 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
         J firstEnclosing = getCursor().getParentOrThrow().firstEnclosing(J.class);
         if (!v.getVariables().isEmpty() && !(firstEnclosing instanceof J.Lambda)) {
             boolean extension = v.getMarkers().findFirst(Extension.class).isPresent();
-            if (v.getVariables().get(0).getPrefix().getWhitespace().isEmpty() && !v.getModifiers().isEmpty() && !extension) {
+            // A space is required before the variable name when it is preceded by a modifier or a leading
+            // annotation. In Kotlin the annotation sits next to the name (e.g. `@Valid name`), so without this
+            // an added annotation would be glued onto the name as `@Validname`.
+            if (v.getVariables().get(0).getPrefix().getWhitespace().isEmpty() &&
+                    (!v.getModifiers().isEmpty() || !first) && !extension) {
                 v = v.withVariables(ListUtils.mapFirst(v.getVariables(), v0 -> v0.withName(spaceBefore(v0.getName(), true))));
             }
         }

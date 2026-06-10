@@ -19,9 +19,11 @@ import org.junit.jupiter.api.Test;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,6 +31,8 @@ import java.util.concurrent.TimeUnit;
 
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class RewriteRpcProcessTest {
 
@@ -140,6 +144,26 @@ class RewriteRpcProcessTest {
                 Files.deleteIfExists(log);
             }
         }
+    }
+
+    /**
+     * If the subprocess binary cannot be exec'd (e.g. missing from PATH), the spawn thread
+     * dies with an {@link java.io.IOException} but {@code start()} previously busy-waited
+     * on {@code process != null} forever — see the Moderne CLI hang when {@code rewrite-go-rpc}
+     * is not installed. {@code start()} must observe the dead spawn thread and surface the
+     * failure instead of hanging.
+     */
+    @Test
+    void startFailsFastWhenBinaryMissing() {
+        // given: a command pointing at a binary that does not exist anywhere
+        String missing = "definitely-no-such-binary-7a3f9e2c";
+        RewriteRpcProcess process = new RewriteRpcProcess(missing);
+
+        // when / then: start() must surface the failure within a bounded time, not hang
+        assertTimeoutPreemptively(Duration.ofSeconds(5), () ->
+                assertThatThrownBy(process::start)
+                        .isInstanceOf(UncheckedIOException.class)
+                        .hasMessageContaining(missing));
     }
 
     /**

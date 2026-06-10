@@ -23,6 +23,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -58,10 +59,6 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         }
 
         String signature = signatureBuilder.signature(type);
-        JavaType existing = typeFactory.get(signature);
-        if (existing != null) {
-            return existing;
-        }
 
         if (type instanceof Class) {
             Class<?> clazz = (Class<?>) type;
@@ -86,20 +83,26 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType.Array array(Class<?> clazz, String signature) {
-        return typeFactory.computeArray(signature, clazz, arr ->
-                arr.unsafeSet(type(clazz.getComponentType()), null));
+        return typeFactory.arrayFor(signature, () -> {
+            JavaType.Array arr = new JavaType.Array(null, null, null);
+            arr.unsafeSet(type(clazz.getComponentType()), null);
+            return arr;
+        });
     }
 
     private JavaType.Array array(GenericArrayType type, String signature) {
-        return typeFactory.computeArray(signature, type, arr ->
-                arr.unsafeSet(type(type.getGenericComponentType()), null));
+        return typeFactory.arrayFor(signature, () -> {
+            JavaType.Array arr = new JavaType.Array(null, null, null);
+            arr.unsafeSet(type(type.getGenericComponentType()), null);
+            return arr;
+        });
     }
 
     private JavaType classType(Class<?> clazz, String signature) {
         JavaType.FullyQualified mappedClazz = classTypeWithoutParameters(clazz);
 
         if (clazz.getTypeParameters().length > 0) {
-            return typeFactory.computeParameterized(signature, clazz, pt -> {
+            return typeFactory.computeParameterized(signature, pt -> {
                 List<JavaType> typeParameters = new ArrayList<>(clazz.getTypeParameters().length);
                 for (TypeVariable<?> typeParameter : clazz.getTypeParameters()) {
                     typeParameters.add(type(typeParameter));
@@ -124,7 +127,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             kind = JavaType.Class.Kind.Class;
         }
 
-        return typeFactory.computeClass(className, className, clazz.getModifiers(), kind, clazz, mappedClazz -> {
+        return typeFactory.computeClass(className, clazz.getModifiers(), kind, mappedClazz -> {
             JavaType.FullyQualified supertype = (JavaType.FullyQualified) (
                     "java.lang.Object".equals(clazz.getName()) ?
                             null :
@@ -198,14 +201,14 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType generic(TypeVariable<?> typeParameter, String signature) {
-        return typeFactory.computeGenericTypeVariable(signature, typeParameter.getName(), INVARIANT, typeParameter, gtv -> {
+        return typeFactory.computeGenericTypeVariable(signature, typeParameter.getName(), INVARIANT, gtv -> {
             List<JavaType> bounds = genericBounds(typeParameter.getBounds());
             gtv.unsafeSet(gtv.getName(), bounds == null ? INVARIANT : COVARIANT, bounds);
         });
     }
 
     private JavaType.GenericTypeVariable generic(WildcardType wildcard, String signature) {
-        return typeFactory.computeGenericTypeVariable(signature, "?", INVARIANT, wildcard, gtv -> {
+        return typeFactory.computeGenericTypeVariable(signature, "?", INVARIANT, gtv -> {
             JavaType.GenericTypeVariable.Variance variance = INVARIANT;
             List<JavaType> bounds = null;
 
@@ -242,7 +245,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     }
 
     private JavaType parameterized(ParameterizedType type, String signature) {
-        return typeFactory.computeParameterized(signature, type, pt -> {
+        return typeFactory.computeParameterized(signature, pt -> {
             List<JavaType> typeParameters = new ArrayList<>(type.getActualTypeArguments().length);
             for (Type actualTypeArgument : type.getActualTypeArguments()) {
                 typeParameters.add(type(actualTypeArgument));
@@ -255,7 +258,9 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
     private JavaType.Variable field(Field field) {
         String signature = signatureBuilder.variableSignature(field);
-        return typeFactory.computeVariable(signature, field.getModifiers(), field.getName(), field, mappedVariable -> {
+        return typeFactory.variableFor(signature, () -> {
+            JavaType.Variable mappedVariable = new JavaType.Variable(
+                    null, field.getModifiers(), field.getName(), null, null, null);
             List<JavaType.FullyQualified> annotations = null;
             if (field.getDeclaredAnnotations().length > 0) {
                 annotations = new ArrayList<>(field.getDeclaredAnnotations().length);
@@ -266,6 +271,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
 
             mappedVariable.unsafeSet(type(field.getDeclaringClass()), type(field.getGenericType()), annotations);
+            return mappedVariable;
         });
     }
 
@@ -282,17 +288,26 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
 
         String[] paramNames = null;
         if (method.getParameters().length > 0) {
-            paramNames = new String[method.getParameters().length];
-            Parameter[] parameters = method.getParameters();
-            for (int i = 0; i < parameters.length; i++) {
-                Parameter p = parameters[i];
+            // Exclude synthetic parameters (e.g. the leading name/ordinal params
+            // of an enum constructor) so parameterNames stays aligned with
+            // parameterTypes below, which also skips synthetic parameters. Sizing
+            // the array to all parameters and filling only the non-synthetic
+            // slots left null holes and a length mismatch between the two lists.
+            List<String> names = new ArrayList<>();
+            for (Parameter p : method.getParameters()) {
                 if (!p.isSynthetic()) {
-                    paramNames[i] = p.getName();
+                    names.add(p.getName());
                 }
             }
+            paramNames = names.isEmpty() ? null : names.toArray(new String[0]);
         }
 
-        return typeFactory.computeMethod(signature, method.getModifiers(), "<constructor>", paramNames, null, null, method, mappedMethod -> {
+        String[] finalParamNames = paramNames;
+        return typeFactory.methodFor(signature,
+                () -> new JavaType.Method(
+                        null, method.getModifiers(), null, "<constructor>",
+                        null, finalParamNames, null, null, null, null, null),
+                mappedMethod -> {
             List<JavaType> thrownExceptions = null;
             if (method.getExceptionTypes().length > 0) {
                 thrownExceptions = new ArrayList<>(method.getExceptionTypes().length);
@@ -393,42 +408,41 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
         }
 
-        return typeFactory.computeMethod(
-                signature,
-                method.getModifiers(),
-                method.getName(),
-                paramNames,
-                defaultValues,
-                declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0]),
-                method,
+        String[] finalParamNames = paramNames;
+        List<String> finalDefaultValues = defaultValues;
+        String[] finalFormalTypeNames = declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0]);
+        return typeFactory.methodFor(signature,
+                () -> new JavaType.Method(
+                        null, method.getModifiers(), null, method.getName(),
+                        null, finalParamNames, null, null, null, finalDefaultValues, finalFormalTypeNames),
                 mappedMethod -> {
-                    List<JavaType> thrownExceptions = null;
-                    if (method.getExceptionTypes().length > 0) {
-                        thrownExceptions = new ArrayList<>(method.getExceptionTypes().length);
-                        for (Type e : method.getGenericExceptionTypes()) {
-                            thrownExceptions.add(type(e));
-                        }
-                    }
+            List<JavaType> thrownExceptions = null;
+            if (method.getExceptionTypes().length > 0) {
+                thrownExceptions = new ArrayList<>(method.getExceptionTypes().length);
+                for (Type e : method.getGenericExceptionTypes()) {
+                    thrownExceptions.add(type(e));
+                }
+            }
 
-                    List<JavaType.FullyQualified> annotations = new ArrayList<>();
-                    if (method.getDeclaredAnnotations().length > 0) {
-                        annotations = new ArrayList<>(method.getDeclaredAnnotations().length);
-                        for (Annotation a : method.getDeclaredAnnotations()) {
-                            JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(a.annotationType());
-                            annotations.add(new JavaType.Annotation(fullyQualified, emptyList()));
-                        }
-                    }
+            List<JavaType.FullyQualified> annotations = new ArrayList<>();
+            if (method.getDeclaredAnnotations().length > 0) {
+                annotations = new ArrayList<>(method.getDeclaredAnnotations().length);
+                for (Annotation a : method.getDeclaredAnnotations()) {
+                    JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(a.annotationType());
+                    annotations.add(new JavaType.Annotation(fullyQualified, emptyList()));
+                }
+            }
 
-                    List<JavaType> parameterTypes = emptyList();
-                    if (method.getParameters().length > 0) {
-                        parameterTypes = new ArrayList<>(method.getParameters().length);
-                        for (Type parameter : method.getGenericParameterTypes()) {
-                            parameterTypes.add(type(parameter));
-                        }
-                    }
+            List<JavaType> parameterTypes = emptyList();
+            if (method.getParameters().length > 0) {
+                parameterTypes = new ArrayList<>(method.getParameters().length);
+                for (Type parameter : method.getGenericParameterTypes()) {
+                    parameterTypes.add(type(parameter));
+                }
+            }
 
-                    JavaType returnType = type(method.getGenericReturnType());
-                    mappedMethod.unsafeSet(declaringType, returnType, parameterTypes, thrownExceptions, annotations);
-                });
+            JavaType returnType = type(method.getGenericReturnType());
+            mappedMethod.unsafeSet(declaringType, returnType, parameterTypes, thrownExceptions, annotations);
+        });
     }
 }

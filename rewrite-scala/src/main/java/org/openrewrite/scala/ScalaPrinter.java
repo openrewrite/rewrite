@@ -31,7 +31,9 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.scala.marker.AsInstanceOfPrefix;
 import org.openrewrite.scala.marker.BlockArgument;
+import org.openrewrite.scala.marker.DottedMatch;
 import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.PackageBraces;
 import org.openrewrite.scala.marker.SObject;
@@ -40,6 +42,7 @@ import org.openrewrite.scala.marker.TypeProjection;
 import org.openrewrite.scala.marker.ScalaForLoop;
 import org.openrewrite.scala.marker.TypeAscription;
 import org.openrewrite.scala.marker.PartialFunctionLiteral;
+import org.openrewrite.scala.marker.ContextFunctionArrow;
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda;
 import org.openrewrite.scala.marker.ValVarKeyword;
 import org.openrewrite.scala.marker.PackageSemicolon;
@@ -270,18 +273,19 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     visit(varDecl.getVariables().get(0).getName(), p);
                 }
                 if (varDecl.getTypeExpression() != null) {
+                    if (varDecl.getVarargs() != null) {
+                        visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
+                    }
                     p.append(":");
                     visit(varDecl.getTypeExpression(), p);
                 }
                 visitSpace(paramPadded.getAfter(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
                 p.append("=>");
-                for (Statement stmt : aCatch.getBody().getStatements()) {
-                    visit(stmt, p);
-                }
+                // Catch case body is a J.Block with OmitBraces — delegate to visitBlock
+                // so the block prefix, inter-statement padding (incl. Semicolon markers),
+                // and end space are all printed correctly.
+                visit(aCatch.getBody(), p);
             }
-            // Close catch block — use end space from last catch body if available
-            J.Try.Catch lastCatch = tryable.getCatches().get(tryable.getCatches().size() - 1);
-            visitSpace(lastCatch.getBody().getEnd(), Space.Location.BLOCK_END, p);
             if (!indentedCatch) {
                 p.append("}");
             }
@@ -301,6 +305,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         JRightPadded<Expression> selector = switch_.getSelector().getPadding().getTree();
         visit(selector.getElement(), p);
         visitSpace(selector.getAfter(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+        if (switch_.getMarkers().findFirst(DottedMatch.class).isPresent()) {
+            p.append(".");
+        }
         p.append("match");
         boolean indented = switch_.getMarkers().findFirst(IndentedSyntax.class).isPresent();
         if (!indented) {
@@ -309,8 +316,15 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
         // Print cases directly (not via visitBlock which adds { })
         J.Block casesBlock = switch_.getCases();
-        for (int i = 0; i < casesBlock.getStatements().size(); i++) {
-            visit(casesBlock.getStatements().get(i), p);
+        List<JRightPadded<Statement>> casePadding = casesBlock.getPadding().getStatements();
+        for (int i = 0; i < casePadding.size(); i++) {
+            JRightPadded<Statement> rp = casePadding.get(i);
+            visit(rp.getElement(), p);
+            visitSpace(rp.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            // Preserve explicit `;` between cases on the same line.
+            if (rp.getMarkers().findFirst(Semicolon.class).isPresent()) {
+                p.append(';');
+            }
         }
         visitSpace(casesBlock.getEnd(), Space.Location.BLOCK_END, p);
         if (!indented) {
@@ -352,17 +366,19 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
         visit(method.getLeadingAnnotations(), p);
         boolean defAlreadyPrinted = false;
+        String defaultKeyword = "def";
         for (J.Modifier m : method.getModifiers()) {
-            if ("def".equals(m.getKeyword()) && m.getType() == J.Modifier.Type.LanguageExtension) {
+            if (m.getType() == J.Modifier.Type.LanguageExtension &&
+                    ("def".equals(m.getKeyword()) || "given".equals(m.getKeyword()))) {
                 visitSpace(m.getPrefix(), Space.Location.MODIFIER_PREFIX, p);
-                p.append("def");
+                p.append(m.getKeyword());
                 defAlreadyPrinted = true;
             } else {
                 visit(m, p);
             }
         }
         if (!defAlreadyPrinted) {
-            p.append("def");
+            p.append(defaultKeyword);
         }
         visit(method.getName(), p);
 
@@ -387,16 +403,24 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 visitSpace(varDecl.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
                 // Print parameter annotations (@unchecked, etc.)
                 visit(varDecl.getLeadingAnnotations(), p);
-                // Print parameter modifiers (e.g., implicit)
+                // Print parameter modifiers (e.g., implicit, using)
                 visit(varDecl.getModifiers(), p);
-                if (!varDecl.getVariables().isEmpty()) {
+                boolean omitParamName = !varDecl.getVariables().isEmpty() &&
+                    varDecl.getVariables().get(0).getMarkers().findFirst(
+                        org.openrewrite.scala.marker.OmitName.class).isPresent();
+                if (!omitParamName && !varDecl.getVariables().isEmpty()) {
                     visit(varDecl.getVariables().get(0).getName(), p);
                 }
                 if (varDecl.getTypeExpression() != null) {
                     // The colon and space between name and type in Scala parameter syntax
                     // Type prefix from parser may or may not include the space
                     TypeTree typeExpr = varDecl.getTypeExpression();
-                    p.append(":");
+                    if (varDecl.getVarargs() != null) {
+                        visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
+                    }
+                    if (!omitParamName) {
+                        p.append(":");
+                    }
                     visit(typeExpr, p);
                 }
                 if (!varDecl.getVariables().isEmpty() &&
@@ -460,8 +484,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 boolean procedureSyntax = method.getMarkers().findFirst(
                         org.openrewrite.scala.marker.OmitBraces.class).isPresent();
                 if (!procedureSyntax) {
-                    Space beforeEquals = actualBody instanceof J.Block ?
-                            ((J.Block) actualBody).getPrefix() : Space.SINGLE_SPACE;
+                    final J finalActualBody = actualBody;
+                    Space beforeEquals = method.getMarkers()
+                            .findFirst(org.openrewrite.scala.marker.MethodBodyEqualsPrefix.class)
+                            .map(org.openrewrite.scala.marker.MethodBodyEqualsPrefix::getPrefix)
+                            .orElseGet(() -> finalActualBody instanceof J.Block ?
+                                    ((J.Block) finalActualBody).getPrefix() : Space.SINGLE_SPACE);
                     visitSpace(beforeEquals, Space.Location.BLOCK_PREFIX, p);
                     p.append("=");
                 }
@@ -487,7 +515,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             boolean omitBodyBraces = body.getMarkers().findFirst(
                     org.openrewrite.scala.marker.OmitBraces.class).isPresent();
             if (!procedureSyntax) {
-                visitSpace(body.getPrefix(), Space.Location.BLOCK_PREFIX, p);
+                Space beforeEquals = method.getMarkers()
+                        .findFirst(org.openrewrite.scala.marker.MethodBodyEqualsPrefix.class)
+                        .map(org.openrewrite.scala.marker.MethodBodyEqualsPrefix::getPrefix)
+                        .orElse(body.getPrefix());
+                visitSpace(beforeEquals, Space.Location.BLOCK_PREFIX, p);
                 p.append("=");
             }
             if (omitBodyBraces && body.getStatements().size() == 1) {
@@ -521,6 +553,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
      * Print a J.Lambda.Parameters as a curried parameter list: (param1, param2)
      */
     private void printLambdaParamsAsCurried(J.Lambda.Parameters lambdaParams, PrintOutputCapture<P> p) {
+        visitSpace(lambdaParams.getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p);
         if (lambdaParams.isParenthesized()) {
             p.append('(');
         }
@@ -533,13 +566,28 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 visitSpace(vd.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
                 visit(vd.getLeadingAnnotations(), p);
                 visit(vd.getModifiers(), p);
-                if (!vd.getVariables().isEmpty()) {
+                boolean omitName = !vd.getVariables().isEmpty() && vd.getVariables().get(0).getMarkers().findFirst(
+                        org.openrewrite.scala.marker.OmitName.class).isPresent();
+                if (!omitName && !vd.getVariables().isEmpty()) {
                     visit(vd.getVariables().get(0).getName(), p);
                 }
                 if (vd.getTypeExpression() != null) {
                     TypeTree te = vd.getTypeExpression();
-                    p.append(":");
+                    if (vd.getVarargs() != null) {
+                        visitSpace(vd.getVarargs(), Space.Location.VARARGS, p);
+                    }
+                    if (!omitName) {
+                        p.append(":");
+                    }
                     visit(te, p);
+                }
+                if (!vd.getVariables().isEmpty()) {
+                    JLeftPadded<Expression> init = vd.getVariables().get(0).getPadding().getInitializer();
+                    if (init != null) {
+                        visitSpace(init.getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
+                        p.append('=');
+                        visit(init.getElement(), p);
+                    }
                 }
             } else {
                 visit(elem, p);
@@ -574,20 +622,42 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitTypeAlias((S.TypeAlias) tree, p);
         } else if (tree instanceof S.Export) {
             return visitExport((S.Export) tree, p);
+        } else if (tree instanceof S.Import) {
+            return visitSImport((S.Import) tree, p);
+        } else if (tree instanceof S.ImportSelector) {
+            return visitImportSelector((S.ImportSelector) tree, p);
         } else if (tree instanceof S.PatternDefinition) {
             return visitPatternDefinition((S.PatternDefinition) tree, p);
+        } else if (tree instanceof S.AnonymousGiven) {
+            return visitAnonymousGiven((S.AnonymousGiven) tree, p);
         } else if (tree instanceof S.FunctionCall) {
             return visitFunctionCall((S.FunctionCall) tree, p);
         } else if (tree instanceof S.SingletonType) {
             return visitSingletonType((S.SingletonType) tree, p);
+        } else if (tree instanceof S.RepeatedType) {
+            return visitRepeatedType((S.RepeatedType) tree, p);
+        } else if (tree instanceof S.SplatExpression) {
+            return visitSplatExpression((S.SplatExpression) tree, p);
+        } else if (tree instanceof S.XmlLiteral) {
+            return visitXmlLiteral((S.XmlLiteral) tree, p);
         } else if (tree instanceof S.Alternative) {
             return visitAlternative((S.Alternative) tree, p);
+        } else if (tree instanceof S.InterpolatedString) {
+            return visitInterpolatedString((S.InterpolatedString) tree, p);
+        } else if (tree instanceof S.Interpolation) {
+            return visitInterpolation((S.Interpolation) tree, p);
+        } else if (tree instanceof S.Binding) {
+            return visitBinding((S.Binding) tree, p);
         } else if (tree instanceof S.QualifiedSuper) {
             return visitQualifiedSuper((S.QualifiedSuper) tree, p);
         } else if (tree instanceof S.AnnotatedExpression) {
             return visitAnnotatedExpression((S.AnnotatedExpression) tree, p);
         } else if (tree instanceof S.RefinedType) {
             return visitRefinedType((S.RefinedType) tree, p);
+        } else if (tree instanceof S.FunctionType) {
+            return visitFunctionType((S.FunctionType) tree, p);
+        } else if (tree instanceof S.TupleType) {
+            return visitTupleType((S.TupleType) tree, p);
         } else if (tree instanceof S.Macro) {
             return visitMacro((S.Macro) tree, p);
         } else if (tree instanceof S.ExtensionMethods) {
@@ -606,28 +676,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         if (scu.getPackageDeclaration() != null) {
             visit(scu.getPackageDeclaration(), p);
             boolean packageEndsWithSemicolon = scu.getPackageDeclaration().getMarkers().findFirst(PackageSemicolon.class).isPresent();
-            // In Scala, package declarations are followed by a newline
-            // Check if the next element has a newline in its prefix, if not add one
-            if (!packageEndsWithSemicolon && !scu.getImports().isEmpty()) {
-                J.Import firstImport = scu.getImports().get(0);
-                String firstImportPrefix = firstImport.getPrefix().getWhitespace();
-                if (!firstImportPrefix.startsWith("\n") && !firstImportPrefix.startsWith(";")) {
-                    p.append("\n");
-                }
-            } else if (!packageEndsWithSemicolon && !scu.getStatements().isEmpty()) {
+            if (!packageEndsWithSemicolon && !scu.getStatements().isEmpty()) {
                 Statement firstStatement = scu.getStatements().get(0);
                 String firstStatementPrefix = firstStatement.getPrefix().getWhitespace();
                 if (!firstStatementPrefix.startsWith("\n") && !firstStatementPrefix.startsWith(";")) {
                     p.append("\n");
                 }
-            }
-        }
-
-        for (J.Import anImport : scu.getImports()) {
-            visit(anImport, p);
-            // Scala imports don't end with semicolons but need newlines between them
-            if (!anImport.getPrefix().getWhitespace().isEmpty() || scu.getImports().indexOf(anImport) < scu.getImports().size() - 1) {
-                // Already has whitespace or not the last import
             }
         }
 
@@ -673,8 +727,16 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     @Override
     public J visitImport(J.Import import_, PrintOutputCapture<P> p) {
         beforeSyntax(import_, Space.Location.IMPORT_PREFIX, p);
-        p.append("import ");
-        
+        // For the continuation in a comma-separated import (e.g. the second
+        // `b._` in `import a._, b._`), the parser emits a `J.Import` with a
+        // CommaContinuation marker. The prefix carries any whitespace before
+        // the `,`; the qualifier's prefix carries whitespace after.
+        if (import_.getMarkers().findFirst(org.openrewrite.scala.marker.CommaContinuation.class).isPresent()) {
+            p.append(',');
+        } else {
+            p.append("import ");
+        }
+
         // Visit the import expression
         // Wildcard imports: Scala 2 uses `._`, Scala 3 uses `.*`
         // The name field preserves which was used in source.
@@ -693,12 +755,19 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     }
     
     private boolean isSyntheticPredefChain(J.FieldAccess fa) {
-        // Detect _root_.scala.Predef.??? chains added by compiler for procedure syntax
-        if ("???".equals(fa.getSimpleName()) || "$qmark$qmark$qmark".equals(fa.getSimpleName())) {
-            return true;
+        // Detect compiler-synthetic _root_.scala.Predef.??? chains from procedure-syntax
+        // desugaring. Require both the `???` leaf and the `_root_` root so that real
+        // user-written `_root_.foo.bar` imports/qualifiers aren't suppressed.
+        String leaf = fa.getSimpleName();
+        if (!"???".equals(leaf) && !"$qmark$qmark$qmark".equals(leaf)) {
+            return false;
         }
+        return chainStartsAtRoot(fa);
+    }
+
+    private boolean chainStartsAtRoot(J.FieldAccess fa) {
         if (fa.getTarget() instanceof J.FieldAccess) {
-            return isSyntheticPredefChain((J.FieldAccess) fa.getTarget());
+            return chainStartsAtRoot((J.FieldAccess) fa.getTarget());
         }
         if (fa.getTarget() instanceof J.Identifier) {
             return "_root_".equals(((J.Identifier) fa.getTarget()).getSimpleName());
@@ -708,7 +777,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     private boolean isWildcardImport(J.FieldAccess qualid) {
         J.Identifier name = qualid.getName();
-        return "*".equals(name.getSimpleName()) || "_".equals(name.getSimpleName());
+        String n = name.getSimpleName();
+        // Scala 2 (`._`), Scala 3 (`.*`), and the Scala 3 given form (`.given`) are all
+        // wildcard-style selectors. Printing routes through the wildcard path so the
+        // selector name (preserved verbatim by the parser) is appended as-is.
+        return "*".equals(n) || "_".equals(n) || "given".equals(n);
     }
     
     private void visitFieldAccessUpToWildcard(J.FieldAccess qualid, PrintOutputCapture<P> p) {
@@ -735,9 +808,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             needsScalaHandling = true;
         }
         
-        // Or if we have a primary constructor with actual parameters
-        if (classDecl.getPadding().getPrimaryConstructor() != null && 
-            !classDecl.getPadding().getPrimaryConstructor().getElements().isEmpty()) {
+        // Or if we have a primary constructor at all — Scala distinguishes
+        // `class Foo`, `class Foo()`, and `class Foo(x)` via container presence,
+        // emptiness, and an OmitParentheses marker on the container.
+        if (classDecl.getPadding().getPrimaryConstructor() != null) {
             needsScalaHandling = true;
         }
         
@@ -797,7 +871,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             // J.VariableDeclarations modeled like a Scala parameter (no implicit val/var,
             // type comes after the name with `:`). We can't fall through to visitVariableDeclarations
             // because that one is for field/local declarations and always emits a val/var keyword.
-            if (classDecl.getPadding().getPrimaryConstructor() != null) {
+            if (classDecl.getPadding().getPrimaryConstructor() != null &&
+                !classDecl.getPadding().getPrimaryConstructor().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
                 JContainer<Statement> primaryConstructor = classDecl.getPadding().getPrimaryConstructor();
                 visitSpace(primaryConstructor.getBefore(), Space.Location.RECORD_STATE_VECTOR, p);
                 p.append('(');
@@ -814,12 +889,20 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                         for (J.Modifier m : varDecl.getModifiers()) {
                             visit(m, p);
                         }
-                        if (!varDecl.getVariables().isEmpty()) {
+                        boolean omitParamName = !varDecl.getVariables().isEmpty() &&
+                            varDecl.getVariables().get(0).getMarkers().findFirst(
+                                org.openrewrite.scala.marker.OmitName.class).isPresent();
+                        if (!omitParamName && !varDecl.getVariables().isEmpty()) {
                             visit(varDecl.getVariables().get(0).getName(), p);
                         }
                         if (varDecl.getTypeExpression() != null) {
                             TypeTree typeExpr = varDecl.getTypeExpression();
-                            p.append(":");
+                            if (varDecl.getVarargs() != null) {
+                                visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
+                            }
+                            if (!omitParamName) {
+                                p.append(":");
+                            }
                             visit(typeExpr, p);
                         }
                         if (!varDecl.getVariables().isEmpty() &&
@@ -836,8 +919,13 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     }
                 }
                 p.append(')');
+                // Re-emit any additional curried constructor param lists captured verbatim
+                // from source (e.g. `(using Executor)`).
+                primaryConstructor.getMarkers()
+                    .findFirst(org.openrewrite.scala.marker.ExtraConstructorParamLists.class)
+                    .ifPresent(m -> p.append(m.text()));
             }
-            
+
             if (classDecl.getPadding().getExtends() != null) {
                 visitSpace(classDecl.getPadding().getExtends().getBefore(), Space.Location.EXTENDS, p);
                 p.append("extends");
@@ -887,49 +975,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             afterSyntax(classDecl, p);
             return classDecl;
         } else {
-            // For classes without Scala features, use Java printing but skip empty primary constructors
-            // The Java printer would print empty parentheses for primary constructors
-            if (classDecl.getPadding().getPrimaryConstructor() != null && 
-                classDecl.getPadding().getPrimaryConstructor().getElements().isEmpty()) {
-                // We have an empty primary constructor that shouldn't be printed
-                // Use the default Java printer logic but without the primary constructor
-                beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
-                visit(classDecl.getLeadingAnnotations(), p);
-                for (J.Modifier m : classDecl.getModifiers()) {
-                    visit(m, p);
-                }
-                visit(classDecl.getPadding().getKind().getAnnotations(), p);
-                visitSpace(classDecl.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
-                // For Scala, print "trait" for Interface kind
-                String classKind = classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface ? 
-                    "trait" : classDecl.getKind().name().toLowerCase();
-                p.append(classKind);
-                visit(classDecl.getName(), p);
-                // Use our custom type parameter printing for Scala
-                visitTypeParameters(classDecl.getPadding().getTypeParameters(), p);
-                // Skip the empty primary constructor
-                
-                if (classDecl.getPadding().getExtends() != null) {
-                    visitSpace(classDecl.getPadding().getExtends().getBefore(), Space.Location.EXTENDS, p);
-                    p.append("extends");
-                    visit(classDecl.getPadding().getExtends().getElement(), p);
-                }
-
-                if (classDecl.getPadding().getImplements() != null) {
-                    visitContainer(" implements", classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", "", p);
-                }
-
-                if (classDecl.getPadding().getPermits() != null) {
-                    visitContainer(" permits", classDecl.getPadding().getPermits(), JContainer.Location.PERMITS, ",", "", p);
-                }
-
-                visit(classDecl.getBody(), p);
-                afterSyntax(classDecl, p);
-                return classDecl;
-            } else {
-                // Use the default Java printing
-                return super.visitClassDeclaration(classDecl, p);
-            }
+            // No Scala-specific structure (no primary constructor, no object/trait/with/type-params).
+            // Fall through to default Java printing.
+            return super.visitClassDeclaration(classDecl, p);
         }
     }
     
@@ -1031,6 +1079,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitTypeAscription(S.TypeAscription typeAscription, PrintOutputCapture<P> p) {
         beforeSyntax(typeAscription, Space.Location.LANGUAGE_EXTENSION, p);
         visit(typeAscription.getExpression(), p);
+        typeAscription.getMarkers()
+                .findFirst(org.openrewrite.scala.marker.TypeAscriptionColonPrefix.class)
+                .ifPresent(m -> visitSpace(m.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         p.append(':');
         visit(typeAscription.getTypeTree(), p);
         afterSyntax(typeAscription, p);
@@ -1046,6 +1097,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             for (Expression arg : fc.getArguments()) {
                 visit(arg, p);
             }
+        } else if (fc.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
+            // Colon-indented arg list: `foo(x):\n  ...`. The arg's prefix carries the indent.
+            p.append(':');
+            for (Expression arg : fc.getArguments()) {
+                visit(arg, p);
+            }
         } else {
             visitContainer("(", fc.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
         }
@@ -1058,6 +1115,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         // asInstanceOf handling
         beforeSyntax(typeCast, Space.Location.TYPE_CAST_PREFIX, p);
         visit(typeCast.getExpression(), p);
+        Optional<AsInstanceOfPrefix> asInstanceOfPrefix = typeCast.getMarkers().findFirst(AsInstanceOfPrefix.class);
+        if (asInstanceOfPrefix.isPresent()) {
+            visitSpace(asInstanceOfPrefix.get().getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
+        }
         p.append(".asInstanceOf");
         if (typeCast.getClazz() instanceof J.ControlParentheses) {
             J.ControlParentheses<?> controlParens = (J.ControlParentheses<?>) typeCast.getClazz();
@@ -1080,19 +1141,23 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             org.openrewrite.scala.marker.LambdaParameter.class).isPresent();
 
         // Print modifiers, but handle Final specially since Scala uses val/var.
-        // The implicit Final modifier (keyword=null) marks val; (keyword="given") marks given.
-        // Its prefix carries the source whitespace between the last visible modifier (or annotations)
-        // and the val/given keyword.
+        // The implicit Final modifier (keyword=null) marks val (or given, when a Given marker
+        // is present on the declaration). Its prefix carries the source whitespace between the
+        // last visible modifier (or annotations) and the val/given keyword.
         // An explicit "final" modifier prints normally.
+        boolean isGiven = multiVariable.getMarkers().findFirst(
+            org.openrewrite.scala.marker.Given.class).isPresent();
         boolean hasVisibleModifier = false;
-        String valVarKeyword = "var";
+        String valVarKeyword = isGiven ? "given" : "var";
         Space valVarPrefix = null;
         Optional<ValVarKeyword> valVarKeywordMarker = multiVariable.getMarkers().findFirst(ValVarKeyword.class);
         boolean annotationGapBridged = false;
         for (J.Modifier m : multiVariable.getModifiers()) {
             if (m.getType() == J.Modifier.Type.Final && !"final".equals(m.getKeyword())) {
                 // Implicit Final marking val/given — capture prefix, don't visit.
-                valVarKeyword = "given".equals(m.getKeyword()) ? "given" : "val";
+                if (!isGiven) {
+                    valVarKeyword = "val";
+                }
                 valVarPrefix = m.getPrefix();
             } else {
                 if (m.getType() == J.Modifier.Type.Final && "final".equals(m.getKeyword())) {
@@ -1135,9 +1200,14 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     @Override
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, PrintOutputCapture<P> p) {
         beforeSyntax(variable, Space.Location.VARIABLE_PREFIX, p);
-        
-        // Print the variable name
-        visit(variable.getName(), p);
+
+        // Print the variable name unless it's a synthesized name suppressed by OmitName
+        // (e.g. anonymous `using` parameters: `def f(using Ord[T])`).
+        boolean omitName = variable.getMarkers().findFirst(
+            org.openrewrite.scala.marker.OmitName.class).isPresent();
+        if (!omitName) {
+            visit(variable.getName(), p);
+        }
 
         // In Scala, type annotation comes after the name
         J.VariableDeclarations parent = getCursor().getParentOrThrow().getValue();
@@ -1147,16 +1217,19 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             if (parent.getVarargs() != null) {
                 visitSpace(parent.getVarargs(), Space.Location.VARARGS, p);
             }
-            p.append(":");
+            // Skip the colon when the name is omitted (anonymous `using` param).
+            if (!omitName) {
+                p.append(":");
+            }
             visit(parent.getTypeExpression(), p);
-            
+
             // If there's an initializer, use visitLeftPadded to handle it properly
             visitLeftPadded("=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
         } else {
             // No type annotation, handle initializer normally
             visitLeftPadded("=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
         }
-        
+
         afterSyntax(variable, p);
         return variable;
     }
@@ -1168,10 +1241,30 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visitRightPadded(newClass.getPadding().getEnclosing(), JRightPadded.Location.NEW_CLASS_ENCLOSING, ".", p);
         }
         p.append("new");
-        visit(newClass.getClazz(), p);
-        // In Scala, constructors can be called without parentheses
-        if (newClass.getPadding().getArguments() != null) {
-            visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+        if (newClass.getClazz() instanceof J.IntersectionType && newClass.getPadding().getArguments() != null) {
+            J.IntersectionType intersectionType = (J.IntersectionType) newClass.getClazz();
+            beforeSyntax(intersectionType, Space.Location.INTERSECTION_TYPE_PREFIX, p);
+            visitSpace(intersectionType.getPadding().getBounds().getBefore(), Space.Location.TYPE_BOUNDS, p);
+
+            List<JRightPadded<TypeTree>> bounds = intersectionType.getPadding().getBounds().getPadding().getElements();
+            if (!bounds.isEmpty()) {
+                JRightPadded<TypeTree> first = bounds.get(0);
+                visit(first.getElement(), p);
+                visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+                for (int i = 1; i < bounds.size(); i++) {
+                    visitSpace(bounds.get(i - 1).getAfter(), Space.Location.TYPE_BOUND_SUFFIX, p);
+                    p.append("with");
+                    JRightPadded<TypeTree> bound = bounds.get(i);
+                    visit(bound.getElement(), p);
+                }
+            }
+            afterSyntax(intersectionType, p);
+        } else {
+            visit(newClass.getClazz(), p);
+            // In Scala, constructors can be called without parentheses
+            if (newClass.getPadding().getArguments() != null) {
+                visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+            }
         }
         visit(newClass.getBody(), p);
         afterSyntax(newClass, p);
@@ -1278,6 +1371,38 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     
     @Override
     public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
+        // Colon-indented argument: `f: arg`, `obj.method: arg`, or `obj.method[T]: arg`.
+        // The arg's prefix carries the indent; we emit `:` in place of `(...)`.
+        if (method.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
+            beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
+
+            if (method.getMarkers().findFirst(org.openrewrite.scala.marker.FunctionApplication.class).isPresent()) {
+                // Function application: `f: arg` — skip the `.apply` name
+                visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
+            } else {
+                if (method.getPadding().getSelect() != null) {
+                    visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, ".", p);
+                }
+                visit(method.getName(), p);
+            }
+
+            if (method.getTypeParameters() != null && !method.getTypeParameters().isEmpty()) {
+                visitContainer("[", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", "]", p);
+            }
+
+            JContainer<Expression> colonArgs = method.getPadding().getArguments();
+            if (colonArgs != null) {
+                visitSpace(colonArgs.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
+                p.append(':');
+                for (Expression arg : method.getArguments()) {
+                    visit(arg, p);
+                }
+            }
+
+            afterSyntax(method, p);
+            return method;
+        }
+
         // Check block argument BEFORE function application — when both are present
         // (e.g. `Seq { 1 }`), the block-arg path should win.
         if (method.getMarkers().findFirst(BlockArgument.class).isPresent()) {
@@ -1293,6 +1418,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, ".", p);
                 }
                 visit(method.getName(), p);
+            }
+
+            // Type arguments: `intercept[T] { ... }` or `list.foreach[T] { ... }`
+            if (method.getTypeParameters() != null && !method.getTypeParameters().isEmpty()) {
+                visitContainer("[", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", "]", p);
             }
 
             // Print the block argument — it's typically an S.StatementExpression(J.Block)
@@ -1408,16 +1538,22 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return lambda;
         }
 
-        // Partial-function literal `{ case pat => ... }` — the body is a J.Block of J.Case.
+        // Partial-function literal: brace form `{ case pat => ... }` or indented form
+        // (after a colon-arg call) where braces are absent.
         if (lambda.getMarkers().findFirst(PartialFunctionLiteral.class).isPresent() &&
                 lambda.getBody() instanceof J.Block) {
+            boolean indented = lambda.getMarkers().findFirst(IndentedSyntax.class).isPresent();
             J.Block cases = (J.Block) lambda.getBody();
-            p.append('{');
+            if (!indented) {
+                p.append('{');
+            }
             for (Statement caseStmt : cases.getStatements()) {
                 visit(caseStmt, p);
             }
             visitSpace(cases.getEnd(), Space.Location.BLOCK_END, p);
-            p.append('}');
+            if (!indented) {
+                p.append('}');
+            }
             afterSyntax(lambda, p);
             return lambda;
         }
@@ -1438,11 +1574,15 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         
         // Print arrow with spacing
         visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
-        p.append("=>");
-        
+        if (lambda.getMarkers().findFirst(ContextFunctionArrow.class).isPresent()) {
+            p.append("?=>");
+        } else {
+            p.append("=>");
+        }
+
         // Print lambda body
         visit(lambda.getBody(), p);
-        
+
         afterSyntax(lambda, p);
         return lambda;
     }
@@ -1472,9 +1612,24 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     public J visitExport(S.Export export, PrintOutputCapture<P> p) {
         beforeSyntax(export, Space.Location.LANGUAGE_EXTENSION, p);
-        p.append("export ");
+        if (export.getMarkers().findFirst(org.openrewrite.scala.marker.CommaContinuation.class).isPresent()) {
+            p.append(',');
+        } else {
+            p.append("export ");
+        }
         Expression clause = export.getExportClause();
-        if (clause instanceof J.FieldAccess && isWildcardImport((J.FieldAccess) clause)) {
+        if (export.getPadding().getSelectors() != null) {
+            visit(clause, p);
+            p.append('.');
+            if (export.getBeforeBrace() != null) {
+                visitSpace(export.getBeforeBrace(), Space.Location.LANGUAGE_EXTENSION, p);
+            }
+            if (export.getMarkers().findFirst(org.openrewrite.scala.marker.OmitImportBraces.class).isPresent()) {
+                visitContainer("", export.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, ",", "", p);
+            } else {
+                visitContainer("{", export.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, ",", "}", p);
+            }
+        } else if (clause instanceof J.FieldAccess && isWildcardImport((J.FieldAccess) clause)) {
             J.FieldAccess fa = (J.FieldAccess) clause;
             visitFieldAccessUpToWildcard(fa, p);
             p.append("." + fa.getName().getSimpleName());
@@ -1485,11 +1640,74 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         return export;
     }
 
+    public J visitSImport(S.Import sImport, PrintOutputCapture<P> p) {
+        beforeSyntax(sImport, Space.Location.LANGUAGE_EXTENSION, p);
+        if (sImport.getMarkers().findFirst(org.openrewrite.scala.marker.CommaContinuation.class).isPresent()) {
+            p.append(',');
+        } else {
+            p.append("import ");
+        }
+        visitRightPadded(sImport.getPadding().getQualifier(), JRightPadded.Location.LANGUAGE_EXTENSION, p);
+        p.append('.');
+        visitSpace(sImport.getBeforeBrace(), Space.Location.LANGUAGE_EXTENSION, p);
+        if (sImport.getMarkers().findFirst(org.openrewrite.scala.marker.OmitImportBraces.class).isPresent()) {
+            visitContainer("", sImport.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, ",", "", p);
+        } else {
+            visitContainer("{", sImport.getPadding().getSelectors(), JContainer.Location.LANGUAGE_EXTENSION, ",", "}", p);
+        }
+        afterSyntax(sImport, p);
+        return sImport;
+    }
+
+    public J visitImportSelector(S.ImportSelector selector, PrintOutputCapture<P> p) {
+        beforeSyntax(selector, Space.Location.LANGUAGE_EXTENSION, p);
+        if (selector.isGiven()) {
+            p.append("given");
+            if (selector.getGivenType() != null) {
+                visit(selector.getGivenType(), p);
+            }
+        } else if (selector.isWildcard()) {
+            p.append(selector.isLegacyUnderscore() ? "_" : "*");
+        } else if (selector.getName() != null) {
+            visit(selector.getName(), p);
+            JLeftPadded<J.Identifier> alias = selector.getPadding().getAlias();
+            if (alias != null) {
+                visitSpace(alias.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+                p.append(selector.isUseAsKeyword() ? "as" : "=>");
+                visit(alias.getElement(), p);
+            }
+        }
+        afterSyntax(selector, p);
+        return selector;
+    }
+
     public J visitPatternDefinition(S.PatternDefinition patDef, PrintOutputCapture<P> p) {
         beforeSyntax(patDef, Space.Location.LANGUAGE_EXTENSION, p);
         p.append(patDef.getText());
         afterSyntax(patDef, p);
         return patDef;
+    }
+
+    public J visitAnonymousGiven(S.AnonymousGiven g, PrintOutputCapture<P> p) {
+        beforeSyntax(g, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(g.getLeadingAnnotations(), p);
+        for (J.Modifier m : g.getModifiers()) {
+            visit(m, p);
+        }
+        // Whitespace between the last modifier (or annotations) and `given`. Captured by
+        // the visitor when a modifier precedes the keyword.
+        g.getMarkers().findFirst(ValVarKeyword.class)
+                .ifPresent(m -> p.append(m.beforeKeyword()));
+        p.append("given");
+        visit(g.getType(), p);
+        JLeftPadded<Expression> init = g.getInitializer();
+        if (init != null) {
+            visitSpace(init.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+            p.append("=");
+            visit(init.getElement(), p);
+        }
+        afterSyntax(g, p);
+        return g;
     }
 
     public J visitSingletonType(S.SingletonType singletonType, PrintOutputCapture<P> p) {
@@ -1501,11 +1719,79 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         return singletonType;
     }
 
+    public J visitRepeatedType(S.RepeatedType repeatedType, PrintOutputCapture<P> p) {
+        beforeSyntax(repeatedType, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(repeatedType.getElementType(), p);
+        visitSpace(repeatedType.getBeforeStar(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append('*');
+        afterSyntax(repeatedType, p);
+        return repeatedType;
+    }
+
+    public J visitSplatExpression(S.SplatExpression splatExpression, PrintOutputCapture<P> p) {
+        beforeSyntax(splatExpression, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(splatExpression.getExpression(), p);
+        if (splatExpression.getBeforeColon() != null) {
+            visitSpace(splatExpression.getBeforeColon(), Space.Location.LANGUAGE_EXTENSION, p);
+            p.append(':');
+            visitSpace(splatExpression.getAfterColon(), Space.Location.LANGUAGE_EXTENSION, p);
+            p.append('_');
+        }
+        visitSpace(splatExpression.getBeforeStar(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append('*');
+        afterSyntax(splatExpression, p);
+        return splatExpression;
+    }
+
+    public J visitXmlLiteral(S.XmlLiteral xmlLiteral, PrintOutputCapture<P> p) {
+        beforeSyntax(xmlLiteral, Space.Location.LANGUAGE_EXTENSION, p);
+        p.append(xmlLiteral.getSource());
+        afterSyntax(xmlLiteral, p);
+        return xmlLiteral;
+    }
+
     public J visitAlternative(S.Alternative alternative, PrintOutputCapture<P> p) {
         beforeSyntax(alternative, Space.Location.LANGUAGE_EXTENSION, p);
         visitContainer("", alternative.getPadding().getPatterns(), JContainer.Location.LANGUAGE_EXTENSION, "|", "", p);
         afterSyntax(alternative, p);
         return alternative;
+    }
+
+    public J visitInterpolatedString(S.InterpolatedString interpolatedString, PrintOutputCapture<P> p) {
+        beforeSyntax(interpolatedString, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(interpolatedString.getInterpolator(), p);
+        p.append(interpolatedString.getDelimiter());
+        for (Expression part : interpolatedString.getParts()) {
+            visit(part, p);
+        }
+        p.append(interpolatedString.getDelimiter());
+        afterSyntax(interpolatedString, p);
+        return interpolatedString;
+    }
+
+    public J visitInterpolation(S.Interpolation interpolation, PrintOutputCapture<P> p) {
+        beforeSyntax(interpolation, Space.Location.LANGUAGE_EXTENSION, p);
+        p.append('$');
+        if (interpolation.isBraces()) {
+            p.append('{');
+        }
+        visit(interpolation.getExpression(), p);
+        visitSpace(interpolation.getAfterExpression(), Space.Location.LANGUAGE_EXTENSION, p);
+        if (interpolation.isBraces()) {
+            p.append('}');
+        }
+        afterSyntax(interpolation, p);
+        return interpolation;
+    }
+
+    public J visitBinding(S.Binding binding, PrintOutputCapture<P> p) {
+        beforeSyntax(binding, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(binding.getName(), p);
+        visitSpace(binding.getBeforeAt(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append('@');
+        visit(binding.getPattern(), p);
+        afterSyntax(binding, p);
+        return binding;
     }
 
     public J visitQualifiedSuper(S.QualifiedSuper qualifiedSuper, PrintOutputCapture<P> p) {
@@ -1532,6 +1818,68 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visit(annotatedExpression.getAnnotation(), p);
         afterSyntax(annotatedExpression, p);
         return annotatedExpression;
+    }
+
+    @Override
+    public J visitAnnotatedType(J.AnnotatedType annotatedType, PrintOutputCapture<P> p) {
+        // Scala writes annotated types as `T @ann` (type first), the reverse of Java's
+        // `@ann T`. Scala syntax never produces prefix-form annotated types, so every
+        // J.AnnotatedType in a Scala LST is the postfix flavor.
+        beforeSyntax(annotatedType, Space.Location.ANNOTATED_TYPE_PREFIX, p);
+        visit(annotatedType.getTypeExpression(), p);
+        visit(annotatedType.getAnnotations(), p);
+        afterSyntax(annotatedType, p);
+        return annotatedType;
+    }
+
+    public J visitFunctionType(S.FunctionType functionType, PrintOutputCapture<P> p) {
+        beforeSyntax(functionType, Space.Location.LANGUAGE_EXTENSION, p);
+        JContainer<TypeTree> params = functionType.getPadding().getParameters();
+        visitSpace(params.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        if (functionType.isParenthesized()) {
+            p.append('(');
+        }
+        List<JRightPadded<TypeTree>> elements = params.getPadding().getElements();
+        for (int i = 0; i < elements.size(); i++) {
+            JRightPadded<TypeTree> element = elements.get(i);
+            visit(element.getElement(), p);
+            visitSpace(element.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            if (i < elements.size() - 1) {
+                p.append(',');
+            }
+        }
+        if (functionType.isParenthesized()) {
+            p.append(')');
+        }
+        JLeftPadded<TypeTree> rt = functionType.getPadding().getReturnType();
+        visitSpace(rt.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        if (functionType.getMarkers().findFirst(ContextFunctionArrow.class).isPresent()) {
+            p.append("?=>");
+        } else {
+            p.append("=>");
+        }
+        visit(rt.getElement(), p);
+        afterSyntax(functionType, p);
+        return functionType;
+    }
+
+    public J visitTupleType(S.TupleType tupleType, PrintOutputCapture<P> p) {
+        beforeSyntax(tupleType, Space.Location.LANGUAGE_EXTENSION, p);
+        JContainer<TypeTree> elements = tupleType.getPadding().getElements();
+        visitSpace(elements.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        p.append('(');
+        List<JRightPadded<TypeTree>> padded = elements.getPadding().getElements();
+        for (int i = 0; i < padded.size(); i++) {
+            JRightPadded<TypeTree> element = padded.get(i);
+            visit(element.getElement(), p);
+            visitSpace(element.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            if (i < padded.size() - 1) {
+                p.append(',');
+            }
+        }
+        p.append(')');
+        afterSyntax(tupleType, p);
+        return tupleType;
     }
 
     public J visitRefinedType(S.RefinedType refinedType, PrintOutputCapture<P> p) {
@@ -1561,6 +1909,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 p.append('\'');
                 visit(macro.getExpression(), p);
                 break;
+            case Scala2Macro:
+                p.append("macro");
+                visit(macro.getExpression(), p);
+                break;
         }
         afterSyntax(macro, p);
         return macro;
@@ -1586,6 +1938,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 }
                 if (varDecl.getTypeExpression() != null) {
                     TypeTree typeExpr = varDecl.getTypeExpression();
+                    if (varDecl.getVarargs() != null) {
+                        visitSpace(varDecl.getVarargs(), Space.Location.VARARGS, p);
+                    }
                     p.append(":");
                     visit(typeExpr, p);
                 }
@@ -1636,6 +1991,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visitSpace(forLoop.getBeforeBody(), Space.Location.LANGUAGE_EXTENSION, p);
         if (forLoop.isYielding()) {
             p.append("yield");
+        } else if (parenless) {
+            p.append("do");
         }
         visit(forLoop.getBody(), p);
         afterSyntax(forLoop, p);

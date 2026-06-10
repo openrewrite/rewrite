@@ -214,6 +214,19 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void abstractClassWithEmptyParensAndAbstractDef() {
+        rewriteRun(
+            scala(
+                """
+                abstract class Foo() {
+                  def x: Boolean
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void classExtendingAnother() {
         rewriteRun(
             scala(
@@ -348,6 +361,118 @@ class ClassDeclarationTest implements RewriteTest {
             scala(
                 """
                 class Person(val name: String, age: Int)
+                """
+            )
+        );
+    }
+
+    @Test
+    void paramNameEndingInUnderscore() {
+        rewriteRun(
+            scala(
+                """
+                class Foo(tag_ : String)
+                """
+            )
+        );
+    }
+
+    @Test
+    void typeParamContextBoundWithSpaceBeforeColon() {
+        rewriteRun(
+            scala(
+                """
+                case class Foo[T : Encoder]()
+                """
+            )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // buildKeywordMethodInvocation — super(...) close paren in line comment
+        rewriteRun(
+            scala(
+                """
+                class Base(val x: Int)
+                class Derived(x: Int) extends Base(x // )
+                )
+                """
+            )
+        );
+        // visitClassDef — type parameter close bracket in block comment
+        rewriteRun(
+            scala(
+                """
+                class C[A /* ] */, B]
+                """
+            )
+        );
+        // visitClassDef — type parameter comma in block comment
+        rewriteRun(
+            scala(
+                """
+                class C[A /* , */ , B]
+                """
+            )
+        );
+        // visitClassDef — constructor close paren in line comment
+        rewriteRun(
+            scala(
+                """
+                class C(x: Int // )
+                )
+                """
+            )
+        );
+        // visitTypeParameter — `[` in block comment between class name and type params
+        rewriteRun(
+            scala(
+                """
+                class C /* [ */ [A]
+                """
+            )
+        );
+        // visitTypeParameter — `>:` lower bound operator in block comment
+        rewriteRun(
+            scala(
+                """
+                class C[A /* >: */ >: Nothing]
+                """
+            )
+        );
+        // visitTypeParameter — `<:` upper bound operator in block comment
+        rewriteRun(
+            scala(
+                """
+                class C[A /* <: */ <: AnyRef]
+                """
+            )
+        );
+    }
+
+    @Test
+    void extendsWithBraceLikeContentInParentArgs() {
+        // Each class has no body, but the parent's constructor args contain a `{` that
+        // must not be mistaken for the body opener:
+        //   - block-form string interpolation `s"${x}"`
+        //   - literal `{` inside a plain string
+        //   - `{` inside a block comment
+        //   - `{` introducing a block expression argument
+        //   - interpolation followed by a `with` trait
+        //   - multi-line extends used by `case class`
+        rewriteRun(
+            scala(
+                """
+                trait T
+                class A(msg: String) extends Exception(msg)
+                class B1(x: Int) extends Exception(s"${x}")
+                class B2(x: Int) extends Exception("{ not a body")
+                class B3(x: Int) extends Exception(/* { */ "x")
+                class B4(x: Int) extends Exception({ val m = "msg"; m })
+                class B5(x: Int) extends Exception(s"${x}") with T
+                case class B6(json: String, err: String)
+                    extends A(s"[x] $json --- ${err.length}")
                 """
             )
         );

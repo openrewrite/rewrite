@@ -369,6 +369,54 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    /**
+     * The shared {@code guavaVersion} variable is used by the targeted artifact ({@code guava}) and
+     * by a neighbor ({@code guava-testlib}) that the recipe matcher does not match.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "def guavaVersion = 'VERSION'",
+      "ext { guavaVersion = 'VERSION' }"
+    })
+    void sharedVersionVariableWithUntargetedNeighbour(String variableDeclarationTemplate) {
+        String beforeDeclaration = variableDeclarationTemplate.replace("VERSION", "29.0-jre");
+        String afterDeclaration = variableDeclarationTemplate.replace("VERSION", "30.1.1-jre");
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              %s
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation "com.google.guava:guava:$guavaVersion"
+                implementation "com.google.guava:guava-testlib:$guavaVersion"
+              }
+              """.formatted(beforeDeclaration),
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              %s
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation "com.google.guava:guava:$guavaVersion"
+                implementation "com.google.guava:guava-testlib:$guavaVersion"
+              }
+              """.formatted(afterDeclaration)
+          )
+        );
+    }
+
     @Test
     void updateVersionInVariableToRelease() {
         rewriteRun(
@@ -2877,6 +2925,201 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               springCloudVersion=2023.0.6
               """,
             spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @Test
+    void upgradesStrictlyVersionConstraintInClosure() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation('com.google.guava:guava:29.0-jre') {
+                      version { strictly('29.0-jre') }
+                  }
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation('com.google.guava:guava:30.1.1-jre') {
+                      version { strictly('30.1.1-jre') }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesRequireAndPreferVersionConstraintsInClosure() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation('com.google.guava:guava:29.0-jre') {
+                      version {
+                          require('29.0-jre')
+                          prefer('29.0-jre')
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation('com.google.guava:guava:30.1.1-jre') {
+                      version {
+                          require('30.1.1-jre')
+                          prefer('30.1.1-jre')
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesStrictlyVersionConstraintInClosureWithMultiComponentNotation() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation(group: 'com.google.guava', name: 'guava', version: '29.0-jre') {
+                      version { strictly('29.0-jre') }
+                  }
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation(group: 'com.google.guava', name: 'guava', version: '30.1.1-jre') {
+                      version { strictly('30.1.1-jre') }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesStrictlyVersionConstraintInKotlinClosure() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation("com.google.guava:guava:29.0-jre") {
+                      version { strictly("29.0-jre") }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation("com.google.guava:guava:30.1.1-jre") {
+                      version { strictly("30.1.1-jre") }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotTouchConstraintsOnUnrelatedDependencies() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation('com.google.guava:guava:29.0-jre')
+                  implementation('org.openrewrite:rewrite-core:8.0.0') {
+                      version { strictly('8.0.0') }
+                  }
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation('com.google.guava:guava:30.1.1-jre')
+                  implementation('org.openrewrite:rewrite-core:8.0.0') {
+                      version { strictly('8.0.0') }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void springBoot3xBomDepManagementLatestPatch() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot-dependencies", "latest.patch", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.0'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.springframework.boot:spring-boot-dependencies:3.1.0"
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.0'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.springframework.boot:spring-boot-dependencies:3.1.12"
+                  }
+              }
+              """
           )
         );
     }

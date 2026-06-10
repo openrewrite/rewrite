@@ -60,6 +60,31 @@ public class Assertions {
         return scala;
     }
 
+    public static SourceSpecs sbt(@Language("scala") @Nullable String before) {
+        return sbt(before, s -> {
+        });
+    }
+
+    public static SourceSpecs sbt(@Language("scala") @Nullable String before, Consumer<SourceSpec<S.CompilationUnit>> spec) {
+        SourceSpec<S.CompilationUnit> sbt = new SourceSpec<>(S.CompilationUnit.class, null, scalaParser, before, null)
+                .path("build.sbt");
+        spec.accept(sbt);
+        return sbt;
+    }
+
+    public static SourceSpecs sbt(@Language("scala") @Nullable String before, @Language("scala") @Nullable String after) {
+        return sbt(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs sbt(@Language("scala") @Nullable String before, @Language("scala") @Nullable String after,
+                                  Consumer<SourceSpec<S.CompilationUnit>> spec) {
+        SourceSpec<S.CompilationUnit> sbt = new SourceSpec<>(S.CompilationUnit.class, null, scalaParser, before, s -> after)
+                .path("build.sbt");
+        spec.accept(sbt);
+        return sbt;
+    }
+
     public static SourceSpecs srcMainScala(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... scalaSources) {
         return dir("src/main/scala", spec, scalaSources);
     }

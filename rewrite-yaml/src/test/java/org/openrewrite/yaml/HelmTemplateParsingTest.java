@@ -532,4 +532,48 @@ class HelmTemplateParsingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void templateInsideSequenceEntryFoldedBlockScalar() {
+        // A folded block scalar that is the value of a sequence entry ("- >-") has no
+        // colon, so it was not recognized as a block scalar. Template lines inside it
+        // that reduce to a standalone placeholder were wrongly commented out.
+        rewriteRun(
+          yaml(
+            """
+              sboms:
+                - artifacts: binary
+                  documents:
+                    - >-
+                      {{ .ProjectName }}_
+                      {{- .Version }}_
+                      {{- if eq .Os "darwin" }}mac{{ else }}{{ .Os }}{{ end }}_
+                      {{- .Arch }}
+                      {{- with .Arm }}v{{ . }}{{ end }}.sbom
+                  cmd: syft
+              """
+          )
+        );
+    }
+
+    @Test
+    void templateWrappedInAsterisksInsideLiteralBlockScalar() {
+        // A "${{ ... }}" expression wrapped in markdown bold ("**...**") inside a
+        // literal block scalar is matched by both the Helm and the asterisk-placeholder
+        // patterns, nesting one UUID inside another. Restoration must resolve both.
+        rewriteRun(
+          yaml(
+            """
+              jobs:
+                summary:
+                  steps:
+                    - name: Summary
+                      run: |
+                        echo "Version: **${{ steps.inputs.outputs.version }}**" >> $GITHUB_STEP_SUMMARY
+                        echo "Commit: **${{ steps.inputs.outputs.commit_hash }}**" >> $GITHUB_STEP_SUMMARY
+                        echo "Status: ${{ steps.setup.outputs.behind_info }}" >> $GITHUB_STEP_SUMMARY
+              """
+          )
+        );
+    }
 }

@@ -19,7 +19,8 @@ package golang
 import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang/internal"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -60,8 +61,8 @@ type removeImportVisitor struct {
 	cfg *RemoveImport
 }
 
-func (v *removeImportVisitor) VisitCompilationUnit(cu *tree.CompilationUnit, p any) tree.J {
-	cu = v.GoVisitor.VisitCompilationUnit(cu, p).(*tree.CompilationUnit)
+func (v *removeImportVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	cu = v.GoVisitor.VisitCompilationUnit(cu, p).(*golang.CompilationUnit)
 	if v.cfg.PackagePath == "" || cu.Imports == nil {
 		return cu
 	}

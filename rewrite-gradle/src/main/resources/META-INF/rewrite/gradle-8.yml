@@ -44,7 +44,7 @@ recipeList:
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.UseAssignmentForPropertySyntax
 displayName: Use `=` assignment syntax for well-known Gradle properties
-description: >
+description: >-
   Converts deprecated Groovy DSL property assignment syntax from space/method-call form
   (e.g., `description 'text'` or `description('text')`) to assignment form (`description = 'text'`)
   for well-known Gradle project and task properties.

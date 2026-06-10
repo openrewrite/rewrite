@@ -30,9 +30,12 @@ import org.openrewrite.rpc.RewriteRpcProcessManager;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -191,6 +194,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
         private Duration timeout = Duration.ofSeconds(60);
         private boolean traceRpcMessages;
         private @Nullable Path workingDirectory;
+        private @Nullable Path recipeInstallDir;
         private @Nullable Path profileOutputPath;
 
         public Builder marketplace(RecipeMarketplace marketplace) {
@@ -279,6 +283,20 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
 
         /**
+         * Directory in which the server creates its recipe project (where
+         * {@code dotnet add package} resolves recipe NuGet packages). Set this so a
+         * caller-written {@code NuGet.config} co-located in the directory is honored
+         * by dotnet's project-directory config discovery.
+         *
+         * @param recipeInstallDir The directory to create the recipe project in
+         * @return This builder
+         */
+        public Builder recipeInstallDir(@Nullable Path recipeInstallDir) {
+            this.recipeInstallDir = recipeInstallDir;
+            return this;
+        }
+
+        /**
          * Enable .NET EventPipe profiling on the C# process. Captures CPU sampling,
          * GC events, sampled allocations, and runtime counters into a {@code .nettrace}
          * file that can be analyzed with {@code dotnet-trace convert}, PerfView, or
@@ -310,7 +328,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
                             dotnetPath.toString(),
                             csharpServerEntry.toAbsolutePath().normalize().toString(),
                             log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                            traceRpcMessages ? "--trace-rpc-messages" : null
+                            traceRpcMessages ? "--trace-rpc-messages" : null,
+                            recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                     );
                 }
             } else {
@@ -321,10 +340,10 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 cmd = buildToolPathCommand(dotnetPath, version);
             }
 
-            return startProcess(cmd);
+            return startProcess(cmd, dotnetPath);
         }
 
-        private CSharpRewriteRpc startProcess(Stream<@Nullable String> cmd) {
+        private CSharpRewriteRpc startProcess(Stream<@Nullable String> cmd, Path dotnetPath) {
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
             RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
 
@@ -334,6 +353,21 @@ public class CSharpRewriteRpc extends RewriteRpc {
             process.setStderrRedirect(log);
 
             process.environment().putAll(environment);
+
+            // The tool is launched as a self-contained apphost (not via the `dotnet`
+            // muxer), so it must locate the shared runtime itself. When DOTNET_ROOT is
+            // unset and the runtime isn't at a registered install location for the
+            // apphost's architecture, launch fails ("You must install .NET ..."). This
+            // bites on hosts where `dotnet` lives in a bin/ dir separate from the runtime
+            // (e.g. Homebrew, where the binary is under bin/ but the runtime under
+            // libexec/), and on arm64 machines using an x64 dotnet. Derive DOTNET_ROOT
+            // from the resolved dotnet and set it if the caller hasn't.
+            if (!process.environment().containsKey("DOTNET_ROOT")) {
+                Path dotnetRoot = resolveDotnetRoot(dotnetPath);
+                if (dotnetRoot != null) {
+                    process.environment().put("DOTNET_ROOT", dotnetRoot.toString());
+                }
+            }
 
             if (profileOutputPath != null) {
                 Map<String, String> env = process.environment();
@@ -360,6 +394,44 @@ public class CSharpRewriteRpc extends RewriteRpc {
             }
         }
 
+        /**
+         * Derive the {@code DOTNET_ROOT} (the directory containing {@code shared/}) for a
+         * resolved {@code dotnet} executable by parsing {@code dotnet --list-runtimes}, whose
+         * lines look like {@code Microsoft.NETCore.App 10.0.2 [/path/to/dotnet/shared/Microsoft.NETCore.App]}.
+         * The root is two levels up from that path ({@code .../shared/Microsoft.NETCore.App} →
+         * {@code .../shared} → root). Returns {@code null} if it can't be determined; callers
+         * then fall back to the apphost's own resolution.
+         */
+        private static @Nullable Path resolveDotnetRoot(Path dotnetPath) {
+            Path resolved = null;
+            try {
+                Process p = new ProcessBuilder(dotnetPath.toString(), "--list-runtimes")
+                        .redirectErrorStream(false)
+                        .start();
+                try (BufferedReader br = new BufferedReader(
+                        new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        int lb = line.indexOf('[');
+                        int rb = line.lastIndexOf(']');
+                        if (lb >= 0 && rb > lb) {
+                            Path sharedAppDir = Paths.get(line.substring(lb + 1, rb).trim());
+                            Path shared = sharedAppDir.getParent();
+                            Path root = shared == null ? null : shared.getParent();
+                            if (root != null && Files.isDirectory(root)) {
+                                resolved = root;
+                                break;
+                            }
+                        }
+                    }
+                }
+                p.waitFor();
+            } catch (IOException | InterruptedException ignored) {
+                // Best effort: leave DOTNET_ROOT unset and let the apphost resolve.
+            }
+            return resolved;
+        }
+
         private Stream<@Nullable String> buildCsprojCommand(Path dotnetPath, Path csproj) {
             return Stream.of(
                     dotnetPath.toString(),
@@ -367,7 +439,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     "--project", csproj.toAbsolutePath().normalize().toString(),
                     "--framework", "net10.0",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                    traceRpcMessages ? "--trace-rpc-messages" : null
+                    traceRpcMessages ? "--trace-rpc-messages" : null,
+                    recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );
         }
 
@@ -393,7 +466,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
             return Stream.of(
                     toolExecutable.toAbsolutePath().normalize().toString(),
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                    traceRpcMessages ? "--trace-rpc-messages" : null
+                    traceRpcMessages ? "--trace-rpc-messages" : null,
+                    recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );
         }
 

@@ -24,7 +24,6 @@ import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.toml.tree.Toml;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -96,7 +95,7 @@ class PyProjectTomlParserTest {
     }
 
     @Test
-    void parsesWithResolvedDependencies(@TempDir Path tempDir) throws IOException {
+    void parsesWithResolvedDependencies(@TempDir Path tempDir) throws Exception {
         String pyprojectToml = """
           [project]
           name = "my-project"
@@ -227,7 +226,7 @@ class PyProjectTomlParserTest {
     }
 
     @Test
-    void skipsUvResolutionWhenPoetryLockExists(@TempDir Path tempDir) throws IOException {
+    void skipsUvResolutionWhenPoetryLockExists(@TempDir Path tempDir) throws Exception {
         String pyprojectToml = """
           [project]
           name = "poetry-managed"
@@ -254,7 +253,7 @@ class PyProjectTomlParserTest {
     }
 
     @Test
-    void skipsUvResolutionWhenPdmLockExists(@TempDir Path tempDir) throws IOException {
+    void skipsUvResolutionWhenPdmLockExists(@TempDir Path tempDir) throws Exception {
         String pyprojectToml = """
           [project]
           name = "pdm-managed"
@@ -281,7 +280,7 @@ class PyProjectTomlParserTest {
     }
 
     @Test
-    void skipsUvResolutionWhenPoetryToolSectionDetected(@TempDir Path tempDir) throws IOException {
+    void skipsUvResolutionWhenPoetryToolSectionDetected(@TempDir Path tempDir) throws Exception {
         String pyprojectToml = """
           [project]
           name = "poetry-tool"

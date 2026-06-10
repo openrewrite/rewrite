@@ -24,7 +24,7 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
@@ -36,7 +36,9 @@ type findFoo struct {
 
 func (r *findFoo) Name() string        { return "org.openrewrite.golang.test.FindFoo" }
 func (r *findFoo) DisplayName() string { return "Find foo identifiers" }
-func (r *findFoo) Description() string { return "Marks all identifiers named `foo` with a search result." }
+func (r *findFoo) Description() string {
+	return "Marks all identifiers named `foo` with a search result."
+}
 
 func (r *findFoo) Editor() recipe.TreeVisitor {
 	return visitor.Init(&findFooVisitor{})
@@ -46,10 +48,10 @@ type findFooVisitor struct {
 	visitor.GoVisitor
 }
 
-func (v *findFooVisitor) VisitIdentifier(ident *tree.Identifier, p any) tree.J {
-	ident = v.GoVisitor.VisitIdentifier(ident, p).(*tree.Identifier)
+func (v *findFooVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
+	ident = v.GoVisitor.VisitIdentifier(ident, p).(*java.Identifier)
 	if ident.Name == "foo" {
-		ident = ident.WithMarkers(tree.FoundSearchResult(ident.Markers, "found foo"))
+		ident = ident.WithMarkers(java.FoundSearchResult(ident.Markers, "found foo"))
 	}
 	return ident
 }
@@ -72,8 +74,8 @@ type renameFooToBarVisitor struct {
 	visitor.GoVisitor
 }
 
-func (v *renameFooToBarVisitor) VisitIdentifier(ident *tree.Identifier, p any) tree.J {
-	ident = v.GoVisitor.VisitIdentifier(ident, p).(*tree.Identifier)
+func (v *renameFooToBarVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
+	ident = v.GoVisitor.VisitIdentifier(ident, p).(*java.Identifier)
 	if ident.Name == "foo" {
 		ident = ident.WithName("bar")
 	}
@@ -108,6 +110,34 @@ func TestRecipeNoChange(t *testing.T) {
 			func hello() {
 			}
 		`),
+	)
+}
+
+// TestSearchRecipeViaRewriteRun verifies that RewriteRun prints SearchResult
+// markers as /*~~(...)~~>*/ comments by default, so search-style recipes can
+// be tested with the same convention used in Java and TypeScript.
+func TestSearchRecipeViaRewriteRun(t *testing.T) {
+	spec := test.NewRecipeSpec().WithRecipe(&findFoo{})
+	spec.RewriteRun(t,
+		test.GolangRaw(
+			"package main\n\nfunc foo() {\n}\n",
+			"package main\n\nfunc /*~~(found foo)~~>*/foo() {\n}\n",
+		),
+	)
+}
+
+// TestSearchRecipeWithSanitizedMarkerPrinter verifies that
+// WithMarkerPrinter(SanitizedMarkerPrinter) lets tests opt out of marker
+// rendering — matching Java's spec.markerPrinter(SANITIZED).
+func TestSearchRecipeWithSanitizedMarkerPrinter(t *testing.T) {
+	spec := test.NewRecipeSpec().
+		WithRecipe(&findFoo{}).
+		WithMarkerPrinter(printer.SanitizedMarkerPrinter)
+	spec.RewriteRun(t,
+		test.GolangRaw(
+			"package main\n\nfunc foo() {\n}\n",
+			"package main\n\nfunc foo() {\n}\n",
+		),
 	)
 }
 

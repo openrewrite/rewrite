@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OperatingSystemProvenanceTest {
 
     @Test
-    void noDeadlockBetweenLinuxAndMacOs() throws InterruptedException {
+    void noDeadlockBetweenLinuxAndMacOs() throws Exception {
         // This test must be first to ensure classes are not already initialized
 
         // given

@@ -16,7 +16,7 @@
 
 package visitor
 
-import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 
 // AfterVisitsProvider is the structural interface a visitor implements
 // to expose its DoAfterVisit queue. GoVisitor satisfies it; user-defined
@@ -24,6 +24,12 @@ import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 type AfterVisitsProvider interface {
 	AfterVisits() []AfterVisitor
 	DoAfterVisit(AfterVisitor)
+}
+
+// PendingAfterVisitsProvider is implemented by visitors that can expose
+// their queued after-visits without draining them.
+type PendingAfterVisitsProvider interface {
+	PendingAfterVisits() []AfterVisitor
 }
 
 // DrainAfterVisits applies any visitors that `editor` queued via
@@ -34,7 +40,7 @@ type AfterVisitsProvider interface {
 // Returns the (possibly modified) tree. Callers should ALWAYS run this
 // after the main editor.Visit so DoAfterVisit-queued follow-ups land.
 // Pass `editor` as the recipe's TreeVisitor and the current tree + ctx.
-func DrainAfterVisits(editor any, t tree.Tree, ctx any) tree.Tree {
+func DrainAfterVisits(editor any, t java.Tree, ctx any) java.Tree {
 	parent, ok := editor.(AfterVisitsProvider)
 	if !ok {
 		return t

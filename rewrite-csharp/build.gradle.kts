@@ -76,9 +76,12 @@ val csharpBuild by tasks.registering(Exec::class) {
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tests")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(csharpDir.resolve("OpenRewrite/bin"))
+    outputs.dir(csharpDir.resolve("OpenRewrite.Tests/bin"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin"))
 
     doFirst {
@@ -128,17 +131,25 @@ val csharpTest by tasks.registering(Exec::class) {
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tests")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.files(junitXmlFile)
     outputs.cacheIf { true }
 
     doFirst {
-        // Use relative path for JUnit XML to avoid absolute paths in cache key
-        val relativeJunitPath = junitXmlFile.relativeTo(csharpDir).path
+        // Target the OpenRewrite.Tests project explicitly. Running 'dotnet test' at solution
+        // level would also probe OpenRewrite and OpenRewrite.Tool (neither carries the junit
+        // logger after the test split), which fails the run even though all tests pass.
+        // JunitXml.TestLogger resolves a relative LogFilePath against the test project's
+        // TargetDir, so pin the absolute path and pass --results-directory to match.
+        junitXmlFile.parentFile.mkdirs()
         commandLine(
-            findDotnet(), "test", "--no-build", "--verbosity", "normal",
-            "--logger", "junit;LogFilePath=${relativeJunitPath}"
+            findDotnet(), "test", "OpenRewrite.Tests/OpenRewrite.Tests.csproj",
+            "--no-build", "--verbosity", "normal",
+            "--results-directory", junitXmlFile.parentFile.absolutePath,
+            "--logger", "junit;LogFilePath=${junitXmlFile.absolutePath}"
         )
         logger.lifecycle("Running C# tests in ${csharpDir}")
     }
@@ -152,6 +163,9 @@ tasks.named("check") {
 
 testing {
     suites {
+        // Cross-process RPC bridge tests: Java drives the C# tool over the JSON-RPC bridge.
+        // Kept out of the main `test` source set (matching rewrite-javascript/python/go) so the
+        // unit suite stays fast and hermetic.
         register<JvmTestSuite>("integTest") {
             useJUnitJupiter()
 
@@ -159,12 +173,40 @@ testing {
                 implementation(project())
                 implementation(project(":rewrite-java-21"))
                 implementation(project(":rewrite-test"))
+                implementation(project(":rewrite-xml"))
                 implementation("org.assertj:assertj-core:latest.release")
                 implementation("org.junit.platform:junit-platform-suite-api")
                 runtimeOnly("org.junit.platform:junit-platform-suite-engine")
             }
+
+            targets {
+                all {
+                    testTask.configure {
+                        // These tests spawn the freshly built C# tool. dependsOn(csharpBuild) is
+                        // also applied by the tasks.withType<Test> block below, but a plain
+                        // dependsOn only orders the build — it does NOT make a C# source change
+                        // invalidate this task's up-to-date/cache state. Declaring the C# sources
+                        // as inputs does: without it a C# regression can slip through a cached test
+                        // run (e.g. the System.Text.Json `IConvertible` break that reached main).
+                        dependsOn(csharpBuild)
+                        inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
+                        inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
+                        // Avoid two tasks driving C# RPC processes at the same time.
+                        shouldRunAfter(tasks.named("test"))
+                    }
+                }
+            }
         }
     }
+}
+
+// Run the cross-process bridge tests as part of `check` (and therefore `build`). The other RPC
+// modules leave integTest opt-in, but here it is the only end-to-end coverage of the Java↔C#
+// bridge, and the input wiring above makes it re-run when the C# tool changes.
+tasks.named("check") {
+    dependsOn(testing.suites.named("integTest"))
 }
 
 // Run tests serially to avoid issues with concurrent C# RPC processes
@@ -364,6 +406,17 @@ val csharpPublishLocal by tasks.registering {
                 if (packageCacheDir.exists()) {
                     logger.lifecycle("Clearing cached: ${packageCacheDir.absolutePath}")
                     packageCacheDir.deleteRecursively()
+                }
+
+                // Clear the persistent tool-path install for the C# Tool so that
+                // CSharpRewriteRpc reinstalls from the freshly published nupkg on the
+                // next run instead of reusing a stale binary.
+                if (packageId.equals("OpenRewrite.CSharp.Tool", ignoreCase = true)) {
+                    val toolPathDir = file("${System.getProperty("user.home")}/.dotnet/rewrite-tools/$nugetVersion")
+                    if (toolPathDir.exists()) {
+                        logger.lifecycle("Clearing installed tool: ${toolPathDir.absolutePath}")
+                        toolPathDir.deleteRecursively()
+                    }
                 }
 
                 nupkg.copyTo(localFeed.resolve(nupkg.name), overwrite = true)

@@ -293,8 +293,8 @@ public class RewriteRpc {
         String pId = maybeUnwrapExecutionContext(p);
         List<String> cursorIds = getCursorIds(cursor);
 
-        String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
-                .getClass().getName();
+        String sourceFileType = DynamicDispatchRpcCodec.canonicalSourceFileType(
+                (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class)).getClass());
         Supplier<VisitResponse> doSend = () -> send("Visit", new Visit(visitorName, sourceFileType, null,
                 tree.getId().toString(), pId, cursorIds), VisitResponse.class);
         VisitResponse response = p instanceof ExecutionContext
@@ -313,8 +313,8 @@ public class RewriteRpc {
         String pId = maybeUnwrapExecutionContext(p);
         List<String> cursorIds = getCursorIds(cursor);
 
-        String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
-                .getClass().getName();
+        String sourceFileType = DynamicDispatchRpcCodec.canonicalSourceFileType(
+                (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class)).getClass());
         Supplier<BatchVisitResponse> doSend = () -> send("BatchVisit",
                 new BatchVisit(sourceFileType, treeId, pId, cursorIds, visitors),
                 BatchVisitResponse.class);
@@ -459,6 +459,12 @@ public class RewriteRpc {
 
     public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo,
                                     Parser parser, String sourceFileType, ExecutionContext ctx) {
+        return parse(inputs, relativeTo, parser, sourceFileType, ctx, null);
+    }
+
+    public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo,
+                                    Parser parser, String sourceFileType, ExecutionContext ctx,
+                                    @Nullable Map<String, String> options) {
         List<Parser.Input> inputList = new ArrayList<>();
         List<Parse.Input> mappedInputs = new ArrayList<>();
         for (Parser.Input input : inputs) {
@@ -486,7 +492,7 @@ public class RewriteRpc {
                 if (ids == null) {
                     // FIXME handle `TimeoutException` gracefully
                     ids = RewriteRpcExecutionContextView.view(ctx).withInFlightSlot(() ->
-                            send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class));
+                            send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null, options), ParseResponse.class));
                     assert ids.size() == inputList.size();
                 }
 
@@ -550,7 +556,7 @@ public class RewriteRpc {
         String treeId = tree.getId().toString();
         localObjects.put(treeId, tree);
         SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : parent.firstEnclosingOrThrow(SourceFile.class);
-        String sourceFileType = sourceFile.getClass().getName();
+        String sourceFileType = DynamicDispatchRpcCodec.canonicalSourceFileType(sourceFile.getClass());
 
         return send(
                 "Print",

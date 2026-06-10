@@ -252,6 +252,19 @@ describe("Rewrite RPC", () => {
         );
     });
 
+    test("prepareRecipeWithRpcSubRecipeInRecipeList", async () => {
+        // A composite recipe whose recipeList() mixes a local recipe with an
+        // already-prepared remote (RpcRecipe) sub-recipe — the shape of e.g.
+        // Angular's UpgradeToAngular21, which lists upgradeDependencyVersion()
+        // (a Java recipe prepared over RPC). Preparing it must not try to
+        // re-install the RpcRecipe by its (no-arg-incompatible) constructor.
+        const recipe = await client.prepareRecipe("org.openrewrite.example.text.with-rpc-sub-recipe");
+        const descriptor = await recipe.descriptor();
+        expect(descriptor.recipeList.map(r => r.name)).toContain(
+            "org.openrewrite.example.text.remote-change-text"
+        );
+    });
+
     test("runRecipeWithCrossModuleRecipeList", async () => {
         spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.cross-module-recipe-list");
         await spec.rewriteRun(

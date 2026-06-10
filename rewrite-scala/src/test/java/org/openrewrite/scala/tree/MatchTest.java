@@ -16,11 +16,59 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.ScalaIsoVisitor;
+import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class MatchTest implements RewriteTest {
+
+    @Test
+    void atBindingIsNotCollapsedIntoSingleIdentifier() {
+        AtomicReference<S.Binding> binding = new AtomicReference<>();
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              case class Person(name: String, age: Int)
+              def handle(x: Any): String = x match {
+                case p@Person(name, _) => name
+                case _ => ""
+              }
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                new ScalaIsoVisitor<Integer>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                        // the whole pattern must never be stuffed into one identifier name
+                        assertThat(identifier.getSimpleName()).doesNotContain("@", "(");
+                        return identifier;
+                    }
+
+                    @Override
+                    public J visitBinding(S.Binding b, Integer p) {
+                        binding.set(b);
+                        return super.visitBinding(b, p);
+                    }
+                }.visit(cu, 0);
+
+                assertThat(binding.get()).isNotNull();
+                assertThat(binding.get().getName().getSimpleName()).isEqualTo("p");
+                assertThat(binding.get().getPattern()).isInstanceOf(J.MethodInvocation.class);
+                J.MethodInvocation pattern = (J.MethodInvocation) binding.get().getPattern();
+                assertThat(pattern.getSelect()).isInstanceOf(J.Identifier.class);
+                assertThat(((J.Identifier) pattern.getSelect()).getSimpleName()).isEqualTo("Person");
+                assertThat(pattern.getArguments()).hasSize(2);
+            })
+          )
+        );
+    }
 
     @Test
     void emptyCaseBodyWithGuardPreservesAlignmentBeforeArrow() {
@@ -183,6 +231,24 @@ class MatchTest implements RewriteTest {
     }
 
     @Test
+    void matchWithBlockGuard() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def handle(x: Any): String = x match {
+                case s: String if {
+                      s.nonEmpty
+                    } => s
+                case _ => "empty"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void matchWithGuardComment() {
         rewriteRun(
           scala(
@@ -277,6 +343,175 @@ class MatchTest implements RewriteTest {
     }
 
     @Test
+    void matchCasesSeparatedBySemicolon() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def label(x: Any): String = x match { case s: String => s; case _ => null }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCasesSeparatedBySemicolonWithMultiplePatterns() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def label(x: Any): String = x match {
+                case s: String => s
+                case i: Int => i.toString; case d: Double => d.toString
+                case _ => null
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithCallInForLoopFollowedByCase() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo(args: java.util.ArrayList[Int]): Unit = {
+                for (a <- List(1, 2, 3)) {
+                  a match {
+                    case x: Int =>
+                      val y = x + 1
+                      args.add(y)
+                    case _ => return
+                  }
+                }
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithMultipleStatementsEndingWithCallFollowedByCase() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val args = new java.util.ArrayList[String]()
+              def visit(t: Any): Unit = t match {
+                case block: String =>
+                  val blockExpr = wrap(block)
+                  args.add(blockExpr.asInstanceOf[String])
+                case _ => cursor = savedCursor
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithNestedDefsAndMultiLineReturn() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def visit(t: Any): String = t match {
+                case innerApp: String =>
+                  def asExpression(j: Int): Int = j match {
+                    case e: Int => e
+                    case _ => 0
+                  }
+                  def finishAtEnd(): Unit = if (true) {
+                    val adjustedEnd = 1
+                    if (adjustedEnd > 0) cursor = adjustedEnd
+                  }
+                  val methodType = "x" match { case m: String => m; case _ => null }
+                  finishAtEnd()
+                  return doCall(prefix, Empty,
+                    new Wrapper(fn, Empty),
+                    Container.build(Empty, args, Empty), methodType)
+
+                case _ =>
+                  ""
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithNestedDefAndReturn() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo(x: Any): Int = x match {
+                case _: String =>
+                  def helper(): Int = if (true) {
+                    42
+                  } else {
+                    0
+                  }
+                  return helper()
+
+                case _ =>
+                  0
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithMultiLineReturnFollowedByCase() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo(x: Any): String = x match {
+                case s: String =>
+                  doFirst()
+                  return doSecond(
+                    "a",
+                    "b")
+
+                case _ =>
+                  "other"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithIfBlockBeforeReturn() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def foo(x: Any): String = x match {
+                case s: String =>
+                  if (s.nonEmpty) {
+                    doSomething()
+                  }
+                  return s
+                case _ =>
+                  "other"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void matchWithLineCommentContainingIfBeforeGuard() {
         rewriteRun(
           scala(
@@ -287,6 +522,73 @@ class MatchTest implements RewriteTest {
                     if s.nonEmpty => s
                 case _ => "empty"
               }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithMultiStatementBody() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def handle(x: Any): String = x match {
+                case s: String =>
+                  println("got string")
+                  s
+                case _ =>
+                  println("other")
+                  "other"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void partialFunctionLiteralWithMultiStatementCaseBody() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val handler: PartialFunction[Any, String] = {
+                case s: String =>
+                  println("got string")
+                  s
+                case _ =>
+                  println("other")
+                  "other"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void dottedMatchOnRightSideOfInfixOperator() {
+        rewriteRun(
+          scala(
+            """
+            val x = a := b.match
+              case _ => 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // buildCasesBlock — `=>` arrow in case line comment
+        rewriteRun(
+          scala(
+            """
+            val r = 1 match {
+              case x // =>
+              => x
             }
             """
           )

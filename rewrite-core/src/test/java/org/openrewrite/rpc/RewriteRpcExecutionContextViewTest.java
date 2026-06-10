@@ -56,7 +56,7 @@ class RewriteRpcExecutionContextViewTest {
     }
 
     @Test
-    void sharedSemaphore_caps_concurrencyAcross_independentContexts() throws InterruptedException {
+    void sharedSemaphore_caps_concurrencyAcross_independentContexts() throws Exception {
         // The shared-semaphore path: one Semaphore installed into multiple ExecutionContexts.
         // No matter how many contexts/threads call withInFlightSlot concurrently, only
         // {permits} of them can be inside the work block at once.

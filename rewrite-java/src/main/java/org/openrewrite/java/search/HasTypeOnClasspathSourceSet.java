@@ -20,10 +20,11 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.internal.JavaSourceSetCompat;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
 import static java.util.Objects.requireNonNull;
@@ -38,7 +39,14 @@ public class HasTypeOnClasspathSourceSet<P> extends JavaIsoVisitor<P> {
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
             return cu.getMarkers().findFirst(JavaSourceSet.class)
-                    .filter(sourceSet -> !JavaSourceSetCompat.findClasspathType(sourceSet, fullyQualifiedTypeName).isPresent())
+                    .filter(sourceSet -> {
+                        for (JavaType.FullyQualified classpath : sourceSet.getClasspath()) {
+                            if (TypeUtils.isOfClassType(classpath, fullyQualifiedTypeName)) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    })
                     .map(sourceSet -> cu)
                     .orElse(SearchResult.found(cu));
         }

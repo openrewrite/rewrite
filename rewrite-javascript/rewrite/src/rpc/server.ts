@@ -31,17 +31,20 @@ import "../javascript";
 // Not possible to set the stack size when executing from npx for security reasons
 require('v8').setFlagsFromString('--stack-size=8000');
 
-function initPyroscope(logger: rpc.Logger): void {
-    const server = process.env.PYROSCOPE_SERVER_ADDRESS;
+function initPyroscope(logger: rpc.Logger): any {
+    // Strip trailing slashes: the SDK builds the ingest URL as `${serverAddress}/ingest`,
+    // so a trailing slash produces `//ingest`, which the server normalizes via redirect —
+    // and undici downgrades the redirected POST to a GET, silently dropping all profiles.
+    const server = (process.env.PYROSCOPE_SERVER_ADDRESS || '').replace(/\/+$/, '');
     if (!server) {
-        return;
+        return undefined;
     }
     let Pyroscope: any;
     try {
         Pyroscope = require('@pyroscope/nodejs');
     } catch {
         logger.warn('PYROSCOPE_SERVER_ADDRESS set but @pyroscope/nodejs not installed; profiling disabled');
-        return;
+        return undefined;
     }
     const tags: Record<string, string> = {runtime: 'node'};
     for (const pair of (process.env.PYROSCOPE_TAGS || '').split(',')) {
@@ -54,8 +57,12 @@ function initPyroscope(logger: rpc.Logger): void {
         appName: process.env.PYROSCOPE_APPLICATION_NAME || 'modcli',
         serverAddress: server,
         tags,
+        wall: {
+            collectCpuTime: true,
+        },
     });
     Pyroscope.start();
+    return Pyroscope;
 }
 
 interface ProgramOptions {
@@ -80,39 +87,45 @@ async function main() {
 
     const options = program.opts() as ProgramOptions;
 
+    let recipeCleanup: (() => Promise<void>) | undefined;
     let recipeInstallDir: string;
     if (!options.recipeInstallDir) {
-        let recipeCleanup: () => Promise<void>;
-
-        async function setupRecipeDir() {
-            const {path, cleanup} = await dir({unsafeCleanup: true});
-            recipeCleanup = cleanup;
-            return path;
-        }
-
-        // Register cleanup on exit
-        process.on('SIGINT', async () => {
-            if (recipeCleanup) {
-                await recipeCleanup();
-            }
-            // Clean up old dependency workspaces (older than 24 hours)
-            DependencyWorkspace.cleanupOldWorkspaces();
-            process.exit(0);
-        });
-
-        process.on('SIGTERM', async () => {
-            if (recipeCleanup) {
-                await recipeCleanup();
-            }
-            // Clean up old dependency workspaces (older than 24 hours)
-            DependencyWorkspace.cleanupOldWorkspaces();
-            process.exit(0);
-        });
-
-        recipeInstallDir = await setupRecipeDir();
+        const {path, cleanup} = await dir({unsafeCleanup: true});
+        recipeCleanup = cleanup;
+        recipeInstallDir = path;
     } else {
         recipeInstallDir = options.recipeInstallDir;
     }
+
+    // Single graceful-shutdown path used by SIGINT, SIGTERM, and connection
+    // close. The connection-close path is what catches parent SIGKILL: when
+    // the host JVM is killed, our stdin closes, vscode-jsonrpc fires onClose,
+    // and we exit. Without it, Pyroscope (or any other ref-holder) can keep
+    // the event loop alive and orphan this process.
+    let pyroscope: any;
+    let shuttingDown = false;
+    const shutdown = async () => {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        try {
+            if (pyroscope) {
+                try {
+                    await pyroscope.stop();
+                } catch (e: any) {
+                    // best-effort flush; nothing to do if it fails during shutdown
+                }
+            }
+            if (recipeCleanup) {
+                await recipeCleanup();
+            }
+            DependencyWorkspace.cleanupOldWorkspaces();
+        } finally {
+            process.exit(0);
+        }
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
 
     const log = options.logFile ? fs.createWriteStream(options.logFile, {flags: 'a'}) : undefined;
     const logger: rpc.Logger = {
@@ -124,7 +137,7 @@ async function main() {
         log: (msg: string) => log && options.traceRpcMessages && log.write(`[js trace] ${msg}\n`)
     };
 
-    initPyroscope(logger);
+    pyroscope = initPyroscope(logger);
 
     // Create the connection with the custom logger
     const connection = rpc.createMessageConnection(
@@ -148,6 +161,7 @@ async function main() {
 
     connection.onClose(() => {
         logger.info(`connection closed`);
+        void shutdown();
     })
 
     connection.onDispose(() => {

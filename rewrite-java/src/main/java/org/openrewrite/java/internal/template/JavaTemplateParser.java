@@ -19,15 +19,18 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.RandomizeIdVisitor;
 import org.openrewrite.java.internal.JavaTypeFactory;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
@@ -44,17 +47,6 @@ public class JavaTemplateParser {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("#{", "}", null);
 
     private static final String TEMPLATE_CACHE_MESSAGE_KEY = "__org.openrewrite.java.internal.template.JavaTemplateParser.cache__";
-
-    /**
-     * Key for a {@link JavaTypeFactory.Provider} on a cursor (looked up via
-     * {@link Cursor#getNearestMessage}). When present, template parsers install
-     * the provider on the internal {@link JavaParser.Builder}, which invokes it
-     * with the parser's resolved classpath at build time — enabling partition-
-     * backed type resolution (proxies match those on the surrounding AST) and
-     * reuse of types resolved during the main parse. Per-file cursors may
-     * override the root default to provide per-classpath factories.
-     */
-    public static final String TYPE_FACTORY_PROVIDER_KEY = "org.openrewrite.java.typeFactoryProvider";
 
     private static final String PACKAGE_STUB = "package #{}; class $Template {}";
     private static final String PARAMETER_STUB = "abstract class $Template { abstract void $template(#{}); }";
@@ -288,9 +280,9 @@ public class JavaTemplateParser {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
-        JavaTypeFactory.Provider typeFactoryProvider = cursor.getNearestMessage(TYPE_FACTORY_PROVIDER_KEY);
-        if (parser instanceof JavaParser.Builder && typeFactoryProvider != null) {
-            ((JavaParser.Builder<?, ?>) parser).typeFactoryProvider(typeFactoryProvider);
+        JavaTypeFactory typeFactory = enclosingTypeFactory(cursor);
+        if (parser instanceof JavaParser.Builder && typeFactory != null) {
+            ((JavaParser.Builder<?, ?>) parser).typeFactory(typeFactory);
         }
         Parser jp = parser.build();
         return getJavaSourceFile(stub, jp, ctx)
@@ -304,6 +296,19 @@ public class JavaTemplateParser {
                 // TLDR: I suspect either a bug in Java Compiler, or some fault in how we call its internals.
                 .orElseGet(() -> getJavaSourceFile(stub, jp, ctx)
                         .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java:\n" + stub)));
+    }
+
+    /**
+     * Resolve the {@link JavaTypeFactory} that should back snippet parsing for templates
+     * applied inside this cursor's enclosing source file. The factory is carried on the
+     * file's {@link JavaSourceSet} marker when the source file's parser had one attached;
+     * returns {@code null} otherwise and callers fall back to a fresh factory.
+     */
+    private static @Nullable JavaTypeFactory enclosingTypeFactory(Cursor cursor) {
+        return cursor.firstEnclosingOrThrow(SourceFile.class)
+                .getMarkers().findFirst(JavaSourceSet.class)
+                .map(JavaSourceSet::getTypeFactory)
+                .orElse(null);
     }
 
     private static Optional<JavaSourceFile> getJavaSourceFile(@Language("java") String stub, Parser jp, ExecutionContext ctx) {
