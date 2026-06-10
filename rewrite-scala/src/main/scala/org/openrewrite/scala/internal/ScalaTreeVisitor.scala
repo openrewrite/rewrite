@@ -6229,11 +6229,9 @@ class ScalaTreeVisitor(
 
     // Visit a parameter list from source, returning J.Lambda.Parameters and advancing cursor past `)`
     def visitParamListAsLambdaParams(params: List[Trees.ValDef[?]]): J.Lambda.Parameters = {
-      val searchEnd = Math.min(cursor + 50, source.length)
-      val searchText = source.substring(cursor, searchEnd)
-      val parenIdx = positionOfNextIn(searchText, "(", 0)
-      val parenSpace = if (parenIdx > 0) Space.format(searchText.substring(0, parenIdx)) else Space.EMPTY
-      if (parenIdx >= 0) cursor = cursor + parenIdx + 1
+      val parenIdx = positionOfNextIn(source, "(", cursor)
+      val parenSpace = if (parenIdx > cursor) Space.format(source.substring(cursor, parenIdx)) else Space.EMPTY
+      if (parenIdx >= 0) cursor = parenIdx + 1
 
       val jParams = new util.ArrayList[JRightPadded[J]]()
       params.zipWithIndex.foreach { case (vd, idx) =>
@@ -6267,16 +6265,37 @@ class ScalaTreeVisitor(
         jParams.add(new JRightPadded(param.asInstanceOf[J], afterParam, Markers.EMPTY))
       }
 
-      // Find closing paren
+      // Find closing paren — search the full remaining source (comment-aware) so a
+      // long trailing line comment before `)` doesn't push it outside a fixed window.
       val lastParamEnd = if (params.nonEmpty) Math.max(0, params.last.span.end - offsetAdjustment) else cursor
       cursor = Math.max(cursor, lastParamEnd)
       if (cursor < source.length) {
-        val remaining = source.substring(cursor, Math.min(cursor + 50, source.length))
-        val closeParen = positionOfNextIn(remaining, ")", 0)
-        if (closeParen >= 0) cursor = cursor + closeParen + 1
+        val closeParen = positionOfNextIn(source, ")", cursor)
+        if (closeParen >= 0) cursor = closeParen + 1
       }
 
       new J.Lambda.Parameters(Tree.randomId(), parenSpace, Markers.EMPTY, true, jParams)
+    }
+
+    // Build an empty parameter list `()`, advancing the cursor past `)`. Any interior
+    // whitespace/comments (e.g. `( // note\n)`) are preserved as a J.Empty element so
+    // the list round-trips; a truly empty `()` keeps a zero-element container.
+    def buildEmptyParamList(): JContainer[Statement] = {
+      val parenIdx = positionOfNextIn(source, "(", cursor)
+      val parenSpace = if (parenIdx > cursor) Space.format(source.substring(cursor, parenIdx)) else Space.EMPTY
+      val elements = new util.ArrayList[JRightPadded[Statement]]()
+      if (parenIdx >= 0) {
+        cursor = parenIdx + 1
+        val closeParen = positionOfNextIn(source, ")", cursor)
+        if (closeParen >= 0) {
+          if (closeParen > cursor) {
+            val interior = new J.Empty(Tree.randomId(), Space.format(source.substring(cursor, closeParen)), Markers.EMPTY)
+            elements.add(new JRightPadded(interior.asInstanceOf[Statement], Space.EMPTY, Markers.EMPTY))
+          }
+          cursor = closeParen + 1
+        }
+      }
+      JContainer.build(parenSpace, elements, Markers.EMPTY)
     }
 
     // Handle value parameters — first list goes in J.MethodDeclaration.parameters,
@@ -6286,11 +6305,9 @@ class ScalaTreeVisitor(
       val firstList = valueParamLists.head.collect { case vd: Trees.ValDef[?] => vd }
       if (firstList.nonEmpty) {
         // Build first list as JContainer for J.MethodDeclaration
-        val searchEnd = Math.min(cursor + 50, source.length)
-        val searchText = source.substring(cursor, searchEnd)
-        val parenIdx = positionOfNextIn(searchText, "(", 0)
-        val parenSpace = if (parenIdx > 0) Space.format(searchText.substring(0, parenIdx)) else Space.EMPTY
-        if (parenIdx >= 0) cursor = cursor + parenIdx + 1
+        val parenIdx = positionOfNextIn(source, "(", cursor)
+        val parenSpace = if (parenIdx > cursor) Space.format(source.substring(cursor, parenIdx)) else Space.EMPTY
+        if (parenIdx >= 0) cursor = parenIdx + 1
 
         val jParams = new util.ArrayList[JRightPadded[Statement]]()
         firstList.zipWithIndex.foreach { case (vd, idx) =>
@@ -6326,9 +6343,8 @@ class ScalaTreeVisitor(
         val lastParamEnd = if (firstList.nonEmpty) Math.max(0, firstList.last.span.end - offsetAdjustment) else cursor
         cursor = Math.max(cursor, lastParamEnd)
         if (cursor < source.length) {
-          val remaining = source.substring(cursor, Math.min(cursor + 50, source.length))
-          val closeParen = positionOfNextIn(remaining, ")", 0)
-          if (closeParen >= 0) cursor = cursor + closeParen + 1
+          val closeParen = positionOfNextIn(source, ")", cursor)
+          if (closeParen >= 0) cursor = closeParen + 1
         }
 
         // Build additional param lists as J.Lambda.Parameters for later wrapping
@@ -6341,36 +6357,14 @@ class ScalaTreeVisitor(
 
         JContainer.build(parenSpace, jParams, Markers.EMPTY)
       } else if (hasParensInSource) {
-        // Empty parameter list ()
-        val searchEnd = Math.min(cursor + 50, source.length)
-        val searchText = source.substring(cursor, searchEnd)
-        val parenIdx = positionOfNextIn(searchText, "(", 0)
-        val parenSpace = if (parenIdx > 0) Space.format(searchText.substring(0, parenIdx)) else Space.EMPTY
-        if (parenIdx >= 0) {
-          cursor = cursor + parenIdx + 1
-          val afterSearch = source.substring(cursor, Math.min(cursor + 50, source.length))
-          val closeParen = positionOfNextIn(afterSearch, ")", 0)
-          if (closeParen >= 0) cursor = cursor + closeParen + 1
-        }
-        JContainer.build(parenSpace, new util.ArrayList[JRightPadded[Statement]](), Markers.EMPTY)
+        buildEmptyParamList()
       } else {
         // Parameterless method — mark so printer omits ()
         JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
           Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))))
       }
     } else if (hasParensInSource) {
-      // Empty parameter list ()
-      val searchEnd = Math.min(cursor + 50, source.length)
-      val searchText = source.substring(cursor, searchEnd)
-      val parenIdx = positionOfNextIn(searchText, "(", 0)
-      val parenSpace = if (parenIdx > 0) Space.format(searchText.substring(0, parenIdx)) else Space.EMPTY
-      if (parenIdx >= 0) {
-        cursor = cursor + parenIdx + 1
-        val afterSearch = source.substring(cursor, Math.min(cursor + 50, source.length))
-        val closeParen = positionOfNextIn(afterSearch, ")", 0)
-        if (closeParen >= 0) cursor = cursor + closeParen + 1
-      }
-      JContainer.build(parenSpace, new util.ArrayList[JRightPadded[Statement]](), Markers.EMPTY)
+      buildEmptyParamList()
     } else {
       // Parameterless method — mark so printer omits ()
       JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
