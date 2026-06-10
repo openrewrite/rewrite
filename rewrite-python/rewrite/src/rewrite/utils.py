@@ -111,6 +111,17 @@ def random_id() -> int:
     return int.from_bytes(os.urandom(16), 'big')
 
 
+def id_to_str(value: int) -> str:
+    """Format a 128-bit int id as a canonical UUID string without building a UUID.
+
+    Equivalent to ``str(UUID(int=value))`` but skips the wrapper allocation and
+    ``UUID.__str__``'s re-derivation — this is the hot path when serialising ids
+    over the RPC wire (one per node).
+    """
+    h = '%032x' % value
+    return f'{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}'
+
+
 def id_to_int(value) -> int:
     """Normalise an id (UUID, canonical string, or int) to its 128-bit int form.
 

@@ -33,7 +33,7 @@ from rewrite.python.tree import (
     Star, NamedArgument, TypeHintedExpression, ErrorFrom, MatchCase, Slice
 )
 from rewrite.rpc.receive_queue import RpcReceiveQueue
-from rewrite.utils import replace_if_changed, random_id, id_to_int
+from rewrite.utils import replace_if_changed, random_id, id_to_int, id_to_str
 
 T = TypeVar('T')
 E = TypeVar('E', bound=Enum)
@@ -1123,14 +1123,14 @@ def _register_marker_codecs():
 
     # Send codecs
     def _send_semicolon(marker: Semicolon, q: RpcSendQueue) -> None:
-        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: id_to_str(x._id))
 
     def _send_trailing_comma(marker: TrailingComma, q: RpcSendQueue) -> None:
-        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: id_to_str(x._id))
         q.get_and_send(marker, lambda x: x.suffix, lambda s: _get_sender()._visit_space(s, q))
 
     def _send_omit_parentheses(marker: OmitParentheses, q: RpcSendQueue) -> None:
-        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: id_to_str(x._id))
 
 
     # Use register_codec_with_both_names to ensure the sender can look up Java type names
@@ -1258,7 +1258,7 @@ def _send_search_result(marker, q):
     Fields are sent in the order expected by Java's SearchResult.rpcReceive():
     id, description
     """
-    q.get_and_send(marker, lambda x: str(x.id))
+    q.get_and_send(marker, lambda x: id_to_str(x._id))
     q.get_and_send(marker, lambda x: x.description)
 
 
@@ -1268,7 +1268,7 @@ def _send_parse_exception_result(marker, q):
     Fields are sent in the order expected by Java's ParseExceptionResult.rpcReceive():
     id, parserType, exceptionType, message, treeType
     """
-    q.get_and_send(marker, lambda x: str(x.id))
+    q.get_and_send(marker, lambda x: id_to_str(x._id))
     q.get_and_send(marker, lambda x: x.parser_type)
     q.get_and_send(marker, lambda x: x.exception_type)
     q.get_and_send(marker, lambda x: x.message)
@@ -1296,7 +1296,7 @@ def _send_markup_marker(marker, q):
     All four share the same fields in the same order: id, message, detail.
     Matches Java's Markup.{Warn,Error,Info,Debug}.rpcSend().
     """
-    q.get_and_send(marker, lambda x: str(x.id))
+    q.get_and_send(marker, lambda x: id_to_str(x._id))
     q.get_and_send(marker, lambda x: x.message)
     q.get_and_send(marker, lambda x: x.detail)
 
@@ -1830,7 +1830,7 @@ def _send_parse_error(parse_error, q):
     id, markers, sourcePath, charset.name(), charsetBomMarked, checksum, fileAttributes, text
     """
     # Send all fields in order (matching Java's ParseError.rpcSend)
-    q.get_and_send(parse_error, lambda x: str(x.id))
+    q.get_and_send(parse_error, lambda x: id_to_str(x._id))
     q.get_and_send(parse_error, lambda x: x.markers)
     q.get_and_send(parse_error, lambda x: str(x.source_path))
     q.get_and_send(parse_error, lambda x: x.charset_name)
@@ -1871,7 +1871,7 @@ def _register_python_marker_codecs():
         return marker.with_id(new_id)
 
     def _send_keyword_arguments(marker: KeywordArguments, q: RpcSendQueue) -> None:
-        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: id_to_str(x._id))
 
     register_codec_with_both_names(
         'org.openrewrite.python.marker.KeywordArguments',
@@ -1889,7 +1889,7 @@ def _register_python_marker_codecs():
         return marker.with_id(new_id)
 
     def _send_keyword_only_arguments(marker: KeywordOnlyArguments, q: RpcSendQueue) -> None:
-        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: id_to_str(x._id))
 
     register_codec_with_both_names(
         'org.openrewrite.python.marker.KeywordOnlyArguments',
@@ -1913,7 +1913,7 @@ def _register_python_marker_codecs():
         return result
 
     def _send_quoted(marker: Quoted, q: RpcSendQueue) -> None:
-        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: id_to_str(x._id))
         q.get_and_send(marker, lambda x: x.style)
 
     register_codec_with_both_names(
@@ -1932,7 +1932,7 @@ def _register_python_marker_codecs():
         return marker.with_id(new_id)
 
     def _send_suppress_newline(marker: SuppressNewline, q: RpcSendQueue) -> None:
-        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: id_to_str(x._id))
 
     register_codec_with_both_names(
         'org.openrewrite.python.marker.SuppressNewline',
@@ -1961,7 +1961,7 @@ def _register_python_marker_codecs():
         return result
 
     def _send_print_syntax(marker: PrintSyntax, q: RpcSendQueue) -> None:
-        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: id_to_str(x._id))
         q.get_and_send(marker, lambda x: x.has_destination)
         q.get_and_send(marker, lambda x: x.trailing_comma)
 
@@ -1981,7 +1981,7 @@ def _register_python_marker_codecs():
         return marker.with_id(new_id)
 
     def _send_exec_syntax(marker: ExecSyntax, q: RpcSendQueue) -> None:
-        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: id_to_str(x._id))
 
     register_codec_with_both_names(
         'org.openrewrite.python.marker.ExecSyntax',
@@ -2146,7 +2146,7 @@ def _register_python_resolution_result_codecs():
         )
 
     def _send_resolution_result(marker: PRR, q: RpcSendQueue) -> None:
-        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: id_to_str(x._id))
         q.get_and_send(marker, lambda x: x.name)
         q.get_and_send(marker, lambda x: x.version)
         q.get_and_send(marker, lambda x: x.description)
