@@ -25,10 +25,14 @@ P = TypeVar('P')
 class Tree(ABC):
     __slots__ = ()
 
+    # Identity is stored on subclasses as a 128-bit int in `_id` (the UUID's own
+    # internal representation), saving the ~64-byte `uuid.UUID` wrapper per node.
+    # The public `id` property reconstructs a `UUID` lazily so the API is unchanged;
+    # equality/hashing/scope checks below compare the raw `_id` int to stay off the
+    # allocation path.
     @property
-    @abstractmethod
     def id(self) -> UUID:
-        ...
+        return UUID(int=self._id)  # ty: ignore[unresolved-attribute]  # _id is declared on concrete subclasses
 
     @property
     @abstractmethod
@@ -52,15 +56,15 @@ class Tree(ABC):
         return cursor.first_enclosing_or_throw(SourceFile).printer(cursor)
 
     def is_scope(self, tree: Optional[Tree]) -> bool:
-        return tree is not None and tree.id == self.id
+        return tree is not None and tree._id == self._id  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
 
     def __eq__(self, other: object) -> bool:
         if self.__class__ == other.__class__:
-            return self.id == cast(Tree, other).id
+            return self._id == cast(Tree, other)._id  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
         return False
 
     def __hash__(self) -> int:
-        return hash(self.id)
+        return hash(self._id)  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
 
     def replace(self, **kwargs) -> 'Tree':
         """Replace fields on this tree node, returning self if nothing changed."""

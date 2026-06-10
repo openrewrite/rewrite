@@ -11,18 +11,10 @@ from rewrite.java.support_types import Space
 class Semicolon(Marker):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
 @dataclass(frozen=True, eq=False, slots=True)
 class TrailingComma(Marker):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
     _suffix: Space
 
@@ -35,6 +27,3 @@ class TrailingComma(Marker):
 class OmitParentheses(Marker):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id

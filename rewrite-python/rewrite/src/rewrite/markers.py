@@ -16,10 +16,11 @@ from .utils import random_id, list_map, replace_if_changed
 class Marker(ABC):
     __slots__ = ()
 
+    # Like Tree, the id is stored as a 128-bit int in `_id` on concrete markers;
+    # `id` reconstructs a UUID lazily and eq/hash compare the raw int.
     @property
-    @abstractmethod
     def id(self) -> UUID:
-        ...
+        return UUID(int=self._id)  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
 
     def replace(self, **kwargs) -> 'Marker':
         """Replace fields on this marker, returning self if nothing changed."""
@@ -30,11 +31,11 @@ class Marker(ABC):
 
     def __eq__(self, other: object) -> bool:
         if self.__class__ == other.__class__:
-            return self.id == cast(Marker, other).id
+            return self._id == cast(Marker, other)._id  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
         return False
 
     def __hash__(self) -> int:
-        return hash(self.id)
+        return hash(self._id)  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
 
 
 M = TypeVar('M', bound=Marker)
@@ -46,7 +47,7 @@ class Markers:
 
     @property
     def id(self) -> UUID:
-        return self._id
+        return UUID(int=self._id)  # _id stored as int internally; public API stays UUID
 
     _markers: List[Marker]
 
@@ -81,11 +82,11 @@ class Markers:
 
     def __eq__(self, other: object) -> bool:
         if self.__class__ == other.__class__:
-            return self.id == cast(Markers, other).id
+            return self._id == cast(Markers, other)._id
         return False
 
     def __hash__(self) -> int:
-        return hash(self.id)
+        return hash(self._id)
 
     @classmethod
     def build(cls, id: UUID, markers: List[Marker]) -> Markers:
@@ -98,10 +99,6 @@ Markers.EMPTY = Markers(random_id(), [])
 @dataclass(frozen=True, eq=False, slots=True)
 class SearchResult(Marker):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
     _description: Optional[str]
 
@@ -191,10 +188,6 @@ class MarkupWarn(Markup):
     _detail: Optional[str] = None
 
     @property
-    def id(self) -> UUID:
-        return self._id
-
-    @property
     def message(self) -> str:
         return self._message
 
@@ -209,10 +202,6 @@ class MarkupError(Markup):
     _id: UUID
     _message: str
     _detail: Optional[str] = None
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
     @property
     def message(self) -> str:
@@ -231,10 +220,6 @@ class MarkupInfo(Markup):
     _detail: Optional[str] = None
 
     @property
-    def id(self) -> UUID:
-        return self._id
-
-    @property
     def message(self) -> str:
         return self._message
 
@@ -251,10 +236,6 @@ class MarkupDebug(Markup):
     _detail: Optional[str] = None
 
     @property
-    def id(self) -> UUID:
-        return self._id
-
-    @property
     def message(self) -> str:
         return self._message
 
@@ -266,10 +247,6 @@ class MarkupDebug(Markup):
 @dataclass(frozen=True, eq=False, slots=True)
 class UnknownJavaMarker(Marker):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
     _data: Dict[str, Any]
 
@@ -287,10 +264,6 @@ class ParseExceptionResult(Marker):
                    ''.join(traceback.format_exception(exc_type, exc_value, exc_tb)))
 
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
     _parser_type: str
 

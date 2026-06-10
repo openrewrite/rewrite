@@ -6,42 +6,31 @@ from typing import Optional, List, Dict
 from uuid import UUID
 
 from rewrite import Marker
+from rewrite.utils import replace_if_changed
 
 
 @dataclass(frozen=True, eq=False, slots=True)
 class KeywordArguments(Marker):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> 'KeywordArguments':
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
 
 @dataclass(frozen=True, eq=False, slots=True)
 class KeywordOnlyArguments(Marker):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> 'KeywordOnlyArguments':
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
 
 @dataclass(frozen=True, eq=False, slots=True)
 class Quoted(Marker):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> Quoted:
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
     _style: Style
 
@@ -80,12 +69,8 @@ class SuppressNewline(Marker):
     """Marker to suppress trailing newline in compilation units."""
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> 'SuppressNewline':
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
 
 @dataclass(frozen=True, eq=False, slots=True)
@@ -97,12 +82,8 @@ class LegacyNotEqual(Marker):
     """
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> 'LegacyNotEqual':
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
 
 @dataclass(frozen=True, eq=False, slots=True)
@@ -115,12 +96,8 @@ class RaiseTuple(Marker):
     """
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> 'RaiseTuple':
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
 
 @dataclass(frozen=True, eq=False, slots=True)
@@ -132,12 +109,8 @@ class TupleExceptClause(Marker):
     """
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> 'TupleExceptClause':
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
 
 @dataclass(frozen=True, eq=False, slots=True)
@@ -153,12 +126,8 @@ class PrintSyntax(Marker):
     _has_destination: bool
     _trailing_comma: bool
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> 'PrintSyntax':
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
     @property
     def has_destination(self) -> bool:
@@ -186,12 +155,8 @@ class ExecSyntax(Marker):
     """
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> 'ExecSyntax':
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
 
 @dataclass(frozen=True, eq=False, slots=True)
@@ -328,12 +293,8 @@ class PythonResolutionResult(Marker):
     _package_manager: Optional[PackageManager]
     _source_indexes: Optional[List[SourceIndex]]
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> PythonResolutionResult:
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
     @property
     def name(self) -> Optional[str]:

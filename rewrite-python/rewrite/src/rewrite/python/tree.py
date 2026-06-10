@@ -24,10 +24,6 @@ from rewrite.python.support_types import Py, P
 class Async(Py, Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -57,10 +53,6 @@ class Async(Py, Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class Await(Py, Expression):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -98,10 +90,6 @@ class Await(Py, Expression):
 @dataclass(frozen=True, eq=False, slots=True)
 class Binary(Py, Expression, TypedTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -197,10 +185,6 @@ class Binary(Py, Expression, TypedTree):
 class ChainedAssignment(Py, Statement, TypedTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -271,10 +255,6 @@ class ChainedAssignment(Py, Statement, TypedTree):
 class ExceptionType(Py, TypeTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -319,10 +299,6 @@ class ExceptionType(Py, TypeTree):
 class LiteralType(Py, Expression, TypeTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -360,10 +336,6 @@ class LiteralType(Py, Expression, TypeTree):
 class TypeHint(Py, TypeTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -400,10 +372,6 @@ class TypeHint(Py, TypeTree):
 @dataclass(frozen=True, eq=False, slots=True)
 class CompilationUnit(Py, JavaSourceFile, SourceFile):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -521,10 +489,6 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
 class ExpressionStatement(Py, Expression, Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     @property
     def prefix(self) -> Space:
@@ -548,10 +512,6 @@ class ExpressionStatement(Py, Expression, Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class ExpressionTypeTree(Py, Expression, TypeTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -582,10 +542,6 @@ class ExpressionTypeTree(Py, Expression, TypeTree):
 @dataclass(frozen=True, eq=False, slots=True)
 class StatementExpression(Py, Expression, Statement):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     @property
@@ -621,10 +577,6 @@ class StatementExpression(Py, Expression, Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class MultiImport(Py, Statement):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -700,10 +652,6 @@ class MultiImport(Py, Statement):
 class KeyValue(Py, Expression, TypedTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -774,10 +722,6 @@ class KeyValue(Py, Expression, TypedTree):
 class DictLiteral(Py, Expression, TypedTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -845,10 +789,6 @@ class CollectionLiteral(Py, Expression, TypedTree):
         TUPLE = 2
 
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -920,10 +860,6 @@ class CollectionLiteral(Py, Expression, TypedTree):
 class FormattedString(Py, Expression, TypedTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -970,12 +906,8 @@ class FormattedString(Py, Expression, TypedTree):
 
         _id: UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
         def with_id(self, id: UUID) -> FormattedString.Value:
-            return self if id is self._id else dataclass_replace(self, _id=id)
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -1072,10 +1004,6 @@ class FormattedString(Py, Expression, TypedTree):
 class Pass(Py, Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1098,10 +1026,6 @@ class Pass(Py, Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class TrailingElseWrapper(Py, Statement):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -1172,10 +1096,6 @@ class ComprehensionExpression(Py, Expression):
 
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1231,12 +1151,8 @@ class ComprehensionExpression(Py, Expression):
     class Condition(Py):
         _id: UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
         def with_id(self, id: UUID) -> ComprehensionExpression.Condition:
-            return self if id is self._id else dataclass_replace(self, _id=id)
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -1273,12 +1189,8 @@ class ComprehensionExpression(Py, Expression):
     class Clause(Py):
         _id: UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
         def with_id(self, id: UUID) -> ComprehensionExpression.Clause:
-            return self if id is self._id else dataclass_replace(self, _id=id)
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -1375,10 +1287,6 @@ class ComprehensionExpression(Py, Expression):
 class TypeAlias(Py, Statement, TypedTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1460,10 +1368,6 @@ class TypeAlias(Py, Statement, TypedTree):
 class YieldFrom(Py, Expression):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1500,10 +1404,6 @@ class YieldFrom(Py, Expression):
 @dataclass(frozen=True, eq=False, slots=True)
 class UnionType(Py, Expression, TypeTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -1572,10 +1472,6 @@ class VariableScope(Py, Statement):
 
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1639,10 +1535,6 @@ class VariableScope(Py, Statement):
 class Del(Py, Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1703,10 +1595,6 @@ class SpecialParameter(Py, TypeTree):
 
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1755,10 +1643,6 @@ class Star(Py, Expression, TypeTree):
 
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1802,10 +1686,6 @@ class Star(Py, Expression, TypeTree):
 @dataclass(frozen=True, eq=False, slots=True)
 class NamedArgument(Py, Expression):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -1877,10 +1757,6 @@ class NamedArgument(Py, Expression):
 class TypeHintedExpression(Py, Expression):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1924,10 +1800,6 @@ class TypeHintedExpression(Py, Expression):
 @dataclass(frozen=True, eq=False, slots=True)
 class ErrorFrom(Py, Expression):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -1998,10 +1870,6 @@ class ErrorFrom(Py, Expression):
 @dataclass(frozen=True, eq=False, slots=True)
 class MatchCase(Py, Expression):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -2088,12 +1956,8 @@ class MatchCase(Py, Expression):
 
         _id: UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
         def with_id(self, id: UUID) -> MatchCase.Pattern:
-            return self if id is self._id else dataclass_replace(self, _id=id)
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -2176,10 +2040,6 @@ class MatchCase(Py, Expression):
 @dataclass(frozen=True, eq=False, slots=True)
 class Slice(Py, Expression, TypedTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space

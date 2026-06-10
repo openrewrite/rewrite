@@ -14,7 +14,7 @@
 
 """Tests for placeholder replacement visitor."""
 
-from uuid import uuid4
+from rewrite import random_id
 
 from rewrite.java import tree as j
 from rewrite.java.support_types import JLeftPadded, Space
@@ -26,7 +26,7 @@ from rewrite.python.template.replacement import PlaceholderReplacementVisitor
 
 
 def _ident(name):
-    return j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], name, None, None)
+    return j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], name, None, None)
 
 
 class TestPlaceholderReplacement:
@@ -147,7 +147,7 @@ class TestMethodInvocationReplacement:
 def _make_binary(left, op, right):
     """Helper to construct a j.Binary node."""
     return j.Binary(
-        uuid4(), Space.EMPTY, Markers.EMPTY,
+        random_id(), Space.EMPTY, Markers.EMPTY,
         left,
         JLeftPadded(Space([], ' '), op, Markers.EMPTY),
         right,
@@ -158,7 +158,7 @@ def _make_binary(left, op, right):
 def _make_py_binary(left, op, right):
     """Helper to construct a py.Binary node."""
     return py.Binary(
-        uuid4(), Space.EMPTY, Markers.EMPTY,
+        random_id(), Space.EMPTY, Markers.EMPTY,
         left,
         JLeftPadded(Space([], ' '), op, Markers.EMPTY),
         None,   # negation
@@ -362,7 +362,7 @@ class TestBlockStatementPlaceholder:
             "if True:\n    {body}", {'body': capture('body')}
         )
         return_stmt = j.Return(
-            uuid4(), Space([], '    '), Markers.EMPTY, _ident('result')
+            random_id(), Space([], '    '), Markers.EMPTY, _ident('result')
         )
         visitor = PlaceholderReplacementVisitor({'body': return_stmt})
         result = visitor.visit(tree, None)

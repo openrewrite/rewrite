@@ -18,10 +18,6 @@ from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Mar
 class AnnotatedType(Expression, TypeTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -58,10 +54,6 @@ class AnnotatedType(Expression, TypeTree):
 @dataclass(frozen=True, eq=False, slots=True)
 class Annotation(Expression):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -126,10 +118,6 @@ class Annotation(Expression):
 class ArrayAccess(Expression, TypedTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -173,10 +161,6 @@ class ArrayAccess(Expression, TypedTree):
 @dataclass(frozen=True, eq=False, slots=True)
 class ArrayType(TypeTree, Expression):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -229,10 +213,6 @@ class ArrayType(TypeTree, Expression):
 class Assert(Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -269,10 +249,6 @@ class Assert(Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class Assignment(Statement, Expression, TypedTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -343,10 +319,6 @@ class Assignment(Statement, Expression, TypedTree):
 @dataclass(frozen=True, eq=False, slots=True)
 class AssignmentOperation(Statement, Expression, TypedTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -440,10 +412,6 @@ class AssignmentOperation(Statement, Expression, TypedTree):
 @dataclass(frozen=True, eq=False, slots=True)
 class Binary(Expression, TypedTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -543,10 +511,6 @@ class Binary(Expression, TypedTree):
 class Block(Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -621,10 +585,6 @@ class Block(Statement):
 class Break(Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -654,10 +614,6 @@ class Break(Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class Case(Statement):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -755,10 +711,6 @@ class Case(Statement):
 class ClassDeclaration(Statement, TypedTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -852,12 +804,8 @@ class ClassDeclaration(Statement, TypedTree):
     class Kind(J):
         _id: UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
         def with_id(self, id: UUID) -> ClassDeclaration.Kind:
-            return self if id is self._id else replace(self, _id=id)
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -959,10 +907,6 @@ class ClassDeclaration(Statement, TypedTree):
 @dataclass(frozen=True, eq=False, slots=True)
 class CompilationUnit(JavaSourceFile, SourceFile):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -1085,10 +1029,6 @@ class CompilationUnit(JavaSourceFile, SourceFile):
 class Continue(Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1118,10 +1058,6 @@ class Continue(Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class DoWhileLoop(Loop):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -1190,10 +1126,6 @@ class DoWhileLoop(Loop):
 class Empty(Statement, Expression, TypeTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1216,10 +1148,6 @@ class Empty(Statement, Expression, TypeTree):
 @dataclass(frozen=True, eq=False, slots=True)
 class EnumValue(J):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -1264,10 +1192,6 @@ class EnumValue(J):
 @dataclass(frozen=True, eq=False, slots=True)
 class EnumValueSet(Statement):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -1331,10 +1255,6 @@ class EnumValueSet(Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class FieldAccess(TypeTree, Expression, Statement):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -1406,10 +1326,6 @@ class FieldAccess(TypeTree, Expression, Statement):
 class ForEachLoop(Loop):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1444,12 +1360,8 @@ class ForEachLoop(Loop):
     class Control(J):
         _id: UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
         def with_id(self, id: UUID) -> ForEachLoop.Control:
-            return self if id is self._id else replace(self, _id=id)
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -1554,10 +1466,6 @@ class ForEachLoop(Loop):
 class ForLoop(Loop):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1592,12 +1500,8 @@ class ForLoop(Loop):
     class Control(J):
         _id: UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
         def with_id(self, id: UUID) -> ForLoop.Control:
-            return self if id is self._id else replace(self, _id=id)
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -1715,10 +1619,6 @@ class ForLoop(Loop):
 class ParenthesizedTypeTree(TypeTree, Expression):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1755,10 +1655,6 @@ class ParenthesizedTypeTree(TypeTree, Expression):
 @dataclass(frozen=True, eq=False, slots=True)
 class Identifier(TypeTree, Expression):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -1811,10 +1707,6 @@ class Identifier(TypeTree, Expression):
 class If(Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -1856,12 +1748,8 @@ class If(Statement):
     class Else(J):
         _id: UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
         def with_id(self, id: UUID) -> If.Else:
-            return self if id is self._id else replace(self, _id=id)
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -1953,10 +1841,6 @@ class If(Statement):
 class Import(Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -2030,10 +1914,6 @@ class Import(Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class InstanceOf(Expression, TypedTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -2112,10 +1992,6 @@ class InstanceOf(Expression, TypedTree):
 class DeconstructionPattern(TypedTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -2186,10 +2062,6 @@ class DeconstructionPattern(TypedTree):
 class IntersectionType(TypeTree, Expression):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -2245,10 +2117,6 @@ class IntersectionType(TypeTree, Expression):
 @dataclass(frozen=True, eq=False, slots=True)
 class Label(Statement):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -2313,10 +2181,6 @@ class Label(Statement):
 class Lambda(Statement, Expression, TypedTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -2365,12 +2229,8 @@ class Lambda(Statement, Expression, TypedTree):
     class Parameters(J):
         _id: UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
         def with_id(self, id: UUID) -> Lambda.Parameters:
-            return self if id is self._id else replace(self, _id=id)
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -2445,10 +2305,6 @@ class Lambda(Statement, Expression, TypedTree):
 class Literal(Expression, TypedTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -2519,10 +2375,6 @@ class Literal(Expression, TypedTree):
 @dataclass(frozen=True, eq=False, slots=True)
 class MemberReference(TypedTree, MethodCall):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -2622,10 +2474,6 @@ class MemberReference(TypedTree, MethodCall):
 @dataclass(frozen=True, eq=False, slots=True)
 class MethodDeclaration(Statement, TypedTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -2842,10 +2690,6 @@ class MethodDeclaration(Statement, TypedTree):
 class MethodInvocation(Statement, TypedTree, MethodCall):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -2943,10 +2787,6 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
 class Modifier(J):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -3011,10 +2851,6 @@ class Modifier(J):
 class MultiCatch(TypeTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -3070,10 +2906,6 @@ class MultiCatch(TypeTree):
 @dataclass(frozen=True, eq=False, slots=True)
 class NewArray(Expression, TypedTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -3152,10 +2984,6 @@ class NewArray(Expression, TypedTree):
 class ArrayDimension(J):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -3211,10 +3039,6 @@ class ArrayDimension(J):
 @dataclass(frozen=True, eq=False, slots=True)
 class NewClass(Statement, TypedTree, MethodCall):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -3319,10 +3143,6 @@ class NewClass(Statement, TypedTree, MethodCall):
 class NullableType(TypeTree, Expression):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -3386,10 +3206,6 @@ class NullableType(TypeTree, Expression):
 class Package(Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -3426,10 +3242,6 @@ class Package(Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class ParameterizedType(TypeTree, Expression):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -3501,10 +3313,6 @@ class ParameterizedType(TypeTree, Expression):
 class Parentheses(Expression, Generic[J2]):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -3566,10 +3374,6 @@ class Parentheses(Expression, Generic[J2]):
 class ControlParentheses(Expression, Generic[J2]):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -3626,10 +3430,6 @@ class ControlParentheses(Expression, Generic[J2]):
 class Primitive(TypeTree, Expression):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -3660,10 +3460,6 @@ class Primitive(TypeTree, Expression):
 class Return(Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -3693,10 +3489,6 @@ class Return(Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class Switch(Statement):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -3734,10 +3526,6 @@ class Switch(Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class SwitchExpression(Expression, TypedTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -3783,10 +3571,6 @@ class SwitchExpression(Expression, TypedTree):
 class Synchronized(Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -3823,10 +3607,6 @@ class Synchronized(Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class Ternary(Expression, Statement, TypedTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -3909,10 +3689,6 @@ class Ternary(Expression, Statement, TypedTree):
 class Throw(Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -3942,10 +3718,6 @@ class Throw(Statement):
 @dataclass(frozen=True, eq=False, slots=True)
 class Try(Statement):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -3995,12 +3767,8 @@ class Try(Statement):
     class Resource(J):
         _id: UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
         def with_id(self, id: UUID) -> Try.Resource:
-            return self if id is self._id else replace(self, _id=id)
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -4046,12 +3814,8 @@ class Try(Statement):
     class Catch(J):
         _id: UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
         def with_id(self, id: UUID) -> Try.Catch:
-            return self if id is self._id else replace(self, _id=id)
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -4130,10 +3894,6 @@ class Try(Statement):
 class TypeCast(Expression, TypedTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -4170,10 +3930,6 @@ class TypeCast(Expression, TypedTree):
 @dataclass(frozen=True, eq=False, slots=True)
 class TypeParameter(J):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -4252,10 +4008,6 @@ class TypeParameter(J):
 class TypeParameters(J):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -4318,10 +4070,6 @@ class TypeParameters(J):
 @dataclass(frozen=True, eq=False, slots=True)
 class Unary(Statement, Expression, TypedTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -4403,10 +4151,6 @@ class Unary(Statement, Expression, TypedTree):
 class VariableDeclarations(Statement, TypedTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -4469,12 +4213,8 @@ class VariableDeclarations(Statement, TypedTree):
     class NamedVariable(NameTree):
         _id: UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
         def with_id(self, id: UUID) -> VariableDeclarations.NamedVariable:
-            return self if id is self._id else replace(self, _id=id)
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -4593,10 +4333,6 @@ class VariableDeclarations(Statement, TypedTree):
 class WhileLoop(Loop):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -4659,10 +4395,6 @@ class WhileLoop(Loop):
 @dataclass(frozen=True, eq=False, slots=True)
 class Wildcard(Expression, TypeTree):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space
@@ -4731,10 +4463,6 @@ class Wildcard(Expression, TypeTree):
 class Yield(Statement):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -4772,10 +4500,6 @@ class Yield(Statement):
 class Unknown(Statement, Expression, TypeTree):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
 
     _prefix: Space
 
@@ -4803,12 +4527,8 @@ class Unknown(Statement, Expression, TypeTree):
     class Source(J):
         _id: UUID
 
-        @property
-        def id(self) -> UUID:
-            return self._id
-
         def with_id(self, id: UUID) -> Unknown.Source:
-            return self if id is self._id else replace(self, _id=id)
+            return replace_if_changed(self, _id=id)
 
         _prefix: Space
 
@@ -4847,10 +4567,6 @@ class Unknown(Statement, Expression, TypeTree):
 @dataclass(frozen=True, eq=False, slots=True)
 class Erroneous(Statement, Expression):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
 
     _prefix: Space

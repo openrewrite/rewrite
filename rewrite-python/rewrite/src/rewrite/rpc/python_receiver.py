@@ -33,7 +33,7 @@ from rewrite.python.tree import (
     Star, NamedArgument, TypeHintedExpression, ErrorFrom, MatchCase, Slice
 )
 from rewrite.rpc.receive_queue import RpcReceiveQueue
-from rewrite.utils import replace_if_changed
+from rewrite.utils import replace_if_changed, random_id, id_to_int
 
 T = TypeVar('T')
 E = TypeVar('E', bound=Enum)
@@ -86,8 +86,8 @@ class PythonRpcReceiver:
         # wrapped child: the sender skips them here and sends them via the child's preVisit.
         if isinstance(tree, J):
             if isinstance(tree, (ExpressionStatement, StatementExpression)):
-                new_id = q.receive(tree.id)
-                tree = tree.replace(id=new_id) if new_id is not tree.id else tree
+                new_id = q.receive(tree._id)
+                tree = tree.replace(_id=id_to_int(new_id)) if new_id is not tree._id else tree
             else:
                 tree = self._pre_visit(tree, q)
 
@@ -170,13 +170,13 @@ class PythonRpcReceiver:
 
     def _pre_visit(self, j: J, q: RpcReceiveQueue) -> J:
         """Handle common J fields: id, prefix, markers."""
-        new_id = q.receive(j.id)
+        new_id = q.receive(j._id)  # ty: ignore[unresolved-attribute]  # _id on concrete J subclasses
         new_prefix = q.receive(j.prefix)
         new_markers = q.receive_markers(j.markers)
 
         changes = {}
-        if new_id is not j.id:
-            changes['_id'] = new_id
+        if new_id is not j._id:  # ty: ignore[unresolved-attribute]  # _id on concrete J subclasses
+            changes['_id'] = id_to_int(new_id)
         if new_prefix is not j.prefix:
             changes['_prefix'] = new_prefix
         if new_markers is not j.markers:
@@ -1132,28 +1132,27 @@ def _register_marker_codecs():
     def _send_omit_parentheses(marker: OmitParentheses, q: RpcSendQueue) -> None:
         q.get_and_send(marker, lambda x: x.id)
 
-    from uuid import uuid4
 
     # Use register_codec_with_both_names to ensure the sender can look up Java type names
     register_codec_with_both_names(
         'org.openrewrite.java.marker.Semicolon',
         Semicolon,
         _receive_semicolon,
-        lambda: Semicolon(uuid4()),
+        lambda: Semicolon(random_id()),
         _send_semicolon
     )
     register_codec_with_both_names(
         'org.openrewrite.java.marker.TrailingComma',
         TrailingComma,
         _receive_trailing_comma,
-        lambda: TrailingComma(uuid4(), Space.EMPTY),
+        lambda: TrailingComma(random_id(), Space.EMPTY),
         _send_trailing_comma
     )
     register_codec_with_both_names(
         'org.openrewrite.java.marker.OmitParentheses',
         OmitParentheses,
         _receive_omit_parentheses,
-        lambda: OmitParentheses(uuid4()),
+        lambda: OmitParentheses(random_id()),
         _send_omit_parentheses
     )
 
@@ -1218,14 +1217,13 @@ def _receive_comment(comment, q: RpcReceiveQueue):
 def _receive_search_result(marker, q: RpcReceiveQueue):
     """Codec for receiving SearchResult marker."""
     from rewrite.markers import SearchResult
-    from uuid import UUID
 
     # SearchResult sends: id, description
     before_id = str(marker.id) if marker and marker.id else None
     id_str = q.receive(before_id)
     description = q.receive(marker.description if marker else None)
 
-    new_id = UUID(id_str) if id_str else (marker.id if marker else None)
+    new_id = id_to_int(id_str) if id_str else (marker._id if marker else None)
     return SearchResult(_id=new_id, _description=description)
 
 
@@ -1244,8 +1242,7 @@ def _receive_parse_exception_result(marker, q: RpcReceiveQueue):
     message = q.receive(marker.message if marker else None)
     tree_type = q.receive(marker.tree_type if marker else None)
 
-    from uuid import UUID
-    new_id = UUID(id_str) if id_str else (marker.id if marker else None)
+    new_id = id_to_int(id_str) if id_str else (marker._id if marker else None)
     return ParseExceptionResult(
         _id=new_id,
         _parser_type=parser_type,
@@ -1284,13 +1281,12 @@ def _receive_markup_marker(marker, q: RpcReceiveQueue, cls):
     All four share the same fields in the same order: id, message, detail.
     Matches Java's Markup.{Warn,Error,Info,Debug}.rpcReceive().
     """
-    from uuid import UUID
 
     id_str = q.receive(str(marker.id) if marker else None)
     message = q.receive(marker.message if marker else None)
     detail = q.receive(marker.detail if marker else None)
 
-    new_id = UUID(id_str) if id_str else (marker.id if marker else None)
+    new_id = id_to_int(id_str) if id_str else (marker._id if marker else None)
     return cls(_id=new_id, _message=message, _detail=detail)
 
 
@@ -1767,7 +1763,6 @@ def _register_markup_marker_codecs():
     """Register codecs for Markup marker types (Warn, Error, Info, Debug)."""
     from rewrite.markers import MarkupWarn, MarkupError, MarkupInfo, MarkupDebug  # ty: ignore[unresolved-import]
     from rewrite.rpc.receive_queue import register_codec_with_both_names
-    from uuid import uuid4
 
     for java_suffix, py_cls in [
         ('Warn', MarkupWarn),
@@ -1777,7 +1772,7 @@ def _register_markup_marker_codecs():
     ]:
         java_type = f'org.openrewrite.marker.Markup${java_suffix}'
         receive = lambda marker, q, c=py_cls: _receive_markup_marker(marker, q, c)
-        factory = lambda c=py_cls: c(_id=uuid4(), _message='', _detail=None)
+        factory = lambda c=py_cls: c(_id=random_id(), _message='', _detail=None)
         register_codec_with_both_names(java_type, py_cls, receive, factory, _send_markup_marker)
 
 
@@ -1813,8 +1808,7 @@ def _receive_parse_error(parse_error, q: RpcReceiveQueue):
     file_attributes = q.receive(parse_error.file_attributes if parse_error else None)
     text = q.receive(parse_error.text if parse_error else '')
 
-    from uuid import UUID
-    new_id = UUID(id_str) if id_str else (parse_error.id if parse_error else None)
+    new_id = id_to_int(id_str) if id_str else (parse_error._id if parse_error else None)
 
     return ParseError(
         _id=new_id,
@@ -1868,7 +1862,6 @@ def _register_python_marker_codecs():
     )
     from rewrite.rpc.receive_queue import register_codec_with_both_names
     from rewrite.rpc.send_queue import RpcSendQueue
-    from uuid import uuid4
 
     # KeywordArguments - only has id
     def _receive_keyword_arguments(marker: KeywordArguments, q: RpcReceiveQueue) -> KeywordArguments:
@@ -1884,7 +1877,7 @@ def _register_python_marker_codecs():
         'org.openrewrite.python.marker.KeywordArguments',
         KeywordArguments,
         _receive_keyword_arguments,
-        lambda: KeywordArguments(uuid4()),
+        lambda: KeywordArguments(random_id()),
         _send_keyword_arguments
     )
 
@@ -1902,7 +1895,7 @@ def _register_python_marker_codecs():
         'org.openrewrite.python.marker.KeywordOnlyArguments',
         KeywordOnlyArguments,
         _receive_keyword_only_arguments,
-        lambda: KeywordOnlyArguments(uuid4()),
+        lambda: KeywordOnlyArguments(random_id()),
         _send_keyword_only_arguments
     )
 
@@ -1927,7 +1920,7 @@ def _register_python_marker_codecs():
         'org.openrewrite.python.marker.Quoted',
         Quoted,
         _receive_quoted,
-        lambda: Quoted(uuid4(), Quoted.Style.DOUBLE),
+        lambda: Quoted(random_id(), Quoted.Style.DOUBLE),
         _send_quoted
     )
 
@@ -1945,7 +1938,7 @@ def _register_python_marker_codecs():
         'org.openrewrite.python.marker.SuppressNewline',
         SuppressNewline,
         _receive_suppress_newline,
-        lambda: SuppressNewline(uuid4()),
+        lambda: SuppressNewline(random_id()),
         _send_suppress_newline
     )
 
@@ -1976,7 +1969,7 @@ def _register_python_marker_codecs():
         'org.openrewrite.python.marker.PrintSyntax',
         PrintSyntax,
         _receive_print_syntax,
-        lambda: PrintSyntax(uuid4(), False, False),
+        lambda: PrintSyntax(random_id(), False, False),
         _send_print_syntax
     )
 
@@ -1994,7 +1987,7 @@ def _register_python_marker_codecs():
         'org.openrewrite.python.marker.ExecSyntax',
         ExecSyntax,
         _receive_exec_syntax,
-        lambda: ExecSyntax(uuid4()),
+        lambda: ExecSyntax(random_id()),
         _send_exec_syntax
     )
 
@@ -2005,7 +1998,6 @@ def _register_python_resolution_result_codecs():
     from rewrite.python.markers import PythonResolutionResult
     from rewrite.rpc.receive_queue import register_codec_with_both_names, RpcReceiveQueue
     from rewrite.rpc.send_queue import RpcSendQueue
-    from uuid import uuid4
 
     PRR = PythonResolutionResult
     Dep = PRR.Dependency
@@ -2202,7 +2194,7 @@ def _register_python_resolution_result_codecs():
         PRR,
         _receive_resolution_result,
         lambda: PRR(
-            _id=uuid4(), _name=None, _version=None, _description=None,
+            _id=random_id(), _name=None, _version=None, _description=None,
             _license=None, _path='', _requires_python=None, _build_backend=None,
             _build_requires=[], _dependencies=[], _optional_dependencies={},
             _dependency_groups={}, _constraint_dependencies=[],

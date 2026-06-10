@@ -1,6 +1,7 @@
+import os
 from dataclasses import fields as _dataclass_fields, is_dataclass as _is_dataclass, replace as dataclass_replace
 from typing import Any, Callable, Dict, TypeVar, List, Tuple, Union, cast
-from uuid import UUID, uuid4
+from uuid import UUID
 
 T = TypeVar('T')
 
@@ -69,6 +70,9 @@ def replace_if_changed(obj: T, **kwargs) -> T:
             # Handle Python keyword conflicts: from_ -> _from
             private_key = f'_{key.rstrip("_")}'
             if private_key in init_fields:
+                if private_key == '_id':
+                    # Ids are stored as a 128-bit int; normalise UUID/str callers.
+                    value = id_to_int(value)
                 mapped_kwargs[private_key] = value
                 # Use 'or' for short-circuit evaluation - skips check once changed is True
                 changed = changed or _is_changed(getattr(obj, private_key), value)
@@ -76,6 +80,8 @@ def replace_if_changed(obj: T, **kwargs) -> T:
                 mapped_kwargs[key] = value
                 changed = changed or _is_changed(getattr(obj, key), value)
         else:
+            if key == '_id':
+                value = id_to_int(value)
             mapped_kwargs[key] = value
             changed = changed or _is_changed(getattr(obj, key), value)
 
@@ -93,8 +99,32 @@ def replace_if_changed(obj: T, **kwargs) -> T:
     return cast(T, cls(**new_kwargs))
 
 
-def random_id() -> UUID:
-    return uuid4()
+def random_id() -> int:
+    # LST/marker ids are stored internally as a 128-bit int (the UUID's own
+    # representation) to avoid the ~64-byte-per-id `uuid.UUID` wrapper. The public
+    # `.id` properties reconstruct a `UUID` lazily, so the API is unchanged.
+    #
+    # Equivalent to `uuid4().int` but without allocating/discarding a UUID object:
+    # `os.urandom(16)` is the same cryptographic source `uuid4()` uses, and we read
+    # the 128-bit value directly (skipping the v4 version/variant bit-twiddle, which
+    # is irrelevant for an opaque identity).
+    return int.from_bytes(os.urandom(16), 'big')
+
+
+def id_to_int(value) -> int:
+    """Normalise an id (UUID, canonical string, or int) to its 128-bit int form.
+
+    Used at the few boundaries where an id can arrive as something other than the
+    internal int representation (e.g. deserialised from the RPC wire as a string,
+    or passed as a ``uuid.UUID`` by older callers).
+    """
+    if type(value) is int:
+        return value
+    if isinstance(value, UUID):
+        return value.int
+    # Canonical UUID string from the wire ("xxxxxxxx-xxxx-..."); base-16 parsing
+    # hits CPython's power-of-two fast path.
+    return int(value.replace('-', ''), 16)
 
 
 # Define a type that allows both single and two-argument callables
