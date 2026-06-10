@@ -825,4 +825,29 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void curriedParameterListWithTrailingLineComment() {
+        rewriteRun(
+          scala(
+            """
+            def f(a: Int)(
+                b: Int // either the width or the height! the other one will be preserved
+            ): Int = a + b
+            """
+          )
+        );
+    }
+
+    @Test
+    void longLineCommentBeforeParameterList() {
+        rewriteRun(
+          scala(
+            """
+            def resize // either the width or the height! the other one will be preserved
+            (size: Int): Int = 1
+            """
+          )
+        );
+    }
 }

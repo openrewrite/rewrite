@@ -6224,11 +6224,9 @@ class ScalaTreeVisitor(
 
     // Visit a parameter list from source, returning J.Lambda.Parameters and advancing cursor past `)`
     def visitParamListAsLambdaParams(params: List[Trees.ValDef[?]]): J.Lambda.Parameters = {
-      val searchEnd = Math.min(cursor + 50, source.length)
-      val searchText = source.substring(cursor, searchEnd)
-      val parenIdx = positionOfNextIn(searchText, "(", 0)
-      val parenSpace = if (parenIdx > 0) Space.format(searchText.substring(0, parenIdx)) else Space.EMPTY
-      if (parenIdx >= 0) cursor = cursor + parenIdx + 1
+      val parenIdx = positionOfNextIn(source, "(", cursor)
+      val parenSpace = if (parenIdx > cursor) Space.format(source.substring(cursor, parenIdx)) else Space.EMPTY
+      if (parenIdx >= 0) cursor = parenIdx + 1
 
       val jParams = new util.ArrayList[JRightPadded[J]]()
       params.zipWithIndex.foreach { case (vd, idx) =>
@@ -6281,11 +6279,9 @@ class ScalaTreeVisitor(
       val firstList = valueParamLists.head.collect { case vd: Trees.ValDef[?] => vd }
       if (firstList.nonEmpty) {
         // Build first list as JContainer for J.MethodDeclaration
-        val searchEnd = Math.min(cursor + 50, source.length)
-        val searchText = source.substring(cursor, searchEnd)
-        val parenIdx = positionOfNextIn(searchText, "(", 0)
-        val parenSpace = if (parenIdx > 0) Space.format(searchText.substring(0, parenIdx)) else Space.EMPTY
-        if (parenIdx >= 0) cursor = cursor + parenIdx + 1
+        val parenIdx = positionOfNextIn(source, "(", cursor)
+        val parenSpace = if (parenIdx > cursor) Space.format(source.substring(cursor, parenIdx)) else Space.EMPTY
+        if (parenIdx >= 0) cursor = parenIdx + 1
 
         val jParams = new util.ArrayList[JRightPadded[Statement]]()
         firstList.zipWithIndex.foreach { case (vd, idx) =>
@@ -6336,15 +6332,12 @@ class ScalaTreeVisitor(
         JContainer.build(parenSpace, jParams, Markers.EMPTY)
       } else if (hasParensInSource) {
         // Empty parameter list ()
-        val searchEnd = Math.min(cursor + 50, source.length)
-        val searchText = source.substring(cursor, searchEnd)
-        val parenIdx = positionOfNextIn(searchText, "(", 0)
-        val parenSpace = if (parenIdx > 0) Space.format(searchText.substring(0, parenIdx)) else Space.EMPTY
+        val parenIdx = positionOfNextIn(source, "(", cursor)
+        val parenSpace = if (parenIdx > cursor) Space.format(source.substring(cursor, parenIdx)) else Space.EMPTY
         if (parenIdx >= 0) {
-          cursor = cursor + parenIdx + 1
-          val afterSearch = source.substring(cursor, Math.min(cursor + 50, source.length))
-          val closeParen = positionOfNextIn(afterSearch, ")", 0)
-          if (closeParen >= 0) cursor = cursor + closeParen + 1
+          cursor = parenIdx + 1
+          val closeParen = positionOfNextIn(source, ")", cursor)
+          if (closeParen >= 0) cursor = closeParen + 1
         }
         JContainer.build(parenSpace, new util.ArrayList[JRightPadded[Statement]](), Markers.EMPTY)
       } else {
@@ -6354,15 +6347,12 @@ class ScalaTreeVisitor(
       }
     } else if (hasParensInSource) {
       // Empty parameter list ()
-      val searchEnd = Math.min(cursor + 50, source.length)
-      val searchText = source.substring(cursor, searchEnd)
-      val parenIdx = positionOfNextIn(searchText, "(", 0)
-      val parenSpace = if (parenIdx > 0) Space.format(searchText.substring(0, parenIdx)) else Space.EMPTY
+      val parenIdx = positionOfNextIn(source, "(", cursor)
+      val parenSpace = if (parenIdx > cursor) Space.format(source.substring(cursor, parenIdx)) else Space.EMPTY
       if (parenIdx >= 0) {
-        cursor = cursor + parenIdx + 1
-        val afterSearch = source.substring(cursor, Math.min(cursor + 50, source.length))
-        val closeParen = positionOfNextIn(afterSearch, ")", 0)
-        if (closeParen >= 0) cursor = cursor + closeParen + 1
+        cursor = parenIdx + 1
+        val closeParen = positionOfNextIn(source, ")", cursor)
+        if (closeParen >= 0) cursor = closeParen + 1
       }
       JContainer.build(parenSpace, new util.ArrayList[JRightPadded[Statement]](), Markers.EMPTY)
     } else {
