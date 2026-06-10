@@ -8,7 +8,7 @@ from uuid import UUID
 from rewrite import Marker
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class KeywordArguments(Marker):
     _id: UUID
 
@@ -20,7 +20,7 @@ class KeywordArguments(Marker):
         return self if id_ is self._id else replace(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class KeywordOnlyArguments(Marker):
     _id: UUID
 
@@ -32,7 +32,7 @@ class KeywordOnlyArguments(Marker):
         return self if id_ is self._id else replace(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Quoted(Marker):
     _id: UUID
 
@@ -75,7 +75,7 @@ class Quoted(Marker):
             return ""
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class SuppressNewline(Marker):
     """Marker to suppress trailing newline in compilation units."""
     _id: UUID
@@ -88,7 +88,7 @@ class SuppressNewline(Marker):
         return self if id_ is self._id else replace(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class LegacyNotEqual(Marker):
     """Marker for the Python 2 ``<>`` not-equal operator on a :class:`j.Binary`.
 
@@ -105,7 +105,7 @@ class LegacyNotEqual(Marker):
         return self if id_ is self._id else replace(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class RaiseTuple(Marker):
     """Marker for the Python 2 three-argument ``raise E, v, tb`` form on a :class:`j.Throw`.
 
@@ -123,7 +123,7 @@ class RaiseTuple(Marker):
         return self if id_ is self._id else replace(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class TupleExceptClause(Marker):
     """Marker for the Python 2 ``except E, e:`` (comma) form on a J.Try.Catch.
 
@@ -140,7 +140,7 @@ class TupleExceptClause(Marker):
         return self if id_ is self._id else replace(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class PrintSyntax(Marker):
     """Marker indicating a J.MethodInvocation represents a Python 2 print statement.
 
@@ -175,7 +175,7 @@ class PrintSyntax(Marker):
         return self if trailing_comma is self._trailing_comma else replace(self, _trailing_comma=trailing_comma)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ExecSyntax(Marker):
     """Marker indicating a J.MethodInvocation represents a Python 2 exec statement.
 
@@ -194,7 +194,7 @@ class ExecSyntax(Marker):
         return self if id_ is self._id else replace(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class PythonResolutionResult(Marker):
     """Contains metadata about a Python project, parsed from pyproject.toml and uv.lock."""
 
@@ -205,7 +205,7 @@ class PythonResolutionResult(Marker):
         Poetry = auto()
         Pdm = auto()
 
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class SourceIndex:
         _name: str
         _url: str
@@ -232,7 +232,7 @@ class PythonResolutionResult(Marker):
         def with_default_index(self, default_index: bool) -> PythonResolutionResult.SourceIndex:
             return self if default_index is self._default_index else replace(self, _default_index=default_index)
 
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class ResolvedDependency:
         _name: str
         _version: str
@@ -267,7 +267,7 @@ class PythonResolutionResult(Marker):
         def with_dependencies(self, dependencies: Optional[List[PythonResolutionResult.ResolvedDependency]]) -> PythonResolutionResult.ResolvedDependency:
             return self if dependencies is self._dependencies else replace(self, _dependencies=dependencies)
 
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class Dependency:
         _name: str
         _version_constraint: Optional[str]

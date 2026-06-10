@@ -82,12 +82,12 @@ def replace_if_changed(obj: T, **kwargs) -> T:
     if not changed:
         return obj
 
-    # Direct construction from __dict__ + overlay — avoids dataclasses.replace's
-    # per-call walk of __dataclass_fields__. Frozen LST dataclasses still have
-    # __dict__ (no __slots__), so vars() is safe here.
-    obj_dict = obj.__dict__
+    # Direct construction from cached init-field names + overlay — avoids
+    # dataclasses.replace's per-call walk of __dataclass_fields__. Reads existing
+    # values via getattr so this works for both __dict__-based and __slots__-based
+    # (slots=True) LST dataclasses.
     new_kwargs = {
-        name: mapped_kwargs[name] if name in mapped_kwargs else obj_dict[name]
+        name: mapped_kwargs[name] if name in mapped_kwargs else getattr(obj, name)
         for name in init_fields
     }
     return cast(T, cls(**new_kwargs))

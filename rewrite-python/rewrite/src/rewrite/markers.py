@@ -14,6 +14,8 @@ from .utils import random_id, list_map, replace_if_changed
 
 
 class Marker(ABC):
+    __slots__ = ()
+
     @property
     @abstractmethod
     def id(self) -> UUID:
@@ -38,7 +40,7 @@ class Marker(ABC):
 M = TypeVar('M', bound=Marker)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Markers:
     _id: UUID
 
@@ -93,7 +95,7 @@ class Markers:
 Markers.EMPTY = Markers(random_id(), [])
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class SearchResult(Marker):
     _id: UUID
 
@@ -140,6 +142,8 @@ class Markup(Marker, ABC):
     Markup markers are used to annotate code with messages that can be displayed
     in various ways depending on the tooling.
     """
+    __slots__ = ()
+
 
     @property
     @abstractmethod
@@ -179,7 +183,7 @@ class Markup(Marker, ABC):
         return MarkupDebug(random_id(), message, detail)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class MarkupWarn(Markup):
     """Warning markup marker for deprecations and other warnings."""
     _id: UUID
@@ -199,7 +203,7 @@ class MarkupWarn(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class MarkupError(Markup):
     """Error markup marker for errors and issues."""
     _id: UUID
@@ -219,7 +223,7 @@ class MarkupError(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class MarkupInfo(Markup):
     """Info markup marker for informational messages."""
     _id: UUID
@@ -239,7 +243,7 @@ class MarkupInfo(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class MarkupDebug(Markup):
     """Debug markup marker for debugging information."""
     _id: UUID
@@ -259,7 +263,7 @@ class MarkupDebug(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class UnknownJavaMarker(Marker):
     _id: UUID
 
@@ -274,7 +278,7 @@ class UnknownJavaMarker(Marker):
         return self._data
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ParseExceptionResult(Marker):
     @classmethod
     def build(cls, parser: 'Parser', exception: Exception) -> ParseExceptionResult:

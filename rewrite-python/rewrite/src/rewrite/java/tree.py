@@ -14,7 +14,7 @@ from .support_types import *
 from rewrite import Checksum, FileAttributes, SourceFile, Tree, TreeVisitor, Markers, Cursor, PrintOutputCapture, PrinterFactory
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class AnnotatedType(Expression, TypeTree):
     _id: UUID
 
@@ -55,7 +55,7 @@ class AnnotatedType(Expression, TypeTree):
         return v.visit_annotated_type(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Annotation(Expression):
     _id: UUID
 
@@ -122,7 +122,7 @@ class Annotation(Expression):
         return v.visit_annotation(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ArrayAccess(Expression, TypedTree):
     _id: UUID
 
@@ -170,7 +170,7 @@ class ArrayAccess(Expression, TypedTree):
         return v.visit_array_access(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ArrayType(TypeTree, Expression):
     _id: UUID
 
@@ -225,7 +225,7 @@ class ArrayType(TypeTree, Expression):
         return v.visit_array_type(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Assert(Statement):
     _id: UUID
 
@@ -266,7 +266,7 @@ class Assert(Statement):
         return v.visit_assert(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Assignment(Statement, Expression, TypedTree):
     _id: UUID
 
@@ -340,7 +340,7 @@ class Assignment(Statement, Expression, TypedTree):
         return v.visit_assignment(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class AssignmentOperation(Statement, Expression, TypedTree):
     _id: UUID
 
@@ -437,7 +437,7 @@ class AssignmentOperation(Statement, Expression, TypedTree):
         return v.visit_assignment_operation(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Binary(Expression, TypedTree):
     _id: UUID
 
@@ -539,7 +539,7 @@ class Binary(Expression, TypedTree):
         return v.visit_binary(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Block(Statement):
     _id: UUID
 
@@ -617,7 +617,7 @@ class Block(Statement):
         return v.visit_block(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Break(Statement):
     _id: UUID
 
@@ -651,7 +651,7 @@ class Break(Statement):
         return v.visit_break(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Case(Statement):
     _id: UUID
 
@@ -751,7 +751,7 @@ class Case(Statement):
         return v.visit_case(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ClassDeclaration(Statement, TypedTree):
     _id: UUID
 
@@ -848,7 +848,7 @@ class ClassDeclaration(Statement, TypedTree):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class Kind(J):
         _id: UUID
 
@@ -956,7 +956,7 @@ class ClassDeclaration(Statement, TypedTree):
         return v.visit_class_declaration(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class CompilationUnit(JavaSourceFile, SourceFile):
     _id: UUID
 
@@ -1081,7 +1081,7 @@ class CompilationUnit(JavaSourceFile, SourceFile):
         return v.visit_compilation_unit(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Continue(Statement):
     _id: UUID
 
@@ -1115,7 +1115,7 @@ class Continue(Statement):
         return v.visit_continue(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class DoWhileLoop(Loop):
     _id: UUID
 
@@ -1186,7 +1186,7 @@ class DoWhileLoop(Loop):
         return v.visit_do_while_loop(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Empty(Statement, Expression, TypeTree):
     _id: UUID
 
@@ -1213,7 +1213,7 @@ class Empty(Statement, Expression, TypeTree):
         return v.visit_empty(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class EnumValue(J):
     _id: UUID
 
@@ -1261,7 +1261,7 @@ class EnumValue(J):
         return v.visit_enum_value(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class EnumValueSet(Statement):
     _id: UUID
 
@@ -1328,7 +1328,7 @@ class EnumValueSet(Statement):
         return v.visit_enum_value_set(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class FieldAccess(TypeTree, Expression, Statement):
     _id: UUID
 
@@ -1402,7 +1402,7 @@ class FieldAccess(TypeTree, Expression, Statement):
         return v.visit_field_access(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ForEachLoop(Loop):
     _id: UUID
 
@@ -1440,7 +1440,7 @@ class ForEachLoop(Loop):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class Control(J):
         _id: UUID
 
@@ -1550,7 +1550,7 @@ class ForEachLoop(Loop):
         return v.visit_for_each_loop(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ForLoop(Loop):
     _id: UUID
 
@@ -1588,7 +1588,7 @@ class ForLoop(Loop):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class Control(J):
         _id: UUID
 
@@ -1711,7 +1711,7 @@ class ForLoop(Loop):
         return v.visit_for_loop(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ParenthesizedTypeTree(TypeTree, Expression):
     _id: UUID
 
@@ -1752,7 +1752,7 @@ class ParenthesizedTypeTree(TypeTree, Expression):
         return v.visit_parenthesized_type_tree(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Identifier(TypeTree, Expression):
     _id: UUID
 
@@ -1807,7 +1807,7 @@ class Identifier(TypeTree, Expression):
         return v.visit_identifier(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class If(Statement):
     _id: UUID
 
@@ -1852,7 +1852,7 @@ class If(Statement):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class Else(J):
         _id: UUID
 
@@ -1949,7 +1949,7 @@ class If(Statement):
         return v.visit_if(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Import(Statement):
     _id: UUID
 
@@ -2027,7 +2027,7 @@ class Import(Statement):
         return v.visit_import(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class InstanceOf(Expression, TypedTree):
     _id: UUID
 
@@ -2108,7 +2108,7 @@ class InstanceOf(Expression, TypedTree):
         return v.visit_instance_of(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class DeconstructionPattern(TypedTree):
     _id: UUID
 
@@ -2182,7 +2182,7 @@ class DeconstructionPattern(TypedTree):
         return v.visit_deconstruction_pattern(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class IntersectionType(TypeTree, Expression):
     _id: UUID
 
@@ -2242,7 +2242,7 @@ class IntersectionType(TypeTree, Expression):
         return v.visit_intersection_type(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Label(Statement):
     _id: UUID
 
@@ -2309,7 +2309,7 @@ class Label(Statement):
         return v.visit_label(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Lambda(Statement, Expression, TypedTree):
     _id: UUID
 
@@ -2361,7 +2361,7 @@ class Lambda(Statement, Expression, TypedTree):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class Parameters(J):
         _id: UUID
 
@@ -2441,7 +2441,7 @@ class Lambda(Statement, Expression, TypedTree):
         return v.visit_lambda(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Literal(Expression, TypedTree):
     _id: UUID
 
@@ -2516,7 +2516,7 @@ class Literal(Expression, TypedTree):
         return v.visit_literal(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class MemberReference(TypedTree, MethodCall):
     _id: UUID
 
@@ -2619,7 +2619,7 @@ class MemberReference(TypedTree, MethodCall):
         return v.visit_member_reference(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class MethodDeclaration(Statement, TypedTree):
     _id: UUID
 
@@ -2838,7 +2838,7 @@ class MethodDeclaration(Statement, TypedTree):
         return v.visit_method_declaration(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class MethodInvocation(Statement, TypedTree, MethodCall):
     _id: UUID
 
@@ -2939,7 +2939,7 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
         return v.visit_method_invocation(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Modifier(J):
     _id: UUID
 
@@ -3007,7 +3007,7 @@ class Modifier(J):
         return v.visit_modifier(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class MultiCatch(TypeTree):
     _id: UUID
 
@@ -3067,7 +3067,7 @@ class MultiCatch(TypeTree):
         return v.visit_multi_catch(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class NewArray(Expression, TypedTree):
     _id: UUID
 
@@ -3148,7 +3148,7 @@ class NewArray(Expression, TypedTree):
         return v.visit_new_array(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ArrayDimension(J):
     _id: UUID
 
@@ -3208,7 +3208,7 @@ class ArrayDimension(J):
         return v.visit_array_dimension(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class NewClass(Statement, TypedTree, MethodCall):
     _id: UUID
 
@@ -3315,7 +3315,7 @@ class NewClass(Statement, TypedTree, MethodCall):
         return v.visit_new_class(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class NullableType(TypeTree, Expression):
     _id: UUID
 
@@ -3382,7 +3382,7 @@ class NullableType(TypeTree, Expression):
         return v.visit_nullable_type(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Package(Statement):
     _id: UUID
 
@@ -3423,7 +3423,7 @@ class Package(Statement):
         return v.visit_package(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ParameterizedType(TypeTree, Expression):
     _id: UUID
 
@@ -3497,7 +3497,7 @@ class ParameterizedType(TypeTree, Expression):
         return v.visit_parameterized_type(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Parentheses(Expression, Generic[J2]):
     _id: UUID
 
@@ -3562,7 +3562,7 @@ class Parentheses(Expression, Generic[J2]):
         return v.visit_parentheses(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ControlParentheses(Expression, Generic[J2]):
     _id: UUID
 
@@ -3622,7 +3622,7 @@ class ControlParentheses(Expression, Generic[J2]):
         return v.visit_control_parentheses(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Primitive(TypeTree, Expression):
     _id: UUID
 
@@ -3656,7 +3656,7 @@ class Primitive(TypeTree, Expression):
         return v.visit_primitive(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Return(Statement):
     _id: UUID
 
@@ -3690,7 +3690,7 @@ class Return(Statement):
         return v.visit_return(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Switch(Statement):
     _id: UUID
 
@@ -3731,7 +3731,7 @@ class Switch(Statement):
         return v.visit_switch(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class SwitchExpression(Expression, TypedTree):
     _id: UUID
 
@@ -3779,7 +3779,7 @@ class SwitchExpression(Expression, TypedTree):
         return v.visit_switch_expression(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Synchronized(Statement):
     _id: UUID
 
@@ -3820,7 +3820,7 @@ class Synchronized(Statement):
         return v.visit_synchronized(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Ternary(Expression, Statement, TypedTree):
     _id: UUID
 
@@ -3905,7 +3905,7 @@ class Ternary(Expression, Statement, TypedTree):
         return v.visit_ternary(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Throw(Statement):
     _id: UUID
 
@@ -3939,7 +3939,7 @@ class Throw(Statement):
         return v.visit_throw(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Try(Statement):
     _id: UUID
 
@@ -3991,7 +3991,7 @@ class Try(Statement):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class Resource(J):
         _id: UUID
 
@@ -4042,7 +4042,7 @@ class Try(Statement):
             return v.visit_try_resource(self, p)
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class Catch(J):
         _id: UUID
 
@@ -4126,7 +4126,7 @@ class Try(Statement):
         return v.visit_try(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class TypeCast(Expression, TypedTree):
     _id: UUID
 
@@ -4167,7 +4167,7 @@ class TypeCast(Expression, TypedTree):
         return v.visit_type_cast(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class TypeParameter(J):
     _id: UUID
 
@@ -4248,7 +4248,7 @@ class TypeParameter(J):
         return v.visit_type_parameter(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class TypeParameters(J):
     _id: UUID
 
@@ -4315,7 +4315,7 @@ class TypeParameters(J):
         return v.visit_type_parameters(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Unary(Statement, Expression, TypedTree):
     _id: UUID
 
@@ -4399,7 +4399,7 @@ class Unary(Statement, Expression, TypedTree):
         return v.visit_unary(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class VariableDeclarations(Statement, TypedTree):
     _id: UUID
 
@@ -4465,7 +4465,7 @@ class VariableDeclarations(Statement, TypedTree):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class NamedVariable(NameTree):
         _id: UUID
 
@@ -4589,7 +4589,7 @@ class VariableDeclarations(Statement, TypedTree):
         return v.visit_variable_declarations(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class WhileLoop(Loop):
     _id: UUID
 
@@ -4656,7 +4656,7 @@ class WhileLoop(Loop):
         return v.visit_while_loop(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Wildcard(Expression, TypeTree):
     _id: UUID
 
@@ -4727,7 +4727,7 @@ class Wildcard(Expression, TypeTree):
         return v.visit_wildcard(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Yield(Statement):
     _id: UUID
 
@@ -4768,7 +4768,7 @@ class Yield(Statement):
         return v.visit_yield(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Unknown(Statement, Expression, TypeTree):
     _id: UUID
 
@@ -4799,7 +4799,7 @@ class Unknown(Statement, Expression, TypeTree):
 
 
     # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class Source(J):
         _id: UUID
 
@@ -4844,7 +4844,7 @@ class Unknown(Statement, Expression, TypeTree):
         return v.visit_unknown(self, p)
 
 # noinspection PyShadowingBuiltins,PyShadowingNames,DuplicatedCode
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Erroneous(Statement, Expression):
     _id: UUID
 

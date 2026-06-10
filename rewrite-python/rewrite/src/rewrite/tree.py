@@ -23,6 +23,8 @@ P = TypeVar('P')
 
 
 class Tree(ABC):
+    __slots__ = ()
+
     @property
     @abstractmethod
     def id(self) -> UUID:
@@ -83,6 +85,8 @@ class PrinterFactory(ABC):
 S = TypeVar('S', bound=Style)
 
 class SourceFile(Tree):
+    __slots__ = ()
+
     @property
     @abstractmethod
     def charset_name(self) -> Optional[str]:
@@ -110,7 +114,7 @@ class SourceFile(Tree):
         return NamedStyles.merge(style, self.markers.find_all(NamedStyles))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FileAttributes:
     creation_time: Optional[datetime]
     last_modified_time: Optional[datetime]
@@ -142,7 +146,7 @@ class FileAttributes:
         return None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Checksum:
     algorithm: str
     value: bytes

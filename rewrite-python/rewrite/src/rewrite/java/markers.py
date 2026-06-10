@@ -7,7 +7,7 @@ from rewrite import Marker
 from rewrite.java.support_types import Space
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Semicolon(Marker):
     _id: UUID
 
@@ -16,7 +16,7 @@ class Semicolon(Marker):
         return self._id
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class TrailingComma(Marker):
     _id: UUID
 
@@ -31,7 +31,7 @@ class TrailingComma(Marker):
         return self._suffix
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class OmitParentheses(Marker):
     _id: UUID
 
