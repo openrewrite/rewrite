@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.fir.extensions.DeclarationGenerationContext
 import org.jetbrains.kotlin.fir.extensions.ExperimentalTopLevelDeclarationsGenerationApi
 import org.jetbrains.kotlin.fir.extensions.FirDeclarationGenerationExtension
 import org.jetbrains.kotlin.fir.plugin.createTopLevelFunction
+import org.jetbrains.kotlin.fir.resolve.providers.dependenciesSymbolProvider
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
 import org.jetbrains.kotlin.fir.types.ConeKotlinType
 import org.jetbrains.kotlin.fir.types.ConeKotlinTypeProjectionOut
@@ -182,6 +183,18 @@ internal class RecipeFirMappedTypeFallbackExtension(session: FirSession) :
                 // member of the same arity to avoid `equals/hashCode/toString`
                 // double-declaration in the generated facade.
                 if (method.name in MASKED_INHERITED_NAMES) continue
+                // Only fill genuine gaps. If the method name already resolves on
+                // the Kotlin side as a real stdlib extension (e.g. `toUpperCase`,
+                // `trim`, `substring`, `isEmpty` all live in `kotlin.text`),
+                // generating a stand-in here would SHADOW that real declaration.
+                // Two failures result: ordinary parsing mis-attributes the call's
+                // declaringType, and (more visibly) the recipe DSL's MethodMatcher
+                // spec computation records the synthetic `__GENERATED__CALLABLES__Kt`
+                // facade instead of the canonical owner (e.g. `kotlin.text.StringsKt`),
+                // so authored recipes never match at runtime. We want ONLY the
+                // methods Kotlin's mapped-type customizer hides with no Kotlin
+                // equivalent — e.g. `String.stripIndent`/`formatted`/`translateEscapes`.
+                if (resolvesAsKotlinExtension(Name.identifier(method.name))) continue
                 // Deduplicate at the *erased* JVM-bytecode level. The generated
                 // top-level extensions all sit in the same facade class
                 // `__GENERATED__CALLABLES__Kt`; two extensions on the same
@@ -228,6 +241,32 @@ internal class RecipeFirMappedTypeFallbackExtension(session: FirSession) :
         else -> "Ljava/lang/Object;"
     }
 
+    /**
+     * True when [name] already resolves on the Kotlin side as a real stdlib
+     * extension function — i.e. some top-level function with that name and an
+     * extension receiver exists in one of the [STDLIB_EXTENSION_PACKAGES]. The
+     * mapped types' stdlib extensions all live in these facades
+     * (`kotlin.text` for `String`/`CharSequence`, `kotlin.collections` for the
+     * collection types, etc.), so a name match there means Kotlin already has a
+     * genuine declaration we must not shadow.
+     *
+     * A name-based check (rather than full receiver-type resolution) is
+     * sufficient and safe here: the only methods we intend to keep generating
+     * are JDK additions the mapped-type customizer hides with NO Kotlin
+     * equivalent (`stripIndent`, `formatted`, `transform`, `translateEscapes`,
+     * …), and none of those names collide with a stdlib extension. Results are
+     * memoized because the same name recurs across many mapped Java classes.
+     */
+    private val resolvableExtensionNames = HashMap<Name, Boolean>()
+
+    private fun resolvesAsKotlinExtension(name: Name): Boolean =
+        resolvableExtensionNames.getOrPut(name) {
+            STDLIB_EXTENSION_PACKAGES.any { pkg ->
+                session.dependenciesSymbolProvider.getTopLevelFunctionSymbols(pkg, name)
+                    .any { it.receiverParameterSymbol != null }
+            }
+        }
+
     private companion object {
         /**
          * Names whose Java instance versions are already members of every
@@ -238,6 +277,21 @@ internal class RecipeFirMappedTypeFallbackExtension(session: FirSession) :
          * them through the receiver's member scope).
          */
         val MASKED_INHERITED_NAMES = setOf("equals", "hashCode", "toString", "getClass", "notify", "notifyAll", "wait")
+
+        /**
+         * Kotlin stdlib facade packages that hold the top-level extension
+         * functions for the mapped types. Used by [resolvesAsKotlinExtension] to
+         * detect (and skip) Java method names that already have a real Kotlin
+         * extension, so the generated fallbacks never shadow them.
+         */
+        val STDLIB_EXTENSION_PACKAGES = listOf(
+            FqName("kotlin"),
+            FqName("kotlin.text"),
+            FqName("kotlin.collections"),
+            FqName("kotlin.sequences"),
+            FqName("kotlin.ranges"),
+            FqName("kotlin.comparisons"),
+        )
     }
 
     override fun getTopLevelCallableIds(): Set<CallableId> {
