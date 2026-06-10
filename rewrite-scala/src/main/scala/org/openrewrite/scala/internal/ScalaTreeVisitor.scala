@@ -7433,9 +7433,38 @@ class ScalaTreeVisitor(
 
     val parts = new util.ArrayList[Expression]()
 
+    // Dotty reports each literal segment's span end as `start + decodedLength`, so every `$$`
+    // escape (which is two source chars but one decoded char) makes the span end one char too
+    // short. Re-derive the true source end by replaying the decoded value over the source,
+    // collapsing `$$` -> `$`. Returns -1 when some other escape (e.g. `\n` in a non-raw string)
+    // prevents a clean 1:1 replay, in which case the caller keeps dotty's span end.
+    def sourceEndForValue(ls: Int, value: String): Int = {
+      var pos = ls
+      var i = 0
+      while (i < value.length) {
+        if (pos >= source.length) return -1
+        val sc = source.charAt(pos)
+        val vc = value.charAt(i)
+        if (sc == '$' && vc == '$' && pos + 1 < source.length && source.charAt(pos + 1) == '$') {
+          pos += 2
+        } else if (sc == vc) {
+          pos += 1
+        } else {
+          return -1
+        }
+        i += 1
+      }
+      pos
+    }
+
     def addLiteral(litTree: Trees.Literal[?]): Unit = {
       val ls = Math.max(0, litTree.span.start - offsetAdjustment)
-      val le = Math.max(0, litTree.span.end - offsetAdjustment)
+      val le = litTree.const.value match {
+        case s: String =>
+          val reconstructed = sourceEndForValue(ls, s)
+          if (reconstructed >= 0) reconstructed else Math.max(0, litTree.span.end - offsetAdjustment)
+        case _ => Math.max(0, litTree.span.end - offsetAdjustment)
+      }
       if (le > ls && le <= source.length) {
         val text = source.substring(ls, le)
         if (text.nonEmpty) {
