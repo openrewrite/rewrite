@@ -800,4 +800,16 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void curriedParameterListsOnSeparateLines() {
+        rewriteRun(
+          scala(
+            """
+            def f(a: Int)
+                (b: Int): Int = a + b
+            """
+          )
+        );
+    }
 }

@@ -6227,6 +6227,7 @@ class ScalaTreeVisitor(
       val searchEnd = Math.min(cursor + 50, source.length)
       val searchText = source.substring(cursor, searchEnd)
       val parenIdx = positionOfNextIn(searchText, "(", 0)
+      val parenSpace = if (parenIdx > 0) Space.format(searchText.substring(0, parenIdx)) else Space.EMPTY
       if (parenIdx >= 0) cursor = cursor + parenIdx + 1
 
       val jParams = new util.ArrayList[JRightPadded[J]]()
@@ -6270,7 +6271,7 @@ class ScalaTreeVisitor(
         if (closeParen >= 0) cursor = cursor + closeParen + 1
       }
 
-      new J.Lambda.Parameters(Tree.randomId(), Space.EMPTY, Markers.EMPTY, true, jParams)
+      new J.Lambda.Parameters(Tree.randomId(), parenSpace, Markers.EMPTY, true, jParams)
     }
 
     // Handle value parameters — first list goes in J.MethodDeclaration.parameters,
