@@ -175,6 +175,7 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.tree.Go$Union", func() any { return &golang.Union{ID: uuid.New()} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$UnderlyingType", func() any { return &golang.UnderlyingType{ID: uuid.New()} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$TypeDecl", func() any { return &golang.TypeDecl{ID: uuid.New()} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$DeclarationBlock", func() any { return &golang.DeclarationBlock{ID: uuid.New()} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$MultiAssignment", func() any { return &golang.MultiAssignment{ID: uuid.New()} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$Return", func() any { return &golang.Return{ID: uuid.New()} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$MethodDeclaration", func() any { return &golang.MethodDeclaration{ID: uuid.New()} })
