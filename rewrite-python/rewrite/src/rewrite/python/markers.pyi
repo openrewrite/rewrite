@@ -9,15 +9,13 @@ import weakref
 
 from enum import Enum, auto
 from rewrite import Marker
+from rewrite.utils import replace_if_changed
 
 @dataclass(frozen=True)
 class KeywordArguments(Marker):
     _id: UUID
 
     def replace(self, **kwargs: Any) -> Self: ...
-
-    @property
-    def id(self) -> UUID: ...
 
     def with_id(self, id_: UUID) -> 'KeywordArguments': ...
 
@@ -26,9 +24,6 @@ class KeywordOnlyArguments(Marker):
     _id: UUID
 
     def replace(self, **kwargs: Any) -> Self: ...
-
-    @property
-    def id(self) -> UUID: ...
 
     def with_id(self, id_: UUID) -> 'KeywordOnlyArguments': ...
 
@@ -47,8 +42,6 @@ class Quoted(Marker):
     def replace(self, **kwargs: Any) -> Self: ...
 
     @property
-    def id(self) -> UUID: ...
-    @property
     def style(self) -> Style: ...
 
     def with_id(self, id_: UUID) -> Quoted: ...
@@ -60,9 +53,6 @@ class SuppressNewline(Marker):
 
     def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
-
     def with_id(self, id_: UUID) -> 'SuppressNewline': ...
 
 @dataclass(frozen=True)
@@ -70,9 +60,6 @@ class LegacyNotEqual(Marker):
     _id: UUID
 
     def replace(self, **kwargs: Any) -> Self: ...
-
-    @property
-    def id(self) -> UUID: ...
 
     def with_id(self, id_: UUID) -> 'LegacyNotEqual': ...
 
@@ -82,9 +69,6 @@ class RaiseTuple(Marker):
 
     def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
-
     def with_id(self, id_: UUID) -> 'RaiseTuple': ...
 
 @dataclass(frozen=True)
@@ -92,9 +76,6 @@ class TupleExceptClause(Marker):
     _id: UUID
 
     def replace(self, **kwargs: Any) -> Self: ...
-
-    @property
-    def id(self) -> UUID: ...
 
     def with_id(self, id_: UUID) -> 'TupleExceptClause': ...
 
@@ -106,8 +87,6 @@ class PrintSyntax(Marker):
 
     def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def has_destination(self) -> bool: ...
     @property
@@ -122,9 +101,6 @@ class ExecSyntax(Marker):
     _id: UUID
 
     def replace(self, **kwargs: Any) -> Self: ...
-
-    @property
-    def id(self) -> UUID: ...
 
     def with_id(self, id_: UUID) -> 'ExecSyntax': ...
 
@@ -226,8 +202,6 @@ class PythonResolutionResult(Marker):
 
     def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def name(self) -> Optional[str]: ...
     @property
