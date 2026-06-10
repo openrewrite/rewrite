@@ -95,11 +95,10 @@ type CheckVisitor struct {
 // matches. RecipeRef operands are treated as "always matches" in-process
 // (they're wire-only placeholders).
 func (c *CheckVisitor) Visit(t java.Tree, p any) java.Tree {
-	sf, IsSourceFile := t.(java.SourceFile)
-	if !IsSourceFile {
+	if !isSourceFile(t) {
 		return c.V.Visit(t, p)
 	}
-	if c.matches(sf, p) {
+	if c.matches(t, p) {
 		return c.V.Visit(t, p)
 	}
 	return t
