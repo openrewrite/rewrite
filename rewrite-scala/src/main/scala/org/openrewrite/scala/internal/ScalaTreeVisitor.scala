@@ -6272,6 +6272,27 @@ class ScalaTreeVisitor(
       new J.Lambda.Parameters(Tree.randomId(), parenSpace, Markers.EMPTY, true, jParams)
     }
 
+    // Build an empty parameter list `()`, advancing the cursor past `)`. Any interior
+    // whitespace/comments (e.g. `( // note\n)`) are preserved as a J.Empty element so
+    // the list round-trips; a truly empty `()` keeps a zero-element container.
+    def buildEmptyParamList(): JContainer[Statement] = {
+      val parenIdx = positionOfNextIn(source, "(", cursor)
+      val parenSpace = if (parenIdx > cursor) Space.format(source.substring(cursor, parenIdx)) else Space.EMPTY
+      val elements = new util.ArrayList[JRightPadded[Statement]]()
+      if (parenIdx >= 0) {
+        cursor = parenIdx + 1
+        val closeParen = positionOfNextIn(source, ")", cursor)
+        if (closeParen >= 0) {
+          if (closeParen > cursor) {
+            val interior = new J.Empty(Tree.randomId(), Space.format(source.substring(cursor, closeParen)), Markers.EMPTY)
+            elements.add(new JRightPadded(interior.asInstanceOf[Statement], Space.EMPTY, Markers.EMPTY))
+          }
+          cursor = closeParen + 1
+        }
+      }
+      JContainer.build(parenSpace, elements, Markers.EMPTY)
+    }
+
     // Handle value parameters — first list goes in J.MethodDeclaration.parameters,
     // additional curried lists become nested J.Lambda nodes (built after the body is parsed)
     val curriedParamLists = new util.ArrayList[J.Lambda.Parameters]()
@@ -6331,30 +6352,14 @@ class ScalaTreeVisitor(
 
         JContainer.build(parenSpace, jParams, Markers.EMPTY)
       } else if (hasParensInSource) {
-        // Empty parameter list ()
-        val parenIdx = positionOfNextIn(source, "(", cursor)
-        val parenSpace = if (parenIdx > cursor) Space.format(source.substring(cursor, parenIdx)) else Space.EMPTY
-        if (parenIdx >= 0) {
-          cursor = parenIdx + 1
-          val closeParen = positionOfNextIn(source, ")", cursor)
-          if (closeParen >= 0) cursor = closeParen + 1
-        }
-        JContainer.build(parenSpace, new util.ArrayList[JRightPadded[Statement]](), Markers.EMPTY)
+        buildEmptyParamList()
       } else {
         // Parameterless method — mark so printer omits ()
         JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
           Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))))
       }
     } else if (hasParensInSource) {
-      // Empty parameter list ()
-      val parenIdx = positionOfNextIn(source, "(", cursor)
-      val parenSpace = if (parenIdx > cursor) Space.format(source.substring(cursor, parenIdx)) else Space.EMPTY
-      if (parenIdx >= 0) {
-        cursor = parenIdx + 1
-        val closeParen = positionOfNextIn(source, ")", cursor)
-        if (closeParen >= 0) cursor = closeParen + 1
-      }
-      JContainer.build(parenSpace, new util.ArrayList[JRightPadded[Statement]](), Markers.EMPTY)
+      buildEmptyParamList()
     } else {
       // Parameterless method — mark so printer omits ()
       JContainer.build(Space.EMPTY, new util.ArrayList[JRightPadded[Statement]](),
