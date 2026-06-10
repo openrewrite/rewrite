@@ -85,6 +85,19 @@ class InterpolatedStringTest implements RewriteTest {
     }
 
     /**
+     * Dotty reports each literal segment's span end as {@code start + decodedLength}, so a {@code $$}
+     * escape (two source chars, one decoded char) leaves the span one char short. That dropped the
+     * character before the next interpolation and shifted the {@code $} into the interpolation's
+     * prefix, corrupting round-trips of strings that mix {@code $$} escapes with interpolations.
+     */
+    @Test
+    void dollarEscapeFollowedByInterpolation() {
+        rewriteRun(
+          scala("val x = s\"\"\"$$('#x-$id')\"\"\"")
+        );
+    }
+
+    /**
      * The embedded expressions must be first-class LST nodes, not text stuffed into a J.Identifier.
      * This is the assertion that fails against the old behavior (the whole {@code s"..."} was a
      * single J.Identifier whose simpleName held the raw source).
