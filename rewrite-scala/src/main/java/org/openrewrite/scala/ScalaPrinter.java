@@ -549,6 +549,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
      * Print a J.Lambda.Parameters as a curried parameter list: (param1, param2)
      */
     private void printLambdaParamsAsCurried(J.Lambda.Parameters lambdaParams, PrintOutputCapture<P> p) {
+        visitSpace(lambdaParams.getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p);
         if (lambdaParams.isParenthesized()) {
             p.append('(');
         }
