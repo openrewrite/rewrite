@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.*
 import org.openrewrite.java.marker.ImplicitReturn
 import org.openrewrite.java.marker.OmitParentheses
 import org.openrewrite.marker.Markers
+import org.openrewrite.scala.marker.DottedMatch
 import org.openrewrite.scala.marker.Implicit
 import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedSyntax
@@ -1780,6 +1781,10 @@ class ScalaTreeVisitor(
       case block: J.Block =>
         // Block arguments in infix calls: `"test" should { ... }`
         new S.StatementExpression(Tree.randomId(), block.withPrefix(rhsSpace))
+      case j: J =>
+        // A compound statement as the right operand, e.g. `x := y.match\n  case _ => ...`
+        // where the dotted `.match` binds to `y`, making the J.Switch the infix argument.
+        new S.StatementExpression(Tree.randomId(), j)
       case _ => cursor = savedCursorArg; return visitUnknown(infixOp)
     }
 
@@ -7233,7 +7238,15 @@ class ScalaTreeVisitor(
 
     val ms = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 30, source.length)) else ""
     val mi = positionOfNextIn(ms, "match", 0)
-    val matchKeywordSpace = if (mi > 0) Space.format(ms.substring(0, mi)) else Space.EMPTY
+    // Scala 3 selector-style match `selector.match { ... }`: the `match` keyword is preceded
+    // by a `.`. Record it via a marker so the dot isn't stored as (non-whitespace) Space.
+    val beforeMatch = if (mi > 0) ms.substring(0, mi) else ""
+    val dotIdx = beforeMatch.indexOf('.')
+    val isDottedMatch = dotIdx >= 0
+    val matchKeywordSpace =
+      if (isDottedMatch) Space.format(beforeMatch.substring(0, dotIdx))
+      else if (mi > 0) Space.format(beforeMatch)
+      else Space.EMPTY
     if (mi >= 0) cursor = cursor + mi + 5
     // Scala 3 `x match\n  case ...` has no `{` before the cases — detect that form.
     val bs = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
@@ -7246,9 +7259,10 @@ class ScalaTreeVisitor(
     val casesBlock = buildCasesBlock(matchTree, isBraceForm).withPrefix(matchBraceSpace)
     updateCursor(matchTree.span.end)
     val selectorParens = new J.ControlParentheses[Expression](Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(selector).withAfter(matchKeywordSpace))
-    val markers = if (isBraceForm) Markers.EMPTY
-      else Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
-    new J.Switch(Tree.randomId(), prefix, markers, selectorParens, casesBlock)
+    val markersList = new util.ArrayList[org.openrewrite.marker.Marker]()
+    if (!isBraceForm) markersList.add(new IndentedSyntax(Tree.randomId()))
+    if (isDottedMatch) markersList.add(DottedMatch.create())
+    new J.Switch(Tree.randomId(), prefix, Markers.build(markersList), selectorParens, casesBlock)
   }
 
   private def buildCasesBlock(matchTree: Trees.Match[?], hasClosingBrace: Boolean = true): J.Block = {

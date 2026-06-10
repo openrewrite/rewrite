@@ -33,6 +33,7 @@ import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.scala.marker.AsInstanceOfPrefix;
 import org.openrewrite.scala.marker.BlockArgument;
+import org.openrewrite.scala.marker.DottedMatch;
 import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.PackageBraces;
 import org.openrewrite.scala.marker.SObject;
@@ -304,6 +305,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         JRightPadded<Expression> selector = switch_.getSelector().getPadding().getTree();
         visit(selector.getElement(), p);
         visitSpace(selector.getAfter(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+        if (switch_.getMarkers().findFirst(DottedMatch.class).isPresent()) {
+            p.append(".");
+        }
         p.append("match");
         boolean indented = switch_.getMarkers().findFirst(IndentedSyntax.class).isPresent();
         if (!indented) {
