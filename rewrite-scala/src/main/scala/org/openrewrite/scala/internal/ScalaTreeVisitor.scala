@@ -9296,11 +9296,14 @@ class ScalaTreeVisitor(
 
         partialApplication match {
           case Some(app) =>
-            // Partially applied function - return the method invocation
+            // Partially applied function - return the underlying call with the lambda's
+            // leading whitespace re-attached. Covers method invocations (`add(5, _)`) as
+            // well as constructor applications (`new Foo(_)`), which yield a J.NewClass
+            // whose own prefix is empty because `extractPrefix` already consumed it.
             val prefix = extractPrefix(func.span)
             val result = visitApply(app)
             result match {
-              case mi: J.MethodInvocation => return mi.withPrefix(prefix)
+              case e: Expression => return e.withPrefix(prefix).asInstanceOf[Expression]
               case _ => return result
             }
           case None =>
