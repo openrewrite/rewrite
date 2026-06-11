@@ -14,12 +14,22 @@
 
 """Tests for AddImport / maybe_add_import."""
 
-from rewrite import ExecutionContext
+from rewrite import ExecutionContext, InMemoryExecutionContext
 from rewrite.java import J
 from rewrite.python.add_import import AddImportOptions, maybe_add_import
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python, from_visitor
+
+
+def _assert_ids_accessible(source_file):
+    """Touch every node's public `.id`; raises if any `_id` holds a UUID instead of an int."""
+    class IdWalker(PythonVisitor[ExecutionContext]):
+        def pre_visit(self, tree, p):
+            assert tree.id is not None
+            return tree
+
+    IdWalker().visit(source_file, InMemoryExecutionContext())
 
 
 def _add_import_visitor(module, name=None, alias=None):
@@ -144,6 +154,25 @@ class TestMaybeAddImport:
                 from os.path import exists, join
                 x = 1
                 """,
+            )
+        )
+
+    def test_merge_into_existing_import_keeps_ids_accessible(self):
+        """Merging into an existing from-import rebuilds the MultiImport from the
+        public `.id` property; the rebuilt node's id must remain accessible
+        (regression for the 8.84.8 int-id migration)."""
+        spec = RecipeSpec(recipe=from_visitor(_add_import_visitor('os.path', 'exists')))
+        spec.rewrite_run(
+            python(
+                """
+                from os.path import join
+                x = 1
+                """,
+                """
+                from os.path import exists, join
+                x = 1
+                """,
+                after_recipe=_assert_ids_accessible,
             )
         )
 
