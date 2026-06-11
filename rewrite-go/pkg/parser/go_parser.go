@@ -703,7 +703,8 @@ func (ctx *parseContext) mapTypeParams(fl *ast.FieldList) *java.TypeParameters {
 
 	var elements []java.RightPadded[java.J]
 	for i, u := range units {
-		tp := &java.TypeParameter{ID: uuid.New(), Name: ctx.mapIdent(u.name)}
+		tpPrefix, name := hoistLeftPrefix(ctx.mapIdent(u.name))
+		tp := &java.TypeParameter{ID: uuid.New(), Prefix: tpPrefix, Name: name}
 		if u.hasBound {
 			constraint := ctx.mapTypeExpr(u.field.Type)
 			tp.Bounds = &java.Container[java.Expression]{
@@ -753,8 +754,12 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) java.Expression {
 			if len(field.Names) == 0 {
 				// Unnamed return: just a type expression
 				typeExpr := ctx.mapTypeExpr(field.Type)
+				// The type prints first and reads the leading whitespace; hoist
+				// it onto the VariableDeclarations (the outermost element).
+				prefix, typeExpr := hoistLeftPrefix(typeExpr)
 				vd := &java.VariableDeclarations{
 					ID:       uuid.New(),
+					Prefix:   prefix,
 					TypeExpr: typeExpr,
 					Variables: []java.RightPadded[*java.VariableDeclarator]{
 						{Element: &java.VariableDeclarator{ID: uuid.New(), Name: &java.Identifier{ID: uuid.New()}}},
@@ -772,8 +777,14 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) java.Expression {
 			} else {
 				// Named return(s): `n int` or `x, y int`
 				var vars []java.RightPadded[*java.VariableDeclarator]
+				var vdPrefix java.Space
 				for j, fieldName := range field.Names {
 					nameIdent := ctx.mapIdent(fieldName)
+					if j == 0 {
+						// The first name reads the leading whitespace; hoist it
+						// onto the VariableDeclarations (the outermost element).
+						vdPrefix, nameIdent = hoistLeftPrefix(nameIdent)
+					}
 					var nameAfter java.Space
 					if j < len(field.Names)-1 {
 						commaOffset := ctx.findNext(',')
@@ -790,6 +801,7 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) java.Expression {
 				typeExpr := ctx.mapTypeExpr(field.Type)
 				vd := &java.VariableDeclarations{
 					ID:        uuid.New(),
+					Prefix:    vdPrefix,
 					TypeExpr:  typeExpr,
 					Variables: vars,
 				}
@@ -839,8 +851,17 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[
 				varargs = &vrd.Prefix
 				typeExpr = vrd.Element
 			}
+			// The type prints first and reads the leading whitespace; hoist
+			// it onto the VariableDeclarations (the outermost element). When
+			// variadic, the `...` prints before the type, so there's nothing
+			// to hoist.
+			var prefix java.Space
+			if varargs == nil {
+				prefix, typeExpr = hoistLeftPrefix(typeExpr)
+			}
 			vd := &java.VariableDeclarations{
 				ID:       uuid.New(),
+				Prefix:   prefix,
 				TypeExpr: typeExpr,
 				Varargs:  varargs,
 				Variables: []java.RightPadded[*java.VariableDeclarator]{
@@ -860,8 +881,14 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[
 			// Named parameter(s): `a int` or `a, b int` (grouped names sharing a type)
 			// Map all names first (source order), then the shared type
 			var vars []java.RightPadded[*java.VariableDeclarator]
+			var vdPrefix java.Space
 			for j, fieldName := range field.Names {
 				nameIdent := ctx.mapIdent(fieldName)
+				if j == 0 {
+					// The first name reads the leading whitespace; hoist it
+					// onto the VariableDeclarations (the outermost element).
+					vdPrefix, nameIdent = hoistLeftPrefix(nameIdent)
+				}
 				var nameAfter java.Space
 				if j < len(field.Names)-1 {
 					commaOffset := ctx.findNext(',')
@@ -884,6 +911,7 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) java.Container[
 			}
 			vd := &java.VariableDeclarations{
 				ID:        uuid.New(),
+				Prefix:    vdPrefix,
 				TypeExpr:  typeExpr,
 				Varargs:   varargs,
 				Variables: vars,
@@ -1642,6 +1670,9 @@ func (ctx *parseContext) mapRangeStmt(stmt *ast.RangeStmt) *java.ForEachLoop {
 		// faithful mirror of Java's J.ForEachLoop.Control.
 		var targets []java.RightPadded[java.Expression]
 		key := ctx.mapExpr(stmt.Key) // prefix = space after "for"
+		// The space after "for" is read onto the key; hoist it onto the
+		// ForEachControl so it stays attached to the outermost element.
+		control.Prefix, key = hoistLeftPrefix(key)
 
 		if stmt.Value != nil {
 			// for k, v ...: key.After captures the space before the comma
@@ -2009,8 +2040,13 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) java.Expression {
 		if expr.Ellipsis.IsValid() && i == len(expr.Args)-1 {
 			ellipsisPrefix := ctx.prefix(expr.Ellipsis)
 			ctx.skip(3) // "..."
+			// `args...`: the element is printed first and reads the leading
+			// whitespace; hoist it onto the Variadic (outermost element).
+			var vprefix java.Space
+			vprefix, mapped = hoistLeftPrefix(mapped)
 			mapped = &golang.Variadic{
 				ID:      uuid.New(),
+				Prefix:  vprefix,
 				Element: mapped,
 				Dots:    ellipsisPrefix,
 				Postfix: true,
@@ -2559,6 +2595,9 @@ func (ctx *parseContext) mapIndexListExpr(expr *ast.IndexListExpr) java.Expressi
 // mapTypeAssertExpr maps a type assertion `x.(T)`.
 func (ctx *parseContext) mapTypeAssertExpr(expr *ast.TypeAssertExpr) java.Expression {
 	x := ctx.mapExpr(expr.X)
+	// The whitespace before the whole expression is read onto x; hoist it onto
+	// the TypeCast so it stays attached to the outermost element.
+	prefix, x := hoistLeftPrefix(x)
 	// dot before (
 	dotOff := ctx.findNext('.')
 	var dotPrefix java.Space
@@ -2588,11 +2627,10 @@ func (ctx *parseContext) mapTypeAssertExpr(expr *ast.TypeAssertExpr) java.Expres
 		Tree:   java.RightPadded[java.Expression]{Element: typeExpr, After: rparenPrefix},
 	}
 
-	_ = dotPrefix // dot is between Expr and Clazz; stored in Expr's suffix isn't ideal
-	// We'll use prefix of the type cast for the dot
+	_ = dotPrefix // space between Expr and the dot; gofmt never emits it
 	return &java.TypeCast{
 		ID:     uuid.New(),
-		Prefix: dotPrefix,
+		Prefix: prefix,
 		Clazz:  clazz,
 		Expr:   x,
 	}
@@ -2625,13 +2663,17 @@ func (ctx *parseContext) mapFuncLit(expr *ast.FuncLit) java.Expression {
 // mapKeyValueExpr maps a key:value expression in composite literals.
 func (ctx *parseContext) mapKeyValueExpr(expr *ast.KeyValueExpr) java.Expression {
 	key := ctx.mapExpr(expr.Key)
+	// The whitespace before the entry is read onto the key; hoist it onto the
+	// KeyValue so it stays attached to the outermost element.
+	prefix, key := hoistLeftPrefix(key)
 	colonPrefix := ctx.prefix(expr.Colon)
 	ctx.skip(1) // ":"
 	value := ctx.mapExpr(expr.Value)
 	return &golang.KeyValue{
-		ID:    uuid.New(),
-		Key:   key,
-		Value: java.LeftPadded[java.Expression]{Before: colonPrefix, Element: value},
+		ID:     uuid.New(),
+		Prefix: prefix,
+		Key:    key,
+		Value:  java.LeftPadded[java.Expression]{Before: colonPrefix, Element: value},
 	}
 }
 
