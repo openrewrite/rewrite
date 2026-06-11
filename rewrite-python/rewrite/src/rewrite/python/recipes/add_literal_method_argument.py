@@ -18,12 +18,11 @@ AddLiteralMethodArgument recipe for Python that delegates to Java's AddLiteralMe
 This recipe adds a literal argument to method invocations matching a pattern.
 """
 from dataclasses import field
-from typing import Any, Optional
 
-from rewrite import ExecutionContext, Recipe, TreeVisitor, option
+from rewrite import Recipe, option
 from rewrite.decorators import categorize
 from rewrite.marketplace import Python
-from rewrite.rpc.java_recipe import prepare_java_recipe, JavaRecipeVisitor, PreparedJavaRecipe
+from rewrite.rpc.rpc_recipe import RpcRecipe
 
 
 @categorize(Python)
@@ -68,7 +67,6 @@ class AddLiteralMethodArgument(Recipe):
         self.method_pattern = method_pattern
         self.argument_index = argument_index
         self.literal = literal
-        self._prepared_recipe: Optional[PreparedJavaRecipe] = None
 
     @property
     def name(self) -> str:
@@ -82,15 +80,10 @@ class AddLiteralMethodArgument(Recipe):
     def description(self) -> str:
         return "Add a literal argument to method invocations matching a pattern."
 
-    def editor(self) -> TreeVisitor[Any, ExecutionContext]:
-        if self._prepared_recipe is None:
-            self._prepared_recipe = prepare_java_recipe(
-                "org.openrewrite.java.AddLiteralMethodArgument",
-                {
-                    "methodPattern": self.method_pattern,
-                    "argumentIndex": self.argument_index,
-                    "literal": self.literal
-                }
-            )
-
-        return JavaRecipeVisitor(self._prepared_recipe)
+    def recipe_list(self) -> list[Recipe]:
+        return [RpcRecipe(
+            "org.openrewrite.java.AddLiteralMethodArgument",
+            methodPattern=self.method_pattern,
+            argumentIndex=self.argument_index,
+            literal=self.literal,
+        )]
