@@ -34,6 +34,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.scala.marker.AsInstanceOfPrefix;
 import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.DottedMatch;
+import org.openrewrite.scala.marker.Implicit;
 import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.PackageBraces;
 import org.openrewrite.scala.marker.SObject;
@@ -826,9 +827,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
             visit(classDecl.getLeadingAnnotations(), p);
             
-            // For objects, skip the final modifier (it's implicit)
+            // For objects, skip the final modifier only when it's implicit (synthesized
+            // because objects are implicitly final). An explicitly written `final` carries
+            // no Implicit marker and must be printed to round-trip faithfully.
             for (J.Modifier m : classDecl.getModifiers()) {
-                if (!(isObject && m.getType() == J.Modifier.Type.Final)) {
+                if (!(isObject && m.getType() == J.Modifier.Type.Final &&
+                      m.getMarkers().findFirst(Implicit.class).isPresent())) {
                     visit(m, p);
                 }
             }
