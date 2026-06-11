@@ -3697,15 +3697,21 @@ class ScalaTreeVisitor(
       }
     }
     
-    // Objects are implicitly final
-    modifiers.add(new J.Modifier(
-      Tree.randomId(),
-      Space.EMPTY,
-      Markers.EMPTY,
-      null, // No keyword for implicit final
-      J.Modifier.Type.Final,
-      Collections.emptyList()
-    ).withMarkers(Markers.build(Collections.singletonList(new Implicit(Tree.randomId())))))
+    // Objects are implicitly final. Only synthesize the implicit modifier when the
+    // source didn't already spell out `final` (e.g. `final object Foo`); otherwise the
+    // explicit modifier extracted above is kept and printed verbatim.
+    var hasExplicitFinal = false
+    modifiers.forEach(m => if (m.getType == J.Modifier.Type.Final) hasExplicitFinal = true)
+    if (!hasExplicitFinal) {
+      modifiers.add(new J.Modifier(
+        Tree.randomId(),
+        Space.EMPTY,
+        Markers.EMPTY,
+        null, // No keyword for implicit final
+        J.Modifier.Type.Final,
+        Collections.emptyList()
+      ).withMarkers(Markers.build(Collections.singletonList(new Implicit(Tree.randomId())))))
+    }
     
     // Find where "object"/"case" keyword ends
     val keywordLen = if (isEnumCase) "case".length else "object".length

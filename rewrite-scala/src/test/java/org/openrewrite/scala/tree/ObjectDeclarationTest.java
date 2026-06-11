@@ -81,6 +81,19 @@ class ObjectDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void finalObject() {
+        rewriteRun(
+            scala(
+                """
+                final object Foo {
+                  val x = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void companionObject() {
         rewriteRun(
             scala(
