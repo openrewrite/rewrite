@@ -11,7 +11,7 @@ from uuid import UUID
 
 from .markers import Markers
 from .style import NamedStyles, Style
-from .utils import replace_if_changed
+from .utils import id_to_int, replace_if_changed
 
 if TYPE_CHECKING:
     from rewrite import TreeVisitor, ExecutionContext
@@ -33,6 +33,14 @@ class Tree(ABC):
     @property
     def id(self) -> UUID:
         return UUID(int=self._id)  # ty: ignore[unresolved-attribute]  # _id is declared on concrete subclasses
+
+    # `_id` is part of the public positional constructor surface, so callers may
+    # pass a `uuid.UUID` (e.g. `uuid4()` or another node's `.id`). The dataclass
+    # `__init__` of every concrete subclass calls this inherited hook; normalise
+    # to the internal int form here so `.id`, equality and hashing stay correct.
+    def __post_init__(self):
+        if type(self._id) is not int:  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
+            object.__setattr__(self, '_id', id_to_int(self._id))  # ty: ignore[unresolved-attribute]
 
     @property
     @abstractmethod

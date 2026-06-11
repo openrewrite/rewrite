@@ -14,12 +14,22 @@
 
 """Tests for RemoveImport / maybe_remove_import."""
 
-from rewrite import ExecutionContext
+from rewrite import ExecutionContext, InMemoryExecutionContext
 from rewrite.java import J
 from rewrite.python.remove_import import RemoveImportOptions, maybe_remove_import
 from rewrite.python.tree import CompilationUnit
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python, from_visitor
+
+
+def _assert_ids_accessible(source_file):
+    """Touch every node's public `.id`; raises if any `_id` holds a UUID instead of an int."""
+    class IdWalker(PythonVisitor[ExecutionContext]):
+        def pre_visit(self, tree, p):
+            assert tree.id is not None
+            return tree
+
+    IdWalker().visit(source_file, InMemoryExecutionContext())
 
 
 class TestMaybeRemoveImport:
@@ -219,5 +229,60 @@ class TestMaybeRemoveImport:
                 import sys
                 x = 1
                 """,
+            )
+        )
+
+    def test_partial_from_import_removal_keeps_ids_accessible(self):
+        """Removing one name from a from-import rebuilds the MultiImport from the
+        public `.id` property; the rebuilt node's id must remain accessible
+        (regression for the 8.84.8 int-id migration)."""
+        class RemoveJoinVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module='os.path',
+                    name='join',
+                    only_if_unused=False
+                ))
+                return super().visit_compilation_unit(cu, p)
+
+        spec = RecipeSpec(recipe=from_visitor(RemoveJoinVisitor()))
+        spec.rewrite_run(
+            python(
+                """
+                from os.path import join, exists
+                x = 1
+                """,
+                """
+                from os.path import exists
+                x = 1
+                """,
+                after_recipe=_assert_ids_accessible,
+            )
+        )
+
+    def test_partial_direct_import_removal_keeps_ids_accessible(self):
+        """Removing one module from 'import X, Y' rebuilds the MultiImport from the
+        public `.id` property; the rebuilt node's id must remain accessible
+        (regression for the 8.84.8 int-id migration)."""
+        class RemoveOsVisitor(PythonVisitor[ExecutionContext]):
+            def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
+                maybe_remove_import(self, RemoveImportOptions(
+                    module='os',
+                    only_if_unused=False
+                ))
+                return super().visit_compilation_unit(cu, p)
+
+        spec = RecipeSpec(recipe=from_visitor(RemoveOsVisitor()))
+        spec.rewrite_run(
+            python(
+                """
+                import os, sys
+                x = 1
+                """,
+                """
+                import sys
+                x = 1
+                """,
+                after_recipe=_assert_ids_accessible,
             )
         )

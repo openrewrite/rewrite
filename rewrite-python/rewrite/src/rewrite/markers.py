@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from .parser import Parser
     from .visitor import Cursor
 
-from .utils import random_id, list_map, replace_if_changed
+from .utils import id_to_int, random_id, list_map, replace_if_changed
 
 
 class Marker(ABC):
@@ -21,6 +21,13 @@ class Marker(ABC):
     @property
     def id(self) -> UUID:
         return UUID(int=self._id)  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
+
+    # `_id` is on the public positional constructor surface, so callers may pass
+    # a `uuid.UUID`; the dataclass `__init__` of every concrete marker calls this
+    # inherited hook to normalise it to the internal int form.
+    def __post_init__(self):
+        if type(self._id) is not int:  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
+            object.__setattr__(self, '_id', id_to_int(self._id))  # ty: ignore[unresolved-attribute]
 
     def replace(self, **kwargs) -> 'Marker':
         """Replace fields on this marker, returning self if nothing changed."""
@@ -48,6 +55,11 @@ class Markers:
     @property
     def id(self) -> UUID:
         return UUID(int=self._id)  # _id stored as int internally; public API stays UUID
+
+    def __post_init__(self):
+        # Normalise `uuid.UUID` ids from external callers to the internal int form.
+        if type(self._id) is not int:
+            object.__setattr__(self, '_id', id_to_int(self._id))
 
     _markers: List[Marker]
 
