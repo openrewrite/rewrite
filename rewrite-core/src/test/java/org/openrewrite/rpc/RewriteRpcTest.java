@@ -24,6 +24,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.marker.Markup;
@@ -40,9 +41,11 @@ import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -265,6 +268,40 @@ class RewriteRpcTest implements RewriteTest {
         );
 
         assertThat(latch.getCount()).isEqualTo(0);
+    }
+
+    @Test
+    void dataTablesWrittenToCsvOnRemotePeer(@TempDir Path tempDir) throws IOException {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        DataTableExecutionContextView.view(ctx).setDataTableStoreConfig(
+          tempDir, ".csv",
+          Map.of("repository", "acme/demo"),
+          Map.of("runId", "run-1"));
+
+        rewriteRun(
+          spec -> spec
+            .recipe(client.prepareRecipe("org.openrewrite.text.Find",
+              Map.of("find", "hello")))
+            .executionContext(ctx)
+            .validateRecipeSerialization(false),
+          text(
+            "Hello Jon!",
+            "~~>Hello Jon!",
+            spec -> spec.path("hello.txt")
+          )
+        );
+
+        // The remote peer wrote the recipe's TextMatches rows; the local scheduler
+        // wrote run-level tables (SourcesFileResults etc.) through the same
+        // configuration, each store using its own unique file name suffix.
+        File[] files = tempDir.toFile().listFiles((dir, name) ->
+          name.startsWith(TextMatches.class.getName() + "-") && name.endsWith(".csv"));
+        assertThat(files).isNotNull().hasSize(1);
+        assertThat(Files.readAllLines(files[0].toPath()))
+          .anySatisfy(line -> assertThat(line)
+            .contains("acme/demo")
+            .contains("hello.txt")
+            .contains("run-1"));
     }
 
     @Test

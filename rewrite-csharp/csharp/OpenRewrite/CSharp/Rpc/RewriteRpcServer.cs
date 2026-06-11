@@ -362,13 +362,15 @@ public class RewriteRpcServer
             });
         }
 
-        // ExecutionContext is sent as a typed shell with no data,
-        // matching the JavaScript pattern (empty codec).
+        // ExecutionContext is sent as a typed shell. The Java codec consumes one
+        // body message (the RPC-shared messages, see ExecutionContext.rpcReceive
+        // in Java); this peer shares none, so it sends NO_CHANGE for that value.
         if (after is ExecutionContext)
         {
             return Task.FromResult(new List<RpcObjectData>
             {
                 new() { State = ADD, ValueType = "org.openrewrite.InMemoryExecutionContext" },
+                new() { State = NO_CHANGE },
                 new() { State = END_OF_OBJECT }
             });
         }

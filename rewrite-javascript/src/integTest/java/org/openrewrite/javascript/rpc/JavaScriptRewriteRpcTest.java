@@ -110,6 +110,43 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void dataTablesWrittenToCsvByJavaScriptPeer() throws IOException {
+        installRecipes();
+        Path dataTableDir = tempDir.resolve("data-tables");
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        DataTableExecutionContextView.view(ctx).setDataTableStoreConfig(
+          dataTableDir, ".csv",
+          Map.of("repositoryOrigin", "github.com/acme/demo"),
+          Map.of("runId", "run-1"));
+
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.text.change-text",
+              Map.of("text", "Hello World!")))
+            .executionContext(ctx),
+          text(
+            "Hello Jon!",
+            "Hello World!",
+            spec -> spec.path("hello.txt")
+          )
+        );
+
+        // The JavaScript peer installed its own CsvDataTableStore from the
+        // configuration carried by the ExecutionContext and wrote the recipe's
+        // data table rows to a uniquely suffixed file in the shared directory.
+        File[] files = dataTableDir.toFile().listFiles((dir, name) ->
+          name.startsWith("org.openrewrite.text.replaced-text-") && name.endsWith(".csv"));
+        assertThat(files).isNotNull().hasSize(1);
+        assertThat(Files.readAllLines(files[0].toPath()))
+          .contains("repositoryOrigin,Source Path,Text,runId")
+          .anySatisfy(line -> assertThat(line)
+            .contains("github.com/acme/demo")
+            .contains("hello.txt")
+            .contains("Hello Jon!")
+            .contains("run-1"));
+    }
+
+    @Test
     void printSubtree() {
         rewriteRun(
           typescript(

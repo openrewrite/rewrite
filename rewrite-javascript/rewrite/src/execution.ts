@@ -22,16 +22,53 @@ export class ExecutionContext {
     }
 }
 
+/**
+ * Messages whose keys start with this prefix are shared with remote RPC peers
+ * when an {@link ExecutionContext} is transferred. All other messages are
+ * process-local and never cross the wire. Values of shared messages must be
+ * limited to strings and lists of strings so that every peer language can
+ * consume them without dedicated codecs.
+ *
+ * Must stay in sync with `ExecutionContext.RPC_SHARED_MESSAGE_PREFIX` in Java.
+ */
+export const RPC_SHARED_MESSAGE_PREFIX = "org.openrewrite.rpc.shared.";
+
+/**
+ * The messages under {@link RPC_SHARED_MESSAGE_PREFIX} as a list of
+ * `[key, value]` pairs sorted by key, or undefined when there are none.
+ */
+function rpcSharedMessages(ctx: ExecutionContext): [string, any][] | undefined {
+    const entries = Object.keys(ctx.messages)
+        .filter(key => key.startsWith(RPC_SHARED_MESSAGE_PREFIX) && ctx.messages[key] !== undefined)
+        .sort()
+        .map(key => [key, ctx.messages[key]] as [string, any]);
+    return entries.length === 0 ? undefined : entries;
+}
+
 const executionContextCodec: RpcCodec<ExecutionContext> = {
     rpcNew(): ExecutionContext {
         return new ExecutionContext();
     },
 
-    async rpcSend(_after: ExecutionContext, _q: RpcSendQueue): Promise<void> {
+    async rpcSend(after: ExecutionContext, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, rpcSharedMessages);
     },
 
-    async rpcReceive(_before: ExecutionContext, _q: RpcReceiveQueue): Promise<ExecutionContext> {
-        return new ExecutionContext();
+    async rpcReceive(before: ExecutionContext, q: RpcReceiveQueue): Promise<ExecutionContext> {
+        const after: [string, any][] | undefined = await q.receive(rpcSharedMessages(before));
+        const retained = new Set<string>();
+        if (after) {
+            for (const [key, value] of after) {
+                before.messages[key] = value;
+                retained.add(key);
+            }
+        }
+        for (const key of Object.keys(before.messages)) {
+            if (key.startsWith(RPC_SHARED_MESSAGE_PREFIX) && !retained.has(key)) {
+                delete before.messages[key];
+            }
+        }
+        return before;
     }
 }
 

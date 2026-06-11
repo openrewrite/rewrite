@@ -18,7 +18,16 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import {ReplacedText} from "../fixtures/replaced-text";
-import {CsvDataTableStore, DATA_TABLE_STORE, ExecutionContext} from "../src";
+import {
+    CsvDataTableStore,
+    DATA_TABLE_STORE,
+    DATA_TABLE_STORE_FILE_EXTENSION,
+    DATA_TABLE_STORE_OUTPUT_DIR,
+    DATA_TABLE_STORE_PREFIX_COLUMNS,
+    DATA_TABLE_STORE_SUFFIX_COLUMNS,
+    ExecutionContext,
+    InMemoryDataTableStore
+} from "../src";
 
 describe("data tables", () => {
 
@@ -145,5 +154,74 @@ describe("data tables", () => {
 
         const store = new CsvDataTableStore(nestedDir);
         expect(fs.existsSync(nestedDir)).toBe(true);
+    });
+
+    test("writes static prefix and suffix columns", () => {
+        const store = new CsvDataTableStore(tmpDir, {
+            prefixColumns: {repositoryOrigin: "github.com/acme/demo"},
+            suffixColumns: {runId: "run-1"}
+        });
+        const ctx = new ExecutionContext();
+        ctx.messages[DATA_TABLE_STORE] = store;
+
+        ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/foo.ts", "old text"));
+
+        const fileKey = CsvDataTableStore.fileKey(ReplacedText.dataTable);
+        const lines = fs.readFileSync(path.join(tmpDir, fileKey + ".csv"), 'utf8').split('\n');
+        expect(lines[3]).toBe('repositoryOrigin,Source Path,Text,runId');
+        expect(lines[4]).toBe('github.com/acme/demo,src/foo.ts,old text,run-1');
+    });
+
+    test("gzip file extension writes readable multi-member gzip", () => {
+        const store = new CsvDataTableStore(tmpDir, {fileExtension: ".csv.gz"});
+        const ctx = new ExecutionContext();
+        ctx.messages[DATA_TABLE_STORE] = store;
+
+        ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/foo.ts", "first"));
+        ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/bar.ts", "second"));
+
+        const fileKey = CsvDataTableStore.fileKey(ReplacedText.dataTable);
+        const gzPath = path.join(tmpDir, fileKey + ".csv.gz");
+        expect(fs.existsSync(gzPath)).toBe(true);
+
+        const zlib = require('zlib');
+        const content = zlib.gunzipSync(fs.readFileSync(gzPath)).toString('utf8');
+        expect(content).toContain('Source Path,Text');
+        expect(content).toContain('src/foo.ts,first');
+        expect(content).toContain('src/bar.ts,second');
+    });
+
+    test("insertRow materializes a CSV store from RPC-shared config messages", () => {
+        const writtenFiles: string[] = [];
+        for (let i = 0; i < 2; i++) {
+            const ctx = new ExecutionContext();
+            ctx.messages[DATA_TABLE_STORE_OUTPUT_DIR] = tmpDir;
+            ctx.messages[DATA_TABLE_STORE_FILE_EXTENSION] = ".csv";
+            ctx.messages[DATA_TABLE_STORE_PREFIX_COLUMNS] = ["repositoryOrigin", "github.com/acme/demo"];
+            ctx.messages[DATA_TABLE_STORE_SUFFIX_COLUMNS] = ["runId", "run-1"];
+
+            ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/foo.ts", "row-" + i));
+
+            expect(ctx.messages[DATA_TABLE_STORE]).toBeInstanceOf(CsvDataTableStore);
+            writtenFiles.push(...fs.readdirSync(tmpDir).filter(f => !writtenFiles.includes(f)));
+        }
+
+        const fileKey = CsvDataTableStore.fileKey(ReplacedText.dataTable);
+        // Each context materialized its own store writing its own uniquely
+        // suffixed file, so concurrent writers never collide.
+        expect(writtenFiles).toHaveLength(2);
+        for (const file of writtenFiles) {
+            expect(file).toMatch(new RegExp(`^${fileKey.replace(/[.$]/g, '\\$&')}-.+\\.csv$`));
+        }
+        const content = fs.readFileSync(path.join(tmpDir, writtenFiles[0]), 'utf8');
+        expect(content).toContain('repositoryOrigin,Source Path,Text,runId');
+        expect(content).toContain('github.com/acme/demo,src/foo.ts,row-0,run-1');
+    });
+
+    test("insertRow without store or config defaults to in-memory", () => {
+        const ctx = new ExecutionContext();
+        ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/foo.ts", "in-memory"));
+        expect(ctx.messages[DATA_TABLE_STORE]).toBeInstanceOf(InMemoryDataTableStore);
+        expect(fs.readdirSync(tmpDir)).toHaveLength(0);
     });
 });

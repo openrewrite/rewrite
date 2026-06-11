@@ -209,6 +209,95 @@ class DataTableStoreTest {
     }
 
     // =========================================================================
+    // DataTableExecutionContextView: store configuration shared over RPC
+    // =========================================================================
+
+    @Test
+    void storeConfigIsWhitelistedForRpcSharing(@TempDir Path tempDir) {
+        ExecutionContext ctx = ctx();
+        Map<String, String> prefix = new LinkedHashMap<>();
+        prefix.put("repositoryOrigin", "github.com/acme/demo");
+        Map<String, String> suffix = new LinkedHashMap<>();
+        suffix.put("runId", "run-1");
+        DataTableExecutionContextView.view(ctx)
+                .setDataTableStoreConfig(tempDir, ".csv", prefix, suffix);
+
+        assertThat(ctx.getMessages().entrySet())
+                .filteredOn(message -> message.getKey().startsWith(ExecutionContext.RPC_SHARED_MESSAGE_PREFIX))
+                .hasSize(4)
+                .allSatisfy(message -> assertThat(message.getValue())
+                        .satisfiesAnyOf(
+                                v -> assertThat(v).isInstanceOf(String.class),
+                                v -> assertThat(v).isInstanceOf(List.class)));
+    }
+
+    @Test
+    void materializesCsvStoreFromConfig(@TempDir Path tempDir) throws Exception {
+        ExecutionContext ctx = ctx();
+        Map<String, String> prefix = new LinkedHashMap<>();
+        prefix.put("repositoryOrigin", "github.com/acme/demo");
+        Map<String, String> suffix = new LinkedHashMap<>();
+        suffix.put("runId", "run-1");
+        DataTableExecutionContextView.view(ctx)
+                .setDataTableStoreConfig(tempDir, ".csv", prefix, suffix);
+
+        DataTableStore store = DataTableExecutionContextView.view(ctx).getDataTableStore();
+        assertThat(store).isInstanceOf(CsvDataTableStore.class);
+        store.insertRow(new TestTable(Recipe.noop()), ctx, new TestTable.Row("alice"));
+        ((AutoCloseable) store).close();
+
+        var files = tempDir.toFile().listFiles((dir, name) -> name.endsWith(".csv"));
+        assertThat(files).hasSize(1);
+        assertThat(files[0].getName()).startsWith(TestTable.class.getName() + "-");
+        List<String> lines = Files.readAllLines(files[0].toPath());
+        assertThat(lines).contains(
+                "repositoryOrigin,name,runId",
+                "github.com/acme/demo,alice,run-1");
+    }
+
+    @Test
+    void materializesGzipCsvStoreFromConfig(@TempDir Path tempDir) throws Exception {
+        ExecutionContext ctx = ctx();
+        DataTableExecutionContextView.view(ctx)
+                .setDataTableStoreConfig(tempDir, ".csv.gz", Map.of(), Map.of());
+
+        DataTableStore store = DataTableExecutionContextView.view(ctx).getDataTableStore();
+        store.insertRow(new TestTable(Recipe.noop()), ctx, new TestTable.Row("alice"));
+        ((AutoCloseable) store).close();
+
+        var files = tempDir.toFile().listFiles((dir, name) -> name.endsWith(".csv.gz"));
+        assertThat(files).hasSize(1);
+        try (var in = new java.util.zip.GZIPInputStream(new FileInputStream(files[0]))) {
+            String content = new String(in.readAllBytes());
+            assertThat(content).contains("alice");
+        }
+    }
+
+    @Test
+    void materializedStoresWriteDistinctFiles(@TempDir Path tempDir) throws Exception {
+        // Each store gets a unique filename suffix so that processes sharing an
+        // output directory (orchestrator + RPC peers) never append to each
+        // other's open (possibly gzip) streams.
+        for (int i = 0; i < 2; i++) {
+            ExecutionContext ctx = ctx();
+            DataTableExecutionContextView.view(ctx)
+                    .setDataTableStoreConfig(tempDir, ".csv", Map.of(), Map.of());
+            DataTableStore store = DataTableExecutionContextView.view(ctx).getDataTableStore();
+            store.insertRow(new TestTable(Recipe.noop()), ctx, new TestTable.Row("row-" + i));
+            ((AutoCloseable) store).close();
+        }
+
+        assertThat(tempDir.toFile().listFiles((dir, name) -> name.endsWith(".csv"))).hasSize(2);
+    }
+
+    @Test
+    void noStoreConfigFallsBackToInMemory() {
+        ExecutionContext ctx = ctx();
+        assertThat(DataTableExecutionContextView.view(ctx).getDataTableStore())
+                .isInstanceOf(InMemoryDataTableStore.class);
+    }
+
+    // =========================================================================
     // CsvDataTableStore
     // =========================================================================
 

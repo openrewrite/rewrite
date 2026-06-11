@@ -905,9 +905,14 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 		}()
 
 		obj = q.Receive(before, func(v any) any {
-			// ExecutionContext uses an empty-body codec (matches JS execution.ts):
-			// the type tag arrives via the queue envelope; no field messages follow.
+			// The ExecutionContext codec carries a single value: the RPC-shared
+			// messages as a list of [key, value] pairs (see ExecutionContext.rpcSend
+			// in Java). This peer consumes and ignores them for now; data table
+			// output is configured via --data-tables-csv-dir instead. Receive()
+			// pushes back an END_OF_OBJECT, so this also tolerates senders that
+			// ship the context with an empty body.
 			if ctx, ok := v.(*recipe.ExecutionContext); ok {
+				q.Receive(nil, nil)
 				return ctx
 			}
 			if t, ok := v.(java.Tree); ok {

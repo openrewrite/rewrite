@@ -40,6 +40,17 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
     String SCANNING_MUTATION_VALIDATION = "org.openrewrite.test.scanningMutationValidation";
 
+    /**
+     * Messages whose keys start with this prefix are shared with remote RPC peers
+     * when this context is transferred via {@link #rpcSend} / {@link #rpcReceive}.
+     * All other messages are process-local (they may hold non-serializable state
+     * like caches, callbacks or open resources) and never cross the wire.
+     * <p>
+     * Values of shared messages must be limited to strings and lists of strings so
+     * that every peer language can consume them without dedicated codecs.
+     */
+    String RPC_SHARED_MESSAGE_PREFIX = "org.openrewrite.rpc.shared.";
+
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
         putMessageInCollection("org.openrewrite.internal.treeObservers", observer,
@@ -119,15 +130,54 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     }
 
     /**
-     * The after state will change if any messages have changed by a call to clone in the
-     * {@link Visit.Handler} implementation.
+     * Sends the messages under {@link #RPC_SHARED_MESSAGE_PREFIX} as a single value:
+     * a list of {@code [key, value]} pairs sorted by key, or nothing (NO_CHANGE) when
+     * there are none. Because a plain list carries no value type, peers receive it as
+     * raw JSON without needing a dedicated codec for it.
+     * <p>
+     * Note that contexts are mutated in place rather than copied, so on a re-send the
+     * before and after state are the same instance and the shared messages are simply
+     * sent again whenever any exist.
      */
     @Override
     default void rpcSend(ExecutionContext ctx, RpcSendQueue q) {
+        q.getAndSend(ctx, ExecutionContext::rpcSharedMessages);
     }
 
     @Override
     default ExecutionContext rpcReceive(ExecutionContext ctx, RpcReceiveQueue q) {
+        List<List<Object>> after = q.receive(rpcSharedMessages(ctx));
+        Set<String> retained = new HashSet<>();
+        if (after != null) {
+            for (List<Object> entry : after) {
+                String key = (String) entry.get(0);
+                ctx.putMessage(key, entry.get(1));
+                retained.add(key);
+            }
+        }
+        ctx.getMessages().keySet().removeIf(key ->
+                key.startsWith(RPC_SHARED_MESSAGE_PREFIX) && !retained.contains(key));
         return ctx;
+    }
+
+    /**
+     * @return The messages under {@link #RPC_SHARED_MESSAGE_PREFIX} as a list of
+     * {@code [key, value]} pairs sorted by key, or null when there are none.
+     */
+    static @Nullable List<List<Object>> rpcSharedMessages(ExecutionContext ctx) {
+        Map<String, Object> shared = new TreeMap<>();
+        for (Map.Entry<String, @Nullable Object> message : ctx.getMessages().entrySet()) {
+            if (message.getKey().startsWith(RPC_SHARED_MESSAGE_PREFIX) && message.getValue() != null) {
+                shared.put(message.getKey(), message.getValue());
+            }
+        }
+        if (shared.isEmpty()) {
+            return null;
+        }
+        List<List<Object>> entries = new ArrayList<>(shared.size());
+        for (Map.Entry<String, Object> entry : shared.entrySet()) {
+            entries.add(Arrays.asList(entry.getKey(), entry.getValue()));
+        }
+        return entries;
     }
 }

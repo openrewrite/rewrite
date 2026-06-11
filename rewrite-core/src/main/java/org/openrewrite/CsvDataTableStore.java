@@ -388,6 +388,10 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
             }
 
             csvWriter.writeRow((Object[]) values);
+            // Rows must be durable without an explicit close: a store on an RPC peer
+            // has no end-of-run hook, so readers (e.g. the orchestrating process)
+            // would otherwise only ever see empty files.
+            csvWriter.flush();
         }
 
         void close() {

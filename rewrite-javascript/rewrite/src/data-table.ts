@@ -16,11 +16,25 @@
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
-import {ExecutionContext} from "./execution";
+import * as zlib from 'zlib';
+import {ExecutionContext, RPC_SHARED_MESSAGE_PREFIX} from "./execution";
 import {OptionDescriptor} from "./recipe";
 
 export const DATA_TABLE_STORE = Symbol.for("org.openrewrite.dataTables.store");
 const COLUMNS_KEY = Symbol.for("org.openrewrite.dataTables.columns");
+
+/**
+ * RPC-shared messages carrying the configuration for a {@link CsvDataTableStore}.
+ * An orchestrating process (typically the JVM) sets these on its ExecutionContext;
+ * they travel to this peer with the context, and {@link DataTable#insertRow}
+ * materializes a local store from them on first use.
+ *
+ * Must stay in sync with `DataTableExecutionContextView` in Java.
+ */
+export const DATA_TABLE_STORE_OUTPUT_DIR = RPC_SHARED_MESSAGE_PREFIX + "dataTableOutputDir";
+export const DATA_TABLE_STORE_FILE_EXTENSION = RPC_SHARED_MESSAGE_PREFIX + "dataTableFileExtension";
+export const DATA_TABLE_STORE_PREFIX_COLUMNS = RPC_SHARED_MESSAGE_PREFIX + "dataTablePrefixColumns";
+export const DATA_TABLE_STORE_SUFFIX_COLUMNS = RPC_SHARED_MESSAGE_PREFIX + "dataTableSuffixColumns";
 
 export function Column(descriptor: ColumnDescriptor) {
     return function (target: any, propertyKey: string) {
@@ -144,11 +158,45 @@ export class DataTable<Row> {
 
     insertRow(ctx: ExecutionContext, row: Row): void {
         if (!ctx.messages[DATA_TABLE_STORE]) {
-            ctx.messages[DATA_TABLE_STORE] = new InMemoryDataTableStore();
+            ctx.messages[DATA_TABLE_STORE] = csvDataTableStoreFromConfig(ctx) ?? new InMemoryDataTableStore();
         }
         const dataTableStore: DataTableStore = ctx.messages[DATA_TABLE_STORE];
         dataTableStore.insertRow(this, ctx, row);
     }
+}
+
+/**
+ * Materialize a {@link CsvDataTableStore} from the RPC-shared configuration
+ * messages in the context, or undefined when no output directory is configured.
+ * The store's files get a unique name suffix so that other processes writing
+ * to the same directory (the orchestrator, other peers) never collide with it.
+ */
+function csvDataTableStoreFromConfig(ctx: ExecutionContext): CsvDataTableStore | undefined {
+    const outputDir = ctx.messages[DATA_TABLE_STORE_OUTPUT_DIR];
+    if (typeof outputDir !== 'string') {
+        return undefined;
+    }
+    const fileExtension = ctx.messages[DATA_TABLE_STORE_FILE_EXTENSION] ?? '.csv';
+    return new CsvDataTableStore(outputDir, {
+        fileExtension: `-${crypto.randomBytes(4).toString('hex')}${fileExtension}`,
+        prefixColumns: unflattenColumns(ctx.messages[DATA_TABLE_STORE_PREFIX_COLUMNS]),
+        suffixColumns: unflattenColumns(ctx.messages[DATA_TABLE_STORE_SUFFIX_COLUMNS]),
+    });
+}
+
+/**
+ * Static columns travel over RPC as a flat list alternating name and value,
+ * preserving column order while staying within the string/list-of-strings
+ * restriction on shared message values.
+ */
+function unflattenColumns(flattened?: string[]): Record<string, string> {
+    const columns: Record<string, string> = {};
+    if (Array.isArray(flattened)) {
+        for (let i = 0; i + 1 < flattened.length; i += 2) {
+            columns[flattened[i]] = flattened[i + 1];
+        }
+    }
+    return columns;
 }
 
 export interface DataTableDescriptor {
@@ -178,6 +226,22 @@ function escapeCsv(value: unknown): string {
 }
 
 /**
+ * Options for {@link CsvDataTableStore}.
+ */
+export interface CsvDataTableStoreOptions {
+    /**
+     * File extension including dot (default ".csv"). An extension ending in
+     * ".gz" GZIP-compresses the output; each write appends a complete GZIP
+     * member, producing a valid multi-member archive at all times.
+     */
+    fileExtension?: string;
+    /** Static columns prepended to each row, in insertion order. */
+    prefixColumns?: Record<string, string>;
+    /** Static columns appended to each row, in insertion order. */
+    suffixColumns?: Record<string, string>;
+}
+
+/**
  * A DataTableStore that writes rows directly to CSV files as they are inserted.
  * Uses the data table's file-safe key for filenames.
  */
@@ -185,14 +249,29 @@ export class CsvDataTableStore implements DataTableStore {
     private readonly _initializedTables = new Set<string>();
     private readonly _rowCounts: { [key: string]: number } = {};
     private readonly _dataTables = new Map<string, DataTable<any>>();
+    private readonly _fileExtension: string;
+    private readonly _prefixColumns: Record<string, string>;
+    private readonly _suffixColumns: Record<string, string>;
 
-    constructor(private readonly outputDir: string) {
+    constructor(private readonly outputDir: string, options?: CsvDataTableStoreOptions) {
+        this._fileExtension = options?.fileExtension ?? '.csv';
+        this._prefixColumns = options?.prefixColumns ?? {};
+        this._suffixColumns = options?.suffixColumns ?? {};
         fs.mkdirSync(outputDir, {recursive: true});
+    }
+
+    private write(csvPath: string, text: string, append: boolean): void {
+        const data = this._fileExtension.endsWith('.gz') ? zlib.gzipSync(Buffer.from(text, 'utf8')) : text;
+        if (append) {
+            fs.appendFileSync(csvPath, data);
+        } else {
+            fs.writeFileSync(csvPath, data);
+        }
     }
 
     insertRow<Row>(dataTable: DataTable<Row>, _ctx: ExecutionContext, row: Row): void {
         const fileKey = CsvDataTableStore.fileKey(dataTable);
-        const csvPath = path.join(this.outputDir, fileKey + '.csv');
+        const csvPath = path.join(this.outputDir, fileKey + this._fileExtension);
 
         if (!this._initializedTables.has(fileKey)) {
             this._initializedTables.add(fileKey);
@@ -200,22 +279,27 @@ export class CsvDataTableStore implements DataTableStore {
             this._dataTables.set(fileKey, dataTable);
 
             const columns = dataTable.descriptor.columns;
-            const headerRow = columns.map(col => escapeCsv(col.displayName)).join(',');
+            const headerRow = [
+                ...Object.keys(this._prefixColumns),
+                ...columns.map(col => col.displayName),
+                ...Object.keys(this._suffixColumns)
+            ].map(escapeCsv).join(',');
             // Write metadata comments + header
             const comments = [
                 `# @name ${dataTable.descriptor.name}`,
                 `# @instanceName ${dataTable.instanceName}`,
                 `# @group ${dataTable.group ?? ''}`,
             ].join('\n');
-            fs.writeFileSync(csvPath, comments + '\n' + headerRow + '\n');
+            this.write(csvPath, comments + '\n' + headerRow + '\n', false);
         }
 
         const columns = dataTable.descriptor.columns;
-        const rowValues = columns.map(col => {
-            const value = (row as any)[col.name];
-            return escapeCsv(value);
-        });
-        fs.appendFileSync(csvPath, rowValues.join(',') + '\n');
+        const rowValues = [
+            ...Object.values(this._prefixColumns),
+            ...columns.map(col => (row as any)[col.name]),
+            ...Object.values(this._suffixColumns)
+        ].map(escapeCsv);
+        this.write(csvPath, rowValues.join(',') + '\n', true);
         this._rowCounts[fileKey]++;
     }
 

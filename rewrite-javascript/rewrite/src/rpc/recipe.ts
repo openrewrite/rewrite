@@ -68,13 +68,10 @@ export class RpcRecipe extends ScanningRecipe<number> {
     }
 
     async onComplete(ctx: ExecutionContext): Promise<void> {
-        // This will merge data tables from the remote into the local context.
-        //
-        // When multiple recipes ran on the same RPC peer, they will all have been
-        // adding to the same ExecutionContext instance on that peer, and so really
-        // a CHANGE will only be returned for the first of any recipes on that peer.
-        // It doesn't matter which one added data table entries, because they all share
-        // the same view of the data tables.
+        // Synchronize the final state of the remote's ExecutionContext. Data table
+        // rows do not flow back over RPC: when a data table store is configured
+        // (see DATA_TABLE_STORE_OUTPUT_DIR in data-table.ts), the peer streams its
+        // rows to its own files in the shared output directory as they are inserted.
         if ("org.openrewrite.rpc.id" in ctx) {
             const updated = await this.rpc.getObject(ctx.messages["org.openrewrite.rpc.id"]);
             Object.assign(ctx, updated);
