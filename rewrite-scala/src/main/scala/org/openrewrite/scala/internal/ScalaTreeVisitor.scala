@@ -8282,12 +8282,28 @@ class ScalaTreeVisitor(
       visitRepeatedType(po)
     case tuple: untpd.Tuple => visitTupleType(tuple)
     case parens: untpd.Parens => visitParenthesizedType(parens)
+    case infix: untpd.InfixOp if infix.op != null &&
+        (infix.op.name.toString == "|" || infix.op.name.toString == "&") =>
+      visitTypeOperatorInfix(infix)
     case _ =>
       visitTree(tpt) match {
         case tt: TypeTree => tt
         case id: J.Identifier => id
         case _ => null
       }
+  }
+
+  /**
+   * Union (`A | B`) and intersection (`A & B`) types are parsed as an `untpd.InfixOp`.
+   * Neither has a dedicated J/S type yet, so — like the `with`-less `&` already handled
+   * elsewhere — preserve the whole expression as a source-text identifier rather than
+   * letting it fall through to a `J.Binary` (which isn't a `TypeTree`) and get dropped.
+   * Returning a non-null `TypeTree` here fixes every type position at once (params,
+   * return types, type ascriptions, bounds, tuple/function components, ...).
+   */
+  private def visitTypeOperatorInfix(infix: untpd.InfixOp): TypeTree = {
+    val prefix = extractPrefix(infix.span)
+    ident(extractSource(infix.span), prefix)
   }
 
   /**
@@ -9111,7 +9127,7 @@ class ScalaTreeVisitor(
           val loPrefix = if (loOpIdx > cursor) ScalaSpace.format(source, cursor, loOpIdx) else Space.EMPTY
           if (loOpIdx >= 0) cursor = loOpIdx + 2
           val savedCursorLo = cursor
-          val loType = visitTree(tb.lo) match {
+          val loType = visitTypeTree(tb.lo) match {
             case tt: TypeTree => tt
             case _ => cursor = savedCursorLo; visitUnknown(tb.lo).asInstanceOf[TypeTree]
           }
@@ -9126,7 +9142,7 @@ class ScalaTreeVisitor(
           val hiPrefix = if (hiOpIdx > cursor) ScalaSpace.format(source, cursor, hiOpIdx) else Space.EMPTY
           if (hiOpIdx >= 0) cursor = hiOpIdx + 2
           val savedCursorHi = cursor
-          val hiType = visitTree(tb.hi) match {
+          val hiType = visitTypeTree(tb.hi) match {
             case tt: TypeTree => tt
             case _ => cursor = savedCursorHi; visitUnknown(tb.hi).asInstanceOf[TypeTree]
           }
