@@ -1921,6 +1921,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitExtensionMethods(S.ExtensionMethods ext, PrintOutputCapture<P> p) {
         beforeSyntax(ext, Space.Location.LANGUAGE_EXTENSION, p);
         p.append("extension");
+        if (ext.getTypeParameters() != null) {
+            visit(ext.getTypeParameters(), p);
+        }
         JContainer<Statement> params = ext.getPadding().getParameters();
         p.append(params.getBefore().getWhitespace());
         p.append('(');

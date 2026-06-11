@@ -7824,19 +7824,36 @@ class ScalaTreeVisitor(
     val prefix = extractPrefix(ext.span)
     val adjustedStart = Math.max(0, ext.span.start - offsetAdjustment)
     val searchStart = Math.max(0, Math.min(cursor, adjustedStart) - "extension".length)
-    val parenIdx = positionOfNext("(", searchStart)
-    val extKwIdx = if (parenIdx >= 0) source.lastIndexOf("extension", parenIdx) else positionOfNext("extension", cursor)
+    val firstParenIdx = positionOfNext("(", searchStart)
+    val extKwIdx = if (firstParenIdx >= 0) source.lastIndexOf("extension", firstParenIdx) else positionOfNext("extension", cursor)
     val keywordEnd = if (extKwIdx >= 0) extKwIdx + "extension".length else cursor
     cursor = keywordEnd
-    val beforeParen = if (parenIdx > keywordEnd) ScalaSpace.format(source, keywordEnd, parenIdx) else Space.EMPTY
+
+    import scala.jdk.CollectionConverters.*
+    val paramss = ext.paramss
+
+    // A leading clause of TypeDefs is the type-parameter clause: `extension [A](x: T)`.
+    val hasTypeParamClause = paramss.nonEmpty && {
+      val head = paramss.head.asInstanceOf[List[Trees.Tree[?]]]
+      head.nonEmpty && head.head.isInstanceOf[Trees.TypeDef[?]]
+    }
+    val typeParameters: J.TypeParameters = if (hasTypeParamClause) {
+      buildExtensionTypeParameters(paramss.head.asInstanceOf[List[Trees.Tree[?]]])
+    } else null
+
+    // The value parameter clause follows the optional type-parameter clause.
+    val valueClause: List[Trees.Tree[?]] = if (hasTypeParamClause) {
+      if (paramss.tail.nonEmpty) paramss.tail.head.asInstanceOf[List[Trees.Tree[?]]] else Nil
+    } else if (paramss.nonEmpty) paramss.head.asInstanceOf[List[Trees.Tree[?]]] else Nil
+
+    val parenIdx = positionOfNext("(", cursor)
+    val beforeParen = if (parenIdx > cursor) ScalaSpace.format(source, cursor, parenIdx) else Space.EMPTY
     if (parenIdx >= 0) cursor = parenIdx + 1
 
-    // Visit parameters from first parameter clause
-    import scala.jdk.CollectionConverters.*
+    // Visit parameters from the value parameter clause
     val rpParams = new util.ArrayList[JRightPadded[Statement]]()
-    val paramss = ext.paramss
-    if (paramss.nonEmpty) {
-      val firstClause = paramss.head.asInstanceOf[List[Trees.Tree[?]]].asJava
+    if (valueClause.nonEmpty) {
+      val firstClause = valueClause.asJava
       var i = 0
       while (i < firstClause.size) {
         val pTree = firstClause.get(i)
@@ -7914,7 +7931,47 @@ class ScalaTreeVisitor(
     } else Markers.EMPTY
     val body = new J.Block(Tree.randomId(), blockPrefix, blockMarkers,
       JRightPadded.build(false), methodStmts, endSpace)
-    S.ExtensionMethods.build(Tree.randomId(), prefix, Markers.EMPTY, parameters, body)
+    S.ExtensionMethods.build(Tree.randomId(), prefix, Markers.EMPTY, typeParameters, parameters, body)
+  }
+
+  /** Build the type-parameter clause `[A, B]` of an extension, advancing the cursor past `]`. */
+  private def buildExtensionTypeParameters(clause: List[Trees.Tree[?]]): J.TypeParameters = {
+    val typeParams = clause.collect { case td: Trees.TypeDef[?] => td }
+    val searchEnd = Math.min(cursor + 100, source.length)
+    val searchText = source.substring(cursor, searchEnd)
+    val bracketIdx = positionOfNextIn(searchText, "[", 0)
+    if (bracketIdx < 0) null
+    else {
+      val bracketSpace = if (bracketIdx > 0) Space.format(searchText.substring(0, bracketIdx)) else Space.EMPTY
+      cursor = cursor + bracketIdx + 1
+
+      val jTypeParams = new util.ArrayList[JRightPadded[J.TypeParameter]]()
+      typeParams.zipWithIndex.foreach { case (tp, idx) =>
+        val jtp = visitTypeParameter(tp)
+        val isLast = idx == typeParams.size - 1
+        val afterParam = if (cursor < source.length) {
+          if (!isLast) {
+            val s = source.substring(cursor, Math.min(cursor + 200, source.length))
+            val commaIdx = positionOfNextIn(s, ",", 0)
+            if (commaIdx >= 0) {
+              cursor = cursor + commaIdx + 1
+              Space.format(s.substring(0, commaIdx))
+            } else Space.EMPTY
+          } else {
+            val s = source.substring(cursor, Math.min(cursor + 200, source.length))
+            val closeIdx = positionOfNextIn(s, "]", 0)
+            if (closeIdx >= 0) Space.format(s.substring(0, closeIdx)) else Space.EMPTY
+          }
+        } else Space.EMPTY
+        jTypeParams.add(new JRightPadded(jtp, afterParam, Markers.EMPTY))
+      }
+
+      val afterSearch = source.substring(cursor, Math.min(cursor + 200, source.length))
+      val closeBracket = positionOfNextIn(afterSearch, "]", 0)
+      if (closeBracket >= 0) cursor = cursor + closeBracket + 1
+
+      new J.TypeParameters(Tree.randomId(), bracketSpace, Markers.EMPTY, Collections.emptyList(), jTypeParams)
+    }
   }
 
   /** Build a single for-comprehension enumerator from a dotty tree. */

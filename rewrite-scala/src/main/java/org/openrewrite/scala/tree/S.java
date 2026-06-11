@@ -2062,6 +2062,14 @@ public interface S extends J {
         Markers markers;
 
         /**
+         * The optional type parameter clause, e.g., {@code [A]} in
+         * {@code extension [A](x: List[A])}. {@code null} when the extension has no
+         * type parameters.
+         */
+        @With @Getter
+        J.@Nullable TypeParameters typeParameters;
+
+        /**
          * The extension parameter list, e.g., {@code (x: T)}. The container's before-space
          * is the space before the {@code (} bracket.
          */
@@ -2074,8 +2082,9 @@ public interface S extends J {
         J.Block body;
 
         public static ExtensionMethods build(UUID id, Space prefix, Markers markers,
+                                             J.@Nullable TypeParameters typeParameters,
                                              JContainer<Statement> parameters, J.Block body) {
-            return new ExtensionMethods(null, id, prefix, markers, parameters, body);
+            return new ExtensionMethods(null, id, prefix, markers, typeParameters, parameters, body);
         }
 
         public List<Statement> getParameters() {
@@ -2121,7 +2130,7 @@ public interface S extends J {
 
             public ExtensionMethods withParameters(JContainer<Statement> parameters) {
                 return t.parameters == parameters ? t :
-                        new ExtensionMethods(null, t.id, t.prefix, t.markers, parameters, t.body);
+                        new ExtensionMethods(null, t.id, t.prefix, t.markers, t.typeParameters, parameters, t.body);
             }
         }
     }
