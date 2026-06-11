@@ -631,6 +631,24 @@ class MethodDeclarationTest implements RewriteTest {
                 )
             );
         }
+
+        @Test
+        void bracelessExtensionWithBraceBlockMethodBody() {
+            // A `{` inside a method body must not be mistaken for the extension's
+            // opening brace, which would make the parser treat this braceless
+            // (indented) extension as brace-delimited.
+            rewriteRun(
+                scala(
+                    """
+                    extension (g: Int)
+                      def rankable =
+                        {
+                          2
+                        }
+                    """
+                )
+            );
+        }
     }
 
     @Test
