@@ -2974,3 +2974,202 @@ class TestProjectParseSupertypeAcrossFiles:
                 "subclass; the shared ty-types session dropped the supertype "
                 "descriptor for a file parsed after the first"
             )
+
+@requires_ty_types_cli
+class TestClassMembers:
+    """``JavaType.Class.members`` must be populated with a class's attributes
+    (annotated class/instance variables), not just its methods.
+
+    Before this, the ``classLiteral`` branch of the type mapping only emitted
+    ``JavaType.Method`` for function-kind members and silently dropped every
+    attribute, so attribute-rich classes (dataclasses, pydantic/ORM models)
+    came back with ``getMembers()`` empty and recipes that reason about fields
+    had nothing to work with.
+
+    The class type is obtained via a method invocation's ``declaring_type``,
+    which the ``classLiteral`` branch builds (and enriches with members).
+    """
+
+    def _class_type(self, source: str):
+        """Parse ``source`` (whose last statement is a method call on an
+        instance) and return the callee's ``declaring_type`` — the populated
+        ``JavaType.Class`` — along with cleanup handles."""
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        call = tree.body[-1].value
+        result = mapping.method_invocation_type(call)
+        assert result is not None and isinstance(result._declaring_type, JavaType.Class)
+        return result._declaring_type, mapping, tmpdir, client
+
+    def test_dataclass_members_populated(self):
+        src = (
+            "from dataclasses import dataclass\n"
+            "\n"
+            "\n"
+            "@dataclass\n"
+            "class Point:\n"
+            "    x: int\n"
+            "    y: int = 0\n"
+            "    label: str = \"p\"\n"
+            "\n"
+            "    def describe(self) -> str:\n"
+            "        return self.label\n"
+            "\n"
+            "Point(1).describe()\n"
+        )
+        cls, mapping, tmpdir, client = self._class_type(src)
+        try:
+            members = cls._members
+            assert members is not None, "dataclass should expose its fields as members"
+            by_name = {v._name: v for v in members}
+
+            assert by_name['x']._type == JavaType.Primitive.Int
+            assert by_name['y']._type == JavaType.Primitive.Int
+            assert by_name['label']._type == JavaType.Primitive.String
+
+            # Each member is a JavaType.Variable owned by the class.
+            for v in members:
+                assert isinstance(v, JavaType.Variable)
+                assert v._owner is cls
+
+            # ty emits both the declared type and the default-value literal for a
+            # field; members must be de-duplicated by name.
+            assert len(members) == len(by_name), \
+                f"members contain duplicate names: {[v._name for v in members]}"
+
+            # Methods must still populate (no regression).
+            assert cls._methods is not None
+            assert 'describe' in [m._name for m in cls._methods]
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_plain_class_members_populated(self):
+        src = (
+            "class Config:\n"
+            "    count: int = 0\n"
+            "    name: str\n"
+            "    ratio: float = 1.5\n"
+            "\n"
+            "    def label(self) -> str:\n"
+            "        return self.name\n"
+            "\n"
+            "Config().label()\n"
+        )
+        cls, mapping, tmpdir, client = self._class_type(src)
+        try:
+            by_name = {v._name: v for v in (cls._members or [])}
+            assert by_name['count']._type == JavaType.Primitive.Int
+            assert by_name['name']._type == JavaType.Primitive.String
+            # ty treats a `float` annotation as accepting `int` too, so the
+            # declared type can come back as a union that includes Double.
+            ratio_type = by_name['ratio']._type
+            ratio_bounds = getattr(ratio_type, '_bounds', [ratio_type])
+            assert JavaType.Primitive.Double in ratio_bounds
+
+            # A function-kind member must not leak into the variables.
+            assert 'label' not in by_name
+            assert cls._methods is not None
+            assert 'label' in [m._name for m in cls._methods]
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_self_typed_member_does_not_hang(self):
+        # A member whose declared type is the owning class must resolve without
+        # infinitely recursing (the cycle guard already covers methods; members
+        # must rely on the same mechanism).
+        src = (
+            "class Node:\n"
+            "    value: int\n"
+            "    next: \"Node\" = None\n"
+            "\n"
+            "    def get(self) -> int:\n"
+            "        return self.value\n"
+            "\n"
+            "Node().get()\n"
+        )
+        cls, mapping, tmpdir, client = self._class_type(src)
+        try:
+            by_name = {v._name: v for v in (cls._members or [])}
+            assert by_name['value']._type == JavaType.Primitive.Int
+
+            next_type = by_name['next']._type
+            assert isinstance(next_type, JavaType.Class)
+            assert next_type.fully_qualified_name.endswith('Node')
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
+@requires_ty_types_cli
+@requires_uv
+class TestPydanticModelMembers:
+    """A ``pydantic.BaseModel`` subclass must expose its annotated fields as
+    ``JavaType.Class.members``, resolved through a forwarded dependency
+    environment (the CLI ``mod build`` scenario). Mirrors the supertype-
+    resolution setup in ``TestExternalSupertypeResolutionInParsePath``.
+    """
+
+    _SOURCE = (
+        "from pydantic import BaseModel\n"
+        "\n"
+        "\n"
+        "class User(BaseModel):\n"
+        "    name: str\n"
+        "    age: int = 0\n"
+        "\n"
+        "    def greeting(self) -> str:\n"
+        "        return self.name\n"
+    )
+    _PYPROJECT = (
+        "[project]\n"
+        'name = "tyrepro"\n'
+        'version = "0.0.0"\n'
+        'requires-python = ">=3.10"\n'
+        'dependencies = ["pydantic>=2.11"]\n'
+    )
+
+    @pytest.fixture(autouse=True)
+    def _skip_if_pydantic_ambient(self):
+        try:
+            import pydantic  # noqa: F401
+            pytest.skip("pydantic is importable in the test interpreter; "
+                        "ty-types would resolve it ambiently")
+        except ImportError:
+            pass
+
+    def _dependency_venv(self):
+        from rewrite.python.template.dependency_workspace import DependencyWorkspace
+        workspace = DependencyWorkspace.get_or_create_from_pyproject(self._PYPROJECT)
+        return os.path.join(workspace, ".venv")
+
+    def _user_class_type(self, tmp_path):
+        from rewrite.rpc import server
+        proj = tmp_path / "proj"
+        proj.mkdir()
+        (proj / "pyproject.toml").write_text(self._PYPROJECT)
+        (proj / "models.py").write_text(self._SOURCE)
+        ids = server.handle_parse({
+            "inputs": [str(proj / "models.py")],
+            "relativeTo": str(proj),
+            "dependencyPath": self._dependency_venv(),
+        })
+        assert ids, "handle_parse returned no results"
+        cu = server.local_objects[ids[0]]
+
+        cls = _collect_class_declarations(cu)['User'].type
+        assert isinstance(cls, JavaType.Class), \
+            f"User class type not resolved: {cls!r}"
+        return cls
+
+    def test_pydantic_fields_are_members(self, tmp_path):
+        cls = self._user_class_type(tmp_path)
+        by_name = {v._name: v for v in (cls._members or [])}
+        assert 'name' in by_name, \
+            f"pydantic field `name` missing from members: {sorted(by_name)}"
+        assert by_name['name']._type == JavaType.Primitive.String
+        assert by_name['age']._type == JavaType.Primitive.Int
+        for v in cls._members:
+            assert isinstance(v, JavaType.Variable)
+            assert v._owner is cls
+
+        # Methods still populate.
+        assert cls._methods is not None
+        assert 'greeting' in [m._name for m in cls._methods]

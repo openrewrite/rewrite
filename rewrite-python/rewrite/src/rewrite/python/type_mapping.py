@@ -539,6 +539,37 @@ class PythonTypeMapping:
                             methods.append(method)
                 class_type._methods = methods if methods else None
 
+            # Populate members (attributes / class & instance variables) from the
+            # non-function members. ty emits a member's *name* on the entry itself
+            # and its *type* via `typeId`; for a field with a default it emits both
+            # the declared type and the default-value literal under the same name,
+            # so de-duplicate by name keeping the first (declared) occurrence. A
+            # member typed as the owning class resolves through the same cycle
+            # guard `_resolve_type` uses for methods, so self-references don't
+            # recurse infinitely.
+            if members and getattr(class_type, '_members', None) is None:
+                variables = []
+                seen_names = set()
+                for member in members:
+                    if not isinstance(member, dict):
+                        continue
+                    member_name = member.get('name')
+                    member_type_id = member.get('typeId')
+                    if not member_name or member_type_id is None or member_name in seen_names:
+                        continue
+                    member_desc = self._type_registry.get(member_type_id)
+                    # Skip function-kinds (handled as methods above) and nested
+                    # classes/modules — only true variables become members.
+                    if member_desc is None or not self._is_variable_descriptor(member_desc):
+                        continue
+                    member_type = self._resolve_type(member_type_id)
+                    if member_type is None:
+                        continue
+                    seen_names.add(member_name)
+                    variables.append(JavaType.Variable(
+                        _name=member_name, _type=member_type, _owner=class_type))
+                class_type._members = variables if variables else None
+
             return class_type
 
         elif kind == 'typedDict':
