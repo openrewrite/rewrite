@@ -20,14 +20,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
-import org.openrewrite.groovy.tree.G;
-import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -63,17 +60,9 @@ public class UseMatchingInsteadOfFindAll extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                // The deprecated Groovy `findAll(Closure)` overload only exists in the Groovy DSL;
-                // the Kotlin DSL uses the unrelated `Iterable.filter` extension.
-                if (tree instanceof JavaSourceFile && !(tree instanceof G.CompilationUnit)) {
-                    return (J) tree;
-                }
-                return super.visit(tree, ctx);
-            }
-
+        // GroovyIsoVisitor only accepts G.CompilationUnit, so the recipe naturally skips the Kotlin DSL, where the
+        // deprecated `findAll(Closure)` overload does not exist (Kotlin uses the unrelated `Iterable.filter`).
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
