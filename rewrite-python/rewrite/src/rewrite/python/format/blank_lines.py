@@ -36,7 +36,7 @@ class BlankLinesVisitor(PythonVisitor):
                 parent_cursor.put_message('prev_import', False)
 
         if top_level:
-            if stmt == cast(CompilationUnit, parent_cursor.value).statements[0]:
+            if stmt == parent_cursor.value.statements[0]:
                 stmt = stmt.replace(prefix=stmt.prefix.replace(whitespace=''))
             else:
                 min_lines = max(self._style.minimum.around_top_level_classes_functions if isinstance(stmt, (ClassDeclaration, MethodDeclaration)) else 0,

@@ -241,13 +241,13 @@ class _VerboseMarkerPrinter(PrintOutputCapture.MarkerPrinter):
 class _FencedMarkerPrinter(PrintOutputCapture.MarkerPrinter):
     """Prints SearchResult and Markup markers with fenced {{uuid}} format."""
     def before_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
-        from .markers import SearchResult, Markup  # ty: ignore[unresolved-import]
+        from .markers import SearchResult, Markup
         if isinstance(marker, (SearchResult, Markup)):
             return "{{" + str(marker.id) + "}}"
         return ""
 
     def after_syntax(self, marker: 'Marker', cursor: 'Cursor', comment_wrapper: Callable[[str], str]) -> str:
-        from .markers import SearchResult, Markup  # ty: ignore[unresolved-import]
+        from .markers import SearchResult, Markup
         if isinstance(marker, (SearchResult, Markup)):
             return "{{" + str(marker.id) + "}}"
         return ""

@@ -2283,7 +2283,7 @@ class ParserVisitor(ast.NodeVisitor):
             name = name.replace(prefix=extra_parens[-1][1])  # ty: ignore[unresolved-attribute]  # recursive call returns unknown
 
             # Wrap in extra parentheses (innermost to outermost)
-            wrapped: Expression = name  # ty: ignore[invalid-assignment]
+            wrapped: Expression = name
             for i in range(len(extra_parens) - 1, -1, -1):
                 paren_prefix, _ = extra_parens[i]
                 suffix = self.__whitespace()
