@@ -1,0 +1,175 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.gradle.gradle9;
+
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
+import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.test.RewriteTest;
+
+import static org.openrewrite.gradle.Assertions.buildGradle;
+
+class UseProjectDependencyInsteadOfModuleCoordinatesTest implements RewriteTest {
+
+    private static GradleProject gradleProject() {
+        return GradleProject.builder()
+          .group("com.example")
+          .name("my-project")
+          .version("1.0.0")
+          .path(":my-project")
+          .build();
+    }
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new UseProjectDependencyInsteadOfModuleCoordinates());
+    }
+
+    @DocumentExample
+    @Test
+    void replacesSelfCoordinatesWithProjectNotation() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'com.example:my-project:1.0.0'
+              }
+              """,
+            """
+              dependencies {
+                  implementation project(':my-project')
+              }
+              """,
+            spec -> spec.markers(gradleProject())
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedForm() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation('com.example:my-project:1.0.0')
+              }
+              """,
+            """
+              dependencies {
+                  implementation(project(':my-project'))
+              }
+              """,
+            spec -> spec.markers(gradleProject())
+          )
+        );
+    }
+
+    @Test
+    void coordinatesWithoutVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'com.example:my-project'
+              }
+              """,
+            """
+              dependencies {
+                  implementation project(':my-project')
+              }
+              """,
+            spec -> spec.markers(gradleProject())
+          )
+        );
+    }
+
+    @Nested
+    class NoChange {
+
+        @Test
+        void differentCoordinatesLeftAlone() {
+            rewriteRun(
+              buildGradle(
+                """
+                  dependencies {
+                      implementation 'com.google.guava:guava:33.0.0-jre'
+                  }
+                  """,
+                spec -> spec.markers(gradleProject())
+              )
+            );
+        }
+
+        @Test
+        void sameGroupDifferentArtifactLeftAlone() {
+            rewriteRun(
+              buildGradle(
+                """
+                  dependencies {
+                      implementation 'com.example:other-project:1.0.0'
+                  }
+                  """,
+                spec -> spec.markers(gradleProject())
+              )
+            );
+        }
+
+        @Test
+        void constraintsLeftAlone() {
+            rewriteRun(
+              buildGradle(
+                """
+                  dependencies {
+                      constraints {
+                          implementation 'com.example:my-project:1.0.0'
+                      }
+                  }
+                  """,
+                spec -> spec.markers(gradleProject())
+              )
+            );
+        }
+
+        @Test
+        void noGradleProjectMarkerLeftAlone() {
+            rewriteRun(
+              buildGradle(
+                """
+                  dependencies {
+                      implementation 'com.example:my-project:1.0.0'
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void alreadyProjectNotation() {
+            rewriteRun(
+              buildGradle(
+                """
+                  dependencies {
+                      implementation project(':my-project')
+                  }
+                  """,
+                spec -> spec.markers(gradleProject())
+              )
+            );
+        }
+    }
+}
