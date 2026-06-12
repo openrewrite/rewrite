@@ -4,7 +4,7 @@ Python RPC Sender that mirrors Java's PythonSender structure.
 This uses the visitor pattern with pre_visit handling common fields (id, prefix, markers)
 and type-specific visit methods handling only additional fields.
 """
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from rewrite import Markers
 from rewrite.utils import id_to_str
@@ -19,6 +19,9 @@ from rewrite.python.tree import (
     TypeAlias, YieldFrom, UnionType, VariableScope, Del, SpecialParameter,
     Star, NamedArgument, TypeHintedExpression, ErrorFrom, MatchCase, Slice
 )
+
+if TYPE_CHECKING:
+    from rewrite.rpc.send_queue import RpcSendQueue
 
 
 class PythonRpcSender:

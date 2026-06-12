@@ -96,7 +96,7 @@ def replace_if_changed(obj: T, **kwargs) -> T:
         name: mapped_kwargs[name] if name in mapped_kwargs else getattr(obj, name)
         for name in init_fields
     }
-    return cast(T, cls(**new_kwargs))
+    return cls(**new_kwargs)
 
 
 def random_id() -> int:

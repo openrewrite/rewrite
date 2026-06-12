@@ -542,6 +542,13 @@ class PythonTypeMapping:
             return class_type
 
         elif kind == 'typedDict':
+            # Map a TypedDict to a nominal class type by name. We intentionally
+            # drop the descriptor's `fields` and (ty-types >= 0.0.49) the PEP 728
+            # `closed` / `extraItems` openness fields: a field *use* `m["name"]`
+            # is a subscript whose value type ty already attributes on the access
+            # node, so the common case is covered without modeling the shape.
+            # Populating the class's members and linking subscript uses back to
+            # field declarations (a J.ArrayAccess LST change) is deferred.
             name = descriptor.get('name', '')
             if name:
                 return self._create_class_type(name)
