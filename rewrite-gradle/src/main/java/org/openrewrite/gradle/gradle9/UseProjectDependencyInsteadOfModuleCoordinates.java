@@ -24,15 +24,13 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.gradle.internal.GradleParseUtils;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Statement;
 
 import java.util.Optional;
 
@@ -62,14 +60,13 @@ public class UseProjectDependencyInsteadOfModuleCoordinates extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                if (m.getSelect() != null || !withinDependenciesNotConstraints(getCursor())) {
-                    return m;
-                }
-                if (m.getArguments().isEmpty() || !(m.getArguments().get(0) instanceof J.Literal)) {
+                // Cheap, allocation-free rejections first; defer the ancestor walk to the rare candidate that
+                // is a bare configuration call taking a single string-literal coordinate.
+                if (m.getSelect() != null || m.getArguments().isEmpty() || !(m.getArguments().get(0) instanceof J.Literal)) {
                     return m;
                 }
                 J.Literal coordinate = (J.Literal) m.getArguments().get(0);
-                if (!(coordinate.getValue() instanceof String)) {
+                if (!(coordinate.getValue() instanceof String) || !withinDependenciesNotConstraints(getCursor())) {
                     return m;
                 }
 
@@ -88,7 +85,7 @@ public class UseProjectDependencyInsteadOfModuleCoordinates extends Recipe {
                 // The `OmitParentheses` marker (Groovy command syntax, e.g. `implementation 'a:b:c'`) lives on
                 // the argument element itself, so carry the original coordinate's markers and prefix over to the
                 // replacement to preserve whether the enclosing call uses parentheses.
-                Expression projectNotation = parseProjectNotation(ctx, projectPath(gp))
+                Expression projectNotation = GradleParseUtils.parseMethodInvocation(ctx, "project('" + projectPath(gp) + "')\n")
                         .withPrefix(coordinate.getPrefix())
                         .withMarkers(coordinate.getMarkers());
                 return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> projectNotation));
@@ -125,17 +122,5 @@ public class UseProjectDependencyInsteadOfModuleCoordinates extends Recipe {
     private static String projectPath(GradleProject gp) {
         String path = gp.getPath();
         return path == null || path.isEmpty() ? ":" : path;
-    }
-
-    private static J.MethodInvocation parseProjectNotation(ExecutionContext ctx, String path) {
-        G.CompilationUnit parsed = (G.CompilationUnit) GradleParser.builder().build()
-                .parse(ctx, "project('" + path + "')\n")
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Unable to parse `project(...)` template"));
-        Statement first = parsed.getStatements().get(0);
-        if (!(first instanceof J.MethodInvocation)) {
-            throw new IllegalStateException("Expected a method invocation, got " + first.getClass().getName());
-        }
-        return (J.MethodInvocation) first;
     }
 }
