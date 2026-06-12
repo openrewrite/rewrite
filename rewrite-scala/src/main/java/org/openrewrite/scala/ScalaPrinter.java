@@ -633,6 +633,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitAnonymousGiven((S.AnonymousGiven) tree, p);
         } else if (tree instanceof S.FunctionCall) {
             return visitFunctionCall((S.FunctionCall) tree, p);
+        } else if (tree instanceof S.ConstructorInvocation) {
+            return visitConstructorInvocation((S.ConstructorInvocation) tree, p);
         } else if (tree instanceof S.SingletonType) {
             return visitSingletonType((S.SingletonType) tree, p);
         } else if (tree instanceof S.RepeatedType) {
@@ -1112,6 +1114,14 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
         afterSyntax(fc, p);
         return fc;
+    }
+
+    public J visitConstructorInvocation(S.ConstructorInvocation ci, PrintOutputCapture<P> p) {
+        beforeSyntax(ci, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(ci.getTypeTree(), p);
+        visitContainer("(", ci.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
+        afterSyntax(ci, p);
+        return ci;
     }
 
     @Override

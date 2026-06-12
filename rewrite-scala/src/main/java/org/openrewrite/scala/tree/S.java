@@ -1504,6 +1504,103 @@ public interface S extends J {
     }
 
     /**
+     * Represents a parent constructor invocation in an {@code extends}/{@code with} clause,
+     * e.g. {@code class E(msg: String) extends Exception(msg)}. Models the supertype together
+     * with its constructor arguments.
+     * <p>
+     * Implements {@link TypeTree} so it can occupy the {@code extends}/{@code implements} slots
+     * of {@link J.ClassDeclaration} (which hold {@code TypeTree}, not {@code Expression}), mirroring
+     * {@code K.ConstructorInvocation} in rewrite-kotlin. The leading {@code extends}/{@code with}
+     * keyword space is held by the surrounding {@link J.ClassDeclaration} padding, so this node's
+     * {@code prefix} is the space between that keyword and the supertype.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ConstructorInvocation implements S, TypeTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        TypeTree typeTree;
+
+        JContainer<Expression> arguments;
+
+        public List<Expression> getArguments() {
+            return arguments.getElements();
+        }
+
+        public S.ConstructorInvocation withArguments(List<Expression> arguments) {
+            return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
+        }
+
+        public static ConstructorInvocation build(UUID id, Space prefix, Markers markers,
+                                                  TypeTree typeTree, JContainer<Expression> arguments) {
+            return new ConstructorInvocation(null, id, prefix, markers, typeTree, arguments);
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return typeTree.getType();
+        }
+
+        @Override
+        public S.ConstructorInvocation withType(@Nullable JavaType type) {
+            return withTypeTree(typeTree.withType(type));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitConstructorInvocation(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final S.ConstructorInvocation t;
+
+            public JContainer<Expression> getArguments() {
+                return t.arguments;
+            }
+
+            public S.ConstructorInvocation withArguments(JContainer<Expression> arguments) {
+                return t.arguments == arguments ? t : new S.ConstructorInvocation(null, t.id, t.prefix, t.markers, t.typeTree, arguments);
+            }
+        }
+    }
+
+    /**
      * Represents a Scala singleton type: {@code foo.type}.
      * The qualifier is any expression, typically an object/module reference.
      */
