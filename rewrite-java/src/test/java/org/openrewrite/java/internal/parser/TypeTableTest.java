@@ -527,6 +527,67 @@ class TypeTableTest implements RewriteTest {
         }
 
         @Test
+        void varargsFlagPreservedThroughTypeTableRoundtrip() throws Exception {
+            //language=java
+            String libraryClass = """
+              package test.library;
+
+              public class VarargsLibrary {
+                  public static String join(String separator, Object... args) {
+                      return null;
+                  }
+              }
+              """;
+
+            Path[] classFiles = compileToClassFiles(
+              libraryClass, "test.library.VarargsLibrary"
+            );
+            Path testJar = createJarFromClasses("varargs-library.jar", classFiles);
+
+            // Write through TypeTable
+            try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
+                writer.jar("test.group", "varargs-library", "1.0").write(testJar);
+            }
+
+            // Load back via TypeTable
+            var table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("varargs-library"));
+            Path classesDir = table.load("varargs-library");
+            assertThat(classesDir).isNotNull();
+
+            rewriteRun(
+              spec -> spec.parser((Parser.Builder) JavaParser.fromJavaVersion()
+                .classpath(List.of(classesDir)).logCompilationWarningsAndErrors(true)),
+              java(
+                """
+                  import test.library.VarargsLibrary;
+
+                  class TestClient {
+                      void use() {
+                          VarargsLibrary.join(",", "a", "b");
+                      }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    J.MethodInvocation invocation = new org.openrewrite.java.JavaIsoVisitor<List<J.MethodInvocation>>() {
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<J.MethodInvocation> found) {
+                            found.add(method);
+                            return super.visitMethodInvocation(method, found);
+                        }
+                    }.reduce(cu, new java.util.ArrayList<J.MethodInvocation>()).getFirst();
+
+                    JavaType.Method methodType = invocation.getMethodType();
+                    assertThat(methodType).isNotNull();
+                    assertThat(methodType.getName()).isEqualTo("join");
+                    assertThat(methodType.getFlags())
+                      .as("Varargs flag must survive the TypeTable round-trip")
+                      .contains(org.openrewrite.java.tree.Flag.Varargs);
+                })
+              )
+            );
+        }
+
+        @Test
         void annotationAttributeValuesPreservedThroughTypeTableRoundtrip() throws Exception {
             // Create annotation with various default values to test escaping and preservation
             //language=java
