@@ -5955,10 +5955,15 @@ class ScalaTreeVisitor(
     // reached before any method-body `=`. The scan skips parameter clauses and
     // type parameter lists so a default value (`x: Int = 0`) or a function-type
     // parameter (`g: () => Unit`) isn't mistaken for the method-body `=`.
+    // Start scanning after the method name so a setter name's trailing `=`
+    // (`def engine_=(...) { ... }`) isn't mistaken for the method-body `=`.
     // Note: nested braces (def foo = { { ... } }) are flattened by the compiler;
     // the AST has one block, so the inner braces are lost in the round-trip.
-    if (adjustedStart < adjustedEnd && adjustedEnd <= source.length) {
-      isProcedureSyntax = bodyOpensWithBrace(adjustedStart, adjustedEnd)
+    val procScanStart =
+      if (dd.nameSpan.exists) Math.max(adjustedStart, Math.max(0, dd.nameSpan.end - offsetAdjustment))
+      else adjustedStart
+    if (procScanStart < adjustedEnd && adjustedEnd <= source.length) {
+      isProcedureSyntax = bodyOpensWithBrace(procScanStart, adjustedEnd)
     }
 
     // Detect parameterless methods (def name: Type = ...) — no parens in source.
