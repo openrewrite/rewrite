@@ -31,8 +31,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
-import java.util.Optional;
-
 public class UseProjectDependencyInsteadOfModuleCoordinates extends Recipe {
 
     @Getter
@@ -89,7 +87,8 @@ public class UseProjectDependencyInsteadOfModuleCoordinates extends Recipe {
     }
 
     private static boolean withinDependenciesNotConstraints(Cursor cursor) {
-        boolean insideDependencies = false;
+        // Walking outward, a `constraints` block (which only nests inside `dependencies`) is always reached before
+        // its enclosing `dependencies`, so hitting `dependencies` first means there is no intervening constraint.
         Cursor c = cursor.getParent();
         while (c != null) {
             if (c.getValue() instanceof J.MethodInvocation) {
@@ -98,20 +97,19 @@ public class UseProjectDependencyInsteadOfModuleCoordinates extends Recipe {
                     return false;
                 }
                 if ("dependencies".equals(name)) {
-                    insideDependencies = true;
+                    return true;
                 }
             }
             c = c.getParent();
         }
-        return insideDependencies;
+        return false;
     }
 
     private static @Nullable GradleProject getGradleProject(@Nullable SourceFile sourceFile) {
         if (sourceFile == null) {
             return null;
         }
-        Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
-        return maybeGp.orElse(null);
+        return sourceFile.getMarkers().findFirst(GradleProject.class).orElse(null);
     }
 
     private static String projectPath(GradleProject gp) {
