@@ -24,9 +24,11 @@ class Marker(ABC):
 
     # `_id` is on the public positional constructor surface, so callers may pass
     # a `uuid.UUID`; the dataclass `__init__` of every concrete marker calls this
-    # inherited hook to normalise it to the internal int form.
+    # inherited hook to normalise it to the internal int form. A None id passes
+    # through untouched: the RPC receiver constructs all-None placeholders (see
+    # `make_dataclass_factory`) and fills the id in later.
     def __post_init__(self):
-        if type(self._id) is not int:  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
+        if self._id is not None and type(self._id) is not int:  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
             object.__setattr__(self, '_id', id_to_int(self._id))  # ty: ignore[unresolved-attribute]
 
     def replace(self, **kwargs) -> 'Marker':
@@ -58,7 +60,8 @@ class Markers:
 
     def __post_init__(self):
         # Normalise `uuid.UUID` ids from external callers to the internal int form.
-        if type(self._id) is not int:
+        # None passes through: the RPC receiver constructs all-None placeholders.
+        if self._id is not None and type(self._id) is not int:
             object.__setattr__(self, '_id', id_to_int(self._id))
 
     _markers: List[Marker]

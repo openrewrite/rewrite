@@ -38,8 +38,10 @@ class Tree(ABC):
     # pass a `uuid.UUID` (e.g. `uuid4()` or another node's `.id`). The dataclass
     # `__init__` of every concrete subclass calls this inherited hook; normalise
     # to the internal int form here so `.id`, equality and hashing stay correct.
+    # A None id passes through untouched: the RPC receiver constructs all-None
+    # placeholders (see `make_dataclass_factory`) and fills the id in later.
     def __post_init__(self):
-        if type(self._id) is not int:  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
+        if self._id is not None and type(self._id) is not int:  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
             object.__setattr__(self, '_id', id_to_int(self._id))  # ty: ignore[unresolved-attribute]
 
     @property
