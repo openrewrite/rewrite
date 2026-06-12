@@ -376,6 +376,7 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.ExtensionMethods e = ext;
         e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.withTypeParameters(visitAndCast(e.getTypeParameters(), p));
         e = e.getPadding().withParameters(visitContainer(e.getPadding().getParameters(), JContainer.Location.LANGUAGE_EXTENSION, p));
         e = e.withBody(visitAndCast(e.getBody(), p));
         return e;

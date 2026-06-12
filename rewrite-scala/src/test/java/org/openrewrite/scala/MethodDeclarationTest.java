@@ -619,6 +619,18 @@ class MethodDeclarationTest implements RewriteTest {
                 )
             );
         }
+
+        @Test
+        void extensionWithTypeParameter() {
+            rewriteRun(
+                scala(
+                    """
+                    extension [A](question: Question[A])
+                      def timeFilter: Question[A] = question
+                    """
+                )
+            );
+        }
     }
 
     @Test
