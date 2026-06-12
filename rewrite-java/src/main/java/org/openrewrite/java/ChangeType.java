@@ -242,11 +242,21 @@ public class ChangeType extends Recipe {
                                 JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
                                 if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
                                     sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
-                                } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                    JavaSourceFile sfBefore = sf;
-                                    sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
-                                    // Track whether the outer class import was actually removed (not retained because still in use)
-                                    outerClassImportRemoved |= (sf != sfBefore);
+                                } else {
+                                    // The import may refer to any (transitive) outer class of the original type,
+                                    // e.g. `import foo.A` when changing `foo.A$B$C`.
+                                    for (JavaType.FullyQualified owner = originalType.getOwningClass(); owner != null; owner = owner.getOwningClass()) {
+                                        if (owner.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
+                                            JavaSourceFile sfBefore = sf;
+                                            sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(owner.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
+                                            // Track whether the outer class import was actually removed (not retained because still in use)
+                                            outerClassImportRemoved |= (sf != sfBefore);
+                                            break;
+                                        }
+                                        if (owner.getOwningClass() != null && TypeUtils.fullyQualifiedNamesAreEqual(owner.getFullyQualifiedName(), owner.getOwningClass().getFullyQualifiedName())) {
+                                            break;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -259,16 +269,22 @@ public class ChangeType extends Recipe {
                     if (!topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName())) {
                         if (!"java.lang".equals(fullyQualifiedTarget.getPackageName()) && hasNoConflictingImport(sf)) {
                             if (owningClass != null) {
-                                // Force-add the outer class import when the original outer class import was
-                                // explicitly removed (meaning code used the outer class by name, e.g. "B" in "B.Builder").
-                                // When the outer class import was absent, the code uses only the simple inner class
-                                // name (e.g. just "Y"), so AddImport can decide based on actual references.
-                                addImport(owningClass, !outerClassImportRemoved);
+                                if (outerClassImportRemoved) {
+                                    // An import of an outer class of the original type was explicitly removed,
+                                    // meaning code referenced the outer class by name, e.g. "B" in "B.Builder".
+                                    // References are rewritten to the full chain starting at the target's
+                                    // top-level class, so force-add that import.
+                                    addImport(getTopLevelClassName(fullyQualifiedTarget), false);
+                                } else {
+                                    // The outer class import was absent, so the code uses only the simple inner
+                                    // class name (e.g. just "Builder"); AddImport can decide based on actual references.
+                                    addImport(owningClass, true);
+                                }
                             }
                             // Force-add the inner class import only when the outer class was NOT removed:
                             // if the outer class was removed and is being re-added, `import bar.B` already
                             // makes `B.Builder` accessible — adding `import bar.B.Builder` would be redundant.
-                            // When only the inner class import existed (e.g. code uses simple name "Y"),
+                            // When only the inner class import existed (e.g. code uses simple name "Builder"),
                             // force-add when the owning class changed so FindTypes can locate the new type.
                             boolean forceAddInnerImport = !outerClassImportRemoved && !owningClassSame(owningClass);
                             addImport(fullyQualifiedTarget, !forceAddInnerImport);

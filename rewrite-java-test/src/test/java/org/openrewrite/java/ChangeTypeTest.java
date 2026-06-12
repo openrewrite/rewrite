@@ -2530,7 +2530,6 @@ class ChangeTypeTest implements RewriteTest {
 
                   public class A {
                     public static class Builder {}
-                    public static class Creator {}
                   }
                   """
               )
@@ -2569,17 +2568,12 @@ class ChangeTypeTest implements RewriteTest {
                   public class A {
                     public static class Builder {}
                   }
-                  """,
-                """
-                  package bar;
-
-                  public class B {
-                    public static class Builder {}
-                  }
                   """
               )
             ),
           java(
+            // The redundant `import foo.A.Builder` exercises the removal of both the inner and the
+            // outer class import; only `import bar.B` may be added back, as it suffices for `B.Builder`.
             """
               import foo.A;
               import foo.A.Builder;
@@ -2591,14 +2585,90 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
-          import bar.B;
+              import bar.B;
 
-          class Test {
-            void test() {
-                B.Builder x = new B.Builder();
-            }
-          }
-          """
+              class Test {
+                void test() {
+                    B.Builder x = new B.Builder();
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeTypeOfInnerWithOnlyOuterImport() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.B$Builder", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package foo;
+
+                  public class A {
+                    public static class Builder {}
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import foo.A;
+
+              class Test {
+                void test() {
+                    A.Builder x = new A.Builder();
+                }
+              }
+              """,
+            """
+              import bar.B;
+
+              class Test {
+                void test() {
+                    B.Builder x = new B.Builder();
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeTypeOfDoublyNestedInnerClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A$B$C", "bar.X$Y$Z", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package foo;
+
+                  public class A {
+                    public static class B {
+                      public static class C {}
+                    }
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import foo.A;
+
+              class Test {
+                void test() {
+                    A.B.C x = new A.B.C();
+                }
+              }
+              """,
+            """
+              import bar.X;
+
+              class Test {
+                void test() {
+                    X.Y.Z x = new X.Y.Z();
+                }
+              }
+              """
           )
         );
     }
@@ -2612,13 +2682,6 @@ class ChangeTypeTest implements RewriteTest {
                   package foo;
 
                   public class A {
-                    public static class Builder {}
-                  }
-                  """,
-                """
-                  package bar;
-
-                  public class B {
                     public static class Builder {}
                   }
                   """
