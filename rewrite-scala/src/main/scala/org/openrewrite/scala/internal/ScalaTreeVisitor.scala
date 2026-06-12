@@ -7898,11 +7898,15 @@ class ScalaTreeVisitor(
     }
     val parameters = JContainer.build(beforeParen, rpParams, Markers.EMPTY)
 
-    // Visit method declarations as a block. Find the opening brace within the
-    // extension's span. Scala 3 extension can also use indented (braceless) form,
-    // in which case there is no `{` between `)` and the span end.
+    // Visit method declarations as a block. Find the opening brace that begins
+    // the extension body. Scala 3 extension can also use indented (braceless) form,
+    // in which case there is no `{` between `)` and the first method. Only search up
+    // to the first method's start — otherwise a `{` inside a method body (e.g.
+    // `def f = { ... }`) would be mistaken for the extension's opening brace.
     val extEnd = Math.max(0, ext.span.end - offsetAdjustment)
-    val remainingBeforeBody = if (cursor < extEnd && extEnd <= source.length) source.substring(cursor, extEnd) else ""
+    val firstMethodStart = if (ext.methods.nonEmpty) Math.max(0, ext.methods.head.span.start - offsetAdjustment) else extEnd
+    val braceSearchEnd = Math.min(extEnd, firstMethodStart)
+    val remainingBeforeBody = if (cursor < braceSearchEnd && braceSearchEnd <= source.length) source.substring(cursor, braceSearchEnd) else ""
     val localBraceIdx = positionOfNextIn(remainingBeforeBody, "{", 0)
     val isExtBraceless = localBraceIdx < 0
 
