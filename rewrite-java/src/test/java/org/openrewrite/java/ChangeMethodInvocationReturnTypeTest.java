@@ -81,6 +81,33 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
     }
 
     @Test
+    void shouldNotChangeVariableTypeWhenMatchIsNestedInInitializer() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Foo {
+                  void bar() {
+                      int direct = Integer.parseInt("1");
+                      // Integer.parseInt(...) is only an argument here, not the initializer of `s`
+                      String s = String.valueOf(Integer.parseInt("2"));
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  void bar() {
+                      long direct = Integer.parseInt("1");
+                      // Integer.parseInt(...) is only an argument here, not the initializer of `s`
+                      String s = String.valueOf(Integer.parseInt("2"));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void replaceVariableAssignmentFullyQualified() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.math.BigInteger"))

@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -77,7 +78,16 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                 JavaType.FullyQualified originalType = multiVariable.getTypeAsFullyQualified();
                 J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, ctx);
 
-                if (methodUpdated) {
+                // Only change the declared type when a variable's initializer is itself the matched
+                // method invocation. A match nested deeper (e.g. as an argument to another call, such
+                // as `Cell c = row.createCell(i, other.getCellType())`) must not change the variable type.
+                boolean initializedByMatch = mv.getVariables().stream().anyMatch(v -> {
+                    Expression initializer = v.getInitializer();
+                    return initializer instanceof J.MethodInvocation &&
+                            methodMatcher.matches((J.MethodInvocation) initializer);
+                });
+
+                if (methodUpdated && initializedByMatch) {
                     JavaType newType = JavaType.buildType(newReturnType);
                     JavaType.FullyQualified newFieldType = TypeUtils.asFullyQualified(newType);
 
