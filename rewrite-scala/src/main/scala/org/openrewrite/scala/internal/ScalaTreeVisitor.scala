@@ -5604,10 +5604,16 @@ class ScalaTreeVisitor(
         // marked OmitParentheses (since the source has no `(...)`).
         return visitMethodInvocationFromTypeApply(ta, sel, savedCursor)
 
-      case id: Trees.Ident[?] if id.name.toString == "classOf" && ta.args.size == 1 =>
-        // classOf[String] is a type application with no value argument list.
+      case id: Trees.Ident[?] if ta.args.nonEmpty =>
+        // A type application whose function is a bare identifier and which has no
+        // value-argument list is a generic method/function reference with the parens
+        // omitted, e.g. `classOf[String]`, `summon[Foo]`, `implicitly[Foo]`,
+        // `identity[Int]`. (When a value-argument list is present, dotty wraps this
+        // node in an Apply that visitApply handles.) Map it to a J.MethodInvocation
+        // with typeParameters populated and arguments marked OmitParentheses.
+        val name = id.name.toString
         val prefix = extractPrefix(ta.span)
-        val nameEnd = if (id.span.exists) Math.max(0, id.span.end - offsetAdjustment) else cursor + "classOf".length
+        val nameEnd = if (id.span.exists) Math.max(0, id.span.end - offsetAdjustment) else cursor + name.length
         if (nameEnd > cursor && nameEnd <= source.length) {
           cursor = nameEnd
         }
@@ -5621,7 +5627,7 @@ class ScalaTreeVisitor(
           Markers.EMPTY,
           null,
           typeParams,
-          ident("classOf"),
+          ident(name),
           args,
           methodTypeOfTree(ta)
         )
