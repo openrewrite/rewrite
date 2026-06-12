@@ -873,4 +873,19 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void procedureSyntaxSetter() {
+        rewriteRun(
+          scala(
+            """
+            trait T {
+              def engine_=(x: Int) {
+                println(x)
+              }
+            }
+            """
+          )
+        );
+    }
 }
