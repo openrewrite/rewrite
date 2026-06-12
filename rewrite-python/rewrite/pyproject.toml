@@ -87,7 +87,11 @@ include = ["src"]
 #   visitor and padding methods (e.g. visit_and_cast's `Type[T]` parameter,
 #   accept_*() narrowing `Self` to the concrete subclass). The `Self` case is
 #   tracked upstream as https://github.com/astral-sh/ty/issues/2255
-# - unresolved-reference: ~430 errors from TYPE_CHECKING forward references
+# - unresolved-reference: ~340 forward-reference annotations (mostly in the
+#   generated .pyi stubs) naming types not imported into that file/stub. These
+#   are quoted and never evaluated at runtime, so they are harmless; in most
+#   cases ty is correct rather than limited, so there is no single upstream issue
+#   to track. Fixable piecemeal by adding the missing TYPE_CHECKING imports.
 invalid-argument-type = "ignore"
 unresolved-reference = "ignore"
 
