@@ -1255,6 +1255,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 JRightPadded<TypeTree> first = bounds.get(0);
                 visit(first.getElement(), p);
                 visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+                newClass.getMarkers()
+                        .findFirst(org.openrewrite.scala.marker.ExtraConstructorParamLists.class)
+                        .ifPresent(m -> p.append(m.text()));
                 for (int i = 1; i < bounds.size(); i++) {
                     visitSpace(bounds.get(i - 1).getAfter(), Space.Location.TYPE_BOUND_SUFFIX, p);
                     p.append("with");
@@ -1269,6 +1272,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             if (newClass.getPadding().getArguments() != null) {
                 visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
             }
+            newClass.getMarkers()
+                    .findFirst(org.openrewrite.scala.marker.ExtraConstructorParamLists.class)
+                    .ifPresent(m -> p.append(m.text()));
         }
         visit(newClass.getBody(), p);
         afterSyntax(newClass, p);

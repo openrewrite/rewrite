@@ -26,6 +26,7 @@ import org.openrewrite.java.marker.ImplicitReturn
 import org.openrewrite.java.marker.OmitParentheses
 import org.openrewrite.marker.Markers
 import org.openrewrite.scala.marker.DottedMatch
+import org.openrewrite.scala.marker.ExtraConstructorParamLists
 import org.openrewrite.scala.marker.Implicit
 import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedSyntax
@@ -2104,6 +2105,12 @@ class ScalaTreeVisitor(
         // Extract the parent type(s) - usually the first parent is the main type
         val parents = template.parents.filter(p => p.span.exists && !p.span.isSynthetic)
 
+        // Verbatim source of any curried constructor parameter lists beyond the
+        // first (e.g. the `(2)` in `new Foo(1)(2) with Bar { ... }`). J.NewClass
+        // only models a single argument list, so extra lists are preserved as a
+        // marker re-emitted by the printer after the first `)`.
+        var extraCtorParamListsText: String = null
+
         // Extract the first parent's class type and constructor arguments (if any).
         // For multi-parent (mixin) Templates, only the first parent may carry args.
         val (firstClazz, args): (TypeTree, JContainer[Expression]) = parents.headOption match {
@@ -2111,11 +2118,26 @@ class ScalaTreeVisitor(
             // `new {}` — no parents at all (anonymous class extending the implicit Object)
             (null, null)
           case Some(firstParent) =>
-            firstParent match {
-              case app: Trees.Apply[?] if app.fun.isInstanceOf[Trees.Select[?]] &&
-                   app.fun.asInstanceOf[Trees.Select[?]].name.toString == "<init>" =>
+            // Peel nested curried constructor applies. For `new Foo(1)(2) { ... }`
+            // the parent is `Apply(Apply(Select(New(Foo), <init>), List(1)), List(2))`;
+            // the innermost Apply's `fun` is the `<init>` Select and the outer Applies
+            // are the additional parameter lists. `applies` is ordered innermost-first
+            // so `applies.head` carries the first list and `applies.last` ends the call.
+            val applies = scala.collection.mutable.ListBuffer[Trees.Apply[?]]()
+            var inner: AnyRef = firstParent
+            while (inner.isInstanceOf[Trees.Apply[?]]) {
+              val a = inner.asInstanceOf[Trees.Apply[?]]
+              applies.prepend(a)
+              inner = a.fun.asInstanceOf[AnyRef]
+            }
+            val initSelect = inner match {
+              case sel: Trees.Select[?] if sel.name.toString == "<init>" => sel
+              case _ => null
+            }
+            if (initSelect != null && initSelect.qualifier.isInstanceOf[Trees.New[?]]) {
                 // Constructor call with arguments: new Person("John", 30) { ... }
-                val sel = app.fun.asInstanceOf[Trees.Select[?]]
+                val app = applies.head
+                val sel = initSelect
                 sel.qualifier match {
                   case newInner: Trees.New[?] =>
                     // Visit the type tree directly
@@ -2200,11 +2222,20 @@ class ScalaTreeVisitor(
                       null
                     }
 
+                    // Capture any remaining curried parameter lists verbatim.
+                    if (applies.size > 1) {
+                      val outerEnd = Math.max(0, applies.last.span.end - offsetAdjustment)
+                      if (cursor < outerEnd && outerEnd <= source.length) {
+                        extraCtorParamListsText = source.substring(cursor, outerEnd)
+                        updateCursor(outerEnd)
+                      }
+                    }
+
                     (typeTree, argContainer)
                   case _ =>
                     (visitUnknown(sel.qualifier).asInstanceOf[TypeTree], null)
                 }
-              case _ =>
+            } else {
                 // Simple interface/trait: new Runnable { ... }
                 val typeTree = visitTree(firstParent).asInstanceOf[TypeTree]
                 (typeTree, null)
@@ -2347,10 +2378,15 @@ class ScalaTreeVisitor(
           null
         }
 
+        val newClassMarkers = if (extraCtorParamListsText != null) {
+          Markers.build(Collections.singletonList(
+            new ExtraConstructorParamLists(Tree.randomId(), extraCtorParamListsText)))
+        } else Markers.EMPTY
+
         new J.NewClass(
           Tree.randomId(),
           prefix,
-          Markers.EMPTY,
+          newClassMarkers,
           null, // enclosing
           Space.SINGLE_SPACE, // Space after "new" keyword
           clazz,
