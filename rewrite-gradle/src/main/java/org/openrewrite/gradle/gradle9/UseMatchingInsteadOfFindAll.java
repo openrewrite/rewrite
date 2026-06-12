@@ -15,8 +15,7 @@
  */
 package org.openrewrite.gradle.gradle9;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
@@ -34,9 +33,17 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-@Value
-@EqualsAndHashCode(callSuper = false)
 public class UseMatchingInsteadOfFindAll extends Recipe {
+
+    @Getter
+    final String displayName = "Use `matching(Spec)` instead of `findAll(Closure)` on Gradle container collections";
+
+    @Getter
+    final String description = "Gradle 9.4 deprecates the Groovy `DomainObjectCollection.findAll(Closure)` overload on " +
+            "containers such as `tasks`, `configurations`, and `sourceSets`. It is replaced by the lazy " +
+            "`DomainObjectCollection.matching(Spec)`, which returns a live collection that only filters " +
+            "elements as they are needed by the build. This recipe rewrites `findAll { ... }` to " +
+            "`matching { ... }` when the receiver is a known Gradle container collection.";
 
     /**
      * Container properties exposed by Gradle that are {@code DomainObjectCollection}s, for which the
@@ -53,20 +60,6 @@ public class UseMatchingInsteadOfFindAll extends Recipe {
      */
     private static final Set<String> COLLECTION_PRESERVING_METHODS =
             new HashSet<>(Arrays.asList("withType", "matching", "named"));
-
-    @Override
-    public String getDisplayName() {
-        return "Use `matching(Spec)` instead of `findAll(Closure)` on Gradle container collections";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Gradle 9.4 deprecates the Groovy `DomainObjectCollection.findAll(Closure)` overload on " +
-                "containers such as `tasks`, `configurations`, and `sourceSets`. It is replaced by the lazy " +
-                "`DomainObjectCollection.matching(Spec)`, which returns a live collection that only filters " +
-                "elements as they are needed by the build. This recipe rewrites `findAll { ... }` to " +
-                "`matching { ... }` when the receiver is a known Gradle container collection.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

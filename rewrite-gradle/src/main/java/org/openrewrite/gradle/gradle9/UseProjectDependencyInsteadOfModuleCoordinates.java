@@ -15,8 +15,7 @@
  */
 package org.openrewrite.gradle.gradle9;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -34,24 +33,18 @@ import org.openrewrite.java.tree.J;
 
 import java.util.Optional;
 
-@Value
-@EqualsAndHashCode(callSuper = false)
 public class UseProjectDependencyInsteadOfModuleCoordinates extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Use `project(...)` dependency notation instead of the current project's module coordinates";
-    }
+    @Getter
+    final String displayName = "Use `project(...)` dependency notation instead of the current project's module coordinates";
 
-    @Override
-    public String getDescription() {
-        return "Gradle 9.3 deprecates depending on the current project by its own `group:name:version` module " +
-                "coordinates. In Gradle 9.x such a declaration resolves to the project's local outgoing variants, " +
-                "but in Gradle 10 it will instead attempt resolution from a repository. This recipe replaces a " +
-                "dependency declaration whose coordinates match the current project with the equivalent " +
-                "`project(\"<path>\")` notation. Requires the `GradleProject` marker (available when parsed by the " +
-                "OpenRewrite Gradle plugin) to know the current project's coordinates and path.";
-    }
+    @Getter
+    final String description = "Gradle 9.3 deprecates depending on the current project by its own `group:name:version` module " +
+            "coordinates. In Gradle 9.x such a declaration resolves to the project's local outgoing variants, " +
+            "but in Gradle 10 it will instead attempt resolution from a repository. This recipe replaces a " +
+            "dependency declaration whose coordinates match the current project with the equivalent " +
+            "`project(\"<path>\")` notation. Requires the `GradleProject` marker (available when parsed by the " +
+            "OpenRewrite Gradle plugin) to know the current project's coordinates and path.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
