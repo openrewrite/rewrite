@@ -573,17 +573,42 @@ class PythonTypeMapping:
             return class_type
 
         elif kind == 'typedDict':
-            # Map a TypedDict to a nominal class type by name. We intentionally
-            # drop the descriptor's `fields` and (ty-types >= 0.0.49) the PEP 728
-            # `closed` / `extraItems` openness fields: a field *use* `m["name"]`
-            # is a subscript whose value type ty already attributes on the access
-            # node, so the common case is covered without modeling the shape.
-            # Populating the class's members and linking subscript uses back to
-            # field declarations (a J.ArrayAccess LST change) is deferred.
+            # Map a TypedDict to a nominal class type by name and populate its
+            # members from the descriptor's `fields`. Each field carries its own
+            # `name` and `typeId` (the same shape as a classLiteral member), so
+            # we reuse the variable-building path. The class is keyed by simple
+            # name via `_create_class_type`, so two TypedDicts that share a name
+            # collapse — acceptable until ty emits a qualified name here.
+            #
+            # We still drop the PEP 728 `closed` / `extraItems` openness fields
+            # and the per-field `required` / `readOnly` flags; and linking a
+            # subscript use `m["name"]` back to its field declaration (a
+            # J.ArrayAccess LST change) remains deferred — that value type is
+            # already attributed on the access node.
             name = descriptor.get('name', '')
-            if name:
-                return self._create_class_type(name)
-            return _UNKNOWN
+            if not name:
+                return _UNKNOWN
+            class_type = self._create_class_type(name)
+            fields = descriptor.get('fields', [])
+            if fields and getattr(class_type, '_members', None) is None:
+                variables = []
+                seen_names = set()
+                for field in fields:
+                    if not isinstance(field, dict):
+                        continue
+                    field_name = field.get('name')
+                    field_type_id = field.get('typeId')
+                    if not field_name or field_type_id is None or field_name in seen_names:
+                        continue
+                    field_type = self._resolve_type(field_type_id)
+                    if field_type is None:
+                        continue
+                    seen_names.add(field_name)
+                    variables.append(JavaType.Variable(
+                        _name=field_name, _type=field_type, _owner=class_type))
+                if variables:
+                    class_type._members = variables
+            return class_type
 
         elif kind == 'subclassOf':
             # `subclassOf X` is ty's representation of `type[X]`: a *class

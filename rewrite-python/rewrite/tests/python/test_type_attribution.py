@@ -3099,6 +3099,82 @@ class TestClassMembers:
 
 
 @requires_ty_types_cli
+class TestTypedDictMembers:
+    """A ``TypedDict`` carries its declared keys in the descriptor's ``fields``;
+    those must surface as ``JavaType.Class.members`` rather than being dropped.
+
+    ty emits a ``typedDict`` descriptor (distinct from the class's
+    ``classLiteral``) as the *type of a value* annotated with the TypedDict, so
+    a recipe reasoning over such a value previously saw an empty shell class.
+    Pydantic-core schemas (``AnySchema``, ``ListSchema``, …) are TypedDicts and
+    were the prime offenders.
+    """
+
+    def _value_type(self, source: str):
+        """Parse ``source`` (whose last statement is an expression whose type is
+        a TypedDict) and return ``mapping.type`` for that expression."""
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        node = tree.body[-1].value
+        result = mapping.type(node)
+        return result, mapping, tmpdir, client
+
+    def test_typed_dict_fields_are_members(self):
+        src = (
+            "from typing import TypedDict\n"
+            "\n"
+            "\n"
+            "class Movie(TypedDict):\n"
+            "    name: str\n"
+            "    year: int\n"
+            "\n"
+            "movie: Movie = {\"name\": \"x\", \"year\": 2020}\n"
+            "movie\n"
+        )
+        cls, mapping, tmpdir, client = self._value_type(src)
+        try:
+            assert isinstance(cls, JavaType.Class)
+            assert cls.fully_qualified_name.endswith('Movie')
+            by_name = {v._name: v for v in (cls._members or [])}
+            assert by_name['name']._type == JavaType.Primitive.String
+            assert by_name['year']._type == JavaType.Primitive.Int
+
+            # Each member is a JavaType.Variable owned by the class.
+            for v in cls._members:
+                assert isinstance(v, JavaType.Variable)
+                assert v._owner is cls
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_self_referential_typed_dict_does_not_hang(self):
+        # ty emits a TypedDict field whose type is the same TypedDict (the
+        # field's typeId points back at the owning descriptor). Resolving the
+        # member must lean on the shared `_resolve_type` cycle guard rather than
+        # recursing forever.
+        src = (
+            "from typing import TypedDict\n"
+            "\n"
+            "\n"
+            "class Tree(TypedDict):\n"
+            "    label: str\n"
+            "    child: \"Tree\"\n"
+            "\n"
+            "t: Tree = {\"label\": \"root\", \"child\": {}}\n"
+            "t\n"
+        )
+        cls, mapping, tmpdir, client = self._value_type(src)
+        try:
+            assert isinstance(cls, JavaType.Class)
+            by_name = {v._name: v for v in (cls._members or [])}
+            assert by_name['label']._type == JavaType.Primitive.String
+
+            child_type = by_name['child']._type
+            assert isinstance(child_type, JavaType.Class)
+            assert child_type.fully_qualified_name.endswith('Tree')
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
+@requires_ty_types_cli
 @requires_uv
 class TestPydanticModelMembers:
     """A ``pydantic.BaseModel`` subclass must expose its annotated fields as
