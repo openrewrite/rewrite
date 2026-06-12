@@ -16,8 +16,14 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.ScalaIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -473,6 +479,44 @@ class ClassDeclarationTest implements RewriteTest {
                 class B5(x: Int) extends Exception(s"${x}") with T
                 case class B6(json: String, err: String)
                     extends A(s"[x] $json --- ${err.length}")
+                """
+            )
+        );
+    }
+
+    @Test
+    void parentConstructorCallIsModeledNotCrammedIntoIdentifier() {
+        // A parent constructor call must become an S.ConstructorInvocation (supertype + args),
+        // not a J.Identifier whose simpleName is the raw source "Exception(msg)".
+        rewriteRun(
+            spec -> spec.beforeRecipe(sources -> {
+                List<S.ConstructorInvocation> invocations = new ArrayList<>();
+                List<String> identifierNames = new ArrayList<>();
+                ScalaIsoVisitor<Integer> visitor = new ScalaIsoVisitor<Integer>() {
+                    @Override
+                    public S.ConstructorInvocation visitConstructorInvocation(S.ConstructorInvocation ci, Integer i) {
+                        invocations.add(ci);
+                        return super.visitConstructorInvocation(ci, i);
+                    }
+
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier ident, Integer i) {
+                        identifierNames.add(ident.getSimpleName());
+                        return super.visitIdentifier(ident, i);
+                    }
+                };
+                sources.forEach(source -> visitor.visit(source, 0));
+
+                assertThat(identifierNames).noneMatch(name -> name.contains("("));
+                assertThat(invocations).hasSize(1);
+                S.ConstructorInvocation ci = invocations.get(0);
+                assertThat(ci.getTypeTree()).isInstanceOf(J.Identifier.class);
+                assertThat(((J.Identifier) ci.getTypeTree()).getSimpleName()).isEqualTo("Exception");
+                assertThat(ci.getArguments()).hasSize(1);
+            }),
+            scala(
+                """
+                class E(msg: String) extends Exception(msg)
                 """
             )
         );

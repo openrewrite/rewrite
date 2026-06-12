@@ -373,4 +373,9 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     public J.Yield visitYield(J.Yield yield, P p) {
         return (J.Yield) super.visitYield(yield, p);
     }
+
+    @Override
+    public S.ConstructorInvocation visitConstructorInvocation(S.ConstructorInvocation constructorInvocation, P p) {
+        return (S.ConstructorInvocation) super.visitConstructorInvocation(constructorInvocation, p);
+    }
 }

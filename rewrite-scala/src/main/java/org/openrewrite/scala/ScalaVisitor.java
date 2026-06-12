@@ -237,6 +237,15 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return f;
     }
 
+    public J visitConstructorInvocation(S.ConstructorInvocation constructorInvocation, P p) {
+        S.ConstructorInvocation c = constructorInvocation;
+        c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withTypeTree(visitAndCast(c.getTypeTree(), p));
+        c = c.getPadding().withArguments(visitContainer(c.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p));
+        return c;
+    }
+
     public J visitSingletonType(S.SingletonType singletonType, P p) {
         S.SingletonType s = singletonType;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
