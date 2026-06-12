@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.scala.marker.AmpersandIntersection;
 import org.openrewrite.scala.marker.AsInstanceOfPrefix;
 import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.DottedMatch;
@@ -659,6 +660,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitFunctionType((S.FunctionType) tree, p);
         } else if (tree instanceof S.TupleType) {
             return visitTupleType((S.TupleType) tree, p);
+        } else if (tree instanceof S.UnionType) {
+            return visitUnionType((S.UnionType) tree, p);
         } else if (tree instanceof S.Macro) {
             return visitMacro((S.Macro) tree, p);
         } else if (tree instanceof S.ExtensionMethods) {
@@ -1277,11 +1280,30 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     @Override
     public J visitIntersectionType(J.IntersectionType intersectionType, PrintOutputCapture<P> p) {
-        // In Scala, parents of an anonymous class are joined with `with` (not Java's `&`).
+        // Scala joins intersections with `with` (anonymous-class parents and the `A with B`
+        // form) or with `&` (the Scala 3 operator form, flagged by AmpersandIntersection).
         beforeSyntax(intersectionType, Space.Location.INTERSECTION_TYPE_PREFIX, p);
-        visitContainer("", intersectionType.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "with", "", p);
+        String separator = intersectionType.getMarkers().findFirst(AmpersandIntersection.class).isPresent() ? "&" : "with";
+        visitContainer("", intersectionType.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, separator, "", p);
         afterSyntax(intersectionType, p);
         return intersectionType;
+    }
+
+    public J visitUnionType(S.UnionType unionType, PrintOutputCapture<P> p) {
+        beforeSyntax(unionType, Space.Location.LANGUAGE_EXTENSION, p);
+        JContainer<Expression> types = unionType.getPadding().getTypes();
+        visitSpace(types.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        List<JRightPadded<Expression>> padded = types.getPadding().getElements();
+        for (int i = 0; i < padded.size(); i++) {
+            JRightPadded<Expression> element = padded.get(i);
+            visit(element.getElement(), p);
+            visitSpace(element.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            if (i < padded.size() - 1) {
+                p.append('|');
+            }
+        }
+        afterSyntax(unionType, p);
+        return unionType;
     }
 
     @Override

@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.*
 import org.openrewrite.java.marker.ImplicitReturn
 import org.openrewrite.java.marker.OmitParentheses
 import org.openrewrite.marker.Markers
+import org.openrewrite.scala.marker.AmpersandIntersection
 import org.openrewrite.scala.marker.DottedMatch
 import org.openrewrite.scala.marker.Implicit
 import org.openrewrite.scala.marker.LambdaParameter
@@ -8382,16 +8383,91 @@ class ScalaTreeVisitor(
   }
 
   /**
-   * Union (`A | B`) and intersection (`A & B`) types are parsed as an `untpd.InfixOp`.
-   * Neither has a dedicated J/S type yet, so — like the `with`-less `&` already handled
-   * elsewhere — preserve the whole expression as a source-text identifier rather than
-   * letting it fall through to a `J.Binary` (which isn't a `TypeTree`) and get dropped.
-   * Returning a non-null `TypeTree` here fixes every type position at once (params,
-   * return types, type ascriptions, bounds, tuple/function components, ...).
+   * Scala 3 operator-form intersection (`A & B`) and union (`A | B`) types are parsed as an
+   * `untpd.InfixOp`. They are modeled structurally — `&` as a `J.IntersectionType` (flagged
+   * with `AmpersandIntersection` so the printer emits `&` rather than `with`) and `|` as an
+   * `S.UnionType` — rather than crammed whole into a single `J.Identifier`. This fixes every
+   * type-annotation position at once (params, return types, ascriptions, bounds, tuple and
+   * function components, ...).
    */
-  private def visitTypeOperatorInfix(infix: untpd.InfixOp): TypeTree = {
+  private def visitTypeOperatorInfix(infix: untpd.InfixOp): TypeTree =
+    if (infix.op.name.toString == "&") visitIntersectionInfixType(infix)
+    else visitUnionInfixType(infix)
+
+  /**
+   * Flatten a (possibly chained) type-level infix `A op B op C` into its leaf operands in
+   * source order, regardless of whether the parser nested it left- or right-associatively.
+   */
+  private def flattenTypeInfix(tree: Trees.Tree[?], opName: String): List[Trees.Tree[?]] = tree match {
+    case nested: untpd.InfixOp if nested.op != null && nested.op.name.toString == opName =>
+      flattenTypeInfix(nested.left, opName) ::: flattenTypeInfix(nested.right, opName)
+    case other => List(other)
+  }
+
+  private def visitIntersectionInfixType(infix: untpd.InfixOp): TypeTree = {
     val prefix = extractPrefix(infix.span)
-    ident(extractSource(infix.span), prefix)
+    val parts = flattenTypeInfix(infix, "&")
+    val elements = new util.ArrayList[JRightPadded[TypeTree]](parts.size)
+    for (i <- parts.indices) {
+      val tt = visitTypeTree(parts(i))
+      if (tt == null) return ident(extractSource(infix.span), prefix)
+      val afterSpace = if (i == parts.size - 1) Space.EMPTY else sourceBefore("&")
+      elements.add(new JRightPadded[TypeTree](tt, afterSpace, Markers.EMPTY))
+    }
+    updateCursor(infix.span.end)
+    new J.IntersectionType(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY.add(AmpersandIntersection.create()),
+      JContainer.build(Space.EMPTY, elements, Markers.EMPTY)
+    )
+  }
+
+  private def visitUnionInfixType(infix: untpd.InfixOp): TypeTree = {
+    val prefix = extractPrefix(infix.span)
+    val parts = flattenTypeInfix(infix, "|")
+    val elements = new util.ArrayList[JRightPadded[Expression]](parts.size)
+    for (i <- parts.indices) {
+      val operand = visitUnionOperand(parts(i))
+      if (operand == null) return ident(extractSource(infix.span), prefix)
+      val afterSpace = if (i == parts.size - 1) Space.EMPTY else sourceBefore("|")
+      elements.add(new JRightPadded[Expression](operand, afterSpace, Markers.EMPTY))
+    }
+    updateCursor(infix.span.end)
+    S.UnionType.build(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      JContainer.build(Space.EMPTY, elements, Markers.EMPTY),
+      typeOfTree(infix)
+    )
+  }
+
+  /**
+   * Visit a single union operand as an `Expression`. Most operands are types
+   * (identifiers, parameterized types) that are also `Expression`s. Singleton
+   * literal types like `"resize"` are parsed by Dotty as `SingletonTypeTree(Literal)`;
+   * the literal itself *is* the type (there is no `.type` suffix in source), so we
+   * visit the inner literal directly rather than producing an `S.SingletonType`
+   * (which would print a spurious `.type`). Returns null for an operand that cannot
+   * be represented as an `Expression` (e.g. a nested intersection), signalling the
+   * caller to fall back to source preservation.
+   */
+  private def visitUnionOperand(tree: Trees.Tree[?]): Expression = tree match {
+    case _: Trees.Literal[?] =>
+      asExpression(visitTree(tree))
+    case stt: Trees.SingletonTypeTree[?] if stt.ref.isInstanceOf[Trees.Literal[?]] =>
+      asExpression(visitTree(stt.ref))
+    case _ =>
+      visitTypeTree(tree) match {
+        case e: Expression => e
+        case _ => null
+      }
+  }
+
+  private def asExpression(j: J): Expression = j match {
+    case e: Expression => e
+    case _ => null
   }
 
   /**
