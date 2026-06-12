@@ -597,6 +597,16 @@ class ScalaTreeVisitor(
           case nt: NameTree => nt
           case _ => return visitUnknown(app)
         }
+      case at: Trees.AppliedTypeTree[?] =>
+        // Parameterized annotation type like @throws[Exception]; skip the leading '@'
+        // so the parameterized type's own prefix stays empty, then map it to a
+        // J.ParameterizedType (a NameTree via TypeTree) instead of leaking source text.
+        val atStart = Math.max(0, at.span.start - offsetAdjustment)
+        if (atStart > cursor) cursor = atStart
+        visitTree(at) match {
+          case nt: NameTree => nt
+          case _ => return visitUnknown(app)
+        }
       case _ => return visitUnknown(app)
     }
     
