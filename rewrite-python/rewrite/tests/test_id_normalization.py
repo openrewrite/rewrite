@@ -76,3 +76,26 @@ class TestMarkerIdNormalization:
         found = SearchResult.found(ident, "match")
         assert found.markers.id == ident.markers.id
         assert found.markers.find_first(SearchResult) is not None
+
+
+class TestRpcPlaceholderConstruction:
+    """The RPC receiver constructs placeholder instances with every field None
+    (see ``make_dataclass_factory``) and fills them in field by field. The id
+    normalization hooks must let a None id pass through untouched."""
+
+    def test_tree_factory_accepts_none_id(self):
+        from rewrite.rpc.receive_queue import make_dataclass_factory
+        placeholder = make_dataclass_factory(Identifier)()
+        assert placeholder._id is None
+        uid = uuid4()
+        assert placeholder.replace(_id=uid.int).id == uid
+
+    def test_marker_factory_accepts_none_id(self):
+        from rewrite.rpc.receive_queue import make_dataclass_factory
+        placeholder = make_dataclass_factory(SearchResult)()
+        assert placeholder._id is None
+
+    def test_markers_factory_accepts_none_id(self):
+        from rewrite.rpc.receive_queue import make_dataclass_factory
+        placeholder = make_dataclass_factory(Markers)()
+        assert placeholder._id is None
