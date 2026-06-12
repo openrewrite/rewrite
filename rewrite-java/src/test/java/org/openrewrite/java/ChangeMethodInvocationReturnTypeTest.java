@@ -108,6 +108,102 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
     }
 
     @Test
+    void replaceParenthesizedInitializer() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Foo {
+                  void bar() {
+                      int one = (Integer.parseInt("1"));
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  void bar() {
+                      long one = (Integer.parseInt("1"));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceTernaryInitializerWithMatchInBothBranches() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Foo {
+                  void bar(boolean flag) {
+                      int one = flag ? Integer.parseInt("1") : Integer.parseInt("2");
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  void bar(boolean flag) {
+                      long one = flag ? Integer.parseInt("1") : Integer.parseInt("2");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceTernaryInitializerWithMatchInOneBranch() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Foo {
+                  void bar(boolean flag) {
+                      int one = flag ? (Integer.parseInt("1")) : 0;
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  void bar(boolean flag) {
+                      long one = flag ? (Integer.parseInt("1")) : 0;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldNotChangeVariableTypeWhenInitializerIsTypeCast() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Foo {
+                  void bar() {
+                      int direct = Integer.parseInt("1");
+                      // the cast, not the matched invocation, determines the type of `one`
+                      int one = (int) Integer.parseInt("2");
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  void bar() {
+                      long direct = Integer.parseInt("1");
+                      // the cast, not the matched invocation, determines the type of `one`
+                      int one = (int) Integer.parseInt("2");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void replaceVariableAssignmentFullyQualified() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.math.BigInteger"))
