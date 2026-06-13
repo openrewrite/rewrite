@@ -438,6 +438,12 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     "run",
                     "--project", csproj.toAbsolutePath().normalize().toString(),
                     "--framework", "net10.0",
+                    // --no-build (which implies --no-restore) keeps `dotnet run` from emitting any
+                    // MSBuild/NuGet output on stdout, which is the JSON-RPC channel. A single restore
+                    // audit warning (e.g. NU1903 for a transitively-pulled vulnerable package) printed
+                    // here corrupts the stream and kills the peer. The project is always pre-built by
+                    // the `csharpBuild` Gradle task this command's only caller (tests) depends on.
+                    "--no-build",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null,
                     recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
