@@ -72,6 +72,7 @@ class TyTypesClient:
         self._request_id: int = 0
         self._initialized = False
         self._project_root: Optional[str] = None
+        self._first_party_root: Optional[str] = None
         self._virtual_env: Optional[str] = str(virtual_env) if virtual_env else None
 
         # Cumulative type table for the lifetime of this ``--serve`` session.
@@ -285,13 +286,27 @@ class TyTypesClient:
                 return None
             return response.get('result')
 
-    def initialize(self, project_root: str) -> bool:
+    def initialize(self, project_root: str,
+                   first_party_root: Optional[str] = None) -> bool:
         """Initialize the ty-types session with a project root.
 
-        If already initialized with the same project root, this is a no-op.
-        If initialized with a different root, shuts down and reinitializes.
+        If already initialized with the same project root and boundary, this is
+        a no-op. If initialized with a different root or boundary, shuts down and
+        reinitializes.
+
+        Args:
+            project_root: The project directory ty-types resolves imports against.
+            first_party_root: Optional first-party package root. When set, the
+                session emits classes defined outside this root as ``classRef``
+                descriptors (identity only), which map to body-less class shells
+                — keeping attribution lean and shrinking the RPC payload. When
+                ``None`` (the default) no boundary is sent and types expand
+                fully, exactly as before. The boundary field is only included in
+                the request when explicitly set, preserving backward compat with
+                ty-types builds that predate it.
         """
-        if self._initialized and self._project_root == project_root:
+        if (self._initialized and self._project_root == project_root
+                and self._first_party_root == first_party_root):
             return True
 
         if self._initialized:
@@ -302,13 +317,16 @@ class TyTypesClient:
             self.java_types.clear()
             self._start_process()
 
+        params = {"projectRoot": project_root}
+        if first_party_root is not None:
+            params["firstPartyRoot"] = first_party_root
         # Bounded so a wedged ty degrades to untyped instead of hanging; large
         # because ty indexes the whole project up front.
-        result = self._send_request("initialize", {"projectRoot": project_root},
-                                    timeout=600)
+        result = self._send_request("initialize", params, timeout=600)
         if result and result.get("ok"):
             self._initialized = True
             self._project_root = project_root
+            self._first_party_root = first_party_root
             return True
         return False
 
@@ -362,6 +380,7 @@ class TyTypesClient:
             self._process = None
             self._initialized = False
             self._project_root = None
+            self._first_party_root = None
 
     def _kill(self) -> None:
         """Forcibly terminate an unresponsive ty-types process."""
@@ -369,6 +388,7 @@ class TyTypesClient:
         self._process = None
         self._initialized = False
         self._project_root = None
+        self._first_party_root = None
         if process is not None:
             try:
                 process.kill()
