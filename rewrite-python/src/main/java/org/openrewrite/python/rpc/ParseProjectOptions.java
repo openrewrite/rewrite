@@ -58,4 +58,17 @@ public class ParseProjectOptions {
      */
     @Nullable
     Path dependencyPath;
+
+    /**
+     * First-party package root that bounds type attribution. When set, classes defined outside
+     * this root (stdlib and third-party packages) are attributed as body-less {@code JavaType.Class}
+     * shells (fully qualified name only) rather than fully expanding their member and supertype
+     * graphs, keeping attribution lean and shrinking the type payload carried over RPC.
+     * <p>
+     * Optional and gated for backward compatibility: when {@code null}, no boundary is applied and
+     * types expand fully, exactly as before. Callers (e.g. a CLI build step) opt in explicitly; the
+     * parser never defaults this to the project path.
+     */
+    @Nullable
+    Path firstPartyRoot;
 }

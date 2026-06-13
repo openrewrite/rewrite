@@ -54,6 +54,60 @@ requires_ty_types_cli = pytest.mark.skipif(
 )
 
 
+def _ty_types_supports_boundary() -> bool:
+    """Probe whether the installed ty-types binary honors the first-party
+    boundary, i.e. emits ``classRef`` shells for out-of-boundary classes.
+
+    The boundary is one half of a two-part change; older ty-types binaries
+    silently ignore the ``firstPartyRoot`` init param and fully expand stdlib
+    types. The end-to-end boundary tests are only meaningful against a binary
+    that supports it, so they skip otherwise. Probes by attributing a stdlib
+    reference with the boundary set and checking whether it came back as a
+    body-less shell.
+    """
+    if not _TY_TYPES_CLI_INSTALLED:
+        return False
+    src = "import datetime\nx = datetime.datetime.now()\n"
+    tmpdir = tempfile.mkdtemp()
+    client = None
+    mapping = None
+    try:
+        file_path = os.path.join(tmpdir, 'probe.py')
+        with open(file_path, 'w') as f:
+            f.write(src)
+        client = TyTypesClient()
+        client.initialize(tmpdir, first_party_root=tmpdir)
+        mapping = PythonTypeMapping(src, file_path, ty_client=client)
+        typ = mapping.type(ast.parse(src).body[1].value)
+        if isinstance(typ, JavaType.Parameterized):
+            typ = typ._type
+        if not isinstance(typ, JavaType.Class):
+            return False
+        return (getattr(typ, '_methods', None) is None
+                and getattr(typ, '_members', None) is None
+                and getattr(typ, '_supertype', None) is None)
+    except Exception:
+        return False
+    finally:
+        if mapping is not None:
+            mapping.close()
+        if client is not None:
+            client.shutdown()
+        import shutil
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+_TY_TYPES_BOUNDARY_SUPPORTED = _ty_types_supports_boundary()
+
+
+# Mark for tests that require a ty-types binary with first-party boundary support
+requires_ty_types_boundary = pytest.mark.skipif(
+    not _TY_TYPES_BOUNDARY_SUPPORTED,
+    reason="installed ty-types binary does not support the first-party boundary "
+           "(firstPartyRoot); skipping end-to-end boundary tests"
+)
+
+
 @requires_ty_types_cli
 class TestTyTypesClient:
     """Tests for the TyTypesClient.
@@ -644,6 +698,28 @@ def _cleanup_mapping(mapping, tmpdir, client):
     shutil.rmtree(tmpdir, ignore_errors=True)
 
 
+def _make_mapping_with_boundary(source: str, with_boundary: bool) -> tuple:
+    """Helper: like _make_mapping, but optionally sets the first-party boundary
+    to the temp project root.
+
+    When ``with_boundary`` is True the session is initialized with
+    ``first_party_root`` set to the project dir, so ty-types emits classes
+    defined outside it (stdlib / third-party) as ``classRef`` shells. When
+    False, no boundary is sent and attribution fully expands as before.
+
+    Returns (mapping, tree, tmpdir, client).
+    """
+    tree = ast.parse(source)
+    tmpdir = tempfile.mkdtemp()
+    file_path = os.path.join(tmpdir, 'test.py')
+    with open(file_path, 'w') as f:
+        f.write(source)
+    client = TyTypesClient()
+    client.initialize(tmpdir, first_party_root=tmpdir if with_boundary else None)
+    mapping = PythonTypeMapping(source, file_path, ty_client=client)
+    return mapping, tree, tmpdir, client
+
+
 class TestDeclaringTypeFromLiterals:
     """Tests for declaring type inference from literal receivers (no CLI needed)."""
 
@@ -1060,6 +1136,88 @@ class TestParameterizedTypes:
 
 
 @requires_ty_types_cli
+class TestBoundaryAwareAttribution:
+    """End-to-end tests for the first-party boundary on the getTypes session.
+
+    With a boundary set to the project root, classes defined outside it (here,
+    stdlib ``datetime.datetime``) come back as body-less shells, while local
+    (in-boundary) classes stay fully attributed. With no boundary, the external
+    class fully expands exactly as before.
+    """
+
+    # A local class with an explicit local base and a method, plus a reference
+    # to a stdlib class. ``Greeter()`` instantiates the local class (full),
+    # ``datetime.datetime.now()`` yields a stdlib datetime instance (external).
+    _SOURCE = '''import datetime
+
+
+class Base:
+    pass
+
+
+class Greeter(Base):
+    def greet(self) -> str:
+        return "hi"
+
+
+g = Greeter()
+x = datetime.datetime.now()
+'''
+
+    @staticmethod
+    def _base_class_of(typ):
+        """Unwrap an instance/parameterized type to its underlying Class."""
+        if isinstance(typ, JavaType.Parameterized):
+            typ = typ._type
+        return typ if isinstance(typ, JavaType.Class) else None
+
+    def _local_and_external(self, mapping, tree):
+        """Resolve the local-class instance and the external datetime instance
+        from the module body (``g = Greeter()`` then ``x = datetime...now()``)."""
+        greeter_call = tree.body[3].value      # g = Greeter()
+        datetime_call = tree.body[4].value     # x = datetime.datetime.now()
+        local = self._base_class_of(mapping.type(greeter_call))
+        external = self._base_class_of(mapping.type(datetime_call))
+        return local, external
+
+    @requires_ty_types_boundary
+    def test_with_boundary_external_is_shell_local_is_full(self):
+        mapping, tree, tmpdir, client = _make_mapping_with_boundary(
+            self._SOURCE, with_boundary=True)
+        try:
+            local, external = self._local_and_external(mapping, tree)
+
+            assert local is not None and local.fully_qualified_name.endswith('Greeter')
+            assert getattr(local, '_methods', None) is not None and len(local._methods) > 0
+            assert getattr(local, '_supertype', None) is not None
+
+            assert external is not None
+            assert external.fully_qualified_name == 'datetime.datetime'
+            assert getattr(external, '_methods', None) is None
+            assert getattr(external, '_members', None) is None
+            assert getattr(external, '_supertype', None) is None
+            assert getattr(external, '_interfaces', None) is None
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_without_boundary_external_is_fully_expanded(self):
+        mapping, tree, tmpdir, client = _make_mapping_with_boundary(
+            self._SOURCE, with_boundary=False)
+        try:
+            _, external = self._local_and_external(mapping, tree)
+
+            assert external is not None
+            assert external.fully_qualified_name == 'datetime.datetime'
+            # Full expansion: at least one of the structural fields is populated.
+            assert (external._methods is not None
+                    or external._members is not None
+                    or getattr(external, '_supertype', None) is not None), \
+                "datetime.datetime should be fully expanded without a boundary"
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
+@requires_ty_types_cli
 class TestMethodSignatureDetails:
     """Tests for parameter name and type resolution in method signatures."""
 
@@ -1241,6 +1399,64 @@ class TestCyclicTypeResolution:
 
         result = mapping._resolve_type(50)
         assert result is JavaType.Primitive.Int
+
+
+class TestClassRefShells:
+    """Unit tests for the `classRef` descriptor → body-less `JavaType.Class` shell.
+
+    ty-types emits `classRef` for classes that fall outside the first-party
+    boundary (stdlib / third-party packages). These carry identity only — no
+    members, methods, supertypes, interfaces, or type parameters — so they must
+    map to a body-less Class shell (FQN + kind). Exercised here with mock
+    descriptors so no ty-types CLI is needed; end-to-end boundary behavior lives
+    in TestBoundaryAwareAttribution below.
+    """
+
+    @staticmethod
+    def _assert_shell(result, fqn):
+        # A shell is a body-less JavaType.Class: FQN + kind set, every
+        # structural field absent. `_create_class_type` leaves those slots
+        # unset, which the RPC sender treats as None/empty via getattr — so we
+        # assert absence the same way.
+        assert isinstance(result, JavaType.Class)
+        assert result.fully_qualified_name == fqn
+        assert result._kind == JavaType.FullyQualified.Kind.Class
+        assert getattr(result, '_members', None) is None
+        assert getattr(result, '_methods', None) is None
+        assert getattr(result, '_supertype', None) is None
+        assert getattr(result, '_interfaces', None) is None
+        assert getattr(result, '_type_parameters', None) is None
+
+    def test_class_ref_maps_to_module_qualified_shell(self):
+        """A module-qualified classRef yields `module.Class` with no body."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[100] = {
+            'kind': 'classRef', 'className': 'datetime', 'moduleName': 'datetime'}
+        self._assert_shell(mapping._resolve_type(100), 'datetime.datetime')
+
+    def test_class_ref_builtins_is_bare(self):
+        """A builtins classRef drops the `builtins.` prefix (matches classLiteral)."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[101] = {
+            'kind': 'classRef', 'className': 'int', 'moduleName': 'builtins'}
+        self._assert_shell(mapping._resolve_type(101), 'int')
+
+    def test_class_ref_without_module_is_bare(self):
+        """A classRef with no moduleName uses the bare class name."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[102] = {'kind': 'classRef', 'className': 'Foo'}
+        self._assert_shell(mapping._resolve_type(102), 'Foo')
+
+    def test_instance_with_class_ref_base_is_shell(self):
+        """An `instance` whose `classId` points to a classRef resolves its base
+        class to the shell — the instance branch needs no change."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[103] = {
+            'kind': 'classRef', 'className': 'datetime', 'moduleName': 'datetime'}
+        mapping._type_registry[104] = {
+            'kind': 'instance', 'className': 'datetime',
+            'moduleName': 'datetime', 'classId': 103}
+        self._assert_shell(mapping._resolve_type(104), 'datetime.datetime')
 
 
 class TestParamSpecAndConcatenate:
@@ -2679,12 +2895,14 @@ class TestDependencyPathForwarding:
     """
 
     _captured: list = []
+    _captured_boundary: list = []
 
     class _StubTyClient:
         def __init__(self, virtual_env=None):
             TestDependencyPathForwarding._captured.append(virtual_env)
 
-        def initialize(self, project_root):
+        def initialize(self, project_root, first_party_root=None):
+            TestDependencyPathForwarding._captured_boundary.append(first_party_root)
             return True
 
         @property
@@ -2703,6 +2921,7 @@ class TestDependencyPathForwarding:
     def _patch_client(self, monkeypatch):
         import rewrite.python.ty_client as ty_mod
         TestDependencyPathForwarding._captured = []
+        TestDependencyPathForwarding._captured_boundary = []
         monkeypatch.setattr(ty_mod, 'TyTypesClient',
                             TestDependencyPathForwarding._StubTyClient)
         yield
@@ -2725,6 +2944,22 @@ class TestDependencyPathForwarding:
             "dependencyPath": "/deps/proj/.venv",
         })
         assert self._captured == ["/deps/proj/.venv"]
+
+    def test_handle_parse_project_forwards_first_party_root_when_set(self, tmp_path):
+        from rewrite.rpc import server
+        (tmp_path / "m.py").write_text("x = 1\n")
+        server.handle_parse_project({
+            "projectPath": str(tmp_path),
+            "firstPartyRoot": "/repo/src",
+        })
+        assert self._captured_boundary == ["/repo/src"]
+
+    def test_handle_parse_project_no_boundary_when_absent(self, tmp_path):
+        # Backward-compat: absent firstPartyRoot ⇒ None forwarded ⇒ full expansion.
+        from rewrite.rpc import server
+        (tmp_path / "m.py").write_text("x = 1\n")
+        server.handle_parse_project({"projectPath": str(tmp_path)})
+        assert self._captured_boundary == [None]
 
     def test_handle_parse_without_dependency_path_does_not_auto_provision(self, tmp_path, monkeypatch):
         # A pyproject.toml with dependencies present must NOT trigger an

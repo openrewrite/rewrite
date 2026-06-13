@@ -572,6 +572,26 @@ class PythonTypeMapping:
 
             return class_type
 
+        elif kind == 'classRef':
+            # A class defined outside the session's first-party boundary
+            # (stdlib / third-party). ty-types emits identity only — no members,
+            # methods, supertypes, or type parameters — so map it to a body-less
+            # JavaType.Class shell. This keeps attribution lean and slashes the
+            # JavaType payload that travels over RPC, which otherwise drags a
+            # class's whole member/supertype graph across third-party packages
+            # and stdlib. The FQN scheme matches the classLiteral/instance
+            # branches: builtins stay bare, everything else is module-qualified.
+            # `_create_class_type` returns a Class with only `_fully_qualified_name`
+            # and `_kind` set, leaving members/methods/supertype/interfaces/
+            # type_parameters as None — exactly the shell we want.
+            class_name = descriptor.get('className', '')
+            module_name = descriptor.get('moduleName')
+            if module_name and module_name != 'builtins':
+                fqn = f"{module_name}.{class_name}"
+            else:
+                fqn = class_name
+            return self._create_class_type(fqn)
+
         elif kind == 'typedDict':
             # Map a TypedDict to a nominal class type by name and populate its
             # members from the descriptor's `fields`. Each field carries its own

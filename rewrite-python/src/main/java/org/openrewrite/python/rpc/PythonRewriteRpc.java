@@ -198,6 +198,7 @@ public class PythonRewriteRpc extends RewriteRpc {
         @Nullable List<String> exclusions = options.getExclusions();
         @Nullable Path relativeTo = options.getRelativeTo();
         @Nullable Path dependencyPath = options.getDependencyPath();
+        @Nullable Path firstPartyRoot = options.getFirstPartyRoot();
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         Stream<SourceFile> rpcStream = StreamSupport.stream(new Spliterator<SourceFile>() {
@@ -208,7 +209,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, dependencyPath), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, dependencyPath, firstPartyRoot), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 

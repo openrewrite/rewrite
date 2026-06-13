@@ -59,4 +59,16 @@ class ParseProject implements RpcRequest {
      */
     @Nullable
     Path dependencyPath;
+
+    /**
+     * Optional first-party package root that bounds type attribution.
+     * <p>
+     * When set, ty-types emits classes defined outside this root (stdlib and third-party
+     * packages) as identity-only references, which the parser maps to body-less
+     * {@code JavaType.Class} shells (fully qualified name only). This keeps attribution lean
+     * and shrinks the type payload carried over RPC. When {@code null}, no boundary is applied
+     * and types expand fully, exactly as before.
+     */
+    @Nullable
+    Path firstPartyRoot;
 }

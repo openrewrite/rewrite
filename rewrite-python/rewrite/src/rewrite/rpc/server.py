@@ -515,6 +515,10 @@ def handle_parse_project(params: dict) -> List[dict]:
     language_level = options.get('languageLevel')
     # Caller-provisioned dependency environment for ty-types (see handle_parse).
     dependency_path = params.get('dependencyPath')
+    # Optional first-party boundary: when set, ty-types emits classes defined
+    # outside this root as `classRef` shells (identity only). Only forwarded
+    # when explicitly provided — absent means full expansion, exactly as before.
+    first_party_root = params.get('firstPartyRoot')
 
     # Resolve project-level language version once for the whole walk; each
     # file may still override it via in-source signals inside parse_python_source.
@@ -529,7 +533,7 @@ def handle_parse_project(params: dict) -> List[dict]:
         # Point ty-types at the caller-provisioned dependency environment (if any)
         # so supertypes reaching into third-party packages resolve.
         ty_client = TyTypesClient(virtual_env=dependency_path)
-        ty_client.initialize(project_path)
+        ty_client.initialize(project_path, first_party_root=first_party_root)
     except (ImportError, RuntimeError):
         pass
 
