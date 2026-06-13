@@ -267,7 +267,7 @@ class RpcSendQueue:
         """Get the Java type name for an object, or None for primitives."""
         # Import python_receiver to ensure codecs are registered before get_java_type_name
         from rewrite.rpc import python_receiver  # noqa: F401 - triggers codec registration
-        from rewrite.rpc.receive_queue import get_java_type_name
+        from rewrite.rpc.receive_queue import get_java_type_name, get_send_codec
 
         if obj is None:
             return None
@@ -283,6 +283,17 @@ class RpcSendQueue:
             return None
         if isinstance(obj, Path):
             return None
+
+        # A host-registered type (e.g. a moderne-cli type-table proxy that is a
+        # JavaType.Class subclass) carries its own send codec and registered
+        # value_type. Honor that discriminator instead of flattening it to a
+        # built-in JavaType name below. Gated on the registered send codec — the
+        # analogue of the JVM's "instance is its own RpcCodec" signal — so the
+        # built-in JavaTypes (which have no send codec) keep their existing names.
+        if get_send_codec(obj) is not None:
+            registered = get_java_type_name(obj_type)
+            if registered is not None:
+                return registered
 
         # JavaType.Primitive is a special Enum that needs its Java type name
         # Check for JavaType.Primitive before the general Enum check

@@ -838,6 +838,16 @@ class PythonRpcSender:
         if java_type is None:
             return
 
+        # Defer to a host-registered send codec when one exists for this exact
+        # type (e.g. a moderne-cli type-table proxy that subclasses JavaType.Class).
+        # Built-in JavaTypes have no registered send codec, so this is inert for
+        # them and they fall through to the hardcoded serialization below.
+        from rewrite.rpc.receive_queue import get_send_codec
+        codec = get_send_codec(java_type)
+        if codec is not None:
+            codec(java_type, q)
+            return
+
         if isinstance(java_type, JT.Primitive):
             # For Primitive types, send the keyword
             # JavaTypeSender.visitPrimitive sends: q.getAndSend(primitive, JavaType.Primitive::getKeyword)
