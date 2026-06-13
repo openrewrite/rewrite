@@ -1458,6 +1458,36 @@ class TestClassRefShells:
             'moduleName': 'datetime', 'classId': 103}
         self._assert_shell(mapping._resolve_type(104), 'datetime.datetime')
 
+    def test_class_ref_resolution_delegates_to_registered_factory(self):
+        """The mapper hands the shell to the registered factory's
+        `resolve_class_ref` (seam 2). A table-backed alternative would resolve
+        it to a full type; here a test-double returns a marker to prove the
+        wiring without building the alternative."""
+        from rewrite.python import type_factory
+
+        marker = JavaType.Class()
+        marker._flags_bit_map = 0
+        marker._fully_qualified_name = 'resolved.Marker'
+        marker._kind = JavaType.FullyQualified.Kind.Class
+
+        seen = []
+
+        class _ResolvingFactory(type_factory.JavaTypeFactory):
+            def resolve_class_ref(self, shell, descriptor):
+                seen.append((shell.fully_qualified_name, descriptor.get('className')))
+                return marker
+
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[105] = {
+            'kind': 'classRef', 'className': 'datetime', 'moduleName': 'datetime'}
+        type_factory.register_java_type_factory(_ResolvingFactory())
+        try:
+            result = mapping._resolve_type(105)
+        finally:
+            type_factory.reset_java_type_factory()
+        assert result is marker
+        assert seen == [('datetime.datetime', 'datetime')]
+
 
 class TestParamSpecAndConcatenate:
     """Unit tests for the ty-types 0.0.31 `paramSpecName` / `concatenatePrefix` fields.
@@ -2920,11 +2950,16 @@ class TestDependencyPathForwarding:
     @pytest.fixture(autouse=True)
     def _patch_client(self, monkeypatch):
         import rewrite.python.ty_client as ty_mod
+        from rewrite.python import type_factory
         TestDependencyPathForwarding._captured = []
         TestDependencyPathForwarding._captured_boundary = []
         monkeypatch.setattr(ty_mod, 'TyTypesClient',
                             TestDependencyPathForwarding._StubTyClient)
+        # Each test starts from (and is restored to) the deep default factory,
+        # so a test that registers an alternative cannot leak into others.
+        type_factory.reset_java_type_factory()
         yield
+        type_factory.reset_java_type_factory()
 
     def test_handle_parse_forwards_dependency_path(self, tmp_path):
         from rewrite.rpc import server
@@ -2945,14 +2980,17 @@ class TestDependencyPathForwarding:
         })
         assert self._captured == ["/deps/proj/.venv"]
 
-    def test_handle_parse_project_forwards_first_party_root_when_set(self, tmp_path):
+    def test_handle_parse_project_default_factory_does_not_apply_boundary(self, tmp_path):
+        # The DEFAULT factory stays deep: even when firstPartyRoot is set, it is
+        # NOT forwarded to ty-types, so attribution never cuts. (A classRef shell
+        # is a dead end without type tables, which only an alternative owns.)
         from rewrite.rpc import server
         (tmp_path / "m.py").write_text("x = 1\n")
         server.handle_parse_project({
             "projectPath": str(tmp_path),
             "firstPartyRoot": "/repo/src",
         })
-        assert self._captured_boundary == ["/repo/src"]
+        assert self._captured_boundary == [None]
 
     def test_handle_parse_project_no_boundary_when_absent(self, tmp_path):
         # Backward-compat: absent firstPartyRoot ⇒ None forwarded ⇒ full expansion.
@@ -2960,6 +2998,48 @@ class TestDependencyPathForwarding:
         (tmp_path / "m.py").write_text("x = 1\n")
         server.handle_parse_project({"projectPath": str(tmp_path)})
         assert self._captured_boundary == [None]
+
+    def test_alternative_factory_applies_boundary(self, tmp_path):
+        # A registered alternative factory that opts into the boundary forwards
+        # firstPartyRoot to ty-types — proving the boundary config channel is
+        # gated behind the factory, not the default path.
+        from rewrite.rpc import server
+        from rewrite.python import type_factory
+
+        class _BoundaryFactory(type_factory.JavaTypeFactory):
+            def initialize_session(self, ty_client, project_root, first_party_root=None):
+                return ty_client.initialize(project_root, first_party_root=first_party_root)
+
+        type_factory.register_java_type_factory(_BoundaryFactory())
+        (tmp_path / "m.py").write_text("x = 1\n")
+        server.handle_parse_project({
+            "projectPath": str(tmp_path),
+            "firstPartyRoot": "/repo/src",
+        })
+        assert self._captured_boundary == ["/repo/src"]
+
+    def test_parse_path_invokes_registered_factory(self, tmp_path):
+        # Proves the parse path obtains and uses the registered factory (the SPI
+        # is the real seam) without depending on ty-types or the boundary.
+        from rewrite.rpc import server
+        from rewrite.python import type_factory
+
+        calls = []
+
+        class _RecordingFactory(type_factory.JavaTypeFactory):
+            def create_ty_client(self, dependency_path=None):
+                calls.append(('create_ty_client', dependency_path))
+                return super().create_ty_client(dependency_path)
+
+            def initialize_session(self, ty_client, project_root, first_party_root=None):
+                calls.append(('initialize_session', project_root, first_party_root))
+                return super().initialize_session(ty_client, project_root, first_party_root)
+
+        type_factory.register_java_type_factory(_RecordingFactory())
+        (tmp_path / "m.py").write_text("x = 1\n")
+        server.handle_parse_project({"projectPath": str(tmp_path)})
+        assert ('create_ty_client', None) in calls
+        assert any(c[0] == 'initialize_session' and c[1] == str(tmp_path) for c in calls)
 
     def test_handle_parse_without_dependency_path_does_not_auto_provision(self, tmp_path, monkeypatch):
         # A pyproject.toml with dependencies present must NOT trigger an

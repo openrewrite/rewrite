@@ -590,7 +590,13 @@ class PythonTypeMapping:
                 fqn = f"{module_name}.{class_name}"
             else:
                 fqn = class_name
-            return self._create_class_type(fqn)
+            shell = self._create_class_type(fqn)
+            # Hand the shell to the registered type factory (seam 2). The default
+            # factory leaves it as a shell; a table-backed alternative resolves
+            # it to a full type from V3 type tables. Deep mode never reaches here
+            # (no boundary ⇒ ty-types emits no classRef), so this is inert there.
+            from rewrite.python.type_factory import get_java_type_factory
+            return get_java_type_factory().resolve_class_ref(shell, descriptor)
 
         elif kind == 'typedDict':
             # Map a TypedDict to a nominal class type by name and populate its

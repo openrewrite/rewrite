@@ -443,21 +443,24 @@ def handle_parse(params: dict) -> List[str]:
     from rewrite.python._version_detect import detect_from_project
     project_language_level = detect_from_project(relative_to) if relative_to else None
 
-    # Create a ty-types client for this parse batch
+    # Create a ty-types client for this parse batch via the process-global type
+    # factory (deep by default; a host may register a table-backed alternative).
+    # Single-file parsing has no first-party boundary, so the session is always
+    # initialized deep here regardless of the registered factory.
+    from rewrite.python.type_factory import get_java_type_factory
+    factory = get_java_type_factory()
     ty_client = None
     tmpdir = None
     try:
-        from rewrite.python.ty_client import TyTypesClient
-        # Point ty-types at the caller-provisioned dependency environment (if any)
-        # so supertypes reaching into third-party packages resolve.
-        ty_client = TyTypesClient(virtual_env=dependency_path)
-        if relative_to:
-            ty_client.initialize(relative_to)
-        else:
-            # For inline text inputs without a project root, create a temp directory
-            # so ty-types can still provide type attribution
-            tmpdir = tempfile.mkdtemp(prefix='rewrite-parse-')
-            ty_client.initialize(tmpdir)
+        ty_client = factory.create_ty_client(dependency_path)
+        if ty_client is not None:
+            if relative_to:
+                factory.initialize_session(ty_client, relative_to)
+            else:
+                # For inline text inputs without a project root, create a temp
+                # directory so ty-types can still provide type attribution
+                tmpdir = tempfile.mkdtemp(prefix='rewrite-parse-')
+                factory.initialize_session(ty_client, tmpdir)
     except (ImportError, RuntimeError):
         ty_client = None  # ty-types not available
 
@@ -527,15 +530,20 @@ def handle_parse_project(params: dict) -> List[dict]:
 
     results = []
 
+    # Obtain the process-global type-attribution factory (deep by default; a
+    # host like moderne-cli may register a table-backed alternative). The factory
+    # creates the ty-types client and decides whether the first-party boundary is
+    # applied: the default ignores firstPartyRoot and stays deep, so the boundary
+    # config channel is inert here unless an alternative factory is registered.
+    from rewrite.python.type_factory import get_java_type_factory
+    factory = get_java_type_factory()
     ty_client = None
     try:
-        from rewrite.python.ty_client import TyTypesClient
-        # Point ty-types at the caller-provisioned dependency environment (if any)
-        # so supertypes reaching into third-party packages resolve.
-        ty_client = TyTypesClient(virtual_env=dependency_path)
-        ty_client.initialize(project_path, first_party_root=first_party_root)
+        ty_client = factory.create_ty_client(dependency_path)
+        if ty_client is not None:
+            factory.initialize_session(ty_client, project_path, first_party_root)
     except (ImportError, RuntimeError):
-        pass
+        ty_client = None
 
     try:
         for root, dirs, files in os.walk(project_path):
