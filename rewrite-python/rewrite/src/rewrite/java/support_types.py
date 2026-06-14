@@ -24,6 +24,8 @@ _JavaVisitor: Any = None
 
 
 class J(Tree):
+    __slots__ = ()
+
     @property
     @abstractmethod
     def prefix(self) -> Space:
@@ -47,7 +49,7 @@ class J(Tree):
         ...
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Comment(ABC):
     @property
     @abstractmethod
@@ -77,7 +79,7 @@ class Comment(ABC):
         return replace_if_changed(self, **kwargs)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TextComment(Comment):
     _multiline: bool
 
@@ -93,7 +95,7 @@ class TextComment(Comment):
         object.__setattr__(self, '_markers', _markers)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Space:
     _comments: List[Comment]
 
@@ -165,39 +167,43 @@ Space.SINGLE_SPACE = Space([], ' ')
 
 
 class JavaSourceFile(J, SourceFile):
-    pass
+    __slots__ = ()
 
 
 class Expression(J):
+    __slots__ = ()
+
     @property
     def type(self) -> Optional[JavaType]:
         return None
 
 
 class Statement(J):
-    pass
+    __slots__ = ()
 
 
 class TypedTree(J):
+    __slots__ = ()
+
     @property
     def type(self) -> Optional[JavaType]:
         return None
 
 
 class NameTree(TypedTree):
-    pass
+    __slots__ = ()
 
 
 class TypeTree(NameTree):
-    pass
+    __slots__ = ()
 
 
 class Loop(Statement):
-    pass
+    __slots__ = ()
 
 
 class MethodCall(Expression):
-    pass
+    __slots__ = ()
 
 
 class JavaType(ABC):
@@ -272,12 +278,14 @@ class JavaType(ABC):
         class ElementValue(ABC):
             """Base class for annotation element values."""
 
+            __slots__ = ()
+
             @property
             @abstractmethod
             def element(self) -> Optional[JavaType]:
                 ...
 
-        @dataclass
+        @dataclass(slots=True)
         class SingleElementValue(ElementValue):
             """A single annotation element value (one constant or one reference)."""
             _element: Optional[JavaType] = field(default=None)
@@ -296,7 +304,7 @@ class JavaType(ABC):
             def reference_value(self) -> Optional[JavaType]:
                 return self._reference_value
 
-        @dataclass
+        @dataclass(slots=True)
         class ArrayElementValue(ElementValue):
             """An array of annotation element values."""
             _element: Optional[JavaType] = field(default=None)
@@ -315,7 +323,7 @@ class JavaType(ABC):
             def reference_values(self) -> Optional[List[JavaType]]:
                 return self._reference_values
 
-    @dataclass
+    @dataclass(slots=True)
     class GenericTypeVariable:
         _name: str = field(default="")
         _variance: GenericTypeVariable.Variance = field(default=None)
@@ -338,7 +346,7 @@ class JavaType(ABC):
         def bounds(self) -> List[JavaType]:
             return self._bounds if self._bounds is not None else []
 
-    @dataclass
+    @dataclass(slots=True)
     class Union:
         """Union type (e.g. str | int). Maps to JavaType$MultiCatch over RPC."""
         _bounds: Optional[List[JavaType]] = field(default=None)
@@ -347,7 +355,7 @@ class JavaType(ABC):
         def bounds(self) -> List[JavaType]:
             return self._bounds if self._bounds is not None else []
 
-    @dataclass
+    @dataclass(slots=True)
     class Intersection:
         """Intersection type (e.g. A & B). Maps to JavaType$Intersection over RPC."""
         _bounds: Optional[List[JavaType]] = field(default=None)
@@ -376,7 +384,7 @@ class JavaType(ABC):
                 return cls.None_
             return super()._missing_(value)
 
-    @dataclass
+    @dataclass(slots=True)
     class Method:
         _flags_bit_map: int = field(default=0)
         _declaring_type: Optional[JavaType.FullyQualified] = field(default=None)
@@ -429,7 +437,7 @@ class JavaType(ABC):
         def declared_formal_type_names(self) -> Optional[List[str]]:
             return self._declared_formal_type_names
 
-    @dataclass
+    @dataclass(slots=True)
     class Variable:
         _flags_bit_map: int = field(default=0)
         _name: str = field(default="")
@@ -457,7 +465,7 @@ class JavaType(ABC):
         def annotations(self) -> Optional[List[JavaType.FullyQualified]]:
             return self._annotations
 
-    @dataclass
+    @dataclass(slots=True)
     class Array:
         _elem_type: Optional[JavaType] = field(default=None)
         _annotations: Optional[List[JavaType.FullyQualified]] = field(default=None)
@@ -476,7 +484,7 @@ J2 = TypeVar('J2', bound=J)
 J3 = TypeVar('J3', bound=J)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JRightPadded(Generic[T]):
     _element: T
 
@@ -550,7 +558,7 @@ class JRightPadded(Generic[T]):
 
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JLeftPadded(Generic[T]):
     _before: Space
 
@@ -584,7 +592,7 @@ class JLeftPadded(Generic[T]):
 
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JContainer(Generic[J2]):
     _before: Space
 
@@ -660,7 +668,7 @@ class JContainer(Generic[J2]):
             return JContainer(Space.EMPTY, JRightPadded.merge_elements([], elements), Markers.EMPTY)
         return before.padding.replace(elements=JRightPadded.merge_elements(before._elements, elements))
 
-    _EMPTY: Optional[JContainer[J]] = None
+    _EMPTY: ClassVar[Optional[JContainer[J]]] = None
 
     @classmethod
     def empty(cls) -> JContainer[J2]:

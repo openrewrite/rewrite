@@ -243,26 +243,40 @@ export function createNodeResolutionResultMarker(
     const dependencyCache = new Map<string, Dependency>();
 
     /**
-     * Normalizes the engines field from package-lock.json.
-     * Some older packages have engines as an array like ["node >=0.6.0"] instead of
-     * the standard object format {"node": ">=0.6.0"}.
+     * Coerces the engines field to the Map<String,String> shape Java's
+     * NodeResolutionResult.ResolvedDependency expects. The npm registry
+     * accepts and serves several shapes that don't fit that type; sending
+     * any of them across RPC throws ClassCastException, which (because
+     * pendingData survives mid-stream failures) cascades the receive queue
+     * out of sync for every subsequent file in the build.
+     *
+     * Shapes seen in the wild and what we do with them:
+     *  - object: pass through.
+     *  - ["node >=0.6.0"]: split on the first space → {node: ">=0.6.0"}.
+     *  - ["node", "rhino"]: bare names with no version. Preserve the
+     *      engine list as {node: "*", rhino: "*"}.
+     *  - ">=0.10.40": bare semver with no engine name (qs@5.2.1 ships this
+     *      verbatim from its published package.json). npm itself drops it —
+     *      npm-install-checks reads eng.node/eng.npm off the string, both
+     *      undefined, so the constraint is silently ignored. Match that.
      */
-    function normalizeEngines(engines?: Record<string, string> | string[]): Record<string, string> | undefined {
+    function normalizeEngines(engines?: unknown): Record<string, string> | undefined {
         if (!engines) return undefined;
         if (Array.isArray(engines)) {
-            // Convert array format to object format
-            // e.g., ["node >=0.6.0"] -> {"node": ">=0.6.0"}
             const result: Record<string, string> = {};
             for (const entry of engines) {
+                if (typeof entry !== 'string') continue;
                 const spaceIdx = entry.indexOf(' ');
                 if (spaceIdx > 0) {
-                    const key = entry.substring(0, spaceIdx);
-                    result[key] = entry.substring(spaceIdx + 1);
+                    result[entry.substring(0, spaceIdx)] = entry.substring(spaceIdx + 1);
+                } else {
+                    result[entry] = "*";
                 }
             }
             return Object.keys(result).length > 0 ? result : undefined;
         }
-        return engines;
+        if (typeof engines !== 'object') return undefined;
+        return engines as Record<string, string>;
     }
 
     /**
@@ -271,7 +285,7 @@ export function createNodeResolutionResultMarker(
      * - Array: ["MIT", "Apache2"] -> "(MIT OR Apache2)"
      * - Object: { type: "MIT", url: "..." } -> "MIT"
      */
-    function normalizeLicense(license?: string | string[] | { type?: string; url?: string }): string | undefined {
+    function normalizeLicense(license?: unknown): string | undefined {
         if (!license) return undefined;
         if (Array.isArray(license)) {
             // Convert array format to SPDX OR expression
@@ -281,9 +295,10 @@ export function createNodeResolutionResultMarker(
         if (typeof license === 'object') {
             // Extract type from object format
             // e.g., { type: "MIT", url: "..." } -> "MIT"
-            return license.type || undefined;
+            const type = (license as { type?: unknown }).type;
+            return typeof type === 'string' ? type : undefined;
         }
-        return license;
+        return typeof license === 'string' ? license : undefined;
     }
 
     /**
@@ -588,7 +603,7 @@ export function createNodeResolutionResultMarker(
         bundledDependencies,
         resolvedDependencies,
         packageManager,
-        engines: packageJsonContent.engines,
+        engines: normalizeEngines(packageJsonContent.engines),
         npmrcConfigs,
     } as NodeResolutionResult;
 }

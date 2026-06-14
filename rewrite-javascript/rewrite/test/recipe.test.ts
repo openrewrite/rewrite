@@ -13,11 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeMarketplace} from "../src";
+import {JavaScript, Recipe, RecipeMarketplace} from "../src";
 import {activate} from "../fixtures/example-recipe";
 import {ChangeText} from "../fixtures/change-text";
 
 describe("recipes", () => {
+
+    // gh-7968: a failure while computing a recipe's descriptor (e.g. a sub-recipe
+    // in recipeList() that needs an RPC connection) is dropped at the JSON-RPC
+    // boundary, leaving only the generic "constructor" hint. The marketplace must
+    // fold the underlying cause into the message so it survives to the caller.
+    test("install surfaces the underlying cause when descriptor computation fails", async () => {
+        class FailingRecipe extends Recipe {
+            name = "org.openrewrite.example.failing";
+            displayName = "Failing recipe";
+            description = "Throws while resolving its recipe list.";
+
+            async recipeList(): Promise<Recipe[]> {
+                throw new Error("no active RewriteRpc connection");
+            }
+        }
+
+        const marketplace = new RecipeMarketplace();
+        await expect(marketplace.install(FailingRecipe, JavaScript)).rejects.toThrow(
+            /Cause: no active RewriteRpc connection/
+        );
+    });
 
     test("register a recipe with options", async () => {
         const marketplace = new RecipeMarketplace();

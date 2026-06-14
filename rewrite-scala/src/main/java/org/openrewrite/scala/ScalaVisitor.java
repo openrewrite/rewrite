@@ -237,6 +237,15 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return f;
     }
 
+    public J visitConstructorInvocation(S.ConstructorInvocation constructorInvocation, P p) {
+        S.ConstructorInvocation c = constructorInvocation;
+        c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withTypeTree(visitAndCast(c.getTypeTree(), p));
+        c = c.getPadding().withArguments(visitContainer(c.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p));
+        return c;
+    }
+
     public J visitSingletonType(S.SingletonType singletonType, P p) {
         S.SingletonType s = singletonType;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
@@ -353,6 +362,14 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return t;
     }
 
+    public J visitUnionType(S.UnionType unionType, P p) {
+        S.UnionType u = unionType;
+        u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.getPadding().withTypes(visitContainer(u.getPadding().getTypes(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return u;
+    }
+
     public J visitRefinedType(S.RefinedType refinedType, P p) {
         S.RefinedType r = refinedType;
         r = r.withPrefix(visitSpace(r.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
@@ -376,6 +393,7 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         S.ExtensionMethods e = ext;
         e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.withTypeParameters(visitAndCast(e.getTypeParameters(), p));
         e = e.getPadding().withParameters(visitContainer(e.getPadding().getParameters(), JContainer.Location.LANGUAGE_EXTENSION, p));
         e = e.withBody(visitAndCast(e.getBody(), p));
         return e;

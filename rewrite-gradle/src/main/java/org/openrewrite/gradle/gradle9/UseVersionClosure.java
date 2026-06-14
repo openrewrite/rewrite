@@ -19,8 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.gradle.internal.GradleParseUtils;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -67,7 +67,7 @@ public class UseVersionClosure extends Recipe {
                         return s;
                     }
                     J.Lambda lambda = (J.Lambda) assignment.getAssignment();
-                    J.MethodInvocation template = parseVersionTemplate(ctx);
+                    J.MethodInvocation template = GradleParseUtils.parseMethodInvocation(ctx, "version {\n}\n");
                     J.Lambda templateLambda = (J.Lambda) template.getArguments().get(0);
                     J.Block templateBody = (J.Block) templateLambda.getBody();
                     J.Block originalBody = (J.Block) lambda.getBody();
@@ -80,18 +80,6 @@ public class UseVersionClosure extends Recipe {
                 }));
             }
         });
-    }
-
-    private static J.MethodInvocation parseVersionTemplate(ExecutionContext ctx) {
-        G.CompilationUnit parsed = (G.CompilationUnit) GradleParser.builder().build()
-                .parse(ctx, "version {\n}\n")
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Unable to parse `version { }` template"));
-        Statement first = parsed.getStatements().get(0);
-        if (!(first instanceof J.MethodInvocation)) {
-            throw new IllegalStateException("Expected a method invocation, got " + first.getClass().getName());
-        }
-        return (J.MethodInvocation) first;
     }
 
     private static J.Assignment asVersionClosureAssignment(Statement s) {

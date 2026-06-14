@@ -16,9 +16,6 @@ class Semicolon(Marker):
 
     def replace(self, **kwargs: Any) -> Self: ...
 
-    @property
-    def id(self) -> UUID: ...
-
 @dataclass(frozen=True)
 class TrailingComma(Marker):
     _id: UUID
@@ -27,8 +24,6 @@ class TrailingComma(Marker):
     def replace(self, **kwargs: Any) -> Self: ...
 
     @property
-    def id(self) -> UUID: ...
-    @property
     def suffix(self) -> Space: ...
 
 @dataclass(frozen=True)
@@ -36,6 +31,3 @@ class OmitParentheses(Marker):
     _id: UUID
 
     def replace(self, **kwargs: Any) -> Self: ...
-
-    @property
-    def id(self) -> UUID: ...

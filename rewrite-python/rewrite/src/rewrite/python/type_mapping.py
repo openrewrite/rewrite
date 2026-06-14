@@ -539,13 +539,76 @@ class PythonTypeMapping:
                             methods.append(method)
                 class_type._methods = methods if methods else None
 
+            # Populate members (attributes / class & instance variables) from the
+            # non-function members. ty emits a member's *name* on the entry itself
+            # and its *type* via `typeId`; for a field with a default it emits both
+            # the declared type and the default-value literal under the same name,
+            # so de-duplicate by name keeping the first (declared) occurrence. A
+            # member typed as the owning class resolves through the same cycle
+            # guard `_resolve_type` uses for methods, so self-references don't
+            # recurse infinitely.
+            if members and getattr(class_type, '_members', None) is None:
+                variables = []
+                seen_names = set()
+                for member in members:
+                    if not isinstance(member, dict):
+                        continue
+                    member_name = member.get('name')
+                    member_type_id = member.get('typeId')
+                    if not member_name or member_type_id is None or member_name in seen_names:
+                        continue
+                    member_desc = self._type_registry.get(member_type_id)
+                    # Skip function-kinds (handled as methods above) and nested
+                    # classes/modules — only true variables become members.
+                    if member_desc is None or not self._is_variable_descriptor(member_desc):
+                        continue
+                    member_type = self._resolve_type(member_type_id)
+                    if member_type is None:
+                        continue
+                    seen_names.add(member_name)
+                    variables.append(JavaType.Variable(
+                        _name=member_name, _type=member_type, _owner=class_type))
+                class_type._members = variables if variables else None
+
             return class_type
 
         elif kind == 'typedDict':
+            # Map a TypedDict to a nominal class type by name and populate its
+            # members from the descriptor's `fields`. Each field carries its own
+            # `name` and `typeId` (the same shape as a classLiteral member), so
+            # we reuse the variable-building path. The class is keyed by simple
+            # name via `_create_class_type`, so two TypedDicts that share a name
+            # collapse — acceptable until ty emits a qualified name here.
+            #
+            # We still drop the PEP 728 `closed` / `extraItems` openness fields
+            # and the per-field `required` / `readOnly` flags; and linking a
+            # subscript use `m["name"]` back to its field declaration (a
+            # J.ArrayAccess LST change) remains deferred — that value type is
+            # already attributed on the access node.
             name = descriptor.get('name', '')
-            if name:
-                return self._create_class_type(name)
-            return _UNKNOWN
+            if not name:
+                return _UNKNOWN
+            class_type = self._create_class_type(name)
+            fields = descriptor.get('fields', [])
+            if fields and getattr(class_type, '_members', None) is None:
+                variables = []
+                seen_names = set()
+                for field in fields:
+                    if not isinstance(field, dict):
+                        continue
+                    field_name = field.get('name')
+                    field_type_id = field.get('typeId')
+                    if not field_name or field_type_id is None or field_name in seen_names:
+                        continue
+                    field_type = self._resolve_type(field_type_id)
+                    if field_type is None:
+                        continue
+                    seen_names.add(field_name)
+                    variables.append(JavaType.Variable(
+                        _name=field_name, _type=field_type, _owner=class_type))
+                if variables:
+                    class_type._members = variables
+            return class_type
 
         elif kind == 'subclassOf':
             # `subclassOf X` is ty's representation of `type[X]`: a *class

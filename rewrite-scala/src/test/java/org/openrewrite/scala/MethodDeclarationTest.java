@@ -619,6 +619,36 @@ class MethodDeclarationTest implements RewriteTest {
                 )
             );
         }
+
+        @Test
+        void extensionWithTypeParameter() {
+            rewriteRun(
+                scala(
+                    """
+                    extension [A](question: Question[A])
+                      def timeFilter: Question[A] = question
+                    """
+                )
+            );
+        }
+
+        @Test
+        void bracelessExtensionWithBraceBlockMethodBody() {
+            // A `{` inside a method body must not be mistaken for the extension's
+            // opening brace, which would make the parser treat this braceless
+            // (indented) extension as brace-delimited.
+            rewriteRun(
+                scala(
+                    """
+                    extension (g: Int)
+                      def rankable =
+                        {
+                          2
+                        }
+                    """
+                )
+            );
+        }
     }
 
     @Test
@@ -796,6 +826,94 @@ class MethodDeclarationTest implements RewriteTest {
             def f: String =
               try "x"
               catch case e: Exception => throw e
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedParameterListsOnSeparateLines() {
+        rewriteRun(
+          scala(
+            """
+            def f(a: Int)
+                (b: Int): Int = a + b
+            """
+          )
+        );
+    }
+
+    @Test
+    void multilineParameterListWithTrailingLineComment() {
+        rewriteRun(
+          scala(
+            """
+            def resize(
+                size: Int // either the width or the height! the other one will be preserved
+            ): Url = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedParameterListWithTrailingLineComment() {
+        rewriteRun(
+          scala(
+            """
+            def f(a: Int)(
+                b: Int // either the width or the height! the other one will be preserved
+            ): Int = a + b
+            """
+          )
+        );
+    }
+
+    @Test
+    void longLineCommentBeforeParameterList() {
+        rewriteRun(
+          scala(
+            """
+            def resize // either the width or the height! the other one will be preserved
+            (size: Int): Int = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void emptyParameterListWithInteriorLineComment() {
+        rewriteRun(
+          scala(
+            """
+            def resize( // either the width or the height! the other one will be preserved
+            ): Int = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void emptyParameterListWithInteriorBlockComment() {
+        rewriteRun(
+          scala(
+            """
+            def resize(/* nothing here */): Int = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void procedureSyntaxSetter() {
+        rewriteRun(
+          scala(
+            """
+            trait T {
+              def engine_=(x: Int) {
+                println(x)
+              }
+            }
             """
           )
         );

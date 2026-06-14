@@ -667,6 +667,7 @@ def handle_reset(params: dict) -> bool:
     remote_objects.clear()
     remote_refs.clear()
     _prepared_recipes.clear()
+    _delegating_recipes.clear()
     _prepared_editor_overrides.clear()
     _prepared_edit_preconditions.clear()
     _execution_contexts.clear()
@@ -1123,6 +1124,14 @@ def _serialize_value(value) -> Any:
 
 # Prepared recipes storage - maps recipe IDs to recipe instances
 _prepared_recipes: Dict[str, Any] = {}
+# RpcRecipe references discovered in a composite's recipe_list(), keyed by the
+# referenced recipe id. An RpcRecipe has no Python implementation and no no-arg
+# constructor, so it cannot live in the marketplace. We register it here when a
+# composite is prepared; when the JVM later round-trips PrepareRecipe for the
+# referenced id (from its RpcRecipe.getRecipeList()), handle_prepare_recipe
+# resolves it here and answers with a delegatesTo response so the JVM runs the
+# real recipe natively.
+_delegating_recipes: Dict[str, Any] = {}
 # Cached bare-editor visitors keyed by prepared recipe id. Populated at
 # PrepareRecipe time when recipe.editor() returns a Preconditions.check
 # wrapper: we strip the wrapper, register the precondition's wire identity
@@ -1160,7 +1169,18 @@ def _get_visitor_registry() -> Dict[str, type]:
 
 def _install_sub_recipes(recipe, marketplace) -> None:
     """Ensure sub-recipes from recipe_list() are registered in the marketplace."""
+    from rewrite.rpc.rpc_recipe import RpcRecipe
+
     for sub_recipe in recipe.recipe_list():
+        if isinstance(sub_recipe, RpcRecipe):
+            # An RpcRecipe is a reference to a recipe on another peer, with no
+            # Python implementation and no no-arg constructor, so it can't be
+            # installed in the marketplace. Register it so a later PrepareRecipe
+            # round-trip for its id resolves to it (and answers with
+            # delegatesTo). It has no sub-recipes of its own, so there is nothing
+            # to recurse into.
+            _delegating_recipes[sub_recipe.java_recipe_name] = sub_recipe
+            continue
         if not marketplace.find_recipe(sub_recipe.name):
             marketplace.install(type(sub_recipe), [])
             _install_sub_recipes(sub_recipe, marketplace)
@@ -1194,6 +1214,27 @@ def handle_prepare_recipe(params: dict) -> dict:
         logger.info(f"Data table output directory set to: {_data_table_output_dir}")
 
     logger.debug(f"PrepareRecipe: id={recipe_name}, options={options}")
+
+    # An RpcRecipe referenced from a composite's recipe_list() has no Python
+    # implementation: answer with a delegatesTo response so the JVM instantiates
+    # and runs the real recipe natively (full ScanningRecipe lifecycle,
+    # non-Python source files). See _install_sub_recipes / _delegating_recipes.
+    if recipe_name in _delegating_recipes:
+        recipe = _delegating_recipes[recipe_name]
+        prepared_id = generate_id()
+        _prepared_recipes[prepared_id] = recipe
+        return {
+            'id': prepared_id,
+            'descriptor': _recipe_descriptor_to_dict(recipe.descriptor()),
+            'editVisitor': f'edit:{prepared_id}',
+            'editPreconditions': [],
+            'scanVisitor': None,
+            'scanPreconditions': [],
+            'delegatesTo': {
+                'recipeName': recipe.java_recipe_name,
+                'options': recipe.delegates_to_options,
+            },
+        }
 
     marketplace = _get_marketplace()
 
@@ -1353,7 +1394,7 @@ def _condition_wire_entry(condition) -> Optional[Dict[str, Any]]:
     intact so the gate runs Python-side as a fallback.
     """
     from rewrite.preconditions import CompositePrecondition, RecipeRef
-    from rewrite.rpc.java_recipe import PreparedJavaRecipe
+    from rewrite.rpc.rpc_recipe import PreparedJavaRecipe
 
     if isinstance(condition, CompositePrecondition):
         operands: List[Dict[str, Any]] = []

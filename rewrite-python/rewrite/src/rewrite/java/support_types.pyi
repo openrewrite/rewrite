@@ -359,11 +359,12 @@ class JContainer(Generic[J2]):
         @property
         def elements(self) -> List[JRightPadded[J3]]: ...
 
+    _EMPTY: ClassVar[Optional[JContainer[J]]]
+
     _before: Space
     _elements: List[JRightPadded[J2]]
     _markers: Markers
     _padding: Optional[weakref.ReferenceType[JContainer.PaddingHelper[J2]]] = ...
-    _EMPTY: Optional[JContainer[J]] = ...
 
     def replace(self, **kwargs: Any) -> 'JContainer[J2]': ...
 

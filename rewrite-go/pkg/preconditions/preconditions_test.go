@@ -188,6 +188,104 @@ func TestHelpersPopulateLocalVisitor(t *testing.T) {
 	}
 }
 
+func TestHasSourcePathMatchesCompilationUnit(t *testing.T) {
+	// given a real source file with a path
+	editor := &recordingVisitor{}
+	cu := &golang.CompilationUnit{SourcePath: "pkg/foo/bar.go"}
+
+	// when the glob matches the path
+	Check(HasSourcePath("**/*.go"), editor).Visit(cu, nil)
+
+	// then the editor runs
+	if editor.calls != 1 {
+		t.Errorf("editor calls (matching path) = %d, want 1", editor.calls)
+	}
+
+	// and when the glob does not match
+	editor2 := &recordingVisitor{}
+	Check(HasSourcePath("**/*.java"), editor2).Visit(cu, nil)
+	if editor2.calls != 0 {
+		t.Errorf("editor calls (non-matching path) = %d, want 0", editor2.calls)
+	}
+}
+
+func TestHasSourcePathMatchesGoMod(t *testing.T) {
+	// given a go.mod root (a non-J SourceFile)
+	editor := &recordingVisitor{}
+	mod := &golang.GoMod{SourcePath: "go.mod"}
+
+	// when the glob matches
+	Check(HasSourcePath("**/go.mod"), editor).Visit(mod, nil)
+
+	// then the editor runs even though GoMod is not a java.SourceFile
+	if editor.calls != 1 {
+		t.Errorf("editor calls (go.mod) = %d, want 1", editor.calls)
+	}
+
+	// and a non-matching glob must actually filter the GoMod out, rather
+	// than the gate being bypassed because GoMod is not a java.SourceFile.
+	editor2 := &recordingVisitor{}
+	Check(HasSourcePath("**/*.go"), editor2).Visit(mod, nil)
+	if editor2.calls != 0 {
+		t.Errorf("editor calls (go.mod, non-matching) = %d, want 0", editor2.calls)
+	}
+}
+
+func TestUsesMethodMatchesInvocationInTree(t *testing.T) {
+	// given a compilation unit containing fmt.Println(...)
+	mi := &java.MethodInvocation{
+		Select: &java.RightPadded[java.Expression]{Element: &java.Identifier{Name: "fmt"}},
+		Name:   &java.Identifier{Name: "Println"},
+	}
+	cu := &golang.CompilationUnit{
+		Statements: []java.RightPadded[java.Statement]{{Element: mi}},
+	}
+
+	// when gating on the matching method pattern
+	editor := &recordingVisitor{}
+	Check(UsesMethod("fmt Println(..)"), editor).Visit(cu, nil)
+
+	// then the editor runs
+	if editor.calls != 1 {
+		t.Errorf("editor calls (matching method) = %d, want 1", editor.calls)
+	}
+
+	// and a non-matching pattern skips the editor
+	editor2 := &recordingVisitor{}
+	Check(UsesMethod("fmt Printf(..)"), editor2).Visit(cu, nil)
+	if editor2.calls != 0 {
+		t.Errorf("editor calls (non-matching method) = %d, want 0", editor2.calls)
+	}
+}
+
+func TestUsesTypeMatchesAttributionInTree(t *testing.T) {
+	// given a node carrying type attribution for "tarfile"
+	typed := &java.Identifier{
+		Name: "tr",
+		Type: &java.JavaTypeClass{FullyQualifiedName: "tarfile"},
+	}
+	mi := &java.MethodInvocation{Name: typed}
+	cu := &golang.CompilationUnit{
+		Statements: []java.RightPadded[java.Statement]{{Element: mi}},
+	}
+
+	// when gating on the matching type
+	editor := &recordingVisitor{}
+	Check(UsesType("tarfile"), editor).Visit(cu, nil)
+
+	// then the editor runs
+	if editor.calls != 1 {
+		t.Errorf("editor calls (matching type) = %d, want 1", editor.calls)
+	}
+
+	// and an unrelated type skips the editor
+	editor2 := &recordingVisitor{}
+	Check(UsesType("zipfile"), editor2).Visit(cu, nil)
+	if editor2.calls != 0 {
+		t.Errorf("editor calls (non-matching type) = %d, want 0", editor2.calls)
+	}
+}
+
 func TestOrRequiresAtLeastTwoOperands(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {

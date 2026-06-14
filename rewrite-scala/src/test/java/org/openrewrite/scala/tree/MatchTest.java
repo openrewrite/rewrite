@@ -569,6 +569,18 @@ class MatchTest implements RewriteTest {
     }
 
     @Test
+    void dottedMatchOnRightSideOfInfixOperator() {
+        rewriteRun(
+          scala(
+            """
+            val x = a := b.match
+              case _ => 1
+            """
+          )
+        );
+    }
+
+    @Test
     void significantCharactersInComments() {
         // buildCasesBlock — `=>` arrow in case line comment
         rewriteRun(
