@@ -578,6 +578,92 @@ public interface S extends J {
     }
 
     /**
+     * Represents a Scala 3 union type: {@code A | B | ...}. For example the return type in
+     * {@code def f: Int | String} or a parameter type {@code def display(op: "resize" | "thumbnail")}.
+     * Operands are held as {@link Expression}s rather than {@link TypeTree}s because singleton
+     * literal types (e.g. {@code "resize"}) are modeled as {@link J.Literal}, which is an
+     * {@code Expression} but not a {@code TypeTree}. Each operand's {@code after} space is the
+     * whitespace before the following {@code |}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class UnionType implements S, TypeTree, Expression {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        JContainer<Expression> types;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public static UnionType build(UUID id, Space prefix, Markers markers,
+                                      JContainer<Expression> types, @Nullable JavaType type) {
+            return new UnionType(null, id, prefix, markers, types, type);
+        }
+
+        public List<Expression> getTypes() {
+            return types.getElements();
+        }
+
+        public UnionType withTypes(List<Expression> types) {
+            return getPadding().withTypes(JContainer.withElements(this.types, types));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitUnionType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final UnionType t;
+
+            public JContainer<Expression> getTypes() {
+                return t.types;
+            }
+
+            public UnionType withTypes(JContainer<Expression> types) {
+                return t.types == types ? t :
+                        new UnionType(null, t.id, t.prefix, t.markers, types, t.type);
+            }
+        }
+    }
+
+    /**
      * Represents a wildcard/underscore placeholder in expressions.
      * Used for partially applied functions (e.g., add(5, _)) and pattern matching.
      * This is NOT for type wildcards (use J.Wildcard) or import wildcards (use * in J.Import).

@@ -516,6 +516,41 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void junitBom_5_to_6() {
+        rewriteRun(
+          spec ->
+            spec.beforeRecipe(withToolingApi())
+              .recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "6.x", null)),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                testImplementation(platform('org.junit:junit-bom:5.9.3'))
+              }
+
+              java {
+                toolchain {
+                  languageVersion = JavaLanguageVersion.of(17)
+                }
+              }
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .doesNotContain("5.9.3")
+                .containsPattern("junit-bom:6.\\d+(.\\d+)?")
+                .actual())
+          )
+        );
+    }
+
+    @Test
     void mapNotationVariable() {
         rewriteRun(
           buildGradle(
