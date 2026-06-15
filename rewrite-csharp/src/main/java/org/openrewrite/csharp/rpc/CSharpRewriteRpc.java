@@ -438,6 +438,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     "run",
                     "--project", csproj.toAbsolutePath().normalize().toString(),
                     "--framework", "net10.0",
+                    // Never let `dotnet run` build/restore here: the caller is expected to have
+                    // already built the tool (the Gradle integTest depends on csharpBuild). An
+                    // implicit restore/build streams MSBuild + NuGet audit output (e.g. NU1903
+                    // vulnerability warnings) to stdout, which is the JSON-RPC pipe. That corrupts
+                    // the stream: the Java peer rejects the non-Content-Length text and replies
+                    // with id-less JSON-RPC errors, which crash the C# SystemTextJsonFormatter
+                    // ("Non-default ID required"). --no-build also implies --no-restore.
+                    "--no-build",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null,
                     recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
