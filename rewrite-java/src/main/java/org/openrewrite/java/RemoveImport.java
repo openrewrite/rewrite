@@ -117,26 +117,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             c = c.withImports(ListUtils.flatMap(c.getImports(), import_ -> {
                 Space removedPrefix = spaceForNextImport.get();
                 if (removedPrefix != null) {
-                    // An end-of-line comment on the removed import's line is stored at the start of
-                    // this (the next) import's prefix. It explained the now-removed import, so drop it.
-                    Space currentPrefix = dropTrailingCommentOfRemovedImport(import_.getPrefix());
-                    if (!removedPrefix.getComments().isEmpty()) {
-                        // The removed import's prefix carried the trailing comment(s) of the preceding
-                        // line (e.g. a `// ktlint-disable` suppression) and/or standalone (commented-out)
-                        // lines. Move them onto the next import so they are not lost, preserving any
-                        // blank line that separated the imports.
-                        List<Comment> comments = ListUtils.concatAll(removedPrefix.getComments(), currentPrefix.getComments());
-                        if (currentPrefix.getComments().isEmpty() &&
-                            countTrailingLinebreaks(currentPrefix) > countTrailingLinebreaks(removedPrefix)) {
-                            String currentLastWhitespace = currentPrefix.getLastWhitespace();
-                            comments = ListUtils.mapLast(comments, comment -> comment.withSuffix(currentLastWhitespace));
-                        }
-                        currentPrefix = removedPrefix.withComments(comments);
-                    } else if (removedPrefix.getLastWhitespace().isEmpty() ||
-                        (countTrailingLinebreaks(removedPrefix) > countTrailingLinebreaks(currentPrefix))) {
-                        currentPrefix = currentPrefix.withWhitespace(removedPrefix.getLastWhitespace());
-                    }
-                    import_ = import_.withPrefix(currentPrefix);
+                    import_ = import_.withPrefix(mergeRemovedImportPrefix(removedPrefix, import_.getPrefix(), true));
                     spaceForNextImport.set(null);
                 }
 
@@ -179,6 +160,19 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 return import_;
             }));
 
+            Space removedLastImportPrefix = spaceForNextImport.get();
+            if (removedLastImportPrefix != null) {
+                // The last import was removed, so there is no following import to carry its prefix
+                // onto. Forward it to the first element after the imports (the first class, or the
+                // EOF when there are none) so a preceding line's comment is not lost.
+                if (!c.getClasses().isEmpty()) {
+                    c = c.withClasses(ListUtils.mapFirst(c.getClasses(), cd ->
+                            cd.withPrefix(mergeRemovedImportPrefix(removedLastImportPrefix, cd.getPrefix(), false))));
+                } else {
+                    c = c.withEof(mergeRemovedImportPrefix(removedLastImportPrefix, c.getEof(), false));
+                }
+            }
+
             if (c != cu && c.getPackageDeclaration() == null && c.getImports().isEmpty() &&
                     c.getPrefix() == Space.EMPTY) {
                 doAfterVisit(new FormatFirstClassPrefix<>());
@@ -192,6 +186,32 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
     private long countTrailingLinebreaks(Space space) {
         return space.getLastWhitespace().chars().filter(s -> s == '\n').count();
+    }
+
+    /**
+     * Carry a removed import's prefix onto the element that now follows it. The removed import's own
+     * end-of-line comment is dropped, while a preceding line's trailing comment and standalone
+     * (commented-out) lines are preserved. When the follower is another import, the blank line that
+     * separated import groups is preserved too; when it is the first class / EOF (the last import was
+     * removed) the follower keeps its own spacing, so import-group blank lines are not pushed onto it.
+     */
+    private Space mergeRemovedImportPrefix(Space removedPrefix, Space targetPrefix, boolean targetIsImport) {
+        // An end-of-line comment on the removed import's line is stored at the start of the following
+        // element's prefix. It described the now-removed import, so drop it.
+        Space currentPrefix = dropTrailingCommentOfRemovedImport(targetPrefix);
+        if (!removedPrefix.getComments().isEmpty()) {
+            List<Comment> comments = ListUtils.concatAll(removedPrefix.getComments(), currentPrefix.getComments());
+            if (currentPrefix.getComments().isEmpty() &&
+                countTrailingLinebreaks(currentPrefix) > countTrailingLinebreaks(removedPrefix)) {
+                String currentLastWhitespace = currentPrefix.getLastWhitespace();
+                comments = ListUtils.mapLast(comments, comment -> comment.withSuffix(currentLastWhitespace));
+            }
+            return removedPrefix.withComments(comments);
+        } else if (targetIsImport && (removedPrefix.getLastWhitespace().isEmpty() ||
+            (countTrailingLinebreaks(removedPrefix) > countTrailingLinebreaks(currentPrefix)))) {
+            return currentPrefix.withWhitespace(removedPrefix.getLastWhitespace());
+        }
+        return currentPrefix;
     }
 
     /**

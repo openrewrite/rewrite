@@ -72,6 +72,27 @@ class RemoveImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void preservesPreviousLineCommentWhenLastImportRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("java.util.List")),
+          kotlin(
+            """
+              import java.util.Date // ktlint-disable no-wildcard-imports
+              import java.util.List
+
+              class A
+              """,
+            """
+              import java.util.Date // ktlint-disable no-wildcard-imports
+
+              class A
+              """
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void jvmStaticMember() {

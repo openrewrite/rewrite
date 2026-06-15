@@ -617,6 +617,77 @@ class RemoveImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void dropsTrailingCommentOfRemovedLastImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.ArrayList")),
+          java(
+            """
+              import java.util.List;
+              import java.util.ArrayList; // explains the removed import
+
+              class A {
+              }
+              """,
+            """
+              import java.util.List;
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void preservesPreviousLineCommentWhenLastImportRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.ArrayList")),
+          java(
+            """
+              import java.util.List; // ktlint-disable no-wildcard-imports
+              import java.util.ArrayList;
+
+              class A {
+              }
+              """,
+            """
+              import java.util.List; // ktlint-disable no-wildcard-imports
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void preservesCommentedOutLineWhenLastImportRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.ArrayList")),
+          java(
+            """
+              import java.util.List;
+              // import java.util.Date
+              import java.util.ArrayList;
+
+              class A {
+              }
+              """,
+            """
+              import java.util.List;
+              // import java.util.Date
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void preservesWhitespaceAfterRemovedStaticImport() {
         rewriteRun(
