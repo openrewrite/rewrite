@@ -588,12 +588,12 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             // since it will never be subject to refactoring
             if (m instanceof JCMethodDecl md && (
                     hasFlag(md.getModifiers(), Flags.GENERATEDCONSTR) ||
-                            hasFlag(md.getModifiers(), Flags.RECORD))) {
+                    hasFlag(md.getModifiers(), Flags.RECORD))) {
                 continue;
             }
             if (m instanceof JCVariableDecl vt && (
                     hasFlag(vt.getModifiers(), Flags.ENUM) ||
-                            hasFlag(vt.getModifiers(), Flags.RECORD))) {
+                    hasFlag(vt.getModifiers(), Flags.RECORD))) {
                 continue;
             }
             membersMultiVariablesSeparated.add(m);
@@ -649,8 +649,8 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             packageDecl = new J.Package(randomId(), sourceBefore("package"), Markers.EMPTY,
                     convert(cu.getPackageName()), packageAnnotations);
         } else if (cu.getPackageName() == null &&
-                cu.modle.equals(Symtab.instance(context).unnamedModule) &&
-                cu.packge.equals(Symtab.instance(context).unnamedModule.unnamedPackage)) {
+                   cu.modle.equals(Symtab.instance(context).unnamedModule) &&
+                   cu.packge.equals(Symtab.instance(context).unnamedModule.unnamedPackage)) {
             int saveCursor = cursor;
         }
         return new J.CompilationUnit(
@@ -798,9 +798,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         List<JRightPadded<Statement>> init = node.getInitializer().isEmpty() ?
                 singletonList(padRight(new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), EMPTY)) :
                 convertStatements(node.getInitializer(), t ->
-                                                         positionOfNext(",", ';') == -1 ?
-                                                                 semiDelim.apply(t) :
-                                                                 commaDelim.apply(t)
+                        positionOfNext(",", ';') == -1 ?
+                                semiDelim.apply(t) :
+                                commaDelim.apply(t)
                 );
 
         JRightPadded<Expression> condition = convert(node.getCondition(), semiDelim);
@@ -2361,7 +2361,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                     try {
                         // FIXME instanceof probably not right here...
                         return field.get(null) instanceof Long &&
-                                field.getName().matches("[A-Z_]+");
+                               field.getName().matches("[A-Z_]+");
                     } catch (IllegalAccessException e) {
                         throw new RuntimeException(e);
                     }
