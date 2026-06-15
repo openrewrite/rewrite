@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.scala.marker.AmpersandIntersection;
 import org.openrewrite.scala.marker.AsInstanceOfPrefix;
 import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.DottedMatch;
@@ -633,6 +634,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitAnonymousGiven((S.AnonymousGiven) tree, p);
         } else if (tree instanceof S.FunctionCall) {
             return visitFunctionCall((S.FunctionCall) tree, p);
+        } else if (tree instanceof S.ConstructorInvocation) {
+            return visitConstructorInvocation((S.ConstructorInvocation) tree, p);
         } else if (tree instanceof S.SingletonType) {
             return visitSingletonType((S.SingletonType) tree, p);
         } else if (tree instanceof S.RepeatedType) {
@@ -659,6 +662,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitFunctionType((S.FunctionType) tree, p);
         } else if (tree instanceof S.TupleType) {
             return visitTupleType((S.TupleType) tree, p);
+        } else if (tree instanceof S.UnionType) {
+            return visitUnionType((S.UnionType) tree, p);
         } else if (tree instanceof S.Macro) {
             return visitMacro((S.Macro) tree, p);
         } else if (tree instanceof S.ExtensionMethods) {
@@ -1114,6 +1119,14 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         return fc;
     }
 
+    public J visitConstructorInvocation(S.ConstructorInvocation ci, PrintOutputCapture<P> p) {
+        beforeSyntax(ci, Space.Location.LANGUAGE_EXTENSION, p);
+        visit(ci.getTypeTree(), p);
+        visitContainer("(", ci.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
+        afterSyntax(ci, p);
+        return ci;
+    }
+
     @Override
     public J visitTypeCast(J.TypeCast typeCast, PrintOutputCapture<P> p) {
         // asInstanceOf handling
@@ -1255,6 +1268,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 JRightPadded<TypeTree> first = bounds.get(0);
                 visit(first.getElement(), p);
                 visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+                newClass.getMarkers()
+                        .findFirst(org.openrewrite.scala.marker.ExtraConstructorParamLists.class)
+                        .ifPresent(m -> p.append(m.text()));
                 for (int i = 1; i < bounds.size(); i++) {
                     visitSpace(bounds.get(i - 1).getAfter(), Space.Location.TYPE_BOUND_SUFFIX, p);
                     p.append("with");
@@ -1269,6 +1285,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             if (newClass.getPadding().getArguments() != null) {
                 visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
             }
+            newClass.getMarkers()
+                    .findFirst(org.openrewrite.scala.marker.ExtraConstructorParamLists.class)
+                    .ifPresent(m -> p.append(m.text()));
         }
         visit(newClass.getBody(), p);
         afterSyntax(newClass, p);
@@ -1277,11 +1296,30 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     @Override
     public J visitIntersectionType(J.IntersectionType intersectionType, PrintOutputCapture<P> p) {
-        // In Scala, parents of an anonymous class are joined with `with` (not Java's `&`).
+        // Scala joins intersections with `with` (anonymous-class parents and the `A with B`
+        // form) or with `&` (the Scala 3 operator form, flagged by AmpersandIntersection).
         beforeSyntax(intersectionType, Space.Location.INTERSECTION_TYPE_PREFIX, p);
-        visitContainer("", intersectionType.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "with", "", p);
+        String separator = intersectionType.getMarkers().findFirst(AmpersandIntersection.class).isPresent() ? "&" : "with";
+        visitContainer("", intersectionType.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, separator, "", p);
         afterSyntax(intersectionType, p);
         return intersectionType;
+    }
+
+    public J visitUnionType(S.UnionType unionType, PrintOutputCapture<P> p) {
+        beforeSyntax(unionType, Space.Location.LANGUAGE_EXTENSION, p);
+        JContainer<Expression> types = unionType.getPadding().getTypes();
+        visitSpace(types.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        List<JRightPadded<Expression>> padded = types.getPadding().getElements();
+        for (int i = 0; i < padded.size(); i++) {
+            JRightPadded<Expression> element = padded.get(i);
+            visit(element.getElement(), p);
+            visitSpace(element.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            if (i < padded.size() - 1) {
+                p.append('|');
+            }
+        }
+        afterSyntax(unionType, p);
+        return unionType;
     }
 
     @Override

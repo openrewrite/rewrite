@@ -25,7 +25,9 @@ import org.openrewrite.java.tree.*
 import org.openrewrite.java.marker.ImplicitReturn
 import org.openrewrite.java.marker.OmitParentheses
 import org.openrewrite.marker.Markers
+import org.openrewrite.scala.marker.AmpersandIntersection
 import org.openrewrite.scala.marker.DottedMatch
+import org.openrewrite.scala.marker.ExtraConstructorParamLists
 import org.openrewrite.scala.marker.Implicit
 import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedSyntax
@@ -594,6 +596,16 @@ class ScalaTreeVisitor(
         val selStart = Math.max(0, sel.span.start - offsetAdjustment)
         if (selStart > cursor) cursor = selStart
         visitTree(sel) match {
+          case nt: NameTree => nt
+          case _ => return visitUnknown(app)
+        }
+      case at: Trees.AppliedTypeTree[?] =>
+        // Parameterized annotation type like @throws[Exception]; skip the leading '@'
+        // so the parameterized type's own prefix stays empty, then map it to a
+        // J.ParameterizedType (a NameTree via TypeTree) instead of leaking source text.
+        val atStart = Math.max(0, at.span.start - offsetAdjustment)
+        if (atStart > cursor) cursor = atStart
+        visitTree(at) match {
           case nt: NameTree => nt
           case _ => return visitUnknown(app)
         }
@@ -2104,6 +2116,12 @@ class ScalaTreeVisitor(
         // Extract the parent type(s) - usually the first parent is the main type
         val parents = template.parents.filter(p => p.span.exists && !p.span.isSynthetic)
 
+        // Verbatim source of any curried constructor parameter lists beyond the
+        // first (e.g. the `(2)` in `new Foo(1)(2) with Bar { ... }`). J.NewClass
+        // only models a single argument list, so extra lists are preserved as a
+        // marker re-emitted by the printer after the first `)`.
+        var extraCtorParamListsText: String = null
+
         // Extract the first parent's class type and constructor arguments (if any).
         // For multi-parent (mixin) Templates, only the first parent may carry args.
         val (firstClazz, args): (TypeTree, JContainer[Expression]) = parents.headOption match {
@@ -2111,11 +2129,26 @@ class ScalaTreeVisitor(
             // `new {}` — no parents at all (anonymous class extending the implicit Object)
             (null, null)
           case Some(firstParent) =>
-            firstParent match {
-              case app: Trees.Apply[?] if app.fun.isInstanceOf[Trees.Select[?]] &&
-                   app.fun.asInstanceOf[Trees.Select[?]].name.toString == "<init>" =>
+            // Peel nested curried constructor applies. For `new Foo(1)(2) { ... }`
+            // the parent is `Apply(Apply(Select(New(Foo), <init>), List(1)), List(2))`;
+            // the innermost Apply's `fun` is the `<init>` Select and the outer Applies
+            // are the additional parameter lists. `applies` is ordered innermost-first
+            // so `applies.head` carries the first list and `applies.last` ends the call.
+            val applies = scala.collection.mutable.ListBuffer[Trees.Apply[?]]()
+            var inner: AnyRef = firstParent
+            while (inner.isInstanceOf[Trees.Apply[?]]) {
+              val a = inner.asInstanceOf[Trees.Apply[?]]
+              applies.prepend(a)
+              inner = a.fun.asInstanceOf[AnyRef]
+            }
+            val initSelect = inner match {
+              case sel: Trees.Select[?] if sel.name.toString == "<init>" => sel
+              case _ => null
+            }
+            if (initSelect != null && initSelect.qualifier.isInstanceOf[Trees.New[?]]) {
                 // Constructor call with arguments: new Person("John", 30) { ... }
-                val sel = app.fun.asInstanceOf[Trees.Select[?]]
+                val app = applies.head
+                val sel = initSelect
                 sel.qualifier match {
                   case newInner: Trees.New[?] =>
                     // Visit the type tree directly
@@ -2200,11 +2233,20 @@ class ScalaTreeVisitor(
                       null
                     }
 
+                    // Capture any remaining curried parameter lists verbatim.
+                    if (applies.size > 1) {
+                      val outerEnd = Math.max(0, applies.last.span.end - offsetAdjustment)
+                      if (cursor < outerEnd && outerEnd <= source.length) {
+                        extraCtorParamListsText = source.substring(cursor, outerEnd)
+                        updateCursor(outerEnd)
+                      }
+                    }
+
                     (typeTree, argContainer)
                   case _ =>
                     (visitUnknown(sel.qualifier).asInstanceOf[TypeTree], null)
                 }
-              case _ =>
+            } else {
                 // Simple interface/trait: new Runnable { ... }
                 val typeTree = visitTree(firstParent).asInstanceOf[TypeTree]
                 (typeTree, null)
@@ -2347,10 +2389,15 @@ class ScalaTreeVisitor(
           null
         }
 
+        val newClassMarkers = if (extraCtorParamListsText != null) {
+          Markers.build(Collections.singletonList(
+            new ExtraConstructorParamLists(Tree.randomId(), extraCtorParamListsText)))
+        } else Markers.EMPTY
+
         new J.NewClass(
           Tree.randomId(),
           prefix,
-          Markers.EMPTY,
+          newClassMarkers,
           null, // enclosing
           Space.SINGLE_SPACE, // Space after "new" keyword
           clazz,
@@ -3799,12 +3846,12 @@ class ScalaTreeVisitor(
         // Now visit the parent with cursor positioned correctly
         val firstParent = tmpl.parents.head
         val savedCursorExtends = cursor
-        val extendsType = visitTree(firstParent) match {
-          case typeTree: TypeTree => typeTree
-          case id: J.Identifier => id.asInstanceOf[TypeTree]
-          case other =>
+        val visitedFirstParent = visitTree(firstParent)
+        val extendsType: TypeTree = parentTypeTree(visitedFirstParent) match {
+          case tt: TypeTree => tt
+          case _ =>
             updateCursor(firstParent.span.end)
-            ident(extractSource(firstParent.span), other.getPrefix).asInstanceOf[TypeTree]
+            ident(extractSource(firstParent.span), visitedFirstParent.getPrefix).asInstanceOf[TypeTree]
         }
 
         extendings = new JLeftPadded(extendsSpace, extendsType, Markers.EMPTY)
@@ -3829,12 +3876,12 @@ class ScalaTreeVisitor(
           
           for (i <- 1 until tmpl.parents.size) {
             val parent = tmpl.parents(i)
-            val implType = visitTree(parent) match {
-              case typeTree: TypeTree => typeTree
-              case id: J.Identifier => id.asInstanceOf[TypeTree]
-              case other =>
+            val visitedParent = visitTree(parent)
+            val implType: TypeTree = parentTypeTree(visitedParent) match {
+              case tt: TypeTree => tt
+              case _ =>
                 updateCursor(parent.span.end)
-                ident(extractSource(parent.span), other.getPrefix).asInstanceOf[TypeTree]
+                ident(extractSource(parent.span), visitedParent.getPrefix).asInstanceOf[TypeTree]
             }
             
             // For subsequent traits, extract space between them
@@ -5126,13 +5173,13 @@ class ScalaTreeVisitor(
         // First parent is the extends clause
         val firstParent = sourceParents.head
         val savedCursorExtends = cursor
-        val extendsType: TypeTree = visitTree(firstParent) match {
+        val visitedFirstParent = visitTree(firstParent)
+        val extendsType: TypeTree = parentTypeTree(visitedFirstParent) match {
           case tt: TypeTree => tt
-          case id: J.Identifier => id.asInstanceOf[TypeTree]
-          case other =>
-            // Constructor call, intersection type, or other complex parent — preserve source
+          case _ =>
+            // Intersection type or other complex parent — preserve source
             updateCursor(firstParent.span.end)
-            ident(extractSource(firstParent.span), other.getPrefix).asInstanceOf[TypeTree]
+            ident(extractSource(firstParent.span), visitedFirstParent.getPrefix).asInstanceOf[TypeTree]
         }
         
         extendings = new JLeftPadded(extendsSpace, extendsType, Markers.EMPTY)
@@ -5163,9 +5210,8 @@ class ScalaTreeVisitor(
             val parent = sourceParents(i)
             val savedCursorWith = cursor
 
-            val implType: TypeTree = visitTree(parent) match {
+            val implType: TypeTree = parentTypeTree(visitTree(parent)) match {
               case tt: TypeTree => tt
-              case id: J.Identifier => id.asInstanceOf[TypeTree]
               case _ =>
                 cursor = savedCursorWith
                 visitUnknown(parent)
@@ -8372,16 +8418,91 @@ class ScalaTreeVisitor(
   }
 
   /**
-   * Union (`A | B`) and intersection (`A & B`) types are parsed as an `untpd.InfixOp`.
-   * Neither has a dedicated J/S type yet, so — like the `with`-less `&` already handled
-   * elsewhere — preserve the whole expression as a source-text identifier rather than
-   * letting it fall through to a `J.Binary` (which isn't a `TypeTree`) and get dropped.
-   * Returning a non-null `TypeTree` here fixes every type position at once (params,
-   * return types, type ascriptions, bounds, tuple/function components, ...).
+   * Scala 3 operator-form intersection (`A & B`) and union (`A | B`) types are parsed as an
+   * `untpd.InfixOp`. They are modeled structurally — `&` as a `J.IntersectionType` (flagged
+   * with `AmpersandIntersection` so the printer emits `&` rather than `with`) and `|` as an
+   * `S.UnionType` — rather than crammed whole into a single `J.Identifier`. This fixes every
+   * type-annotation position at once (params, return types, ascriptions, bounds, tuple and
+   * function components, ...).
    */
-  private def visitTypeOperatorInfix(infix: untpd.InfixOp): TypeTree = {
+  private def visitTypeOperatorInfix(infix: untpd.InfixOp): TypeTree =
+    if (infix.op.name.toString == "&") visitIntersectionInfixType(infix)
+    else visitUnionInfixType(infix)
+
+  /**
+   * Flatten a (possibly chained) type-level infix `A op B op C` into its leaf operands in
+   * source order, regardless of whether the parser nested it left- or right-associatively.
+   */
+  private def flattenTypeInfix(tree: Trees.Tree[?], opName: String): List[Trees.Tree[?]] = tree match {
+    case nested: untpd.InfixOp if nested.op != null && nested.op.name.toString == opName =>
+      flattenTypeInfix(nested.left, opName) ::: flattenTypeInfix(nested.right, opName)
+    case other => List(other)
+  }
+
+  private def visitIntersectionInfixType(infix: untpd.InfixOp): TypeTree = {
     val prefix = extractPrefix(infix.span)
-    ident(extractSource(infix.span), prefix)
+    val parts = flattenTypeInfix(infix, "&")
+    val elements = new util.ArrayList[JRightPadded[TypeTree]](parts.size)
+    for (i <- parts.indices) {
+      val tt = visitTypeTree(parts(i))
+      if (tt == null) return ident(extractSource(infix.span), prefix)
+      val afterSpace = if (i == parts.size - 1) Space.EMPTY else sourceBefore("&")
+      elements.add(new JRightPadded[TypeTree](tt, afterSpace, Markers.EMPTY))
+    }
+    updateCursor(infix.span.end)
+    new J.IntersectionType(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY.add(AmpersandIntersection.create()),
+      JContainer.build(Space.EMPTY, elements, Markers.EMPTY)
+    )
+  }
+
+  private def visitUnionInfixType(infix: untpd.InfixOp): TypeTree = {
+    val prefix = extractPrefix(infix.span)
+    val parts = flattenTypeInfix(infix, "|")
+    val elements = new util.ArrayList[JRightPadded[Expression]](parts.size)
+    for (i <- parts.indices) {
+      val operand = visitUnionOperand(parts(i))
+      if (operand == null) return ident(extractSource(infix.span), prefix)
+      val afterSpace = if (i == parts.size - 1) Space.EMPTY else sourceBefore("|")
+      elements.add(new JRightPadded[Expression](operand, afterSpace, Markers.EMPTY))
+    }
+    updateCursor(infix.span.end)
+    S.UnionType.build(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      JContainer.build(Space.EMPTY, elements, Markers.EMPTY),
+      typeOfTree(infix)
+    )
+  }
+
+  /**
+   * Visit a single union operand as an `Expression`. Most operands are types
+   * (identifiers, parameterized types) that are also `Expression`s. Singleton
+   * literal types like `"resize"` are parsed by Dotty as `SingletonTypeTree(Literal)`;
+   * the literal itself *is* the type (there is no `.type` suffix in source), so we
+   * visit the inner literal directly rather than producing an `S.SingletonType`
+   * (which would print a spurious `.type`). Returns null for an operand that cannot
+   * be represented as an `Expression` (e.g. a nested intersection), signalling the
+   * caller to fall back to source preservation.
+   */
+  private def visitUnionOperand(tree: Trees.Tree[?]): Expression = tree match {
+    case _: Trees.Literal[?] =>
+      asExpression(visitTree(tree))
+    case stt: Trees.SingletonTypeTree[?] if stt.ref.isInstanceOf[Trees.Literal[?]] =>
+      asExpression(visitTree(stt.ref))
+    case _ =>
+      visitTypeTree(tree) match {
+        case e: Expression => e
+        case _ => null
+      }
+  }
+
+  private def asExpression(j: J): Expression = j match {
+    case e: Expression => e
+    case _ => null
   }
 
   /**
@@ -8672,6 +8793,38 @@ class ScalaTreeVisitor(
    * it consumes `sourceBefore(endDelim)` (e.g. `")"` or `"]"`), so the trailing
    * whitespace before the closing delimiter is captured on the last element.
    */
+  /**
+   * Map a visited class/object parent into a `TypeTree` for the `extends`/`with`
+   * slots of `J.ClassDeclaration` (which hold `TypeTree`, not `Expression`).
+   *
+   * A bare supertype maps directly. A parent constructor call like
+   * `extends Exception(msg)` is parsed as a `J.NewClass` (dotty wraps it in a
+   * `New`/`<init>` apply) or, for some forms, a `J.MethodInvocation` whose `select`
+   * is the supertype. Either way we lift it into an `S.ConstructorInvocation` so the
+   * arguments stay first-class LST nodes instead of being crammed into a
+   * `J.Identifier` name. Returns null when no rich mapping fits, so callers can fall back.
+   */
+  private def parentTypeTree(visited: J): TypeTree = visited match {
+    case tt: TypeTree => tt
+    case nc: J.NewClass if nc.getClazz != null && nc.getPadding.getArguments != null =>
+      S.ConstructorInvocation.build(
+        Tree.randomId(),
+        nc.getPrefix,
+        Markers.EMPTY,
+        nc.getClazz,
+        nc.getPadding.getArguments
+      )
+    case mi: J.MethodInvocation if mi.getSelect != null && mi.getSelect.isInstanceOf[TypeTree] =>
+      S.ConstructorInvocation.build(
+        Tree.randomId(),
+        mi.getPrefix,
+        Markers.EMPTY,
+        mi.getSelect.asInstanceOf[TypeTree],
+        mi.getPadding.getArguments
+      )
+    case _ => null
+  }
+
   private def buildArgumentContainer[A, T <: J](
     items: Seq[A],
     convert: A => T,

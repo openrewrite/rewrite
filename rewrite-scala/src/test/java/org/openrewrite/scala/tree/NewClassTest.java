@@ -332,4 +332,19 @@ class NewClassTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void curriedAnonymousClass() {
+        rewriteRun(
+          scala(
+            """
+            class Foo(a: Int)(b: Int)
+            trait Bar
+            object O {
+              val x = new Foo(1)(2) with Bar {}
+            }
+            """
+          )
+        );
+    }
 }
