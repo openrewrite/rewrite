@@ -18,6 +18,7 @@ package org.openrewrite.kotlin;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
@@ -46,6 +47,29 @@ class RemoveImportTest implements RewriteTest {
                 return cu;
             }
         });
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
+    @Test
+    void preservesKtlintSuppressionCommentOnLineBeforeRemovedImport() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("java.util.List")),
+          kotlin(
+            """
+              import java.util.Date // ktlint-disable no-wildcard-imports
+              import java.util.List
+              import java.util.UUID
+
+              class A
+              """,
+            """
+              import java.util.Date // ktlint-disable no-wildcard-imports
+              import java.util.UUID
+
+              class A
+              """
+          )
+        );
     }
 
     @DocumentExample

@@ -117,11 +117,26 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             c = c.withImports(ListUtils.flatMap(c.getImports(), import_ -> {
                 Space removedPrefix = spaceForNextImport.get();
                 if (removedPrefix != null) {
-                    Space currentPrefix = import_.getPrefix();
-                    if (removedPrefix.getLastWhitespace().isEmpty() ||
+                    // An end-of-line comment on the removed import's line is stored at the start of
+                    // this (the next) import's prefix. It explained the now-removed import, so drop it.
+                    Space currentPrefix = dropTrailingCommentOfRemovedImport(import_.getPrefix());
+                    if (!removedPrefix.getComments().isEmpty()) {
+                        // The removed import's prefix carried the trailing comment(s) of the preceding
+                        // line (e.g. a `// ktlint-disable` suppression) and/or standalone (commented-out)
+                        // lines. Move them onto the next import so they are not lost, preserving any
+                        // blank line that separated the imports.
+                        List<Comment> comments = ListUtils.concatAll(removedPrefix.getComments(), currentPrefix.getComments());
+                        if (currentPrefix.getComments().isEmpty() &&
+                            countTrailingLinebreaks(currentPrefix) > countTrailingLinebreaks(removedPrefix)) {
+                            String currentLastWhitespace = currentPrefix.getLastWhitespace();
+                            comments = ListUtils.mapLast(comments, comment -> comment.withSuffix(currentLastWhitespace));
+                        }
+                        currentPrefix = removedPrefix.withComments(comments);
+                    } else if (removedPrefix.getLastWhitespace().isEmpty() ||
                         (countTrailingLinebreaks(removedPrefix) > countTrailingLinebreaks(currentPrefix))) {
-                        import_ = import_.withPrefix(currentPrefix.withWhitespace(removedPrefix.getLastWhitespace()));
+                        currentPrefix = currentPrefix.withWhitespace(removedPrefix.getLastWhitespace());
                     }
+                    import_ = import_.withPrefix(currentPrefix);
                     spaceForNextImport.set(null);
                 }
 
@@ -177,6 +192,20 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
     private long countTrailingLinebreaks(Space space) {
         return space.getLastWhitespace().chars().filter(s -> s == '\n').count();
+    }
+
+    /**
+     * The end-of-line comment of a removed import is stored as the first comment of the following
+     * import's prefix, on the same line as the removed import (i.e. no newline precedes it). It
+     * described the removed import, so drop it. Standalone comments (preceded by a newline, such as
+     * commented-out import lines) and the trailing comments of earlier lines are left untouched.
+     */
+    private static Space dropTrailingCommentOfRemovedImport(Space prefix) {
+        List<Comment> comments = prefix.getComments();
+        if (comments.isEmpty() || prefix.getWhitespace().contains("\n")) {
+            return prefix;
+        }
+        return Space.build(comments.get(0).getSuffix(), comments.subList(1, comments.size()));
     }
 
     private Object unfoldStarImport(J.Import starImport, Set<String> otherImportsUsed, JavaSourceFile cu) {
