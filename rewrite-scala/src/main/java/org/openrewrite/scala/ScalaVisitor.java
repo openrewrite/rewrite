@@ -362,6 +362,14 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return t;
     }
 
+    public J visitUnionType(S.UnionType unionType, P p) {
+        S.UnionType u = unionType;
+        u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.getPadding().withTypes(visitContainer(u.getPadding().getTypes(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return u;
+    }
+
     public J visitRefinedType(S.RefinedType refinedType, P p) {
         S.RefinedType r = refinedType;
         r = r.withPrefix(visitSpace(r.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

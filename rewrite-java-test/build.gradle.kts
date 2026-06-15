@@ -6,6 +6,8 @@ recipeDependencies {
     testParserClasspath("jakarta.validation:jakarta.validation-api:3.0.2")
     testParserClasspath("javax.validation:validation-api:1.1.0.Final")
     testParserClasspath("org.hibernate:hibernate-validator:5.4.3.Final")
+    // parser classpath for ModerneWebsiteExampleTest — the LST example behind www.moderne.ai/platform/lst
+    testParserClasspath("org.apache.httpcomponents:httpclient:4.5.14")
 }
 
 dependencies {
