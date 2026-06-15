@@ -677,64 +677,45 @@ public class RewriteRpcServer
             </Project>
             """);
 
-        // Add local directory-based NuGet feeds so locally-published SDK/recipe
-        // snapshots are discovered. We only *add* sources here and deliberately do
-        // NOT declare nuget.org: dotnet merges this project-level nuget.config with
-        // the user- and machine-level configuration, so the environment's already
-        // configured default feed (which may be an internal mirror rather than
-        // nuget.org in networks that block it) is preserved and combined with these
-        // local feeds. Hardcoding nuget.org here would break such environments. When a
-        // caller (e.g. the Moderne CLI) has already written its own nuget.config in the
-        // project dir — possibly an exclusive feed with <clear/> — we append rather than
-        // clobber it. No-ops in production, where no local feed is configured.
-        var localFeeds = new List<(string Key, string Path)>();
-
-        var defaultLocalFeed = Path.Combine(
+        // For local cross-repo development, make the local NuGet feed additive to
+        // whatever config already lives in the project dir. A caller (e.g. the Moderne
+        // CLI) may have written its own nuget.config there — possibly an exclusive
+        // configured feed — so we must not clobber it: append only the local feed when
+        // a config is present, and create a standalone dev config that adds only the
+        // local feed (never nuget.org, so it merges with the user/machine config's
+        // default source) when none exists. No-ops in production, where local-feed is absent.
+        var localFeed = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".nuget", "local-feed");
-        if (Directory.Exists(defaultLocalFeed))
-            localFeeds.Add(("local-feed", defaultLocalFeed));
-
-        // Additional feed directory supplied out-of-band: the caller-injected
-        // --recipe-install-dir takes precedence, falling back to the LOCAL_NUGET_FEED
-        // environment variable when the argument is absent.
-        var extraFeed = !string.IsNullOrWhiteSpace(_recipeInstallDir)
-            ? _recipeInstallDir
-            : Environment.GetEnvironmentVariable("LOCAL_NUGET_FEED");
-        if (!string.IsNullOrWhiteSpace(extraFeed) && Directory.Exists(extraFeed))
-            localFeeds.Add(("local-feed-env", Path.GetFullPath(extraFeed)));
-
-        if (localFeeds.Count > 0)
+        if (Directory.Exists(localFeed))
         {
             var nugetConfig = Path.Combine(_recipesProjectDir, "nuget.config");
             var existing = File.Exists(nugetConfig) ? File.ReadAllText(nugetConfig) : null;
-            File.WriteAllText(nugetConfig, BuildRecipesNuGetConfig(existing, localFeeds));
+            File.WriteAllText(nugetConfig, BuildRecipesNuGetConfig(existing, localFeed));
         }
 
         return csprojPath;
     }
 
     /// <summary>
-    /// Produces the recipe project's <c>nuget.config</c> with the given local development
-    /// feeds present. When <paramref name="existingConfigXml"/> is null/empty, creates a
-    /// standalone config that adds only those feeds — never nuget.org — so it merges with
-    /// (rather than overrides) the user/machine NuGet configuration that supplies the
+    /// Produces the recipe project's <c>nuget.config</c> with the local development
+    /// feed present. When <paramref name="existingConfigXml"/> is null/empty, creates a
+    /// standalone config that adds only the local feed — never nuget.org — so it merges
+    /// with (rather than overrides) the user/machine NuGet configuration that supplies the
     /// environment's default source. Otherwise the caller already wrote a config (possibly
-    /// an exclusive configured feed): each feed is appended to <c>&lt;packageSources&gt;</c>,
-    /// preserving the caller's sources and any <c>&lt;clear/&gt;</c>, and idempotently.
+    /// an exclusive configured feed): only the local feed is appended to
+    /// <c>&lt;packageSources&gt;</c>, preserving the caller's sources and any
+    /// <c>&lt;clear/&gt;</c>, and idempotently (no duplicate if already present).
     /// </summary>
-    internal static string BuildRecipesNuGetConfig(string? existingConfigXml,
-        IReadOnlyList<(string Key, string Path)> localFeeds)
+    internal static string BuildRecipesNuGetConfig(string? existingConfigXml, string localFeedPath)
     {
         if (string.IsNullOrWhiteSpace(existingConfigXml))
         {
-            var sources = string.Join(Environment.NewLine,
-                localFeeds.Select(f => $"    <add key=\"{f.Key}\" value=\"{f.Path}\" />"));
             return $"""
                 <?xml version="1.0" encoding="utf-8"?>
                 <configuration>
                   <packageSources>
-                {sources}
+                    <add key="local-feed" value="{localFeedPath}" />
                   </packageSources>
                 </configuration>
                 """;
@@ -750,16 +731,13 @@ public class RewriteRpcServer
             configuration.Add(packageSources);
         }
 
-        foreach (var feed in localFeeds)
+        bool alreadyPresent = packageSources.Elements("add").Any(e =>
+            string.Equals((string?)e.Attribute("value"), localFeedPath, StringComparison.OrdinalIgnoreCase));
+        if (!alreadyPresent)
         {
-            bool alreadyPresent = packageSources.Elements("add").Any(e =>
-                string.Equals((string?)e.Attribute("value"), feed.Path, StringComparison.OrdinalIgnoreCase));
-            if (!alreadyPresent)
-            {
-                packageSources.Add(new XElement("add",
-                    new XAttribute("key", feed.Key),
-                    new XAttribute("value", feed.Path)));
-            }
+            packageSources.Add(new XElement("add",
+                new XAttribute("key", "local-feed"),
+                new XAttribute("value", localFeedPath)));
         }
 
         var declaration = doc.Declaration ?? new XDeclaration("1.0", "utf-8", null);

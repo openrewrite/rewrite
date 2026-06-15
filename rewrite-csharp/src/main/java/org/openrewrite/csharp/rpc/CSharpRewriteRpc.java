@@ -493,38 +493,21 @@ public class CSharpRewriteRpc extends RewriteRpc {
                         "--ignore-failed-sources"
                 ));
 
-                // Resolve the feed that provides the tool package itself. LOCAL_NUGET_FEED, when
-                // set, takes precedence; otherwise default to the NuGet global packages cache,
-                // where publishToMavenLocal lands the tool package.
-                String localFeedOverride = environment.get("LOCAL_NUGET_FEED");
-                if (localFeedOverride == null) {
-                    localFeedOverride = System.getenv("LOCAL_NUGET_FEED");
-                }
-                Path localFeed;
-                boolean addLocalFeed;
-                if (localFeedOverride != null && !localFeedOverride.isEmpty()) {
-                    localFeed = Paths.get(localFeedOverride);
-                    addLocalFeed = true;
-                } else {
-                    localFeed = Paths.get(System.getProperty("user.home"),
-                            ".nuget", "packages", NUGET_PACKAGE_ID.toLowerCase(), version);
-                    addLocalFeed = Files.isDirectory(localFeed);
-                }
-                if (addLocalFeed) {
-                    installCmd.addAll(Arrays.asList("--add-source",
-                            localFeed.toAbsolutePath().normalize().toString()));
+                // When the tool package exists in the NuGet global cache (e.g. from publishToMavenLocal),
+                // add it as a source so the install can resolve it without remote feeds
+                Path globalCachePath = Paths.get(System.getProperty("user.home"),
+                        ".nuget", "packages", NUGET_PACKAGE_ID.toLowerCase(), version);
+                if (Files.isDirectory(globalCachePath)) {
+                    installCmd.addAll(Arrays.asList("--add-source", globalCachePath.toString()));
                 }
 
                 ProcessBuilder pb = new ProcessBuilder(installCmd);
-                // Run from a fresh, empty directory whose ancestors hold no nuget.config. This
-                // lets NuGet's own config discovery pick up the user/machine-level global
-                // configuration (which applies regardless of working directory, and may span
-                // multiple files) while skipping any repo-level nuget.config that would otherwise
-                // be discovered up the working-directory hierarchy — such a config could <clear/>
-                // global sources or enable <packageSourceMapping> that rejects --add-source with
-                // "The --add-source option cannot be combined with package source mapping". We
-                // delegate to NuGet's discovery rather than locating the global config ourselves,
-                // since its path is convention, not a stable contract.
+                // Run from a fresh, empty temp directory so NuGet's working-directory config
+                // walk finds no repo-level nuget.config up the hierarchy. Such a config could
+                // <clear/> global sources or enable <packageSourceMapping> that rejects
+                // --add-source with "The --add-source option cannot be combined with package
+                // source mapping". User- and machine-level config still apply, since they are
+                // discovered independently of the working directory.
                 installCwd = Files.createTempDirectory("rewrite-csharp-tool-install");
                 pb.directory(installCwd.toFile());
                 pb.environment().putAll(environment);
