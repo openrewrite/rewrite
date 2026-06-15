@@ -767,48 +767,18 @@ public class PythonRewriteRpc extends RewriteRpc {
             try {
                 Files.createDirectories(pipPackagesPath);
 
-                // Install with the [profiling] extra so pyroscope-io is available when
-                // PYROSCOPE_SERVER_ADDRESS is set in the rpc subprocess environment. The
-                // SDK init in rewrite.rpc.server is a no-op when the env var is unset, so
-                // adding the extra costs nothing for non-profiled deployments.
-                ProcessBuilder pb = new ProcessBuilder(
-                        pythonPath.toString(),
-                        "-m", "pip", "install",
-                        "--upgrade",
-                        "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
-                        "openrewrite[profiling]==" + version
-                );
-                pb.environment().putAll(environment);
-                pb.redirectErrorStream(true);
-                if (log != null) {
-                    File logFile = log.toAbsolutePath().normalize().toFile();
-                    pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile));
-                }
-                Process process = pb.start();
-                String pipOutput = "";
-                if (log == null) {
-                    // Capture stdout+stderr so we can include it in error messages
-                    try (InputStream is = process.getInputStream()) {
-                        pipOutput = StringUtils.readFully(is);
+                // Only request the [profiling] extra (which pulls in pyroscope-io) when
+                // profiling is actually enabled, i.e. PYROSCOPE_SERVER_ADDRESS is set in the
+                // rpc subprocess environment; the SDK init in rewrite.rpc.server is a no-op
+                // otherwise. pyroscope-io ships no wheels for some platforms (e.g. Windows)
+                // and would otherwise force an unbuildable native source build, so even when
+                // profiling is requested we fall back to the plain package if the extra fails.
+                List<String> specs = openrewriteInstallSpecs(version, profilingEnabled());
+                for (int i = 0; i < specs.size(); i++) {
+                    boolean lastAttempt = i == specs.size() - 1;
+                    if (installPackage(pythonPath, pipPackagesPath, specs.get(i), version, lastAttempt)) {
+                        break;
                     }
-                }
-                boolean completed = process.waitFor(2, TimeUnit.MINUTES);
-
-                if (!completed) {
-                    process.destroyForcibly();
-                    throw new RuntimeException("Timed out bootstrapping openrewrite==" + version);
-                }
-
-                int exitCode = process.exitValue();
-                if (exitCode != 0) {
-                    String message = "Failed to install openrewrite==" + version +
-                            " (pip exited with code " + exitCode + ")";
-                    if (!pipOutput.isEmpty()) {
-                        message += ":\n" + pipOutput.trim();
-                    } else if (log != null) {
-                        message += ". See " + log.toAbsolutePath().normalize() + " for details";
-                    }
-                    throw new RuntimeException(message);
                 }
 
                 Files.write(pipPackagesPath.resolve(".openrewrite-version"), version.getBytes(StandardCharsets.UTF_8));
@@ -818,6 +788,83 @@ public class PythonRewriteRpc extends RewriteRpc {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Interrupted while bootstrapping openrewrite package", e);
             }
+        }
+
+        /**
+         * Runs {@code pip install} for a single package spec. Returns {@code true} on success.
+         * On failure throws when {@code lastAttempt} is set, otherwise returns {@code false} so
+         * the caller can fall back to another spec.
+         */
+        private boolean installPackage(Path pythonPath, Path pipPackagesPath, String packageSpec,
+                                       String version, boolean lastAttempt) throws IOException, InterruptedException {
+            ProcessBuilder pb = new ProcessBuilder(pipInstallCommand(pythonPath, pipPackagesPath, packageSpec));
+            pb.environment().putAll(environment);
+            pb.redirectErrorStream(true);
+            if (log != null) {
+                File logFile = log.toAbsolutePath().normalize().toFile();
+                pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile));
+            }
+            Process process = pb.start();
+            String pipOutput = "";
+            if (log == null) {
+                // Capture stdout+stderr so we can include it in error messages
+                try (InputStream is = process.getInputStream()) {
+                    pipOutput = StringUtils.readFully(is);
+                }
+            }
+            boolean completed = process.waitFor(2, TimeUnit.MINUTES);
+
+            if (!completed) {
+                process.destroyForcibly();
+                throw new RuntimeException("Timed out bootstrapping openrewrite==" + version);
+            }
+
+            int exitCode = process.exitValue();
+            if (exitCode != 0) {
+                if (!lastAttempt) {
+                    return false;
+                }
+                String message = "Failed to install openrewrite==" + version +
+                        " (pip exited with code " + exitCode + ")";
+                if (!pipOutput.isEmpty()) {
+                    message += ":\n" + pipOutput.trim();
+                } else if (log != null) {
+                    message += ". See " + log.toAbsolutePath().normalize() + " for details";
+                }
+                throw new RuntimeException(message);
+            }
+            return true;
+        }
+
+        /**
+         * Whether the profiling SDK will be active in the rpc subprocess, i.e. whether a
+         * non-blank {@code PYROSCOPE_SERVER_ADDRESS} is present in the subprocess environment.
+         */
+        boolean profilingEnabled() {
+            String address = environment.get("PYROSCOPE_SERVER_ADDRESS");
+            return address != null && !address.trim().isEmpty();
+        }
+
+        /**
+         * The openrewrite package specs to attempt installing, in order. When profiling is
+         * enabled the {@code [profiling]} extra is tried first with a plain fallback so a
+         * missing/unbuildable {@code pyroscope-io} can never block the core install.
+         */
+        static List<String> openrewriteInstallSpecs(String version, boolean profiling) {
+            if (profiling) {
+                return Arrays.asList("openrewrite[profiling]==" + version, "openrewrite==" + version);
+            }
+            return Collections.singletonList("openrewrite==" + version);
+        }
+
+        static List<String> pipInstallCommand(Path pythonPath, Path pipPackagesPath, String packageSpec) {
+            return Arrays.asList(
+                    pythonPath.toString(),
+                    "-m", "pip", "install",
+                    "--upgrade",
+                    "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
+                    packageSpec
+            );
         }
     }
 }
