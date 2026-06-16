@@ -319,14 +319,27 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
             Stream<@Nullable String> cmd;
 
-            if (csharpServerEntry != null) {
-                // Explicit override (used by tests)
-                if (csharpServerEntry.toString().endsWith(".csproj")) {
-                    cmd = buildCsprojCommand(dotnetPath, csharpServerEntry);
+            // An explicit builder value wins; otherwise fall back to the
+            // REWRITE_DOTNET_RPC_SERVER environment variable so a source .csproj
+            // or a pre-built dll/exe can be selected without code changes (local
+            // cross-repo development, parallel git worktrees). A .csproj is launched
+            // via `dotnet run --project`; anything else is treated as a server entry
+            // assembly/executable run directly.
+            Path serverEntry = csharpServerEntry;
+            if (serverEntry == null) {
+                String envServerEntry = System.getenv("REWRITE_DOTNET_RPC_SERVER");
+                if (envServerEntry != null && !envServerEntry.isEmpty()) {
+                    serverEntry = Paths.get(envServerEntry);
+                }
+            }
+
+            if (serverEntry != null) {
+                if (serverEntry.toString().endsWith(".csproj")) {
+                    cmd = buildCsprojCommand(dotnetPath, serverEntry);
                 } else {
                     cmd = Stream.of(
                             dotnetPath.toString(),
-                            csharpServerEntry.toAbsolutePath().normalize().toString(),
+                            serverEntry.toAbsolutePath().normalize().toString(),
                             log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                             traceRpcMessages ? "--trace-rpc-messages" : null,
                             recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
@@ -334,9 +347,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 }
             } else {
                 // Install and run the tool from a persistent tool-path, bypassing
-                // dotnet tool exec which has auth issues with private feeds (dotnet/sdk#51375)
-                String version = StringUtils.readFully(
-                        CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
+                // dotnet tool exec which has auth issues with private feeds (dotnet/sdk#51375).
+                // REWRITE_DOTNET_RPC_SERVER_VERSION overrides the embedded version so a
+                // specific package version of the tool can be pinned without rebuilding.
+                String version = System.getenv("REWRITE_DOTNET_RPC_SERVER_VERSION");
+                if (version == null || version.isEmpty()) {
+                    version = StringUtils.readFully(
+                            CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
+                }
                 cmd = buildToolPathCommand(dotnetPath, version);
             }
 
