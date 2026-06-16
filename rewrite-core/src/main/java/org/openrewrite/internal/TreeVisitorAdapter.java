@@ -45,7 +45,12 @@ public class TreeVisitorAdapter {
                     "TreeVisitorAdapter currently supports at most one mixin per adapt() call; got " + mixins.length + ".");
         }
 
-        TreeVisitor<?, ?> mixin = mixins.length == 1 ? mixins[0] : discoverRegisteredMixin(delegate, adaptTo);
+        TreeVisitorAdapterClassLoader cl;
+        synchronized (classLoaders) {
+            cl = classLoaders.computeIfAbsent(delegate.getClass().getClassLoader(), TreeVisitorAdapterClassLoader::new);
+        }
+
+        TreeVisitor<?, ?> mixin = mixins.length == 1 ? mixins[0] : discoverRegisteredMixin(cl, delegate, adaptTo);
         if (mixin != null && !adaptTo.isAssignableFrom(mixin.getClass())) {
             throw new IllegalArgumentException(
                     "Mixin " + mixin.getClass().getName() + " is not assignable to " + adaptTo.getName() +
@@ -62,11 +67,6 @@ public class TreeVisitorAdapter {
         String adaptedName = delegate.getClass().getName().trim().replace('$', '_') +
                              "_" + adaptTo.getSimpleName() +
                              (mixinClass == null ? "" : "_" + mixinClass.getName().trim().replace('$', '_'));
-
-        TreeVisitorAdapterClassLoader cl;
-        synchronized (classLoaders) {
-            cl = classLoaders.computeIfAbsent(delegate.getClass().getClassLoader(), TreeVisitorAdapterClassLoader::new);
-        }
 
         if (!cl.hasClass(adaptedName)) {
             synchronized (classCreationLock) {
@@ -324,7 +324,26 @@ public class TreeVisitorAdapter {
         }
     }
 
-    private static @org.jspecify.annotations.Nullable TreeVisitor<?, ?> discoverRegisteredMixin(TreeVisitor<?, ?> delegate, Class<?> adaptTo) {
+    private static @org.jspecify.annotations.Nullable TreeVisitor<?, ?> discoverRegisteredMixin(
+            TreeVisitorAdapterClassLoader cache, TreeVisitor<?, ?> delegate, Class<?> adaptTo) {
+        // adapt() is invoked once per node of a foreign-language subtree, so the
+        // classpath scan in discoverRegisteredMixinClass would otherwise run per node.
+        // Cache the resolved mixin class (or "none") keyed by delegate + adaptTo, then
+        // instantiate a fresh mixin per call (the proxy copies the mixin's fields).
+        String key = delegate.getClass().getName() + '\n' + adaptTo.getName();
+        java.util.Optional<Class<?>> mixinClass = cache.mixinClass(key, k -> discoverRegisteredMixinClass(delegate, adaptTo));
+        if (!mixinClass.isPresent()) {
+            return null;
+        }
+        try {
+            return (TreeVisitor<?, ?>) mixinClass.get().getDeclaredConstructor().newInstance();
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(
+                    "Failed to instantiate registered mixin " + mixinClass.get().getName() + ".", e);
+        }
+    }
+
+    private static java.util.Optional<Class<?>> discoverRegisteredMixinClass(TreeVisitor<?, ?> delegate, Class<?> adaptTo) {
         // Each language module ships per-base-visitor registry files at
         //   META-INF/rewrite/mixins/<base-visitor-fqn>
         // listing mixin classes that should compose with that base. Same
@@ -343,7 +362,7 @@ public class TreeVisitorAdapter {
             cl = Thread.currentThread().getContextClassLoader();
         }
         if (cl == null) {
-            return null;
+            return java.util.Optional.empty();
         }
         String resource = "META-INF/rewrite/mixins/" + delegate.getClass().getName();
         try {
@@ -371,10 +390,10 @@ public class TreeVisitorAdapter {
                             if (!adaptTo.isAssignableFrom(mixinClass)) {
                                 continue;
                             }
-                            return (TreeVisitor<?, ?>) mixinClass.getDeclaredConstructor().newInstance();
-                        } catch (ReflectiveOperationException e) {
+                            return java.util.Optional.of(mixinClass);
+                        } catch (ClassNotFoundException e) {
                             throw new IllegalStateException(
-                                    "Failed to instantiate registered mixin " + line + " (from " + url + ").", e);
+                                    "Failed to load registered mixin " + line + " (from " + url + ").", e);
                         }
                     }
                 }
@@ -382,7 +401,7 @@ public class TreeVisitorAdapter {
         } catch (java.io.IOException e) {
             // Couldn't enumerate mixin registry resources; treat as no registration.
         }
-        return null;
+        return java.util.Optional.empty();
     }
 
     @SuppressWarnings("rawtypes")
