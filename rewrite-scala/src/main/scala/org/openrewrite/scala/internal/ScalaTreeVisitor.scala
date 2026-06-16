@@ -7050,106 +7050,14 @@ class ScalaTreeVisitor(
    * which `J.Try.Catch`'s fixed `ControlParentheses<VariableDeclarations>` cannot hold — fall
    * back to [[S.Try]] (which models the handler as a `J.Block` of `J.Case`).
    */
+  /**
+   * Build the try node, preferring the Java model. The decision (J.Try vs S.Try) and the
+   * J.Case→J.Try.Catch conversion live in [[ScalaTryBuilder]] (Java) because they read
+   * Lombok-generated getters on same-module `S.*` types, which the Scala joint compiler
+   * cannot see (it reads `S.java` as source, before Lombok runs).
+   */
   private def buildTryNode(prefix: Space, body: J.Block, catches: JLeftPadded[J.Block], finallyBlock: JLeftPadded[J.Block]): J = {
-    if (catches == null || catchesFitJModel(catches.getElement)) {
-      buildJTry(prefix, body, catches, finallyBlock)
-    } else {
-      val braceless = catches.getElement.getMarkers.findFirst(classOf[OmitBraces]).isPresent
-      val tryMarkers = if (braceless) Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
-        else Markers.EMPTY
-      S.Try.build(Tree.randomId(), prefix, tryMarkers, body, catches, finallyBlock, null)
-    }
-  }
-
-  /** True when every clause is a guard-free `[name][: Type]` catch, expressible as a `J.Try.Catch`. */
-  private def catchesFitJModel(casesBlock: J.Block): Boolean = {
-    casesBlock.getPadding.getStatements.asScala.forall { rp =>
-      if (rp.getMarkers.findFirst(classOf[Semicolon]).isPresent) false
-      else rp.getElement match {
-        case c: J.Case if c.getGuard == null && c.getPadding.getCaseLabels.getElements.size == 1 =>
-          c.getPadding.getCaseLabels.getElements.get(0) match {
-            case ta: S.TypeAscription =>
-              (ta.getExpression.isInstanceOf[J.Identifier] || ta.getExpression.isInstanceOf[S.Wildcard]) &&
-                (ta.getTypeTree.isInstanceOf[J.Identifier] || ta.getTypeTree.isInstanceOf[J.FieldAccess])
-            case _: J.Identifier => true
-            case _: S.Wildcard => true
-            case _ => false
-          }
-        case _ => false
-      }
-    }
-  }
-
-  /** Convert the `J.Block` of `J.Case` catch handler into `J.Try`'s list of `J.Try.Catch`. */
-  private def buildJTry(prefix: Space, body: J.Block, catches: JLeftPadded[J.Block], finallyBlock: JLeftPadded[J.Block]): J.Try = {
-    val catchList = new util.ArrayList[J.Try.Catch]()
-    var braceless = false
-    if (catches != null) {
-      val casesBlock = catches.getElement
-      braceless = casesBlock.getMarkers.findFirst(classOf[OmitBraces]).isPresent
-      val beforeCatch = catches.getBefore
-      val blockPrefix = casesBlock.getPrefix
-      val rps = casesBlock.getPadding.getStatements
-      var i = 0
-      while (i < rps.size) {
-        val c = rps.get(i).getElement.asInstanceOf[J.Case]
-        val labelRp = c.getPadding.getCaseLabels.getPadding.getElements.get(0)
-        val (nameId, typeTree, beforeColon): (J.Identifier, TypeTree, Space) = labelRp.getElement match {
-          case ta: S.TypeAscription =>
-            // The space after `case` is on the ascription's own prefix, not the inner expr.
-            val nm = ta.getExpression match {
-              case id: J.Identifier => id.withPrefix(ta.getPrefix)
-              case _ => ident("_", ta.getPrefix)
-            }
-            val bcOpt = ta.getMarkers.findFirst(classOf[org.openrewrite.scala.marker.TypeAscriptionColonPrefix])
-            val bc = if (bcOpt.isPresent) bcOpt.get.getPrefix else null
-            (nm, ta.getTypeTree, bc)
-          case id: J.Identifier => (id, null, null)
-          case w: S.Wildcard => (ident("_", w.getPrefix), null, null)
-          case _ => (ident("_", Space.EMPTY), null, null)
-        }
-        val caseBody = wrapCatchBody(c.getPadding.getBody)
-        val namedVar = new J.VariableDeclarations.NamedVariable(Tree.randomId(), Space.EMPTY, Markers.EMPTY, nameId, Collections.emptyList(), null, null)
-        val varDecl = new J.VariableDeclarations(Tree.randomId(), c.getPrefix, Markers.EMPTY,
-          Collections.emptyList(), Collections.emptyList(), typeTree, beforeColon,
-          Collections.emptyList(), Collections.singletonList(JRightPadded.build(namedVar)))
-        // For the first catch the J.Try printer emits the catch keyword then the brace, so
-        // its parameter prefix carries the space before `{`; subsequent catches don't reprint it.
-        val controlPrefix = if (i == 0) blockPrefix else Space.EMPTY
-        val controlParens = new J.ControlParentheses[J.VariableDeclarations](Tree.randomId(), controlPrefix, Markers.EMPTY,
-          JRightPadded.build(varDecl).withAfter(labelRp.getAfter))
-        val catchPrefix = if (i == 0) beforeCatch else c.getPrefix
-        catchList.add(new J.Try.Catch(Tree.randomId(), catchPrefix, Markers.EMPTY, controlParens, caseBody))
-        i += 1
-      }
-      // The space before the closing `}` lives on the cases-block end; in J.Try it
-      // belongs to the last catch body's end space.
-      if (!braceless && !catchList.isEmpty) {
-        val last = catchList.get(catchList.size - 1)
-        catchList.set(catchList.size - 1, last.withBody(last.getBody.withEnd(casesBlock.getEnd)))
-      }
-    }
-    val tryMarkers = if (braceless) Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
-      else Markers.EMPTY
-    new J.Try(Tree.randomId(), prefix, tryMarkers, null, body, catchList, finallyBlock)
-  }
-
-  /** Wrap a catch-clause body (a bare J on `J.Case`) in an OmitBraces `J.Block` as `J.Try.Catch` requires. */
-  private def wrapCatchBody(bodyRp: JRightPadded[J]): J.Block = {
-    val omit = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
-    def shell(stmt: Statement): J.Block = {
-      val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(stmt))
-      new J.Block(Tree.randomId(), Space.EMPTY, omit, JRightPadded.build(false), s, Space.EMPTY)
-    }
-    def empty: J.Block = new J.Block(Tree.randomId(), Space.EMPTY, omit, JRightPadded.build(false), new util.ArrayList(), Space.EMPTY)
-    if (bodyRp == null) empty
-    else bodyRp.getElement match {
-      case b: J.Block if b.getMarkers.findFirst(classOf[OmitBraces]).isPresent => b
-      case b: J.Block => shell(b)
-      case stmt: Statement => shell(stmt)
-      case e: Expression => shell(new S.ExpressionStatement(Tree.randomId(), e))
-      case _ => empty
-    }
+    ScalaTryBuilder.buildTry(prefix, body, catches, finallyBlock)
   }
 
   private def visitMatchTree(matchTree: Trees.Match[?]): J = {
