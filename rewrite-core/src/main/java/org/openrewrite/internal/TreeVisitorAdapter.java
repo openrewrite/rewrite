@@ -328,10 +328,9 @@ public class TreeVisitorAdapter {
             TreeVisitorAdapterClassLoader cache, TreeVisitor<?, ?> delegate, Class<?> adaptTo) {
         // adapt() is invoked once per node of a foreign-language subtree, so the
         // classpath scan in discoverRegisteredMixinClass would otherwise run per node.
-        // Cache the resolved mixin class (or "none") keyed by delegate + adaptTo, then
-        // instantiate a fresh mixin per call (the proxy copies the mixin's fields).
-        String key = delegate.getClass().getName() + '\n' + adaptTo.getName();
-        java.util.Optional<Class<?>> mixinClass = cache.mixinClass(key, k -> discoverRegisteredMixinClass(delegate, adaptTo));
+        // The cache resolves the mixin class (or "none") keyed by delegate + adaptTo,
+        // then we instantiate a fresh mixin per call (the proxy copies the mixin's fields).
+        java.util.Optional<Class<?>> mixinClass = cache.mixinClass(delegate.getClass(), adaptTo);
         if (!mixinClass.isPresent()) {
             return null;
         }
@@ -343,7 +342,7 @@ public class TreeVisitorAdapter {
         }
     }
 
-    private static java.util.Optional<Class<?>> discoverRegisteredMixinClass(TreeVisitor<?, ?> delegate, Class<?> adaptTo) {
+    static java.util.Optional<Class<?>> discoverRegisteredMixinClass(Class<?> delegateClass, Class<?> adaptTo) {
         // Each language module ships per-base-visitor registry files at
         //   META-INF/rewrite/mixins/<base-visitor-fqn>
         // listing mixin classes that should compose with that base. Same
@@ -364,7 +363,7 @@ public class TreeVisitorAdapter {
         if (cl == null) {
             return java.util.Optional.empty();
         }
-        String resource = "META-INF/rewrite/mixins/" + delegate.getClass().getName();
+        String resource = "META-INF/rewrite/mixins/" + delegateClass.getName();
         try {
             java.util.Enumeration<java.net.URL> urls = cl.getResources(resource);
             while (urls.hasMoreElements()) {

@@ -16,27 +16,43 @@
 package org.openrewrite.internal;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TreeVisitorAdapterClassLoaderTest {
 
     @Test
-    void resolvesMixinClassOncePerKey() {
+    void resolvesAndMemoizesRegisteredMixin() {
         TreeVisitorAdapterClassLoader cl = new TreeVisitorAdapterClassLoader(getClass().getClassLoader());
-        AtomicInteger resolverCalls = new AtomicInteger();
-        Function<String, Optional<Class<?>>> resolver = key -> {
-            resolverCalls.incrementAndGet();
-            return Optional.empty();
-        };
 
-        assertThat(cl.mixinClass("delegate\nadaptTo", resolver)).isEmpty();
-        assertThat(cl.mixinClass("delegate\nadaptTo", resolver)).isEmpty();
+        Optional<Class<?>> first = cl.mixinClass(MixinDelegate.class, MixinTarget.class);
+        Optional<Class<?>> second = cl.mixinClass(MixinDelegate.class, MixinTarget.class);
 
-        assertThat(resolverCalls.get()).isEqualTo(1);
+        assertThat(first).contains(RegisteredMixin.class);
+        // ClassValue memoizes per (delegate, adaptTo): the same Optional instance is
+        // returned, proving the classpath scan ran only once.
+        assertThat(second).isSameAs(first);
     }
+
+    @Test
+    void emptyWhenNoMixinRegistered() {
+        TreeVisitorAdapterClassLoader cl = new TreeVisitorAdapterClassLoader(getClass().getClassLoader());
+        assertThat(cl.mixinClass(UnregisteredDelegate.class, MixinTarget.class)).isEmpty();
+    }
+}
+
+class MixinTarget extends TreeVisitor<Tree, Integer> {
+}
+
+class RegisteredMixin extends MixinTarget {
+}
+
+class MixinDelegate extends TreeVisitor<Tree, Integer> {
+}
+
+class UnregisteredDelegate extends TreeVisitor<Tree, Integer> {
 }
