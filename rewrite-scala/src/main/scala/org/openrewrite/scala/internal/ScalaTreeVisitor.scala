@@ -945,17 +945,6 @@ class ScalaTreeVisitor(
           case _ =>
             // Continue with regular method invocation (including explicit .apply() calls)
         }
-      case ta: Trees.TypeApply[?] =>
-        // Handle type applications like Array[String]("hello", "world")
-        ta.fun match {
-          case id: Trees.Ident[?] if id.name.toString == "Array" =>
-            // Array[T](...) — preserve full source text including type params and args
-            val taText = extractSource(app.span)
-            updateCursor(app.span.end)
-            return ident(taText, prefix, typeFor(app.span))
-          case _ =>
-            // Other TypeApply: continue with regular method invocation
-        }
       case _ =>
         // Continue with regular method invocation
     }
@@ -1360,73 +1349,6 @@ class ScalaTreeVisitor(
     // Update cursor to end of expression
     updateCursor(app.span.end)
 
-    new J.NewArray(
-      Tree.randomId(),
-      prefix,
-      Markers.EMPTY,
-      typeExpression,
-      dimensions,
-      initializer,
-      typeFor(app.span)
-    )
-  }
-
-  private def visitNewArrayWithType(app: Trees.Apply[?], ta: Trees.TypeApply[?]): J = {
-    val prefix = extractPrefix(app.span)
-    
-    // In Scala, Array[String]("hello", "world") creates a typed array
-    // We need to map this to J.NewArray with a type expression
-    
-    // Visit the type parameter
-    val typeExpression = if (ta.args.nonEmpty) {
-      visitTree(ta.args.head) match {
-        case tt: TypeTree => tt
-        case _ => null
-      }
-    } else {
-      null
-    }
-    
-    // Visit array dimensions (empty for Scala array literals)
-    val dimensions = Collections.emptyList[J.ArrayDimension]()
-    
-    // Update cursor to skip past the type parameter section before processing arguments
-    if (ta.args.nonEmpty && ta.args.head.span.exists) {
-      // Move cursor past the closing ] of the type parameter
-      val typeEnd = Math.max(0, ta.args.head.span.end - offsetAdjustment)
-      val closeBracketPos = positionOfNext("]", typeEnd)
-      if (closeBracketPos >= 0) {
-        cursor = closeBracketPos + 1
-      }
-    }
-    
-    // Visit the array initializer elements
-    val elements = new util.ArrayList[Expression]()
-    for (arg <- app.args) {
-      visitTree(arg) match {
-        case expr: Expression => elements.add(expr)
-        case j: J => elements.add(new S.StatementExpression(Tree.randomId(), j))
-        case _ => return visitUnknown(app)
-      }
-    }
-
-    // Create the initializer container
-    val initializer = if (elements.isEmpty) {
-      // Empty array with type: Array[Int]()
-      val initPrefix = sourceBefore("(")
-      // Look for closing paren
-      sourceBefore(")")
-      JContainer.build(initPrefix, Collections.emptyList[JRightPadded[Expression]](), Markers.EMPTY)
-    } else {
-      val initPrefix = sourceBefore("(")
-      import scala.jdk.CollectionConverters.*
-      buildArgumentContainer[Expression, Expression](
-        elements.asScala.toSeq, identity, ")", initPrefix, Markers.EMPTY)
-    }
-    
-    // Update cursor to end of expression
-    updateCursor(app.span.end)
-    
     new J.NewArray(
       Tree.randomId(),
       prefix,
