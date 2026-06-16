@@ -6924,7 +6924,6 @@ class ScalaTreeVisitor(
 
   private def visitParsedTry(parsedTry: untpd.ParsedTry): J = {
     // ParsedTry is the untpd version: has expr, handler (a Match), finalizer
-    // Extract cases from the handler Match and delegate to common try logic
     val prefix = extractPrefix(parsedTry.span)
 
     // Advance past "try" keyword
@@ -6935,324 +6934,120 @@ class ScalaTreeVisitor(
       if (tryIdx >= 0) cursor = cursor + tryIdx + 3
     }
 
-    // Visit the try body
-    val omitBracesMarkers = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
-    val body = visitTree(parsedTry.expr) match {
-      case block: J.Block => block
-      case stmt: Statement =>
-        val stmts = new util.ArrayList[JRightPadded[Statement]]()
-        stmts.add(JRightPadded.build(stmt))
-        new J.Block(Tree.randomId(), Space.EMPTY, omitBracesMarkers, JRightPadded.build(false), stmts, Space.EMPTY)
-      case expr: Expression =>
-        val stmts = new util.ArrayList[JRightPadded[Statement]]()
-        stmts.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
-        new J.Block(Tree.randomId(), Space.EMPTY, omitBracesMarkers, JRightPadded.build(false), stmts, Space.EMPTY)
-      case _ => visitUnknown(parsedTry)
-    }
+    val body = buildTryBody(parsedTry.expr)
 
-    // Handle catch handler
-      val catches = new util.ArrayList[J.Try.Catch]()
-    var catchHasBraces = true
-    if (!parsedTry.handler.isEmpty && parsedTry.handler.span.exists) {
-      val catchAbs = positionOfNext("catch")
-      val catchPrefix = if (catchAbs > cursor) ScalaSpace.format(source, cursor, catchAbs) else Space.EMPTY
-      if (catchAbs >= cursor) cursor = catchAbs + 5
-      // Scala 3 `catch case ... =>` (no braces) — only consume `{` if it appears before the first `case`.
-      val braceSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
-      val braceIdx = positionOfNextIn(braceSearch, "{", 0)
-      val firstCaseIdx = positionOfNextIn(braceSearch, "case", 0)
-      catchHasBraces = braceIdx >= 0 && (firstCaseIdx < 0 || braceIdx < firstCaseIdx)
-      val catchBraceSpace = if (catchHasBraces && braceIdx > 0) Space.format(braceSearch.substring(0, braceIdx)) else Space.EMPTY
-      if (catchHasBraces) cursor = cursor + braceIdx + 1
-
-      // The handler should be a Match tree containing the case defs
-      val cases: List[Trees.CaseDef[?]] = parsedTry.handler match {
-        case matchTree: Trees.Match[?] => matchTree.cases
-        case _ => Nil
-      }
-
-      for (caseDef <- cases) {
-        val casePrefix = extractPrefix(caseDef.span)
-        val caseStart = Math.max(0, caseDef.span.start - offsetAdjustment)
-        if (caseStart >= cursor) cursor = caseStart
-        val caseSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
-        val caseKwIdx = positionOfNextIn(caseSearch, "case", 0)
-        if (caseKwIdx >= 0) cursor = cursor + caseKwIdx + 4
-
-        val arrowSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
-        val arrowIdx = positionOfNextIn(arrowSearch, "=>", 0)
-
-        // Extract param name and type from the catch pattern without disturbing cursor.
-        // Handles: `e: Exception`, `_: A | _: B` (Alternative), `_` (wildcard)
-        val (paramName, paramType): (String, TypeTree) = caseDef.pat match {
-          case bind: Trees.Bind[?] => bind.body match {
-            case typed: Trees.Typed[?] =>
-              val tpeName = typed.tpt match { case id: Trees.Ident[?] => id.name.toString; case sel: Trees.Select[?] => extractSource(sel.span); case _ => null }
-              (bind.name.toString, if (tpeName != null) ident(tpeName, Space.format(" ")) else null)
-            case _ =>
-              // e.g. `e @ (_: A | _: B)` — bind over an Alternative (or other pattern);
-              // preserve the full source so the `@ (...)` part isn't lost on print.
-              val patSource = if (caseDef.pat.span.exists) extractSource(caseDef.pat.span) else ""
-              (if (patSource.nonEmpty) patSource else bind.name.toString, null)
-          }
-          case typed: Trees.Typed[?] =>
-            val name = typed.expr match { case id: Trees.Ident[?] => id.name.toString; case _ => "_" }
-            val tpeName = typed.tpt match { case id: Trees.Ident[?] => id.name.toString; case sel: Trees.Select[?] => extractSource(sel.span); case _ => null }
-            (name, if (tpeName != null) ident(tpeName, Space.format(" ")) else null)
-          case alt: Trees.Alternative[?] =>
-            // Multi-pattern: `_: A | _: B` — preserve full source as the "name", no separate type
-            val patSource = extractSource(caseDef.pat.span)
-            (patSource, null)
-          case _ =>
-            // Any other pattern (e.g. UnApply extractor `NonFatal(e)`, tuple, literal) —
-            // preserve the full source text so the binding/extractor isn't lost on print.
-            val patSource = if (caseDef.pat.span.exists) extractSource(caseDef.pat.span) else ""
-            (if (patSource.nonEmpty) patSource else "_", null)
+    // The handler is a synthetic Match whose case clauses are the catch patterns.
+    val catches: JLeftPadded[J.Block] =
+      if (!parsedTry.handler.isEmpty && parsedTry.handler.span.exists) {
+        val cases: List[Trees.CaseDef[?]] = parsedTry.handler match {
+          case matchTree: Trees.Match[?] => matchTree.cases
+          case _ => Nil
         }
-        // Capture the whitespace between the param name and `:` (e.g. `e : Exception`).
-        val beforeColon: Space = if (paramType != null && caseDef.pat.span.exists) {
-          val patStart = Math.max(0, caseDef.pat.span.start - offsetAdjustment)
-          val patEnd = Math.max(0, caseDef.pat.span.end - offsetAdjustment)
-          val patSrc = if (patStart < patEnd && patEnd <= source.length) source.substring(patStart, patEnd) else ""
-          val colonAt = positionOfNextIn(patSrc, ":", 0)
-          val nameAt = if (paramName.nonEmpty) positionOfNextIn(patSrc, paramName, 0) else -1
-          if (colonAt > 0 && nameAt >= 0 && nameAt + paramName.length <= colonAt) {
-            Space.format(patSrc.substring(nameAt + paramName.length, colonAt))
-          } else Space.EMPTY
-        } else Space.EMPTY
-        updateCursor(caseDef.pat.span.end)
-        val arrowAbs = positionOfNext("=>", cursor)
-        val spaceBeforeArrow = if (arrowAbs >= cursor) ScalaSpace.format(source, cursor, arrowAbs) else Space.EMPTY
-        if (arrowIdx >= 0 && arrowAbs >= 0) cursor = arrowAbs + 2
+        buildCatchBlock(cases)
+      } else null
 
-        val paramId = ident(paramName, Space.format(" "))
-        val namedVar = new J.VariableDeclarations.NamedVariable(Tree.randomId(), Space.EMPTY, Markers.EMPTY, paramId, Collections.emptyList(), null, null)
-        val varDecl = new J.VariableDeclarations(Tree.randomId(), casePrefix, Markers.EMPTY,
-          Collections.emptyList(), Collections.emptyList(), paramType,
-          if (beforeColon != Space.EMPTY) beforeColon else null,
-          Collections.emptyList(),
-          Collections.singletonList(JRightPadded.build(namedVar)))
-        val controlPrefix = if (catches.isEmpty) catchBraceSpace else Space.EMPTY
-        val controlParens = new J.ControlParentheses[J.VariableDeclarations](Tree.randomId(), controlPrefix, Markers.EMPTY, JRightPadded.build(varDecl).withAfter(spaceBeforeArrow))
-
-        val caseBodyOmitBraces = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
-        val caseBody = visitTree(caseDef.body) match {
-          case block: J.Block if block.getMarkers.findFirst(classOf[OmitBraces]).isPresent => block
-          case block: J.Block =>
-            // Block has its own braces (e.g. `case _ => { stmts }`). Wrap it in an
-            // OmitBraces shell so the inner block keeps its own end space and the
-            // shell can carry the catch's trailing space (before the outer `}`).
-            val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(block))
-            new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces,
-              JRightPadded.build(false), s, Space.EMPTY)
-          case stmt: Statement =>
-            val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(stmt))
-            new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
-          case expr: Expression =>
-            val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
-            new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
-          case _ => new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces, JRightPadded.build(false), new util.ArrayList(), Space.EMPTY)
-        }
-        updateCursor(caseDef.span.end)
-        val thisCatchPrefix = if (catches.isEmpty) catchPrefix else casePrefix
-        catches.add(new J.Try.Catch(Tree.randomId(), thisCatchPrefix, Markers.EMPTY, controlParens, caseBody))
-      }
-      // Extract end space before closing '}'  and set it on the last catch body
-      if (catchHasBraces && cursor < source.length) {
-        val ci = positionOfNext("}")
-        if (ci >= cursor) {
-          val endSpace = if (ci > cursor) ScalaSpace.format(source, cursor, ci) else Space.EMPTY
-          // Update last catch body's end space
-          if (!catches.isEmpty) {
-            val lastCatch = catches.get(catches.size - 1)
-            val updatedBody = lastCatch.getBody.withEnd(endSpace)
-            catches.set(catches.size - 1, lastCatch.withBody(updatedBody))
-          }
-          cursor = ci + 1
-        }
-      }
-    }
-
-    // Handle finalizer
-    val finallyBlock: JLeftPadded[J.Block] = if (!parsedTry.finalizer.isEmpty && parsedTry.finalizer.span.exists) {
-      val finallyAbs = positionOfNext("finally")
-      val fSpace = if (finallyAbs > cursor) ScalaSpace.format(source, cursor, finallyAbs) else Space.EMPTY
-      if (finallyAbs >= cursor) cursor = finallyAbs + 7
-      val parsedFinallyOmitBraces = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
-      val fb = visitTree(parsedTry.finalizer) match {
-        case block: J.Block => block
-        case stmt: Statement =>
-          val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(stmt))
-          new J.Block(Tree.randomId(), Space.EMPTY, parsedFinallyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
-        case expr: Expression =>
-          val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
-          new J.Block(Tree.randomId(), Space.EMPTY, parsedFinallyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
-        case _ => null
-      }
-      if (fb != null) JLeftPadded.build(fb).withBefore(fSpace) else null
-    } else null
+    val finallyBlock = buildTryFinalizer(parsedTry.finalizer)
 
     updateCursor(parsedTry.span.end)
-    val tryMarkers = if (catchHasBraces) Markers.EMPTY
-      else Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
-    new J.Try(Tree.randomId(), prefix, tryMarkers, null, body, catches, finallyBlock)
+    buildSTry(prefix, body, catches, finallyBlock)
   }
 
-  private def visitTryImpl(tryTree: Trees.Try[?]): J.Try = {
+  private def visitTryImpl(tryTree: Trees.Try[?]): J = {
     val prefix = extractPrefix(tryTree.span)
     val tryStart = Math.max(0, tryTree.span.start - offsetAdjustment)
     if (tryStart >= cursor && tryStart + 3 <= source.length) cursor = tryStart + 3
 
+    val body = buildTryBody(tryTree.expr)
+
+    val catches: JLeftPadded[J.Block] =
+      if (tryTree.cases.nonEmpty) buildCatchBlock(tryTree.cases.toList) else null
+
+    val finallyBlock = buildTryFinalizer(tryTree.finalizer)
+
+    updateCursor(tryTree.span.end)
+    buildSTry(prefix, body, catches, finallyBlock)
+  }
+
+  /** Visit the `try` body, wrapping a bare statement/expression in an OmitBraces block. */
+  private def buildTryBody(expr: Trees.Tree[?]): J.Block = {
     val omitBracesMarkers = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
-    val body = visitTree(tryTree.expr) match {
+    visitTree(expr) match {
       case block: J.Block => block
       case stmt: Statement =>
         val stmts = new util.ArrayList[JRightPadded[Statement]]()
         stmts.add(JRightPadded.build(stmt))
         new J.Block(Tree.randomId(), Space.EMPTY, omitBracesMarkers, JRightPadded.build(false), stmts, Space.EMPTY)
-      case expr: Expression =>
+      case e: Expression =>
         val stmts = new util.ArrayList[JRightPadded[Statement]]()
-        stmts.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
+        stmts.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), e)))
         new J.Block(Tree.randomId(), Space.EMPTY, omitBracesMarkers, JRightPadded.build(false), stmts, Space.EMPTY)
-      case _ => return visitUnknown(tryTree).asInstanceOf[J.Try]
+      case other => throw new IllegalStateException(
+        s"try body must map to a Block, Statement, or Expression, got: ${if (other == null) "null" else other.getClass.getName}")
     }
+  }
 
-    val catches = new util.ArrayList[J.Try.Catch]()
-    var catchHasBraces = true
-    if (tryTree.cases.nonEmpty) {
-      // Extract space before "catch" keyword — this becomes the first Catch's prefix
-      val catchAbs = positionOfNext("catch")
-      val catchPrefix = if (catchAbs > cursor) ScalaSpace.format(source, cursor, catchAbs) else Space.EMPTY
-      if (catchAbs >= cursor) cursor = catchAbs + 5
-      // Scala 3 `catch case ... =>` (no braces) — only consume `{` if it appears before the first `case`.
-      val braceSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
-      val braceIdx = positionOfNextIn(braceSearch, "{", 0)
-      val firstCaseIdx = positionOfNextIn(braceSearch, "case", 0)
-      catchHasBraces = braceIdx >= 0 && (firstCaseIdx < 0 || braceIdx < firstCaseIdx)
-      val catchBraceSpace = if (catchHasBraces && braceIdx > 0) Space.format(braceSearch.substring(0, braceIdx)) else Space.EMPTY
-      if (catchHasBraces) cursor = cursor + braceIdx + 1
+  /**
+   * Build the catch handler as a `J.Block` of `J.Case`, reusing [[buildCase]] so the
+   * patterns (extractors, alternatives, at-bindings) are richly modelled rather than
+   * crammed into an identifier. The returned padding's before-space is the space before
+   * `catch`; the block prefix is the space before `{` (empty + OmitBraces for Scala 3's
+   * brace-less `catch case` form).
+   */
+  private def buildCatchBlock(cases: List[Trees.CaseDef[?]]): JLeftPadded[J.Block] = {
+    val catchAbs = positionOfNext("catch")
+    val beforeCatch = if (catchAbs > cursor) ScalaSpace.format(source, cursor, catchAbs) else Space.EMPTY
+    if (catchAbs >= cursor) cursor = catchAbs + 5
+    // Scala 3 `catch case ... =>` (no braces) — only consume `{` if it appears before the first `case`.
+    val braceSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
+    val braceIdx = positionOfNextIn(braceSearch, "{", 0)
+    val firstCaseIdx = positionOfNextIn(braceSearch, "case", 0)
+    val hasBraces = braceIdx >= 0 && (firstCaseIdx < 0 || braceIdx < firstCaseIdx)
+    val blockPrefix = if (hasBraces && braceIdx > 0) Space.format(braceSearch.substring(0, braceIdx)) else Space.EMPTY
+    if (hasBraces) cursor = cursor + braceIdx + 1
 
-      for (caseDef <- tryTree.cases) {
-        val casePrefix = extractPrefix(caseDef.span)
-        val caseStart = Math.max(0, caseDef.span.start - offsetAdjustment)
-        if (caseStart >= cursor) cursor = caseStart
-        val caseSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
-        val caseKwIdx = positionOfNextIn(caseSearch, "case", 0)
-        if (caseKwIdx >= 0) cursor = cursor + caseKwIdx + 4
+    val caseStatements = new util.ArrayList[JRightPadded[Statement]]()
+    for (caseDef <- cases) caseStatements.add(buildCase(caseDef))
 
-        val arrowSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
-        val arrowIdx = positionOfNextIn(arrowSearch, "=>", 0)
-
-        // Extract param name and type from the catch pattern without disturbing cursor.
-        // Handles: `e: Exception`, `_: A | _: B` (Alternative), `_` (wildcard)
-        val (paramName, paramType): (String, TypeTree) = caseDef.pat match {
-          case bind: Trees.Bind[?] => bind.body match {
-            case typed: Trees.Typed[?] =>
-              val tpeName = typed.tpt match { case id: Trees.Ident[?] => id.name.toString; case sel: Trees.Select[?] => extractSource(sel.span); case _ => null }
-              (bind.name.toString, if (tpeName != null) ident(tpeName, Space.format(" ")) else null)
-            case _ =>
-              // e.g. `e @ (_: A | _: B)` — bind over an Alternative (or other pattern);
-              // preserve the full source so the `@ (...)` part isn't lost on print.
-              val patSource = if (caseDef.pat.span.exists) extractSource(caseDef.pat.span) else ""
-              (if (patSource.nonEmpty) patSource else bind.name.toString, null)
-          }
-          case typed: Trees.Typed[?] =>
-            val name = typed.expr match { case id: Trees.Ident[?] => id.name.toString; case _ => "_" }
-            val tpeName = typed.tpt match { case id: Trees.Ident[?] => id.name.toString; case sel: Trees.Select[?] => extractSource(sel.span); case _ => null }
-            (name, if (tpeName != null) ident(tpeName, Space.format(" ")) else null)
-          case alt: Trees.Alternative[?] =>
-            // Multi-pattern: `_: A | _: B` — preserve full source as the "name", no separate type
-            val patSource = extractSource(caseDef.pat.span)
-            (patSource, null)
-          case _ =>
-            // Any other pattern (e.g. UnApply extractor `NonFatal(e)`, tuple, literal) —
-            // preserve the full source text so the binding/extractor isn't lost on print.
-            val patSource = if (caseDef.pat.span.exists) extractSource(caseDef.pat.span) else ""
-            (if (patSource.nonEmpty) patSource else "_", null)
-        }
-        // Capture the whitespace between the param name and `:` (e.g. `e : Exception`).
-        val beforeColon: Space = if (paramType != null && caseDef.pat.span.exists) {
-          val patStart = Math.max(0, caseDef.pat.span.start - offsetAdjustment)
-          val patEnd = Math.max(0, caseDef.pat.span.end - offsetAdjustment)
-          val patSrc = if (patStart < patEnd && patEnd <= source.length) source.substring(patStart, patEnd) else ""
-          val colonAt = positionOfNextIn(patSrc, ":", 0)
-          val nameAt = if (paramName.nonEmpty) positionOfNextIn(patSrc, paramName, 0) else -1
-          if (colonAt > 0 && nameAt >= 0 && nameAt + paramName.length <= colonAt) {
-            Space.format(patSrc.substring(nameAt + paramName.length, colonAt))
-          } else Space.EMPTY
-        } else Space.EMPTY
-        updateCursor(caseDef.pat.span.end)
-        val arrowAbs = positionOfNext("=>", cursor)
-        val spaceBeforeArrow = if (arrowAbs >= cursor) ScalaSpace.format(source, cursor, arrowAbs) else Space.EMPTY
-        if (arrowIdx >= 0 && arrowAbs >= 0) cursor = arrowAbs + 2
-
-        val paramId = ident(paramName, Space.format(" "))
-        val namedVar = new J.VariableDeclarations.NamedVariable(Tree.randomId(), Space.EMPTY, Markers.EMPTY, paramId, Collections.emptyList(), null, null)
-        val varDecl = new J.VariableDeclarations(Tree.randomId(), casePrefix, Markers.EMPTY,
-          Collections.emptyList(), Collections.emptyList(), paramType,
-          if (beforeColon != Space.EMPTY) beforeColon else null,
-          Collections.emptyList(),
-          Collections.singletonList(JRightPadded.build(namedVar)))
-        val controlPrefix = if (catches.isEmpty) catchBraceSpace else Space.EMPTY
-        val controlParens = new J.ControlParentheses[J.VariableDeclarations](Tree.randomId(), controlPrefix, Markers.EMPTY, JRightPadded.build(varDecl).withAfter(spaceBeforeArrow))
-
-        val caseBodyOmitBraces = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
-        val caseBody = visitTree(caseDef.body) match {
-          case block: J.Block if block.getMarkers.findFirst(classOf[OmitBraces]).isPresent => block
-          case block: J.Block =>
-            val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(block))
-            new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces,
-              JRightPadded.build(false), s, Space.EMPTY)
-          case stmt: Statement =>
-            val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(stmt))
-            new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
-          case expr: Expression =>
-            val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
-            new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
-          case _ => new J.Block(Tree.randomId(), Space.EMPTY, caseBodyOmitBraces, JRightPadded.build(false), new util.ArrayList(), Space.EMPTY)
-        }
-        updateCursor(caseDef.span.end)
-        // First catch gets catchPrefix (space before "catch"); subsequent get casePrefix
-        val thisCatchPrefix = if (catches.isEmpty) catchPrefix else casePrefix
-        catches.add(new J.Try.Catch(Tree.randomId(), thisCatchPrefix, Markers.EMPTY, controlParens, caseBody))
-      }
-      // Extract end space before closing '}' and set it on the last catch body
-      if (catchHasBraces && cursor < source.length) {
-        val ci = positionOfNext("}")
-        if (ci >= cursor) {
-          val endSpace = if (ci > cursor) ScalaSpace.format(source, cursor, ci) else Space.EMPTY
-          if (!catches.isEmpty) {
-            val lastCatch = catches.get(catches.size - 1)
-            val updatedBody = lastCatch.getBody.withEnd(endSpace)
-            catches.set(catches.size - 1, lastCatch.withBody(updatedBody))
-          }
-          cursor = ci + 1
-        }
+    var endSpace = Space.EMPTY
+    if (hasBraces && cursor < source.length) {
+      val ci = positionOfNext("}")
+      if (ci >= cursor) {
+        endSpace = if (ci > cursor) ScalaSpace.format(source, cursor, ci) else Space.EMPTY
+        cursor = ci + 1
       }
     }
+    val blockMarkers = if (hasBraces) Markers.EMPTY
+      else Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
+    val casesBlock = new J.Block(Tree.randomId(), blockPrefix, blockMarkers, JRightPadded.build(false), caseStatements, endSpace)
+    JLeftPadded.build(casesBlock).withBefore(beforeCatch)
+  }
 
-    val finallyBlock: JLeftPadded[J.Block] = if (!tryTree.finalizer.isEmpty && tryTree.finalizer.span.exists) {
-      val finallyAbs = positionOfNext("finally")
-      val fSpace = if (finallyAbs > cursor) ScalaSpace.format(source, cursor, finallyAbs) else Space.EMPTY
-      if (finallyAbs >= cursor) cursor = finallyAbs + 7
-      val finallyOmitBraces = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
-      val fb = visitTree(tryTree.finalizer) match {
-        case block: J.Block => block
-        case stmt: Statement =>
-          val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(stmt))
-          new J.Block(Tree.randomId(), Space.EMPTY, finallyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
-        case expr: Expression =>
-          val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
-          new J.Block(Tree.randomId(), Space.EMPTY, finallyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
-        case _ => null
-      }
-      if (fb != null) JLeftPadded.build(fb).withBefore(fSpace) else null
-    } else null
+  /** Visit the `finally` block, if present, capturing the space before the `finally` keyword. */
+  private def buildTryFinalizer(finalizer: Trees.Tree[?]): JLeftPadded[J.Block] = {
+    if (finalizer.isEmpty || !finalizer.span.exists) return null
+    val finallyAbs = positionOfNext("finally")
+    val fSpace = if (finallyAbs > cursor) ScalaSpace.format(source, cursor, finallyAbs) else Space.EMPTY
+    if (finallyAbs >= cursor) cursor = finallyAbs + 7
+    val finallyOmitBraces = Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId())))
+    val fb = visitTree(finalizer) match {
+      case block: J.Block => block
+      case stmt: Statement =>
+        val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(stmt))
+        new J.Block(Tree.randomId(), Space.EMPTY, finallyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
+      case e: Expression =>
+        val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), e)))
+        new J.Block(Tree.randomId(), Space.EMPTY, finallyOmitBraces, JRightPadded.build(false), s, Space.EMPTY)
+      case _ => null
+    }
+    if (fb != null) JLeftPadded.build(fb).withBefore(fSpace) else null
+  }
 
-    updateCursor(tryTree.span.end)
-    val tryMarkers = if (catchHasBraces) Markers.EMPTY
-      else Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
-    new J.Try(Tree.randomId(), prefix, tryMarkers, null, body, catches, finallyBlock)
+  private def buildSTry(prefix: Space, body: J.Block, catches: JLeftPadded[J.Block], finallyBlock: JLeftPadded[J.Block]): S.Try = {
+    // A brace-less catch (Scala 3 `catch case`) flags indented syntax on the whole try.
+    val braceless = catches != null && catches.getElement.getMarkers.findFirst(classOf[OmitBraces]).isPresent
+    val tryMarkers = if (braceless) Markers.build(Collections.singletonList(new IndentedSyntax(Tree.randomId())))
+      else Markers.EMPTY
+    S.Try.build(Tree.randomId(), prefix, tryMarkers, body, catches, finallyBlock, null)
   }
 
   private def visitMatchTree(matchTree: Trees.Match[?]): J = {
@@ -7322,76 +7117,87 @@ class ScalaTreeVisitor(
     new J.Switch(Tree.randomId(), prefix, Markers.build(markersList), selectorParens, casesBlock)
   }
 
+  /**
+   * Build a single `case pat [if guard] => body` clause as a J.Case wrapped in a
+   * JRightPadded (carrying a Semicolon marker when the case is `;`-terminated).
+   * Shared by match blocks ([[buildCasesBlock]]) and try/catch handlers so that
+   * catch patterns get the same rich modelling (extractors, alternatives, bindings)
+   * instead of being crammed into an identifier name.
+   */
+  private def buildCase(caseDef: Trees.CaseDef[?]): JRightPadded[Statement] = {
+    val casePrefix = extractPrefix(caseDef.span)
+    val cs = Math.max(0, caseDef.span.start - offsetAdjustment); if (cs >= cursor) cursor = cs
+    val ck = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
+    val cki = positionOfNextIn(ck, "case", 0); if (cki >= 0) cursor = cursor + cki + 4
+
+    val patternJ = visitTree(caseDef.pat) match { case j: J => j; case _ => ident("_", Space.format(" ")) }
+
+    // Handle guard: `case x if condition =>`
+    // Store space-before-if in label's after space so the printer can emit it.
+    // Store space between guard expression end and `=>` in the statements
+    // container's `before` space (matching the Java printer's convention).
+    var guard: Expression = null
+    var labelAfter = Space.EMPTY
+    var guardArrowSpace = Space.EMPTY
+    if (!caseDef.guard.isEmpty && caseDef.guard.span.exists) {
+      val ifPos = positionOfNext("if")
+      if (ifPos > cursor) labelAfter = ScalaSpace.format(source, cursor, ifPos)
+      if (ifPos >= 0) cursor = ifPos + 2  // past "if"
+      val guardResult = visitTree(caseDef.guard)
+      guardResult match {
+        case expr: Expression => guard = expr
+        case j: J => guard = new S.StatementExpression(Tree.randomId(), j)
+        case _ =>
+      }
+      val arrowPos = positionOfNext("=>", cursor)
+      if (arrowPos >= cursor) guardArrowSpace = ScalaSpace.format(source, cursor, arrowPos)
+    } else {
+      val arrowPos = positionOfNext("=>", cursor)
+      if (arrowPos >= cursor) labelAfter = ScalaSpace.format(source, cursor, arrowPos)
+    }
+    val labels = new util.ArrayList[JRightPadded[J]]()
+    labels.add(JRightPadded.build(patternJ).withAfter(labelAfter))
+
+    val as = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
+    val ai = positionOfNextIn(as, "=>", 0); if (ai >= 0) { val aa = positionOfNext("=>", cursor); if (aa >= 0) cursor = aa + 2 }
+
+    val caseBodyJ = visitTree(caseDef.body) match { case j: J => JRightPadded.build(j); case _ => null }
+    // Compute the end of the body's actual content from the AST (not from
+    // the cursor, which may have overshot when Dotty's body span included
+    // the `;` or part of the next case).
+    val bodyContentEnd: Int = caseDef.body match {
+      case b: Trees.Block[?] =>
+        if (!b.expr.isEmpty && b.expr.span.exists) Math.max(0, b.expr.span.end - offsetAdjustment)
+        else if (b.stats.nonEmpty && b.stats.last.span.exists) Math.max(0, b.stats.last.span.end - offsetAdjustment)
+        else if (b.span.exists) Math.max(0, b.span.end - offsetAdjustment)
+        else cursor
+      case t if t.span.exists => Math.max(0, t.span.end - offsetAdjustment)
+      case _ => cursor
+    }
+    updateCursor(caseDef.span.end)
+
+    // If the next non-whitespace token immediately after the body content is
+    // `;`, preserve it via a Semicolon marker on the JRightPadded wrapping
+    // the case (e.g. `case a => x; case b => y`).
+    var caseRpMarkers = Markers.EMPTY
+    val caseRpAfter = Space.EMPTY
+    val nextNonWs = indexOfNextNonWhitespace(bodyContentEnd)
+    if (nextNonWs < source.length && source.charAt(nextNonWs) == ';') {
+      caseRpMarkers = Markers.EMPTY.add(new Semicolon(Tree.randomId()))
+      cursor = nextNonWs + 1
+    }
+
+    val statementsContainer: JContainer[Statement] =
+      JContainer.build(guardArrowSpace, java.util.Collections.emptyList[JRightPadded[Statement]](), Markers.EMPTY)
+    val jCase = new J.Case(Tree.randomId(), casePrefix, Markers.EMPTY, J.Case.Type.Rule,
+      null, null, JContainer.build(Space.EMPTY, labels, Markers.EMPTY), guard, statementsContainer, caseBodyJ)
+    new JRightPadded[Statement](jCase.asInstanceOf[Statement], caseRpAfter, caseRpMarkers)
+  }
+
   private def buildCasesBlock(matchTree: Trees.Match[?], hasClosingBrace: Boolean = true): J.Block = {
     val caseStatements = new util.ArrayList[JRightPadded[Statement]]()
     for (caseDef <- matchTree.cases) {
-      val casePrefix = extractPrefix(caseDef.span)
-      val cs = Math.max(0, caseDef.span.start - offsetAdjustment); if (cs >= cursor) cursor = cs
-      val ck = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
-      val cki = positionOfNextIn(ck, "case", 0); if (cki >= 0) cursor = cursor + cki + 4
-
-      val patternJ = visitTree(caseDef.pat) match { case j: J => j; case _ => ident("_", Space.format(" ")) }
-
-      // Handle guard: `case x if condition =>`
-      // Store space-before-if in label's after space so the printer can emit it.
-      // Store space between guard expression end and `=>` in the statements
-      // container's `before` space (matching the Java printer's convention).
-      var guard: Expression = null
-      var labelAfter = Space.EMPTY
-      var guardArrowSpace = Space.EMPTY
-      if (!caseDef.guard.isEmpty && caseDef.guard.span.exists) {
-        val ifPos = positionOfNext("if")
-        if (ifPos > cursor) labelAfter = ScalaSpace.format(source, cursor, ifPos)
-        if (ifPos >= 0) cursor = ifPos + 2  // past "if"
-        val guardResult = visitTree(caseDef.guard)
-        guardResult match {
-          case expr: Expression => guard = expr
-          case j: J => guard = new S.StatementExpression(Tree.randomId(), j)
-          case _ =>
-        }
-        val arrowPos = positionOfNext("=>", cursor)
-        if (arrowPos >= cursor) guardArrowSpace = ScalaSpace.format(source, cursor, arrowPos)
-      } else {
-        val arrowPos = positionOfNext("=>", cursor)
-        if (arrowPos >= cursor) labelAfter = ScalaSpace.format(source, cursor, arrowPos)
-      }
-      val labels = new util.ArrayList[JRightPadded[J]]()
-      labels.add(JRightPadded.build(patternJ).withAfter(labelAfter))
-
-      val as = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
-      val ai = positionOfNextIn(as, "=>", 0); if (ai >= 0) { val aa = positionOfNext("=>", cursor); if (aa >= 0) cursor = aa + 2 }
-
-      val caseBodyJ = visitTree(caseDef.body) match { case j: J => JRightPadded.build(j); case _ => null }
-      // Compute the end of the body's actual content from the AST (not from
-      // the cursor, which may have overshot when Dotty's body span included
-      // the `;` or part of the next case).
-      val bodyContentEnd: Int = caseDef.body match {
-        case b: Trees.Block[?] =>
-          if (!b.expr.isEmpty && b.expr.span.exists) Math.max(0, b.expr.span.end - offsetAdjustment)
-          else if (b.stats.nonEmpty && b.stats.last.span.exists) Math.max(0, b.stats.last.span.end - offsetAdjustment)
-          else if (b.span.exists) Math.max(0, b.span.end - offsetAdjustment)
-          else cursor
-        case t if t.span.exists => Math.max(0, t.span.end - offsetAdjustment)
-        case _ => cursor
-      }
-      updateCursor(caseDef.span.end)
-
-      // If the next non-whitespace token immediately after the body content is
-      // `;`, preserve it via a Semicolon marker on the JRightPadded wrapping
-      // the case (e.g. `case a => x; case b => y`).
-      var caseRpMarkers = Markers.EMPTY
-      val caseRpAfter = Space.EMPTY
-      val nextNonWs = indexOfNextNonWhitespace(bodyContentEnd)
-      if (nextNonWs < source.length && source.charAt(nextNonWs) == ';') {
-        caseRpMarkers = Markers.EMPTY.add(new Semicolon(Tree.randomId()))
-        cursor = nextNonWs + 1
-      }
-
-      val statementsContainer: JContainer[Statement] =
-        JContainer.build(guardArrowSpace, java.util.Collections.emptyList[JRightPadded[Statement]](), Markers.EMPTY)
-      val jCase = new J.Case(Tree.randomId(), casePrefix, Markers.EMPTY, J.Case.Type.Rule,
-        null, null, JContainer.build(Space.EMPTY, labels, Markers.EMPTY), guard, statementsContainer, caseBodyJ)
-      caseStatements.add(new JRightPadded[Statement](jCase.asInstanceOf[Statement], caseRpAfter, caseRpMarkers))
+      caseStatements.add(buildCase(caseDef))
     }
 
     // Extract space before closing brace of match block (or up to span end for indented form)

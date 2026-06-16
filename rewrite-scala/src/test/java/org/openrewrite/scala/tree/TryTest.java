@@ -16,8 +16,14 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class TryTest implements RewriteTest {
@@ -389,6 +395,73 @@ class TryTest implements RewriteTest {
             }
             """
         ));
+    }
+
+    @Test
+    void catchPatternsNotCrammedIntoIdentifier() {
+        assertNoPatternInIdentifier(
+            """
+            object Test {
+              try {
+                println("risky")
+              } catch {
+                case NonFatal(e) => println(e)
+                case _: IllegalArgumentException | _: IllegalStateException => println("illegal")
+                case e @ (_: ClassNotFoundException) => println(e)
+              }
+            }
+            """
+        );
+    }
+
+    @Test
+    void scala3BracelessCatch() {
+        rewriteRun(scala(
+            """
+            object Test {
+              def run(): Unit =
+                try risky()
+                catch
+                  case _: RuntimeException => recover()
+                  case NonFatal(e) => log(e)
+            }
+            """
+        ));
+    }
+
+    @Test
+    void scala3BracelessCatchWithFinally() {
+        rewriteRun(scala(
+            """
+            object Test {
+              def run(): Unit =
+                try risky()
+                catch case _: Exception => recover()
+                finally cleanup()
+            }
+            """
+        ));
+    }
+
+    private void assertNoPatternInIdentifier(String source) {
+        rewriteRun(
+            scala(
+                source,
+                spec -> spec.afterRecipe(cu -> {
+                    List<String> identifierNames = new ArrayList<>();
+                    new JavaIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                            identifierNames.add(identifier.getSimpleName());
+                            return super.visitIdentifier(identifier, p);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(identifierNames)
+                      .as("catch-pattern source text should not be crammed into an identifier name")
+                      .allSatisfy(name -> assertThat(name).doesNotContain("(", "|", "@", ":"));
+                })
+            )
+        );
     }
 
     @Test
