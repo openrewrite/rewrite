@@ -22,7 +22,8 @@ the bare ``TreeVisitor`` doesn't implement, raising ``AttributeError``.
 """
 
 from dataclasses import fields
-from uuid import uuid4
+from uuid import UUID
+from rewrite import random_id
 
 from rewrite import Markers, TreeVisitor
 from rewrite.java.support_types import Space
@@ -33,7 +34,7 @@ def _empty_py_compilation_unit(*, markers: Markers = Markers.EMPTY):
     """Construct a minimal ``Py.CompilationUnit`` for visitor tests."""
     from rewrite.python.tree import CompilationUnit
     cu_fields = {f.name: None for f in fields(CompilationUnit) if f.init}
-    cu_fields['_id'] = uuid4()
+    cu_fields['_id'] = random_id()
     cu_fields['_markers'] = markers
     cu_fields['_prefix'] = Space.EMPTY
     cu_fields['_imports'] = []
@@ -88,12 +89,13 @@ class TestTreeVisitorAdapt:
         on a ``Py.CompilationUnit``."""
         from rewrite.rpc.server import _collect_search_result_ids
 
-        sr_id = uuid4()
-        markers = Markers(uuid4(), [SearchResult(sr_id, "test")])
+        sr_id = random_id()
+        markers = Markers(random_id(), [SearchResult(sr_id, "test")])
         cu = _empty_py_compilation_unit(markers=markers)
 
         ids = _collect_search_result_ids(cu)
-        assert ids == {str(sr_id)}
+        # ids are stored internally as int; the collector emits canonical UUID strings
+        assert ids == {str(UUID(int=sr_id))}
 
     def test_adapt_returns_self_for_already_correct_visitor_type(self):
         """``adapt`` is a no-op when the visitor already is-a target type."""

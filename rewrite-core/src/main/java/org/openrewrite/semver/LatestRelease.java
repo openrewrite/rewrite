@@ -174,11 +174,11 @@ public class LatestRelease implements VersionComparator {
     }
 
     private static boolean matchesMetadata(String version, String metadataPattern) {
-        java.util.regex.Matcher m = VersionComparator.RELEASE_PATTERN.matcher(version);
-        if (!m.matches()) {
+        ParsedVersion parsed = ParsedVersion.parse(version);
+        if (!parsed.matches()) {
             return false;
         }
-        String qualifier = m.group("qualifier");
+        String qualifier = parsed.qualifier();
         return qualifier != null && qualifier.matches(metadataPattern);
     }
 

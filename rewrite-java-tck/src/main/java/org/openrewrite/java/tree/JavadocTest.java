@@ -1627,6 +1627,77 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    // Java 25's Javadoc parser emits "// comment" inside <pre><code> blocks as nodes whose body lacks
+    // the leading space after the margin asterisk. The visitText whitespace compensation must re-insert
+    // that space before the "//" (not after it), otherwise "* // comment" reprints as "*//  comment".
+    @Issue("https://github.com/openrewrite/rewrite/issues/8002")
+    @Test
+    void lineCommentInPreCodeBlockIsIdempotent() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Example:
+                   * <pre><code class='java'>
+                   *
+                   * // assertions will pass
+                   * assertThat(1).isEqualTo(1);
+                   *
+                   * </code></pre>
+                   */
+                  void method() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8002")
+    @Test
+    void lineCommentDirectlyAfterAsteriskSpaceIsIdempotent() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * <pre><code>
+                   * // line comment
+                   * int x = 1;
+                   * </code></pre>
+                   */
+                  void method() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8002")
+    @Test
+    void lineCommentInPreBlockWithMultipleLines() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * Description.
+                   * <pre><code class='java'>
+                   *
+                   * // first comment
+                   * doSomething();
+                   * // second comment
+                   * doSomethingElse();
+                   *
+                   * </code></pre>
+                   */
+                  void method() {}
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1409")
     @Test
     void trailingWhitespaceWithWhitespaceOnEmptyLine() {

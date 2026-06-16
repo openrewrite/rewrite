@@ -10,7 +10,7 @@ from .execution import ExecutionContext, InMemoryExecutionContext
 from .markers import Markers, ParseExceptionResult
 from .result import Result
 from .tree import SourceFile, Tree, PrintOutputCapture, PrinterFactory, FileAttributes, Checksum
-from .utils import random_id
+from .utils import random_id, replace_if_changed
 from .visitor import TreeVisitor, Cursor
 
 
@@ -60,12 +60,8 @@ class ParseError(SourceFile):
 
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id: UUID) -> 'ParseError':
-        return self if id is self._id else replace(self, _id=id)
+        return replace_if_changed(self, _id=id)
 
     _markers: Markers
 

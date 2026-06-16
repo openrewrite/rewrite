@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.table.FieldsOfTypeUses;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
 
@@ -79,7 +80,7 @@ public class FindFieldsOfType extends Recipe {
                             varType = variable.getInitializer().getType().toString();
                         }
                         fieldsOfTypeUses.insertRow(ctx, new FieldsOfTypeUses.Row(
-                            getCursor().firstEnclosingOrThrow(J.CompilationUnit.class).getSourcePath().toString(),
+                            getCursor().firstEnclosingOrThrow(JavaSourceFile.class).getSourcePath().toString(),
                             variable.getSimpleName(),
                             multiVariable.getTypeExpression().getType().toString(),
                             varType,

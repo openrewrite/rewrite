@@ -578,6 +578,92 @@ public interface S extends J {
     }
 
     /**
+     * Represents a Scala 3 union type: {@code A | B | ...}. For example the return type in
+     * {@code def f: Int | String} or a parameter type {@code def display(op: "resize" | "thumbnail")}.
+     * Operands are held as {@link Expression}s rather than {@link TypeTree}s because singleton
+     * literal types (e.g. {@code "resize"}) are modeled as {@link J.Literal}, which is an
+     * {@code Expression} but not a {@code TypeTree}. Each operand's {@code after} space is the
+     * whitespace before the following {@code |}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class UnionType implements S, TypeTree, Expression {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        JContainer<Expression> types;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public static UnionType build(UUID id, Space prefix, Markers markers,
+                                      JContainer<Expression> types, @Nullable JavaType type) {
+            return new UnionType(null, id, prefix, markers, types, type);
+        }
+
+        public List<Expression> getTypes() {
+            return types.getElements();
+        }
+
+        public UnionType withTypes(List<Expression> types) {
+            return getPadding().withTypes(JContainer.withElements(this.types, types));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitUnionType(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final UnionType t;
+
+            public JContainer<Expression> getTypes() {
+                return t.types;
+            }
+
+            public UnionType withTypes(JContainer<Expression> types) {
+                return t.types == types ? t :
+                        new UnionType(null, t.id, t.prefix, t.markers, types, t.type);
+            }
+        }
+    }
+
+    /**
      * Represents a wildcard/underscore placeholder in expressions.
      * Used for partially applied functions (e.g., add(5, _)) and pattern matching.
      * This is NOT for type wildcards (use J.Wildcard) or import wildcards (use * in J.Import).
@@ -1504,6 +1590,103 @@ public interface S extends J {
     }
 
     /**
+     * Represents a parent constructor invocation in an {@code extends}/{@code with} clause,
+     * e.g. {@code class E(msg: String) extends Exception(msg)}. Models the supertype together
+     * with its constructor arguments.
+     * <p>
+     * Implements {@link TypeTree} so it can occupy the {@code extends}/{@code implements} slots
+     * of {@link J.ClassDeclaration} (which hold {@code TypeTree}, not {@code Expression}), mirroring
+     * {@code K.ConstructorInvocation} in rewrite-kotlin. The leading {@code extends}/{@code with}
+     * keyword space is held by the surrounding {@link J.ClassDeclaration} padding, so this node's
+     * {@code prefix} is the space between that keyword and the supertype.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ConstructorInvocation implements S, TypeTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        TypeTree typeTree;
+
+        JContainer<Expression> arguments;
+
+        public List<Expression> getArguments() {
+            return arguments.getElements();
+        }
+
+        public S.ConstructorInvocation withArguments(List<Expression> arguments) {
+            return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
+        }
+
+        public static ConstructorInvocation build(UUID id, Space prefix, Markers markers,
+                                                  TypeTree typeTree, JContainer<Expression> arguments) {
+            return new ConstructorInvocation(null, id, prefix, markers, typeTree, arguments);
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return typeTree.getType();
+        }
+
+        @Override
+        public S.ConstructorInvocation withType(@Nullable JavaType type) {
+            return withTypeTree(typeTree.withType(type));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitConstructorInvocation(this, p);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final S.ConstructorInvocation t;
+
+            public JContainer<Expression> getArguments() {
+                return t.arguments;
+            }
+
+            public S.ConstructorInvocation withArguments(JContainer<Expression> arguments) {
+                return t.arguments == arguments ? t : new S.ConstructorInvocation(null, t.id, t.prefix, t.markers, t.typeTree, arguments);
+            }
+        }
+    }
+
+    /**
      * Represents a Scala singleton type: {@code foo.type}.
      * The qualifier is any expression, typically an object/module reference.
      */
@@ -2062,6 +2245,14 @@ public interface S extends J {
         Markers markers;
 
         /**
+         * The optional type parameter clause, e.g., {@code [A]} in
+         * {@code extension [A](x: List[A])}. {@code null} when the extension has no
+         * type parameters.
+         */
+        @With @Getter
+        J.@Nullable TypeParameters typeParameters;
+
+        /**
          * The extension parameter list, e.g., {@code (x: T)}. The container's before-space
          * is the space before the {@code (} bracket.
          */
@@ -2074,8 +2265,9 @@ public interface S extends J {
         J.Block body;
 
         public static ExtensionMethods build(UUID id, Space prefix, Markers markers,
+                                             J.@Nullable TypeParameters typeParameters,
                                              JContainer<Statement> parameters, J.Block body) {
-            return new ExtensionMethods(null, id, prefix, markers, parameters, body);
+            return new ExtensionMethods(null, id, prefix, markers, typeParameters, parameters, body);
         }
 
         public List<Statement> getParameters() {
@@ -2121,7 +2313,7 @@ public interface S extends J {
 
             public ExtensionMethods withParameters(JContainer<Statement> parameters) {
                 return t.parameters == parameters ? t :
-                        new ExtensionMethods(null, t.id, t.prefix, t.markers, parameters, t.body);
+                        new ExtensionMethods(null, t.id, t.prefix, t.markers, t.typeParameters, parameters, t.body);
             }
         }
     }
@@ -2584,6 +2776,136 @@ public interface S extends J {
         @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * Scala {@code try}/{@code catch}/{@code finally}. Unlike {@link J.Try}, whose catch
+     * clauses are restricted to {@code ControlParentheses<VariableDeclarations>}, the catch
+     * handler in Scala is a partial function whose clauses can hold arbitrary patterns
+     * (extractors like {@code NonFatal(e)}, alternatives like {@code _: A | _: B}, and
+     * at-bindings like {@code e @ (_: C)}). The handler is therefore modelled as a
+     * {@link J.Block} of {@link J.Case}, exactly like a {@code match} block, so those rich
+     * patterns are preserved instead of being crammed into an identifier name.
+     * <p>
+     * Examples:
+     * <pre>{@code
+     * try { risky() } catch { case NonFatal(e) => log(e) } finally { cleanup() }
+     * try risky() catch case _: IOException => recover()   // Scala 3 brace-less
+     * }</pre>
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class Try implements S, Expression, Statement {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        @With @Getter
+        J.Block body;
+
+        /**
+         * The catch handler. The padding's before-space is the space before the
+         * {@code catch} keyword; the element is a {@link J.Block} of {@link J.Case} whose
+         * prefix is the space before the opening {@code {} (empty for the brace-less form,
+         * flagged by an {@code OmitBraces} marker on the block).
+         */
+        @Nullable
+        JLeftPadded<J.Block> catches;
+
+        /**
+         * The finalizer. The padding's before-space is the space before the
+         * {@code finally} keyword; the element is the finalizer block.
+         */
+        @Nullable
+        JLeftPadded<J.Block> finalizer;
+
+        @With @Getter
+        @Nullable
+        JavaType type;
+
+        public static S.Try build(UUID id, Space prefix, Markers markers, J.Block body,
+                                @Nullable JLeftPadded<J.Block> catches,
+                                @Nullable JLeftPadded<J.Block> finalizer, @Nullable JavaType type) {
+            return new S.Try(null, id, prefix, markers, body, catches, finalizer, type);
+        }
+
+        public J.@Nullable Block getCatches() {
+            return catches == null ? null : catches.getElement();
+        }
+
+        public S.Try withCatches(J.@Nullable Block catches) {
+            return getPadding().withCatches(catches == null ? null :
+                    (this.catches == null ? JLeftPadded.build(catches) : this.catches.withElement(catches)));
+        }
+
+        public J.@Nullable Block getFinalizer() {
+            return finalizer == null ? null : finalizer.getElement();
+        }
+
+        public S.Try withFinalizer(J.@Nullable Block finalizer) {
+            return getPadding().withFinalizer(finalizer == null ? null :
+                    (this.finalizer == null ? JLeftPadded.build(finalizer) : this.finalizer.withElement(finalizer)));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitSTry(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final S.Try t;
+
+            public @Nullable JLeftPadded<J.Block> getCatches() {
+                return t.catches;
+            }
+
+            public S.Try withCatches(@Nullable JLeftPadded<J.Block> catches) {
+                return t.catches == catches ? t :
+                        new S.Try(null, t.id, t.prefix, t.markers, t.body, catches, t.finalizer, t.type);
+            }
+
+            public @Nullable JLeftPadded<J.Block> getFinalizer() {
+                return t.finalizer;
+            }
+
+            public S.Try withFinalizer(@Nullable JLeftPadded<J.Block> finalizer) {
+                return t.finalizer == finalizer ? t :
+                        new S.Try(null, t.id, t.prefix, t.markers, t.body, t.catches, finalizer, t.type);
+            }
         }
     }
 }

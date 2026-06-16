@@ -15,7 +15,7 @@
 """Tests for Template class."""
 
 from typing import Any, Optional
-from uuid import uuid4
+from rewrite import random_id
 
 import pytest
 
@@ -82,7 +82,7 @@ class TestApplySubstitutions:
 
     @staticmethod
     def _ident(name: str) -> j.Identifier:
-        return j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], name, None, None)
+        return j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], name, None, None)
 
     def test_replace_placeholder_in_method_args(self):
         """Placeholder in method arguments is replaced correctly."""
@@ -346,7 +346,7 @@ class TestTemplateApply:
         expr = capture('expr')
         tmpl = template("print({expr})", expr=expr)
 
-        ident = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "hello", None, None)
+        ident = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "hello", None, None)
         result = tmpl.apply(cursor=None, values={'expr': ident})
 
         assert isinstance(result, j.MethodInvocation)
@@ -361,7 +361,7 @@ class TestTemplateApply:
         expr = capture('expr')
         tmpl = template("print({expr})", expr=expr)
 
-        ident = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "world", None, None)
+        ident = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "world", None, None)
         match_result = MatchResult({'expr': ident})
         result = tmpl.apply(cursor=None, values=match_result)
 
@@ -383,12 +383,12 @@ class TestMaybeParenthesize:
 
     @staticmethod
     def _ident(name: str) -> j.Identifier:
-        return j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], name, None, None)
+        return j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], name, None, None)
 
     @staticmethod
     def _binary(left, op, right) -> j.Binary:
         return j.Binary(
-            uuid4(), Space.EMPTY, Markers.EMPTY, left,
+            random_id(), Space.EMPTY, Markers.EMPTY, left,
             JRightPadded(op, Space([], ' '), Markers.EMPTY),
             right, None,
         )
@@ -423,7 +423,7 @@ class TestMaybeParenthesize:
         """`or` under `not` needs parens (not has precedence 3, or is 1)."""
         or_expr = self._binary(self._ident('a'), j.Binary.Type.Or, self._ident('b'))
         not_parent = j.Unary(
-            uuid4(), Space.EMPTY, Markers.EMPTY,
+            random_id(), Space.EMPTY, Markers.EMPTY,
             JRightPadded(j.Unary.Type.Not, Space.EMPTY, Markers.EMPTY),
             or_expr, None,
         )
@@ -465,10 +465,10 @@ class TestMaybeParenthesize:
         y_ident = self._ident('y')
         and_inner = self._binary(x_ident, j.Binary.Type.And, y_ident)
         not_expr = j.Unary(
-            uuid4(), Space.EMPTY, Markers.EMPTY,
+            random_id(), Space.EMPTY, Markers.EMPTY,
             JRightPadded(j.Unary.Type.Not, Space.EMPTY, Markers.EMPTY),
             j.Parentheses(
-                uuid4(), Space.EMPTY, Markers.EMPTY,
+                random_id(), Space.EMPTY, Markers.EMPTY,
                 JRightPadded(and_inner, Space.EMPTY, Markers.EMPTY),
             ),
             None,

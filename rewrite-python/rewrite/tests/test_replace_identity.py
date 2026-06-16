@@ -20,7 +20,7 @@ unnecessary allocations and GC pressure.
 """
 
 import pytest
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from rewrite import Markers, random_id
 from rewrite.markers import SearchResult
@@ -72,7 +72,8 @@ class TestReplaceIdentity:
         assert result is not markers, (
             "Markers.replace() with different id should return a new object"
         )
-        assert result.id == new_id
+        # ids are stored internally as int; `.id` reconstructs the UUID lazily
+        assert result.id == UUID(int=new_id)
 
     def test_space_replace_same_values_returns_same_object(self):
         """Space.replace() should return self when nothing changes."""

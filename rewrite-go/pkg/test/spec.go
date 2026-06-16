@@ -516,6 +516,14 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 			}
 		}
 
+		// Assert leading whitespace is attached to the outermost LST element
+		// for every parsed source.
+		if errs := WhitespaceAttachmentViolations(cu); len(errs) > 0 {
+			for _, e := range errs {
+				t.Errorf("whitespace attachment: %s", e)
+			}
+		}
+
 		if src.AfterRecipe != nil {
 			src.AfterRecipe(t, cu)
 		}

@@ -19,7 +19,6 @@ import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.internal.PackageManagerExecutor;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -96,7 +95,6 @@ public class DependencyWorkspace {
                 return cached;
             }
             cache.remove(hash);
-            ensureTempDirIsAbsent(cached);
         }
 
         // Check disk cache
@@ -105,6 +103,10 @@ public class DependencyWorkspace {
             cache.put(hash, workspaceDir);
             return workspaceDir;
         }
+        // An invalid leftover at the target path (e.g. gutted by macOS periodic tmp
+        // cleanup, which deletes old files but keeps the directory skeleton) would
+        // block the final Files.move into place; remove it before rebuilding.
+        cleanupDirectory(workspaceDir);
 
         // Create new workspace
         try {
@@ -196,7 +198,6 @@ public class DependencyWorkspace {
                 return cached;
             }
             cache.remove(hash);
-            ensureTempDirIsAbsent(cached);
         }
 
         // Check disk cache
@@ -205,6 +206,10 @@ public class DependencyWorkspace {
             cache.put(hash, workspaceDir);
             return workspaceDir;
         }
+        // An invalid leftover at the target path (e.g. gutted by macOS periodic tmp
+        // cleanup, which deletes old files but keeps the directory skeleton) would
+        // block the final Files.move into place; remove it before rebuilding.
+        cleanupDirectory(workspaceDir);
 
         // Create new workspace
         try {
@@ -307,7 +312,6 @@ public class DependencyWorkspace {
                 return cached;
             }
             cache.remove(hash);
-            ensureTempDirIsAbsent(cached);
         }
 
         // Check disk cache
@@ -316,6 +320,10 @@ public class DependencyWorkspace {
             cache.put(hash, workspaceDir);
             return workspaceDir;
         }
+        // An invalid leftover at the target path (e.g. gutted by macOS periodic tmp
+        // cleanup, which deletes old files but keeps the directory skeleton) would
+        // block the final Files.move into place; remove it before rebuilding.
+        cleanupDirectory(workspaceDir);
 
         if (projectDir == null || !Files.isDirectory(projectDir)) {
             return null;
@@ -496,17 +504,6 @@ public class DependencyWorkspace {
                     });
         } catch (IOException e) {
             // Ignore - cache will be populated as needed
-        }
-    }
-
-    private static void ensureTempDirIsAbsent(Path cached) {
-        File file = cached.toFile();
-        if (file.exists()) {
-            try {
-                file.delete();
-            } catch (Exception e) {
-                //Just a safety to make sure we can write to the directory later on.
-            }
         }
     }
 }

@@ -45,7 +45,6 @@ public class XRange extends LatestRelease {
         this.micro = micro;
     }
 
-    @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
         if (!super.isValid(currentVersion, version)) {
@@ -56,10 +55,9 @@ public class XRange extends LatestRelease {
             return true;
         }
 
-        Matcher gav = VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(version));
-        gav.matches();
+        ParsedVersion gav = ParsedVersion.parse(normalizeVersion(version));
 
-        if (!gav.group(1).equals(major)) {
+        if (!major.equals(gav.group(1))) {
             return false;
         }
 
@@ -158,8 +156,7 @@ public class XRange extends LatestRelease {
                 return 0;
             }
 
-            Matcher gav = VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(v2));
-            gav.matches();
+            ParsedVersion gav = ParsedVersion.parse(normalizeVersion(v2));
 
             if (!xrangeV1.major.equals(gav.group(1))) {
                 return xrangeV1.major.compareTo(gav.group(1));
@@ -188,23 +185,25 @@ public class XRange extends LatestRelease {
                 return 0;
             }
 
-            Matcher gav = VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(v1));
-            gav.matches();
+            ParsedVersion gav = ParsedVersion.parse(normalizeVersion(v1));
 
-            if (!gav.group(1).equals(xrangeV2.major)) {
-                return gav.group(1).compareTo(xrangeV2.major);
+            String major = gav.group(1);
+            if (!xrangeV2.major.equals(major)) {
+                return requireNonNull(major).compareTo(xrangeV2.major);
             }
 
+            String minor = gav.group(2);
             if ("*".equals(xrangeV2.minor)) {
                 return 0;
-            } else if (gav.group(2) == null || !gav.group(2).equals(xrangeV2.minor)) {
-                return gav.group(2).compareTo(xrangeV2.minor);
+            } else if (minor == null || !minor.equals(xrangeV2.minor)) {
+                return requireNonNull(minor).compareTo(xrangeV2.minor);
             }
 
+            String patch = gav.group(3);
             if ("*".equals(xrangeV2.patch)) {
                 return 0;
-            } else if (gav.group(3) == null || !gav.group(3).equals(xrangeV2.patch)) {
-                return gav.group(3).compareTo(xrangeV2.patch);
+            } else if (patch == null || !patch.equals(xrangeV2.patch)) {
+                return requireNonNull(patch).compareTo(xrangeV2.patch);
             }
 
             return 0;

@@ -134,7 +134,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apk update
               """,
             """
-              ~~(EOL: alpine:3.14 (ended 2023-05-01, suggest 3.23 or 3.22))~~>FROM alpine:3.14
+              ~~(EOL: alpine:3.14 (ended 2023-05-01, suggest 3.24 or 3.23))~~>FROM alpine:3.14
               RUN apk update
               """
           )

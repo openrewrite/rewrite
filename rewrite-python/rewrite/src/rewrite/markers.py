@@ -10,14 +10,26 @@ if TYPE_CHECKING:
     from .parser import Parser
     from .visitor import Cursor
 
-from .utils import random_id, list_map, replace_if_changed
+from .utils import id_to_int, random_id, list_map, replace_if_changed
 
 
 class Marker(ABC):
+    __slots__ = ()
+
+    # Like Tree, the id is stored as a 128-bit int in `_id` on concrete markers;
+    # `id` reconstructs a UUID lazily and eq/hash compare the raw int.
     @property
-    @abstractmethod
     def id(self) -> UUID:
-        ...
+        return UUID(int=self._id)  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
+
+    # `_id` is on the public positional constructor surface, so callers may pass
+    # a `uuid.UUID`; the dataclass `__init__` of every concrete marker calls this
+    # inherited hook to normalise it to the internal int form. A None id passes
+    # through untouched: the RPC receiver constructs all-None placeholders (see
+    # `make_dataclass_factory`) and fills the id in later.
+    def __post_init__(self):
+        if self._id is not None and type(self._id) is not int:  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
+            object.__setattr__(self, '_id', id_to_int(self._id))  # ty: ignore[unresolved-attribute]
 
     def replace(self, **kwargs) -> 'Marker':
         """Replace fields on this marker, returning self if nothing changed."""
@@ -28,23 +40,29 @@ class Marker(ABC):
 
     def __eq__(self, other: object) -> bool:
         if self.__class__ == other.__class__:
-            return self.id == cast(Marker, other).id
+            return self._id == cast(Marker, other)._id  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
         return False
 
     def __hash__(self) -> int:
-        return hash(self.id)
+        return hash(self._id)  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
 
 
 M = TypeVar('M', bound=Marker)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Markers:
     _id: UUID
 
     @property
     def id(self) -> UUID:
-        return self._id
+        return UUID(int=self._id)  # _id stored as int internally; public API stays UUID
+
+    def __post_init__(self):
+        # Normalise `uuid.UUID` ids from external callers to the internal int form.
+        # None passes through: the RPC receiver constructs all-None placeholders.
+        if self._id is not None and type(self._id) is not int:
+            object.__setattr__(self, '_id', id_to_int(self._id))
 
     _markers: List[Marker]
 
@@ -79,11 +97,11 @@ class Markers:
 
     def __eq__(self, other: object) -> bool:
         if self.__class__ == other.__class__:
-            return self.id == cast(Markers, other).id
+            return self._id == cast(Markers, other)._id
         return False
 
     def __hash__(self) -> int:
-        return hash(self.id)
+        return hash(self._id)
 
     @classmethod
     def build(cls, id: UUID, markers: List[Marker]) -> Markers:
@@ -93,13 +111,9 @@ class Markers:
 Markers.EMPTY = Markers(random_id(), [])
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class SearchResult(Marker):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
     _description: Optional[str]
 
@@ -140,6 +154,8 @@ class Markup(Marker, ABC):
     Markup markers are used to annotate code with messages that can be displayed
     in various ways depending on the tooling.
     """
+    __slots__ = ()
+
 
     @property
     @abstractmethod
@@ -179,7 +195,7 @@ class Markup(Marker, ABC):
         return MarkupDebug(random_id(), message, detail)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class MarkupWarn(Markup):
     """Warning markup marker for deprecations and other warnings."""
     _id: UUID
@@ -187,10 +203,6 @@ class MarkupWarn(Markup):
     _detail: Optional[str] = None
 
     @property
-    def id(self) -> UUID:
-        return self._id
-
-    @property
     def message(self) -> str:
         return self._message
 
@@ -199,7 +211,7 @@ class MarkupWarn(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class MarkupError(Markup):
     """Error markup marker for errors and issues."""
     _id: UUID
@@ -207,10 +219,6 @@ class MarkupError(Markup):
     _detail: Optional[str] = None
 
     @property
-    def id(self) -> UUID:
-        return self._id
-
-    @property
     def message(self) -> str:
         return self._message
 
@@ -219,7 +227,7 @@ class MarkupError(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class MarkupInfo(Markup):
     """Info markup marker for informational messages."""
     _id: UUID
@@ -227,10 +235,6 @@ class MarkupInfo(Markup):
     _detail: Optional[str] = None
 
     @property
-    def id(self) -> UUID:
-        return self._id
-
-    @property
     def message(self) -> str:
         return self._message
 
@@ -239,7 +243,7 @@ class MarkupInfo(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class MarkupDebug(Markup):
     """Debug markup marker for debugging information."""
     _id: UUID
@@ -247,10 +251,6 @@ class MarkupDebug(Markup):
     _detail: Optional[str] = None
 
     @property
-    def id(self) -> UUID:
-        return self._id
-
-    @property
     def message(self) -> str:
         return self._message
 
@@ -259,13 +259,9 @@ class MarkupDebug(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class UnknownJavaMarker(Marker):
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
     _data: Dict[str, Any]
 
@@ -274,7 +270,7 @@ class UnknownJavaMarker(Marker):
         return self._data
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ParseExceptionResult(Marker):
     @classmethod
     def build(cls, parser: 'Parser', exception: Exception) -> ParseExceptionResult:
@@ -283,10 +279,6 @@ class ParseExceptionResult(Marker):
                    ''.join(traceback.format_exception(exc_type, exc_value, exc_tb)))
 
     _id: UUID
-
-    @property
-    def id(self) -> UUID:
-        return self._id
 
     _parser_type: str
 

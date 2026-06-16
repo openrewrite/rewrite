@@ -619,6 +619,36 @@ class MethodDeclarationTest implements RewriteTest {
                 )
             );
         }
+
+        @Test
+        void extensionWithTypeParameter() {
+            rewriteRun(
+                scala(
+                    """
+                    extension [A](question: Question[A])
+                      def timeFilter: Question[A] = question
+                    """
+                )
+            );
+        }
+
+        @Test
+        void bracelessExtensionWithBraceBlockMethodBody() {
+            // A `{` inside a method body must not be mistaken for the extension's
+            // opening brace, which would make the parser treat this braceless
+            // (indented) extension as brace-delimited.
+            rewriteRun(
+                scala(
+                    """
+                    extension (g: Int)
+                      def rankable =
+                        {
+                          2
+                        }
+                    """
+                )
+            );
+        }
     }
 
     @Test
@@ -869,6 +899,21 @@ class MethodDeclarationTest implements RewriteTest {
           scala(
             """
             def resize(/* nothing here */): Int = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void procedureSyntaxSetter() {
+        rewriteRun(
+          scala(
+            """
+            trait T {
+              def engine_=(x: Int) {
+                println(x)
+              }
+            }
             """
           )
         );
