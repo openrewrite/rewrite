@@ -31,7 +31,7 @@ public class Semver {
         if (StringUtils.isBlank(version)) {
             return false;
         }
-        return LatestRelease.RELEASE_PATTERN.matcher(version).matches();
+        return ParsedVersion.parse(version).matches();
     }
 
     /**
