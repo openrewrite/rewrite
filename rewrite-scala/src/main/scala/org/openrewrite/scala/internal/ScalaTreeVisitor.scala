@@ -3502,9 +3502,9 @@ class ScalaTreeVisitor(
         ScalaSpace.format(source, cursor, typeStart)
       else Space.SINGLE_SPACE
       cursor = typeStart
-      visitTree(vd.tpt) match {
+      visitTypeTree(vd.tpt) match {
         case tt: TypeTree => tt.withPrefix(typePrefix)
-        case other =>
+        case _ =>
           // Fall back to source-text identifier — preserves printing fidelity but
           // intentionally drops rich typing for unmapped type expressions.
           val tText = extractSource(vd.tpt.span)
@@ -5471,8 +5471,10 @@ class ScalaTreeVisitor(
             Space.EMPTY
           }
           
-          // Visit the target type
-          val targetType = visitTree(ta.args.head) match {
+          // Visit the target type. Use the type-position helper so that function types
+          // (`A => B`), tuple types, union/intersection types, etc. are mapped to a
+          // `TypeTree` rather than being misread as expressions.
+          val targetType = visitTypeTree(ta.args.head) match {
             case tt: TypeTree => tt
             case _ => return visitUnknown(ta)
           }
@@ -5546,8 +5548,9 @@ class ScalaTreeVisitor(
             cursor = Math.max(0, ta.args.head.span.start - offsetAdjustment)
           }
 
-          // Visit the target type
-          val clazz = visitTree(ta.args.head) match {
+          // Visit the target type via the type-position helper so function types
+          // (`A => B`), tuple/union/intersection types map to a `TypeTree`.
+          val clazz = visitTypeTree(ta.args.head) match {
             case tt: TypeTree => tt
             case _ => return visitUnknown(ta)
           }
@@ -5681,11 +5684,17 @@ class ScalaTreeVisitor(
     val beforeBracket = sourceBefore("[")
     buildArgumentContainer[Trees.Tree[?], Expression](
       ta.args,
-      arg => visitTree(arg) match {
-        case e: Expression => e
-        case tt: TypeTree => tt.asInstanceOf[Expression]
-        case j: J => new S.StatementExpression(Tree.randomId(), j)
-        case _ => visitUnknown(arg)
+      arg => {
+        // These are type arguments, so prefer the type-position helper: it maps
+        // function types (`A => B`), tuple/union/intersection types to a TypeTree
+        // rather than letting `visitTree` misread them as expressions (e.g. a lambda).
+        val tt = visitTypeTree(arg)
+        if (tt != null) tt.asInstanceOf[Expression]
+        else visitTree(arg) match {
+          case e: Expression => e
+          case j: J => new S.StatementExpression(Tree.randomId(), j)
+          case _ => visitUnknown(arg)
+        }
       },
       "]",
       beforeBracket
@@ -5747,7 +5756,11 @@ class ScalaTreeVisitor(
 
       for (i <- at.args.indices) {
         val arg = at.args(i)
-        val argTree = visitTree(arg) match {
+        // Prefer the type-position helper so function types (`A => B`), tuple/union/
+        // intersection types map to a TypeTree rather than being misread as expressions.
+        val tt = visitTypeTree(arg)
+        val argTree: Expression = if (tt != null) tt.asInstanceOf[Expression]
+        else visitTree(arg) match {
           case expr: Expression => expr
           case j: J => new S.StatementExpression(Tree.randomId(), j)
           case _ => cursor = savedCursor; return visitUnknown(at)
@@ -7497,12 +7510,7 @@ class ScalaTreeVisitor(
     } else Space.EMPTY
 
     val parent: TypeTree = if (rtt.tpt != null && !rtt.tpt.isEmpty && rtt.tpt.span.exists) {
-      visitTree(rtt.tpt) match {
-        case t: TypeTree => t
-        case e: Expression => new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-          Collections.emptyList(), e.toString, null, null)
-        case _ => null
-      }
+      visitTypeTree(rtt.tpt)
     } else null
 
     // Find opening brace
@@ -9061,7 +9069,7 @@ class ScalaTreeVisitor(
             val loPrefix = if (loOpIdx > cursor) ScalaSpace.format(source, cursor, loOpIdx) else Space.EMPTY
             if (loOpIdx >= 0) cursor = loOpIdx + 2
             val savedC = cursor
-            visitTree(innerBounds.lo) match {
+            visitTypeTree(innerBounds.lo) match {
               case tt: TypeTree =>
                 val loBound: TypeTree = new J.TypeBound(Tree.randomId(), loPrefix, Markers.EMPTY, J.TypeBound.Kind.Lower, tt)
                 boundList.add(JRightPadded.build(loBound))
@@ -9073,7 +9081,7 @@ class ScalaTreeVisitor(
             val hiPrefix = if (hiOpIdx > cursor) ScalaSpace.format(source, cursor, hiOpIdx) else Space.EMPTY
             if (hiOpIdx >= 0) cursor = hiOpIdx + 2
             val savedC = cursor
-            visitTree(innerBounds.hi) match {
+            visitTypeTree(innerBounds.hi) match {
               case tt: TypeTree =>
                 val hiBound: TypeTree = new J.TypeBound(Tree.randomId(), hiPrefix, Markers.EMPTY, J.TypeBound.Kind.Upper, tt)
                 boundList.add(JRightPadded.build(hiBound))
