@@ -301,6 +301,42 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         return tryable;
     }
 
+    public J visitSTry(S.Try tryable, PrintOutputCapture<P> p) {
+        beforeSyntax(tryable, Space.Location.TRY_PREFIX, p);
+        p.append("try");
+        visit(tryable.getBody(), p);
+        JLeftPadded<J.Block> catches = tryable.getPadding().getCatches();
+        if (catches != null) {
+            visitSpace(catches.getBefore(), Space.Location.CATCH_PREFIX, p);
+            p.append("catch");
+            J.Block cases = catches.getElement();
+            boolean omitBraces = cases.getMarkers().findFirst(org.openrewrite.scala.marker.OmitBraces.class).isPresent();
+            visitSpace(cases.getPrefix(), Space.Location.BLOCK_PREFIX, p);
+            if (!omitBraces) {
+                p.append("{");
+            }
+            for (JRightPadded<Statement> rp : cases.getPadding().getStatements()) {
+                visit(rp.getElement(), p);
+                visitSpace(rp.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+                if (rp.getMarkers().findFirst(Semicolon.class).isPresent()) {
+                    p.append(';');
+                }
+            }
+            visitSpace(cases.getEnd(), Space.Location.BLOCK_END, p);
+            if (!omitBraces) {
+                p.append("}");
+            }
+        }
+        JLeftPadded<J.Block> finalizer = tryable.getPadding().getFinalizer();
+        if (finalizer != null) {
+            visitSpace(finalizer.getBefore(), Space.Location.TRY_FINALLY, p);
+            p.append("finally");
+            visit(finalizer.getElement(), p);
+        }
+        afterSyntax(tryable, p);
+        return tryable;
+    }
+
     @Override
     public J visitSwitch(J.Switch switch_, PrintOutputCapture<P> p) {
         beforeSyntax(switch_, Space.Location.SWITCH_PREFIX, p);
@@ -672,6 +708,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitFor((S.For) tree, p);
         } else if (tree instanceof S.For.Enumerator) {
             return visitForEnumerator((S.For.Enumerator) tree, p);
+        } else if (tree instanceof S.Try) {
+            return visitSTry((S.Try) tree, p);
         }
         return super.visit(tree, p);
     }

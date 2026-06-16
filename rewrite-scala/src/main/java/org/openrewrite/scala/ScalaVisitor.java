@@ -409,6 +409,20 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return f;
     }
 
+    public J visitSTry(S.Try tryable, P p) {
+        S.Try t = tryable;
+        t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.TRY_PREFIX, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.withBody(visitAndCast(t.getBody(), p));
+        if (t.getPadding().getCatches() != null) {
+            t = t.getPadding().withCatches(visitLeftPadded(t.getPadding().getCatches(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (t.getPadding().getFinalizer() != null) {
+            t = t.getPadding().withFinalizer(visitLeftPadded(t.getPadding().getFinalizer(), JLeftPadded.Location.TRY_FINALLY, p));
+        }
+        return t;
+    }
+
     public J visitForEnumerator(S.For.Enumerator enumerator, P p) {
         S.For.Enumerator e = enumerator;
         e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
