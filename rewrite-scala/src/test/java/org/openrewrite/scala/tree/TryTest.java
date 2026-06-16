@@ -18,10 +18,13 @@ package org.openrewrite.scala.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.ScalaIsoVisitor;
+import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
@@ -441,6 +444,62 @@ class TryTest implements RewriteTest {
             }
             """
         ));
+    }
+
+    @Test
+    void commonCatchesFitJavaTryModel() {
+        // OpenRewrite prefers reusing J.* types so Java recipes apply: the common
+        // `[name][: Type]` (guard-free) catch maps onto J.Try.Catch and must stay J.Try.
+        assertTryKind(
+            """
+            object Test {
+              def run(): Unit =
+                try { a() } catch {
+                  case e: Exception => 1
+                  case _: java.io.IOException => 2
+                  case e => 3
+                  case _ => 4
+                } finally { b() }
+            }
+            """, 1, 0);
+    }
+
+    @Test
+    void scalaSpecificCatchesUseSTry() {
+        // Patterns J.Try.Catch cannot hold (extractors, alternatives, guards) fall back to S.Try.
+        assertTryKind("object T { try { a() } catch { case NonFatal(e) => 1 } }", 0, 1);
+        assertTryKind("object T { try { a() } catch { case _: A | _: B => 1 } }", 0, 1);
+        assertTryKind("object T { try { a() } catch { case e: Exception if e != null => 1 } }", 0, 1);
+        // A single non-fitting clause routes the whole try to S.Try.
+        assertTryKind("object T { try { a() } catch { case e: A => 1\n case NonFatal(e) => 2 } }", 0, 1);
+    }
+
+    private void assertTryKind(String source, int expectedJTry, int expectedSTry) {
+        AtomicInteger jTry = new AtomicInteger();
+        AtomicInteger sTry = new AtomicInteger();
+        rewriteRun(
+            scala(
+                source,
+                spec -> spec.afterRecipe(cu -> {
+                    new JavaIsoVisitor<Integer>() {
+                        @Override
+                        public J.Try visitTry(J.Try t, Integer p) {
+                            jTry.incrementAndGet();
+                            return super.visitTry(t, p);
+                        }
+                    }.visit(cu, 0);
+                    new ScalaIsoVisitor<Integer>() {
+                        @Override
+                        public S.Try visitSTry(S.Try t, Integer p) {
+                            sTry.incrementAndGet();
+                            return super.visitSTry(t, p);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(jTry.get()).as("J.Try count").isEqualTo(expectedJTry);
+                    assertThat(sTry.get()).as("S.Try count").isEqualTo(expectedSTry);
+                })
+            )
+        );
     }
 
     private void assertNoPatternInIdentifier(String source) {
