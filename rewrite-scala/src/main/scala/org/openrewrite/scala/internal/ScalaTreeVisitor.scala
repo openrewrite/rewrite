@@ -5471,8 +5471,10 @@ class ScalaTreeVisitor(
             Space.EMPTY
           }
           
-          // Visit the target type
-          val targetType = visitTree(ta.args.head) match {
+          // Visit the target type. Use the type-position helper so that function types
+          // (`A => B`), tuple types, union/intersection types, etc. are mapped to a
+          // `TypeTree` rather than being misread as expressions.
+          val targetType = visitTypeTree(ta.args.head) match {
             case tt: TypeTree => tt
             case _ => return visitUnknown(ta)
           }
