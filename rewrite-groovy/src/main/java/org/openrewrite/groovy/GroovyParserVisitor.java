@@ -3356,6 +3356,20 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitDoWhileLoop(DoWhileStatement loop) {
+            Space fmt = sourceBefore("do");
+            Statement body = doVisit(loop.getLoopBlock());
+            Space beforeWhile = sourceBefore("while");
+            J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(
+                    randomId(), sourceBefore("("), Markers.EMPTY,
+                    JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
+                            .withAfter(sourceBefore(")")));
+            queue.add(new J.DoWhileLoop(randomId(), fmt, Markers.EMPTY,
+                    JRightPadded.build(body).withAfter(beforeWhile),
+                    padLeft(EMPTY, condition)));
+        }
+
+        @Override
         public void visitWhileLoop(WhileStatement loop) {
             Space fmt = sourceBefore("while");
             queue.add(new J.WhileLoop(randomId(), fmt, Markers.EMPTY,
