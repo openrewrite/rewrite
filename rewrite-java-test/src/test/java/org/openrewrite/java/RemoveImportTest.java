@@ -553,6 +553,38 @@ class RemoveImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/8010")
+    @Test
+    void distinguishesLineEndingFromPrecedingLineCommentInSamePrefix() {
+        // A removed import's line-ending comment and the next import's preceding-line comment can
+        // both live in the next import's prefix; they have different owners and are treated separately.
+        // The line-ending comment (about the removed import) is dropped; the preceding-line comment
+        // (about the next import) is preserved.
+        rewriteRun(
+          spec -> spec.recipe(removeImport("java.util.ArrayList")),
+          java(
+            """
+              import java.util.ArrayList; // This comment is about ArrayList
+
+              // This comment is about List
+              import java.util.List;
+
+              class A {
+                  List<Integer> l;
+              }
+              """,
+            """
+              // This comment is about List
+              import java.util.List;
+
+              class A {
+                  List<Integer> l;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/moderneinc/customer-requests/issues/2437")
     @Test
     void preservesCommentedOutLineBeforeRemovedImport() {
