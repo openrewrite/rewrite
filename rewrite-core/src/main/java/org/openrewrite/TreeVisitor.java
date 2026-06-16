@@ -246,12 +246,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
                     }
                 }
                 if (t != tree && t != null && p instanceof ExecutionContext) {
-                    ExecutionContext ctx = (ExecutionContext) p;
-                    for (TreeObserver.Subscription observer : ctx.getObservers()) {
-                        if (observer.isSubscribed(tree)) {
-                            t = observer.treeChanged(getCursor(), t, tree);
-                        }
-                    }
+                    t = notifyObservers(tree, t, (ExecutionContext) p);
                 }
             }
 
@@ -259,11 +254,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
 
             if (topLevel) {
                 if (t != null && afterVisit != null) {
-                    for (TreeVisitor<?, P> v : afterVisit) {
-                        v.setCursor(getCursor());
-                        //noinspection unchecked
-                        t = (T) v.visit(t, p);
-                    }
+                    t = applyAfterVisitors(t, p);
                 }
 
                 afterVisit = null;
@@ -280,6 +271,34 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
 
         //noinspection unchecked
         return isAcceptable ? t : (T) tree;
+    }
+
+    /**
+     * Dispatches a changed tree to any subscribed {@link TreeObserver}s. Extracted from
+     * {@link #visit(Tree, Object)} so that this rarely-taken path does not count against that
+     * method's inlining budget.
+     */
+    private T notifyObservers(Tree tree, T t, ExecutionContext ctx) {
+        for (TreeObserver.Subscription observer : ctx.getObservers()) {
+            if (observer.isSubscribed(tree)) {
+                t = observer.treeChanged(getCursor(), t, tree);
+            }
+        }
+        return t;
+    }
+
+    /**
+     * Runs the visitors registered via {@link #doAfterVisit(TreeVisitor)} once the top-level tree has
+     * been visited. Extracted from {@link #visit(Tree, Object)} so that this rarely-taken path does not
+     * count against that method's inlining budget.
+     */
+    private @Nullable T applyAfterVisitors(@Nullable T t, P p) {
+        for (TreeVisitor<?, P> v : afterVisit) {
+            v.setCursor(getCursor());
+            //noinspection unchecked
+            t = (T) v.visit(t, p);
+        }
+        return t;
     }
 
     public void visit(@Nullable List<? extends T> nodes, P p) {
