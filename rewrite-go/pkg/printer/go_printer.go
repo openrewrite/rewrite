@@ -164,6 +164,17 @@ func (p *GoPrinter) VisitReturn(ret *java.Return, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(ret.Prefix, ret.Markers, out)
 	out.Append("return")
+	if ret.Expression != nil {
+		p.Visit(ret.Expression, out)
+	}
+	p.afterSyntax(ret.Markers, out)
+	return ret
+}
+
+func (p *GoPrinter) VisitGoReturn(ret *golang.Return, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(ret.Prefix, ret.Markers, out)
+	out.Append("return")
 	for i, rp := range ret.Expressions {
 		p.Visit(rp.Element, out)
 		p.visitSpace(rp.After, out)
@@ -177,14 +188,29 @@ func (p *GoPrinter) VisitReturn(ret *java.Return, param any) java.J {
 
 func (p *GoPrinter) VisitIf(ifStmt *java.If, param any) java.J {
 	out := param.(*PrintOutputCapture)
-	p.beforeSyntax(ifStmt.Prefix, ifStmt.Markers, out)
+	// An `if` with an init clause is wrapped in a golang.StatementWithInit, which
+	// owns the prefix and the init statement (java.If has no init slot). When
+	// wrapped, the prefix and `<init>;` are sourced from that parent and emitted
+	// between `if` and the condition.
+	wrapper, wrapped := p.statementWithInitWrapper()
+	prefix := ifStmt.Prefix
+	if wrapped {
+		prefix = wrapper.Prefix
+	}
+	p.beforeSyntax(prefix, ifStmt.Markers, out)
 	out.Append("if")
-	if ifStmt.Init != nil {
-		p.Visit(ifStmt.Init.Element, out)
-		p.visitSpace(ifStmt.Init.After, out)
+	if wrapped {
+		p.Visit(wrapper.Init.Element, out)
+		p.visitSpace(wrapper.Init.After, out)
 		out.Append(";")
 	}
-	p.Visit(ifStmt.Condition, out)
+	// The condition is a ControlParentheses (matching J.If), but Go has no parens,
+	// so emit only its inner element. The wrapper's own spaces are empty for
+	// parsed Go; print them for robustness against Java-side edits.
+	cond := ifStmt.Condition
+	p.visitSpace(cond.Prefix, out)
+	p.Visit(cond.Tree.Element, out)
+	p.visitSpace(cond.Tree.After, out)
 	p.Visit(ifStmt.Then, out)
 	if ifStmt.ElsePart != nil {
 		p.visitSpace(ifStmt.ElsePart.After, out)
@@ -212,22 +238,32 @@ func (p *GoPrinter) VisitAssignment(assign *java.Assignment, param any) java.J {
 
 func (p *GoPrinter) VisitMethodDeclaration(md *java.MethodDeclaration, param any) java.J {
 	out := param.(*PrintOutputCapture)
+	// A method with a receiver is wrapped in a golang.MethodDeclaration, which
+	// owns the prefix (J.MethodDeclaration has no receiver slot). When wrapped,
+	// the prefix and the receiver `(s *Service)` come from that parent; the
+	// inner declaration's own prefix is empty.
+	wrapper, wrapped := p.methodDeclarationWrapper()
+	prefix := md.Prefix
+	if wrapped {
+		prefix = wrapper.Prefix
+	}
 	// Each leading annotation emits as a `//<name>[ <args>]` line. The
 	// annotation's Prefix supplies the whitespace before `//` (newline
 	// + indent for non-first directives). The newline that follows the
-	// last directive lives on md.Prefix below.
+	// last directive lives on the prefix below.
 	for _, ann := range md.LeadingAnnotations {
 		p.visitSpace(ann.Prefix, out)
 		out.Append("//")
 		p.printDirectiveBody(ann, out)
 	}
-	p.beforeSyntax(md.Prefix, md.Markers, out)
+	p.beforeSyntax(prefix, md.Markers, out)
 	isInterfaceMethod := java.FindMarker[golang.InterfaceMethod](md.Markers) != nil
 	if !isInterfaceMethod {
 		out.Append("func")
 	}
-	if md.Receiver != nil {
-		p.printParamList(*md.Receiver, out)
+	if wrapped {
+		// receiver printed between `func` and the name
+		p.printParamList(wrapper.Receiver, out)
 	}
 	if md.Name.Name != "" {
 		p.Visit(md.Name, out)
@@ -244,6 +280,50 @@ func (p *GoPrinter) VisitMethodDeclaration(md *java.MethodDeclaration, param any
 	}
 	p.afterSyntax(md.Markers, out)
 	return md
+}
+
+// VisitGoMethodDeclaration prints a method declaration with a receiver. The
+// wrapper owns the prefix and the receiver, but both are emitted by the inner
+// declaration's VisitMethodDeclaration (which sources them via the cursor),
+// keeping the receiver correctly positioned between `func` and the name and the
+// prefix after any leading `//go:` directives. So this just visits the inner.
+func (p *GoPrinter) VisitGoMethodDeclaration(md *golang.MethodDeclaration, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.Visit(md.Declaration, out)
+	return md
+}
+
+// methodDeclarationWrapper returns the golang.MethodDeclaration directly
+// wrapping the J.MethodDeclaration currently being printed, if any.
+func (p *GoPrinter) methodDeclarationWrapper() (*golang.MethodDeclaration, bool) {
+	c := p.Cursor()
+	if c == nil || c.Parent() == nil {
+		return nil, false
+	}
+	wrapper, ok := c.Parent().Value().(*golang.MethodDeclaration)
+	return wrapper, ok
+}
+
+// VisitStatementWithInit prints an if/switch carrying an init clause. The
+// wrapper owns the prefix and the init statement, but both are emitted by the
+// inner statement's VisitIf/VisitSwitch (which source them via the cursor),
+// keeping `<init>;` correctly positioned between the keyword and the condition.
+// So this just visits the inner statement.
+func (p *GoPrinter) VisitStatementWithInit(s *golang.StatementWithInit, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.Visit(s.Statement, out)
+	return s
+}
+
+// statementWithInitWrapper returns the golang.StatementWithInit directly
+// wrapping the if/switch currently being printed, if any.
+func (p *GoPrinter) statementWithInitWrapper() (*golang.StatementWithInit, bool) {
+	c := p.Cursor()
+	if c == nil || c.Parent() == nil {
+		return nil, false
+	}
+	wrapper, ok := c.Parent().Value().(*golang.StatementWithInit)
+	return wrapper, ok
 }
 
 func (p *GoPrinter) VisitTypeParameters(tps *java.TypeParameters, param any) java.J {
@@ -324,6 +404,18 @@ func (p *GoPrinter) VisitMethodInvocation(mi *java.MethodInvocation, param any) 
 	if mi.Name.Name != "" {
 		p.Visit(mi.Name, out)
 	}
+	if mi.TypeParameters != nil {
+		p.visitSpace(mi.TypeParameters.Before, out)
+		out.Append("[")
+		for i, rp := range mi.TypeParameters.Elements {
+			p.Visit(rp.Element, out)
+			p.visitSpace(rp.After, out)
+			if i < len(mi.TypeParameters.Elements)-1 {
+				out.Append(",")
+			}
+		}
+		out.Append("]")
+	}
 	p.visitSpace(mi.Arguments.Before, out)
 	out.Append("(")
 	tc := java.FindMarker[golang.TrailingComma](mi.Markers)
@@ -366,19 +458,6 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *java.VariableDeclarations, par
 		} else if java.FindMarker[golang.VarKeyword](vd.Markers) != nil {
 			out.Append("var")
 		}
-	}
-
-	if vd.Specs != nil {
-		// Grouped: var ( ... ) or const ( ... )
-		p.visitSpace(vd.Specs.Before, out)
-		out.Append("(")
-		for _, rp := range vd.Specs.Elements {
-			p.Visit(rp.Element, out)
-			p.visitSpace(rp.After, out)
-		}
-		out.Append(")")
-		p.afterSyntax(vd.Markers, out)
-		return vd
 	}
 
 	// Go order: keyword name[, name]... type [= value]
@@ -437,6 +516,33 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *java.VariableDeclarations, par
 	return vd
 }
 
+func (p *GoPrinter) VisitDeclarationBlock(db *golang.DeclarationBlock, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	// Leading `//go:` directives, emitted before the var/const keyword.
+	for _, ann := range db.LeadingAnnotations {
+		p.visitSpace(ann.Prefix, out)
+		out.Append("//")
+		p.printDirectiveBody(ann, out)
+	}
+	p.beforeSyntax(db.Prefix, db.Markers, out)
+	if db.Kind == golang.DeclConst {
+		out.Append("const")
+	} else {
+		out.Append("var")
+	}
+	if db.Specs != nil {
+		p.visitSpace(db.Specs.Before, out)
+		out.Append("(")
+		for _, rp := range db.Specs.Elements {
+			p.Visit(rp.Element, out)
+			p.visitSpace(rp.After, out)
+		}
+		out.Append(")")
+	}
+	p.afterSyntax(db.Markers, out)
+	return db
+}
+
 func (p *GoPrinter) VisitVariableDeclarator(vd *java.VariableDeclarator, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(vd.Prefix, vd.Markers, out)
@@ -458,15 +564,23 @@ func (p *GoPrinter) VisitImport(imp *java.Import, param any) java.J {
 
 func (p *GoPrinter) VisitSwitch(sw *java.Switch, param any) java.J {
 	out := param.(*PrintOutputCapture)
-	p.beforeSyntax(sw.Prefix, sw.Markers, out)
+	// A `switch` with an init clause is wrapped in a golang.StatementWithInit
+	// (java.Switch has no init slot); when wrapped, the prefix and `<init>;` come
+	// from that parent. `select` has no init, so it is never wrapped.
+	wrapper, wrapped := p.statementWithInitWrapper()
+	prefix := sw.Prefix
+	if wrapped {
+		prefix = wrapper.Prefix
+	}
+	p.beforeSyntax(prefix, sw.Markers, out)
 	if java.FindMarker[golang.SelectStmt](sw.Markers) != nil {
 		out.Append("select")
 	} else {
 		out.Append("switch")
 	}
-	if sw.Init != nil {
-		p.Visit(sw.Init.Element, out)
-		p.visitSpace(sw.Init.After, out)
+	if wrapped {
+		p.Visit(wrapper.Init.Element, out)
+		p.visitSpace(wrapper.Init.After, out)
 		out.Append(";")
 	}
 	if sw.Tag != nil {
@@ -566,23 +680,13 @@ func (p *GoPrinter) VisitForEachLoop(forEach *java.ForEachLoop, param any) java.
 func (p *GoPrinter) VisitForEachControl(control *java.ForEachControl, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(control.Prefix, control.Markers, out)
-	if control.Key != nil {
-		p.Visit(control.Key.Element, out)
-		p.visitSpace(control.Key.After, out)
-		if control.Value != nil {
-			out.Append(",")
-			p.Visit(control.Value.Element, out)
-			p.visitSpace(control.Value.After, out)
-		}
-		if control.Operator.Element == java.AssignOpDefine {
-			out.Append(":=")
-		} else {
-			out.Append("=")
-		}
-		p.visitSpace(control.Operator.Before, out)
-	}
+	// Variable prints the target list and `:=`/`=` operator (or nothing for a
+	// J.Empty keyless range); the MultiAssignment owns the operator spelling.
+	p.Visit(control.Variable.Element, out)
+	p.visitSpace(control.Variable.After, out)
 	out.Append("range")
-	p.Visit(control.Iterable, out)
+	p.Visit(control.Iterable.Element, out)
+	p.visitSpace(control.Iterable.After, out)
 	p.afterSyntax(control.Markers, out)
 	return control
 }
@@ -827,10 +931,19 @@ func (p *GoPrinter) VisitArrayType(at *java.ArrayType, param any) java.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(at.Prefix, at.Markers, out)
 	out.Append("[")
-	if at.Length != nil {
-		p.Visit(at.Length, out)
-	}
 	p.visitSpace(at.Dimension.Element, out)
+	out.Append("]")
+	p.Visit(at.ElementType, out)
+	p.afterSyntax(at.Markers, out)
+	return at
+}
+
+func (p *GoPrinter) VisitGoArrayType(at *golang.ArrayType, param any) java.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(at.Prefix, at.Markers, out)
+	out.Append("[")
+	p.Visit(at.Length.Element, out)
+	p.visitSpace(at.Length.After, out)
 	out.Append("]")
 	p.Visit(at.ElementType, out)
 	p.afterSyntax(at.Markers, out)

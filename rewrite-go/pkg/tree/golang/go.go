@@ -38,6 +38,8 @@ func (*CompilationUnit) IsTree()       {}
 func (*CompilationUnit) IsJ()          {}
 func (*CompilationUnit) IsSourceFile() {}
 
+func (n *CompilationUnit) GetSourcePath() string { return n.SourcePath }
+
 func (n *CompilationUnit) WithPrefix(prefix java.Space) *CompilationUnit {
 	c := *n
 	c.Prefix = prefix
@@ -268,6 +270,34 @@ func (n *Slice) WithPrefix(prefix java.Space) *Slice {
 }
 
 func (n *Slice) WithMarkers(markers java.Markers) *Slice {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// ArrayType represents a fixed-size array type: `[N]T` (e.g. `[5]int`,
+// `[...]int{...}`). The length `N` is an inline constant expression that has no
+// equivalent in Java's J.ArrayType, so it cannot fit there. Slices `[]T` (no
+// length) keep using java.ArrayType, which mirrors Java's variable-length array.
+type ArrayType struct {
+	ID          uuid.UUID
+	Prefix      java.Space // space before `[`
+	Markers     java.Markers
+	Length      java.RightPadded[java.Expression] // Element = `N` (Prefix = space after `[`), After = space before `]`
+	ElementType java.Expression                   // element type `T` (Prefix = space after `]`)
+}
+
+func (*ArrayType) IsTree()       {}
+func (*ArrayType) IsJ()          {}
+func (*ArrayType) IsExpression() {}
+
+func (n *ArrayType) WithPrefix(prefix java.Space) *ArrayType {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ArrayType) WithMarkers(markers java.Markers) *ArrayType {
 	c := *n
 	c.Markers = markers
 	return &c
@@ -558,6 +588,53 @@ func (n *TypeDecl) WithTypeParameters(tps *java.TypeParameters) *TypeDecl {
 	return &c
 }
 
+// DeclKind is the keyword introducing a grouped declaration block.
+type DeclKind int
+
+const (
+	DeclVar   DeclKind = iota // var ( ... )
+	DeclConst                 // const ( ... )
+)
+
+// DeclarationBlock represents a grouped (parenthesized) declaration:
+//
+//	var   ( ... )
+//	const ( ... )
+//
+// The block owns the keyword (Kind); each element of Specs is a single
+// java.VariableDeclarations carrying its own variables/type/initializer.
+// There is no Java J equivalent — grouping is Go-specific.
+type DeclarationBlock struct {
+	ID                 uuid.UUID
+	Prefix             java.Space
+	Markers            java.Markers
+	LeadingAnnotations []*java.Annotation              // `//go:` directives preceding the block
+	Kind               DeclKind                        // var or const
+	Specs              *java.Container[java.Statement] // the grouped declarations; Before = space before `(`
+}
+
+func (*DeclarationBlock) IsTree()      {}
+func (*DeclarationBlock) IsJ()         {}
+func (*DeclarationBlock) IsStatement() {}
+
+func (n *DeclarationBlock) WithPrefix(prefix java.Space) *DeclarationBlock {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *DeclarationBlock) WithMarkers(markers java.Markers) *DeclarationBlock {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+func (n *DeclarationBlock) WithLeadingAnnotations(anns []*java.Annotation) *DeclarationBlock {
+	c := *n
+	c.LeadingAnnotations = anns
+	return &c
+}
+
 // ShortVarDecl is a marker on Assignment indicating `:=` instead of `=`.
 type ShortVarDecl struct {
 	Ident uuid.UUID
@@ -619,6 +696,96 @@ func (n *MultiAssignment) WithPrefix(prefix java.Space) *MultiAssignment {
 }
 
 func (n *MultiAssignment) WithMarkers(markers java.Markers) *MultiAssignment {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// Return represents a Go return statement carrying more than one value:
+// `return 0, nil`. Single- and zero-value returns map to java.Return, mirroring
+// how single assignments map to java.Assignment and multi-value assignments to
+// MultiAssignment.
+type Return struct {
+	ID          uuid.UUID
+	Prefix      java.Space
+	Markers     java.Markers
+	Expressions []java.RightPadded[java.Expression] // returned values; After = space before comma
+}
+
+func (*Return) IsTree()      {}
+func (*Return) IsJ()         {}
+func (*Return) IsStatement() {}
+
+func (n *Return) WithPrefix(prefix java.Space) *Return {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Return) WithMarkers(markers java.Markers) *Return {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// MethodDeclaration represents a Go method declaration carrying a receiver:
+// `func (s *Service) Run() {}`. It wraps the inner java.MethodDeclaration (which
+// holds the name, parameters, return type and body) and adds the receiver, for
+// which java.MethodDeclaration — mirroring Java's J.MethodDeclaration — has no
+// slot. Free functions, interface methods and function literals stay as a bare
+// java.MethodDeclaration. The wrapper is transparent for printing: its own
+// Prefix is empty and the inner Declaration keeps the whitespace before `func`.
+type MethodDeclaration struct {
+	ID          uuid.UUID
+	Prefix      java.Space
+	Markers     java.Markers
+	Receiver    java.Container[java.Statement] // `(s *Service)` between `func` and the name
+	Declaration *java.MethodDeclaration
+}
+
+func (*MethodDeclaration) IsTree()      {}
+func (*MethodDeclaration) IsJ()         {}
+func (*MethodDeclaration) IsStatement() {}
+
+func (n *MethodDeclaration) WithPrefix(prefix java.Space) *MethodDeclaration {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *MethodDeclaration) WithMarkers(markers java.Markers) *MethodDeclaration {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// StatementWithInit carries the optional init clause Go allows before the
+// condition of an `if` or the tag of a `switch`: `if x := f(); cond {}` or
+// `switch x := f(); x {}`. It wraps the inner java.If / java.Switch (which —
+// mirroring Java's J.If / J.Switch — has no slot for an init statement) and
+// holds that statement. `if`/`switch` without an init stay a bare
+// java.If / java.Switch. The wrapper owns the prefix (whitespace before the
+// keyword); the inner statement is otherwise prefix-less and keeps its own
+// markers (e.g. the type-switch guard or select markers on a Switch).
+type StatementWithInit struct {
+	ID        uuid.UUID
+	Prefix    java.Space
+	Markers   java.Markers
+	Init      java.RightPadded[java.Statement] // the SimpleStmt; After = space before `;`
+	Statement java.Statement                   // the inner java.If or java.Switch
+}
+
+func (*StatementWithInit) IsTree()      {}
+func (*StatementWithInit) IsJ()         {}
+func (*StatementWithInit) IsStatement() {}
+
+func (n *StatementWithInit) WithPrefix(prefix java.Space) *StatementWithInit {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *StatementWithInit) WithMarkers(markers java.Markers) *StatementWithInit {
 	c := *n
 	c.Markers = markers
 	return &c

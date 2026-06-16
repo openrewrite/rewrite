@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"text/template"
 
@@ -188,7 +189,7 @@ func (inst *Installer) loadRecipes(modulePath, activatePkg string, registry *rec
 		}
 	}
 
-	helperBin := filepath.Join(helperDir, "helper")
+	helperBin := helperBinaryPath(helperDir, runtime.GOOS)
 	cmd := exec.Command("go", "build", "-o", helperBin, ".")
 	cmd.Dir = helperDir
 	cmd.Env = append(os.Environ(), "GO111MODULE=on")
@@ -251,6 +252,16 @@ type RecipeDescriptorJSON struct {
 type CategoryDescriptorJSON struct {
 	DisplayName string `json:"displayName"`
 	Description string `json:"description"`
+}
+
+// helperBinaryPath returns the helper binary path, adding the Windows .exe that
+// `go build -o` appends so exec.Command can find it.
+func helperBinaryPath(helperDir, goos string) string {
+	bin := filepath.Join(helperDir, "helper")
+	if goos == "windows" {
+		bin += ".exe"
+	}
+	return bin
 }
 
 // helperTemplate is the Go source template for the recipe discovery helper program.

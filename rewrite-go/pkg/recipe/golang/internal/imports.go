@@ -424,7 +424,7 @@ func insertGrouped(elements []java.RightPadded[*java.Import], imp *java.Import, 
 func NewImport(path string, alias *string) *java.Import {
 	imp := &java.Import{
 		ID:     uuid.New(),
-		Qualid: &java.Literal{ID: uuid.New(), Source: `"` + path + `"`, Value: path, Kind: java.StringLiteral},
+		Qualid: &java.Literal{ID: uuid.New(), Source: `"` + path + `"`, Value: path},
 	}
 	if alias != nil {
 		if lit, ok := imp.Qualid.(*java.Literal); ok {

@@ -47,4 +47,16 @@ class ParseProject implements RpcRequest {
      */
     @Nullable
     Path relativeTo;
+
+    /**
+     * Optional path to a virtual environment with the project's dependencies installed.
+     * <p>
+     * The caller (e.g. a CLI build step) provisions this environment and forwards its
+     * path so the parser can point ty-types at it, allowing supertypes that reach into
+     * third-party packages to resolve (e.g. a first-party class extending
+     * {@code pydantic.BaseModel}). The parser never provisions dependencies itself.
+     * When {@code null}, parsing proceeds without dependency-backed type resolution.
+     */
+    @Nullable
+    Path dependencyPath;
 }

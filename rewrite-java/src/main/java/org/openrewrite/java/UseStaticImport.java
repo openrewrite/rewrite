@@ -23,6 +23,7 @@ import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Javadoc;
 
@@ -110,7 +111,7 @@ public class UseStaticImport extends Recipe {
     }
 
     private static boolean hasConflictingImport(String typeName, String methodName, Cursor cursor) {
-        J.CompilationUnit cu = cursor.firstEnclosing(J.CompilationUnit.class);
+        JavaSourceFile cu = cursor.firstEnclosing(JavaSourceFile.class);
         if (cu != null) {
             for (J.Import imp : cu.getImports()) {
                 if (imp.isStatic() &&

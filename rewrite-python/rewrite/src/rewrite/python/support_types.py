@@ -19,6 +19,8 @@ _PythonVisitor: Any = None
 
 
 class Py(J):
+    __slots__ = ()
+
     def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]:
         global _PythonVisitor
         if _PythonVisitor is None:
@@ -41,7 +43,7 @@ T = TypeVar('T')
 J2 = TypeVar('J2', bound=J)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PyComment(Comment):
     _aligned_to_indent: bool
 

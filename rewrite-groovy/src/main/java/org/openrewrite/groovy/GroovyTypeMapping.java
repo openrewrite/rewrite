@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -205,11 +206,12 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         }
 
         String[] finalParamNames = paramNames;
-        return typeFactory.methodFor(signature, () -> {
-            JavaType.Method method = new JavaType.Method(
+        return typeFactory.methodFor(signature,
+                () -> new JavaType.Method(
                     null, node.getModifiers(), null,
                     node instanceof ConstructorNode ? "<constructor>" : node.getName(),
-                    null, finalParamNames, null, null, null, null, null);
+                    null, finalParamNames, null, null, null, null, null),
+                method -> {
             List<JavaType> parameterTypes = null;
             if (node.getParameters().length > 0) {
                 parameterTypes = new ArrayList<>(node.getParameters().length);
@@ -235,7 +237,6 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
                     thrownExceptions,
                     annotations
             );
-            return method;
         });
     }
 

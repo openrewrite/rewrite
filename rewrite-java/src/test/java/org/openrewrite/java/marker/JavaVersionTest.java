@@ -40,4 +40,25 @@ class JavaVersionTest {
         var javaVersion = new JavaVersion(UUID.randomUUID(), "", "", "11.0.11+x", "").getMajorVersion();
         assertThat(javaVersion).isEqualTo(11);
     }
+
+    @Test
+    void emptyCompatibilityReturnsMinusOne() {
+        var javaVersion = new JavaVersion(UUID.randomUUID(), "", "", "", "");
+        assertThat(javaVersion.getMajorVersion()).isEqualTo(-1);
+        assertThat(javaVersion.getMajorReleaseVersion()).isEqualTo(-1);
+    }
+
+    @Test
+    void blankCompatibilityReturnsMinusOne() {
+        var javaVersion = new JavaVersion(UUID.randomUUID(), "", "", "  ", "  ");
+        assertThat(javaVersion.getMajorVersion()).isEqualTo(-1);
+        assertThat(javaVersion.getMajorReleaseVersion()).isEqualTo(-1);
+    }
+
+    @Test
+    void nullCompatibilityReturnsMinusOneWithoutThrowing() {
+        var javaVersion = new JavaVersion(UUID.randomUUID(), "", "", null, null);
+        assertThat(javaVersion.getMajorVersion()).isEqualTo(-1);
+        assertThat(javaVersion.getMajorReleaseVersion()).isEqualTo(-1);
+    }
 }

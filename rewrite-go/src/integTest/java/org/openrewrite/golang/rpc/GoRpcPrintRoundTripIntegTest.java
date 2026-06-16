@@ -105,6 +105,18 @@ class GoRpcPrintRoundTripIntegTest {
     }
 
     @Test
+    void fixedSizeArrayTypeKeepsLength() {
+        // Go.ArrayType carries the inline length `5` across the wire; if it were
+        // dropped this would print `[]int`.
+        assertPrintsUnchangedAfterReset(
+                "package main\n" +
+                "\n" +
+                "func process(data [5]int) [3]string {\n" +
+                "\treturn [3]string{}\n" +
+                "}\n");
+    }
+
+    @Test
     void blockBodyStatementsKeepWhitespace() {
         assertPrintsUnchangedAfterReset(
                 "package main\n" +
@@ -116,6 +128,36 @@ class GoRpcPrintRoundTripIntegTest {
                 "\t}\n" +
                 "\treturn s\n" +
                 "}\n");
+    }
+
+    @Test
+    void chainedMethodCallInsideErrorCheckBlock() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func handle(err error) {
+                \tif err != nil {
+                \t\tlogger.Error().Err(err).Msg("Cannot retrieve data")
+                \t}
+                }
+                """);
+    }
+
+    @Test
+    void errorCheckBlockNestedInForLoop() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func handle(items []int, err error) {
+                \tfor range items {
+                \t\tif err != nil {
+                \t\t\tlogger.Error().Err(err).Msg("Cannot retrieve data")
+                \t\t}
+                \t}
+                }
+                """);
     }
 
     @Test
@@ -190,6 +232,90 @@ class GoRpcPrintRoundTripIntegTest {
     }
 
     @Test
+    void multiValueReturnSurvivesDeserialization() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func retrieve() (int, error) {
+                \treturn 0, nil
+                }
+                """);
+    }
+
+    @Test
+    void ifWithInitClauseSurvivesDeserialization() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f() {
+                \tif err := g(); err != nil {
+                \t} else {
+                \t}
+                }
+                """);
+    }
+
+    @Test
+    void switchWithInitClauseSurvivesDeserialization() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f() {
+                \tswitch x := g(); x {
+                \tcase 1:
+                \t}
+                }
+                """);
+    }
+
+    @Test
+    void methodReceiverSurvivesDeserialization() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                type Service struct {
+                }
+
+                func (s *Service) Run() {
+                }
+                """);
+    }
+
+    @Test
+    void valueReceiverWithParamsAndReturn() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                type Service struct {
+                }
+
+                func (s Service) Add(a int, b int) int {
+                \treturn a + b
+                }
+                """);
+    }
+
+    @Test
+    void receiverMethodWithMultiValueReturn() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                type Service struct {
+                }
+
+                func (s *Service) Run() (int, error) {
+                \treturn 0, nil
+                }
+                """);
+    }
+
+    @Test
     void addressOfAndVariadicSpread() {
         assertPrintsUnchangedAfterReset(
                 "package main\n" +
@@ -202,5 +328,86 @@ class GoRpcPrintRoundTripIntegTest {
                 "\tdst = append(dst, src...)\n" +
                 "\treturn &T{Name: dst[0]}\n" +
                 "}\n");
+    }
+
+    /**
+     * for-range headers carry up to two loop targets plus a {@code :=}/{@code =}
+     * operator. These live in the {@code Variable} slot of J.ForEachLoop.Control
+     * as a Go MultiAssignment (the {@code :=} vs {@code =} is a ShortVarDecl
+     * marker), so the full head must survive the wire. Before that mapping the
+     * Java side could hold only a single loop variable and always re-emitted
+     * {@code :=}, so {@code for k, v = range} came back as {@code for k := range}.
+     */
+    @Test
+    void forRangeKeylessSurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f(items []int) {
+                \tfor range items {
+                \t}
+                }
+                """);
+    }
+
+    @Test
+    void forRangeTwoVarsDefineSurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f(items []int) {
+                \tfor k, v := range items {
+                \t\t_ = k
+                \t\t_ = v
+                \t}
+                }
+                """);
+    }
+
+    @Test
+    void forRangeBlankKeySurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f(items []int) {
+                \tfor _, v := range items {
+                \t\t_ = v
+                \t}
+                }
+                """);
+    }
+
+    @Test
+    void forRangeTwoVarsAssignSurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f(items []int) {
+                \tvar k, v int
+                \tfor k, v = range items {
+                \t}
+                \t_ = k
+                \t_ = v
+                }
+                """);
+    }
+
+    @Test
+    void forRangeArbitraryLhsAssignSurvivesReset() {
+        assertPrintsUnchangedAfterReset(
+                """
+                package main
+
+                func f(items []int, m map[int]int) {
+                \tvar v int
+                \tfor m[0], v = range items {
+                \t}
+                \t_ = v
+                }
+                """);
     }
 }

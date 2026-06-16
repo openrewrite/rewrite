@@ -2,7 +2,7 @@
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, List, Optional, TypeVar, Generic
+from typing import Any, ClassVar, List, Optional, Callable, Type, TypeVar, Generic
 from typing_extensions import Self
 from uuid import UUID
 import weakref
@@ -46,6 +46,10 @@ class PrintOutputCapture(Generic[P]):
     @dataclass(frozen=True)
     class MarkerPrinter(ABC):
         DEFAULT: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']]
+        SEARCH_MARKERS_ONLY: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']]
+        VERBOSE: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']]
+        FENCED: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']]
+        SANITIZED: ClassVar[Optional['PrintOutputCapture.MarkerPrinter']]
 
         def replace(self, **kwargs: Any) -> Self: ...
 

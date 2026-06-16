@@ -29,6 +29,7 @@ import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
@@ -446,11 +447,12 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         Type finalSelectType = selectType;
         JavaType.FullyQualified finalDeclaringType = resolvedDeclaringType;
         String[] finalParamNames = paramNames;
-        return typeFactory.methodFor(signature, () -> {
-            JavaType.Method method = new JavaType.Method(
+        return typeFactory.methodFor(signature,
+                () -> new JavaType.Method(
                     null, methodSymbol.flags_field, null,
                     methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
-                    null, finalParamNames, null, null, null, null, null);
+                    null, finalParamNames, null, null, null, null, null),
+                method -> {
             JavaType returnType = null;
             List<JavaType> parameterTypes = null;
             List<JavaType> exceptionTypes = null;
@@ -486,7 +488,6 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             method.unsafeSet(finalDeclaringType,
                     methodSymbol.isConstructor() ? finalDeclaringType : returnType,
                     parameterTypes, exceptionTypes, listAnnotations(methodSymbol));
-            return method;
         });
     }
 
@@ -556,11 +557,12 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             String[] finalParamNames = paramNames;
             List<String> finalDefaultValues = defaultValues;
             String[] finalFormalTypeNames = declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0]);
-            return typeFactory.methodFor(signature, () -> {
-                JavaType.Method method = new JavaType.Method(
+            return typeFactory.methodFor(signature,
+                    () -> new JavaType.Method(
                         null, methodSymbol.flags_field, null,
                         methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
-                        null, finalParamNames, null, null, null, finalDefaultValues, finalFormalTypeNames);
+                        null, finalParamNames, null, null, null, finalDefaultValues, finalFormalTypeNames),
+                    method -> {
                 Type signatureType = methodSymbol.type instanceof Type.ForAll ?
                         ((Type.ForAll) methodSymbol.type).qtype :
                         methodSymbol.type;
@@ -610,7 +612,6 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                 method.unsafeSet(finalDeclaringType,
                         methodSymbol.isConstructor() ? finalDeclaringType : returnType,
                         parameterTypes, exceptionTypes, listAnnotations(methodSymbol));
-                return method;
             });
         }
 

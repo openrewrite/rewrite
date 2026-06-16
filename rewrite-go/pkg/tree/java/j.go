@@ -68,25 +68,23 @@ func (n *Identifier) WithFieldType(ft *JavaTypeVariable) *Identifier {
 
 // Literal represents a literal value (string, number, boolean, etc.).
 type Literal struct {
-	ID      uuid.UUID
-	Prefix  Space
-	Markers Markers
-	Kind    LiteralKind
-	Value   any
-	Source  string   // the original source text of the literal
-	Type    JavaType // the type of this literal (nullable)
+	ID             uuid.UUID
+	Prefix         Space
+	Markers        Markers
+	Value          any
+	Source         string          // the original source text of the literal
+	UnicodeEscapes []UnicodeEscape // mirrors J.Literal.unicodeEscapes; typically empty for Go
+	Type           JavaType        // the type of this literal (nullable)
 }
 
-type LiteralKind int
-
-const (
-	BoolLiteral LiteralKind = iota
-	IntLiteral
-	FloatLiteral
-	StringLiteral
-	CharLiteral
-	NilLiteral
-)
+// UnicodeEscape mirrors J.Literal.UnicodeEscape: an escaped code point and
+// the index into the value source where it occurs. Go does not currently
+// produce these, but the field exists to keep Literal symmetric with the
+// Java model for RPC round-tripping.
+type UnicodeEscape struct {
+	ValueSourceIndex int
+	CodePoint        string
+}
 
 func (*Literal) IsTree()       {}
 func (*Literal) IsJ()          {}
@@ -312,12 +310,14 @@ func (n *Block) WithEnd(end Space) *Block {
 	return &c
 }
 
-// Return represents a return statement.
+// Return represents a return statement. Mirrors Java's J.Return: a single,
+// nullable returned expression. Go return statements with more than one value
+// map to golang.Return instead.
 type Return struct {
-	ID          uuid.UUID
-	Prefix      Space
-	Markers     Markers
-	Expressions []RightPadded[Expression]
+	ID         uuid.UUID
+	Prefix     Space
+	Markers    Markers
+	Expression Expression // nil for a naked `return`
 }
 
 func (*Return) IsTree()      {}
@@ -336,17 +336,19 @@ func (n *Return) WithMarkers(markers Markers) *Return {
 	return &c
 }
 
-// If represents an if statement.
-// In Go, if can have an init statement: `if init; cond { }`.
+// If represents an if statement. Mirrors Java's J.If exactly: the condition is a
+// ControlParentheses (as in Java) whose inner element is the bare Go condition —
+// Go has no parens, so the wrapper carries no whitespace of its own and the
+// printer emits only the inner element. Go's optional init clause
+// (`if x := f(); cond {}`) has no slot here — it lives on a wrapping
+// golang.StatementWithInit instead.
 type If struct {
-	ID          uuid.UUID
-	Prefix      Space
-	Markers     Markers
-	Init        *RightPadded[Statement] // nil if no init; After = space before `;`
-	Condition   Expression
-	ConditionCP *ControlParentheses // cached ControlParentheses from RPC round-trip
-	Then        *Block
-	ElsePart    *RightPadded[J] // nil if no else clause
+	ID        uuid.UUID
+	Prefix    Space
+	Markers   Markers
+	Condition *ControlParentheses
+	Then      *Block
+	ElsePart  *RightPadded[J] // nil if no else clause
 }
 
 func (*If) IsTree()      {}
@@ -365,7 +367,7 @@ func (n *If) WithMarkers(markers Markers) *If {
 	return &c
 }
 
-func (n *If) WithCondition(condition Expression) *If {
+func (n *If) WithCondition(condition *ControlParentheses) *If {
 	c := *n
 	c.Condition = condition
 	return &c
@@ -547,8 +549,7 @@ type MethodDeclaration struct {
 	ID                 uuid.UUID
 	Prefix             Space
 	Markers            Markers
-	LeadingAnnotations []*Annotation         // `//go:noinline` / `//go:nosplit` etc. on funcs
-	Receiver           *Container[Statement] // nil for free functions; `(r *Type)` receiver
+	LeadingAnnotations []*Annotation // `//go:noinline` / `//go:nosplit` etc. on funcs
 	Name               *Identifier
 	TypeParameters     *TypeParameters      // nil for non-generic functions; `[T any]` declaration-site type params
 	Parameters         Container[Statement] // parameter list in parentheses
@@ -748,54 +749,22 @@ func (n *ForEachLoop) WithBody(body *Block) *ForEachLoop {
 	return &c
 }
 
-// ForEachControl holds the variable and iterable of a for-range loop.
-// The "range" keyword is implicit (always present).
+// ForEachControl is a faithful mirror of Java's J.ForEachLoop.Control: it has
+// exactly the same two slots, Variable and Iterable. The "range" keyword (the
+// Go analog of Java's `:` separator) is implicit and always present.
 //
-// Structure: `for` [key] [`,` value] [`:=`|`=`] `range` iterable
-//   - Key and Value may be nil (e.g., `for range expr {}`)
-//   - When Key is non-nil, Operator contains `:=` or `=`
+// Structure: `for` [variable] `range` iterable
+//   - Variable holds the loop target(s). Keyless `for range expr {}` uses a
+//     J.Empty here. One or more targets — together with the `:=`/`=` operator —
+//     are carried by a golang.MultiAssignment (its ShortVarDecl marker encodes
+//     `:=` vs `=`); this keeps all Go-specific structure out of this mirror.
+//   - Variable.After = space before "range".
 type ForEachControl struct {
 	ID       uuid.UUID
 	Prefix   Space
 	Markers  Markers
-	Key      *RightPadded[Expression] // nil for `for range expr`; After = space after key (including comma)
-	Value    *RightPadded[Expression] // nil when no value; After = space before operator
-	Operator LeftPadded[AssignOp]     // `:=` or `=`; Before = space before operator. Unused when Key is nil
-	Iterable Expression               // expression after "range" keyword
-}
-
-// AssignOp distinguishes := from = in assignment contexts.
-type AssignOp int
-
-const (
-	AssignOpEquals AssignOp = iota + 1 // =
-	AssignOpDefine                     // :=
-)
-
-// String returns a string representation of AssignOp for RPC serialization.
-func (op AssignOp) String() string {
-	switch op {
-	case AssignOpEquals:
-		return "Equals"
-	case AssignOpDefine:
-		return "Define"
-	default:
-		return "Equals"
-	}
-}
-
-// ParseAssignOp converts a string to an AssignOp.
-// Accepts both the Go enum names emitted by AssignOp.String() ("Equals", "Define")
-// and the Java-side source-symbol spellings ("=", ":=").
-func ParseAssignOp(s string) AssignOp {
-	switch s {
-	case "Equals", "=":
-		return AssignOpEquals
-	case "Define", ":=":
-		return AssignOpDefine
-	default:
-		return 0 // Unknown
-	}
+	Variable RightPadded[Statement]  // loop target(s); J.Empty when keyless
+	Iterable RightPadded[Expression] // expression after "range" keyword
 }
 
 func (*ForEachControl) IsTree() {}
@@ -813,12 +782,13 @@ func (n *ForEachControl) WithMarkers(markers Markers) *ForEachControl {
 	return &c
 }
 
-// Switch represents a switch statement.
+// Switch represents a switch statement. Mirrors Java's J.Switch: a selector tag
+// and the case block. Go's optional init clause (`switch x := f(); x {}`) has no
+// slot here — it lives on a wrapping golang.StatementWithInit instead.
 type Switch struct {
 	ID      uuid.UUID
 	Prefix  Space
 	Markers Markers
-	Init    *RightPadded[Statement]  // optional init statement; After = space after semicolon
 	Tag     *RightPadded[Expression] // optional tag expression; After = space before {
 	Body    *Block                   // contains Case statements
 }
@@ -1175,13 +1145,14 @@ func (n *FieldAccess) WithTarget(target Expression) *FieldAccess {
 
 // MethodInvocation represents a function or method call like `f(args)`.
 type MethodInvocation struct {
-	ID         uuid.UUID
-	Prefix     Space
-	Markers    Markers
-	Select     *RightPadded[Expression] // nil for free functions
-	Name       *Identifier
-	Arguments  Container[Expression]
-	MethodType *JavaTypeMethod // the method type being invoked (nullable)
+	ID             uuid.UUID
+	Prefix         Space
+	Markers        Markers
+	Select         *RightPadded[Expression] // nil for free functions
+	TypeParameters *Container[Expression]   // explicit call-site type arguments, e.g. `[int]` in `Map[int](42)`; nil otherwise
+	Name           *Identifier
+	Arguments      Container[Expression]
+	MethodType     *JavaTypeMethod // the method type being invoked (nullable)
 }
 
 func (*MethodInvocation) IsTree()       {}
@@ -1207,9 +1178,15 @@ func (n *MethodInvocation) WithName(name *Identifier) *MethodInvocation {
 	return &c
 }
 
+func (n *MethodInvocation) WithTypeParameters(typeParameters *Container[Expression]) *MethodInvocation {
+	c := *n
+	c.TypeParameters = typeParameters
+	return &c
+}
+
 // VariableDeclarations represents one or more variable declarations.
-// For grouped declarations `var ( ... )` or `const ( ... )`, Specs is non-nil and
-// Variables/TypeExpr are unused.
+// Grouped declarations `var ( ... )` / `const ( ... )` are modeled by
+// golang.DeclarationBlock, whose elements are single VariableDeclarations.
 type VariableDeclarations struct {
 	ID                 uuid.UUID
 	Prefix             Space
@@ -1218,7 +1195,6 @@ type VariableDeclarations struct {
 	TypeExpr           Expression                         // the declared type (nil if inferred)
 	Varargs            *Space                             // non-nil for variadic params (`...T`); holds prefix of `...`
 	Variables          []RightPadded[*VariableDeclarator] // the declared variables
-	Specs              *Container[Statement]              // non-nil for grouped `var ( ... )`; Before = space before `(`
 }
 
 func (*VariableDeclarations) IsTree()      {}
@@ -1273,13 +1249,14 @@ func (n *VariableDeclarator) WithName(name *Identifier) *VariableDeclarator {
 	return &c
 }
 
-// ArrayType represents an array or slice type like `[]T`, `[N]T`.
+// ArrayType represents a variable-length array (slice) type like `[]T`.
+// Mirrors Java's J.ArrayType, which has no length slot. Go's fixed-size arrays
+// `[N]T` carry an inline length expression and map to golang.ArrayType instead.
 type ArrayType struct {
 	ID          uuid.UUID
 	Prefix      Space
 	Markers     Markers
-	Dimension   LeftPadded[Space] // Before = space before `[`, Element = space inside brackets before `]`; for `[N]T`, the length expr is stored separately
-	Length      Expression        // nil for slices (`[]T`), non-nil for arrays (`[N]T`)
+	Dimension   LeftPadded[Space] // Before = space before `[`, Element = space inside brackets before `]`
 	ElementType Expression        // the element type
 	Type        JavaType          // the array type (nullable)
 }
@@ -1306,7 +1283,6 @@ type Parentheses struct {
 	Prefix  Space
 	Markers Markers
 	Tree    RightPadded[Expression] // Element = inner expr, After = space before `)`
-	Type    JavaType                // the result type (nullable)
 }
 
 func (*Parentheses) IsTree()       {}
@@ -1332,7 +1308,6 @@ type TypeCast struct {
 	Markers Markers
 	Clazz   *ControlParentheses // the type in parentheses
 	Expr    Expression          // the expression being cast/asserted
-	Type    JavaType            // the result type (nullable)
 }
 
 func (*TypeCast) IsTree()       {}

@@ -295,6 +295,106 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void htmlVoidElementInJsp() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <html lang="en">
+              <body>
+              	<br>
+              	Message
+              	<br>
+              </body>
+              </html>
+              """,
+            spec -> spec.path("voids.jsp")
+          )
+        );
+    }
+
+    @Test
+    void htmlVoidElementsWithAttributesInJsp() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <html>
+              <head>
+                <meta charset="utf-8">
+                <link rel="stylesheet" href="app.css">
+              </head>
+              <body>
+                <img src="logo.png" alt="logo">
+                <input type="text" name="q">
+                <hr>
+              </body>
+              </html>
+              """,
+            spec -> spec.path("attrs.jsp")
+          )
+        );
+    }
+
+    @Test
+    void springBootWelcomeJsp() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+
+              <%@ taglib prefix="spring" uri="http://www.springframework.org/tags"%>
+              <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+
+              <html lang="en">
+
+              <body>
+              	<c:url value="/resources/text.txt" var="url"/>
+              	<spring:url value="/resources/text.txt" htmlEscape="true" var="springUrl" />
+              	Spring URL: ${springUrl} at ${time}
+              	<br>
+              	JSTL URL: ${url}
+              	<br>
+              	Message: ${message}
+              </body>
+
+              </html>
+              """,
+            spec -> spec.path("welcome.jsp")
+          )
+        );
+    }
+
+    @Test
+    void voidElementNameAsContainerStillParsesInXml() {
+        // In real XML (htmlMode off), an element that happens to share a name with an HTML
+        // void element but has content and a matching close tag must still parse normally.
+        rewriteRun(
+          xml(
+            """
+              <root>
+                <link>https://example.com</link>
+                <source>generated</source>
+              </root>
+              """
+          )
+        );
+    }
+
+    @Test
+    void voidElementLeniencyIsHtmlOnly() {
+        // In a plain .xml file (htmlMode off) an unclosed <br> remains malformed XML and is
+        // preserved verbatim as a ParseError, rather than being treated as an HTML void element.
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), "<root>\n<br>\n</root>")
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo("<root>\n<br>\n</root>");
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2189")
     @Test
     void specialCharacters() {

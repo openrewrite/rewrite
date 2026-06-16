@@ -46,7 +46,21 @@ import {ReferenceMap} from "../reference";
 import {GetLanguages} from "./request/get-languages";
 
 export class RewriteRpc {
-    private static _global?: RewriteRpc;
+    /**
+     * Key for the active {@link RewriteRpc} connection on {@link globalThis}.
+     *
+     * It deliberately lives on `globalThis` rather than as a `static` field:
+     * a recipe package that bundles `@openrewrite/rewrite` (or resolves it from
+     * its own `node_modules`) loads a *separate copy* of this module, with its
+     * own class object and therefore its own statics. A `static` field set by
+     * the host would be invisible to such a copy, so `RewriteRpc.get()` (e.g.
+     * via `prepareJavaRecipe`) would return `undefined` and throw "no active
+     * RewriteRpc connection" — surfacing during `InstallRecipes` as the
+     * misleading "Ensure the constructor can be called without any arguments".
+     * {@link Symbol.for} resolves to the same symbol across every module copy,
+     * so all copies share the one active connection. See gh-7968.
+     */
+    private static readonly GLOBAL_KEY: symbol = Symbol.for("org.openrewrite.rpc.RewriteRpc.global");
 
     private readonly snowflake = SnowflakeId();
 
@@ -154,11 +168,11 @@ export class RewriteRpc {
     }
 
     static set(value: RewriteRpc) {
-        this._global = value;
+        (globalThis as any)[RewriteRpc.GLOBAL_KEY] = value;
     }
 
     static get(): RewriteRpc | undefined {
-        return this._global;
+        return (globalThis as any)[RewriteRpc.GLOBAL_KEY];
     }
 
     end(): RewriteRpc {

@@ -87,7 +87,14 @@ export namespace RecipeMarketplace {
                         const recipeInst = new recipe({});
                         this.recipes.set(await recipeInst.descriptor(), recipe);
                     } catch (e) {
-                        const err = new Error(`Failed to install recipe '${recipe.name}'. Ensure the constructor can be called without any arguments.`);
+                        // Surface the underlying cause inline: it is dropped at the
+                        // JSON-RPC serialization boundary (only `message` survives), so
+                        // folding it into the message is the only way it reaches the
+                        // caller's logs. Without this, a failure deeper in the recipe
+                        // (e.g. a sub-recipe needing an RPC connection) is hidden behind
+                        // the generic "constructor" hint. See gh-7968.
+                        const cause = e instanceof Error ? e.message : String(e);
+                        const err = new Error(`Failed to install recipe '${recipe.name}'. Ensure the constructor can be called without any arguments. Cause: ${cause}`);
                         (err as any).cause = e;
                         throw err;
                     }

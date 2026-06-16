@@ -159,6 +159,16 @@ class PythonTypeMapping:
         self._declaring_cycle_placeholders: Dict[int, JavaType.Class] = {}
         self._class_literal_index: Dict[str, int] = {}  # className -> classLiteral type_id
 
+        # Cumulative, session-wide type table shared by every file parsed through
+        # the same ty ``--serve`` session. ty deduplicates descriptors across a
+        # session, so a type first seen in an earlier file is omitted from later
+        # files' responses; this table restores those descriptors as a fallback
+        # (see TyTypesClient.session_types and _build_index back-fill).
+        self._session_types: Dict[int, Dict[str, Any]] = (
+            ty_client.session_types if ty_client is not None
+            and hasattr(ty_client, 'session_types') else {}
+        )
+
         # Fetch all types in one batch call
         if ty_client is not None:
             try:
@@ -261,6 +271,19 @@ class PythonTypeMapping:
                 cn = descriptor.get('className', '')
                 if cn:
                     self._class_literal_index[cn] = tid
+
+        # Back-fill descriptors that this file's response omitted because ty's
+        # shared --serve session already emitted them for an earlier file. The
+        # session table is keyed by ty's session-stable ids, so a referenced id
+        # absent from this file's registry resolves through the cumulative table.
+        # File-local descriptors take precedence (setdefault) — they are the
+        # authoritative, full descriptors for types this file is the first to see.
+        for tid, descriptor in self._session_types.items():
+            if self._type_registry.setdefault(tid, descriptor) is descriptor and \
+                    descriptor.get('kind') == 'classLiteral':
+                cn = descriptor.get('className', '')
+                if cn:
+                    self._class_literal_index.setdefault(cn, tid)
 
     def _lookup_type_id(self, node: ast.AST) -> Optional[int]:
         """Look up a node's type ID by converting AST position to byte offset.
@@ -516,20 +539,97 @@ class PythonTypeMapping:
                             methods.append(method)
                 class_type._methods = methods if methods else None
 
+            # Populate members (attributes / class & instance variables) from the
+            # non-function members. ty emits a member's *name* on the entry itself
+            # and its *type* via `typeId`; for a field with a default it emits both
+            # the declared type and the default-value literal under the same name,
+            # so de-duplicate by name keeping the first (declared) occurrence. A
+            # member typed as the owning class resolves through the same cycle
+            # guard `_resolve_type` uses for methods, so self-references don't
+            # recurse infinitely.
+            if members and getattr(class_type, '_members', None) is None:
+                variables = []
+                seen_names = set()
+                for member in members:
+                    if not isinstance(member, dict):
+                        continue
+                    member_name = member.get('name')
+                    member_type_id = member.get('typeId')
+                    if not member_name or member_type_id is None or member_name in seen_names:
+                        continue
+                    member_desc = self._type_registry.get(member_type_id)
+                    # Skip function-kinds (handled as methods above) and nested
+                    # classes/modules — only true variables become members.
+                    if member_desc is None or not self._is_variable_descriptor(member_desc):
+                        continue
+                    member_type = self._resolve_type(member_type_id)
+                    if member_type is None:
+                        continue
+                    seen_names.add(member_name)
+                    variables.append(JavaType.Variable(
+                        _name=member_name, _type=member_type, _owner=class_type))
+                class_type._members = variables if variables else None
+
             return class_type
 
         elif kind == 'typedDict':
+            # Map a TypedDict to a nominal class type by name and populate its
+            # members from the descriptor's `fields`. Each field carries its own
+            # `name` and `typeId` (the same shape as a classLiteral member), so
+            # we reuse the variable-building path. The class is keyed by simple
+            # name via `_create_class_type`, so two TypedDicts that share a name
+            # collapse — acceptable until ty emits a qualified name here.
+            #
+            # We still drop the PEP 728 `closed` / `extraItems` openness fields
+            # and the per-field `required` / `readOnly` flags; and linking a
+            # subscript use `m["name"]` back to its field declaration (a
+            # J.ArrayAccess LST change) remains deferred — that value type is
+            # already attributed on the access node.
             name = descriptor.get('name', '')
-            if name:
-                return self._create_class_type(name)
-            return _UNKNOWN
+            if not name:
+                return _UNKNOWN
+            class_type = self._create_class_type(name)
+            fields = descriptor.get('fields', [])
+            if fields and getattr(class_type, '_members', None) is None:
+                variables = []
+                seen_names = set()
+                for field in fields:
+                    if not isinstance(field, dict):
+                        continue
+                    field_name = field.get('name')
+                    field_type_id = field.get('typeId')
+                    if not field_name or field_type_id is None or field_name in seen_names:
+                        continue
+                    field_type = self._resolve_type(field_type_id)
+                    if field_type is None:
+                        continue
+                    seen_names.add(field_name)
+                    variables.append(JavaType.Variable(
+                        _name=field_name, _type=field_type, _owner=class_type))
+                if variables:
+                    class_type._members = variables
+            return class_type
 
         elif kind == 'subclassOf':
+            # `subclassOf X` is ty's representation of `type[X]`: a *class
+            # object*, not an instance of X. Model it as `type[X]` so it stays
+            # distinct from an instance of X (see _make_class_object_type).
             base_id = descriptor.get('base')
             if base_id is not None:
                 result = self._resolve_type(base_id)
                 if result is not None:
-                    return result
+                    return self._make_class_object_type(result)
+            return _UNKNOWN
+
+        elif kind == 'typeForm':
+            # PEP 747 TypeForm[T] (ty-types >= 0.0.44): a type expression used as
+            # a runtime value. Like `subclassOf` (`type[X]`), the value is the
+            # type T, not an instance of T, so wrap it as a class object.
+            type_arg_id = descriptor.get('typeArgument')
+            if type_arg_id is not None:
+                result = self._resolve_type(type_arg_id)
+                if result is not None:
+                    return self._make_class_object_type(result)
             return _UNKNOWN
 
         elif kind == 'newType':
@@ -1071,6 +1171,12 @@ class PythonTypeMapping:
                 return self._resolve_declaring_type(base_id)
             return None
 
+        elif kind == 'typeForm':
+            type_arg_id = descriptor.get('typeArgument')
+            if type_arg_id is not None:
+                return self._resolve_declaring_type(type_arg_id)
+            return None
+
         elif kind == 'newType':
             name = descriptor.get('name', '')
             if name:
@@ -1274,6 +1380,22 @@ class PythonTypeMapping:
                 if name:
                     names.append(name)
         return names
+
+    def _make_class_object_type(self, base: JavaType) -> JavaType:
+        """Wrap a resolved type ``X`` as the class-object type ``type[X]``.
+
+        A value of type ``type[X]`` (ty's ``subclassOf X``, and PEP 747
+        ``TypeForm[X]``) is the *class* ``X`` itself, not an instance of ``X``.
+        It is modelled as a :class:`JavaType.Parameterized` over ``type`` with
+        ``X`` as its sole type parameter — mirroring how ``list[X]`` is modelled
+        — so that ``is_assignable_to(X, type[X])`` is ``False`` (the raw name is
+        ``type``, not ``X``) while the wrapped ``X`` remains recoverable via
+        ``type_parameters[0]`` for attribute/classmethod resolution.
+        """
+        param = JavaType.Parameterized()
+        param._type = self._create_class_type('type')
+        param._type_parameters = [base]
+        return param
 
     def _create_class_type(self, fqn: str) -> JavaType.Class:
         """Create a JavaType.Class from a fully qualified name."""

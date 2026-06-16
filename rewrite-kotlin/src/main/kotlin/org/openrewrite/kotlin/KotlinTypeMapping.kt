@@ -635,10 +635,11 @@ class KotlinTypeMapping(
         }
         val name = if (function.symbol is FirConstructorSymbol) "<constructor>" else methodName(function)
         val finalParamNames = paramNamesArr
-        return typeFactory.methodFor(signature) {
-            val method = Method(
+        return typeFactory.methodFor(signature, {
+            Method(
                     null, methodFlags, null, name,
                     null, finalParamNames, null, null, null, null, null)
+        }) { method ->
             var parentType: JavaType? = when {
                 function.symbol is FirConstructorSymbol -> type(function.returnTypeRef)
                 function.dispatchReceiverType is ConeClassLikeType ->
@@ -700,7 +701,6 @@ class KotlinTypeMapping(
                 returnType,
                 parameterTypes, null, listAnnotations(function.annotations)
             )
-            method
         }
     }
 
@@ -764,10 +764,11 @@ class KotlinTypeMapping(
         val finalParamNames = paramNamesArr
         val finalDefaultValues = defaultValues
         val finalMethodFlags = methodFlags
-        return typeFactory.methodFor(signature) {
-            val method = Method(
+        return typeFactory.methodFor(signature, {
+            Method(
                     null, finalMethodFlags, null, javaMethod.name.asString(),
                     null, finalParamNames, null, null, null, finalDefaultValues, null)
+        }) { method ->
             val exceptionTypes: List<JavaType>? = null
             val returnType = type(javaMethod.returnType)
             var parameterTypes: MutableList<JavaType>? = null
@@ -782,7 +783,6 @@ class KotlinTypeMapping(
                 returnType,
                 parameterTypes, exceptionTypes, listAnnotations(javaMethod.annotations)
             )
-            method
         }
     }
 
@@ -841,10 +841,11 @@ class KotlinTypeMapping(
         }
         val finalParamNames = paramNamesArr
         val finalInvocationFlags = invocationFlags
-        return typeFactory.methodFor(signature) {
-            val method = Method(
+        return typeFactory.methodFor(signature, {
+            Method(
                     null, finalInvocationFlags, null, name,
                     null, finalParamNames, null, null, null, null, null)
+        }) { method ->
             var paramTypes: MutableList<JavaType>? = if (paramNamesArr != null) ArrayList(paramNamesArr.size) else null
             var declaringType: FullyQualified? = null
             if (function.calleeReference is FirResolvedNamedReference &&
@@ -944,7 +945,6 @@ class KotlinTypeMapping(
                 returnType,
                 paramTypes, null, listAnnotations(function.annotations)
             )
-            method
         }
     }
 
@@ -1435,10 +1435,11 @@ class KotlinTypeMapping(
         constructorFlags = constructorFlags and (1L shl 4).inv()
         val finalParamNames = paramNamesArr
         val finalConstructorFlags = constructorFlags
-        return typeFactory.methodFor(signature) {
-            val method = Method(
+        return typeFactory.methodFor(signature, {
+            Method(
                     null, finalConstructorFlags, null, "<constructor>",
                     null, finalParamNames, null, null, null, null, null)
+        }) { method ->
             val exceptionTypes: List<JavaType>? = null
             var parameterTypes: MutableList<JavaType>? = null
             if (constructor.valueParameters.isNotEmpty()) {
@@ -1452,7 +1453,6 @@ class KotlinTypeMapping(
                 finalDeclaringType,
                 parameterTypes, exceptionTypes, listAnnotations(constructor.annotations)
             )
-            method
         }
     }
 

@@ -36,6 +36,7 @@ import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SourceSet;
 
+import java.beans.ConstructorProperties;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.*;
@@ -86,7 +87,7 @@ public class JavaSourceSet implements SourceSet {
         this(id, name, classpath, gavToTypes, null);
     }
 
-    @java.beans.ConstructorProperties({"id", "name", "classpath", "gavToTypes", "typeFactory"})
+    @ConstructorProperties({"id", "name", "classpath", "gavToTypes", "typeFactory"})
     public JavaSourceSet(UUID id, String name,
                          List<JavaType.FullyQualified> classpath,
                          Map<String, List<JavaType.FullyQualified>> gavToTypes,

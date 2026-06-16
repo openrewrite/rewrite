@@ -1761,7 +1761,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void deriveFromNexusUpgrade() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
@@ -1827,7 +1826,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void badManagedVersion() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
@@ -3137,6 +3135,38 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             );
             mockRepo.shutdown();
         }
+    }
+
+    @Test
+    void doesNotThrowWhenManagedDependencyHasNullRequested() {
+        // Older serialized LSTs can carry BOM-imported managed dependencies whose `requested` is null.
+        // `MavenVisitor.isManagedDependencyTag` must not dereference it unconditionally, otherwise recipes
+        // such as DependencyVulnerabilityCheck blow up with an NPE on otherwise valid poms.
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>example</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-dependencies</artifactId>
+                              <version>3.3.0</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            spec -> spec.beforeRecipe(doc -> doc.getMarkers().findFirst(MavenResolutionResult.class)
+              .ifPresent(mrr -> mrr.getPom().getDependencyManagement().replaceAll(dm -> dm.withRequested(null))))
+          )
+        );
     }
 
 }

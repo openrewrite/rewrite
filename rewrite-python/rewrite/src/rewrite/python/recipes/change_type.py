@@ -19,12 +19,11 @@ This recipe changes type references from one fully qualified name to another,
 handling all the complexities of type attribution and imports.
 """
 from dataclasses import field
-from typing import Any, Optional
 
-from rewrite import ExecutionContext, Recipe, TreeVisitor, option
+from rewrite import Recipe, option
 from rewrite.decorators import categorize
 from rewrite.marketplace import Python
-from rewrite.rpc.java_recipe import prepare_java_recipe, JavaRecipeVisitor, PreparedJavaRecipe
+from rewrite.rpc.rpc_recipe import RpcRecipe
 
 
 @categorize(Python)
@@ -73,7 +72,6 @@ class ChangeType(Recipe):
         self.old_fully_qualified_type_name = old_fully_qualified_type_name
         self.new_fully_qualified_type_name = new_fully_qualified_type_name
         self.ignore_definition = ignore_definition
-        self._prepared_recipe: Optional[PreparedJavaRecipe] = None
 
     @property
     def name(self) -> str:
@@ -87,16 +85,10 @@ class ChangeType(Recipe):
     def description(self) -> str:
         return "Change a type reference from one fully qualified name to another."
 
-    def editor(self) -> TreeVisitor[Any, ExecutionContext]:
-        # Prepare the Java recipe if not already done
-        if self._prepared_recipe is None:
-            self._prepared_recipe = prepare_java_recipe(
-                "org.openrewrite.java.ChangeType",
-                {
-                    "oldFullyQualifiedTypeName": self.old_fully_qualified_type_name,
-                    "newFullyQualifiedTypeName": self.new_fully_qualified_type_name,
-                    "ignoreDefinition": self.ignore_definition
-                }
-            )
-
-        return JavaRecipeVisitor(self._prepared_recipe)
+    def recipe_list(self) -> list[Recipe]:
+        return [RpcRecipe(
+            "org.openrewrite.java.ChangeType",
+            oldFullyQualifiedTypeName=self.old_fully_qualified_type_name,
+            newFullyQualifiedTypeName=self.new_fully_qualified_type_name,
+            ignoreDefinition=self.ignore_definition,
+        )]

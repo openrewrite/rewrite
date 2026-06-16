@@ -260,6 +260,19 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    void newClassWithInterpolatedStringArgOnNewLine() {
+        rewriteRun(
+          scala(
+            """
+            val n = 1
+            val x = new RuntimeException(
+              s"value: $n")
+            """
+          )
+        );
+    }
+
+    @Test
     void newClassFirstArgIsIfElseOnNewLine() {
         rewriteRun(
           scala(
@@ -315,6 +328,21 @@ class NewClassTest implements RewriteTest {
             """
             def make: Foo =
               new Foo(0)(f)
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedAnonymousClass() {
+        rewriteRun(
+          scala(
+            """
+            class Foo(a: Int)(b: Int)
+            trait Bar
+            object O {
+              val x = new Foo(1)(2) with Bar {}
+            }
             """
           )
         );

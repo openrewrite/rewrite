@@ -25,6 +25,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.golang.GoModVisitor;
 import org.openrewrite.golang.rpc.GoRewriteRpc;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
@@ -53,7 +54,7 @@ import java.util.UUID;
  */
 @lombok.Value
 @With
-public class GoMod implements SourceFile {
+public class GoMod implements SourceFile, GoModTree {
 
     UUID id;
 
@@ -95,14 +96,8 @@ public class GoMod implements SourceFile {
     }
 
     @Override
-    public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return true;
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return (R) this;
+    public <P> GoModTree acceptGoMod(GoModVisitor<P> v, P p) {
+        return v.visitGoMod(this, p);
     }
 
     @Override
@@ -121,8 +116,7 @@ public class GoMod implements SourceFile {
     /**
      * A top-level go.mod statement or a single entry line inside a {@link Block}.
      */
-    public interface GoModStatement {
-        UUID getId();
+    public interface GoModStatement extends GoModTree {
     }
 
     /**
@@ -150,6 +144,11 @@ public class GoMod implements SourceFile {
          * individual values.
          */
         List<Value> values;
+
+        @Override
+        public <P> GoModTree acceptGoMod(GoModVisitor<P> v, P p) {
+            return v.visitDirective(this, p);
+        }
     }
 
     /**
@@ -171,6 +170,11 @@ public class GoMod implements SourceFile {
         Space beforeLParen;
         List<JRightPadded<GoModStatement>> entries;
         Space beforeRParen;
+
+        @Override
+        public <P> GoModTree acceptGoMod(GoModVisitor<P> v, P p) {
+            return v.visitBlock(this, p);
+        }
     }
 
     /**
@@ -179,10 +183,15 @@ public class GoMod implements SourceFile {
      */
     @lombok.Value
     @With
-    public static class Value {
+    public static class Value implements GoModTree {
         UUID id;
         Space prefix;
         Markers markers;
         String text;
+
+        @Override
+        public <P> GoModTree acceptGoMod(GoModVisitor<P> v, P p) {
+            return v.visitValue(this, p);
+        }
     }
 }

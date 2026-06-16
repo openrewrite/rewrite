@@ -1,6 +1,6 @@
 """Tests for empty-diff detection in the test harness."""
 
-from uuid import uuid4
+from rewrite import random_id
 
 import pytest
 
@@ -21,7 +21,7 @@ class _GhostChangeVisitor(PythonVisitor[ExecutionContext]):
 
     def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext):
         cu = super().visit_compilation_unit(cu, p)
-        return cu.replace(markers=Markers(uuid4(), cu.markers.markers))
+        return cu.replace(markers=Markers(random_id(), cu.markers.markers))
 
 
 def test_empty_diff_raises_error():

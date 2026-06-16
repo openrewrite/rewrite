@@ -170,6 +170,40 @@ public class MethodDeclarationTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void ExpressionBodiedMethodWithCommentBeforeSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    int Bar()
+                        => 42
+                            // trailing comment
+                            ;
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ExpressionBodiedConstructorWithCommentBeforeSemicolon()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    int _x;
+                    Foo()
+                        => _x = 1 // set default
+                        ;
+                }
+                """
+            )
+        );
+    }
+
     /// <summary>
     /// Verifies that the printer does not crash with an InvalidCastException when a recipe
     /// transforms the Return statement inside an expression-bodied method into a different

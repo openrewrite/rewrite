@@ -16,8 +16,14 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class AnnotationTest implements RewriteTest {
@@ -289,6 +295,59 @@ class AnnotationTest implements RewriteTest {
                   def f(x: Int @deprecated): Unit = ()
                 }
                 """
+            )
+        );
+    }
+
+    @Test
+    void qualifiedAnnotationName() {
+        rewriteRun(
+            scala(
+                """
+                @scala.annotation.implicitNotFound("msg")
+                trait Foo[T]
+                """
+            )
+        );
+    }
+
+    @Test
+    void throwsAnnotationTypeArgNotInIdentifier() {
+        assertNoTypeArgInIdentifier(
+            """
+            @throws[Exception]
+            def riskyMethod(): Unit = {}
+            """
+        );
+    }
+
+    @Test
+    void throwsAnnotationWithTypeArgAndValueArgNotInIdentifier() {
+        assertNoTypeArgInIdentifier(
+            """
+            @throws[IllegalArgumentException]("Invalid argument")
+            def validate(x: Int): Unit = {}
+            """
+        );
+    }
+
+    private void assertNoTypeArgInIdentifier(String source) {
+        rewriteRun(
+            scala(
+                source,
+                spec -> spec.afterRecipe(cu -> {
+                    List<String> identifierNames = new ArrayList<>();
+                    new JavaIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                            identifierNames.add(identifier.getSimpleName());
+                            return super.visitIdentifier(identifier, p);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(identifierNames)
+                      .as("type-arg source text should not be crammed into an identifier name")
+                      .allSatisfy(name -> assertThat(name).doesNotContain("[", "@"));
+                })
             )
         );
     }

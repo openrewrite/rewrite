@@ -2077,7 +2077,42 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		})
 	}
 
-	s.logger.Printf("ParseProject: parsed %d files across %d module(s)", len(items), len(mods))
+	// Emit each go.mod as a lossless GoMod LST so recipes operate on the
+	// module file directly instead of plain text. Mirrors the single-file
+	// Parse path; the GoResolutionResult — already parsed above for module
+	// context — is attached as a marker when available.
+	for _, modPath := range disc.goMods {
+		data, err := os.ReadFile(modPath)
+		if err != nil {
+			continue
+		}
+		// Relativize before building the LST so the GoMod's own SourcePath
+		// matches the response item (and the compilation units) — the Java
+		// side reads SourcePath off the serialized object, not the item.
+		sourcePath := modPath
+		if req.RelativeTo != nil && *req.RelativeTo != "" {
+			if rel, err := filepath.Rel(*req.RelativeTo, modPath); err == nil {
+				sourcePath = rel
+			}
+		}
+		gm, err := goparser.ParseGoModFile(sourcePath, string(data))
+		if err != nil {
+			s.logger.Printf("ParseProject: skip go.mod LST %s: %v", modPath, err)
+			continue
+		}
+		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
+			gm.Markers.Entries = append(gm.Markers.Entries, *m.mrr)
+		}
+		id := gm.Ident.String()
+		s.localObjects[id] = gm
+		items = append(items, parseProjectResponseItem{
+			ID:             id,
+			SourceFileType: "org.openrewrite.golang.tree.GoMod",
+			SourcePath:     sourcePath,
+		})
+	}
+
+	s.logger.Printf("ParseProject: parsed %d sources across %d module(s)", len(items), len(mods))
 	return items, nil
 }
 

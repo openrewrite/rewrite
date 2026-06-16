@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 using System.Diagnostics;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Serialization;
 using OpenRewrite.Core;
+using OpenRewrite.Core.Rpc;
 using OpenRewrite.CSharp.Rpc;
 using StreamJsonRpc;
 
@@ -49,11 +47,16 @@ public class RpcFixture : IDisposable
         };
         _javaProcess.BeginErrorReadLine();
 
-        // Configure JSON serialization to match Java expectations
-        var formatter = new JsonMessageFormatter();
-        formatter.JsonSerializer.ContractResolver = new CamelCasePropertyNamesContractResolver();
-        formatter.JsonSerializer.Converters.Add(new StringEnumConverter());
-        formatter.JsonSerializer.NullValueHandling = NullValueHandling.Ignore;
+        // Match the production wire format: stream the JSON-RPC envelope with
+        // System.Text.Json via the shared RpcJson.Options (camelCase, string
+        // enums, omitted nulls). The C# RPC stack migrated off Newtonsoft's
+        // JToken-DOM formatter; the Java peer's request codecs expect that
+        // exact shape, so the test harness must use the same formatter or the
+        // Java side fails to deserialize Visit/GetObject requests.
+        var formatter = new SystemTextJsonFormatter
+        {
+            JsonSerializerOptions = RpcJson.Options,
+        };
 
         var handler = new HeaderDelimitedMessageHandler(
             _javaProcess.StandardInput.BaseStream,

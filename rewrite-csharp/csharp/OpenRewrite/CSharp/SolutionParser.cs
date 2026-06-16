@@ -15,6 +15,7 @@
  */
 using System.Diagnostics;
 using System.Xml.Linq;
+using LibGit2Sharp;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
@@ -575,6 +576,12 @@ public class SolutionParser
 
         var dotNetProject = CreateDotNetProjectMarker(projectPath, projectName);
 
+        // One shared symbol→JavaType cache for the whole project. Roslyn interns symbols
+        // per Compilation, so every document in this project resolves a given type to the
+        // same JavaType instance — letting the RPC layer (asRef) serialize each type once
+        // per project instead of re-serializing it for every referencing file.
+        var projectTypeCache = new Dictionary<ISymbol, OpenRewrite.Java.JavaType>(SymbolEqualityComparer.Default);
+
         var results = new List<SourceFile>();
         var fileIndex = 0;
         var projectSw = Stopwatch.StartNew();
@@ -607,11 +614,11 @@ public class SolutionParser
                 if (configSymbolSets.Count > 1)
                 {
                     cu = _parser.ParseWithConfigurations(source, relativePath, semanticModel, configSymbolSets,
-                        charsetBomMarked);
+                        charsetBomMarked, projectTypeCache);
                 }
                 else
                 {
-                    cu = _parser.Parse(source, relativePath, semanticModel, charsetBomMarked);
+                    cu = _parser.Parse(source, relativePath, semanticModel, charsetBomMarked, projectTypeCache);
                 }
 
                 // Attach formatting style marker from .editorconfig
@@ -712,8 +719,7 @@ public class SolutionParser
     /// <summary>
     /// Returns the set of file paths (from <paramref name="candidatePaths"/>) that are
     /// git-ignored according to the repository rooted at or above <paramref name="rootDir"/>.
-    /// Returns an empty set when git is not available or <paramref name="rootDir"/> is not
-    /// inside a git repository.
+    /// Returns an empty set when <paramref name="rootDir"/> is not inside a git repository.
     /// </summary>
     private static HashSet<string> GetGitIgnoredPaths(string rootDir, IEnumerable<string> candidatePaths)
     {
@@ -723,52 +729,29 @@ public class SolutionParser
 
         try
         {
-            // Check if rootDir is inside a git repo
-            var checkPsi = new ProcessStartInfo("git", "rev-parse --git-dir")
-            {
-                WorkingDirectory = rootDir,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var checkProcess = Process.Start(checkPsi);
-            if (checkProcess == null) return ignored;
-            checkProcess.WaitForExit(5_000);
-            if (checkProcess.ExitCode != 0) return ignored;
+            var gitDir = Repository.Discover(rootDir);
+            if (gitDir == null) return ignored; // Not inside a git repository.
 
-            // Use git check-ignore --stdin to batch-check all candidate paths
-            var psi = new ProcessStartInfo("git", "check-ignore --stdin")
-            {
-                WorkingDirectory = rootDir,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var process = Process.Start(psi);
-            if (process == null) return ignored;
+            using var repo = new Repository(gitDir);
+            var workDir = PathUtil.Canonicalize(repo.Info.WorkingDirectory);
 
-            // Write all paths to stdin, one per line
             foreach (var path in paths)
-                process.StandardInput.WriteLine(path);
-            process.StandardInput.Close();
-
-            // Read ignored paths from stdout
-            var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit(10_000);
-
-            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
-                var trimmed = line.TrimEnd('\r');
-                if (!string.IsNullOrEmpty(trimmed))
-                {
-                    // git check-ignore outputs paths relative to the working directory;
-                    // resolve them to full paths for comparison
-                    var fullPath = Path.GetFullPath(trimmed, rootDir);
-                    ignored.Add(fullPath);
-                }
+                // Evaluate ignore rules against the repo-relative path (forward slashes, as
+                // libgit2 expects), but report the original candidate string so the caller's
+                // membership check matches verbatim.
+                var rel = Path.GetRelativePath(workDir, PathUtil.Canonicalize(path));
+                if (rel.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(rel))
+                    continue; // Outside the working tree — not subject to its ignore rules.
+                rel = rel.Replace('\\', '/');
+
+                // Mirror `git check-ignore`: tracked files are never reported as ignored, even
+                // when an ignore rule would otherwise match them.
+                if (repo.Index[rel] != null)
+                    continue;
+
+                if (repo.Ignore.IsPathIgnored(rel))
+                    ignored.Add(path);
             }
         }
         catch (Exception ex)
@@ -803,7 +786,54 @@ public class SolutionParser
             relativePath.StartsWith("obj/", StringComparison.OrdinalIgnoreCase))
             return false;
 
+        // Skip source files supplied by NuGet packages. Source-only packages (e.g. *.sources,
+        // and any package shipping contentFiles/cs/**) inject .cs files from the global package
+        // cache into the compilation. That is third-party code living outside the repository, so
+        // it must not be parsed into the LST, transformed by recipes, or emitted into fix patches
+        // (which would otherwise target unwritable cache paths and fail to apply).
+        if (IsUnderNuGetCache(doc.FilePath))
+            return false;
+
         return true;
+    }
+
+    private static readonly string[] NuGetCacheRoots = BuildNuGetCacheRoots();
+
+    private static string[] BuildNuGetCacheRoots()
+    {
+        var roots = new List<string>();
+        var configured = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
+        if (!string.IsNullOrEmpty(configured))
+        {
+            try { roots.Add(Path.TrimEndingDirectorySeparator(Path.GetFullPath(configured))); }
+            catch { /* ignore malformed NUGET_PACKAGES */ }
+        }
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrEmpty(home))
+            roots.Add(Path.Combine(home, ".nuget", "packages"));
+        return roots.ToArray();
+    }
+
+    /// <summary>
+    /// True when the file lives under the NuGet global package cache (so it is package-provided
+    /// source, not repository source). Matches only the resolved cache roots (NUGET_PACKAGES env
+    /// and the per-user default <c>~/.nuget/packages</c>). A repository may legitimately contain a
+    /// local <c>.nuget/packages</c> directory of its own source, so a bare path-segment match is
+    /// intentionally avoided.
+    /// </summary>
+    private static bool IsUnderNuGetCache(string filePath)
+    {
+        string full;
+        try { full = Path.GetFullPath(filePath); }
+        catch { return false; }
+
+        foreach (var root in NuGetCacheRoots)
+        {
+            if (full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>

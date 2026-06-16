@@ -36,6 +36,15 @@ public class PluginLoadContext : AssemblyLoadContext
         _resolver = new AssemblyDependencyResolver(pluginMainDllPath);
     }
 
+    /// <summary>
+    /// Returns the plugin-private path for <paramref name="assemblyName"/> as declared by the
+    /// plugin's <c>.deps.json</c>, or <c>null</c> when the assembly is not part of the plugin's
+    /// private dependency graph (host/framework assemblies resolve to <c>null</c>). Lets callers
+    /// distinguish a plugin-bundled dependency from a shared host assembly without loading it.
+    /// </summary>
+    public string? ResolvePluginPath(AssemblyName assemblyName) =>
+        _resolver.ResolveAssemblyToPath(assemblyName);
+
     protected override Assembly? Load(AssemblyName assemblyName)
     {
         // If the assembly is already loaded in the Default ALC, return it directly.

@@ -30,12 +30,18 @@ files in the rewrite package.
 import ast
 import keyword
 import sys
+import typing
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Set, Tuple, Optional
 
 
 # Python reserved keywords that can't be used as parameter names
 PYTHON_RESERVED = set(keyword.kwlist) | {'type'}  # 'type' is soft keyword in 3.12+
+
+# Names exported by the typing module. Used to detect which typing imports a
+# generated stub needs beyond the always-imported Any/ClassVar/List/Optional
+# (e.g. Dict, Callable, Type, Tuple, Union appearing in annotations).
+TYPING_EXPORTS = frozenset(getattr(typing, '__all__', ()))
 
 
 def to_public_name(name: str) -> str:
@@ -459,6 +465,78 @@ def get_replace_return_type(node: ast.ClassDef) -> Optional[str]:
     return None
 
 
+def collect_defined_names(tree: ast.Module) -> Set[str]:
+    """
+    Collect every name bound anywhere in the module: classes and functions (at
+    any nesting level), imported names, and module-level assignment targets.
+
+    These shadow same-named ``typing`` exports, so a bare annotation like
+    ``-> TypeAlias`` or ``-> Literal`` resolves to the local class
+    (e.g. ``Py.TypeAlias``, ``J.Literal``, ``JavaType.Union``), not the typing
+    name. We must not emit a ``from typing import`` for such names.
+    """
+    defined: Set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            defined.add(node.name)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                defined.add(alias.asname or alias.name.split('.')[0])
+        elif isinstance(node, ast.ImportFrom):
+            # Names imported from typing are the very ones the stub must
+            # re-import; only imports from other modules shadow a typing name.
+            if node.module in ('typing', 'typing_extensions'):
+                continue
+            for alias in node.names:
+                if alias.name != '*':
+                    defined.add(alias.asname or alias.name)
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    defined.add(target.id)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            defined.add(node.target.id)
+    return defined
+
+
+def collect_typing_names(tree: ast.Module) -> Set[str]:
+    """
+    Collect typing names (e.g. Dict, Callable, Type, Tuple, Union) referenced in
+    annotations anywhere in the module, so the stub can import them.
+
+    Annotation contexts (field annotations, parameter annotations, return
+    types) and class base expressions are scanned. Base classes matter for
+    ``Generic[...]``/``Protocol[...]``; method bodies are not scanned since
+    stubs omit them.
+    """
+    names: Set[str] = set()
+
+    def scan(annotation: ast.AST) -> None:
+        for sub in ast.walk(annotation):
+            if isinstance(sub, ast.Name) and sub.id in TYPING_EXPORTS:
+                names.add(sub.id)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            for base in node.bases:
+                scan(base)
+        elif isinstance(node, ast.AnnAssign) and node.annotation is not None:
+            scan(node.annotation)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.returns is not None:
+                scan(node.returns)
+            fn_args = node.args
+            all_args = (*fn_args.posonlyargs, *fn_args.args, *fn_args.kwonlyargs)
+            for arg in all_args:
+                if arg.annotation is not None:
+                    scan(arg.annotation)
+            if fn_args.vararg is not None and fn_args.vararg.annotation is not None:
+                scan(fn_args.vararg.annotation)
+            if fn_args.kwarg is not None and fn_args.kwarg.annotation is not None:
+                scan(fn_args.kwarg.annotation)
+    return names
+
+
 def extract_typevars(tree: ast.Module) -> List[str]:
     """
     Extract TypeVar declarations from the module.
@@ -738,14 +816,25 @@ def generate_stub_content(source_path: Path) -> str:
 
     # Check if we need TypeVar
     typevars = extract_typevars(tree)
-    typevar_import = ", TypeVar, Generic" if typevars else ""
+
+    # Always import these; append any other typing names used in annotations
+    # (Dict, Callable, Type, ...), keeping TypeVar/Generic last to match the
+    # historical import order and minimize diff churn.
+    always_typing = ['Any', 'ClassVar', 'List', 'Optional']
+    trailing_typing = ['TypeVar', 'Generic']
+    # Exclude names shadowed by local class/function/import definitions; a bare
+    # annotation referencing them resolves to the local name, not typing.
+    detected_typing = collect_typing_names(tree) - collect_defined_names(tree)
+    extra_typing = sorted(detected_typing - set(always_typing) - set(trailing_typing))
+    trailing = [name for name in trailing_typing if typevars or name in detected_typing]
+    typing_line = "from typing import " + ", ".join(always_typing + extra_typing + trailing)
 
     stub_lines = [
         "# Auto-generated stub file for IDE autocomplete support.",
         "# Do not edit manually - regenerate with: python scripts/generate_stubs.py",
         "",
         "from dataclasses import dataclass",
-        f"from typing import Any, ClassVar, List, Optional{typevar_import}",
+        typing_line,
         "from typing_extensions import Self",
         "from uuid import UUID",
         "import weakref",

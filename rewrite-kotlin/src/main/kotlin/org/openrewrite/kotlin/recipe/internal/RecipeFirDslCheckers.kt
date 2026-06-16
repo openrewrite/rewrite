@@ -86,6 +86,7 @@ internal object RecipeFirDslCheckers : FirPropertyChecker(MppCheckerKind.Common)
     private val NAME_EDIT = Name.identifier("edit")
     private val NAME_GENERATE = Name.identifier("generate")
     private val NAME_REWRITE = Name.identifier("rewrite")
+    private val NAME_STRICT_ARITY = Name.identifier("strictArity")
 
     /** Classification of a top-level statement inside the `recipe { … }` block. */
     private sealed interface StatementKind {
@@ -238,7 +239,9 @@ internal object RecipeFirDslCheckers : FirPropertyChecker(MppCheckerKind.Common)
         // receiver is `scan(…) { … }`. We classify by what the chain DOES.
         val chain = unwindChain(call)
         return when {
-            chain.head?.callableSimpleName() == NAME_REWRITE && chain.outermost.callableSimpleName() != NAME_TO ->
+            chain.head?.callableSimpleName() == NAME_REWRITE &&
+                chain.outermost.callableSimpleName() != NAME_TO &&
+                chain.outermost.callableSimpleName() != NAME_STRICT_ARITY ->
                 StatementKind.OrphanRewrite
             chain.head?.callableSimpleName() == NAME_SCAN -> {
                 val hasEdit = chain.tailNames.contains(NAME_EDIT)
@@ -326,7 +329,8 @@ internal object RecipeFirDslCheckers : FirPropertyChecker(MppCheckerKind.Common)
                     ?: continue
                 val chain = unwindChain(call)
                 if (chain.head?.callableSimpleName() == NAME_REWRITE &&
-                    chain.outermost.callableSimpleName() != NAME_TO
+                    chain.outermost.callableSimpleName() != NAME_TO &&
+                    chain.outermost.callableSimpleName() != NAME_STRICT_ARITY
                 ) {
                     reportError(
                         stmt.source ?: declaration.source ?: return,

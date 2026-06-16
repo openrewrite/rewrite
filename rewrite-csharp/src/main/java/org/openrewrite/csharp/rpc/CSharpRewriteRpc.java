@@ -30,9 +30,12 @@ import org.openrewrite.rpc.RewriteRpcProcessManager;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -191,6 +194,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
         private Duration timeout = Duration.ofSeconds(60);
         private boolean traceRpcMessages;
         private @Nullable Path workingDirectory;
+        private @Nullable Path recipeInstallDir;
         private @Nullable Path profileOutputPath;
 
         public Builder marketplace(RecipeMarketplace marketplace) {
@@ -279,6 +283,20 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
 
         /**
+         * Directory in which the server creates its recipe project (where
+         * {@code dotnet add package} resolves recipe NuGet packages). Set this so a
+         * caller-written {@code NuGet.config} co-located in the directory is honored
+         * by dotnet's project-directory config discovery.
+         *
+         * @param recipeInstallDir The directory to create the recipe project in
+         * @return This builder
+         */
+        public Builder recipeInstallDir(@Nullable Path recipeInstallDir) {
+            this.recipeInstallDir = recipeInstallDir;
+            return this;
+        }
+
+        /**
          * Enable .NET EventPipe profiling on the C# process. Captures CPU sampling,
          * GC events, sampled allocations, and runtime counters into a {@code .nettrace}
          * file that can be analyzed with {@code dotnet-trace convert}, PerfView, or
@@ -301,30 +319,49 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
             Stream<@Nullable String> cmd;
 
-            if (csharpServerEntry != null) {
-                // Explicit override (used by tests)
-                if (csharpServerEntry.toString().endsWith(".csproj")) {
-                    cmd = buildCsprojCommand(dotnetPath, csharpServerEntry);
+            // An explicit builder value wins; otherwise fall back to the
+            // REWRITE_DOTNET_RPC_SERVER environment variable so a source .csproj
+            // or a pre-built dll/exe can be selected without code changes (local
+            // cross-repo development, parallel git worktrees). A .csproj is launched
+            // via `dotnet run --project`; anything else is treated as a server entry
+            // assembly/executable run directly.
+            Path serverEntry = csharpServerEntry;
+            if (serverEntry == null) {
+                String envServerEntry = System.getenv("REWRITE_DOTNET_RPC_SERVER");
+                if (envServerEntry != null && !envServerEntry.isEmpty()) {
+                    serverEntry = Paths.get(envServerEntry);
+                }
+            }
+
+            if (serverEntry != null) {
+                if (serverEntry.toString().endsWith(".csproj")) {
+                    cmd = buildCsprojCommand(dotnetPath, serverEntry);
                 } else {
                     cmd = Stream.of(
                             dotnetPath.toString(),
-                            csharpServerEntry.toAbsolutePath().normalize().toString(),
+                            serverEntry.toAbsolutePath().normalize().toString(),
                             log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                            traceRpcMessages ? "--trace-rpc-messages" : null
+                            traceRpcMessages ? "--trace-rpc-messages" : null,
+                            recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                     );
                 }
             } else {
                 // Install and run the tool from a persistent tool-path, bypassing
-                // dotnet tool exec which has auth issues with private feeds (dotnet/sdk#51375)
-                String version = StringUtils.readFully(
-                        CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
+                // dotnet tool exec which has auth issues with private feeds (dotnet/sdk#51375).
+                // REWRITE_DOTNET_RPC_SERVER_VERSION overrides the embedded version so a
+                // specific package version of the tool can be pinned without rebuilding.
+                String version = System.getenv("REWRITE_DOTNET_RPC_SERVER_VERSION");
+                if (version == null || version.isEmpty()) {
+                    version = StringUtils.readFully(
+                            CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
+                }
                 cmd = buildToolPathCommand(dotnetPath, version);
             }
 
-            return startProcess(cmd);
+            return startProcess(cmd, dotnetPath);
         }
 
-        private CSharpRewriteRpc startProcess(Stream<@Nullable String> cmd) {
+        private CSharpRewriteRpc startProcess(Stream<@Nullable String> cmd, Path dotnetPath) {
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
             RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
 
@@ -334,6 +371,21 @@ public class CSharpRewriteRpc extends RewriteRpc {
             process.setStderrRedirect(log);
 
             process.environment().putAll(environment);
+
+            // The tool is launched as a self-contained apphost (not via the `dotnet`
+            // muxer), so it must locate the shared runtime itself. When DOTNET_ROOT is
+            // unset and the runtime isn't at a registered install location for the
+            // apphost's architecture, launch fails ("You must install .NET ..."). This
+            // bites on hosts where `dotnet` lives in a bin/ dir separate from the runtime
+            // (e.g. Homebrew, where the binary is under bin/ but the runtime under
+            // libexec/), and on arm64 machines using an x64 dotnet. Derive DOTNET_ROOT
+            // from the resolved dotnet and set it if the caller hasn't.
+            if (!process.environment().containsKey("DOTNET_ROOT")) {
+                Path dotnetRoot = resolveDotnetRoot(dotnetPath);
+                if (dotnetRoot != null) {
+                    process.environment().put("DOTNET_ROOT", dotnetRoot.toString());
+                }
+            }
 
             if (profileOutputPath != null) {
                 Map<String, String> env = process.environment();
@@ -360,14 +412,61 @@ public class CSharpRewriteRpc extends RewriteRpc {
             }
         }
 
+        /**
+         * Derive the {@code DOTNET_ROOT} (the directory containing {@code shared/}) for a
+         * resolved {@code dotnet} executable by parsing {@code dotnet --list-runtimes}, whose
+         * lines look like {@code Microsoft.NETCore.App 10.0.2 [/path/to/dotnet/shared/Microsoft.NETCore.App]}.
+         * The root is two levels up from that path ({@code .../shared/Microsoft.NETCore.App} →
+         * {@code .../shared} → root). Returns {@code null} if it can't be determined; callers
+         * then fall back to the apphost's own resolution.
+         */
+        private static @Nullable Path resolveDotnetRoot(Path dotnetPath) {
+            Path resolved = null;
+            try {
+                Process p = new ProcessBuilder(dotnetPath.toString(), "--list-runtimes")
+                        .redirectErrorStream(false)
+                        .start();
+                try (BufferedReader br = new BufferedReader(
+                        new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        int lb = line.indexOf('[');
+                        int rb = line.lastIndexOf(']');
+                        if (lb >= 0 && rb > lb) {
+                            Path sharedAppDir = Paths.get(line.substring(lb + 1, rb).trim());
+                            Path shared = sharedAppDir.getParent();
+                            Path root = shared == null ? null : shared.getParent();
+                            if (root != null && Files.isDirectory(root)) {
+                                resolved = root;
+                                break;
+                            }
+                        }
+                    }
+                }
+                p.waitFor();
+            } catch (IOException | InterruptedException ignored) {
+                // Best effort: leave DOTNET_ROOT unset and let the apphost resolve.
+            }
+            return resolved;
+        }
+
         private Stream<@Nullable String> buildCsprojCommand(Path dotnetPath, Path csproj) {
             return Stream.of(
                     dotnetPath.toString(),
                     "run",
                     "--project", csproj.toAbsolutePath().normalize().toString(),
                     "--framework", "net10.0",
+                    // Never let `dotnet run` build/restore here: the caller is expected to have
+                    // already built the tool (the Gradle integTest depends on csharpBuild). An
+                    // implicit restore/build streams MSBuild + NuGet audit output (e.g. NU1903
+                    // vulnerability warnings) to stdout, which is the JSON-RPC pipe. That corrupts
+                    // the stream: the Java peer rejects the non-Content-Length text and replies
+                    // with id-less JSON-RPC errors, which crash the C# SystemTextJsonFormatter
+                    // ("Non-default ID required"). --no-build also implies --no-restore.
+                    "--no-build",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                    traceRpcMessages ? "--trace-rpc-messages" : null
+                    traceRpcMessages ? "--trace-rpc-messages" : null,
+                    recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );
         }
 
@@ -393,11 +492,13 @@ public class CSharpRewriteRpc extends RewriteRpc {
             return Stream.of(
                     toolExecutable.toAbsolutePath().normalize().toString(),
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                    traceRpcMessages ? "--trace-rpc-messages" : null
+                    traceRpcMessages ? "--trace-rpc-messages" : null,
+                    recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );
         }
 
         private void installTool(Path dotnetPath, String version, Path toolPath) {
+            Path installCwd = null;
             try {
                 Files.createDirectories(toolPath);
 
@@ -419,9 +520,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 }
 
                 ProcessBuilder pb = new ProcessBuilder(installCmd);
-                if (workingDirectory != null) {
-                    pb.directory(workingDirectory.toFile());
-                }
+                // Run from a fresh, empty temp directory so NuGet's working-directory config
+                // walk finds no repo-level nuget.config up the hierarchy. Such a config could
+                // <clear/> global sources or enable <packageSourceMapping> that rejects
+                // --add-source with "The --add-source option cannot be combined with package
+                // source mapping". User- and machine-level config still apply, since they are
+                // discovered independently of the working directory.
+                installCwd = Files.createTempDirectory("rewrite-csharp-tool-install");
+                pb.directory(installCwd.toFile());
                 pb.environment().putAll(environment);
                 pb.redirectErrorStream(true);
                 Process process = pb.start();
@@ -438,6 +544,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Interrupted while installing " + NUGET_PACKAGE_ID + "@" + version, e);
+            } finally {
+                if (installCwd != null) {
+                    try {
+                        Files.deleteIfExists(installCwd);
+                    } catch (IOException ignored) {
+                        // Best effort: the temp directory is empty and harmless if it lingers.
+                    }
+                }
             }
         }
     }

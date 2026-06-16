@@ -215,6 +215,36 @@ class UsePropertyAssignmentSyntaxTest implements RewriteTest {
     }
 
     @Test
+    void groupOutsidePluginsBlockConverted() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("group")),
+          buildGradle(
+            """
+              group 'com.example.app'
+              """,
+            """
+              group = 'com.example.app'
+              """
+          )
+        );
+    }
+
+    @Test
+    void groupWithProjectSelectorConverted() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("group")),
+          buildGradle(
+            """
+              project.group 'com.example.app'
+              """,
+            """
+              project.group = 'com.example.app'
+              """
+          )
+        );
+    }
+
+    @Test
     void methodCallArgConvertedToAssignment() {
         rewriteRun(
           spec -> spec.recipe(new UsePropertyAssignmentSyntax("version")),

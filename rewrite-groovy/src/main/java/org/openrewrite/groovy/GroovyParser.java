@@ -28,6 +28,7 @@ import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.groovy.internal.NegativeCachingGroovyClassLoader;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.DefaultJavaTypeFactory;
@@ -38,9 +39,14 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -112,11 +118,25 @@ public class GroovyParser implements Parser {
             compilerCustomizer.accept(configuration);
         }
 
+        // Build both loaders once and reuse them across every source in this batch:
+        //  - transformLoader is classpath-free; it only discovers (and lets us disable) global AST
+        //    transformations. Carrying the compile classpath here would make CompilationUnit rescan it for
+        //    transforms once per source file — pure overhead, since the parser never runs them.
+        //  - classLoader carries the compile classpath and is what Groovy resolves types against. A fresh loader
+        //    per file would re-resolve the same classpath types from scratch every time; sharing one warms the
+        //    JVM's per-loader class table once. Safe because parsing stops at CANONICALIZATION and never defines
+        //    classes into the loader. NegativeCachingGroovyClassLoader additionally skips re-scanning the
+        //    classpath for the many never-resolving lookups Groovy's resolver makes.
+        // Both outlive the lazily-consumed stream, so they are closed in its onClose handler (GC otherwise).
+        GroovyClassLoader transformLoader = new GroovyClassLoader(getClass().getClassLoader());
+        disableGlobalAstTransformations(configuration, transformLoader);
+        GroovyClassLoader classLoader = new NegativeCachingGroovyClassLoader(getClass().getClassLoader(), configuration);
+
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         return StreamSupport.stream(sources.spliterator(), false)
                 .map(input -> {
                     ParseWarningCollector errorCollector = new ParseWarningCollector(configuration, this);
-                    try (GroovyClassLoader classLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration, true)) {
+                    try {
                         SourceUnit unit = new SourceUnit(
                                 "doesntmatter",
                                 new InputStreamReaderSource(input.getSource(ctx), configuration),
@@ -126,7 +146,7 @@ public class GroovyParser implements Parser {
                         );
 
                         pctx.getParsingListener().startedParsing(input);
-                        CompilationUnit compUnit = new LessAstTransformationsCompilationUnit(configuration, null, classLoader, classLoader);
+                        CompilationUnit compUnit = new LessAstTransformationsCompilationUnit(configuration, null, classLoader, transformLoader);
                         compUnit.addSource(unit);
                         compUnit.compile(Phases.CANONICALIZATION);
                         ModuleNode ast = unit.getAST();
@@ -176,7 +196,56 @@ public class GroovyParser implements Parser {
                             }
                         }
                     }
+                })
+                .onClose(() -> {
+                    closeQuietly(classLoader);
+                    closeQuietly(transformLoader);
                 });
+    }
+
+    private static void closeQuietly(Closeable closeable) {
+        try {
+            closeable.close();
+        } catch (IOException ignored) {
+            // Best-effort: the loaders hold only classpath JAR handles, which GC releases otherwise.
+        }
+    }
+
+    private static final String AST_TRANSFORMATION_SERVICE = "META-INF/services/org.codehaus.groovy.transform.ASTTransformation";
+
+    /**
+     * OpenRewrite parses Groovy only to build a source-faithful LST; it never executes the parsed code. Global
+     * AST transformations rewrite the AST <em>away</em> from the original source text, which desynchronizes the
+     * position-based {@link GroovyParserVisitor} and surfaces as "Failed to parse ... at cursor position N".
+     * Since they serve no purpose for parsing, disable every one the parser can discover so the same source
+     * always produces the same LST.
+     * <p>
+     * Discovery uses {@code transformLoader}, the classpath-free loader the per-source compilation units are
+     * given (see {@link #parseInputs}), so only transformations on the runtime classpath (e.g. groovy-core's
+     * {@code @Grab}) are found and disabled — exactly the set {@link CompilationUnit} would otherwise register.
+     * Local annotation-driven transformations (e.g. {@code @Builder}) are unaffected, and names already
+     * configured by a compiler customizer are preserved.
+     */
+    private void disableGlobalAstTransformations(CompilerConfiguration configuration, GroovyClassLoader transformLoader) {
+        Set<String> disabled = configuration.getDisabledGlobalASTTransformations() == null ?
+                new HashSet<>() : new HashSet<>(configuration.getDisabledGlobalASTTransformations());
+        try {
+            Enumeration<URL> services = transformLoader.getResources(AST_TRANSFORMATION_SERVICE);
+            while (services.hasMoreElements()) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(services.nextElement().openStream(), StandardCharsets.UTF_8))) {
+                    for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+                        int comment = line.indexOf('#');
+                        String name = (comment >= 0 ? line.substring(0, comment) : line).trim();
+                        if (!name.isEmpty()) {
+                            disabled.add(name);
+                        }
+                    }
+                }
+            }
+        } catch (IOException ignored) {
+            // If discovery fails, fall back to whatever was already configured; never worse than before.
+        }
+        configuration.setDisabledGlobalASTTransformations(disabled);
     }
 
     @Override

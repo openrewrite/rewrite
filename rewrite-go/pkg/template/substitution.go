@@ -86,7 +86,13 @@ func setPrefix(j java.J, prefix java.Space) java.J {
 		return n.WithPrefix(prefix)
 	case *java.Return:
 		return n.WithPrefix(prefix)
+	case *golang.Return:
+		return n.WithPrefix(prefix)
 	case *java.If:
+		return n.WithPrefix(prefix)
+	case *golang.MethodDeclaration:
+		return n.WithPrefix(prefix)
+	case *golang.StatementWithInit:
 		return n.WithPrefix(prefix)
 	case *java.MethodDeclaration:
 		return n.WithPrefix(prefix)
@@ -103,6 +109,8 @@ func setPrefix(j java.J, prefix java.Space) java.J {
 	case *java.ArrayAccess:
 		return n.WithPrefix(prefix)
 	case *java.ArrayType:
+		return n.WithPrefix(prefix)
+	case *golang.ArrayType:
 		return n.WithPrefix(prefix)
 	case *java.ForLoop:
 		return n.WithPrefix(prefix)

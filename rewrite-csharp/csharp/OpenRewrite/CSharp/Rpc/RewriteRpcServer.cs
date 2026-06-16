@@ -17,10 +17,9 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json.Serialization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Xml.Linq;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
@@ -53,6 +52,7 @@ public class RewriteRpcServer
     private readonly ConcurrentDictionary<string, object?> _recipeAccumulators = new();
     private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
     private string? _recipesProjectDir;
+    private readonly string? _recipeInstallDir;
     private JsonRpc? _jsonRpc;
     private DotNetBuildContext? _buildContext;
 
@@ -88,9 +88,10 @@ public class RewriteRpcServer
         jsonRpc.StartListening();
     }
 
-    public RewriteRpcServer(RecipeMarketplace marketplace)
+    public RewriteRpcServer(RecipeMarketplace marketplace, string? recipeInstallDir = null)
     {
         _marketplace = marketplace;
+        _recipeInstallDir = recipeInstallDir;
 
         // Register type name overrides for nagoya types that don't match Java names
         RpcSendQueue.RegisterJavaTypeName(typeof(CsLambda),
@@ -211,14 +212,25 @@ public class RewriteRpcServer
         var path = ResolvePath(request.Path);
         var rootDir = ResolvePath(request.RootDir);
 
+        // Remove any global.json SDK pin before running dotnet restore / loading the workspace,
+        // so the latest installed SDK is used regardless of the version the repo pins. The
+        // file(s) are restored verbatim when the guard is disposed at the end of this method
+        // (after all projects are parsed), and any global.json a prior crashed run left deleted
+        // is recovered from git at that point too.
+        using var globalJsonGuard = GlobalJsonGuard.Neutralize(rootDir);
+
         var requirePrintEqualsInput = true;
         if (request.Options?.TryGetValue("org.openrewrite.requirePrintEqualsInput", out var val) == true)
         {
-            // StreamJsonRpc with Newtonsoft.Json may deliver values as JToken wrappers
-            if (val is JToken jt)
-                requirePrintEqualsInput = jt.Value<bool>();
-            else
-                requirePrintEqualsInput = Convert.ToBoolean(val);
+            // SystemTextJsonFormatter delivers object-typed option values as JsonElement.
+            requirePrintEqualsInput = val switch
+            {
+                JsonElement { ValueKind: JsonValueKind.True } => true,
+                JsonElement { ValueKind: JsonValueKind.False } => false,
+                JsonElement { ValueKind: JsonValueKind.String } je => bool.Parse(je.GetString()!),
+                JsonElement je => Convert.ToBoolean(je.ToString()),
+                _ => Convert.ToBoolean(val),
+            };
         }
 
         var solution = await solutionParser.LoadAsync(path, CancellationToken.None);
@@ -541,20 +553,33 @@ public class RewriteRpcServer
         var beforeCount = _marketplace.AllRecipes().Count;
         string? version = null;
 
-        if (request.Recipes is string path)
+        // SystemTextJsonFormatter deserializes the object-typed Recipes payload to a JsonElement:
+        // a JSON string is a local assembly path; a JSON object describes a NuGet package.
+        var recipesString = request.Recipes switch
+        {
+            string s => s,
+            JsonElement { ValueKind: JsonValueKind.String } je => je.GetString(),
+            _ => null,
+        };
+        var recipesObject = request.Recipes is JsonElement { ValueKind: JsonValueKind.Object } obj
+            ? (JsonElement?)obj
+            : null;
+
+        if (recipesString != null)
         {
             // Local assembly path
-            var absolutePath = Path.GetFullPath(path);
+            var absolutePath = Path.GetFullPath(recipesString);
             var context = new PluginLoadContext(absolutePath);
             var assembly = context.LoadFromAssemblyPath(absolutePath);
             CheckVersionCompatibility(assembly);
             ActivateAssembly(assembly);
+            ActivateDependencyRecipeAssemblies(assembly, context);
         }
-        else if (request.Recipes is JObject packageObj)
+        else if (recipesObject is { } packageObj)
         {
-            var packageName = packageObj["packageName"]?.ToString()
+            var packageName = (packageObj.TryGetProperty("packageName", out var pn) ? pn.GetString() : null)
                               ?? throw new ArgumentException("Missing packageName in recipes object");
-            version = packageObj["version"]?.ToString();
+            version = packageObj.TryGetProperty("version", out var v) ? v.GetString() : null;
 
             if (File.Exists(packageName))
             {
@@ -563,6 +588,7 @@ public class RewriteRpcServer
                 var assembly = context.LoadFromAssemblyPath(absolutePath);
                 CheckVersionCompatibility(assembly);
                 ActivateAssembly(assembly);
+                ActivateDependencyRecipeAssemblies(assembly, context);
             }
             else
             {
@@ -627,6 +653,63 @@ public class RewriteRpcServer
         }
     }
 
+    /// <summary>
+    /// Activates the recipe-bearing dependency assemblies of a plugin loaded from a loose DLL.
+    /// </summary>
+    /// <remarks>
+    /// The NuGet install path runs <c>dotnet publish</c>, which surfaces every dependency
+    /// assembly so each gets <see cref="ActivateAssembly"/>'d. A loose DLL registered by file
+    /// path has no such enumeration: the ALC loads a referenced recipe package's types on demand
+    /// (to satisfy a <c>new SomeOtherRecipe()</c> reference) but never runs that package's
+    /// <see cref="IRecipeActivator"/>, so its recipes stay absent from the marketplace. A composite
+    /// recipe that lists a recipe from a referenced package then fails <c>PrepareRecipe</c> with
+    /// "Recipe not found" (e.g. Migration.Dotnet's UpgradeToDotNet10 -> Core's
+    /// ChangeDotNetTargetFramework). Walk the reference graph and activate any plugin-private
+    /// assembly that exposes an activator; host/framework assemblies (including the SDK, already
+    /// activated at startup) resolve to no plugin path and are skipped.
+    /// </remarks>
+    private void ActivateDependencyRecipeAssemblies(Assembly primary, PluginLoadContext context)
+    {
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // The SDK assembly is activated once at startup; the primary plugin just above.
+            Assembly.GetExecutingAssembly().GetName().Name!,
+            primary.GetName().Name!,
+        };
+
+        var queue = new Queue<Assembly>();
+        queue.Enqueue(primary);
+        while (queue.Count > 0)
+        {
+            foreach (var reference in queue.Dequeue().GetReferencedAssemblies())
+            {
+                if (reference.Name == null || !visited.Add(reference.Name))
+                    continue;
+
+                // Only follow plugin-private dependencies (those listed in the plugin's
+                // .deps.json). Shared host/framework assemblies resolve to null here, so the
+                // SDK's activator is never re-run and core recipes are not double-registered.
+                if (context.ResolvePluginPath(reference) == null)
+                    continue;
+
+                Assembly dependency;
+                try
+                {
+                    dependency = context.LoadFromAssemblyName(reference);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("Could not load dependency {Assembly} for recipe activation: {Error}",
+                        reference.Name, ex.Message);
+                    continue;
+                }
+
+                ActivateAssembly(dependency);
+                queue.Enqueue(dependency);
+            }
+        }
+    }
+
     private string EnsureRecipesProject()
     {
         if (_recipesProjectDir != null)
@@ -636,7 +719,11 @@ public class RewriteRpcServer
                 return existing;
         }
 
-        _recipesProjectDir = Path.Combine(Path.GetTempPath(), "rewrite-recipes", Guid.NewGuid().ToString("N")[..8]);
+        // Use the caller-supplied recipe install directory when provided (so a
+        // co-located NuGet.config is found by dotnet's project-directory config
+        // walk); otherwise fall back to a unique temp directory.
+        _recipesProjectDir = _recipeInstallDir
+            ?? Path.Combine(Path.GetTempPath(), "rewrite-recipes", Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(_recipesProjectDir);
 
         var csprojPath = Path.Combine(_recipesProjectDir, "Recipes.csproj");
@@ -649,26 +736,71 @@ public class RewriteRpcServer
             </Project>
             """);
 
-        // Add local NuGet feed as a package source if it exists, so that
-        // locally-published SDK snapshots are discovered alongside nuget.org
+        // For local cross-repo development, make the local NuGet feed additive to
+        // whatever config already lives in the project dir. A caller (e.g. the Moderne
+        // CLI) may have written its own nuget.config there — possibly an exclusive
+        // configured feed — so we must not clobber it: append only the local feed when
+        // a config is present, and create a standalone dev config that adds only the
+        // local feed (never nuget.org, so it merges with the user/machine config's
+        // default source) when none exists. No-ops in production, where local-feed is absent.
         var localFeed = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".nuget", "local-feed");
         if (Directory.Exists(localFeed))
         {
             var nugetConfig = Path.Combine(_recipesProjectDir, "nuget.config");
-            File.WriteAllText(nugetConfig, $"""
-                <?xml version="1.0" encoding="utf-8"?>
-                <configuration>
-                  <packageSources>
-                    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-                    <add key="local-feed" value="{localFeed}" />
-                  </packageSources>
-                </configuration>
-                """);
+            var existing = File.Exists(nugetConfig) ? File.ReadAllText(nugetConfig) : null;
+            File.WriteAllText(nugetConfig, BuildRecipesNuGetConfig(existing, localFeed));
         }
 
         return csprojPath;
+    }
+
+    /// <summary>
+    /// Produces the recipe project's <c>nuget.config</c> with the local development
+    /// feed present. When <paramref name="existingConfigXml"/> is null/empty, creates a
+    /// standalone config that adds only the local feed — never nuget.org — so it merges
+    /// with (rather than overrides) the user/machine NuGet configuration that supplies the
+    /// environment's default source. Otherwise the caller already wrote a config (possibly
+    /// an exclusive configured feed): only the local feed is appended to
+    /// <c>&lt;packageSources&gt;</c>, preserving the caller's sources and any
+    /// <c>&lt;clear/&gt;</c>, and idempotently (no duplicate if already present).
+    /// </summary>
+    internal static string BuildRecipesNuGetConfig(string? existingConfigXml, string localFeedPath)
+    {
+        if (string.IsNullOrWhiteSpace(existingConfigXml))
+        {
+            return $"""
+                <?xml version="1.0" encoding="utf-8"?>
+                <configuration>
+                  <packageSources>
+                    <add key="local-feed" value="{localFeedPath}" />
+                  </packageSources>
+                </configuration>
+                """;
+        }
+
+        var doc = XDocument.Parse(existingConfigXml);
+        var configuration = doc.Element("configuration")
+                            ?? throw new InvalidOperationException("nuget.config is missing its <configuration> root");
+        var packageSources = configuration.Element("packageSources");
+        if (packageSources == null)
+        {
+            packageSources = new XElement("packageSources");
+            configuration.Add(packageSources);
+        }
+
+        bool alreadyPresent = packageSources.Elements("add").Any(e =>
+            string.Equals((string?)e.Attribute("value"), localFeedPath, StringComparison.OrdinalIgnoreCase));
+        if (!alreadyPresent)
+        {
+            packageSources.Add(new XElement("add",
+                new XAttribute("key", "local-feed"),
+                new XAttribute("value", localFeedPath)));
+        }
+
+        var declaration = doc.Declaration ?? new XDeclaration("1.0", "utf-8", null);
+        return declaration + Environment.NewLine + doc.Root!.ToString();
     }
 
     private static void RunDotnet(string arguments)
@@ -1003,11 +1135,32 @@ public class RewriteRpcServer
             var prop = recipeType.GetProperty(key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
             if (prop != null && prop.CanWrite)
             {
-                var convertedValue = Convert.ChangeType(value, prop.PropertyType);
-                prop.SetValue(recipe, convertedValue);
+                prop.SetValue(recipe, ConvertOptionValue(value, prop.PropertyType));
             }
         }
         return recipe;
+    }
+
+    /// <summary>
+    /// Coerce a recipe option value received over the wire to its target property type.
+    /// The streaming <c>SystemTextJsonFormatter</c> deserializes <c>object</c>-typed values
+    /// to <see cref="JsonElement"/>, which is not <see cref="IConvertible"/> — so a plain
+    /// <see cref="Convert.ChangeType(object?, Type)"/> throws. Deserialize the fragment
+    /// straight to the property type instead. A non-<see cref="JsonElement"/> value (an
+    /// in-process call or a test passing a direct CLR value) keeps the prior conversion.
+    /// </summary>
+    private static object? ConvertOptionValue(object? value, Type targetType)
+    {
+        if (value is JsonElement element)
+        {
+            return element.Deserialize(targetType, RpcJson.Options);
+        }
+        if (value is null || targetType.IsInstanceOfType(value))
+        {
+            return value;
+        }
+        var conversionType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        return Convert.ChangeType(value, conversionType);
     }
 
     [JsonRpcMethod("Visit", UseSingleObjectParameterDeserialization = true)]
@@ -1218,6 +1371,7 @@ public class RewriteRpcServer
     }
 
     public static async Task RunAsync(RecipeMarketplace? marketplace = null,
+        string? recipeInstallDir = null,
         CancellationToken cancellationToken = default)
     {
         marketplace ??= new RecipeMarketplace();
@@ -1235,18 +1389,20 @@ public class RewriteRpcServer
         using var inputStream = Console.OpenStandardInput();
         using var outputStream = Console.OpenStandardOutput();
 
-        // Configure JSON serialization to match Java expectations:
-        // - camelCase property names
-        // - string enum values (not integers)
-        var formatter = new JsonMessageFormatter();
-        formatter.JsonSerializer.ContractResolver = new CamelCasePropertyNamesContractResolver();
-        formatter.JsonSerializer.Converters.Add(new StringEnumConverter());
-        formatter.JsonSerializer.NullValueHandling = NullValueHandling.Ignore;
+        // Stream the JSON-RPC envelope with System.Text.Json (Utf8JsonWriter/Utf8JsonReader)
+        // instead of Newtonsoft's JToken-DOM formatter. The wire format stays JSON and matches
+        // Java's expectations (camelCase property names, string enum values, omitted nulls) via
+        // the shared RpcJson.Options. See RpcJson for why this is far cheaper on the .NET side
+        // (no per-message DOM, no per-value converter scan under lock, far less GC pressure).
+        var formatter = new SystemTextJsonFormatter
+        {
+            JsonSerializerOptions = RpcJson.Options,
+        };
 
         var handler = new HeaderDelimitedMessageHandler(outputStream, inputStream, formatter);
         using var jsonRpc = new StringErrorDataJsonRpc(handler);
 
-        var server = new RewriteRpcServer(marketplace);
+        var server = new RewriteRpcServer(marketplace, recipeInstallDir);
         server._jsonRpc = jsonRpc;
         _current = server;
         // Allow concurrent request dispatch so reentrant callbacks don't deadlock.
@@ -1515,6 +1671,39 @@ public class CategoryDescriptorDto
     public string? Description { get; set; }
 }
 
+/// <summary>
+/// Reads <c>estimatedEffortPerOccurrence</c> from either the Java wire shape (a
+/// JSON number of seconds) or the C# wire shape (an ISO-8601 duration string),
+/// normalizing both to an ISO-8601 string. Writes the ISO-8601 string, which
+/// the Java peer's Jackson Duration deserializer accepts.
+/// </summary>
+public sealed class DurationWireConverter : JsonConverter<string?>
+{
+    public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.Null:
+                return null;
+            case JsonTokenType.String:
+                return reader.GetString();
+            case JsonTokenType.Number:
+                return System.Xml.XmlConvert.ToString(TimeSpan.FromSeconds(reader.GetDouble()));
+            default:
+                reader.Skip();
+                return null;
+        }
+    }
+
+    public override void Write(Utf8JsonWriter writer, string? value, JsonSerializerOptions options)
+    {
+        if (value is null)
+            writer.WriteNullValue();
+        else
+            writer.WriteStringValue(value);
+    }
+}
+
 public class RecipeDescriptorDto
 {
     public string Name { get; set; } = "";
@@ -1522,6 +1711,12 @@ public class RecipeDescriptorDto
     public string InstanceName { get; set; } = "";
     public string Description { get; set; } = "";
     public HashSet<string> Tags { get; set; } = [];
+
+    // The Java peer serializes the recipe's estimatedEffortPerOccurrence
+    // (a Duration) as a JSON number of seconds, while the C# side emits it as
+    // an ISO-8601 duration string. Accept either on read so System.Text.Json's
+    // strict number/string handling doesn't fail descriptor deserialization.
+    [JsonConverter(typeof(DurationWireConverter))]
     public string? EstimatedEffortPerOccurrence { get; set; }
     public List<OptionDescriptorDto> Options { get; set; } = [];
     public List<RecipeDescriptorDto> Preconditions { get; set; } = [];
@@ -1630,7 +1825,7 @@ public class Precondition
 public class GenerateRequest
 {
     public string Id { get; set; } = "";
-    [JsonProperty("p")]
+    [JsonPropertyName("p")]
     public string? P { get; set; }
 }
 
@@ -1642,13 +1837,13 @@ public class GenerateResponse
 
 public class VisitRequest
 {
-    [JsonProperty("visitor")]
+    [JsonPropertyName("visitor")]
     public string VisitorName { get; set; } = "";
     public string? SourceFileType { get; set; }
     public string TreeId { get; set; } = "";
-    [JsonProperty("p")]
+    [JsonPropertyName("p")]
     public string? PId { get; set; }
-    [JsonProperty("cursor")]
+    [JsonPropertyName("cursor")]
     public List<string>? CursorIds { get; set; }
 }
 
@@ -1661,9 +1856,9 @@ public class BatchVisitRequest
 {
     public string SourceFileType { get; set; } = "";
     public string TreeId { get; set; } = "";
-    [JsonProperty("p")]
+    [JsonPropertyName("p")]
     public string? PId { get; set; }
-    [JsonProperty("cursor")]
+    [JsonPropertyName("cursor")]
     public List<string>? CursorIds { get; set; }
     public List<BatchVisitItem> Visitors { get; set; } = new();
 }

@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.NavigableMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
@@ -86,13 +87,16 @@ public class FindCommitters extends ScanningRecipe<AtomicReference<GitProvenance
             LocalDate from = StringUtils.isBlank(fromDate) ? null : LocalDate.parse(fromDate);
             Collection<GitProvenance.Committer> committerList = findCommitters(gitProvenance, from);
             for (GitProvenance.Committer committer : committerList) {
+                // commitsByDay is empty when only committer identities were collected
+                // (GitProvenance.CommitHistory.Detail.COMMITTERS), so guard the per-day reporting.
+                NavigableMap<LocalDate, Integer> byDay = committer.getCommitsByDay();
                 committers.insertRow(ctx, new DistinctCommitters.Row(
                         committer.getName(),
                         committer.getEmail(),
-                        committer.getCommitsByDay().lastKey(),
-                        committer.getCommitsByDay().values().stream().mapToInt(Integer::intValue).sum()
+                        byDay.isEmpty() ? null : byDay.lastKey(),
+                        byDay.values().stream().mapToInt(Integer::intValue).sum()
                 ));
-                committer.getCommitsByDay().forEach((day, commits) -> commitsByDay.insertRow(ctx, new CommitsByDay.Row(
+                byDay.forEach((day, commits) -> commitsByDay.insertRow(ctx, new CommitsByDay.Row(
                         committer.getName(),
                         committer.getEmail(),
                         day,
@@ -107,7 +111,10 @@ public class FindCommitters extends ScanningRecipe<AtomicReference<GitProvenance
         LocalDate cutOff = from == null ? null : from.minusDays(1);
         List<GitProvenance.Committer> committerList = new ArrayList<>();
         for (GitProvenance.Committer committer : requireNonNull(gitProvenance.getCommitters())) {
-            if (cutOff == null || committer.getCommitsByDay().keySet().stream().anyMatch(day -> day.isAfter(cutOff))) {
+            NavigableMap<LocalDate, Integer> byDay = committer.getCommitsByDay();
+            // An identities-only committer (Detail.COMMITTERS) carries no per-day dates; surface it rather
+            // than silently dropping it, matching generate(), which reports it with a null last commit.
+            if (cutOff == null || byDay.isEmpty() || byDay.keySet().stream().anyMatch(day -> day.isAfter(cutOff))) {
                 committerList.add(committer);
             }
         }
