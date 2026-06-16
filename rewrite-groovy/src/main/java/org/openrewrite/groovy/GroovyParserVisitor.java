@@ -3483,23 +3483,23 @@ public class GroovyParserVisitor {
     private static final Class<?>[] DISCARDED_TRANSFORM_ANNOTATIONS = {Canonical.class, CompileDynamic.class, Immutable.class, groovy.transform.Synchronized.class};
 
     public List<J.Annotation> visitAndGetAnnotations(AnnotatedNode node, RewriteGroovyClassVisitor classVisitor) {
-        // Check for discarded transform annotations before iterating the AST annotation list,
-        // since the Groovy compiler may replace or fully remove these annotations while
-        // leaving them present in source. Cursor advancement after each visitAnnotation call
-        // ensures later checks don't re-match the same source annotation.
-        List<J.Annotation> paramAnnotations = new ArrayList<>();
-        for (Class<?> discarded : DISCARDED_TRANSFORM_ANNOTATIONS) {
-            if (sourceStartsWith("@" + discarded.getSimpleName()) || sourceStartsWith("@" + discarded.getCanonicalName())) {
-                paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(discarded)), classVisitor));
-            }
+        if (node.getAnnotations().isEmpty()) {
+            return emptyList();
         }
 
+        List<J.Annotation> paramAnnotations = new ArrayList<>(node.getAnnotations().size());
         for (AnnotationNode annotationNode : node.getAnnotations()) {
+            for (Class<?> discarded : DISCARDED_TRANSFORM_ANNOTATIONS) {
+                if (sourceStartsWith("@" + discarded.getSimpleName()) || sourceStartsWith("@" + discarded.getCanonicalName())) {
+                    paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(discarded)), classVisitor));
+                }
+            }
+
             if (appearsInSource(annotationNode)) {
                 paramAnnotations.add(visitAnnotation(annotationNode, classVisitor));
             }
         }
-        return paramAnnotations.isEmpty() ? emptyList() : paramAnnotations;
+        return paramAnnotations;
     }
 
     public J.Annotation visitAnnotation(AnnotationNode annotation, RewriteGroovyClassVisitor classVisitor) {
