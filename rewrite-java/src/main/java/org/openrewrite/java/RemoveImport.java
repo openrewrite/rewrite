@@ -196,22 +196,40 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
      * removed) the follower keeps its own spacing, so import-group blank lines are not pushed onto it.
      */
     private Space mergeRemovedImportPrefix(Space removedPrefix, Space targetPrefix, boolean targetIsImport) {
-        // An end-of-line comment on the removed import's line is stored at the start of the following
-        // element's prefix. It described the now-removed import, so drop it.
-        Space currentPrefix = dropTrailingCommentOfRemovedImport(targetPrefix);
+        // An end-of-line comment on the removed import's line is stored at the start of the follower's
+        // prefix (no newline before it). It described the now-removed import, so drop it. What remains
+        // is the spacing/comments that genuinely belong to the follower.
+        Space followerPrefix = dropTrailingCommentOfRemovedImport(targetPrefix);
+
+        // Case 1: the removed import carried comments in its prefix - a comment on the line above it,
+        // or commented-out lines. Those belong to neither import specifically, so keep them by
+        // prepending them to the follower's own comments.
         if (!removedPrefix.getComments().isEmpty()) {
-            List<Comment> comments = ListUtils.concatAll(removedPrefix.getComments(), currentPrefix.getComments());
-            if (currentPrefix.getComments().isEmpty() &&
-                countTrailingLinebreaks(currentPrefix) > countTrailingLinebreaks(removedPrefix)) {
-                String currentLastWhitespace = currentPrefix.getLastWhitespace();
-                comments = ListUtils.mapLast(comments, comment -> comment.withSuffix(currentLastWhitespace));
+            List<Comment> comments = ListUtils.concatAll(removedPrefix.getComments(), followerPrefix.getComments());
+            // If the follower had no comments of its own but was separated by a wider gap (a blank
+            // line starting a new import group) than the removed import, preserve that wider gap by
+            // moving the follower's trailing whitespace onto the last carried comment's suffix.
+            // Otherwise the comment would inherit the removed import's narrower spacing and the blank
+            // line between groups would be lost.
+            if (followerPrefix.getComments().isEmpty() &&
+                countTrailingLinebreaks(followerPrefix) > countTrailingLinebreaks(removedPrefix)) {
+                String followerWhitespace = followerPrefix.getLastWhitespace();
+                comments = ListUtils.mapLast(comments, comment -> comment.withSuffix(followerWhitespace));
             }
             return removedPrefix.withComments(comments);
-        } else if (targetIsImport && (removedPrefix.getLastWhitespace().isEmpty() ||
-            (countTrailingLinebreaks(removedPrefix) > countTrailingLinebreaks(currentPrefix)))) {
-            return currentPrefix.withWhitespace(removedPrefix.getLastWhitespace());
         }
-        return currentPrefix;
+
+        // Case 2: the removed import had no comments, but when the follower is another import we may
+        // still need to carry the removed import's leading whitespace onto it - specifically when the
+        // removed import was the first import (empty prefix, so the follower must not gain a leading
+        // blank line) or started a new group (a wider blank-line gap that should be kept).
+        if (targetIsImport && (removedPrefix.getLastWhitespace().isEmpty() ||
+            countTrailingLinebreaks(removedPrefix) > countTrailingLinebreaks(followerPrefix))) {
+            return followerPrefix.withWhitespace(removedPrefix.getLastWhitespace());
+        }
+
+        // Case 3: nothing to carry over - the follower keeps its own prefix unchanged.
+        return followerPrefix;
     }
 
     /**
