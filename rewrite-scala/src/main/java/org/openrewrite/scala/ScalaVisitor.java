@@ -362,6 +362,14 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return t;
     }
 
+    public J visitUnionType(S.UnionType unionType, P p) {
+        S.UnionType u = unionType;
+        u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.getPadding().withTypes(visitContainer(u.getPadding().getTypes(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return u;
+    }
+
     public J visitRefinedType(S.RefinedType refinedType, P p) {
         S.RefinedType r = refinedType;
         r = r.withPrefix(visitSpace(r.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
@@ -399,6 +407,20 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         f = f.withBeforeBody(visitSpace(f.getBeforeBody(), Space.Location.LANGUAGE_EXTENSION, p));
         f = f.withBody(visitAndCast(f.getBody(), p));
         return f;
+    }
+
+    public J visitSTry(S.Try tryable, P p) {
+        S.Try t = tryable;
+        t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.TRY_PREFIX, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.withBody(visitAndCast(t.getBody(), p));
+        if (t.getPadding().getCatches() != null) {
+            t = t.getPadding().withCatches(visitLeftPadded(t.getPadding().getCatches(), JLeftPadded.Location.LANGUAGE_EXTENSION, p));
+        }
+        if (t.getPadding().getFinalizer() != null) {
+            t = t.getPadding().withFinalizer(visitLeftPadded(t.getPadding().getFinalizer(), JLeftPadded.Location.TRY_FINALLY, p));
+        }
+        return t;
     }
 
     public J visitForEnumerator(S.For.Enumerator enumerator, P p) {

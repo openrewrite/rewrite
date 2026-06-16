@@ -1077,17 +1077,27 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 cursor++;
                 Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor);
                 texts.add(lineBreak);
-            } else if (cursor < source.length() && source.charAt(cursor) != c && (source.startsWith(unicodeEscaped(c), cursor) || source.startsWith(unicodeEscaped(c).toLowerCase(), cursor) )) {
+            } else if (cursor < source.length() && source.charAt(cursor) != c && (source.startsWith(unicodeEscaped(c), cursor) || source.startsWith(unicodeEscaped(c).toLowerCase(), cursor))) {
                 int escapedCharLength = unicodeEscaped(c).length();
                 text.append(source, cursor, cursor + escapedCharLength);
                 cursor += escapedCharLength;
             } else {
+                // Java 25 strips the space between the margin '*' and non-whitespace text (e.g. '// comment')
+                // from DCRawText/DCComment content, but that space is still present in source.
+                // Emit it before advancing with the node character so cursor stays in sync.
+                if (cursor < source.length()
+                        && source.charAt(cursor) != c
+                        && !Character.isWhitespace(c)
+                        && Character.isSpaceChar(source.charAt(cursor))
+                ) {
+                    text.append(whitespaceBeforeAsString(Character::isSpaceChar));
+                }
                 text.append(c);
                 cursor++;
             }
             // The AST contained unnecessary whitespace for Javadoc, and they got rid of this with Java 25.
             // So now have to manually account for this.
-            if (cursor < source.length() && i+1 <= node.length() -1 && node.charAt(i+1) != source.charAt(cursor) && Character.isWhitespace(source.charAt(cursor))) {
+            if (cursor < source.length() && i + 1 <= node.length() - 1 && node.charAt(i + 1) != source.charAt(cursor) && Character.isWhitespace(source.charAt(cursor))) {
                 text.append(whitespaceBeforeAsString(Character::isSpaceChar));
             }
         }

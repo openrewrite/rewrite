@@ -20,7 +20,8 @@ namespace OpenRewrite.Tests.Rpc;
 /// <summary>
 /// When a local NuGet feed (<c>~/.nuget/local-feed</c>) exists for cross-repo
 /// development, the server makes it additive to the recipe project's
-/// <c>nuget.config</c>: it creates one (public + local feed) when none exists,
+/// <c>nuget.config</c>: it creates one with only the local feed (never nuget.org,
+/// so it merges with the user/machine config's default source) when none exists,
 /// and otherwise only appends the local feed — preserving a caller-written
 /// config (e.g. an exclusive configured feed) untouched.
 /// </summary>
@@ -29,12 +30,12 @@ public class RecipesNuGetConfigTests
     private const string LocalFeed = "/home/dev/.nuget/local-feed";
 
     [Fact]
-    public void CreatesPublicPlusLocalFeedWhenNoConfigExists()
+    public void CreatesLocalFeedOnlyWhenNoConfigExists()
     {
         string xml = RewriteRpcServer.BuildRecipesNuGetConfig(null, LocalFeed);
 
-        Assert.Contains("api.nuget.org", xml);
         Assert.Contains(LocalFeed, xml);
+        Assert.DoesNotContain("api.nuget.org", xml);
     }
 
     [Fact]

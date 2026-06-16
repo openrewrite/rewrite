@@ -544,7 +544,8 @@ public class ChangePackage extends Recipe {
                 if (f.get()) {
                     return fieldAccess;
                 }
-                for (Object o : getCursor().getPathAsStream().toArray()) {
+                for (Iterator<?> it = getCursor().getPath(); it.hasNext(); ) {
+                    Object o = it.next();
                     if (o instanceof Javadoc.Reference) {
                         JavaType type = fieldAccess.getType();
                         if (type instanceof JavaType.FullyQualified) {

@@ -1,0 +1,30 @@
+<Project>
+  <!--
+    Normalize ProjectReference paths to collapse any '..' segments, evaluated here (not in a
+    <Target>) because NuGet restore's path-walk reads @(ProjectReference) at EVALUATION time,
+    before any target runs. Directory.Build.targets is imported after the project body, so this
+    ItemGroup sees the project's own references and rewrites them in time.
+
+    Why: when this SDK tree is consumed through a symlink (e.g. a recipes repo's
+    external/openrewrite/rewrite -> a local rewrite checkout), a literal '../Sibling.csproj'
+    reference is resolved TWO different ways for the same physical project:
+      - NuGet restore resolves the '..' PHYSICALLY (POSIX), crossing the symlink to the real path;
+      - the build resolves the same '..' LEXICALLY, keeping the symlink path.
+    The project then enters the restore graph as two nodes and races on its shared obj/bin under a
+    parallel build (deps.json / nuget.g.props "file in use" / missing ref-assembly errors).
+
+    Rewriting each ProjectReference to its lexically-normalized %(FullPath) removes the '..' so a
+    single, symlink-stable spelling is seen everywhere. In a non-symlinked checkout %(FullPath)
+    equals the original path, so this is a no-op. The SDK's ProjectReferences carry no custom
+    metadata, so re-projecting on %(FullPath) loses nothing.
+
+    This file also terminates MSBuild's upward search for Directory.Build.targets, mirroring the
+    sibling Directory.Build.props stop-marker, so a consumer's Directory.Build.targets is not
+    inherited by the SDK projects when this tree is symlinked into it.
+  -->
+  <ItemGroup Condition="'@(ProjectReference)' != ''">
+    <_SdkProjectReferenceOriginal Include="@(ProjectReference)" />
+    <ProjectReference Remove="@(ProjectReference)" />
+    <ProjectReference Include="@(_SdkProjectReferenceOriginal->'%(FullPath)')" />
+  </ItemGroup>
+</Project>

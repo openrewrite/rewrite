@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.scala.marker.AmpersandIntersection;
 import org.openrewrite.scala.marker.AsInstanceOfPrefix;
 import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.DottedMatch;
@@ -295,6 +296,42 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visitSpace(tryable.getPadding().getFinally().getBefore(), Space.Location.TRY_FINALLY, p);
             p.append("finally");
             visit(tryable.getPadding().getFinally().getElement(), p);
+        }
+        afterSyntax(tryable, p);
+        return tryable;
+    }
+
+    public J visitSTry(S.Try tryable, PrintOutputCapture<P> p) {
+        beforeSyntax(tryable, Space.Location.TRY_PREFIX, p);
+        p.append("try");
+        visit(tryable.getBody(), p);
+        JLeftPadded<J.Block> catches = tryable.getPadding().getCatches();
+        if (catches != null) {
+            visitSpace(catches.getBefore(), Space.Location.CATCH_PREFIX, p);
+            p.append("catch");
+            J.Block cases = catches.getElement();
+            boolean omitBraces = cases.getMarkers().findFirst(org.openrewrite.scala.marker.OmitBraces.class).isPresent();
+            visitSpace(cases.getPrefix(), Space.Location.BLOCK_PREFIX, p);
+            if (!omitBraces) {
+                p.append("{");
+            }
+            for (JRightPadded<Statement> rp : cases.getPadding().getStatements()) {
+                visit(rp.getElement(), p);
+                visitSpace(rp.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+                if (rp.getMarkers().findFirst(Semicolon.class).isPresent()) {
+                    p.append(';');
+                }
+            }
+            visitSpace(cases.getEnd(), Space.Location.BLOCK_END, p);
+            if (!omitBraces) {
+                p.append("}");
+            }
+        }
+        JLeftPadded<J.Block> finalizer = tryable.getPadding().getFinalizer();
+        if (finalizer != null) {
+            visitSpace(finalizer.getBefore(), Space.Location.TRY_FINALLY, p);
+            p.append("finally");
+            visit(finalizer.getElement(), p);
         }
         afterSyntax(tryable, p);
         return tryable;
@@ -661,6 +698,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitFunctionType((S.FunctionType) tree, p);
         } else if (tree instanceof S.TupleType) {
             return visitTupleType((S.TupleType) tree, p);
+        } else if (tree instanceof S.UnionType) {
+            return visitUnionType((S.UnionType) tree, p);
         } else if (tree instanceof S.Macro) {
             return visitMacro((S.Macro) tree, p);
         } else if (tree instanceof S.ExtensionMethods) {
@@ -669,6 +708,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitFor((S.For) tree, p);
         } else if (tree instanceof S.For.Enumerator) {
             return visitForEnumerator((S.For.Enumerator) tree, p);
+        } else if (tree instanceof S.Try) {
+            return visitSTry((S.Try) tree, p);
         }
         return super.visit(tree, p);
     }
@@ -1293,11 +1334,30 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     @Override
     public J visitIntersectionType(J.IntersectionType intersectionType, PrintOutputCapture<P> p) {
-        // In Scala, parents of an anonymous class are joined with `with` (not Java's `&`).
+        // Scala joins intersections with `with` (anonymous-class parents and the `A with B`
+        // form) or with `&` (the Scala 3 operator form, flagged by AmpersandIntersection).
         beforeSyntax(intersectionType, Space.Location.INTERSECTION_TYPE_PREFIX, p);
-        visitContainer("", intersectionType.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "with", "", p);
+        String separator = intersectionType.getMarkers().findFirst(AmpersandIntersection.class).isPresent() ? "&" : "with";
+        visitContainer("", intersectionType.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, separator, "", p);
         afterSyntax(intersectionType, p);
         return intersectionType;
+    }
+
+    public J visitUnionType(S.UnionType unionType, PrintOutputCapture<P> p) {
+        beforeSyntax(unionType, Space.Location.LANGUAGE_EXTENSION, p);
+        JContainer<Expression> types = unionType.getPadding().getTypes();
+        visitSpace(types.getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        List<JRightPadded<Expression>> padded = types.getPadding().getElements();
+        for (int i = 0; i < padded.size(); i++) {
+            JRightPadded<Expression> element = padded.get(i);
+            visit(element.getElement(), p);
+            visitSpace(element.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            if (i < padded.size() - 1) {
+                p.append('|');
+            }
+        }
+        afterSyntax(unionType, p);
+        return unionType;
     }
 
     @Override
