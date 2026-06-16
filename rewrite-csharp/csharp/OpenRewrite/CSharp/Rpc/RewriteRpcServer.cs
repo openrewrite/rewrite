@@ -573,6 +573,7 @@ public class RewriteRpcServer
             var assembly = context.LoadFromAssemblyPath(absolutePath);
             CheckVersionCompatibility(assembly);
             ActivateAssembly(assembly);
+            ActivateDependencyRecipeAssemblies(assembly, context);
         }
         else if (recipesObject is { } packageObj)
         {
@@ -587,6 +588,7 @@ public class RewriteRpcServer
                 var assembly = context.LoadFromAssemblyPath(absolutePath);
                 CheckVersionCompatibility(assembly);
                 ActivateAssembly(assembly);
+                ActivateDependencyRecipeAssemblies(assembly, context);
             }
             else
             {
@@ -647,6 +649,63 @@ public class RewriteRpcServer
             {
                 var activator = (IRecipeActivator)Activator.CreateInstance(type)!;
                 activator.Activate(_marketplace);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Activates the recipe-bearing dependency assemblies of a plugin loaded from a loose DLL.
+    /// </summary>
+    /// <remarks>
+    /// The NuGet install path runs <c>dotnet publish</c>, which surfaces every dependency
+    /// assembly so each gets <see cref="ActivateAssembly"/>'d. A loose DLL registered by file
+    /// path has no such enumeration: the ALC loads a referenced recipe package's types on demand
+    /// (to satisfy a <c>new SomeOtherRecipe()</c> reference) but never runs that package's
+    /// <see cref="IRecipeActivator"/>, so its recipes stay absent from the marketplace. A composite
+    /// recipe that lists a recipe from a referenced package then fails <c>PrepareRecipe</c> with
+    /// "Recipe not found" (e.g. Migration.Dotnet's UpgradeToDotNet10 -> Core's
+    /// ChangeDotNetTargetFramework). Walk the reference graph and activate any plugin-private
+    /// assembly that exposes an activator; host/framework assemblies (including the SDK, already
+    /// activated at startup) resolve to no plugin path and are skipped.
+    /// </remarks>
+    private void ActivateDependencyRecipeAssemblies(Assembly primary, PluginLoadContext context)
+    {
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // The SDK assembly is activated once at startup; the primary plugin just above.
+            Assembly.GetExecutingAssembly().GetName().Name!,
+            primary.GetName().Name!,
+        };
+
+        var queue = new Queue<Assembly>();
+        queue.Enqueue(primary);
+        while (queue.Count > 0)
+        {
+            foreach (var reference in queue.Dequeue().GetReferencedAssemblies())
+            {
+                if (reference.Name == null || !visited.Add(reference.Name))
+                    continue;
+
+                // Only follow plugin-private dependencies (those listed in the plugin's
+                // .deps.json). Shared host/framework assemblies resolve to null here, so the
+                // SDK's activator is never re-run and core recipes are not double-registered.
+                if (context.ResolvePluginPath(reference) == null)
+                    continue;
+
+                Assembly dependency;
+                try
+                {
+                    dependency = context.LoadFromAssemblyName(reference);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("Could not load dependency {Assembly} for recipe activation: {Error}",
+                        reference.Name, ex.Message);
+                    continue;
+                }
+
+                ActivateAssembly(dependency);
+                queue.Enqueue(dependency);
             }
         }
     }

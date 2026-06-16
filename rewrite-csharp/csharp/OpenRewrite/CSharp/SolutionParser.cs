@@ -786,7 +786,54 @@ public class SolutionParser
             relativePath.StartsWith("obj/", StringComparison.OrdinalIgnoreCase))
             return false;
 
+        // Skip source files supplied by NuGet packages. Source-only packages (e.g. *.sources,
+        // and any package shipping contentFiles/cs/**) inject .cs files from the global package
+        // cache into the compilation. That is third-party code living outside the repository, so
+        // it must not be parsed into the LST, transformed by recipes, or emitted into fix patches
+        // (which would otherwise target unwritable cache paths and fail to apply).
+        if (IsUnderNuGetCache(doc.FilePath))
+            return false;
+
         return true;
+    }
+
+    private static readonly string[] NuGetCacheRoots = BuildNuGetCacheRoots();
+
+    private static string[] BuildNuGetCacheRoots()
+    {
+        var roots = new List<string>();
+        var configured = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
+        if (!string.IsNullOrEmpty(configured))
+        {
+            try { roots.Add(Path.TrimEndingDirectorySeparator(Path.GetFullPath(configured))); }
+            catch { /* ignore malformed NUGET_PACKAGES */ }
+        }
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrEmpty(home))
+            roots.Add(Path.Combine(home, ".nuget", "packages"));
+        return roots.ToArray();
+    }
+
+    /// <summary>
+    /// True when the file lives under the NuGet global package cache (so it is package-provided
+    /// source, not repository source). Matches only the resolved cache roots (NUGET_PACKAGES env
+    /// and the per-user default <c>~/.nuget/packages</c>). A repository may legitimately contain a
+    /// local <c>.nuget/packages</c> directory of its own source, so a bare path-segment match is
+    /// intentionally avoided.
+    /// </summary>
+    private static bool IsUnderNuGetCache(string filePath)
+    {
+        string full;
+        try { full = Path.GetFullPath(filePath); }
+        catch { return false; }
+
+        foreach (var root in NuGetCacheRoots)
+        {
+            if (full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>
