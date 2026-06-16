@@ -55,7 +55,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_ARTIFACT_CACHE = "org.openrewrite.maven.artifactCache";
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
     private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
-    private static final String MAVEN_UNREACHABLE_HOSTS = "org.openrewrite.maven.unreachableHosts";
+    private static final String MAVEN_UNREACHABLE_ENDPOINTS = "org.openrewrite.maven.unreachableEndpoints";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -79,14 +79,17 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     /**
-     * Hosts that have proven unreachable (a connection-level failure, as opposed to an HTTP error
-     * response) during this execution. Repositories on these hosts are skipped for the remainder of
-     * the run rather than re-probed for every declaration, so a single dead repository costs one
-     * connection timeout instead of one per artifact. The set is concurrent because resolution runs
-     * across multiple threads sharing one execution context.
+     * Connection endpoints, each a {@code host:port}, that have proven unreachable (a connection-level
+     * failure, as opposed to an HTTP error response) during this execution. Repositories on these
+     * endpoints are skipped for the remainder of the run rather than re-probed for every declaration,
+     * so a single dead repository costs one connection timeout instead of one per artifact. The key is
+     * {@code host:port} rather than the full repository URI because a connection failure occurs before
+     * any path is sent and so is independent of the path; the same dead host declared under different
+     * paths or ids is therefore deduped. The set is concurrent because resolution runs across multiple
+     * threads sharing one execution context.
      */
-    public Set<String> getUnreachableHosts() {
-        return computeMessageIfAbsent(MAVEN_UNREACHABLE_HOSTS, k -> ConcurrentHashMap.newKeySet());
+    public Set<String> getUnreachableEndpoints() {
+        return computeMessageIfAbsent(MAVEN_UNREACHABLE_ENDPOINTS, k -> ConcurrentHashMap.newKeySet());
     }
 
     public MavenExecutionContextView setResolutionListener(ResolutionEventListener listener) {
