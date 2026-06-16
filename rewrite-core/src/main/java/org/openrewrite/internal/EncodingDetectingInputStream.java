@@ -33,6 +33,8 @@ public class EncodingDetectingInputStream extends InputStream {
     @Nullable
     private Charset charset;
 
+    private final boolean charsetProvided;
+
     private boolean bomChecked;
     private boolean charsetBomMarked;
 
@@ -49,6 +51,7 @@ public class EncodingDetectingInputStream extends InputStream {
     public EncodingDetectingInputStream(InputStream inputStream, @Nullable Charset charset) {
         this.inputStream = inputStream;
         this.charset = charset;
+        this.charsetProvided = charset != null;
     }
 
     public Charset getCharset() {
@@ -154,9 +157,16 @@ public class EncodingDetectingInputStream extends InputStream {
             // If the detected charset can't re-encode the content, the detection
             // was likely wrong — fall back to UTF-8. This catches cases where
             // UTF-8 files with CJK content are misdetected as Windows-1252,
-            // since Windows-1252 has undefined byte positions that produce
+            // since Windows-1252 has undefined byte positions that decode to
             // U+FFFD (which can't be re-encoded as Windows-1252).
-            if (detectedCharset != StandardCharsets.UTF_8 &&
+            //
+            // Only guessed charsets are second-guessed; an explicitly supplied
+            // charset is respected. U+FFFD is the only char a REPLACE-decode can
+            // produce that the charset can't re-encode, so this cheap scan gates
+            // the expensive encoder check and skips it for genuine content.
+            if (!charsetProvided &&
+                    detectedCharset != StandardCharsets.UTF_8 &&
+                    result.indexOf('\uFFFD') >= 0 &&
                     !detectedCharset.newEncoder().canEncode(result)) {
                 charset = StandardCharsets.UTF_8;
                 return new String(bos.toByteArray(), StandardCharsets.UTF_8);
