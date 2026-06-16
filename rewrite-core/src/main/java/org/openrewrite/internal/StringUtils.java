@@ -447,8 +447,27 @@ public class StringUtils {
      * @param pattern the glob pattern to evaluate. null and "*" both match everything.
      * @return true if the input string matches the glob pattern, false otherwise
      * @see org.openrewrite.PathUtils#matchesGlob(Path, String)
+     * @see #matchesGlob(String, String, boolean)
      */
     public static boolean matchesGlob(@Nullable String str, @Nullable String pattern) {
+        return matchesGlob(str, pattern, false);
+    }
+
+    /**
+     * Checks if a given string matches a specified glob pattern, optionally honoring case. A glob
+     * pattern may include special characters such as '*' to represent any sequence of characters
+     * and '?' to represent any single character.
+     * <p>
+     * For file path matching, use {@link org.openrewrite.PathUtils#matchesGlob(Path, String)},
+     * which properly interprets '*' and '**' wildcards for file paths.
+     *
+     * @param str the input string to match against the pattern, can be null
+     * @param pattern the glob pattern to evaluate. null and "*" both match everything.
+     * @param caseSensitive whether literal characters must match exactly with respect to case
+     * @return true if the input string matches the glob pattern, false otherwise
+     * @see org.openrewrite.PathUtils#matchesGlob(Path, String)
+     */
+    public static boolean matchesGlob(@Nullable String str, @Nullable String pattern, boolean caseSensitive) {
         if ("*".equals(pattern) || pattern == null) {
             return true;
         }
@@ -474,7 +493,7 @@ public class StringUtils {
             if (ch == '*') {
                 break;
             }
-            if (ch != '?' && different(ch, str.charAt(strIdxStart))) {
+            if (ch != '?' && different(ch, str.charAt(strIdxStart), caseSensitive)) {
                 return false; // Character mismatch
             }
             patIdxStart++;
@@ -495,7 +514,7 @@ public class StringUtils {
             if (ch == '*') {
                 break;
             }
-            if (ch != '?' && different(ch, str.charAt(strIdxEnd))) {
+            if (ch != '?' && different(ch, str.charAt(strIdxEnd), caseSensitive)) {
                 return false; // Character mismatch
             }
             patIdxEnd--;
@@ -528,7 +547,7 @@ public class StringUtils {
             int strLength = (strIdxEnd - strIdxStart + 1);
 
             int foundIdx = findPatternInString(pattern, patIdxStart + 1, patLength,
-                    str, strIdxStart, strLength);
+                    str, strIdxStart, strLength, caseSensitive);
 
             if (foundIdx == -1) {
                 return false;
@@ -543,12 +562,12 @@ public class StringUtils {
     }
 
     private static int findPatternInString(String pattern, int patStart, int patLength,
-                                           String str, int strStart, int strLength) {
+                                           String str, int strStart, int strLength, boolean caseSensitive) {
         strLoop:
         for (int i = 0; i <= strLength - patLength; i++) {
             for (int j = 0; j < patLength; j++) {
                 char ch = pattern.charAt(patStart + j);
-                if (ch != '?' && different(ch, str.charAt(strStart + i + j))) {
+                if (ch != '?' && different(ch, str.charAt(strStart + i + j), caseSensitive)) {
                     continue strLoop;
                 }
             }
@@ -566,8 +585,13 @@ public class StringUtils {
         return true;
     }
 
-    private static boolean different(char ch, char other) {
-        return Character.toUpperCase(ch) != Character.toUpperCase(other);
+    private static boolean different(char ch, char other, boolean caseSensitive) {
+        // Equal characters are the common case (e.g. matching coordinate prefixes); short-circuiting
+        // here avoids the relatively expensive Character.toUpperCase pair for all callers.
+        if (ch == other) {
+            return false;
+        }
+        return caseSensitive || Character.toUpperCase(ch) != Character.toUpperCase(other);
     }
 
     public static String indent(String text) {

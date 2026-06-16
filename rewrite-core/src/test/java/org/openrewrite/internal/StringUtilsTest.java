@@ -123,6 +123,30 @@ class StringUtilsTest {
         assertThat(matchesGlob("test.test.txt", "*.*")).isTrue();
     }
 
+    @Test
+    void globMatchingCaseSensitive() {
+        // The default two-arg overload is case-insensitive.
+        assertThat(matchesGlob("Test", "test")).isTrue();
+        assertThat(matchesGlob("Test", "test", false)).isTrue();
+
+        // Case-sensitive literal matching.
+        assertThat(matchesGlob("test", "test", true)).isTrue();
+        assertThat(matchesGlob("Test", "test", true)).isFalse();
+        assertThat(matchesGlob("test", "Test", true)).isFalse();
+        assertThat(matchesGlob("com.example", "com.example", true)).isTrue();
+        assertThat(matchesGlob("com.example", "Com.Example", true)).isFalse();
+
+        // Wildcards still work case-sensitively.
+        assertThat(matchesGlob("com.fasterxml.jackson", "com.fasterxml.*", true)).isTrue();
+        assertThat(matchesGlob("com.fasterxml.jackson", "Com.*", true)).isFalse();
+        assertThat(matchesGlob("com.fasterxml.jackson", "*", true)).isTrue();
+        assertThat(matchesGlob("com.fasterxml.jackson", null, true)).isTrue();
+        assertThat(matchesGlob("comXexample", "com?example", true)).isTrue();
+        assertThat(matchesGlob("comXexample", "com?Example", true)).isFalse();
+        assertThat(matchesGlob("com.fasterxml.core", "com.*.core", true)).isTrue();
+        assertThat(matchesGlob("com.fasterxml.Core", "com.*.core", true)).isFalse();
+    }
+
     @SuppressWarnings("TextBlockMigration")
     @Test
     void greatestCommonMargin() {

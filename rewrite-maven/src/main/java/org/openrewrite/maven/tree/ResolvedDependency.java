@@ -126,7 +126,7 @@ public class ResolvedDependency implements Serializable {
 
     private List<ResolvedDependency> findDependencies0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
         List<ResolvedDependency> dependencies = new ArrayList<>();
-        if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
+        if (matchesGlob(getGroupId(), groupId, true) && matchesGlob(getArtifactId(), artifactId, true)) {
             dependencies.add(this);
         } else if (!visited.add(this)) {
             return emptyList();
@@ -136,8 +136,8 @@ public class ResolvedDependency implements Serializable {
                     .filter(found -> {
                         if (getRequested().getExclusions() != null) {
                             for (GroupArtifact exclusion : getRequested().getExclusions()) {
-                                if (matchesGlob(found.getGroupId(), exclusion.getGroupId()) &&
-                                        matchesGlob(found.getArtifactId(), exclusion.getArtifactId())) {
+                                if (matchesGlob(found.getGroupId(), exclusion.getGroupId(), true) &&
+                                        matchesGlob(found.getArtifactId(), exclusion.getArtifactId(), true)) {
                                     return false;
                                 }
                             }
@@ -153,7 +153,7 @@ public class ResolvedDependency implements Serializable {
     }
 
     private @Nullable ResolvedDependency findDependency0(@Nullable String groupId, @Nullable String artifactId, Set<ResolvedDependency> visited) {
-        if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
+        if (matchesGlob(getGroupId(), groupId, true) && matchesGlob(getArtifactId(), artifactId, true)) {
             return this;
         } else if (!visited.add(this)) {
             return null;
@@ -164,8 +164,8 @@ public class ResolvedDependency implements Serializable {
             if (found != null) {
                 if (getRequested().getExclusions() != null) {
                     for (GroupArtifact exclusion : getRequested().getExclusions()) {
-                        if (matchesGlob(found.getGroupId(), exclusion.getGroupId()) &&
-                                matchesGlob(found.getArtifactId(), exclusion.getArtifactId())) {
+                        if (matchesGlob(found.getGroupId(), exclusion.getGroupId(), true) &&
+                                matchesGlob(found.getArtifactId(), exclusion.getArtifactId(), true)) {
                             continue outer;
                         }
                     }

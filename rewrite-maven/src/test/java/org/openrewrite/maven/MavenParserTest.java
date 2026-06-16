@@ -513,6 +513,45 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    void coordinateMatchingIsCaseSensitive() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>14.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult result = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+
+                // Exact-case coordinates match.
+                assertThat(result.findDependencies("com.google.guava", "guava", null)).isNotEmpty();
+                // Case-sensitive globs match case-sensitively.
+                assertThat(result.findDependencies("com.google.*", "guava", null)).isNotEmpty();
+
+                // Mismatched case does not match.
+                assertThat(result.findDependencies("Com.Google.Guava", "guava", null)).isEmpty();
+                assertThat(result.findDependencies("com.google.guava", "Guava", null)).isEmpty();
+                assertThat(result.findDependencies("Com.Google.*", "guava", null)).isEmpty();
+
+                ResolvedDependency guava = result.findDependencies("com.google.guava", "guava", null).getFirst();
+                assertThat(guava.findDependency("com.google.guava", "guava")).isNotNull();
+                assertThat(guava.findDependency("Com.Google.Guava", "guava")).isNull();
+            })
+          )
+        );
+    }
+
+    @Test
     void parseMergeExclusions() {
         rewriteRun(
           mavenProject("my-dep",

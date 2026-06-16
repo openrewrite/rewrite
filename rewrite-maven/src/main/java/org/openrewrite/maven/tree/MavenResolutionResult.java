@@ -122,7 +122,7 @@ public class MavenResolutionResult implements Marker {
      * @return A list of matching dependencies
      */
     public List<ResolvedDependency> findDependencies(String groupId, String artifactId, @Nullable Scope scope) {
-        return findDependencies(d -> matchesGlob(d.getGroupId(), groupId) && matchesGlob(d.getArtifactId(), artifactId), scope);
+        return findDependencies(d -> matchesGlob(d.getGroupId(), groupId, true) && matchesGlob(d.getArtifactId(), artifactId, true), scope);
     }
 
     /**

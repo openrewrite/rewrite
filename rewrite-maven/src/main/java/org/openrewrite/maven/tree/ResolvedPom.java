@@ -1173,8 +1173,8 @@ public class ResolvedPom {
                         if (d.getExclusions() != null) {
                             d2 = d2.withExclusions(ListUtils.concatAll(d2.getExclusions(), d.getExclusions()));
                             for (GroupArtifact exclusion : d.getExclusions()) {
-                                if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
-                                        matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
+                                if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId()), true) &&
+                                        matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()), true)) {
                                     if (resolved.getEffectiveExclusions().isEmpty()) {
                                         resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
                                     }
