@@ -9164,8 +9164,18 @@ class ScalaTreeVisitor(
       if (nameEnd > cursor && nameEnd <= source.length) cursor = nameEnd
     }
 
-    // Extract the type parameter name
-    val name = ident(nameStr, namePrefix)
+    // Extract the type parameter name. Higher-kinded params like `F[_]` are
+    // modeled as a J.ParameterizedType (F applied to its kind params) rather
+    // than crammed verbatim into a J.Identifier name.
+    val leadingWsLen = if (adjustedStart < adjustedEnd && adjustedEnd <= source.length)
+      source.substring(adjustedStart, adjustedEnd).length - source.substring(adjustedStart, adjustedEnd).stripLeading().length
+    else 0
+    val tokenStart = adjustedStart + leadingWsLen
+    val name: Expression = tparam.rhs match {
+      case lt: untpd.LambdaTypeTree if nameStr.contains("[") =>
+        buildHigherKindedName(tparam, lt, tokenStart, namePrefix)
+      case _ => ident(nameStr, namePrefix)
+    }
 
     def contextBoundName(cxBound: Trees.Tree[?]): String = {
       def selectToName(t: Trees.Tree[?]): String = t match {
@@ -9319,7 +9329,73 @@ class ScalaTreeVisitor(
       bounds
     )
   }
-  
+
+  /**
+   * Build the name of a higher-kinded type parameter (e.g. `F[_]`, `F[_, _]`,
+   * `F[G[_]]`) as a {@link J.ParameterizedType}: the type constructor identifier
+   * applied to its kind parameters. Kind parameters are driven from the dotty
+   * {@link untpd.LambdaTypeTree} so they map to rich types (S.Wildcard for `_`,
+   * J.Identifier for named params, nested J.ParameterizedType for nested kinds)
+   * instead of being crammed into an identifier name.
+   *
+   * @param baseNameStart absolute source offset of the type constructor name
+   *                      (pointing at any `+`/`-` variance marker, if present).
+   */
+  private def buildHigherKindedName(td: Trees.TypeDef[?], lt: untpd.LambdaTypeTree,
+                                    baseNameStart: Int, prefix: Space): J.ParameterizedType = {
+    val varianceLen = if (baseNameStart < source.length &&
+      (source.charAt(baseNameStart) == '+' || source.charAt(baseNameStart) == '-')) 1 else 0
+    val nameLen = td.name.toString.length + varianceLen
+    val bracketPos = baseNameStart + nameLen
+    val clazzName = source.substring(baseNameStart, Math.min(source.length, bracketPos))
+    val clazz: NameTree = ident(clazzName, Space.EMPTY)
+
+    // Find the `]` matching the `[` at bracketPos so the last element knows where it ends.
+    var depth = 1
+    var ci = bracketPos + 1
+    while (ci < source.length && depth > 0) {
+      val c = source.charAt(ci)
+      if (c == '[') depth += 1
+      else if (c == ']') depth -= 1
+      ci += 1
+    }
+    val closePos = ci - 1
+
+    val elems = new util.ArrayList[JRightPadded[Expression]]()
+    val tparams = lt.tparams
+    val n = tparams.size
+    var p = bracketPos + 1
+    tparams.zipWithIndex.foreach { case (inner, idx) =>
+      val innerStart = Math.max(0, inner.span.start - offsetAdjustment)
+      val innerEnd = Math.min(source.length, Math.max(0, inner.span.end - offsetAdjustment))
+      val elemPrefix = if (innerStart > p && innerStart <= source.length) ScalaSpace.format(source, p, innerStart) else Space.EMPTY
+      val elem: Expression = inner.rhs match {
+        case innerLt: untpd.LambdaTypeTree =>
+          buildHigherKindedName(inner, innerLt, innerStart, elemPrefix)
+        case _ =>
+          val nm = inner.name.toString
+          if (nm == "_" || nm.startsWith("_$")) new S.Wildcard(Tree.randomId(), elemPrefix, Markers.EMPTY, null)
+          else ident(source.substring(innerStart, innerEnd), elemPrefix)
+      }
+      val delimPos = if (idx < n - 1) {
+        val cp = positionOfNext(",", innerEnd)
+        if (cp >= 0 && cp < closePos) cp else closePos
+      } else closePos
+      val afterSpace = if (delimPos > innerEnd) ScalaSpace.format(source, innerEnd, delimPos) else Space.EMPTY
+      elems.add(new JRightPadded(elem, afterSpace, Markers.EMPTY))
+      p = delimPos + 1
+    }
+
+    new J.ParameterizedType(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      clazz,
+      JContainer.build(Space.EMPTY, elems, Markers.EMPTY),
+      null
+    )
+  }
+
   private def extractTypeParametersSource(td: Trees.TypeDef[?]): String = {
     // This method is not actually used anymore since we get type params from the AST
     // We only need to update the cursor position correctly
