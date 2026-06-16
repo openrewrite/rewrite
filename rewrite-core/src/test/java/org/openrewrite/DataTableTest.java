@@ -18,8 +18,10 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.config.ColumnDescriptor;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.DataTableDescriptor;
+import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -28,6 +30,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -67,6 +71,32 @@ class DataTableTest implements RewriteTest {
         new WordTable(recipe);
         assertThat(recipe.getDataTableDescriptors()).hasSize(5);
         assertThat(recipe.getDataTableDescriptors().getFirst().getColumns()).hasSize(2);
+    }
+
+    @Test
+    void columnDescriptorsAreCachedPerRowType() {
+        Recipe recipe = toRecipe();
+        // Two DataTable instances backed by the same row type must share one set of column descriptors.
+        WordTable first = new WordTable(recipe);
+        WordTable second = new WordTable(recipe);
+
+        DataTableDescriptor d1 = RecipeIntrospectionUtils.dataTableDescriptorFromDataTable(first);
+        DataTableDescriptor d2 = RecipeIntrospectionUtils.dataTableDescriptorFromDataTable(second);
+
+        // Descriptors are correct and preserve declared-field order.
+        assertThat(d1.getColumns())
+          .extracting(ColumnDescriptor::getName, ColumnDescriptor::getType,
+            ColumnDescriptor::getDisplayName, ColumnDescriptor::getDescription)
+          .containsExactly(
+            tuple("position", "int", "Position", "The index position of the word in the text."),
+            tuple("text", "String", "Text", "The text of the word."));
+
+        // Memoized per row type: equal contents and the exact same cached instance.
+        assertThat(d2.getColumns()).isEqualTo(d1.getColumns());
+        assertThat(d2.getColumns()).isSameAs(d1.getColumns());
+
+        // The shared cached list is unmodifiable so callers can't corrupt it.
+        assertThatThrownBy(() -> d1.getColumns().clear()).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
