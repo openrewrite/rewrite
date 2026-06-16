@@ -498,6 +498,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
 
         private void installTool(Path dotnetPath, String version, Path toolPath) {
+            Path installCwd = null;
             try {
                 Files.createDirectories(toolPath);
 
@@ -519,9 +520,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 }
 
                 ProcessBuilder pb = new ProcessBuilder(installCmd);
-                if (workingDirectory != null) {
-                    pb.directory(workingDirectory.toFile());
-                }
+                // Run from a fresh, empty temp directory so NuGet's working-directory config
+                // walk finds no repo-level nuget.config up the hierarchy. Such a config could
+                // <clear/> global sources or enable <packageSourceMapping> that rejects
+                // --add-source with "The --add-source option cannot be combined with package
+                // source mapping". User- and machine-level config still apply, since they are
+                // discovered independently of the working directory.
+                installCwd = Files.createTempDirectory("rewrite-csharp-tool-install");
+                pb.directory(installCwd.toFile());
                 pb.environment().putAll(environment);
                 pb.redirectErrorStream(true);
                 Process process = pb.start();
@@ -538,6 +544,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException("Interrupted while installing " + NUGET_PACKAGE_ID + "@" + version, e);
+            } finally {
+                if (installCwd != null) {
+                    try {
+                        Files.deleteIfExists(installCwd);
+                    } catch (IOException ignored) {
+                        // Best effort: the temp directory is empty and harmless if it lingers.
+                    }
+                }
             }
         }
     }

@@ -740,8 +740,9 @@ public class RewriteRpcServer
         // whatever config already lives in the project dir. A caller (e.g. the Moderne
         // CLI) may have written its own nuget.config there — possibly an exclusive
         // configured feed — so we must not clobber it: append only the local feed when
-        // a config is present, and create the standalone dev default (public + local
-        // feed) only when none exists. No-ops in production, where local-feed is absent.
+        // a config is present, and create a standalone dev config that adds only the
+        // local feed (never nuget.org, so it merges with the user/machine config's
+        // default source) when none exists. No-ops in production, where local-feed is absent.
         var localFeed = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".nuget", "local-feed");
@@ -758,9 +759,11 @@ public class RewriteRpcServer
     /// <summary>
     /// Produces the recipe project's <c>nuget.config</c> with the local development
     /// feed present. When <paramref name="existingConfigXml"/> is null/empty, creates a
-    /// standalone config with nuget.org + the local feed. Otherwise the caller already
-    /// wrote a config (possibly an exclusive configured feed): only the local feed is
-    /// appended to <c>&lt;packageSources&gt;</c>, preserving the caller's sources and any
+    /// standalone config that adds only the local feed — never nuget.org — so it merges
+    /// with (rather than overrides) the user/machine NuGet configuration that supplies the
+    /// environment's default source. Otherwise the caller already wrote a config (possibly
+    /// an exclusive configured feed): only the local feed is appended to
+    /// <c>&lt;packageSources&gt;</c>, preserving the caller's sources and any
     /// <c>&lt;clear/&gt;</c>, and idempotently (no duplicate if already present).
     /// </summary>
     internal static string BuildRecipesNuGetConfig(string? existingConfigXml, string localFeedPath)
@@ -771,7 +774,6 @@ public class RewriteRpcServer
                 <?xml version="1.0" encoding="utf-8"?>
                 <configuration>
                   <packageSources>
-                    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
                     <add key="local-feed" value="{localFeedPath}" />
                   </packageSources>
                 </configuration>
