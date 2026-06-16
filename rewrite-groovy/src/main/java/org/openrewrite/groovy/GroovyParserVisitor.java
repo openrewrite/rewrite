@@ -3360,8 +3360,7 @@ public class GroovyParserVisitor {
             Space fmt = sourceBefore("do");
             Statement body = doVisit(loop.getLoopBlock());
             Space beforeWhile = sourceBefore("while");
-            J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(
-                    randomId(), sourceBefore("("), Markers.EMPTY,
+            J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                     JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
                             .withAfter(sourceBefore(")")));
             queue.add(new J.DoWhileLoop(randomId(), fmt, Markers.EMPTY,
