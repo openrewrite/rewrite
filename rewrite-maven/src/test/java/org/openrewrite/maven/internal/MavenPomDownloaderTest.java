@@ -170,6 +170,35 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
+        void unreachableHostProbedOncePerRun() {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            // Nothing listens on port 1, so connections are refused immediately.
+            String deadUri = "http://localhost:1/repo/";
+
+            List<String> probed = new ArrayList<>();
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void repositoryAccessFailed(String uri, Throwable t) {
+                    probed.add(uri);
+                }
+            });
+
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            // The same dead host declared under two different repository ids — as happens when
+            // several transitive POMs each declare the same (dead) repository. The per-repository
+            // normalization cache does not dedupe these by host, so without a host-level circuit
+            // breaker each one is re-probed (here, ~once; in a real run, once per artifact).
+            var repoA = MavenRepository.builder().id("a").uri(deadUri).build();
+            var repoB = MavenRepository.builder().id("b").uri(deadUri).build();
+
+            assertThat(downloader.normalizeRepository(repoA, ctx, null)).isNull();
+            assertThat(downloader.normalizeRepository(repoB, ctx, null)).isNull();
+
+            // The unreachable host must be probed only once; the second repository is skipped.
+            assertThat(probed).containsExactly(deadUri);
+        }
+
+        @Test
         void listenerRecordsRepository() {
             var ctx = MavenExecutionContextView.view(this.ctx);
             // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com

@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -54,6 +55,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_ARTIFACT_CACHE = "org.openrewrite.maven.artifactCache";
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
     private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
+    private static final String MAVEN_UNREACHABLE_HOSTS = "org.openrewrite.maven.unreachableHosts";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -74,6 +76,17 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     public Duration getResolutionTime() {
         return Duration.ofMillis(getMessage(MAVEN_RESOLUTION_TIME, 0L));
+    }
+
+    /**
+     * Hosts that have proven unreachable (a connection-level failure, as opposed to an HTTP error
+     * response) during this execution. Repositories on these hosts are skipped for the remainder of
+     * the run rather than re-probed for every declaration, so a single dead repository costs one
+     * connection timeout instead of one per artifact. The set is concurrent because resolution runs
+     * across multiple threads sharing one execution context.
+     */
+    public Set<String> getUnreachableHosts() {
+        return computeMessageIfAbsent(MAVEN_UNREACHABLE_HOSTS, k -> ConcurrentHashMap.newKeySet());
     }
 
     public MavenExecutionContextView setResolutionListener(ResolutionEventListener listener) {

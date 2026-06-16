@@ -963,10 +963,24 @@ public class MavenPomDownloader {
                     ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), new IllegalArgumentException("Repository " + repository.getUri() + " is not HTTP(S)."));
                     return null;
                 }
+                // A host that has already failed to connect during this run is skipped rather than
+                // re-probed. The same dead repository is frequently declared (often under different
+                // ids) by many transitive POMs; the per-repository normalization cache does not
+                // dedupe those by host, so without this each one costs a full connection timeout.
+                String host = hostOrNull(repository.getUri());
+                if (host != null && ctx.getUnreachableHosts().contains(host)) {
+                    ctx.getResolutionListener().repositoryAccessFailedPreviously(repository.getUri());
+                    return null;
+                }
                 MavenRepository normalized = null;
                 try {
                     normalized = normalizeRepository(repository);
                 } catch (Throwable e) {
+                    // normalizeRepository(repository) only throws once the host is unreachable on
+                    // every probed endpoint, so remember it and skip the host for the rest of the run.
+                    if (host != null) {
+                        ctx.getUnreachableHosts().add(host);
+                    }
                     ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), e);
                 }
 
@@ -1158,6 +1172,14 @@ public class MavenPomDownloader {
 
     private static boolean hasCredentials(MavenRepository repository) {
         return repository.getUsername() != null && repository.getPassword() != null;
+    }
+
+    private static @Nullable String hostOrNull(String uri) {
+        try {
+            return URI.create(uri).getHost();
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private MavenRepository applyMirrors(MavenRepository repository) {
