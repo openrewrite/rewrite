@@ -17,6 +17,7 @@ package org.openrewrite.groovy;
 
 import groovy.lang.GroovySystem;
 import groovy.transform.Canonical;
+import groovy.transform.CompileDynamic;
 import groovy.transform.Field;
 import groovy.transform.Generated;
 import groovy.transform.Immutable;
@@ -3479,26 +3480,26 @@ public class GroovyParserVisitor {
 
     // The groovy compiler discards these annotations in favour of other transform annotations,
     // so they must be parsed by hand when found in source.
-    private static final Class<?>[] DISCARDED_TRANSFORM_ANNOTATIONS = {Canonical.class, Immutable.class, groovy.transform.Synchronized.class};
+    private static final Class<?>[] DISCARDED_TRANSFORM_ANNOTATIONS = {Canonical.class, CompileDynamic.class, Immutable.class, groovy.transform.Synchronized.class};
 
     public List<J.Annotation> visitAndGetAnnotations(AnnotatedNode node, RewriteGroovyClassVisitor classVisitor) {
-        if (node.getAnnotations().isEmpty()) {
-            return emptyList();
+        // Check for discarded transform annotations before iterating the AST annotation list,
+        // since the Groovy compiler may replace or fully remove these annotations while
+        // leaving them present in source. Cursor advancement after each visitAnnotation call
+        // ensures later checks don't re-match the same source annotation.
+        List<J.Annotation> paramAnnotations = new ArrayList<>();
+        for (Class<?> discarded : DISCARDED_TRANSFORM_ANNOTATIONS) {
+            if (sourceStartsWith("@" + discarded.getSimpleName()) || sourceStartsWith("@" + discarded.getCanonicalName())) {
+                paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(discarded)), classVisitor));
+            }
         }
 
-        List<J.Annotation> paramAnnotations = new ArrayList<>(node.getAnnotations().size());
         for (AnnotationNode annotationNode : node.getAnnotations()) {
-            for (Class<?> discarded : DISCARDED_TRANSFORM_ANNOTATIONS) {
-                if (sourceStartsWith("@" + discarded.getSimpleName()) || sourceStartsWith("@" + discarded.getCanonicalName())) {
-                    paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(discarded)), classVisitor));
-                }
-            }
-
             if (appearsInSource(annotationNode)) {
                 paramAnnotations.add(visitAnnotation(annotationNode, classVisitor));
             }
         }
-        return paramAnnotations;
+        return paramAnnotations.isEmpty() ? emptyList() : paramAnnotations;
     }
 
     public J.Annotation visitAnnotation(AnnotationNode annotation, RewriteGroovyClassVisitor classVisitor) {
