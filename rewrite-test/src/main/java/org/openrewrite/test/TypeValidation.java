@@ -140,6 +140,15 @@ public class TypeValidation {
     private boolean parseAndPrintEquality = true;
 
     /**
+     * It is almost always a parser bug if an identifier's name contains characters that cannot appear in an identifier
+     * of the source language (for example raw source text such as a type expression or constructor call being stored
+     * into a {@code J.Identifier} name). In some edge cases with parsers this may be allowed.
+     * If you find yourself using this setting in a normal recipe test consider reporting a bug on the parser instead.
+     */
+    @Builder.Default
+    private boolean allowInvalidIdentifierNames = false;
+
+    /**
      * Enable all invariant validation checks.
      */
     public static TypeValidation all() {
@@ -150,7 +159,7 @@ public class TypeValidation {
      * Skip all invariant validation checks.
      */
     public static TypeValidation none() {
-        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false, false, false, false);
+        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false, false, false, false, false);
     }
 
     static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {

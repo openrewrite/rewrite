@@ -392,6 +392,19 @@ public interface RewriteTest extends SourceSpecs {
                                 // Language/parser does not provide whitespace validation and that's OK for now
                             }
                         }
+                        if (!beforeValidations.allowInvalidIdentifierNames()) {
+                            try {
+                                IdentifierValidationService service = sourceFile.service(IdentifierValidationService.class);
+                                SourceFile identifierValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
+                                if (identifierValidated != null && identifierValidated != sourceFile) {
+                                    fail("Source file was parsed into an LST that contains identifiers with characters that cannot appear " +
+                                         "in an identifier of this language. This usually means the parser stored raw source text (such as a " +
+                                         "type expression or constructor call) into a J.Identifier name. \n" + identifierValidated.printAll());
+                                }
+                            } catch (UnsupportedOperationException e) {
+                                // Language/parser does not provide identifier validation and that's OK for now
+                            }
+                        }
                     }
                 }
 

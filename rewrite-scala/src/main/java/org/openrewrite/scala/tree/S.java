@@ -20,12 +20,14 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.IdentifierValidationService;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.scala.ScalaPrinter;
 import org.openrewrite.scala.ScalaVisitor;
+import org.openrewrite.scala.internal.ScalaIdentifierValidationService;
 import org.openrewrite.scala.service.ScalaAutoFormatService;
 
 import java.lang.ref.SoftReference;
@@ -260,6 +262,8 @@ public interface S extends J {
                     serviceClass = service;
                 } else if (AutoFormatService.class.getName().equals(serviceName)) {
                     serviceClass = (Class<S>) service.getClassLoader().loadClass(ScalaAutoFormatService.class.getName());
+                } else if (IdentifierValidationService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(ScalaIdentifierValidationService.class.getName());
                 } else {
                     return JavaSourceFile.super.service(service);
                 }
