@@ -37,10 +37,10 @@ public class Cursor {
     public static final String ROOT_VALUE = "root";
 
     @Nullable
-    private final Cursor parent;
+    private Cursor parent;
 
     @With
-    private final Object value;
+    private Object value;
 
     @Nullable
     private Map<String, Object> messages;
@@ -48,6 +48,22 @@ public class Cursor {
     public Cursor(@Nullable Cursor parent, Object value) {
         this.parent = parent;
         this.value = value;
+    }
+
+    /**
+     * Re-point this cursor at a new position so a {@link CursorPool} can recycle the object
+     * instead of allocating a fresh {@code new Cursor(...)} for every visited node. Messages
+     * are dropped, matching a newly constructed cursor.
+     * <p>
+     * Package-private and intended <strong>only</strong> for the pool driven by the visitor's
+     * own push/pop. Any cursor that must outlive the visit of its node must instead be copied
+     * with {@link #detach()} (which allocates a separate, never-pooled object), so that the
+     * cursor being reset here is provably dead.
+     */
+    void reset(@Nullable Cursor parent, Object value) {
+        this.parent = parent;
+        this.value = value;
+        this.messages = null;
     }
 
     /**

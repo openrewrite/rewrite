@@ -1342,7 +1342,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             return null;
         }
 
-        setCursor(new Cursor(getCursor(), right));
+        Cursor pushed = pushCursor(right);
 
         T t = right.getElement();
         if (t instanceof J) {
@@ -1350,7 +1350,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             t = visitAndCast((J) right.getElement(), p);
         }
 
-        setCursor(getCursor().getParent());
+        popCursor(pushed);
         if (t == null) {
             //noinspection ConstantConditions
             return null;
@@ -1368,7 +1368,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             return null;
         }
 
-        setCursor(new Cursor(getCursor(), left));
+        Cursor pushed = pushCursor(left);
 
         Space before = visitSpace(left.getBefore(), loc.getBeforeLocation(), p);
         T t = left.getElement();
@@ -1378,7 +1378,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             t = visitAndCast((J) left.getElement(), p);
         }
 
-        setCursor(getCursor().getParent());
+        popCursor(pushed);
         // If nothing changed leave AST node the same
         if (left.getElement() == t && before == left.getBefore()) {
             return left;
@@ -1394,12 +1394,12 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             //noinspection ConstantConditions
             return null;
         }
-        setCursor(new Cursor(getCursor(), container));
+        Cursor pushed = pushCursor(container);
 
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
         List<JRightPadded<J2>> js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
 
-        setCursor(getCursor().getParent());
+        popCursor(pushed);
 
         return js == container.getPadding().getElements() && before == container.getBefore() ?
                 container :

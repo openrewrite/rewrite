@@ -83,6 +83,41 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
     }
 
     /**
+     * Descend the cursor onto {@code value}, recycling a cursor from the {@link CursorPool} when
+     * enabled instead of allocating one, and return the cursor that was acquired. Visitors that
+     * manage the cursor by hand (e.g. for padding wrappers) should pair this with
+     * {@link #popCursor(Cursor)} — passing back the returned cursor — rather than calling
+     * {@code new Cursor} and {@code setCursor(getCursor().getParent())} directly, so they share the
+     * pooling discipline.
+     */
+    protected final Cursor pushCursor(Object value) {
+        Cursor acquired = CursorPool.ENABLED ? CursorPool.acquire(cursor, value) : new Cursor(cursor, value);
+        setCursor(acquired);
+        if (CursorEscapeDetector.ENABLED) {
+            CursorEscapeDetector.onCursorCreated(acquired, value);
+        }
+        return acquired;
+    }
+
+    /**
+     * Ascend the cursor back to its parent and return the cursor acquired by the matching
+     * {@link #pushCursor(Object)} to the {@link CursorPool} when enabled.
+     * <p>
+     * Only the {@code pushed} cursor is recycled — never the current {@code cursor} — because a
+     * visit may legitimately re-point its own {@code cursor} field at an unrelated cursor (e.g.
+     * {@code SourcePositionService}'s printer adopts the caller's cursor via {@code setCursor},
+     * and {@code updateCursor} swaps in a fresh value). Recycling the field rather than what this
+     * frame actually allocated would return someone else's still-live cursor to the pool and
+     * corrupt its parent chain.
+     */
+    protected final void popCursor(Cursor pushed) {
+        setCursor(cursor.getParent());
+        if (CursorPool.ENABLED) {
+            CursorPool.release(pushed);
+        }
+    }
+
+    /**
      * @return Describes the language type that this visitor applies to, e.g. java, xml, properties.
      */
     public @Nullable String getLanguage() {
@@ -231,10 +266,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
         }
 
         visitCount++;
-        setCursor(new Cursor(cursor, tree));
-        if (CursorEscapeDetector.ENABLED) {
-            CursorEscapeDetector.onCursorCreated(cursor, tree);
-        }
+        Cursor pushed = pushCursor(tree);
 
         T t = null;
         // Do you visitor take tree and do you tree take visitor?
@@ -262,7 +294,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
                 }
             }
 
-            setCursor(cursor.getParent());
+            popCursor(pushed);
 
             if (topLevel) {
                 if (t != null && afterVisit != null) {
