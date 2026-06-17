@@ -20,6 +20,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.IdentifierValidationService;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
@@ -28,6 +29,7 @@ import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
+import org.openrewrite.kotlin.internal.KotlinIdentifierValidationService;
 import org.openrewrite.kotlin.internal.KotlinPrinter;
 import org.openrewrite.kotlin.service.KotlinAutoFormatService;
 import org.openrewrite.kotlin.service.KotlinImportService;
@@ -354,6 +356,8 @@ public interface K extends J {
                     return (T) service.getConstructor().newInstance();
                 } else if (AutoFormatService.class.getName().equals(serviceName)) {
                     return (T) service.getClassLoader().loadClass(KotlinAutoFormatService.class.getName()).getConstructor().newInstance();
+                } else if (IdentifierValidationService.class.getName().equals(serviceName)) {
+                    return (T) service.getClassLoader().loadClass(KotlinIdentifierValidationService.class.getName()).getConstructor().newInstance();
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);

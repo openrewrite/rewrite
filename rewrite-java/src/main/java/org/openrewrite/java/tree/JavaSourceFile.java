@@ -18,8 +18,10 @@ package org.openrewrite.java.tree;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.IdentifierValidationService;
 import org.openrewrite.internal.NamingService;
 import org.openrewrite.internal.WhitespaceValidationService;
+import org.openrewrite.java.internal.JavaIdentifierValidationService;
 import org.openrewrite.java.internal.JavaWhitespaceValidationService;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.*;
@@ -74,6 +76,9 @@ public interface JavaSourceFile extends J, SourceFile {
             } else if (WhitespaceValidationService.class.getName().equals(service.getName())) {
                 // Only unit tests should need to use this service, so no classloading concerns
                 return (T) new JavaWhitespaceValidationService();
+            } else if (IdentifierValidationService.class.getName().equals(service.getName())) {
+                // Only unit tests should need to use this service, so no classloading concerns
+                return (T) new JavaIdentifierValidationService();
             } else if (NamingService.class.getName().equals(service.getName())) {
                 return (T) new JavaNamingService();
             } else if (SourcePositionService.class.getName().equals(service.getName())) {
