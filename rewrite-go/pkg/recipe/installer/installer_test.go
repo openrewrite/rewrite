@@ -17,10 +17,49 @@
 package installer
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestIsProxyFetchError(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{
+			"proxy 403 reading zip",
+			errors.New("get github.com/moderneinc/recipes-go@v0.4.0: reading https://proxy.golang.org/github.com/moderneinc/recipes-go/@v/v0.4.0.zip: 403 Forbidden"),
+			true,
+		},
+		{
+			"proxy 410 gone",
+			errors.New("reading https://proxy.golang.org/github.com/foo/bar/@v/v1.0.0.info: 410 Gone"),
+			true,
+		},
+		{
+			"unrelated compile error",
+			errors.New("build helper: ./main.go:5: undefined: recipes.Activate"),
+			false,
+		},
+		{
+			"genuine not-found should not be masked by proxy mention alone",
+			errors.New("go: github.com/foo/bar@v9.9.9: invalid version: unknown revision"),
+			false,
+		},
+	} {
+		// when
+		got := isProxyFetchError(tc.err)
+
+		// then
+		if got != tc.want {
+			t.Errorf("isProxyFetchError(%q) = %v, want %v", tc.err, got, tc.want)
+		}
+	}
+}
 
 func writeGoMod(t *testing.T, contents string) string {
 	t.Helper()
