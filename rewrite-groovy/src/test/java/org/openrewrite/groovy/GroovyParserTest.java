@@ -414,4 +414,50 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doWhileLoop() {
+        rewriteRun(
+          groovy(
+            """
+                    def a() {
+                    do {
+                    } while (c)
+                    }
+              """
+          )
+        );
+    }
+
+    @Test
+    void defaultMethodWithThis() {
+        rewriteRun(
+          groovy(
+            """
+            interface A {
+
+                default void a() {
+                    this.a(false)
+                }
+
+                void a(boolean b)
+
+            }
+              """
+          )
+        );
+    }
+
+    @Test
+    void compileDynamicAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.CompileDynamic
+              @CompileDynamic
+              void a() {
+              }
+              """
+          )
+        );
+    }
 }

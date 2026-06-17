@@ -23,6 +23,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -33,6 +34,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
 public class ShortenFullyQualifiedTypeReferences extends Recipe {
@@ -173,22 +175,52 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                         return !fieldAccess.getPrefix().isEmpty() ? fieldAccess.getName().withPrefix(fieldAccess.getPrefix()) : fieldAccess.getName();
                     } else if (!usedTypes.containsKey(simpleName)) {
                         String fullyQualifiedName = ((JavaType.FullyQualified) type).getFullyQualifiedName();
-                        if (!fullyQualifiedName.startsWith("java.lang.")) {
-                            maybeAddImport(fullyQualifiedName);
-                            usedTypes.put(simpleName, type);
-                            if (!fieldAccess.getName().getAnnotations().isEmpty()) {
-                                return fieldAccess.getName().withAnnotations(ListUtils.map(fieldAccess.getName().getAnnotations(), (i, a) -> {
-                                    if (i == 0) {
-                                        return a.withPrefix(fieldAccess.getPrefix());
-                                    }
-                                    return a;
-                                }));
+                        if (fullyQualifiedName.startsWith("java.lang.")) {
+                            if (!isAnnotationTypeName() || conflictsWithSamePackageType(simpleName, fullyQualifiedName)) {
+                                return fieldAccess;
                             }
-                            return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+                        } else {
+                            maybeAddImport(fullyQualifiedName);
                         }
+                        usedTypes.put(simpleName, type);
+                        return shorten(fieldAccess);
                     }
                 }
                 return super.visitFieldAccess(fieldAccess, ctx);
+            }
+
+            private J shorten(J.FieldAccess fieldAccess) {
+                if (!fieldAccess.getName().getAnnotations().isEmpty()) {
+                    return fieldAccess.getName().withAnnotations(ListUtils.map(fieldAccess.getName().getAnnotations(), (i, a) -> {
+                        if (i == 0) {
+                            return a.withPrefix(fieldAccess.getPrefix());
+                        }
+                        return a;
+                    }));
+                }
+                return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+            }
+
+            private boolean isAnnotationTypeName() {
+                J.Annotation annotation = getCursor().firstEnclosing(J.Annotation.class);
+                return annotation != null && annotation.getAnnotationType() == getCursor().getValue();
+            }
+
+            private boolean conflictsWithSamePackageType(String simpleName, String fullyQualifiedName) {
+                SourceFile sourceFile = getCursor().firstEnclosing(SourceFile.class);
+                if (!(sourceFile instanceof JavaSourceFile)) {
+                    return false;
+                }
+                JavaSourceFile javaSourceFile = (JavaSourceFile) sourceFile;
+                J.Package packageDeclaration = javaSourceFile.getPackageDeclaration();
+                String packageName = packageDeclaration == null ? "" : packageDeclaration.getPackageName();
+                String samePackageType = packageName.isEmpty() ? simpleName : packageName + "." + simpleName;
+                return javaSourceFile.getMarkers().findFirst(JavaSourceSet.class)
+                        .map(JavaSourceSet::getClasspath)
+                        .orElseGet(java.util.Collections::emptyList)
+                        .stream()
+                        .anyMatch(fq -> !fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fullyQualifiedName) &&
+                                fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), samePackageType));
             }
         };
     }

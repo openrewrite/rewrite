@@ -17,6 +17,7 @@ package org.openrewrite.groovy;
 
 import groovy.lang.GroovySystem;
 import groovy.transform.Canonical;
+import groovy.transform.CompileDynamic;
 import groovy.transform.Field;
 import groovy.transform.Generated;
 import groovy.transform.Immutable;
@@ -2676,6 +2677,18 @@ public class GroovyParserVisitor {
                     }
                     select = JRightPadded.build(selectExpr).withAfter(afterSelect);
                 }
+
+                // Handle explicit "this." receiver when Groovy's AST marks the call as implicit-this.
+                // This occurs in interface default methods where `this.method()` is represented
+                // with isImplicitThis() == true despite the explicit receiver in source.
+                if (select == null && source.startsWith("this", cursor) &&
+                        cursor + 4 < source.length() && source.charAt(cursor + 4) == '.') {
+                    Expression thisIdent = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "this", null, null);
+                    skip("this");
+                    Space afterSelect = sourceBefore(".");
+                    select = JRightPadded.build(thisIdent).withAfter(afterSelect);
+                }
+
                 JContainer<Expression> typeParameters = call.getGenericsTypes() != null ? visitTypeParameterizations(call.getGenericsTypes()) : null;
                 // Closure invocations that are written as closure.call() and closure() are parsed into identical MethodCallExpression
                 // closure() has implicitThis set to false
@@ -3356,6 +3369,19 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitDoWhileLoop(DoWhileStatement loop) {
+            Space fmt = sourceBefore("do");
+            Statement body = doVisit(loop.getLoopBlock());
+            Space beforeWhile = sourceBefore("while");
+            J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
+                    JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
+                            .withAfter(sourceBefore(")")));
+            queue.add(new J.DoWhileLoop(randomId(), fmt, Markers.EMPTY,
+                    JRightPadded.build(body).withAfter(beforeWhile),
+                    padLeft(EMPTY, condition)));
+        }
+
+        @Override
         public void visitWhileLoop(WhileStatement loop) {
             Space fmt = sourceBefore("while");
             queue.add(new J.WhileLoop(randomId(), fmt, Markers.EMPTY,
@@ -3479,7 +3505,7 @@ public class GroovyParserVisitor {
 
     // The groovy compiler discards these annotations in favour of other transform annotations,
     // so they must be parsed by hand when found in source.
-    private static final Class<?>[] DISCARDED_TRANSFORM_ANNOTATIONS = {Canonical.class, Immutable.class, groovy.transform.Synchronized.class};
+    private static final Class<?>[] DISCARDED_TRANSFORM_ANNOTATIONS = {Canonical.class, CompileDynamic.class, Immutable.class, groovy.transform.Synchronized.class};
 
     public List<J.Annotation> visitAndGetAnnotations(AnnotatedNode node, RewriteGroovyClassVisitor classVisitor) {
         if (node.getAnnotations().isEmpty()) {
