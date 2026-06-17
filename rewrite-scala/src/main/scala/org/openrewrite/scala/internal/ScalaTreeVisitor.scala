@@ -652,11 +652,7 @@ class ScalaTreeVisitor(
       arguments
     )
     
-    // Update cursor to the end of the annotation
-    val adjustedEnd = Math.max(0, app.span.end - offsetAdjustment)
-    if (adjustedEnd > cursor) {
-      cursor = adjustedEnd
-    }
+    updateCursor(app.span.end)
     
     
     annotation
@@ -969,12 +965,8 @@ class ScalaTreeVisitor(
         } else Space.EMPTY
         if (dotPos >= 0) cursor = dotPos + 1
 
-        // Update cursor position to after the method name
         if (sel.nameSpan.exists) {
-          val nameEnd = Math.max(0, sel.nameSpan.end - offsetAdjustment)
-          if (nameEnd > cursor) {
-            cursor = nameEnd
-          }
+          updateCursor(sel.nameSpan.end)
         }
 
         select = target
@@ -1250,12 +1242,8 @@ class ScalaTreeVisitor(
       Markers.EMPTY
     )
 
-    // Update cursor to end of the apply expression
     if (app.span.exists) {
-      val adjustedEnd = Math.max(0, app.span.end - offsetAdjustment)
-      if (adjustedEnd > cursor && adjustedEnd <= source.length) {
-        cursor = adjustedEnd
-      }
+      updateCursor(app.span.end)
     }
 
     val markers = if (isBlockArg) {
@@ -1390,13 +1378,9 @@ class ScalaTreeVisitor(
     val operator = mapOperator(sel.name.toString)
     val rightExpr = visitTree(right).asInstanceOf[Expression]
     
-    // Extract any remaining source from the Apply span if provided
     appSpan.foreach { span =>
       if (span.exists) {
-        val adjustedEnd = Math.max(0, span.end - offsetAdjustment)
-        if (adjustedEnd > cursor && adjustedEnd <= source.length) {
-          cursor = adjustedEnd
-        }
+        updateCursor(span.end)
       }
     }
     
@@ -1506,12 +1490,8 @@ class ScalaTreeVisitor(
       }
       val name = ident(nameStr, dotSpace, typeOfTree(sel), variableTypeOfTree(sel))
       
-      // Consume up to the end of the selection
       if (sel.span.exists) {
-        val adjustedEnd = Math.max(0, sel.span.end - offsetAdjustment)
-        if (adjustedEnd > cursor && adjustedEnd <= source.length) {
-          cursor = adjustedEnd
-        }
+        updateCursor(sel.span.end)
       }
       
       val faMarkers = if (isTypeProjection) {
@@ -5330,12 +5310,8 @@ class ScalaTreeVisitor(
       null
     }
     
-    // Update cursor to end of the class
     if (td.span.exists) {
-      val adjustedEnd = Math.max(0, td.span.end - offsetAdjustment)
-      if (adjustedEnd > cursor && adjustedEnd <= source.length) {
-        cursor = adjustedEnd
-      }
+      updateCursor(td.span.end)
     }
     
     val classDeclMarkers = if (isEnumCaseClass) {
@@ -5449,10 +5425,7 @@ class ScalaTreeVisitor(
               Space.EMPTY
             }
 
-          // Update cursor past ".asInstanceOf"
-          if (asInstanceOfEnd > cursor) {
-            cursor = asInstanceOfEnd
-          }
+          updateCursor(sel.span.end)
           
           // Now handle the type argument in brackets
           // Extract any space before the opening bracket
