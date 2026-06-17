@@ -420,17 +420,30 @@ class GroovyParserTest implements RewriteTest {
           groovy(
             """
             interface A {
-            
+
                 default void a() {
                     this.a(false)
                 }
-            
+
                 void a(boolean b)
-            
+
             }
               """
           )
         );
     }
 
+    @Test
+    void compileDynamicAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.CompileDynamic
+              @CompileDynamic
+              void a() {
+              }
+              """
+          )
+        );
+    }
 }

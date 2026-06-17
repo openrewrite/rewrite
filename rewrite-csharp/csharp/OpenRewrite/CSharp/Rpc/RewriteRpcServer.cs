@@ -573,6 +573,7 @@ public class RewriteRpcServer
             var assembly = context.LoadFromAssemblyPath(absolutePath);
             CheckVersionCompatibility(assembly);
             ActivateAssembly(assembly);
+            ActivateDependencyRecipeAssemblies(assembly, context);
         }
         else if (recipesObject is { } packageObj)
         {
@@ -587,6 +588,7 @@ public class RewriteRpcServer
                 var assembly = context.LoadFromAssemblyPath(absolutePath);
                 CheckVersionCompatibility(assembly);
                 ActivateAssembly(assembly);
+                ActivateDependencyRecipeAssemblies(assembly, context);
             }
             else
             {
@@ -651,6 +653,63 @@ public class RewriteRpcServer
         }
     }
 
+    /// <summary>
+    /// Activates the recipe-bearing dependency assemblies of a plugin loaded from a loose DLL.
+    /// </summary>
+    /// <remarks>
+    /// The NuGet install path runs <c>dotnet publish</c>, which surfaces every dependency
+    /// assembly so each gets <see cref="ActivateAssembly"/>'d. A loose DLL registered by file
+    /// path has no such enumeration: the ALC loads a referenced recipe package's types on demand
+    /// (to satisfy a <c>new SomeOtherRecipe()</c> reference) but never runs that package's
+    /// <see cref="IRecipeActivator"/>, so its recipes stay absent from the marketplace. A composite
+    /// recipe that lists a recipe from a referenced package then fails <c>PrepareRecipe</c> with
+    /// "Recipe not found" (e.g. Migration.Dotnet's UpgradeToDotNet10 -> Core's
+    /// ChangeDotNetTargetFramework). Walk the reference graph and activate any plugin-private
+    /// assembly that exposes an activator; host/framework assemblies (including the SDK, already
+    /// activated at startup) resolve to no plugin path and are skipped.
+    /// </remarks>
+    private void ActivateDependencyRecipeAssemblies(Assembly primary, PluginLoadContext context)
+    {
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            // The SDK assembly is activated once at startup; the primary plugin just above.
+            Assembly.GetExecutingAssembly().GetName().Name!,
+            primary.GetName().Name!,
+        };
+
+        var queue = new Queue<Assembly>();
+        queue.Enqueue(primary);
+        while (queue.Count > 0)
+        {
+            foreach (var reference in queue.Dequeue().GetReferencedAssemblies())
+            {
+                if (reference.Name == null || !visited.Add(reference.Name))
+                    continue;
+
+                // Only follow plugin-private dependencies (those listed in the plugin's
+                // .deps.json). Shared host/framework assemblies resolve to null here, so the
+                // SDK's activator is never re-run and core recipes are not double-registered.
+                if (context.ResolvePluginPath(reference) == null)
+                    continue;
+
+                Assembly dependency;
+                try
+                {
+                    dependency = context.LoadFromAssemblyName(reference);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning("Could not load dependency {Assembly} for recipe activation: {Error}",
+                        reference.Name, ex.Message);
+                    continue;
+                }
+
+                ActivateAssembly(dependency);
+                queue.Enqueue(dependency);
+            }
+        }
+    }
+
     private string EnsureRecipesProject()
     {
         if (_recipesProjectDir != null)
@@ -681,8 +740,9 @@ public class RewriteRpcServer
         // whatever config already lives in the project dir. A caller (e.g. the Moderne
         // CLI) may have written its own nuget.config there — possibly an exclusive
         // configured feed — so we must not clobber it: append only the local feed when
-        // a config is present, and create the standalone dev default (public + local
-        // feed) only when none exists. No-ops in production, where local-feed is absent.
+        // a config is present, and create a standalone dev config that adds only the
+        // local feed (never nuget.org, so it merges with the user/machine config's
+        // default source) when none exists. No-ops in production, where local-feed is absent.
         var localFeed = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".nuget", "local-feed");
@@ -699,9 +759,11 @@ public class RewriteRpcServer
     /// <summary>
     /// Produces the recipe project's <c>nuget.config</c> with the local development
     /// feed present. When <paramref name="existingConfigXml"/> is null/empty, creates a
-    /// standalone config with nuget.org + the local feed. Otherwise the caller already
-    /// wrote a config (possibly an exclusive configured feed): only the local feed is
-    /// appended to <c>&lt;packageSources&gt;</c>, preserving the caller's sources and any
+    /// standalone config that adds only the local feed — never nuget.org — so it merges
+    /// with (rather than overrides) the user/machine NuGet configuration that supplies the
+    /// environment's default source. Otherwise the caller already wrote a config (possibly
+    /// an exclusive configured feed): only the local feed is appended to
+    /// <c>&lt;packageSources&gt;</c>, preserving the caller's sources and any
     /// <c>&lt;clear/&gt;</c>, and idempotently (no duplicate if already present).
     /// </summary>
     internal static string BuildRecipesNuGetConfig(string? existingConfigXml, string localFeedPath)
@@ -712,7 +774,6 @@ public class RewriteRpcServer
                 <?xml version="1.0" encoding="utf-8"?>
                 <configuration>
                   <packageSources>
-                    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
                     <add key="local-feed" value="{localFeedPath}" />
                   </packageSources>
                 </configuration>
