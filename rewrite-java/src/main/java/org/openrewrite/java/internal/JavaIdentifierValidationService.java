@@ -22,18 +22,19 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 
 /**
- * Validates that identifier names contain no characters that cannot appear in an identifier of a J-based language.
+ * Validates that identifier names contain only characters that can appear in an identifier of the source language.
  * A common parser bug is to store raw source text (e.g. a type expression or a constructor call) into a
  * {@code J.Identifier} name; this service catches that.
  * <p>
- * The default rule flags the structural characters (whitespace, brackets, parentheses, braces, comma, semicolon)
- * that cannot appear in an identifier of any of these languages, while whitelisting quoted/backtick-quoted names
- * (e.g. Groovy {@code 'some name'} or Kotlin {@code `some name`}) which may contain any character. Languages that
- * need different rules can subclass and override {@link #isWhitelisted(String)}.
+ * The rule is an allow-list of characters, so it is specific to each language. This base implementation encodes the
+ * Java rule ({@link Character#isJavaIdentifierPart}, which permits letters, digits, {@code _} and {@code $} plus the
+ * corresponding Unicode categories). Other languages subclass and override {@link #isValidChar(char)} (and, where the
+ * language quotes identifiers, {@link #isWhitelisted(String)} / {@link #isInvalid(J.Identifier)}).
+ * <p>
+ * Only the character set is validated, not start-of-identifier rules; an LST may legitimately carry synthesized names
+ * that would not be legal at the start of a source identifier.
  */
 public class JavaIdentifierValidationService implements IdentifierValidationService {
-
-    private static final String INVALID_CHARS = " \t\r\n()[]{},;";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -49,32 +50,39 @@ public class JavaIdentifierValidationService implements IdentifierValidationServ
     }
 
     /**
-     * Whether the given identifier's name contains characters that cannot appear in an identifier of this language.
+     * Whether the identifier's name contains a character that cannot appear in an identifier of this language.
      * Subclasses can override to account for language-specific quoting (e.g. a marker indicating the name was quoted).
      */
     protected boolean isInvalid(J.Identifier identifier) {
         String name = identifier.getSimpleName();
-        return !isWhitelisted(name) && containsInvalidChar(name);
-    }
-
-    /**
-     * Names that may legitimately contain otherwise-invalid characters. Covers quoted identifiers wrapped in
-     * backticks (Kotlin), single quotes or double quotes (Groovy).
-     */
-    protected boolean isWhitelisted(String name) {
-        if (name.length() < 2) {
+        if (name.isEmpty() || isWhitelisted(name)) {
             return false;
         }
-        char first = name.charAt(0);
-        return (first == '`' || first == '\'' || first == '"') && name.charAt(name.length() - 1) == first;
-    }
-
-    protected static boolean containsInvalidChar(String name) {
         for (int i = 0; i < name.length(); i++) {
-            if (INVALID_CHARS.indexOf(name.charAt(i)) >= 0) {
+            if (!isValidChar(name.charAt(i))) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Whether {@code c} may appear anywhere in a bare (unquoted) identifier of this language. The Java rule permits
+     * letters, digits, {@code _}, {@code $} and the Unicode categories recognized by {@link Character#isJavaIdentifierPart}.
+     */
+    protected boolean isValidChar(char c) {
+        return Character.isJavaIdentifierPart(c);
+    }
+
+    /**
+     * Names allowed despite containing otherwise-invalid characters:
+     * <ul>
+     *     <li>{@code *} — wildcard imports (e.g. {@code import a.b.*}) represent the wildcard as a {@code J.Identifier}.</li>
+     *     <li>Names beginning with {@code <} — compiler-synthesized names (e.g. {@code <init>}, Kotlin {@code <get>}/{@code <destruct>},
+     *     C# {@code <Main>$}) follow this convention; no source identifier in these languages starts with {@code <}.</li>
+     * </ul>
+     */
+    protected boolean isWhitelisted(String name) {
+        return "*".equals(name) || name.charAt(0) == '<';
     }
 }

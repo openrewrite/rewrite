@@ -22,9 +22,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
+import org.openrewrite.csharp.internal.CSharpIdentifierValidationService;
 import org.openrewrite.csharp.service.CSharpAutoFormatService;
 import org.openrewrite.csharp.service.CSharpNamingService;
 import org.openrewrite.csharp.service.CSharpWhitespaceValidationService;
+import org.openrewrite.internal.IdentifierValidationService;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NamingService;
 import org.openrewrite.internal.WhitespaceValidationService;
@@ -295,6 +297,9 @@ public interface Cs extends J {
             }
             if (WhitespaceValidationService.class.getName().equals(service.getName())) {
                 return (T) new CSharpWhitespaceValidationService();
+            }
+            if (IdentifierValidationService.class.getName().equals(service.getName())) {
+                return (T) new CSharpIdentifierValidationService();
             }
             return JavaSourceFile.super.service(service);
         }

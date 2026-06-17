@@ -23,8 +23,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
+import org.openrewrite.internal.IdentifierValidationService;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.javascript.internal.JavaScriptIdentifierValidationService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
@@ -229,6 +231,8 @@ public interface JS extends J {
             try {
                 if (AutoFormatService.class.getName().equals(serviceName)) {
                     return (T) service.getClassLoader().loadClass(JavaScriptAutoFormatService.class.getName()).getConstructor().newInstance();
+                } else if (IdentifierValidationService.class.getName().equals(serviceName)) {
+                    return (T) service.getClassLoader().loadClass(JavaScriptIdentifierValidationService.class.getName()).getConstructor().newInstance();
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);

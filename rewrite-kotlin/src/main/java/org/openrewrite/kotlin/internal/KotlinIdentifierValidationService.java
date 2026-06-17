@@ -18,16 +18,27 @@ package org.openrewrite.kotlin.internal;
 import org.openrewrite.java.internal.JavaIdentifierValidationService;
 import org.openrewrite.java.marker.Quoted;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.marker.Implicit;
 
 public class KotlinIdentifierValidationService extends JavaIdentifierValidationService {
 
     @Override
     protected boolean isInvalid(J.Identifier identifier) {
+        // Compiler-synthesized identifiers (e.g. implicit receivers) are not source identifiers and are not printed.
+        if (identifier.getMarkers().findFirst(Implicit.class).isPresent()) {
+            return false;
+        }
         // Kotlin stores backtick-quoted identifiers without the backticks and marks them with Quoted;
         // such names may contain any character.
         if (identifier.getMarkers().findFirst(Quoted.class).isPresent()) {
             return false;
         }
         return super.isInvalid(identifier);
+    }
+
+    @Override
+    protected boolean isValidChar(char c) {
+        // Kotlin bare identifiers permit letters, digits and underscore, but not '$' (reserved for string templates).
+        return Character.isLetterOrDigit(c) || c == '_';
     }
 }
