@@ -5480,10 +5480,8 @@ class ScalaTreeVisitor(
           }
           
           // Update cursor past the closing bracket
-          if (ta.span.end > cursor) {
-            cursor = ta.span.end
-          }
-          
+          updateCursor(ta.span.end)
+
           val typeCastMarkers =
             if (asInstanceOfPrefix.getWhitespace.nonEmpty || !asInstanceOfPrefix.getComments.isEmpty) {
               Markers.EMPTY.addIfAbsent(AsInstanceOfPrefix.create(asInstanceOfPrefix))

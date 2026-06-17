@@ -905,6 +905,25 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void asInstanceOfInProcedureSyntaxBody() {
+        // Procedure-syntax bodies are reparsed with a nonzero offset; the cursor update
+        // after `asInstanceOf[...]` must apply that offset or it swallows the following
+        // statement's leading whitespace (`x.asInstanceOf[B]\ny` -> `x.asInstanceOf[B]y`).
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def m() {
+                x.asInstanceOf[B]
+                y
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void procedureSyntaxSetter() {
         rewriteRun(
           scala(
