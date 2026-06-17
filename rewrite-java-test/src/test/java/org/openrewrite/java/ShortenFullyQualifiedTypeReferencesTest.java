@@ -26,6 +26,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.withSourceTypesOnClasspath;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
@@ -77,6 +78,66 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void shortenJavaLangAnnotationInSubtree() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(ShortenFullyQualifiedTypeReferencesTest::shortenClassDeclarationReferences)),
+          java(
+            """
+              class Foo {
+                  @java.lang.Deprecated
+                  void test() {
+                  }
+              }
+              """,
+            """
+              class Foo {
+                  @Deprecated
+                  void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotShortenJavaLangAnnotationWhenSamePackageTypeConflicts() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withSourceTypesOnClasspath())
+            .recipe(toRecipe(ShortenFullyQualifiedTypeReferencesTest::shortenClassDeclarationReferences)),
+          java(
+            """
+              package a;
+
+              class Deprecated {
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+
+              class Foo {
+                  @java.lang.Deprecated
+                  void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    private static JavaIsoVisitor<ExecutionContext> shortenClassDeclarationReferences() {
+        return new JavaIsoVisitor<>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(classDecl));
+                return super.visitClassDeclaration(classDecl, ctx);
+            }
+        };
     }
 
     @Test
