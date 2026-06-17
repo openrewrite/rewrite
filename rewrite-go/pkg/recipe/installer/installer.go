@@ -150,8 +150,24 @@ func (inst *Installer) InstallFromPackage(packageName string, version *string, r
 
 	// Run go get to fetch the module
 	getArg := packageName + "@" + versionSpec
-	if err := inst.goCmd("get", "-d", getArg); err != nil {
-		return nil, fmt.Errorf("go get %s: %w", getArg, err)
+	if err := inst.goCmd("get", getArg); err != nil {
+		// The public module proxy (proxy.golang.org) occasionally fails to
+		// serve a module it cannot fetch from the source host, returning
+		// 403/410. Retry once fetching directly from the source VCS by
+		// marking the module path as private, which bypasses both the proxy
+		// and the checksum database for that module while leaving public
+		// dependencies proxied and verified as usual.
+		if isProxyFetchError(err) {
+			if inst.Logger != nil {
+				inst.Logger("proxy fetch of %s failed (%v); retrying directly from source", getArg, err)
+			}
+			directEnv := []string{"GOPRIVATE=" + packageName}
+			if fbErr := inst.goCmdEnv(directEnv, "get", getArg); fbErr != nil {
+				return nil, fmt.Errorf("go get %s (direct fallback after proxy failure): %w", getArg, fbErr)
+			}
+		} else {
+			return nil, fmt.Errorf("go get %s: %w", getArg, err)
+		}
 	}
 
 	// Read resolved version from go.mod
@@ -331,9 +347,17 @@ func generateHelper(path string, modulePath string) error {
 
 // goCmd runs a go command in the workspace directory.
 func (inst *Installer) goCmd(args ...string) error {
+	return inst.goCmdEnv(nil, args...)
+}
+
+// goCmdEnv runs a go command in the workspace directory with the given extra
+// environment variables appended to the process environment (later entries
+// override earlier ones, so callers can override inherited values).
+func (inst *Installer) goCmdEnv(extraEnv []string, args ...string) error {
 	cmd := exec.Command("go", args...)
 	cmd.Dir = inst.WorkspaceDir
 	cmd.Env = append(os.Environ(), "GO111MODULE=on")
+	cmd.Env = append(cmd.Env, extraEnv...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s: %s", strings.Join(args, " "), string(output))
@@ -342,6 +366,26 @@ func (inst *Installer) goCmd(args ...string) error {
 		inst.Logger("go %s: %s", strings.Join(args, " "), string(output))
 	}
 	return nil
+}
+
+// isProxyFetchError reports whether a go command failure looks like the module
+// proxy being unable to serve a module (e.g. proxy.golang.org returning 403 or
+// 410 while reading a module zip/info). These failures are typically transient
+// or proxy-specific and are recoverable by fetching directly from the source.
+func isProxyFetchError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "proxy.golang.org") && !strings.Contains(msg, "/@v/") {
+		return false
+	}
+	return strings.Contains(msg, "403") ||
+		strings.Contains(msg, "Forbidden") ||
+		strings.Contains(msg, "410") ||
+		strings.Contains(msg, "Gone") ||
+		strings.Contains(msg, "404") ||
+		strings.Contains(msg, "Not Found")
 }
 
 // addReplace adds a replace directive to the workspace go.mod.
