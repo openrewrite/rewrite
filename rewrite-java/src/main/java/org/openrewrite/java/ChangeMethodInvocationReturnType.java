@@ -20,13 +20,12 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.marker.Markers;
-
-import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -38,7 +37,8 @@ public class ChangeMethodInvocationReturnType extends Recipe {
     String methodPattern;
 
     @Option(displayName = "New method invocation return type",
-            description = "The fully qualified new return type of method invocation.",
+            description = "The fully qualified new return type of method invocation. " +
+                    "Parameterized types like `java.util.Set<java.lang.String>` are supported.",
             example = "long")
     String newReturnType;
 
@@ -63,7 +63,7 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 JavaType.Method type = m.getMethodType();
                 if (methodMatcher.matches(method) && type != null && !newReturnType.equals(type.getReturnType().toString())) {
-                    type = type.withReturnType(JavaType.buildType(newReturnType));
+                    type = type.withReturnType(TypeUtils.buildTypeTree(newReturnType).getType());
                     m = m.withMethodType(type);
                     if (m.getName().getType() != null) {
                         m = m.withName(m.getName().withType(type));
@@ -76,7 +76,7 @@ public class ChangeMethodInvocationReturnType extends Recipe {
             @Override
             public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                 methodUpdated = false;
-                JavaType.FullyQualified originalType = multiVariable.getTypeAsFullyQualified();
+                JavaType originalType = multiVariable.getType();
                 J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, ctx);
 
                 // Only change the declared type when a variable's initializer is itself the matched
@@ -86,23 +86,20 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                         .anyMatch(v -> isInitializedByMatch(v.getInitializer()));
 
                 if (methodUpdated && initializedByMatch) {
-                    JavaType newType = JavaType.buildType(newReturnType);
-                    JavaType.FullyQualified newFieldType = TypeUtils.asFullyQualified(newType);
+                    TypeTree newTypeTree = TypeUtils.buildTypeTree(newReturnType);
+                    JavaType newType = newTypeTree.getType();
 
-                    maybeRemoveImport(originalType);
-                    maybeAddImport(newFieldType);
+                    maybeRemoveImports(originalType);
 
-                    mv = mv.withTypeExpression(mv.getTypeExpression() == null ?
-                            null :
-                            new J.Identifier(mv.getTypeExpression().getId(),
-                                    mv.getTypeExpression().getPrefix(),
-                                    Markers.EMPTY,
-                                    emptyList(),
-                                    newReturnType.substring(newReturnType.lastIndexOf('.') + 1),
-                                    newType,
-                                    null
-                            )
-                    );
+                    if (mv.getTypeExpression() != null) {
+                        TypeTree newTypeExpression = newTypeTree.withPrefix(mv.getTypeExpression().getPrefix());
+                        mv = mv.withTypeExpression(newTypeExpression);
+                        // The tree is built with fully-qualified names; shorten them and add imports for the
+                        // new type and all of its type parameters (recursively for nested generics).
+                        if (!(newTypeExpression instanceof J.Identifier) && !(newTypeExpression instanceof J.Primitive)) {
+                            doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(newTypeExpression));
+                        }
+                    }
 
                     mv = mv.withVariables(ListUtils.map(mv.getVariables(), var -> {
                         JavaType.FullyQualified varType = TypeUtils.asFullyQualified(var.getType());
@@ -114,6 +111,29 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                 }
 
                 return mv;
+            }
+
+            /**
+             * Remove the imports for a type that is being replaced, walking parameterized types, arrays and
+             * wildcard bounds so that imports introduced for type parameters are also cleaned up when no longer
+             * referenced.
+             */
+            private void maybeRemoveImports(@Nullable JavaType type) {
+                if (type instanceof JavaType.Parameterized) {
+                    JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+                    maybeRemoveImport(parameterized.getType());
+                    for (JavaType typeParameter : parameterized.getTypeParameters()) {
+                        maybeRemoveImports(typeParameter);
+                    }
+                } else if (type instanceof JavaType.Array) {
+                    maybeRemoveImports(((JavaType.Array) type).getElemType());
+                } else if (type instanceof JavaType.GenericTypeVariable) {
+                    for (JavaType bound : ((JavaType.GenericTypeVariable) type).getBounds()) {
+                        maybeRemoveImports(bound);
+                    }
+                } else if (type instanceof JavaType.FullyQualified) {
+                    maybeRemoveImport((JavaType.FullyQualified) type);
+                }
             }
 
             /**

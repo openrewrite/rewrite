@@ -132,7 +132,7 @@ public class AddMethodParameter extends Recipe {
         }
 
         private J.VariableDeclarations createParameter(J.MethodDeclaration method) {
-            TypeTree typeTree = createTypeTree(parameterType);
+            TypeTree typeTree = TypeUtils.buildTypeTree(parameterType);
 
             return new J.VariableDeclarations(
                     randomId(),
@@ -175,86 +175,6 @@ public class AddMethodParameter extends Recipe {
             );
         }
 
-        private TypeTree createTypeTree(String typeName) {
-            int arrayIndex = typeName.lastIndexOf('[');
-            if (arrayIndex != -1) {
-                TypeTree elementType = createTypeTree(typeName.substring(0, arrayIndex));
-                return new J.ArrayType(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        elementType,
-                        null,
-                        JLeftPadded.build(Space.EMPTY),
-                        new JavaType.Array(null, elementType.getType(), null)
-                );
-            }
-            int genericsIndex = typeName.indexOf('<');
-            if (genericsIndex != -1) {
-                TypeTree rawType = createTypeTree(typeName.substring(0, genericsIndex));
-                List<JRightPadded<Expression>> typeParameters = new ArrayList<>();
-                for (String typeParam : typeName.substring(genericsIndex + 1, typeName.lastIndexOf('>')).split(",")) {
-                    typeParameters.add(JRightPadded.build((Expression) createTypeTree(typeParam.trim())));
-                }
-                return new J.ParameterizedType(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        rawType,
-                        JContainer.build(Space.EMPTY, typeParameters, Markers.EMPTY),
-                        new JavaType.Parameterized(null, (JavaType.FullyQualified) rawType.getType(), null)
-                );
-            }
-            JavaType.Primitive type = JavaType.Primitive.fromKeyword(typeName);
-            if (type != null) {
-                return new J.Primitive(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        type
-                );
-            }
-            if ("?".equals(typeName)) {
-                return new J.Wildcard(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        null,
-                        null
-                );
-            }
-            if (typeName.startsWith("?") && typeName.contains("extends")) {
-                return new J.Wildcard(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        new JLeftPadded<>(Space.SINGLE_SPACE, J.Wildcard.Bound.Extends, Markers.EMPTY),
-                        createTypeTree(typeName.substring(typeName.indexOf("extends") + "extends".length() + 1).trim()).withPrefix(Space.SINGLE_SPACE)
-                );
-            }
-            if (typeName.indexOf('.') == -1) {
-                String javaLangType = TypeUtils.findQualifiedJavaLangTypeName(typeName);
-                if (javaLangType != null) {
-                    return new J.Identifier(
-                            randomId(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            emptyList(),
-                            typeName,
-                            JavaType.buildType(javaLangType),
-                            null
-                    );
-                }
-            }
-            TypeTree typeTree = TypeTree.build(typeName);
-            // somehow the type attribution is incomplete, but `ChangeType` relies on this
-            if (typeTree instanceof J.FieldAccess) {
-                typeTree = ((J.FieldAccess) typeTree).withName(((J.FieldAccess) typeTree).getName().withType(typeTree.getType()));
-            } else if (typeTree.getType() == null) {
-                typeTree = ((J.Identifier) typeTree).withType(JavaType.ShallowClass.build(typeName));
-            }
-            return typeTree;
-        }
     }
 
     private static class DeclaresMatchingType extends JavaIsoVisitor<ExecutionContext> {
