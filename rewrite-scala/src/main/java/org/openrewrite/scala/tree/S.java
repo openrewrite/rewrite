@@ -257,20 +257,18 @@ public interface S extends J {
         public <S, T extends S> T service(Class<S> service) {
             String serviceName = service.getName();
             try {
-                Class<S> serviceClass;
                 if (ScalaAutoFormatService.class.getName().equals(serviceName)) {
-                    serviceClass = service;
+                    return (T) service.getConstructor().newInstance();
                 } else if (AutoFormatService.class.getName().equals(serviceName)) {
-                    serviceClass = (Class<S>) service.getClassLoader().loadClass(ScalaAutoFormatService.class.getName());
+                    return (T) service.getClassLoader().loadClass(ScalaAutoFormatService.class.getName()).getConstructor().newInstance();
                 } else if (IdentifierValidationService.class.getName().equals(serviceName)) {
-                    serviceClass = (Class<S>) service.getClassLoader().loadClass(ScalaIdentifierValidationService.class.getName());
-                } else {
-                    return JavaSourceFile.super.service(service);
+                    return (T) service.getClassLoader().loadClass(ScalaIdentifierValidationService.class.getName()).getConstructor().newInstance();
                 }
-                return (T) serviceClass.getConstructor().newInstance();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+            // Delegate unknown services outside the try so an UnsupportedOperationException is not re-wrapped.
+            return JavaSourceFile.super.service(service);
         }
 
         @Override

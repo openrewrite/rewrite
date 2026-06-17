@@ -227,16 +227,14 @@ public interface JS extends J {
         public <S, T extends S> T service(Class<S> service) {
             String serviceName = service.getName();
             try {
-                Class<S> serviceClass;
                 if (AutoFormatService.class.getName().equals(serviceName)) {
-                    serviceClass = (Class<S>) service.getClassLoader().loadClass(JavaScriptAutoFormatService.class.getName());
-                } else {
-                    return JavaSourceFile.super.service(service);
+                    return (T) service.getClassLoader().loadClass(JavaScriptAutoFormatService.class.getName()).getConstructor().newInstance();
                 }
-                return (T) serviceClass.getConstructor().newInstance();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+            // Delegate unknown services outside the try so an UnsupportedOperationException is not re-wrapped.
+            return JavaSourceFile.super.service(service);
         }
 
         @Transient
