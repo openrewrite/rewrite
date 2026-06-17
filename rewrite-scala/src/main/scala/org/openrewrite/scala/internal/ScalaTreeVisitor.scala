@@ -7160,10 +7160,32 @@ class ScalaTreeVisitor(
     new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), caseStatements, matchEndSpace)
   }
 
-  private def visitThis(thisTree: Trees.This[?]): J.Identifier = {
+  private def visitThis(thisTree: Trees.This[?]): J = {
     val prefix = extractPrefix(thisTree.span)
-    updateCursor(thisTree.span.end)
-    ident("this", prefix, typeFor(thisTree.span))
+    val qual = thisTree.qual
+    val qualName: String = qual match {
+      case ident: Trees.Ident[?] if ident.name != null && !ident.name.isEmpty =>
+        ident.name.toString
+      case _ => null
+    }
+    if (qualName == null) {
+      updateCursor(thisTree.span.end)
+      ident("this", prefix, typeFor(thisTree.span))
+    } else {
+      // Qualified `this`, e.g. `Outer.this`, modeled as a field access onto the `this` keyword.
+      val afterQual = Math.max(0, thisTree.span.start - offsetAdjustment) + qualName.length
+      val thisEnd = Math.max(0, thisTree.span.end - offsetAdjustment)
+      val dotIdx = source.indexOf('.', afterQual)
+      val thisStart = thisEnd - "this".length
+      val beforeDot = ScalaSpace.format(source, afterQual, dotIdx)
+      val namePrefix = ScalaSpace.format(source, dotIdx + 1, thisStart)
+      val qualifier = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+        Collections.emptyList(), qualName, null, null)
+      val thisName = ident("this", namePrefix, typeFor(thisTree.span))
+      updateCursor(thisTree.span.end)
+      new J.FieldAccess(Tree.randomId(), prefix, Markers.EMPTY, qualifier,
+        new JLeftPadded(beforeDot, thisName, Markers.EMPTY), typeFor(thisTree.span))
+    }
   }
 
   private def visitSuper(superTree: Trees.Super[?]): J = {

@@ -2677,6 +2677,18 @@ public class GroovyParserVisitor {
                     }
                     select = JRightPadded.build(selectExpr).withAfter(afterSelect);
                 }
+
+                // Handle explicit "this." receiver when Groovy's AST marks the call as implicit-this.
+                // This occurs in interface default methods where `this.method()` is represented
+                // with isImplicitThis() == true despite the explicit receiver in source.
+                if (select == null && source.startsWith("this", cursor) &&
+                        cursor + 4 < source.length() && source.charAt(cursor + 4) == '.') {
+                    Expression thisIdent = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "this", null, null);
+                    skip("this");
+                    Space afterSelect = sourceBefore(".");
+                    select = JRightPadded.build(thisIdent).withAfter(afterSelect);
+                }
+
                 JContainer<Expression> typeParameters = call.getGenericsTypes() != null ? visitTypeParameterizations(call.getGenericsTypes()) : null;
                 // Closure invocations that are written as closure.call() and closure() are parsed into identical MethodCallExpression
                 // closure() has implicitThis set to false

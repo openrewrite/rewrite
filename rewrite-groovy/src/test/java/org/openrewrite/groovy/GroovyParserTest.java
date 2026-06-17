@@ -429,6 +429,25 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
+    void defaultMethodWithThis() {
+        rewriteRun(
+          groovy(
+            """
+            interface A {
+
+                default void a() {
+                    this.a(false)
+                }
+
+                void a(boolean b)
+
+            }
+              """
+          )
+        );
+    }
+
+    @Test
     void compileDynamicAnnotation() {
         rewriteRun(
           groovy(
@@ -441,6 +460,4 @@ class GroovyParserTest implements RewriteTest {
           )
         );
     }
-
-
 }
