@@ -17,6 +17,7 @@ package org.openrewrite.groovy;
 
 import groovy.lang.GroovySystem;
 import groovy.transform.Canonical;
+import groovy.transform.CompileDynamic;
 import groovy.transform.Field;
 import groovy.transform.Generated;
 import groovy.transform.Immutable;
@@ -3479,7 +3480,7 @@ public class GroovyParserVisitor {
 
     // The groovy compiler discards these annotations in favour of other transform annotations,
     // so they must be parsed by hand when found in source.
-    private static final Class<?>[] DISCARDED_TRANSFORM_ANNOTATIONS = {Canonical.class, Immutable.class, groovy.transform.Synchronized.class};
+    private static final Class<?>[] DISCARDED_TRANSFORM_ANNOTATIONS = {Canonical.class, CompileDynamic.class, Immutable.class, groovy.transform.Synchronized.class};
 
     public List<J.Annotation> visitAndGetAnnotations(AnnotatedNode node, RewriteGroovyClassVisitor classVisitor) {
         if (node.getAnnotations().isEmpty()) {

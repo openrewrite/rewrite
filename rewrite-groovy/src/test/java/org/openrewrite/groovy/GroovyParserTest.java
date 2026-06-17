@@ -414,4 +414,19 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void compileDynamicAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.CompileDynamic
+              @CompileDynamic
+              void a() {
+              }
+              """
+          )
+        );
+    }
+
+
 }
