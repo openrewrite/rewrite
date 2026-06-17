@@ -44,9 +44,10 @@ public interface Reference extends Trait<Tree> {
     /**
      * Applies the {@link org.openrewrite.trait.Reference.Renamer} to the provided cursor to compute a new reference value.
      * Note that this method only provides the logic for computing a new {@link org.openrewrite.Tree} with a renamed value,
-     * specific to the reference type. Hence, the reference itself is not changed, nor are the reference cursor
-     * {@link org.openrewrite.trait.Reference#getCursor()} or value {@link org.openrewrite.trait.Reference#getValue()}
-     * used to compute the new value.
+     * specific to the reference type. Hence, the reference itself is not changed, and the new value is computed from the
+     * provided {@code cursor} (which the caller supplies fresh during its own traversal), not from the reference's own
+     * {@link org.openrewrite.trait.Reference#getTree()} or {@link org.openrewrite.trait.Reference#getValue()}. References
+     * are cursor-free: {@link Trait#getCursor()} is not available on a cached reference.
      */
     default Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
         throw new UnsupportedOperationException();

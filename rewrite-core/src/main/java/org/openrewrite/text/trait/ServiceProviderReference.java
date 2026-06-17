@@ -31,13 +31,13 @@ import java.util.regex.Pattern;
 
 @Value
 public class ServiceProviderReference implements Reference {
-    Cursor cursor;
+    Tree tree;
     Kind kind;
     String value;
 
     @Override
-    public Tree getTree() {
-        return cursor.getValue();
+    public Cursor getCursor() {
+        throw new UnsupportedOperationException("References are cursor-free; use getTree()");
     }
 
     @Override
@@ -104,19 +104,18 @@ public class ServiceProviderReference implements Reference {
         public Set<Reference> getReferences(SourceFile sourceFile) {
             PlainText plainText = (PlainText) sourceFile;
             Set<Reference> references = new HashSet<>();
-            Cursor cursor = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), plainText);
 
             // Reference for the filename (the service interface FQCN)
             String fileName = plainText.getSourcePath().getFileName().toString();
             if (JAVA_FQCN.test(fileName)) {
-                references.add(new ServiceProviderReference(cursor, Reference.Kind.TYPE, fileName));
+                references.add(new ServiceProviderReference(plainText, Reference.Kind.TYPE, fileName));
             }
 
             // References for each implementation class in the content
             for (String line : plainText.getText().split("\n", -1)) {
                 String trimmed = line.trim();
                 if (!trimmed.isEmpty() && !trimmed.startsWith("#") && JAVA_FQCN.test(trimmed)) {
-                    references.add(new ServiceProviderReference(cursor, Reference.Kind.TYPE, trimmed));
+                    references.add(new ServiceProviderReference(plainText, Reference.Kind.TYPE, trimmed));
                 }
             }
 

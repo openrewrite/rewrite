@@ -30,8 +30,13 @@ import java.util.regex.Pattern;
 
 @Value
 public class PropertiesReference implements Reference {
-    Cursor cursor;
+    Tree tree;
     Kind kind;
+
+    @Override
+    public Cursor getCursor() {
+        throw new UnsupportedOperationException("References are cursor-free; use getTree()");
+    }
 
     @Override
     public String getValue() {
@@ -70,7 +75,7 @@ public class PropertiesReference implements Reference {
                 Object value = cursor.getValue();
                 if (value instanceof Properties.Entry &&
                         javaFullyQualifiedTypeMatcher.test(((Properties.Entry) value).getValue().getText())) {
-                    return new PropertiesReference(cursor, determineKind(((Properties.Entry) value).getValue().getText()));
+                    return new PropertiesReference((Properties.Entry) value, determineKind(((Properties.Entry) value).getValue().getText()));
                 }
                 return null;
             }

@@ -50,6 +50,16 @@ public class Cursor {
         this.value = value;
     }
 
+    /**
+     * Create a standalone copy of this cursor and its entire parent chain, detached from the traversal
+     * that produced it. Use this whenever a cursor (or its path) must outlive the visit of its node —
+     * e.g. when storing it as a long-lived map key or in a field — so that it stays valid even if the
+     * originating cursors are later reused/recycled by the visitor. Messages are not copied.
+     */
+    public Cursor detach() {
+        return new Cursor(parent == null ? null : parent.detach(), value);
+    }
+
     public Cursor getRoot() {
         Cursor c = this;
         while (c.parent != null) {

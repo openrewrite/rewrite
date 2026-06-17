@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.CursorEscapeDetector;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.TreeVisitorAdapter;
@@ -225,9 +226,15 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
         }
 
         boolean topLevel = visitCount == 0;
+        if (CursorEscapeDetector.ENABLED && topLevel) {
+            CursorEscapeDetector.pushVisitor(getClass().getName());
+        }
 
         visitCount++;
         setCursor(new Cursor(cursor, tree));
+        if (CursorEscapeDetector.ENABLED) {
+            CursorEscapeDetector.onCursorCreated(cursor, tree);
+        }
 
         T t = null;
         // Do you visitor take tree and do you tree take visitor?
@@ -268,6 +275,10 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
 
                 afterVisit = null;
                 visitCount = 0;
+                if (CursorEscapeDetector.ENABLED) {
+                    CursorEscapeDetector.onTopLevelEnd();
+                    CursorEscapeDetector.popVisitor();
+                }
             }
         } catch (Throwable e) {
             if (e instanceof RecipeRunException) {

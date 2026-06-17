@@ -24,6 +24,11 @@ import org.openrewrite.yaml.tree.Yaml;
 
 public abstract class YamlReference implements Reference {
     @Override
+    public Cursor getCursor() {
+        throw new UnsupportedOperationException("References are cursor-free; use getTree()");
+    }
+
+    @Override
     public String getValue() {
         if (getTree() instanceof Yaml.Scalar) {
             return ((Yaml.Scalar) getTree()).getValue();

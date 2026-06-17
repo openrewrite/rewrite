@@ -172,7 +172,9 @@ public class VariableNameUtils {
             Statement s = super.visitStatement(statement, namesInScope);
             Cursor aggregatedScope = aggregateNameScope();
             if (currentScope.isEmpty() || currentScope.peek() != aggregatedScope) {
-                Set<String> namesInAggregatedScope = nameScopes.computeIfAbsent(aggregatedScope, k -> new HashSet<>());
+                // detach() the map key so it stays valid after this scope is exited (and its live
+                // cursor may be recycled); lookups with live cursors still match by id-based equality.
+                Set<String> namesInAggregatedScope = nameScopes.computeIfAbsent(aggregatedScope.detach(), k -> new HashSet<>());
                 // Pass the name scopes available from a parent scope down to the child.
                 if (!currentScope.isEmpty() && aggregatedScope.isScopeInPath(currentScope.peek().getValue())) {
                     namesInAggregatedScope.addAll(nameScopes.get(currentScope.peek()));
@@ -232,7 +234,7 @@ public class VariableNameUtils {
                 if (o instanceof J.VariableDeclarations) {
                     J.VariableDeclarations variableDeclarations = (J.VariableDeclarations) o;
                     variableDeclarations.getVariables().forEach(v ->
-                            nameScopes.computeIfAbsent(getCursor(), k -> new HashSet<>()).add(v.getSimpleName()));
+                            nameScopes.computeIfAbsent(getCursor().detach(), k -> new HashSet<>()).add(v.getSimpleName()));
                 }
             });
 
@@ -279,7 +281,7 @@ public class VariableNameUtils {
                 imports.forEach(i -> {
                     if (i.isStatic()) {
                         // Note: Currently, adds all statically imported identifiers including method and classes rather than restricting the names to static fields.
-                        Set<String> namesAtCursor = nameScopes.computeIfAbsent(classCursor, k -> new HashSet<>());
+                        Set<String> namesAtCursor = nameScopes.computeIfAbsent(classCursor.detach(), k -> new HashSet<>());
                         if (isValidImportName(i.getQualid().getTarget().getType(), i.getQualid().getSimpleName())) {
                             namesAtCursor.add(i.getQualid().getSimpleName());
                         }

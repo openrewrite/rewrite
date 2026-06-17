@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.xml.XPathMatcher;
@@ -32,7 +33,7 @@ import java.util.regex.Pattern;
 @EqualsAndHashCode(callSuper = false)
 public class SpringXmlReference extends XmlReference {
 
-    Cursor cursor;
+    Tree tree;
     Kind kind;
 
     public static class Provider extends AbstractProvider<SpringXmlReference> {
@@ -52,7 +53,7 @@ public class SpringXmlReference extends XmlReference {
                     if (classXPath.matches(cursor) || typeXPath.matches(cursor) || keyTypeXPath.matches(cursor) || valueTypeXPath.matches(cursor)) {
                         String stringVal = attrib.getValueAsString();
                         if (referencePattern.matcher(stringVal).matches()) {
-                            return new SpringXmlReference(cursor, determineKind(stringVal));
+                            return new SpringXmlReference(attrib, determineKind(stringVal));
                         }
                     }
                 } else if (value instanceof Xml.Tag) {
@@ -60,7 +61,7 @@ public class SpringXmlReference extends XmlReference {
                     if (tags.matches(cursor)) {
                         Optional<String> stringVal = tag.getValue();
                         if (stringVal.isPresent() && referencePattern.matcher(stringVal.get()).matches()) {
-                            return new SpringXmlReference(cursor, determineKind(stringVal.get()));
+                            return new SpringXmlReference(tag, determineKind(stringVal.get()));
                         }
                     }
                 }

@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -29,7 +30,7 @@ import java.util.regex.Pattern;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class YamlApplicationConfigReference extends YamlReference {
-    Cursor cursor;
+    Tree tree;
     Kind kind;
 
     public static class Provider extends YamlProvider {
@@ -44,7 +45,7 @@ public class YamlApplicationConfigReference extends YamlReference {
             protected @Nullable YamlReference test(Cursor cursor) {
                 Object value = cursor.getValue();
                 if (value instanceof Yaml.Scalar && javaFullyQualifiedTypePattern.test(((Yaml.Scalar) value).getValue())) {
-                    return new YamlApplicationConfigReference(cursor, determineKind(((Yaml.Scalar) value).getValue()));
+                    return new YamlApplicationConfigReference((Yaml.Scalar) value, determineKind(((Yaml.Scalar) value).getValue()));
                 }
                 return null;
             }

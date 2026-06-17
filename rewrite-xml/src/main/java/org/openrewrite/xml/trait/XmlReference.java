@@ -24,8 +24,8 @@ import org.openrewrite.xml.tree.Xml;
 public abstract class XmlReference implements Reference {
 
     @Override
-    public Tree getTree() {
-        return Reference.super.getTree();
+    public Cursor getCursor() {
+        throw new UnsupportedOperationException("References are cursor-free; use getTree()");
     }
 
     @Override

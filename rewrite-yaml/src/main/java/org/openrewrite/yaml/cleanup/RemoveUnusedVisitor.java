@@ -27,7 +27,9 @@ public class RemoveUnusedVisitor<P> extends YamlIsoVisitor<P> {
     private final Cursor cursor;
 
     public RemoveUnusedVisitor(@Nullable Cursor cursor) {
-        this.cursor = cursor;
+        // detach() so this retained cursor's path stays valid after the caller's traversal moves on
+        // (and its live cursors may be recycled); only isScopeInPath (a read-only path walk) uses it.
+        this.cursor = cursor == null ? null : cursor.detach();
     }
 
     @Override
