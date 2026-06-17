@@ -414,7 +414,6 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
-
     @Test
     void doWhileLoop() {
         rewriteRun(
@@ -424,6 +423,20 @@ class GroovyParserTest implements RewriteTest {
                     do {
                     } while (c)
                     }
+              """
+          )
+        );
+    }
+
+    @Test
+    void compileDynamicAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.CompileDynamic
+              @CompileDynamic
+              void a() {
+              }
               """
           )
         );

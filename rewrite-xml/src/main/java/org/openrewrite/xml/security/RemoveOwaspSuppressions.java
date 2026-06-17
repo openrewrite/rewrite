@@ -49,6 +49,18 @@ public class RemoveOwaspSuppressions extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsOwaspSuppressionsFile(), new XmlIsoVisitor<ExecutionContext>() {
             @Override
+            public Xml.@Nullable Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml.Document doc = super.visitDocument(document, ctx);
+                Xml.Tag root = doc.getRoot();
+                if ("suppressions".equals(root.getName()) && root.getContent() != null &&
+                        root.getContent().stream().noneMatch(c -> c instanceof Xml.Tag && "suppress".equals(((Xml.Tag) c).getName()))) {
+                    // Remove the suppressions file altogether once no suppressions remain.
+                    return null;
+                }
+                return doc;
+            }
+
+            @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 if (!new XPathMatcher("/suppressions").matches(getCursor()) || t.getContent() == null) {
