@@ -415,6 +415,20 @@ class GroovyParserTest implements RewriteTest {
     }
 
     @Test
+    void doWhileLoop() {
+        rewriteRun(
+          groovy(
+            """
+                    def a() {
+                    do {
+                    } while (c)
+                    }
+              """
+          )
+        );
+    }
+
+    @Test
     void defaultMethodWithThis() {
         rewriteRun(
           groovy(
