@@ -989,7 +989,28 @@ public class RewriteRpcServer
         var found = _marketplace.FindRecipe(request.Id);
         if (found == null)
         {
-            throw new InvalidOperationException($"Recipe not found: {request.Id}");
+            // The host re-prepares every sub-recipe of a composite by id while building
+            // RpcRecipe.getRecipeList(). A sub-recipe that delegates to a Java recipe is not in
+            // this marketplace, so a miss means the host owns this recipe: answer with delegatesTo
+            // so the host resolves the id locally (the Java recipe is on its classpath) rather than
+            // failing with "Recipe not found".
+            var delegateId = Guid.NewGuid().ToString();
+            return Task.FromResult(new PrepareRecipeResponse
+            {
+                Id = delegateId,
+                Descriptor = new RecipeDescriptorDto
+                {
+                    Name = request.Id,
+                    DisplayName = request.Id,
+                    InstanceName = request.Id
+                },
+                EditVisitor = $"edit:{delegateId}",
+                DelegatesTo = new DelegatesTo
+                {
+                    RecipeName = request.Id,
+                    Options = request.Options ?? new()
+                }
+            });
         }
 
         var (descriptor, recipe) = found.Value;

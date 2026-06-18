@@ -43,7 +43,26 @@ export class PrepareRecipe {
                     const id = snowflake.generate();
                     const recipeCtor = marketplace.findRecipe(request.id);
                     if (!recipeCtor) {
-                        throw new Error(`Could not find recipe with id ${request.id}`);
+                        // The host re-prepares every sub-recipe of a composite by id while
+                        // building RpcRecipe.getRecipeList(). A sub-recipe that delegates to a
+                        // Java recipe (e.g. org.openrewrite.javascript.UpgradeDependencyVersion,
+                        // produced by upgradeDependencyVersion() -> prepareJavaRecipe) is an
+                        // RpcRecipe that installSubRecipes deliberately did not register here: it
+                        // has no no-arg constructor and is hosted on the peer. A miss therefore
+                        // means the host owns this recipe, so tell it to resolve the id locally
+                        // (the Java recipe is on the host's classpath) via delegatesTo, rather
+                        // than failing with "Could not find recipe with id ...".
+                        return {
+                            id: id,
+                            descriptor: PrepareRecipe.delegateDescriptor(request.id),
+                            editVisitor: `edit:${id}`,
+                            editPreconditions: [],
+                            scanPreconditions: [],
+                            delegatesTo: {
+                                recipeName: request.id,
+                                options: request.options ?? {}
+                            }
+                        };
                     }
                     if (!recipeCtor[1]) {
                         throw new Error(`Recipe ${request.id} was installed without a constructor`);
@@ -80,6 +99,29 @@ export class PrepareRecipe {
                 }
             )
         );
+    }
+
+    /**
+     * Minimal stand-in descriptor for a recipe the host will resolve locally via
+     * {@link PrepareRecipeResponse.delegatesTo}. The host reads only `delegatesTo` for
+     * delegated recipes and ignores this descriptor, but the response type requires one.
+     */
+    private static delegateDescriptor(name: string): RecipeDescriptor {
+        return {
+            name: name,
+            displayName: name,
+            instanceName: name,
+            description: "",
+            tags: [],
+            estimatedEffortPerOccurrence: 5,
+            options: [],
+            preconditions: [],
+            recipeList: [],
+            dataTables: [],
+            maintainers: [],
+            contributors: [],
+            examples: []
+        };
     }
 
     private static async installSubRecipes(recipe: Recipe, marketplace: RecipeMarketplace) {
