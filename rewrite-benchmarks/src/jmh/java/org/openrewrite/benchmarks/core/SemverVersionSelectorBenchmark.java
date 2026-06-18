@@ -48,6 +48,13 @@ import java.util.concurrent.TimeUnit;
 @State(Scope.Benchmark)
 public class SemverVersionSelectorBenchmark {
 
+    /**
+     * A mix of node-semver selector shapes that exercise the full selector-detection chain in
+     * {@link Semver#validate}: an exact version, an x-range, a hyphen range, a caret range, and a
+     * {@code latest.release} literal.
+     */
+    private static final String[] SELECTORS = {"1.5.1", "1.x", "1.5 - 2", "^1.5", "latest.release"};
+
     private List<String> versions;
     private VersionComparator latestRelease;
     private VersionComparator xRange;
@@ -74,6 +81,19 @@ public class SemverVersionSelectorBenchmark {
     @Benchmark
     public void upgradeHyphenRange(Blackhole bh) {
         bh.consume(hyphenRange.upgrade("3.0.0", versions));
+    }
+
+    /**
+     * Mimics the hot path of a recipe run: a (recipe-constant) version selector is repeatedly
+     * validated for every dependency and every visit. Exercises {@link Semver#validate} over the
+     * representative {@link #SELECTORS} mix; quantifies the selector-detection regex cost and the
+     * effect of memoizing it.
+     */
+    @Benchmark
+    public void validateSelectors(Blackhole bh) {
+        for (String selector : SELECTORS) {
+            bh.consume(Semver.validate(selector, null));
+        }
     }
 
     /**
