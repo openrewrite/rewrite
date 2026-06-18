@@ -20,6 +20,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/base64"
 	"encoding/csv"
 	"encoding/json"
 	"flag"
@@ -39,6 +40,7 @@ import (
 	"github.com/grafana/pyroscope-go"
 
 	goparser "github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser/modgraph"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/preconditions"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
@@ -123,6 +125,9 @@ type server struct {
 
 	reader    *bufio.Reader
 	writer    io.Writer
+	// httpMu serializes bidirectional Http requests so concurrent fetches do
+	// not interleave on the single duplex stream.
+	httpMu    sync.Mutex
 	logger    *log.Logger
 	registry  *recipe.Registry
 	installer *installer.Installer
@@ -816,6 +821,97 @@ func mapMarkerPrinter(mp *string) printer.MarkerPrinter {
 	}
 }
 
+// fetchHTTP performs an HTTP GET by delegating to the Java side over
+// bidirectional RPC, which executes the request through the CLI-configured
+// OpenRewrite HttpSender (proxy, auth, TLS all honored). Returns the response
+// body and status code. Used by the module-graph resolver to fetch dependency
+// go.mod files from a GOPROXY when they are not in the local module cache.
+func (s *server) fetchHTTP(url string) ([]byte, int, error) {
+	s.httpMu.Lock()
+	defer s.httpMu.Unlock()
+	params, _ := json.Marshal(map[string]any{"url": url, "method": "GET"})
+	req, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "go-Http",
+		"method":  "Http",
+		"params":  json.RawMessage(params),
+	})
+	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(req))
+	if _, err := s.writer.Write(append([]byte(header), req...)); err != nil {
+		return nil, 0, err
+	}
+	resp, err := s.readMessage()
+	if err != nil {
+		return nil, 0, err
+	}
+	raw := resp.Result
+	if raw == nil {
+		raw = resp.Params
+	}
+	if raw == nil {
+		return nil, 0, fmt.Errorf("Http: empty response")
+	}
+	var out struct {
+		Status int    `json:"status"`
+		Body   string `json:"body"` // base64
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, 0, err
+	}
+	body, err := base64.StdEncoding.DecodeString(out.Body)
+	if err != nil {
+		return nil, 0, err
+	}
+	return body, out.Status, nil
+}
+
+// resolveModuleGraph enriches a go.mod's GoResolutionResult marker with the
+// resolved module graph + build list. Dependency go.mod files are read from the
+// local module cache first and fetched from the GOPROXY (via the Java
+// HttpSender) on a miss. Best-effort: on any failure the marker keeps whatever
+// was resolved and GraphComplete reflects partiality.
+//
+// Proxy fetching is opt-in via MODERNE_GO_PROXY_RESOLVE to avoid unexpected
+// network during parsing; without it, only the local cache is consulted.
+func (s *server) resolveModuleGraph(goModContent []byte, mrr *golang.GoResolutionResult) {
+	res, err := modgraph.Resolve(goModContent, s.moduleSource())
+	if err != nil {
+		s.logger.Printf("resolveModuleGraph: %v", err)
+		return
+	}
+	modgraph.ApplyTo(res, mrr)
+}
+
+// moduleSource builds the dependency-resolution source: the local module cache
+// first, then (when MODERNE_GO_PROXY_RESOLVE is set) a GOPROXY tier whose HTTP
+// is delegated to the Java HttpSender via the bidirectional Http method. The
+// same source is used at parse time and installed into the recipe
+// ExecutionContext for recipe-time re-resolution.
+func (s *server) moduleSource() modgraph.ModSource {
+	sources := []modgraph.ModSource{modgraph.CacheSource(envOr("GOMODCACHE", defaultModCache()))}
+	if os.Getenv("MODERNE_GO_PROXY_RESOLVE") != "" {
+		sources = append(sources, modgraph.ProxySource(envOr("GOPROXY", "https://proxy.golang.org,direct"), s.fetchHTTP))
+	}
+	return modgraph.TieredSource(sources...)
+}
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+func defaultModCache() string {
+	if gp := os.Getenv("GOPATH"); gp != "" {
+		return filepath.Join(strings.SplitN(gp, string(os.PathListSeparator), 2)[0], "pkg", "mod")
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, "go", "pkg", "mod")
+	}
+	return ""
+}
+
 // getObjectFromJava fetches an object from the Java side via bidirectional RPC.
 // For Print, Java holds the (potentially modified) tree. We need to request it back.
 // Supports multi-batch transfers: each GetObject call returns one batch, and
@@ -1042,6 +1138,10 @@ func (s *server) resolveExecutionContext(pid *string) *recipe.ExecutionContext {
 		s.preparedContexts[*pid] = ctx
 	}
 	s.installDataTableStore(ctx)
+	// Make the dependency-resolution source available so recipes that mutate
+	// dependencies can re-resolve the module model at recipe time (network via
+	// the Java HttpSender).
+	recipes.SetModSource(ctx, s.moduleSource())
 	return ctx
 }
 
@@ -1953,6 +2053,9 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if sumData, err := os.ReadFile(sumPath); err == nil {
 			mrr.ResolvedDependencies = goparser.ParseGoSum(string(sumData))
 		}
+		// Enrich with the resolved module graph + build list (cache, then
+		// GOPROXY via the Java HttpSender) so recipes get the full graph.
+		s.resolveModuleGraph(data, mrr)
 		mods[filepath.Dir(modPath)] = &modCtx{dir: filepath.Dir(modPath), mrr: mrr}
 	}
 

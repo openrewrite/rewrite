@@ -18,6 +18,7 @@ package org.openrewrite.golang.rpc;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.golang.GolangParser;
@@ -235,6 +236,9 @@ public class GoRewriteRpc extends RewriteRpc {
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
+        // Route the Go module-graph resolver's GOPROXY fetches through the
+        // CLI-configured HttpSender (handled by the "Http" RPC method).
+        setHttpSender(HttpSenderExecutionContextView.view(ctx).getHttpSender());
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {

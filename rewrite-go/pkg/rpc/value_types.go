@@ -130,6 +130,8 @@ func init() {
 	RegisterValueType(reflect.TypeOf(golang.GoExclude{}), "org.openrewrite.golang.marker.GoResolutionResult$Exclude")
 	RegisterValueType(reflect.TypeOf(golang.GoRetract{}), "org.openrewrite.golang.marker.GoResolutionResult$Retract")
 	RegisterValueType(reflect.TypeOf(golang.GoResolvedDependency{}), "org.openrewrite.golang.marker.GoResolutionResult$ResolvedDependency")
+	RegisterValueType(reflect.TypeOf(golang.GoModule{}), "org.openrewrite.golang.marker.GoResolutionResult$GoModule")
+	RegisterValueType(reflect.TypeOf(golang.GoModuleEdge{}), "org.openrewrite.golang.marker.GoResolutionResult$GoModuleEdge")
 
 	// JavaType types
 	RegisterValueType(reflect.TypeOf((*java.JavaTypeClass)(nil)), "org.openrewrite.java.tree.JavaType$Class")
@@ -267,6 +269,8 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$Exclude", func() any { return golang.GoExclude{} })
 	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$Retract", func() any { return golang.GoRetract{} })
 	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$ResolvedDependency", func() any { return golang.GoResolvedDependency{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$GoModule", func() any { return golang.GoModule{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$GoModuleEdge", func() any { return golang.GoModuleEdge{} })
 
 	RegisterFactory("org.openrewrite.java.tree.Space", func() any { return java.Space{} })
 	RegisterFactory("org.openrewrite.marker.Markers", func() any { return java.Markers{} })

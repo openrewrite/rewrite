@@ -39,6 +39,9 @@ import (
 //  9. retracts (List<Retract>, ref-by-key)
 //
 // 10. resolvedDependencies (List<ResolvedDependency>, ref-by-key)
+// 11. buildList (List<GoModule>, ref-by-key)
+// 12. graph (List<GoModuleEdge>, ref-by-key)
+// 13. graphComplete (boolean)
 //
 // Each list element invokes its own rpcSend on the Java side; we mirror
 // the same field order in the per-element onChange callback.
@@ -110,6 +113,39 @@ func sendGoResolutionResult(m golang.GoResolutionResult, q *SendQueue) {
 			q.GetAndSend(d, func(y any) any { return emptyAsNil(y.(golang.GoResolvedDependency).ModuleHash) }, nil)
 			q.GetAndSend(d, func(y any) any { return emptyAsNil(y.(golang.GoResolvedDependency).GoModHash) }, nil)
 		})
+
+	q.GetAndSendListAsRef(m,
+		func(x any) []any { return moduleSlice(x.(golang.GoResolutionResult).BuildList) },
+		func(x any) any {
+			b := x.(golang.GoModule)
+			return b.ModulePath + "@" + b.Version
+		},
+		func(x any) {
+			b := x.(golang.GoModule)
+			q.GetAndSend(b, func(y any) any { return y.(golang.GoModule).ModulePath }, nil)
+			q.GetAndSend(b, func(y any) any { return y.(golang.GoModule).Version }, nil)
+			q.GetAndSend(b, func(y any) any { return emptyAsNil(y.(golang.GoModule).GoVersion) }, nil)
+			q.GetAndSend(b, func(y any) any { return y.(golang.GoModule).Main }, nil)
+			q.GetAndSend(b, func(y any) any { return emptyAsNil(y.(golang.GoModule).ModuleHash) }, nil)
+			q.GetAndSend(b, func(y any) any { return emptyAsNil(y.(golang.GoModule).GoModHash) }, nil)
+		})
+
+	q.GetAndSendListAsRef(m,
+		func(x any) []any { return edgeSlice(x.(golang.GoResolutionResult).Graph) },
+		func(x any) any {
+			e := x.(golang.GoModuleEdge)
+			return e.FromPath + "@" + e.FromVersion + "->" + e.ToPath + "@" + e.ToVersion
+		},
+		func(x any) {
+			e := x.(golang.GoModuleEdge)
+			q.GetAndSend(e, func(y any) any { return y.(golang.GoModuleEdge).FromPath }, nil)
+			q.GetAndSend(e, func(y any) any { return emptyAsNil(y.(golang.GoModuleEdge).FromVersion) }, nil)
+			q.GetAndSend(e, func(y any) any { return y.(golang.GoModuleEdge).ToPath }, nil)
+			q.GetAndSend(e, func(y any) any { return emptyAsNil(y.(golang.GoModuleEdge).ToVersion) }, nil)
+			q.GetAndSend(e, func(y any) any { return y.(golang.GoModuleEdge).Indirect }, nil)
+		})
+
+	q.GetAndSend(m, func(x any) any { return x.(golang.GoResolutionResult).GraphComplete }, nil)
 }
 
 // receiveGoResolutionResult mirrors Java's
@@ -131,7 +167,73 @@ func receiveGoResolutionResult(before golang.GoResolutionResult, q *ReceiveQueue
 	before.Excludes = recvExcludes(q, before.Excludes)
 	before.Retracts = recvRetracts(q, before.Retracts)
 	before.ResolvedDependencies = recvResolvedDeps(q, before.ResolvedDependencies)
+	before.BuildList = recvBuildList(q, before.BuildList)
+	before.Graph = recvGraph(q, before.Graph)
+	before.GraphComplete = receiveScalar[bool](q, before.GraphComplete)
 	return before
+}
+
+func recvBuildList(q *ReceiveQueue, before []golang.GoModule) []golang.GoModule {
+	afterAny := q.ReceiveList(moduleSlice(before), func(v any) any {
+		b := v.(golang.GoModule)
+		b.ModulePath = receiveScalar[string](q, b.ModulePath)
+		b.Version = receiveScalar[string](q, b.Version)
+		b.GoVersion = receiveNullableString(q, b.GoVersion)
+		b.Main = receiveScalar[bool](q, b.Main)
+		b.ModuleHash = receiveNullableString(q, b.ModuleHash)
+		b.GoModHash = receiveNullableString(q, b.GoModHash)
+		return b
+	})
+	if afterAny == nil {
+		return nil
+	}
+	out := make([]golang.GoModule, len(afterAny))
+	for i, v := range afterAny {
+		out[i] = v.(golang.GoModule)
+	}
+	return out
+}
+
+func recvGraph(q *ReceiveQueue, before []golang.GoModuleEdge) []golang.GoModuleEdge {
+	afterAny := q.ReceiveList(edgeSlice(before), func(v any) any {
+		e := v.(golang.GoModuleEdge)
+		e.FromPath = receiveScalar[string](q, e.FromPath)
+		e.FromVersion = receiveNullableString(q, e.FromVersion)
+		e.ToPath = receiveScalar[string](q, e.ToPath)
+		e.ToVersion = receiveNullableString(q, e.ToVersion)
+		e.Indirect = receiveScalar[bool](q, e.Indirect)
+		return e
+	})
+	if afterAny == nil {
+		return nil
+	}
+	out := make([]golang.GoModuleEdge, len(afterAny))
+	for i, v := range afterAny {
+		out[i] = v.(golang.GoModuleEdge)
+	}
+	return out
+}
+
+func moduleSlice(s []golang.GoModule) []any {
+	if s == nil {
+		return nil
+	}
+	out := make([]any, len(s))
+	for i, v := range s {
+		out[i] = v
+	}
+	return out
+}
+
+func edgeSlice(s []golang.GoModuleEdge) []any {
+	if s == nil {
+		return nil
+	}
+	out := make([]any, len(s))
+	for i, v := range s {
+		out[i] = v
+	}
+	return out
 }
 
 func recvRequires(q *ReceiveQueue, before []golang.GoRequire) []golang.GoRequire {

@@ -102,6 +102,24 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
      */
     List<ResolvedDependency> resolvedDependencies;
 
+    /**
+     * The MVS-selected version of every module in the resolved graph (including the main module).
+     * Mirrors {@code go list -m all}. Populated at parse time by the Go {@code modgraph} resolver.
+     */
+    List<GoModule> buildList;
+
+    /**
+     * Require edges between modules — the transitive graph the main module's go.mod alone does
+     * not contain. Mirrors {@code go mod graph}.
+     */
+    List<GoModuleEdge> graph;
+
+    /**
+     * Whether {@link #buildList}/{@link #graph} were fully resolved. False when the module cache
+     * or proxy could not be fully traversed; consumers then treat the graph as partial.
+     */
+    boolean graphComplete;
+
     public @Nullable Require findRequire(String module) {
         for (Require r : requires) {
             if (r.getModulePath().equals(module)) {
@@ -142,6 +160,13 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
         q.getAndSendListAsRef(after, r -> r.getResolvedDependencies() != null ? r.getResolvedDependencies() : emptyList(),
                 rd -> rd.getModulePath() + "@" + rd.getVersion(),
                 rd -> rd.rpcSend(rd, q));
+        q.getAndSendListAsRef(after, r -> r.getBuildList() != null ? r.getBuildList() : emptyList(),
+                m -> m.getModulePath() + "@" + m.getVersion(),
+                m -> m.rpcSend(m, q));
+        q.getAndSendListAsRef(after, r -> r.getGraph() != null ? r.getGraph() : emptyList(),
+                e -> e.getFromPath() + "@" + e.getFromVersion() + "->" + e.getToPath() + "@" + e.getToVersion(),
+                e -> e.rpcSend(e, q));
+        q.getAndSend(after, GoResolutionResult::isGraphComplete);
     }
 
     @Override
@@ -156,7 +181,10 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
                 .withReplaces(q.receiveList(before.replaces, r -> r.rpcReceive(r, q)))
                 .withExcludes(q.receiveList(before.excludes, r -> r.rpcReceive(r, q)))
                 .withRetracts(q.receiveList(before.retracts, r -> r.rpcReceive(r, q)))
-                .withResolvedDependencies(q.receiveList(before.resolvedDependencies, r -> r.rpcReceive(r, q)));
+                .withResolvedDependencies(q.receiveList(before.resolvedDependencies, r -> r.rpcReceive(r, q)))
+                .withBuildList(q.receiveList(before.buildList, m -> m.rpcReceive(m, q)))
+                .withGraph(q.receiveList(before.graph, e -> e.rpcReceive(e, q)))
+                .withGraphComplete(q.receive(before.graphComplete));
     }
 
     /**
@@ -310,6 +338,95 @@ public class GoResolutionResult implements Marker, RpcCodec<GoResolutionResult> 
                     .withVersion(q.receive(before.version))
                     .withModuleHash(q.receive(before.moduleHash))
                     .withGoModHash(q.receive(before.goModHash));
+        }
+    }
+
+    /**
+     * One node of the resolved module graph: a module at its MVS-selected version.
+     * {@link #moduleHash} (zip hash) is present only when the module's packages are
+     * actually imported; {@link #goModHash} is present for the whole build list.
+     */
+    @Value
+    @With
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+    public static class GoModule implements RpcCodec<GoModule> {
+        @ToString.Include
+        String modulePath;
+
+        /** Empty for the main module. */
+        String version;
+
+        /** The module's own {@code go} directive — drives go-directive bump. */
+        @Nullable String goVersion;
+
+        boolean main;
+
+        /** h1: zip hash from the cache; null when the module's zip was not downloaded. */
+        @Nullable String moduleHash;
+
+        /** h1: hash of the module's go.mod. */
+        @Nullable String goModHash;
+
+        @Override
+        public void rpcSend(GoModule after, RpcSendQueue q) {
+            q.getAndSend(after, GoModule::getModulePath);
+            q.getAndSend(after, GoModule::getVersion);
+            q.getAndSend(after, GoModule::getGoVersion);
+            q.getAndSend(after, GoModule::isMain);
+            q.getAndSend(after, GoModule::getModuleHash);
+            q.getAndSend(after, GoModule::getGoModHash);
+        }
+
+        @Override
+        public GoModule rpcReceive(GoModule before, RpcReceiveQueue q) {
+            return before
+                    .withModulePath(q.receive(before.modulePath))
+                    .withVersion(q.receive(before.version))
+                    .withGoVersion(q.receive(before.goVersion))
+                    .withMain(q.receive(before.main))
+                    .withModuleHash(q.receive(before.moduleHash))
+                    .withGoModHash(q.receive(before.goModHash));
+        }
+    }
+
+    /**
+     * A require edge {@code from -> to} in the resolved graph. {@link #indirect} reflects
+     * whether the require in {@code from}'s go.mod was {@code // indirect}.
+     */
+    @Value
+    @With
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+    public static class GoModuleEdge implements RpcCodec<GoModuleEdge> {
+        @ToString.Include
+        String fromPath;
+
+        /** Empty when the edge originates at the main module. */
+        @Nullable String fromVersion;
+
+        @ToString.Include
+        String toPath;
+
+        @Nullable String toVersion;
+
+        boolean indirect;
+
+        @Override
+        public void rpcSend(GoModuleEdge after, RpcSendQueue q) {
+            q.getAndSend(after, GoModuleEdge::getFromPath);
+            q.getAndSend(after, GoModuleEdge::getFromVersion);
+            q.getAndSend(after, GoModuleEdge::getToPath);
+            q.getAndSend(after, GoModuleEdge::getToVersion);
+            q.getAndSend(after, GoModuleEdge::isIndirect);
+        }
+
+        @Override
+        public GoModuleEdge rpcReceive(GoModuleEdge before, RpcReceiveQueue q) {
+            return before
+                    .withFromPath(q.receive(before.fromPath))
+                    .withFromVersion(q.receive(before.fromVersion))
+                    .withToPath(q.receive(before.toPath))
+                    .withToVersion(q.receive(before.toVersion))
+                    .withIndirect(q.receive(before.indirect));
         }
     }
 }

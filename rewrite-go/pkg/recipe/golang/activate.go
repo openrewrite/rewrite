@@ -33,4 +33,5 @@ func Activate(r *recipe.Registry) {
 	r.Register(&RemoveUnusedImports{}, golangCategory)
 	r.Register(&OrderImports{}, golangCategory)
 	r.Register(&RenamePackage{}, golangCategory)
+	r.Register(&GoModTidy{}, golangCategory)
 }

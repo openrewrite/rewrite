@@ -36,7 +36,16 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import org.openrewrite.HttpSenderExecutionContextView;
+import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.ipc.http.HttpUrlConnectionSender;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.PrintStream;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -62,6 +71,7 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc {
     private final JsonRpc jsonRpc;
+    private volatile @Nullable HttpSender httpSender;
     private final AtomicInteger batchSize = new AtomicInteger(1000);
     private Duration timeout = Duration.ofSeconds(30);
     private Supplier<? extends @Nullable RuntimeException> livenessCheck = () -> null;
@@ -233,7 +243,52 @@ public class RewriteRpc {
             }
         });
 
+        // Http: lets the RPC peer (e.g. the Go module-graph resolver fetching
+        // dependency go.mod files from a GOPROXY) perform an HTTP GET through
+        // the configured HttpSender, so proxy/auth/TLS are honored. Returns the
+        // status code and base64-encoded body.
+        jsonRpc.rpc("Http", new JsonRpcMethod<HttpRequest>() {
+            @Override
+            protected Object handle(HttpRequest request) {
+                HttpSender sender = httpSender != null ? httpSender : new HttpUrlConnectionSender();
+                Map<String, Object> out = new HashMap<>();
+                try (HttpSender.Response response = sender.get(request.url).send()) {
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    try (InputStream in = response.getBody()) {
+                        byte[] buf = new byte[8192];
+                        for (int n; (n = in.read(buf)) != -1; ) {
+                            bos.write(buf, 0, n);
+                        }
+                    }
+                    out.put("status", response.getCode());
+                    out.put("body", Base64.getEncoder().encodeToString(bos.toByteArray()));
+                } catch (Exception e) {
+                    out.put("status", 0);
+                    out.put("body", "");
+                }
+                return out;
+            }
+        });
+
         jsonRpc.bind();
+    }
+
+    /**
+     * Configure the {@link HttpSender} used by the {@code Http} RPC method.
+     * Typically set from a parse/recipe ExecutionContext so the peer's HTTP
+     * fetches use the CLI-configured sender (proxy, auth, TLS).
+     */
+    public RewriteRpc setHttpSender(@Nullable HttpSender httpSender) {
+        this.httpSender = httpSender;
+        return this;
+    }
+
+    /**
+     * Request body for the {@code Http} RPC method.
+     */
+    static class HttpRequest {
+        public String url;
+        public @Nullable String method;
     }
 
     public RewriteRpc livenessCheck(Supplier<? extends @Nullable RuntimeException> livenessCheck) {
@@ -286,7 +341,20 @@ public class RewriteRpc {
         return visit(sourceFile, visitorName, p, null);
     }
 
+    // Make the HttpSender from the current operation's ExecutionContext available
+    // to the peer's Http RPC method (e.g. the Go module-graph resolver fetching
+    // from a GOPROXY at recipe time).
+    private void setHttpSenderFrom(@Nullable Object p) {
+        if (p instanceof ExecutionContext) {
+            HttpSender sender = HttpSenderExecutionContextView.view((ExecutionContext) p).getHttpSender();
+            if (sender != null) {
+                this.httpSender = sender;
+            }
+        }
+    }
+
     public <P> @Nullable Tree visit(Tree tree, String visitorName, P p, @Nullable Cursor cursor) {
+        setHttpSenderFrom(p);
         // Set the local state of this tree, so that when the remote asks for it, we know what to send.
         localObjects.put(tree.getId().toString(), tree);
 
@@ -307,6 +375,7 @@ public class RewriteRpc {
 
     public <P> BatchVisitResponse batchVisit(Tree tree, P p, @Nullable Cursor cursor,
                                              List<BatchVisit.BatchVisitItem> visitors) {
+        setHttpSenderFrom(p);
         String treeId = tree.getId().toString();
         localObjects.put(treeId, tree);
 
@@ -324,6 +393,7 @@ public class RewriteRpc {
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
+        setHttpSenderFrom(ctx);
         String ctxId = maybeUnwrapExecutionContext(ctx);
         GenerateResponse response = RewriteRpcExecutionContextView.view(ctx).withInFlightSlot(() ->
                 send("Generate", new Generate(remoteRecipeId, ctxId), GenerateResponse.class));
