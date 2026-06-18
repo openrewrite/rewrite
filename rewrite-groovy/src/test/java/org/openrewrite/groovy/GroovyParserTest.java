@@ -460,4 +460,17 @@ class GroovyParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void notInstanceOfOperator() {
+        rewriteRun(
+          groovy(
+            """
+              if (a !instanceof B) {
+              }
+              """
+          )
+        );
+    }
+
 }
