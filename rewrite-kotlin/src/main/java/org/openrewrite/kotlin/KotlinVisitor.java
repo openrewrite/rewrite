@@ -386,12 +386,12 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             //noinspection ConstantConditions
             return null;
         }
-        setCursor(new Cursor(getCursor(), container));
+        pushCursor(container);
 
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
         List<JRightPadded<J2>> js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
 
-        setCursor(getCursor().getParent());
+        popCursor();
 
         return js == container.getPadding().getElements() && before == container.getBefore() ?
                 container :
@@ -404,7 +404,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             return null;
         }
 
-        setCursor(new Cursor(getCursor(), left));
+        pushCursor(left);
 
         Space before = visitSpace(left.getBefore(), loc.getBeforeLocation(), p);
         T t = left.getElement();
@@ -414,7 +414,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             t = visitAndCast((J) left.getElement(), p);
         }
 
-        setCursor(getCursor().getParent());
+        popCursor();
         if (t == null) {
             // If nothing changed leave AST node the same
             if (left.getElement() == null && before == left.getBefore()) {
@@ -433,7 +433,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             return null;
         }
 
-        setCursor(new Cursor(getCursor(), right));
+        pushCursor(right);
 
         T t = right.getElement();
         if (t instanceof J) {
@@ -441,7 +441,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             t = visitAndCast((J) right.getElement(), p);
         }
 
-        setCursor(getCursor().getParent());
+        popCursor();
         if (t == null) {
             //noinspection ConstantConditions
             return null;

@@ -91,9 +91,9 @@ public class GoModVisitor<P> extends TreeVisitor<GoModTree, P> {
         if (right == null) {
             return null;
         }
-        setCursor(new Cursor(getCursor(), right));
+        pushCursor(right);
         T t = visitAndCast(right.getElement(), p);
-        setCursor(getCursor().getParent());
+        popCursor();
         if (t == null) {
             return null;
         }

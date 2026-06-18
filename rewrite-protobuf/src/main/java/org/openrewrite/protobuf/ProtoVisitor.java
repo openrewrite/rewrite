@@ -256,12 +256,12 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
             return null;
         }
 
-        setCursor(new Cursor(getCursor(), container));
+        pushCursor(container);
 
         Space before = visitSpace(container.getBefore(), p);
         List<ProtoRightPadded<P2>> ps = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, p));
 
-        setCursor(getCursor().getParent());
+        popCursor();
 
         return ps == container.getPadding().getElements() && before == container.getBefore() ?
                 container :
@@ -269,7 +269,7 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
     }
 
     public <T> @Nullable ProtoLeftPadded<T> visitLeftPadded(ProtoLeftPadded<T> left, P p) {
-        setCursor(new Cursor(getCursor(), left));
+        pushCursor(left);
 
         Space before = visitSpace(left.getBefore(), p);
         T t = left.getElement();
@@ -279,7 +279,7 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
             t = visitAndCast((Proto) left.getElement(), p);
         }
 
-        setCursor(getCursor().getParent());
+        popCursor();
         if (t == null) {
             //noinspection ConstantConditions
             return null;
@@ -295,7 +295,7 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
             return null;
         }
 
-        setCursor(new Cursor(getCursor(), right));
+        pushCursor(right);
 
         T t = right.getElement();
         if (t instanceof Proto) {
@@ -303,7 +303,7 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
             t = (T) visit((Proto) right.getElement(), p);
         }
 
-        setCursor(getCursor().getParent());
+        popCursor();
         if (t == null) {
             //noinspection ConstantConditions
             return null;

@@ -30,6 +30,21 @@ public class TreeVisitorAdapter {
     private static final Integer classCreationLock = 1;
     private static final Map<ClassLoader, TreeVisitorAdapterClassLoader> classLoaders = new IdentityHashMap<>();
 
+    /**
+     * {@link TreeVisitor#shareCursorWith(TreeVisitor)} is package-private (not public API); resolve it once and
+     * make it accessible so the adapted proxy can be wired to share the delegate's lazy cursor stack.
+     */
+    private static final Method SHARE_CURSOR_WITH;
+
+    static {
+        try {
+            SHARE_CURSOR_WITH = TreeVisitor.class.getDeclaredMethod("shareCursorWith", TreeVisitor.class);
+            SHARE_CURSOR_WITH.setAccessible(true);
+        } catch (NoSuchMethodException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
     private TreeVisitorAdapter() {
     }
 
@@ -196,6 +211,11 @@ public class TreeVisitorAdapter {
                 copyMixinInstanceFields(mixin, adapted);
             }
             a.getDeclaredMethod("setDelegate", delegateType).invoke(adapted, delegate);
+            // Share a single lazy cursor stack between the proxy and its delegate. The proxy's inherited visit()
+            // drives pushCursor/popCursor; forwarding those (and getCursor) to the delegate keeps both views
+            // consistent and preserves laziness, instead of materializing a Cursor per node via setCursor sync.
+            // shareCursorWith is package-private (not public API), so it is invoked reflectively.
+            SHARE_CURSOR_WITH.invoke(adapted, delegate);
             return adapted;
         } catch (InvocationTargetException | NoSuchMethodException | InstantiationException | IllegalAccessException |
                  ClassNotFoundException e) {

@@ -383,7 +383,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
     }
 
     public <T> @Nullable HclLeftPadded<T> visitLeftPadded(HclLeftPadded<T> left, HclLeftPadded.Location loc, P p) {
-        setCursor(new Cursor(getCursor(), left));
+        pushCursor(left);
 
         Space before = visitSpace(left.getBefore(), loc.getBeforeLocation(), p);
         T t = left.getElement();
@@ -393,7 +393,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
             t = visitAndCast((Hcl) left.getElement(), p);
         }
 
-        setCursor(getCursor().getParent());
+        popCursor();
         if (t == null) {
             //noinspection ConstantConditions
             return null;
@@ -408,7 +408,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
             return null;
         }
 
-        setCursor(new Cursor(getCursor(), right));
+        pushCursor(right);
 
         T t = right.getElement();
         if (t instanceof Hcl) {
@@ -416,7 +416,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
             t = visitAndCast((Hcl) right.getElement(), p);
         }
 
-        setCursor(getCursor().getParent());
+        popCursor();
         if (t == null) {
             //noinspection ConstantConditions
             return null;
@@ -427,12 +427,12 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
 
     public <H extends Hcl> HclContainer<H> visitContainer(HclContainer<H> container,
                                                           HclContainer.Location loc, P p) {
-        setCursor(new Cursor(getCursor(), container));
+        pushCursor(container);
 
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
         List<HclRightPadded<H>> js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
 
-        setCursor(getCursor().getParent());
+        popCursor();
 
         return js == container.getPadding().getElements() && before == container.getBefore() ?
                 container :

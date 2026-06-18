@@ -126,7 +126,7 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
             return null;
         }
 
-        setCursor(new Cursor(getCursor(), right));
+        pushCursor(right);
 
         T t = right.getElement();
         if (t instanceof Json) {
@@ -134,7 +134,7 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
             t = (T) visit((Json) right.getElement(), p);
         }
 
-        setCursor(getCursor().getParent());
+        popCursor();
         if (t == null) {
             //noinspection ConstantConditions
             return null;

@@ -95,7 +95,7 @@ public class TomlVisitor<P> extends TreeVisitor<Toml, P> {
             return null;
         }
 
-        setCursor(new Cursor(getCursor(), right));
+        pushCursor(right);
 
         T t = right.getElement();
         if (t instanceof Toml) {
@@ -103,7 +103,7 @@ public class TomlVisitor<P> extends TreeVisitor<Toml, P> {
             t = visitAndCast((Toml) right.getElement(), p);
         }
 
-        setCursor(getCursor().getParent());
+        popCursor();
         if (t == null) {
             //noinspection ConstantConditions
             return null;
