@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
@@ -99,7 +100,7 @@ public class ChangeType extends Recipe {
                         return used;
                     }
                     if (!Boolean.TRUE.equals(ignoreDefinition) &&
-                            mayContainDefinition(cu, normalizedOldName, getCursor()) &&
+                            mayContainDefinition(cu, normalizedOldName) &&
                             containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
                     }
@@ -786,7 +787,7 @@ public class ChangeType extends Recipe {
         public J.@Nullable Package visitPackage(J.Package pkg, ExecutionContext ctx) {
             Boolean updatePackage = getCursor().pollNearestMessage("UPDATE_PACKAGE");
             if (updatePackage != null && updatePackage) {
-                String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
+                String original = PackageNameUtils.getPackageName(pkg);
                 if (original.equals(originalType.getPackageName())) {
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
                     if (fq != null) {
@@ -901,7 +902,7 @@ public class ChangeType extends Recipe {
      *
      * @param normalizedOldName the old fully qualified type name with {@code $} normalized to {@code .}
      */
-    private static boolean mayContainDefinition(JavaSourceFile sourceFile, String normalizedOldName, Cursor cursor) {
+    private static boolean mayContainDefinition(JavaSourceFile sourceFile, String normalizedOldName) {
         if (!(sourceFile instanceof J.CompilationUnit)) {
             return true;
         }
@@ -910,10 +911,9 @@ public class ChangeType extends Recipe {
             // Default package: can't cheaply rule out a declaration here, so scan.
             return true;
         }
-        String filePackage = packageDeclaration.getExpression().printTrimmed(cursor).replaceAll("\\s", "");
         // The declared type's package equals the file's, so the old name must begin with the file's
-        // package. Prefix-only: never rejects a file that actually declares the type.
-        return filePackage.isEmpty() || normalizedOldName.startsWith(filePackage + ".");
+        // package. The prefix check never rejects a file that actually declares the type.
+        return PackageNameUtils.isPrefixOf(packageDeclaration, normalizedOldName);
     }
 
     public static boolean containsClassDefinition(JavaSourceFile sourceFile, String fullyQualifiedTypeName) {
