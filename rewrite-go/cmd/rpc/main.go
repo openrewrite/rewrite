@@ -1180,6 +1180,26 @@ func (s *server) handleGetMarketplace(params json.RawMessage) (any, *rpcError) {
 // wire-format marketplaceDescriptor expected by Java. Recursive fields
 // (recipeList, preconditions) are populated. Cycle protection is handled
 // upstream by recipe.Describe.
+// delegateDescriptor builds a minimal stand-in descriptor for a recipe the host will resolve
+// locally via the delegatesTo response. The host reads only delegatesTo for delegated recipes
+// and ignores this descriptor, but the response type requires one.
+func delegateDescriptor(name string) marketplaceDescriptor {
+	return marketplaceDescriptor{
+		Name:          name,
+		DisplayName:   name,
+		InstanceName:  name,
+		Description:   "",
+		Tags:          []string{},
+		Options:       []marketplaceOption{},
+		Preconditions: []marketplaceDescriptor{},
+		RecipeList:    []marketplaceDescriptor{},
+		DataTables:    []any{},
+		Maintainers:   []any{},
+		Contributors:  []any{},
+		Examples:      []any{},
+	}
+}
+
 func marketplaceDescriptorFromRecipe(desc recipe.RecipeDescriptor) marketplaceDescriptor {
 	options := make([]marketplaceOption, 0, len(desc.Options))
 	for _, opt := range desc.Options {
@@ -1357,7 +1377,27 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 
 	reg, ok := s.registry.FindRecipe(req.ID)
 	if !ok {
-		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("Unknown recipe: %s", req.ID)}
+		// The host re-prepares every sub-recipe of a composite by id while building
+		// RpcRecipe.getRecipeList(). A sub-recipe that delegates to a Java recipe is not
+		// registered here, so a miss means the host owns this recipe: answer with delegatesTo
+		// so the host resolves the id locally (the Java recipe is on its classpath) rather than
+		// failing with "Unknown recipe".
+		options := req.Options
+		if options == nil {
+			options = map[string]any{}
+		}
+		recipeID := uuid.New().String()
+		return prepareRecipeResponse{
+			ID:                recipeID,
+			Descriptor:        delegateDescriptor(req.ID),
+			EditVisitor:       "edit:" + recipeID,
+			EditPreconditions: []any{},
+			ScanPreconditions: []any{},
+			DelegatesTo: &delegatesToResponse{
+				RecipeName: req.ID,
+				Options:    options,
+			},
+		}, nil
 	}
 
 	// Create recipe instance with options

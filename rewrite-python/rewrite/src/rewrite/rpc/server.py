@@ -1082,6 +1082,26 @@ def _category_descriptor_to_dict(descriptor) -> dict:
     }
 
 
+def _delegate_descriptor(name: str) -> dict:
+    """Minimal stand-in descriptor for a recipe the host resolves locally via a delegatesTo
+    response. The host reads only delegatesTo for delegated recipes and ignores this descriptor,
+    but the response shape requires one."""
+    return {
+        'name': name,
+        'displayName': name,
+        'description': '',
+        'tags': [],
+        'estimatedEffortPerOccurrence': None,
+        'options': [],
+        'preconditions': [],
+        'recipeList': [],
+        'dataTables': [],
+        'maintainers': [],
+        'contributors': [],
+        'examples': [],
+    }
+
+
 def _recipe_descriptor_to_dict(descriptor) -> dict:
     """Convert a RecipeDescriptor to a dict for JSON serialization."""
     return {
@@ -1241,7 +1261,24 @@ def handle_prepare_recipe(params: dict) -> dict:
     # Look up the recipe - returns (RecipeDescriptor, Type[Recipe]) tuple
     recipe_info = marketplace.find_recipe(recipe_name)
     if recipe_info is None:
-        raise ValueError(f"Recipe not found: {recipe_name}")
+        # The host re-prepares every sub-recipe of a composite by id while building
+        # RpcRecipe.getRecipeList(). A sub-recipe that delegates to a Java recipe and was not
+        # captured in _delegating_recipes is not in this marketplace, so a miss means the host
+        # owns this recipe: answer with a delegatesTo response so the JVM resolves the id locally
+        # (the Java recipe is on its classpath), rather than failing with "Recipe not found".
+        prepared_id = generate_id()
+        return {
+            'id': prepared_id,
+            'descriptor': _delegate_descriptor(recipe_name),
+            'editVisitor': f'edit:{prepared_id}',
+            'editPreconditions': [],
+            'scanVisitor': None,
+            'scanPreconditions': [],
+            'delegatesTo': {
+                'recipeName': recipe_name,
+                'options': options,
+            },
+        }
 
     _descriptor, recipe_class = recipe_info
     if recipe_class is None:

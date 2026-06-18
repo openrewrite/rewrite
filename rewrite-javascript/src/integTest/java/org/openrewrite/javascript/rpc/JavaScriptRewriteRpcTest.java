@@ -23,15 +23,24 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
+import org.openrewrite.config.Environment;
+import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
+import org.openrewrite.javascript.UpgradeDependencyVersion;
 import org.openrewrite.javascript.style.Autodetect;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeBundleReader;
+import org.openrewrite.marketplace.RecipeBundleResolver;
+import org.openrewrite.marketplace.RecipeListing;
+import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.rpc.RpcRecipe;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -618,6 +627,82 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             )
           )
         );
+    }
+
+    /**
+     * A JS composite whose {@code recipeList()} contains a recipe that delegates to a Java recipe
+     * (the shape of Angular's {@code UpgradeToAngular19}). The host re-prepares each child by id while
+     * building {@code RpcRecipe.getRecipeList()}; the Java-delegate child misses in the JS marketplace,
+     * so the JS server must answer {@code delegatesTo} (rather than throwing "Could not find recipe
+     * with id ...") and the host resolves it from its own marketplace as a LOCAL Java recipe.
+     * <p>
+     * The host (this JVM) is configured with a runtime-classpath marketplace + resolver that owns its
+     * bundled {@code org.openrewrite.javascript.*} recipes — mirroring the moderne-cli concession.
+     */
+    @Test
+    void jsCompositeWithJavaDelegateChild() {
+        Environment env = Environment.builder().scanRuntimeClasspath("org.openrewrite.javascript").build();
+        RecipeMarketplace marketplace = env.toMarketplace(RecipeBundle.runtimeClasspath());
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .marketplace(marketplace)
+          .resolvers(List.of(new RuntimeClasspathResolver(marketplace)))
+          .log(tempDir.resolve("rpc.log")));
+
+        assertThat(client().installRecipes(new File("rewrite/dist-fixtures/composite-with-java-delegate.js"))
+          .getRecipesInstalled()).isGreaterThan(0);
+
+        Recipe composite = client().prepareRecipe("org.openrewrite.example.npm.composite-with-java-delegate");
+
+        Recipe delegate = composite.getRecipeList().stream()
+          .filter(r -> "org.openrewrite.javascript.UpgradeDependencyVersion".equals(r.getName()))
+          .findFirst()
+          .orElseThrow(() -> new AssertionError("expected an org.openrewrite.javascript.UpgradeDependencyVersion child"));
+        assertThat(delegate)
+          .isInstanceOf(UpgradeDependencyVersion.class)
+          .isNotInstanceOf(RpcRecipe.class);
+    }
+
+    /**
+     * A runtime-classpath {@link RecipeBundleResolver} that materializes a bundled recipe by id straight
+     * off the JVM classpath, mirroring the moderne-cli {@code RuntimeClasspathRecipeBundleResolver}.
+     */
+    private static class RuntimeClasspathResolver implements RecipeBundleResolver {
+        private final RecipeMarketplace marketplace;
+
+        RuntimeClasspathResolver(RecipeMarketplace marketplace) {
+            this.marketplace = marketplace;
+        }
+
+        @Override
+        public String getEcosystem() {
+            return "runtime";
+        }
+
+        @Override
+        public RecipeBundleReader resolve(RecipeBundle bundle) {
+            return new RecipeBundleReader() {
+                @Override
+                public RecipeBundle getBundle() {
+                    return bundle;
+                }
+
+                @Override
+                public RecipeMarketplace read() {
+                    return marketplace;
+                }
+
+                @Override
+                public RecipeDescriptor describe(RecipeListing listing) {
+                    return new RecipeLoader(null).load(listing.getName(), Map.of()).getDescriptor();
+                }
+
+                @Override
+                public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
+                    return new RecipeLoader(null).load(listing.getName(), options);
+                }
+            };
+        }
     }
 
     /**
