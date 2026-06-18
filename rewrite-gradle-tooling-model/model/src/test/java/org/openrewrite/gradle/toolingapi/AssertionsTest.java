@@ -218,4 +218,35 @@ class AssertionsTest implements RewriteTest {
           buildGradle("", spec -> spec.path("subproject2/build.gradle"))
         );
     }
+
+    @Test
+    void multimoduleResolvesAgainstBuildRoot() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://downloads.gradle.org/distributions/gradle-9.5.1-bin.zip"))),
+          //language=groovy
+          settingsGradle(
+            """
+              rootProject.name = 'test'
+              include 'web'
+              include 'ear'
+              """
+          ),
+          buildGradle(
+            """
+              apply plugin: 'java'
+              """,
+            spec -> spec.path("web/build.gradle")
+          ),
+          buildGradle(
+            """
+              apply plugin: 'java'
+              
+              dependencies {
+                implementation project(path: ':web', configuration: 'archives')
+              }
+              """,
+            spec -> spec.path("ear/build.gradle")
+          )
+        );
+    }
 }
