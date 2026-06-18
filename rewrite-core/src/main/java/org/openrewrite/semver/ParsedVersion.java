@@ -17,8 +17,6 @@ package org.openrewrite.semver;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 
@@ -53,13 +51,7 @@ final class ParsedVersion {
      */
     private static final int MAX_CACHE_SIZE = 4_096;
 
-    private static final Map<String, ParsedVersion> CACHE = Collections.synchronizedMap(
-            new LinkedHashMap<String, ParsedVersion>(256, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, ParsedVersion> eldest) {
-                    return size() > MAX_CACHE_SIZE;
-                }
-            });
+    private static final Map<String, ParsedVersion> CACHE = LruCache.bounded(MAX_CACHE_SIZE);
 
     private static final ParsedVersion NO_MATCH = new ParsedVersion(false, null, null, false);
 
