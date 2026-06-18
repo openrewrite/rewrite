@@ -99,7 +99,7 @@ public class ChangeType extends Recipe {
                         return used;
                     }
                     if (!Boolean.TRUE.equals(ignoreDefinition) &&
-                            mayContainDefinition(cu, normalizedOldName, getCursor()) &&
+                            mayContainDefinition(cu, normalizedOldName) &&
                             containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
                     }
@@ -901,7 +901,7 @@ public class ChangeType extends Recipe {
      *
      * @param normalizedOldName the old fully qualified type name with {@code $} normalized to {@code .}
      */
-    private static boolean mayContainDefinition(JavaSourceFile sourceFile, String normalizedOldName, Cursor cursor) {
+    private static boolean mayContainDefinition(JavaSourceFile sourceFile, String normalizedOldName) {
         if (!(sourceFile instanceof J.CompilationUnit)) {
             return true;
         }
@@ -910,10 +910,51 @@ public class ChangeType extends Recipe {
             // Default package: can't cheaply rule out a declaration here, so scan.
             return true;
         }
-        String filePackage = packageDeclaration.getExpression().printTrimmed(cursor).replaceAll("\\s", "");
         // The declared type's package equals the file's, so the old name must begin with the file's
-        // package. Prefix-only: never rejects a file that actually declares the type.
-        return filePackage.isEmpty() || normalizedOldName.startsWith(filePackage + ".");
+        // package. Rather than printing the package name and comparing strings, walk the name tree
+        // and match it against the old name segment by segment, short-circuiting as soon as a segment
+        // diverges. Prefix-only: never rejects a file that actually declares the type.
+        int matched = matchPackagePrefix(packageDeclaration.getExpression(), normalizedOldName);
+        // A definitive mismatch is the only case where the scan can be skipped; a matched prefix or an
+        // expression we couldn't interpret both fall through to the scan.
+        return matched != PACKAGE_MISMATCH;
+    }
+
+    /** The package is definitively not a prefix of the old name, so the definition scan can be skipped. */
+    private static final int PACKAGE_MISMATCH = -1;
+    /** The package expression couldn't be interpreted, so the definition scan must run to be safe. */
+    private static final int PACKAGE_UNKNOWN = -2;
+
+    /**
+     * Matches the package described by {@code expression} against the leading segments of
+     * {@code normalizedOldName}, returning the offset just past the matched prefix (including its
+     * trailing {@code '.'}), or {@link #PACKAGE_MISMATCH} / {@link #PACKAGE_UNKNOWN}. The name tree is
+     * structured outermost-first, so recursion descends to the leftmost segment and matches on the way
+     * back up, comparing in left-to-right order without building an intermediate string.
+     */
+    private static int matchPackagePrefix(Expression expression, String normalizedOldName) {
+        String segment;
+        int start;
+        if (expression instanceof J.Identifier) {
+            segment = ((J.Identifier) expression).getSimpleName();
+            start = 0;
+        } else if (expression instanceof J.FieldAccess) {
+            J.FieldAccess fieldAccess = (J.FieldAccess) expression;
+            start = matchPackagePrefix(fieldAccess.getTarget(), normalizedOldName);
+            if (start < 0) {
+                return start; // propagate mismatch / unknown
+            }
+            segment = fieldAccess.getSimpleName();
+        } else {
+            return PACKAGE_UNKNOWN;
+        }
+        int end = start + segment.length();
+        if (end < normalizedOldName.length() &&
+                normalizedOldName.charAt(end) == '.' &&
+                normalizedOldName.regionMatches(start, segment, 0, segment.length())) {
+            return end + 1;
+        }
+        return PACKAGE_MISMATCH;
     }
 
     public static boolean containsClassDefinition(JavaSourceFile sourceFile, String fullyQualifiedTypeName) {
