@@ -761,22 +761,42 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
+         * Whether Pyroscope profiling has been requested for the RPC subprocess, via
+         * either the configured builder environment or the inherited process environment.
+         * Drives whether the heavier, registry-only {@code [profiling]} extra is installed
+         * alongside the base engine.
+         */
+        private boolean isProfilingRequested() {
+            String fromBuilder = environment.get("PYROSCOPE_SERVER_ADDRESS");
+            if (fromBuilder != null && !fromBuilder.trim().isEmpty()) {
+                return true;
+            }
+            String fromProcess = System.getenv("PYROSCOPE_SERVER_ADDRESS");
+            return fromProcess != null && !fromProcess.trim().isEmpty();
+        }
+
+        /**
          * Installs the pinned openrewrite package into the given pip packages directory.
          */
         private void bootstrapOpenrewrite(Path pythonPath, Path pipPackagesPath, String version) {
             try {
                 Files.createDirectories(pipPackagesPath);
 
-                // Install with the [profiling] extra so pyroscope-io is available when
-                // PYROSCOPE_SERVER_ADDRESS is set in the rpc subprocess environment. The
-                // SDK init in rewrite.rpc.server is a no-op when the env var is unset, so
-                // adding the extra costs nothing for non-profiled deployments.
+                // Install the lean engine by default. The [profiling] extra pulls in
+                // pyroscope-io and its transitive (often native) dependencies, which most
+                // deployments never use; request it only when PYROSCOPE_SERVER_ADDRESS is
+                // set — the same signal the SDK init in rewrite.rpc.server gates on. The env
+                // var may arrive through either the configured builder environment or the
+                // inherited process environment, so check both. Keeping the default install
+                // free of the profiling deps makes it resolvable from a restricted or offline
+                // package source and keeps those extra packages off the parse path.
+                String packageSpec = (isProfilingRequested() ? "openrewrite[profiling]==" : "openrewrite==") + version;
                 ProcessBuilder pb = new ProcessBuilder(
                         pythonPath.toString(),
                         "-m", "pip", "install",
                         "--upgrade",
                         "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
-                        "openrewrite[profiling]==" + version
+                        packageSpec
                 );
                 pb.environment().putAll(environment);
                 pb.redirectErrorStream(true);
@@ -796,12 +816,12 @@ public class PythonRewriteRpc extends RewriteRpc {
 
                 if (!completed) {
                     process.destroyForcibly();
-                    throw new RuntimeException("Timed out bootstrapping openrewrite==" + version);
+                    throw new RuntimeException("Timed out bootstrapping " + packageSpec);
                 }
 
                 int exitCode = process.exitValue();
                 if (exitCode != 0) {
-                    String message = "Failed to install openrewrite==" + version +
+                    String message = "Failed to install " + packageSpec +
                             " (pip exited with code " + exitCode + ")";
                     if (!pipOutput.isEmpty()) {
                         message += ":\n" + pipOutput.trim();

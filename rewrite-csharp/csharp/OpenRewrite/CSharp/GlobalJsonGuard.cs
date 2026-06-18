@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using LibGit2Sharp;
 using OpenRewrite.Core;
 using Serilog;
 
@@ -162,28 +161,21 @@ internal sealed class GlobalJsonGuard : IDisposable
     {
         try
         {
-            var gitDir = Repository.Discover(rootDir);
-            if (gitDir == null)
+            var workDir = GitCli.DiscoverWorkTree(rootDir);
+            if (workDir == null)
                 return; // Not inside a git repository — nothing to recover.
 
-            using var repo = new Repository(gitDir);
-            var head = repo.Head.Tip;
-            if (head == null)
+            if (!GitCli.HasHead(workDir))
                 return; // Unborn branch (no commits) — nothing is tracked yet.
 
-            var workDir = repo.Info.WorkingDirectory;
             var normRoot = RealPath(rootDir);
 
-            // Walk the index (tracked files) rather than scanning the whole working tree: there
-            // are only ever a handful of global.json files, and we touch disk solely to check
-            // whether each is missing. This mirrors `git ls-files --deleted` filtered to
-            // global.json, without a full status scan.
-            foreach (var entry in repo.Index)
+            // List the tracked global.json files (mirrors `git ls-files` filtered to
+            // global.json) rather than scanning the whole working tree: there are only ever a
+            // handful, and we touch disk solely to check whether each is missing.
+            foreach (var rel in GitCli.ListTrackedByName(workDir, FileName))
             {
-                if (!string.Equals(Path.GetFileName(entry.Path), FileName, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var full = RealPath(Path.Combine(workDir, entry.Path));
+                var full = RealPath(Path.Combine(workDir, rel));
 
                 // Only recover files under the directory we were asked to guard.
                 if (!IsUnder(full, normRoot))
@@ -199,9 +191,8 @@ internal sealed class GlobalJsonGuard : IDisposable
                 }
 
                 // Force-restore the committed version into the working tree.
-                repo.CheckoutPaths(head.Sha, new[] { entry.Path },
-                    new CheckoutOptions { CheckoutModifiers = CheckoutModifiers.Force });
-                Log.Debug("global.json: recovered {Path} from git (left deleted by a prior run)", full);
+                if (GitCli.RestoreFromHead(workDir, rel))
+                    Log.Debug("global.json: recovered {Path} from git (left deleted by a prior run)", full);
             }
         }
         catch (Exception ex)
