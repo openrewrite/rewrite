@@ -2054,6 +2054,102 @@ class SpacesTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/8053")
+    @Test
+    void beforeLeftBraceArrayInitializerTrueDoesNotAffectAnnotationArrayInitializer() {
+        rewriteRun(
+          spaces(style -> style.withBeforeLeftBrace(style.getBeforeLeftBrace()
+            .withArrayInitializerLeftBrace(true)
+            .withAnnotationArrayInitializerLeftBrace(false))),
+          java(
+            """
+              import java.lang.annotation.*;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @interface Produces {
+                  String[] value();
+              }
+
+              class A {
+                  @Produces({"a", "b"})
+                  public void getByUuid() {
+                  }
+
+                  public void foo() {
+                      int[] arr = new int[]{1, 2, 3};
+                  }
+              }
+              """,
+            """
+              import java.lang.annotation.*;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @interface Produces {
+                  String[] value();
+              }
+
+              class A {
+                  @Produces({"a", "b"})
+                  public void getByUuid() {
+                  }
+
+                  public void foo() {
+                      int[] arr = new int[] {1, 2, 3};
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8053")
+    @Test
+    void beforeLeftBraceAnnotationArrayInitializerTrueAddsSpace() {
+        rewriteRun(
+          spaces(style -> style.withBeforeLeftBrace(style.getBeforeLeftBrace()
+            .withArrayInitializerLeftBrace(false)
+            .withAnnotationArrayInitializerLeftBrace(true))),
+          java(
+            """
+              import java.lang.annotation.*;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @interface Produces {
+                  String[] value();
+              }
+
+              class A {
+                  @Produces({"a", "b"})
+                  public void getByUuid() {
+                  }
+
+                  public void foo() {
+                      int[] arr = new int[]{1, 2, 3};
+                  }
+              }
+              """,
+            """
+              import java.lang.annotation.*;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @interface Produces {
+                  String[] value();
+              }
+
+              class A {
+                  @Produces( {"a", "b"})
+                  public void getByUuid() {
+                  }
+
+                  public void foo() {
+                      int[] arr = new int[]{1, 2, 3};
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void beforeKeywordsElseKeywordFalse() {
         rewriteRun(
