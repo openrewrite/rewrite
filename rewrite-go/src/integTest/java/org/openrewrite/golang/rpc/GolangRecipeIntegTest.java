@@ -372,8 +372,8 @@ class GolangRecipeIntegTest implements RewriteTest {
 
               import "fmt"
 
-              func main() {/*~~>*/
-              \tfmt.Println("hello")
+              func main() {
+              \t/*~~>*/fmt.Println("hello")
               }
               """
           )
