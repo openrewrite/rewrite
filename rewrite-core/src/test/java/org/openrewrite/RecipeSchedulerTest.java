@@ -41,10 +41,12 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
@@ -261,6 +263,31 @@ class RecipeSchedulerTest implements RewriteTest {
 
         assertThat(beforeContents).containsExactlyInAnyOrder("a", "b");
         assertThat(afterContents).containsExactlyInAnyOrder("modified:a", "modified:b");
+    }
+
+    @Test
+    void firesRecipeTimeoutWhenCycleExceedsRunTimeout() {
+        AtomicReference<Throwable> timedOut = new AtomicReference<>();
+        var ctx = new InMemoryExecutionContext(
+          t -> {
+          },
+          Duration.ZERO,
+          (t, c) -> timedOut.set(t));
+        rewriteRun(
+          spec -> spec
+            .executionContext(ctx)
+            .recipe(toRecipe(() -> new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    return text.withText("changed");
+                }
+            })),
+          // No "after": a zero run timeout fires before any edit, so the file is left unchanged.
+          text("hello")
+        );
+        assertThat(timedOut.get())
+          .as("onTimeout should be invoked with a RecipeTimeoutException once the cycle exceeds the run timeout")
+          .isInstanceOf(RecipeTimeoutException.class);
     }
 
     @Test
