@@ -21,6 +21,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
@@ -87,8 +88,7 @@ public class ChangePackage extends Recipe {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
                     if (cu.getPackageDeclaration() != null) {
-                        String original = cu.getPackageDeclaration().getExpression()
-                                .printTrimmed(getCursor()).replaceAll("\\s", "");
+                        String original = PackageNameUtils.getPackageName(cu.getPackageDeclaration());
                         if (original.startsWith(oldPackageName)) {
                             return SearchResult.found(cu);
                         }
@@ -182,7 +182,7 @@ public class ChangePackage extends Recipe {
 
         @Override
         public J visitPackage(J.Package pkg, ExecutionContext ctx) {
-            String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
+            String original = PackageNameUtils.getPackageName(pkg);
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_FROM_KEY, original);
 
             pkg = pkg.withAnnotations(ListUtils.map(pkg.getAnnotations(), a -> visitAndCast(a, ctx)));
