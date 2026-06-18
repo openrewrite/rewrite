@@ -82,11 +82,39 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     long cycleStartTime = System.nanoTime();
     AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
 
+    @NonFinal
+    @Nullable
+    Duration runTimeout;
+
     @Getter
     Set<Recipe> madeChangesInThisCycle = newSetFromMap(new IdentityHashMap<>());
 
     public int getRecipePosition() {
         return allRecipeStack.getRecipePosition();
+    }
+
+    /**
+     * Whether the elapsed time for this cycle has exceeded the run timeout, firing the
+     * timeout callbacks (at most once) if so. The run timeout is fixed for the duration of a
+     * cycle, so it is resolved from the {@link ExecutionContext} lazily on first access and
+     * cached to avoid a message lookup for every recipe and source file. Resolved lazily
+     * (rather than in a field initializer) because {@code ctx} is not yet assigned when field
+     * initializers run.
+     */
+    private boolean isTimedOut(Recipe recipe) {
+        if (runTimeout == null) {
+            runTimeout = ctx.getMessage(ExecutionContext.RUN_TIMEOUT, Duration.ofMinutes(4));
+        }
+        Duration duration = Duration.ofNanos(System.nanoTime() - cycleStartTime);
+        if (duration.compareTo(runTimeout) > 0) {
+            if (thrownErrorOnTimeout.compareAndSet(false, true)) {
+                RecipeTimeoutException t = new RecipeTimeoutException(recipe);
+                ctx.getOnError().accept(t);
+                ctx.getOnTimeout().accept(t, ctx);
+            }
+            return true;
+        }
+        return false;
     }
 
     public LSS scanSources(LSS sourceSet) {
@@ -313,13 +341,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             SourceFile after = src;
 
             try {
-                Duration duration = Duration.ofNanos(System.nanoTime() - cycleStartTime);
-                if (duration.compareTo(ctx.getMessage(ExecutionContext.RUN_TIMEOUT, Duration.ofMinutes(4))) > 0) {
-                    if (thrownErrorOnTimeout.compareAndSet(false, true)) {
-                        RecipeTimeoutException t = new RecipeTimeoutException(recipe);
-                        ctx.getOnError().accept(t);
-                        ctx.getOnTimeout().accept(t, ctx);
-                    }
+                if (isTimedOut(recipe)) {
                     return src;
                 }
 
