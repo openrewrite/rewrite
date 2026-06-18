@@ -15,7 +15,6 @@
  */
 using System.Diagnostics;
 using System.Xml.Linq;
-using LibGit2Sharp;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
@@ -729,29 +728,30 @@ public class SolutionParser
 
         try
         {
-            var gitDir = Repository.Discover(rootDir);
-            if (gitDir == null) return ignored; // Not inside a git repository.
+            var workDir = GitCli.DiscoverWorkTree(rootDir);
+            if (workDir == null) return ignored; // Not inside a git repository.
+            workDir = PathUtil.Canonicalize(workDir);
 
-            using var repo = new Repository(gitDir);
-            var workDir = PathUtil.Canonicalize(repo.Info.WorkingDirectory);
-
+            // Evaluate ignore rules against repo-relative paths (forward slashes, as git
+            // expects), but report the original candidate string so the caller's membership
+            // check matches verbatim. `git check-ignore` is index-aware by default, so a
+            // tracked file is never reported as ignored even when a rule would match it.
+            var relToOriginal = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var path in paths)
             {
-                // Evaluate ignore rules against the repo-relative path (forward slashes, as
-                // libgit2 expects), but report the original candidate string so the caller's
-                // membership check matches verbatim.
                 var rel = Path.GetRelativePath(workDir, PathUtil.Canonicalize(path));
                 if (rel.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(rel))
                     continue; // Outside the working tree — not subject to its ignore rules.
                 rel = rel.Replace('\\', '/');
+                relToOriginal[rel] = path;
+            }
 
-                // Mirror `git check-ignore`: tracked files are never reported as ignored, even
-                // when an ignore rule would otherwise match them.
-                if (repo.Index[rel] != null)
-                    continue;
+            if (relToOriginal.Count == 0) return ignored;
 
-                if (repo.Ignore.IsPathIgnored(rel))
-                    ignored.Add(path);
+            foreach (var rel in GitCli.CheckIgnored(workDir, relToOriginal.Keys))
+            {
+                if (relToOriginal.TryGetValue(rel, out var original))
+                    ignored.Add(original);
             }
         }
         catch (Exception ex)
