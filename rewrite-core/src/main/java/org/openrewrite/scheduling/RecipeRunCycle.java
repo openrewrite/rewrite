@@ -82,9 +82,13 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     long cycleStartTime = System.nanoTime();
     AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
 
+    /**
+     * The run timeout in nanoseconds, resolved lazily and cached. A negative value
+     * means "not yet resolved". Stored as a primitive so that {@link #isTimedOut(Recipe)}
+     * can compare elapsed nanos directly, avoiding a {@link Duration} allocation per call.
+     */
     @NonFinal
-    @Nullable
-    Duration runTimeout;
+    long runTimeoutNanos = -1;
 
     @Getter
     Set<Recipe> madeChangesInThisCycle = newSetFromMap(new IdentityHashMap<>());
@@ -102,11 +106,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
      * initializers run.
      */
     private boolean isTimedOut(Recipe recipe) {
-        if (runTimeout == null) {
-            runTimeout = ctx.getMessage(ExecutionContext.RUN_TIMEOUT, Duration.ofMinutes(4));
+        if (runTimeoutNanos < 0) {
+            runTimeoutNanos = ctx.getMessage(ExecutionContext.RUN_TIMEOUT, Duration.ofMinutes(4)).toNanos();
         }
-        Duration duration = Duration.ofNanos(System.nanoTime() - cycleStartTime);
-        if (duration.compareTo(runTimeout) > 0) {
+        if (System.nanoTime() - cycleStartTime > runTimeoutNanos) {
             if (thrownErrorOnTimeout.compareAndSet(false, true)) {
                 RecipeTimeoutException t = new RecipeTimeoutException(recipe);
                 ctx.getOnError().accept(t);
