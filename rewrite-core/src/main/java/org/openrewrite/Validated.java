@@ -346,14 +346,19 @@ public interface Validated<T> extends Iterable<Validated<T>> {
                 return right.iterator();
             } else {
                 //If both are valid/invalid, concat all validations.
-                List<Validated<T>> result = new ArrayList<>();
-                for (Validated<T> v : left) {
-                    result.add(v);
-                }
-                for (Validated<T> v : right) {
-                    result.add(v);
-                }
-                return result.iterator();
+                Iterator<Validated<T>> leftIt = left.iterator();
+                Iterator<Validated<T>> rightIt = right.iterator();
+                return new Iterator<Validated<T>>() {
+                    @Override
+                    public boolean hasNext() {
+                        return leftIt.hasNext() || rightIt.hasNext();
+                    }
+
+                    @Override
+                    public Validated<T> next() {
+                        return leftIt.hasNext() ? leftIt.next() : rightIt.next();
+                    }
+                };
             }
         }
     }
