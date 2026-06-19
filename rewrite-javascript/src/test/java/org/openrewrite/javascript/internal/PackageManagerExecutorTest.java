@@ -17,7 +17,11 @@ package org.openrewrite.javascript.internal;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class PackageManagerExecutorTest {
 
@@ -35,5 +39,22 @@ class PackageManagerExecutorTest {
         PackageManagerExecutor missing =
                 PackageManagerExecutor.forTesting("definitely-not-a-real-binary-2026", 30);
         assertThat(missing.find()).isNull();
+    }
+
+    @Test
+    void npmResolvesAlongsideTheActiveNode() {
+        // given the node that will actually execute npm (npm re-invokes node via its
+        // `#!/usr/bin/env node` shebang, so it must run under a compatible runtime)
+        String node = PackageManagerExecutor.which("node");
+        assumeTrue(node != null, "node must be installed to validate the npm/node pairing");
+        Path nodeDir = Paths.get(node).toAbsolutePath().getParent();
+
+        // when locating npm
+        String npm = PackageManagerExecutor.NPM.find();
+        assumeTrue(npm != null, "npm must be installed");
+
+        // then it lives next to that node rather than some unrelated install whose
+        // engines may reject the active node (npm validate-engines, exit 7)
+        assertThat(Paths.get(npm).toAbsolutePath().getParent()).isEqualTo(nodeDir);
     }
 }
