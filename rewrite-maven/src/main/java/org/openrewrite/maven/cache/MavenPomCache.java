@@ -34,6 +34,44 @@ public interface MavenPomCache {
 
     void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata);
 
+    /**
+     * Return a possibly-stale cached metadata entry together with its HTTP validators (ETag /
+     * Last-Modified) so the caller can revalidate it with a conditional GET instead of a full
+     * re-download. This is consulted only after {@link #getMavenMetadata} has reported a miss
+     * (e.g. because the entry's freshness window has elapsed), giving caches a chance to retain a
+     * validator past the point at which they stop serving the value directly.
+     * <p>
+     * The default implementation returns {@code null}, meaning "no validator available"; callers
+     * then fall back to an unconditional download, preserving pre-existing behavior.
+     *
+     * @param repo the repository the metadata would be downloaded from
+     * @param gav  the group/artifact (and optionally version) the metadata describes
+     * @return a validator-carrying entry, or {@code null} if none is retained
+     */
+    default @Nullable MavenMetadataValidation getMavenMetadataForRevalidation(URI repo, GroupArtifactVersion gav) {
+        return null;
+    }
+
+    /**
+     * Store metadata along with the HTTP validators returned by the origin, so that a later expiry
+     * can be revalidated cheaply via {@link #getMavenMetadataForRevalidation}. Re-storing a value
+     * that was confirmed unchanged by a {@code 304} response also refreshes the entry's freshness.
+     * <p>
+     * The default implementation delegates to {@link #putMavenMetadata(URI, GroupArtifactVersion,
+     * MavenMetadata)}, discarding the validators; caches that do not support conditional requests
+     * therefore behave exactly as before.
+     *
+     * @param repo         the repository the metadata was downloaded from
+     * @param gav          the group/artifact (and optionally version) the metadata describes
+     * @param metadata     the metadata value, or {@code null} for a negative result
+     * @param etag         the {@code ETag} response header, or {@code null}
+     * @param lastModified the {@code Last-Modified} response header, or {@code null}
+     */
+    default void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata,
+                                  @Nullable String etag, @Nullable String lastModified) {
+        putMavenMetadata(repo, gav, metadata);
+    }
+
     @Nullable
     Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException;
 

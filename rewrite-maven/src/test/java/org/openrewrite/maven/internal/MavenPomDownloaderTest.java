@@ -36,6 +36,9 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.MavenSettings;
+import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.cache.MavenMetadataValidation;
+import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
@@ -53,6 +56,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.StreamSupport;
 
 import static java.util.Collections.*;
@@ -1779,6 +1783,198 @@ class MavenPomDownloaderTest implements RewriteTest {
             assertThrows(MavenDownloadingException.class, () -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.-1"), null, null, repositories));
             // Existing POM whose Gradle `.module` side-car returns 401 (not 404) -> does not throw (PR #7685)
             assertDoesNotThrow(() -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.0"), null, null, repositories));
+        }
+    }
+
+    @Nested
+    class ConditionalMetadataRequests {
+        private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(new HttpUrlConnectionSender(Duration.ofSeconds(5), Duration.ofSeconds(5)));
+
+        @Language("xml")
+        private static final String METADATA_V1 = """
+          <metadata>
+            <groupId>org.openrewrite.test</groupId>
+            <artifactId>foo</artifactId>
+            <versioning>
+              <latest>1.0</latest>
+              <release>1.0</release>
+              <versions>
+                <version>1.0</version>
+              </versions>
+            </versioning>
+          </metadata>
+          """;
+
+        @Language("xml")
+        private static final String METADATA_V2 = """
+          <metadata>
+            <groupId>org.openrewrite.test</groupId>
+            <artifactId>foo</artifactId>
+            <versioning>
+              <latest>2.0</latest>
+              <release>2.0</release>
+              <versions>
+                <version>1.0</version>
+                <version>2.0</version>
+              </versions>
+            </versioning>
+          </metadata>
+          """;
+
+        private static final GroupArtifact GA = new GroupArtifact("org.openrewrite.test", "foo");
+
+        private MavenPomDownloader downloader(MavenPomCache cache) {
+            ExecutionContext mavenCtx = MavenExecutionContextView.view(ctx)
+              .setAddCentralRepository(false)
+              .setAddLocalRepository(false)
+              .setPomCache(cache);
+            return new MavenPomDownloader(emptyMap(), mavenCtx);
+        }
+
+        private static MavenRepository repo(MockWebServer server) {
+            return MavenRepository.builder().id("test").uri(server.url("/").toString()).build();
+        }
+
+        /**
+         * A dispatcher that records every {@code maven-metadata.xml} request into {@code sink} and
+         * delegates its response to {@code onMetadata}, while answering repository-normalization probes
+         * (OPTIONS/HEAD against the base URL) with a plain 200.
+         */
+        private static Dispatcher metadataDispatcher(List<RecordedRequest> sink, Function<RecordedRequest, MockResponse> onMetadata) {
+            return new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    String path = request.getPath();
+                    if (path != null && path.endsWith("maven-metadata.xml")) {
+                        sink.add(request);
+                        return onMetadata.apply(request);
+                    }
+                    return new MockResponse().setResponseCode(200);
+                }
+            };
+        }
+
+        @Test
+        void reusesCachedValueOn304() throws Exception {
+            String etag = "\"v1\"";
+            List<RecordedRequest> metadataRequests = new ArrayList<>();
+            try (MockWebServer server = new MockWebServer()) {
+                server.setDispatcher(metadataDispatcher(metadataRequests, request ->
+                  etag.equals(request.getHeader("If-None-Match")) ?
+                    new MockResponse().setResponseCode(304) :
+                    new MockResponse().setResponseCode(200).setHeader("ETag", etag).setBody(METADATA_V1)));
+                server.start();
+                MavenPomDownloader downloader = downloader(new RetainingPomCache());
+                MavenRepository repo = repo(server);
+
+                // Cold: unconditional GET -> 200, caches value + ETag validator.
+                MavenMetadata first = downloader.downloadMetadata(GA, null, List.of(repo));
+                assertThat(first.getVersioning().getVersions()).containsExactly("1.0");
+
+                // Warm-but-expired: getMavenMetadata misses, but the retained validator drives a
+                // conditional GET -> 304 -> the cached value is reused without re-parsing a body.
+                MavenMetadata second = downloader.downloadMetadata(GA, null, List.of(repo));
+                assertThat(second.getVersioning().getVersions()).containsExactly("1.0");
+
+                assertThat(metadataRequests).hasSize(2);
+                assertThat(metadataRequests.get(0).getHeader("If-None-Match")).isNull();
+                assertThat(metadataRequests.get(1).getHeader("If-None-Match")).isEqualTo(etag);
+            }
+        }
+
+        @Test
+        void downloadsNewMetadataWhenChanged() throws Exception {
+            // The origin's current validator and body; flipping these simulates a newly published version.
+            String[] currentEtag = {"\"v1\""};
+            String[] currentBody = {METADATA_V1};
+            List<RecordedRequest> metadataRequests = new ArrayList<>();
+            try (MockWebServer server = new MockWebServer()) {
+                server.setDispatcher(metadataDispatcher(metadataRequests, request ->
+                  currentEtag[0].equals(request.getHeader("If-None-Match")) ?
+                    new MockResponse().setResponseCode(304) :
+                    new MockResponse().setResponseCode(200).setHeader("ETag", currentEtag[0]).setBody(currentBody[0])));
+                server.start();
+                MavenPomDownloader downloader = downloader(new RetainingPomCache());
+                MavenRepository repo = repo(server);
+
+                // Cold download caches v1 + its ETag.
+                assertThat(downloader.downloadMetadata(GA, null, List.of(repo)).getVersioning().getVersions()).containsExactly("1.0");
+
+                // A new version is published: the origin's validator no longer matches, so the conditional
+                // GET (If-None-Match: v1) is answered with a fresh 200 carrying the new value and validator.
+                currentEtag[0] = "\"v2\"";
+                currentBody[0] = METADATA_V2;
+                assertThat(downloader.downloadMetadata(GA, null, List.of(repo)).getVersioning().getVersions()).containsExactly("1.0", "2.0");
+
+                // The new validator (v2) was stored, so a subsequent revalidation is a 304 reusing v2.
+                assertThat(downloader.downloadMetadata(GA, null, List.of(repo)).getVersioning().getVersions()).containsExactly("1.0", "2.0");
+
+                assertThat(metadataRequests).hasSize(3);
+                assertThat(metadataRequests.get(0).getHeader("If-None-Match")).isNull();
+                assertThat(metadataRequests.get(1).getHeader("If-None-Match")).isEqualTo("\"v1\"");
+                assertThat(metadataRequests.get(2).getHeader("If-None-Match")).isEqualTo("\"v2\"");
+            }
+        }
+
+        @Test
+        void sendsNoConditionalHeadersWhenCacheRetainsNoValidator() throws Exception {
+            List<RecordedRequest> metadataRequests = new ArrayList<>();
+            try (MockWebServer server = new MockWebServer()) {
+                server.setDispatcher(metadataDispatcher(metadataRequests, request ->
+                  new MockResponse().setResponseCode(200).setHeader("ETag", "\"v1\"").setBody(METADATA_V1)));
+                server.start();
+
+                // A cache that always misses and uses the no-op default getMavenMetadataForRevalidation,
+                // so every lookup falls back to a plain, unconditional download.
+                MavenPomCache nonRevalidating = new RetainingPomCache() {
+                    @Override
+                    public @Nullable MavenMetadataValidation getMavenMetadataForRevalidation(URI repo, GroupArtifactVersion gav) {
+                        return null;
+                    }
+                };
+                MavenPomDownloader downloader = downloader(nonRevalidating);
+                MavenRepository repo = repo(server);
+
+                downloader.downloadMetadata(GA, null, List.of(repo));
+                downloader.downloadMetadata(GA, null, List.of(repo));
+
+                assertThat(metadataRequests).hasSize(2);
+                assertThat(metadataRequests).allSatisfy(r -> assertThat(r.getHeader("If-None-Match")).isNull());
+            }
+        }
+
+        /**
+         * A cache that always reports a miss from {@link #getMavenMetadata} (simulating an elapsed
+         * freshness window) yet retains the last-stored value and its validators for revalidation.
+         */
+        static class RetainingPomCache extends InMemoryMavenPomCache {
+            private final Map<String, MavenMetadataValidation> retained = new HashMap<>();
+
+            private static String key(URI repo, GroupArtifactVersion gav) {
+                return repo + "|" + gav;
+            }
+
+            @Override
+            public @Nullable Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+                return null;
+            }
+
+            @Override
+            public void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata) {
+                retained.put(key(repo, gav), new MavenMetadataValidation(metadata, null, null));
+            }
+
+            @Override
+            public void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata,
+                                         @Nullable String etag, @Nullable String lastModified) {
+                retained.put(key(repo, gav), new MavenMetadataValidation(metadata, etag, lastModified));
+            }
+
+            @Override
+            public @Nullable MavenMetadataValidation getMavenMetadataForRevalidation(URI repo, GroupArtifactVersion gav) {
+                return retained.get(key(repo, gav));
+            }
         }
     }
 }
