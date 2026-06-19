@@ -8757,6 +8757,13 @@ class ScalaTreeVisitor(
    */
   private def consumeTrailingSemicolon(statEnd: Int, nextStart: Int): (Space, Markers) = {
     val trailStart = Math.max(statEnd, cursor)
+    // When the statement's rhs sits on its own line, Dotty extends the statement
+    // span to include the trailing `;`, so the cursor already moved past it. The
+    // forward scan below would miss it, dropping the explicit separator on print.
+    // Recognize that already-absorbed `;` here so it is preserved via the marker.
+    if (trailStart > 0 && trailStart <= source.length && source.charAt(trailStart - 1) == ';') {
+      return (Space.EMPTY, Markers.EMPTY.add(new Semicolon(Tree.randomId())))
+    }
     if (trailStart >= nextStart || nextStart > source.length) {
       return (Space.EMPTY, Markers.EMPTY)
     }
