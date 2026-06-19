@@ -271,7 +271,7 @@ func (s *JavaSender) VisitMethodDeclaration(md *java.MethodDeclaration, p any) j
 		func(v any) any { return extractID(v) },
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	// modifiers (empty for Go)
-	q.GetAndSendList(md, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(md, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// typeParameters (`[T any]` declaration-site generics; nil for non-generic funcs)
 	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).TypeParameters },
 		func(v any) { s.Visit(v.(java.Tree), q) })
@@ -279,7 +279,7 @@ func (s *JavaSender) VisitMethodDeclaration(md *java.MethodDeclaration, p any) j
 	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).ReturnType },
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	// name annotations (empty)
-	q.GetAndSendList(md, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(md, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// name
 	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).Name },
 		func(v any) { s.Visit(v.(java.Tree), q) })
@@ -287,7 +287,7 @@ func (s *JavaSender) VisitMethodDeclaration(md *java.MethodDeclaration, p any) j
 	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).Parameters },
 		func(v any) { sendContainer(s, v, q) })
 	// dimensionsAfterName (empty for Go — no C-style array method returns)
-	q.GetAndSendList(md, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(md, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// throws (nil for Go)
 	q.GetAndSend(md, func(_ any) any { return nil }, nil)
 	// body
@@ -304,7 +304,7 @@ func (s *JavaSender) VisitMethodDeclaration(md *java.MethodDeclaration, p any) j
 func (s *JavaSender) VisitTypeParameters(tps *java.TypeParameters, p any) java.J {
 	q := p.(*SendQueue)
 	// annotations (empty for Go)
-	q.GetAndSendList(tps, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(tps, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// typeParameters (list of right-padded J$TypeParameter)
 	q.GetAndSendList(tps,
 		func(v any) []any {
@@ -323,9 +323,9 @@ func (s *JavaSender) VisitTypeParameters(tps *java.TypeParameters, p any) java.J
 func (s *JavaSender) VisitTypeParameter(tp *java.TypeParameter, p any) java.J {
 	q := p.(*SendQueue)
 	// annotations (empty for Go)
-	q.GetAndSendList(tp, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(tp, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// modifiers (empty for Go)
-	q.GetAndSendList(tp, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(tp, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// name
 	q.GetAndSend(tp, func(v any) any { return v.(*java.TypeParameter).Name },
 		func(v any) { s.Visit(v.(java.Tree), q) })
@@ -600,7 +600,7 @@ func (s *JavaSender) VisitVariableDeclarator(vd *java.VariableDeclarator, p any)
 	q.GetAndSend(vd, func(v any) any { return v.(*java.VariableDeclarator).Name },
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	// dimensionsAfterName (empty for Go)
-	q.GetAndSendList(vd, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(vd, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// initializer (left-padded, nullable) — dereference pointer
 	q.GetAndSend(vd, func(v any) any {
 		init := v.(*java.VariableDeclarator).Initializer
@@ -620,7 +620,7 @@ func (s *JavaSender) VisitArrayType(at *java.ArrayType, p any) java.J {
 	q.GetAndSend(at, func(v any) any { return v.(*java.ArrayType).ElementType },
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	// annotations (empty for Go)
-	q.GetAndSendList(at, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(at, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// dimension (left-padded)
 	q.GetAndSend(at, func(v any) any { return v.(*java.ArrayType).Dimension },
 		func(v any) { sendLeftPadded(s, v, q) })
