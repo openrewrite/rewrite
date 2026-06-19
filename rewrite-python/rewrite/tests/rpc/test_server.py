@@ -144,6 +144,82 @@ def test_pip_install_recipe_package_comparator_spec(tmp_path, monkeypatch):
         ], f"version {version!r}: expected spec {expected_spec!r}"
 
 
+def test_pip_install_local_path_shape(tmp_path, monkeypatch):
+    # Local recipe sources are mutable, so --force-reinstall picks up changed
+    # content even when the version is unchanged, and --upgrade lets pip replace
+    # the existing files under --target. `pip install <path>` also resolves and
+    # installs the local package's dependencies — local sources don't carry them.
+    import subprocess
+
+    import rewrite.rpc.server as server
+
+    install_dir = tmp_path / "recipes"
+    local = tmp_path / "my-recipe"
+    captured = {}
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(cmd, capture_output=False, text=False):
+        captured["cmd"] = cmd
+        return FakeCompletedProcess()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    server._pip_install_local_path(local, install_dir)
+
+    assert install_dir.exists()
+    assert captured["cmd"][1:] == [
+        "-m", "pip", "install",
+        "--force-reinstall", "--upgrade",
+        "--target", str(install_dir),
+        str(local),
+    ]
+    assert str(install_dir.resolve()) in __import__("sys").path
+
+
+def test_handle_install_recipes_local_path_installs_with_deps(tmp_path, monkeypatch):
+    # A local-path install must pip-install the path (resolving its deps) when a
+    # recipe-install dir is configured. A Python source dir doesn't carry its
+    # dependencies, so importing it directly would fail for any recipe with
+    # third-party deps — unlike the prepackaged npm/NuGet local artifacts.
+    import subprocess
+
+    import rewrite.rpc.server as server
+    from rewrite.discovery import RecipeAttribution
+    from rewrite.marketplace import RecipeMarketplace
+
+    monkeypatch.setattr(server, "_marketplace", RecipeMarketplace())
+    monkeypatch.setattr(server, "_attribution", RecipeAttribution())
+    monkeypatch.setattr(server, "_recipe_install_dir", tmp_path / "install")
+
+    captured = {}
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(cmd, capture_output=False, text=False):
+        captured["cmd"] = cmd
+        return FakeCompletedProcess()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    # A bare directory (no pyproject/setup) makes _find_package_name return None,
+    # so activation is skipped — but the install must still have run.
+    local = tmp_path / "my-recipe"
+    local.mkdir()
+
+    server.handle_install_recipes({"recipes": str(local)})
+
+    assert "cmd" in captured, "expected a pip install for a local-path recipe"
+    assert "--force-reinstall" in captured["cmd"]
+    assert str(local) in captured["cmd"]
+
+
 def test_recipe_descriptor_to_dict_emits_all_collection_keys():
     from rewrite.recipe import RecipeDescriptor
     from rewrite.rpc.server import _recipe_descriptor_to_dict
