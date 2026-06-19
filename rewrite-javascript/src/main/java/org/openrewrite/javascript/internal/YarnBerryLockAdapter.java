@@ -73,11 +73,20 @@ public final class YarnBerryLockAdapter {
             if ("__metadata".equals(entry.getKey())) {
                 continue;
             }
+            // Workspace entries (the project itself and any sibling workspace packages) use the
+            // "@workspace:" protocol and are not real installed dependencies; npm v3 represents the
+            // root under the "" key, so they must be skipped to stay in parity with the RPC marker.
+            if (entry.getKey().contains("@workspace:")) {
+                continue;
+            }
             if (!(entry.getValue() instanceof Map)) {
                 continue;
             }
             Map<String, Object> body = (Map<String, Object>) entry.getValue();
             String resolution = asString(body.get("resolution"));
+            if (resolution != null && resolution.contains("@workspace:")) {
+                continue;
+            }
             String version = asString(body.get("version"));
             // Prefer name from resolution (canonical); fallback to key.
             String name = extractName(resolution != null ? resolution : entry.getKey());
