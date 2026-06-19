@@ -182,9 +182,11 @@ class LockFileParserParityTest {
     void parityPnpmTinyProject() throws Exception {
         Assumptions.assumeTrue(PackageManagerExecutor.PNPM.find() != null,
                 "pnpm not installed");
+        // No `packageManager` pin: use whatever pnpm is installed. The adapter handles both
+        // the lockfileVersion 6.0 (pnpm 8.x) and 9.0 (pnpm 9.x/10.x) formats, so we don't force
+        // corepack to download a specific old pnpm — that download crashes on newer Node runtimes.
         String packageJson = "{\n" +
                 "  \"name\": \"parity-pnpm\",\n" +
-                "  \"packageManager\": \"pnpm@8.15.4\",\n" +
                 "  \"dependencies\": { \"is-even\": \"1.0.0\" }\n" +
                 "}\n";
         Set<String> javaSet = parseLockInJavaForPm(packageJson, PackageManager.Pnpm);
