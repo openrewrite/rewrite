@@ -66,6 +66,42 @@ class TypesInUseTest implements RewriteTest {
     }
 
     @Test
+    void recordsFullyQualifiedJavadocReferencesSeparately() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite.other;
+              public class Target {}
+              """
+          ),
+          java(
+            """
+              package com.example;
+              /**
+               * See {@link org.openrewrite.other.Target} for details.
+               */
+              public class Bar {}
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                TypesInUse tiu = cu.getTypesInUse();
+
+                // Fully qualified Javadoc references stay out of the import-retention set (#5738)...
+                assertThat(tiu.getTypesInUse().stream()
+                  .filter(t -> t instanceof JavaType.FullyQualified)
+                  .map(t -> ((JavaType.FullyQualified) t).getFullyQualifiedName()))
+                  .doesNotContain("org.openrewrite.other.Target");
+
+                // ...but their packages are recorded separately so package-renaming recipes can find them.
+                assertThat(tiu.hasDocReferenceInPackage("org.openrewrite.other", false)).isTrue();
+                assertThat(tiu.hasDocReferenceInPackage("org.openrewrite", false)).isFalse();
+                assertThat(tiu.hasDocReferenceInPackage("org.openrewrite", true)).isTrue();
+                assertThat(tiu.hasDocReferenceInPackage("com.other", true)).isFalse();
+            })
+          )
+        );
+    }
+
+    @Test
     void publicFactoryReturnsInstanceWithSuppliedSets() {
         rewriteRun(
           java(

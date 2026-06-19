@@ -136,12 +136,17 @@ class DependencyWorkspace {
                 try {
                     Files.move(tempDir, workspaceDir);
                 } catch (IOException e) {
-                    // If move fails, another thread might have created it
+                    // The move can fail because another thread already created the workspace, or
+                    // because a stale/corrupt directory (e.g. one missing package.json from an
+                    // interrupted prior run) is occupying the target.
                     if (isWorkspaceValid(workspaceDir)) {
                         // Use the other thread's workspace
                         cleanupDirectory(tempDir);
                     } else {
-                        throw e;
+                        // Target is stale/invalid; replace it with our freshly built workspace so a
+                        // corrupt directory can't permanently wedge workspace creation.
+                        cleanupDirectory(workspaceDir);
+                        Files.move(tempDir, workspaceDir);
                     }
                 }
 
@@ -183,8 +188,18 @@ class DependencyWorkspace {
                 args = new String[]{"install", "--ignore-scripts"};
                 break;
             case YarnBerry:
-                executor = PackageManagerExecutor.YARN;
-                args = new String[]{"install", "--mode", "skip-build"};
+                // Yarn Berry projects pin their version via the package.json "packageManager"
+                // field and rely on Corepack to provision it. A global Yarn Classic refuses to
+                // run such a project, so prefer Corepack when it is available and fall back to a
+                // plain yarn otherwise (e.g. when the yarn on PATH is already a Corepack shim).
+                String corepackExe = PackageManagerExecutor.COREPACK.find();
+                if (corepackExe != null) {
+                    executor = PackageManagerExecutor.COREPACK;
+                    args = new String[]{"yarn", "install", "--mode", "skip-build"};
+                } else {
+                    executor = PackageManagerExecutor.YARN;
+                    args = new String[]{"install", "--mode", "skip-build"};
+                }
                 break;
             case Pnpm:
                 executor = PackageManagerExecutor.PNPM;
