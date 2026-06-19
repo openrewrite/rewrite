@@ -30,6 +30,7 @@ import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
@@ -48,6 +49,22 @@ public class TypesInUse {
     private final Set<JavaType.Method> declaredMethods;
     private final Set<JavaType.Method> usedMethods;
     private final Set<JavaType.Variable> variables;
+
+    /**
+     * Packages of the fully qualified types referenced only from documentation comments — Javadoc
+     * {@code {@link com.foo.Bar}}, C# {@code <see cref="..."/>}, etc. — each contributing its package
+     * (e.g. {@code com.foo}). The types themselves are deliberately excluded from {@link #typesInUse}
+     * because a fully qualified doc reference needs no import, so it must not count toward import
+     * retention (see #5738). Their packages are recorded here so that package-renaming recipes can still
+     * discover them without re-walking the tree. Only the package is retained because that is all such
+     * recipes query.
+     * <p>
+     * This bucket is <em>transient</em>: it is populated only by {@link #build(JavaSourceFile)} and is left
+     * empty by {@link #of}, since a serialized type index carries no doc references. It is queried only via
+     * {@link #hasDocReferenceInPackage}; the raw set is intentionally not exposed.
+     */
+    @Getter(AccessLevel.NONE)
+    private final Set<String> docReferencePackages;
 
     /**
      * Lazily-built prefix tree over every fully qualified name reachable via
@@ -83,7 +100,8 @@ public class TypesInUse {
                 findTypesInUse.getTypes(),
                 findTypesInUse.getDeclaredMethods(),
                 findTypesInUse.getUsedMethods(),
-                findTypesInUse.getVariables());
+                findTypesInUse.getVariables(),
+                findTypesInUse.getDocReferencePackages());
     }
 
     /**
@@ -96,7 +114,23 @@ public class TypesInUse {
                                 Set<JavaType.Method> declaredMethods,
                                 Set<JavaType.Method> usedMethods,
                                 Set<JavaType.Variable> variables) {
-        return new TypesInUse(cu, typesInUse, declaredMethods, usedMethods, variables);
+        return new TypesInUse(cu, typesInUse, declaredMethods, usedMethods, variables, Collections.emptySet());
+    }
+
+    /**
+     * Whether any fully qualified documentation-comment reference in this compilation unit has a package
+     * equal to {@code packageName}, or (when {@code recursive}) starts with {@code packageName + '.'}.
+     * Mirrors the per-type package check that package-renaming recipes apply to {@link #typesInUse}, for
+     * the references that {@link #typesInUse} deliberately omits.
+     */
+    public boolean hasDocReferenceInPackage(String packageName, boolean recursive) {
+        String recursivePrefix = packageName + ".";
+        for (String pkg : docReferencePackages) {
+            if (pkg.equals(packageName) || recursive && pkg.startsWith(recursivePrefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -509,6 +543,7 @@ public class TypesInUse {
         private final Set<JavaType.Method> declaredMethods = newSetFromMap(new IdentityHashMap<>());
         private final Set<JavaType.Method> usedMethods = newSetFromMap(new IdentityHashMap<>());
         private final Set<JavaType.Variable> variables = newSetFromMap(new IdentityHashMap<>());
+        private final Set<String> docReferencePackages = new HashSet<>();
 
         @Override
         public J.Import visitImport(J.Import _import, Integer p) {
@@ -554,9 +589,14 @@ public class TypesInUse {
                         usedMethods.add((JavaType.Method) javaType);
                     }
                 } else if (!(cursor.getValue() instanceof J.ClassDeclaration) &&
-                        !(cursor.getValue() instanceof J.Lambda) &&
-                        !isFullyQualifiedJavaDocReference(cursor)) {
-                    types.add(javaType);
+                        !(cursor.getValue() instanceof J.Lambda)) {
+                    if (isFullyQualifiedJavaDocReference(cursor)) {
+                        if (javaType instanceof JavaType.FullyQualified) {
+                            docReferencePackages.add(((JavaType.FullyQualified) javaType).getPackageName());
+                        }
+                    } else {
+                        types.add(javaType);
+                    }
                 }
             }
             return javaType;
