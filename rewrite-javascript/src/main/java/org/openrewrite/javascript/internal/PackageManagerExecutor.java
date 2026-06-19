@@ -41,6 +41,7 @@ public final class PackageManagerExecutor {
     public static final PackageManagerExecutor YARN = new PackageManagerExecutor("yarn", 120);
     public static final PackageManagerExecutor PNPM = new PackageManagerExecutor("pnpm", 120);
     public static final PackageManagerExecutor BUN  = new PackageManagerExecutor("bun",  120);
+    public static final PackageManagerExecutor COREPACK = new PackageManagerExecutor("corepack", 120);
 
     private static final boolean IS_WINDOWS =
             System.getProperty("os.name").toLowerCase().contains("windows");
