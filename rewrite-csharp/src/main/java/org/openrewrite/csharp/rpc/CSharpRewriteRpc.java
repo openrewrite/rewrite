@@ -35,6 +35,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -182,6 +184,16 @@ public class CSharpRewriteRpc extends RewriteRpc {
     public static class Builder implements Supplier<CSharpRewriteRpc> {
         private static final String TOOL_COMMAND = "rewrite-csharp";
         private static final String NUGET_PACKAGE_ID = "OpenRewrite.CSharp.Tool";
+
+        /**
+         * Serializes tool installs within this JVM. {@code RewriteRpcProcessManager}
+         * holds one RPC per thread, so several threads can each trigger an install of
+         * the same version at once. A {@link FileLock} alone is per-JVM (a second
+         * channel lock from the same JVM throws {@code OverlappingFileLockException}
+         * rather than blocking), so cross-thread serialization needs this monitor in
+         * addition to the cross-process file lock.
+         */
+        private static final Object INSTALL_LOCK = new Object();
 
 
         private RecipeMarketplace marketplace = new RecipeMarketplace();
@@ -477,8 +489,9 @@ public class CSharpRewriteRpc extends RewriteRpc {
          * fails to authenticate against private NuGet feeds.
          * <p>
          * Uses {@code dotnet tool install --tool-path} which handles authentication
-         * correctly. The tool-path is version-specific so multiple versions can coexist
-         * without file-lock conflicts during parallel execution.
+         * correctly. The tool-path is version-specific so multiple versions can coexist;
+         * concurrent installs of the <em>same</em> version (parallel Gradle test forks
+         * hitting a fresh daily snapshot) are serialized by {@link #installToolPath}.
          */
         private Stream<@Nullable String> buildToolPathCommand(Path dotnetPath, String version) {
             Path toolPath = Paths.get(System.getProperty("user.home"),
@@ -486,7 +499,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
             Path toolExecutable = toolPath.resolve(TOOL_COMMAND);
 
             if (!Files.isRegularFile(toolExecutable)) {
-                installTool(dotnetPath, version, toolPath);
+                installTool(dotnetPath, version, toolPath, toolExecutable);
             }
 
             return Stream.of(
@@ -497,7 +510,41 @@ public class CSharpRewriteRpc extends RewriteRpc {
             );
         }
 
-        private void installTool(Path dotnetPath, String version, Path toolPath) {
+        private void installTool(Path dotnetPath, String version, Path toolPath, Path toolExecutable) {
+            installToolPath(toolPath.getParent(), version, toolExecutable,
+                    () -> runDotnetInstall(dotnetPath, version, toolPath));
+        }
+
+        /**
+         * Runs {@code install} at most once for {@code toolExecutable}, serialized
+         * against other threads in this JVM and other processes on this host.
+         * {@code dotnet tool install} is not safe to run concurrently into a single
+         * {@code --tool-path}: racing installs of the same not-yet-cached version fail
+         * with "Directory not empty". Gradle runs test forks in parallel (one JVM per
+         * core), each lazily triggering an install of the same daily snapshot, so the
+         * install is guarded by an exclusive lock on a {@code <version>.lock} file in
+         * the shared tools directory. The executable presence is re-checked under the
+         * lock so a winner's install is reused rather than repeated.
+         */
+        static void installToolPath(Path toolsDir, String version, Path toolExecutable, Runnable install) {
+            synchronized (INSTALL_LOCK) {
+                try {
+                    Files.createDirectories(toolsDir);
+                    Path lockFile = toolsDir.resolve(version + ".lock");
+                    try (FileChannel channel = FileChannel.open(lockFile,
+                            StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+                         FileLock ignored = channel.lock()) {
+                        if (!Files.isRegularFile(toolExecutable)) {
+                            install.run();
+                        }
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException("Failed to install " + NUGET_PACKAGE_ID + "@" + version, e);
+                }
+            }
+        }
+
+        private void runDotnetInstall(Path dotnetPath, String version, Path toolPath) {
             Path installCwd = null;
             try {
                 Files.createDirectories(toolPath);
