@@ -539,28 +539,44 @@ public class ChangePackage extends Recipe {
 
     private static boolean hasJavadocReferenceToPackage(JavaSourceFile cu, String packageName, boolean recursive, String recursivePrefix) {
         return new JavaIsoVisitor<AtomicBoolean>() {
+            boolean inJavadocReference;
+
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, AtomicBoolean f) {
+                // Once a matching reference is found, skip the rest of the traversal.
+                return f.get() ? (J) tree : super.visit(tree, f);
+            }
+
+            @Override
+            protected JavadocVisitor<AtomicBoolean> getJavadocVisitor() {
+                // Field accesses only carry a fully qualified package reference worth checking when
+                // they appear inside a Javadoc reference, so let the Javadoc delegate flag that scope
+                // rather than re-walking each field access's ancestors during the descent.
+                return new JavadocVisitor<AtomicBoolean>(this) {
+                    @Override
+                    public Javadoc visitReference(Javadoc.Reference reference, AtomicBoolean f) {
+                        inJavadocReference = true;
+                        try {
+                            return super.visitReference(reference, f);
+                        } finally {
+                            inJavadocReference = false;
+                        }
+                    }
+                };
+            }
+
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicBoolean f) {
-                if (f.get()) {
-                    return fieldAccess;
-                }
-                for (Iterator<?> it = getCursor().getPath(); it.hasNext(); ) {
-                    Object o = it.next();
-                    if (o instanceof Javadoc.Reference) {
-                        JavaType type = fieldAccess.getType();
-                        if (type instanceof JavaType.FullyQualified) {
-                            String pkg = ((JavaType.FullyQualified) type).getPackageName();
-                            if (pkg.equals(packageName) || recursive && pkg.startsWith(recursivePrefix)) {
-                                f.set(true);
-                            }
+                if (inJavadocReference && !f.get()) {
+                    JavaType type = fieldAccess.getType();
+                    if (type instanceof JavaType.FullyQualified) {
+                        String pkg = ((JavaType.FullyQualified) type).getPackageName();
+                        if (pkg.equals(packageName) || recursive && pkg.startsWith(recursivePrefix)) {
+                            f.set(true);
                         }
-                        break;
-                    }
-                    if (o instanceof J.Block) {
-                        break;
                     }
                 }
-                return fieldAccess;
+                return super.visitFieldAccess(fieldAccess, f);
             }
         }.reduce(cu, new AtomicBoolean()).get();
     }
