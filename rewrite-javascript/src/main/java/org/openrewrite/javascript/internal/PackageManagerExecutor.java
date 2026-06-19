@@ -87,6 +87,12 @@ public final class PackageManagerExecutor {
 
         Process process = pb.start();
 
+        // Close the child's stdin so any prompt sees EOF immediately instead of blocking forever.
+        // ProcessBuilder leaves stdin as an open pipe that never receives data or EOF; a package
+        // manager that reads stdin (e.g. pnpm during a cold-store install) would otherwise hang
+        // until the timeout. This mirrors the TS side's spawnSync, which feeds an empty stdin.
+        process.getOutputStream().close();
+
         StringBuilder stdout = new StringBuilder();
         StringBuilder stderr = new StringBuilder();
         Thread stdoutReader = new Thread(() -> drain(process.getInputStream(), stdout));
