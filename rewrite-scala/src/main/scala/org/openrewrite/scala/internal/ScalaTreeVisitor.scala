@@ -4358,14 +4358,17 @@ class ScalaTreeVisitor(
     // Detect Scala 3 paren-less form (`for x <- xs do body`): after `for`, the next
     // non-whitespace is neither `(` nor `{`. The single-generator J.ForEachLoop
     // shortcut assumes parens, so for paren-less route through buildSFor.
-    val isParenless = {
+    val openDelim: Char = {
       val forStart = Math.max(0, forTree.span.start - offsetAdjustment)
       var i = forStart + 3 // skip "for"
       while (i < source.length && source.charAt(i).isWhitespace) i += 1
-      i < source.length && source.charAt(i) != '(' && source.charAt(i) != '{'
+      if (i < source.length) source.charAt(i) else ' '
     }
+    // The single-generator J.ForEachLoop shortcut always prints with parens, so only
+    // take it for the paren form. The brace form `for { x <- xs } { body }` and the
+    // Scala 3 paren-less form must route through buildSFor, which preserves brackets.
     val enums = forTree.enums
-    if (!isParenless && enums.size == 1) {
+    if (openDelim == '(' && enums.size == 1) {
       enums.head match {
         case genFrom: untpd.GenFrom if genFrom.pat.isInstanceOf[Trees.Ident[?]] =>
           return visitSimpleForEach(forTree, genFrom)
