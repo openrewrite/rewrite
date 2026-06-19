@@ -406,6 +406,9 @@ public class PythonRewriteRpc extends RewriteRpc {
         private @Nullable Path log;
         private @Nullable Path pipPackagesPath;
         private @Nullable Path recipeInstallDir;
+        // Resolved lazily at start; when it yields a directory, the engine is taken from there and
+        // all bootstrap/detection is skipped. Default: no pre-provisioned engine.
+        private Supplier<@Nullable Path> engineInstallDirSupplier = () -> null;
 
         private static Path findDefaultPythonPath() {
             // Try to find a venv in the project structure
@@ -558,6 +561,35 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
+         * Point at a directory where the {@code openrewrite} engine is already installed (an
+         * importable {@code rewrite} package and its dependencies). When set, that directory is put
+         * on {@code PYTHONPATH} and <em>all</em> engine bootstrap/detection is skipped — no pip
+         * install, no interpreter probes, no network. This is the seam an embedding host uses to
+         * provide an engine it has provisioned out-of-band; it leaves the normal install-from-index
+         * path as the fallback for everyone else.
+         *
+         * @param engineInstallDir The directory containing the installed engine, or {@code null}
+         * @return This builder
+         */
+        public Builder engineInstallDir(@Nullable Path engineInstallDir) {
+            return engineInstallDir(() -> engineInstallDir);
+        }
+
+        /**
+         * Supplies the engine install directory, resolved at most once when the RPC first starts.
+         * Returning {@code null} means "no pre-provisioned engine" (fall back to normal detection).
+         * Because it runs at start, the supplier is the right place to do lazy, on-demand work such
+         * as installing the engine before returning its directory.
+         *
+         * @param engineInstallDirSupplier Supplier for the installed-engine directory
+         * @return This builder
+         */
+        public Builder engineInstallDir(Supplier<@Nullable Path> engineInstallDirSupplier) {
+            this.engineInstallDirSupplier = engineInstallDirSupplier;
+            return this;
+        }
+
+        /**
          * Set the Python language version to parse.
          * <p>
          * Supported values:
@@ -586,7 +618,14 @@ public class PythonRewriteRpc extends RewriteRpc {
             boolean isDevBuild = version.isEmpty() || version.endsWith(".dev0") || "unspecified".equals(version);
 
             Path resolvedPipPackagesPath = null;
-            if (!isDevBuild) {
+            // Explicit seam: the engineInstallDir supplier hands us an engine that the caller has
+            // already provisioned out-of-band. Resolved lazily here so any such work only happens
+            // when the RPC actually starts; when present, use it directly and skip all
+            // bootstrap/detection — no network, no interpreter probes. Null → normal path.
+            Path engineInstallDir = engineInstallDirSupplier.get();
+            if (engineInstallDir != null) {
+                resolvedPipPackagesPath = engineInstallDir;
+            } else if (!isDevBuild) {
                 // Known version (release or published pre-release) — try to find or
                 // install the pinned version, falling back to any available install.
                 if (pipPackagesPath != null && isVersionInstalled(pipPackagesPath.resolve(version), version)) {
