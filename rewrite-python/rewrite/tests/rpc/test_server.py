@@ -72,10 +72,41 @@ def test_pip_install_recipe_package_shape(tmp_path, monkeypatch):
     assert install_dir.exists()
     assert captured["cmd"][1:] == [
         "-m", "pip", "install",
+        "--upgrade",
         "--target", str(install_dir),
         "openrewrite-recipes-python==1.2.3",
     ]
     assert str(install_dir.resolve()) in __import__("sys").path
+
+
+def test_pip_install_recipe_package_passes_upgrade(tmp_path, monkeypatch):
+    # `pip install --target` refuses to replace an already-populated package
+    # directory without --upgrade, silently leaving stale files from a prior
+    # version. Recipe versions are immutable, so reinstalling a version *change*
+    # into the shared install dir must overwrite cleanly.
+    import subprocess
+
+    import rewrite.rpc.server as server
+
+    install_dir = tmp_path / "recipes"
+    captured = {}
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(cmd, capture_output=False, text=False):
+        captured["cmd"] = cmd
+        return FakeCompletedProcess()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    server._pip_install_recipe_package(
+        "openrewrite-recipes-python", "1.2.3", install_dir
+    )
+
+    assert "--upgrade" in captured["cmd"]
 
 
 def test_pip_install_recipe_package_comparator_spec(tmp_path, monkeypatch):
@@ -107,6 +138,7 @@ def test_pip_install_recipe_package_comparator_spec(tmp_path, monkeypatch):
 
         assert captured["cmd"][1:] == [
             "-m", "pip", "install",
+            "--upgrade",
             "--target", str(install_dir),
             expected_spec,
         ], f"version {version!r}: expected spec {expected_spec!r}"

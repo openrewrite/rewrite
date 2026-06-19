@@ -742,7 +742,12 @@ def _pip_install_recipe_package(package_name: str, version: Optional[str], targe
         spec = f"{package_name}{version}" if version[0] in "=<>!~" else f"{package_name}=={version}"
     else:
         spec = package_name
-    cmd = [sys.executable, "-m", "pip", "install", "--target", str(target_dir), spec]
+    # --upgrade is required: `pip install --target` refuses to replace an
+    # already-populated package directory without it, otherwise leaving stale
+    # files from a previously-installed version. The caller only reaches here
+    # for a version not already present (see handle_install_recipes), so this
+    # is the version-change path that must overwrite cleanly.
+    cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "--target", str(target_dir), spec]
     logger.info(f"pip install: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
