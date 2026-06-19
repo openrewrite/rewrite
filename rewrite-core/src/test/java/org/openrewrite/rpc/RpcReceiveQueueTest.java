@@ -15,6 +15,8 @@
  */
 package org.openrewrite.rpc;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Checksum;
@@ -26,6 +28,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RpcReceiveQueueTest {
@@ -105,6 +108,32 @@ class RpcReceiveQueueTest {
 
         assertThat(received).isInstanceOf(Checksum.class);
         assertThat(((Checksum) received).getAlgorithm()).isEqualTo("SHA-256");
+    }
+
+    @Test
+    void plainMapRoundTripsWithoutLeakingRefMetadata() throws Exception {
+        // A Map<String, String> (e.g. NodeResolutionResult.Npmrc#properties) must survive
+        // the round trip without gaining "@c"/"@ref" entries. Those keys are only meaningful
+        // for POJOs annotated with @JsonTypeInfo/@JsonIdentityInfo; leaking them into a Map
+        // puts a String "@c" and an Integer "@ref" into a Map<String, String>.
+        Map<String, String> before = new LinkedHashMap<>();
+        before.put("registry", "https://registry.npmjs.org/");
+        before.put("save-exact", "true");
+
+        sq.send(before, null, null);
+        Map<String, String> after = rq.receive(null);
+
+        assertThat(after).doesNotContainKeys("@c", "@ref");
+        assertThat(after).isEqualTo(before);
+
+        // Serializing the received map the way the V2 edit writer does -- as a declared
+        // Map<String, String> -- must not throw. Before the fix the leaked "@ref" -> 1
+        // (Integer) entry blew up here with the exact failure customers reported:
+        // "java.lang.Integer cannot be cast to java.lang.String".
+        assertThatCode(() -> new ObjectMapper()
+                .writerFor(new TypeReference<Map<String, String>>() {})
+                .writeValueAsString(after))
+                .doesNotThrowAnyException();
     }
 
     @Test
