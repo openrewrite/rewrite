@@ -36,7 +36,7 @@ func TestTidyRequireSetViaProxy(t *testing.T) {
 		t.Skip("needs network + the go toolchain")
 	}
 	cases := []struct {
-		name, modPath, goMod, mainGo string
+		name, modPath, goMod, mainGo, testGo string
 	}{
 		{
 			// No pruning-completeness extras: indirect == import-reachable only.
@@ -65,6 +65,30 @@ func TestTidyRequireSetViaProxy(t *testing.T) {
 			goMod:   "module example.com/ginapp\n\ngo 1.25.0\n\nrequire github.com/gin-gonic/gin v1.10.0\n",
 			mainGo:  "package main\n\nimport _ \"github.com/gin-gonic/gin\"\n\nfunc main() {}\n",
 		},
+		{
+			// conc shape: testify is imported by a TEST of the main module (not
+			// main code), with the older testify v1.8.1. `go mod tidy` does NOT
+			// record kr/text here (the pruned graph already selects it correctly),
+			// so the version gate must NOT over-promote it. Guards the conc 0/1
+			// regression.
+			name:    "test_in_test_file",
+			modPath: "example.com/conctest",
+			goMod:   "module example.com/conctest\n\ngo 1.20\n\nrequire github.com/stretchr/testify v1.8.1\n",
+			mainGo:  "package conctest\n",
+			testGo:  "package conctest\n\nimport (\n\t\"testing\"\n\n\t\"github.com/stretchr/testify/assert\"\n)\n\nfunc TestX(t *testing.T) { assert.Equal(t, 1, 1) }\n",
+		},
+		{
+			// The exact conc go.mod, which exercises the DEPTH-ORDERING rule:
+			// check.v1 -> kr/pretty -> kr/text. `go mod tidy` promotes kr/pretty
+			// (under-selected) but NOT kr/text (kr/pretty's go.mod pins it once
+			// kr/pretty is a root). A non-frontier-ordered pass over-promotes
+			// kr/text; this guards that the BFS pins it first.
+			name:    "conc_depth_ordering",
+			modPath: "github.com/sourcegraph/conc",
+			goMod:   "module github.com/sourcegraph/conc\n\ngo 1.20\n\nrequire github.com/stretchr/testify v1.8.1\n\nrequire (\n\tgithub.com/davecgh/go-spew v1.1.1 // indirect\n\tgithub.com/kr/pretty v0.3.0 // indirect\n\tgithub.com/pmezard/go-difflib v1.0.0 // indirect\n\tgithub.com/rogpeppe/go-internal v1.9.0 // indirect\n\tgopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect\n\tgopkg.in/yaml.v3 v3.0.1 // indirect\n)\n",
+			mainGo:  "package conc\n",
+			testGo:  "package conc\n\nimport (\n\t\"testing\"\n\n\t\"github.com/stretchr/testify/assert\"\n)\n\nfunc TestX(t *testing.T) { assert.Equal(t, 1, 1) }\n",
+		},
 	}
 
 	httpGet := func(url string) ([]byte, int, error) {
@@ -82,6 +106,9 @@ func TestTidyRequireSetViaProxy(t *testing.T) {
 			dir := t.TempDir()
 			write(t, dir, "go.mod", tc.goMod)
 			write(t, dir, "main.go", tc.mainGo)
+			if tc.testGo != "" {
+				write(t, dir, "main_test.go", tc.testGo)
+			}
 			runGo(t, dir, "mod", "tidy")
 			wantDirect, wantIndirect := goldenRequires(t, dir)
 			mainImports := scanMainImports(t, dir)

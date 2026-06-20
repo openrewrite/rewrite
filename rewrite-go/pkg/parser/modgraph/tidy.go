@@ -51,15 +51,27 @@ func TidyRequireSet(mainImports []string, mainModulePath, mainGoMod string, res 
 	// loaded[path] = the version each module is selected at in the full build
 	// list (go's `m.Version` — the version a package's module is loaded at).
 	loaded := map[string]string{}
+	var mods []modVer
 	for _, m := range res.BuildList {
 		if !m.Main {
 			loaded[m.Path] = m.Version
+			mods = append(mods, modVer{m.Path, m.Version})
 		}
 	}
-
-	// Reachable modules via imports AND tests, starting from `all`. Their
-	// providing modules are the candidates that may need explicit roots.
-	reachable := testReachableModules(mainImports, mainModulePath, res, src)
+	moduleOf := func(importPath string) (string, string) {
+		best, bestVer := "", ""
+		for _, m := range mods {
+			if importPath == m.path || strings.HasPrefix(importPath, m.path+"/") {
+				if len(m.path) > len(best) {
+					best, bestVer = m.path, m.version
+				}
+			}
+		}
+		return best, bestVer
+	}
+	isLocal := func(importPath string) bool {
+		return importPath == mainModulePath || strings.HasPrefix(importPath, mainModulePath+"/")
+	}
 
 	// Current root set: everything NeededModules already requires.
 	roots := map[string]string{}
@@ -76,27 +88,67 @@ func TidyRequireSet(mainImports []string, mainModulePath, mainGoMod string, res 
 	// entirely in memory — no per-iteration re-resolution.
 	idx := newReqIndex(res, mainGoMod, src)
 
-	// Iterate: under the current roots' PRUNED graph, promote any reachable
-	// module that is under-selected to a root. Adding roots raises selections,
-	// so repeat to a fixpoint (bounded by the number of candidates).
-	for {
-		sel := prunedSelectInMemory(roots, idx)
-		added := false
-		for path := range reachable {
-			if _, isRoot := roots[path]; isRoot {
-				continue
-			}
-			want, have := loaded[path], sel[path]
-			if want == "" {
-				continue
-			}
-			if have == "" || semver.Compare(have, want) < 0 {
-				roots[path] = want
-				added = true
-			}
+	// Walk the package import graph FRONTIER BY FRONTIER, by increasing import-
+	// stack depth, mirroring cmd/go/internal/modload.tidyPrunedRoots. At each
+	// frontier we recompute the pruned selection under the roots accumulated so
+	// far, then promote any frontier module the pruned graph under-selects. This
+	// ordering is essential: promoting a shallow module (e.g. kr/pretty) pins its
+	// deeper requirements (kr/text) BEFORE they are examined, so they are not
+	// wrongly promoted. A package's TEST imports are deferred one frontier deeper
+	// (go models this as a separate `<pkg>.test` node) so test-transitive deps
+	// sort below ordinary ones.
+	type qitem struct {
+		path   string
+		isTest bool
+	}
+	queued := map[string]bool{}
+	var queue []qitem
+	enq := func(path string, isTest bool) {
+		if isStdlibImport(path) || isLocal(path) {
+			return
 		}
-		if !added {
-			break
+		k := path
+		if isTest {
+			k += "\x00t"
+		}
+		if !queued[k] {
+			queued[k] = true
+			queue = append(queue, qitem{path, isTest})
+		}
+	}
+	for _, imp := range mainImports {
+		enq(imp, false)
+	}
+
+	for len(queue) > 0 {
+		sel := prunedSelectInMemory(roots, idx)
+		frontier := queue
+		queue = nil
+		for _, it := range frontier {
+			mod, ver := moduleOf(it.path)
+			if mod == "" {
+				continue
+			}
+			imports, testImports, err := packageImportsWithTests(src, mod, ver, it.path)
+			if err == nil {
+				if it.isTest {
+					for _, d := range testImports {
+						enq(d, false)
+					}
+				} else {
+					for _, d := range imports {
+						enq(d, false)
+					}
+					enq(it.path, true) // the package's test node, one frontier deeper
+				}
+			}
+			if _, isRoot := roots[mod]; !isRoot {
+				want := loaded[mod]
+				have := sel[mod]
+				if want != "" && (have == "" || semver.Compare(have, want) < 0) {
+					roots[mod] = want
+				}
+			}
 		}
 	}
 
@@ -257,65 +309,5 @@ func prunedSelectInMemory(roots map[string]string, idx *reqIndex) map[string]str
 	return present
 }
 
-// testReachableModules returns the set of module paths reachable from the main
-// module's imports by following BOTH ordinary and test imports, recursively. It
-// maps each reached package to its providing build-list module. This is the set
-// of modules `go mod tidy` considers when deciding which need explicit roots for
-// the pruned graph to be reproducible.
-func testReachableModules(mainImports []string, mainModulePath string, res Result, src ModSource) map[string]bool {
-	type modver struct{ path, version string }
-	var mods []modver
-	for _, m := range res.BuildList {
-		if !m.Main {
-			mods = append(mods, modver{m.Path, m.Version})
-		}
-	}
-	moduleOf := func(importPath string) (string, string) {
-		best, bestVer := "", ""
-		for _, m := range mods {
-			if importPath == m.path || strings.HasPrefix(importPath, m.path+"/") {
-				if len(m.path) > len(best) {
-					best, bestVer = m.path, m.version
-				}
-			}
-		}
-		return best, bestVer
-	}
-	isLocal := func(importPath string) bool {
-		return importPath == mainModulePath || strings.HasPrefix(importPath, mainModulePath+"/")
-	}
-
-	out := map[string]bool{}
-	visited := map[string]bool{}
-	var queue []string
-	queue = append(queue, mainImports...)
-
-	for len(queue) > 0 {
-		imp := queue[0]
-		queue = queue[1:]
-		if visited[imp] || isStdlibImport(imp) || isLocal(imp) {
-			continue
-		}
-		visited[imp] = true
-		m, ver := moduleOf(imp)
-		if m == "" {
-			continue
-		}
-		out[m] = true
-		imports, testImports, err := packageImportsWithTests(src, m, ver, imp)
-		if err != nil {
-			continue
-		}
-		for _, dep := range imports {
-			if !visited[dep] {
-				queue = append(queue, dep)
-			}
-		}
-		for _, dep := range testImports {
-			if !visited[dep] {
-				queue = append(queue, dep)
-			}
-		}
-	}
-	return out
-}
+// modVer is a build-list module path at its selected version.
+type modVer struct{ path, version string }
