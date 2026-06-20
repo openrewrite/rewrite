@@ -29,6 +29,7 @@ import org.openrewrite.style.Style;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.Collections.singleton;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
 
@@ -59,38 +60,54 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         J j = tree;
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
+            String sourcePath = cu.getSourcePath().toString();
+            boolean isKotlin = !(cu instanceof J.CompilationUnit) && (sourcePath.endsWith(".kt") || sourcePath.endsWith(".kts"));
             ImportLayoutStyle importLayoutStyle = Style.from(ImportLayoutStyle.class, cu, IntelliJ::importLayout);
 
             boolean typeUsed = false;
+            Set<String> types = new HashSet<>(singleton(type));
             Set<String> otherTypesInPackageUsed = new TreeSet<>();
 
             Set<String> methodsAndFieldsUsed = new HashSet<>();
             Set<String> otherMethodsAndFieldsInTypeUsed = new TreeSet<>();
             Set<String> originalImports = new HashSet<>();
             for (J.Import cuImport : cu.getImports()) {
-                if (cuImport.getQualid().getType() != null) {
-                    originalImports.add(((JavaType.FullyQualified) cuImport.getQualid().getType()).getFullyQualifiedName().replace("$", "."));
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(cuImport.getQualid().getType());
+                if (fq != null) {
+                    String fqnType = TypeUtils.toFullyQualifiedName(fq.getFullyQualifiedName());
+                    originalImports.add(fqnType);
+                    if (isKotlin && TypeUtils.fullyQualifiedNamesAreEqual(type, fqnType)) {
+                        collectSupertypeNames(fq, types);
+                    }
                 }
             }
 
             for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
-                if (fq != null && (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), type) ||
+                if (fq != null && (fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), types) ||
                         TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), owner))) {
                     methodsAndFieldsUsed.add(variable.getName());
                 }
             }
 
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
-                if (method.hasFlags(Flag.Static)) {
-                    String declaringType = method.getDeclaringType().getFullyQualifiedName();
-                    if (TypeUtils.fullyQualifiedNamesAreEqual(declaringType, type)) {
+                if (method.hasFlags(Flag.Static) || isKotlin) {
+                    String declaringType = TypeUtils.toFullyQualifiedName(method.getDeclaringType().getFullyQualifiedName());
+                    if (fullyQualifiedNamesAreEqual(declaringType, types)) {
                         methodsAndFieldsUsed.add(method.getName());
                     } else if (declaringType.equals(owner)) {
                         if (method.getName().equals(type.substring(type.lastIndexOf('.') + 1))) {
                             methodsAndFieldsUsed.add(method.getName());
                         } else {
                             otherMethodsAndFieldsInTypeUsed.add(method.getName());
+                        }
+                    } else if (isKotlin && (declaringType.endsWith("Kt") || declaringType.endsWith("Kts"))) {
+                        // Top-level Kotlin functions are compiled into a "<File>Kt" facade class, but
+                        // are imported by their package-qualified name (e.g. `org.example.one`).
+                        String packageName = method.getDeclaringType().getPackageName();
+                        String topLevelFqn = packageName.isEmpty() ? method.getName() : packageName + "." + method.getName();
+                        if (fullyQualifiedNamesAreEqual(topLevelFqn, types)) {
+                            methodsAndFieldsUsed.add(method.getName());
                         }
                     }
                 }
@@ -99,7 +116,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
                 if (javaType instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
-                    if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), type)) {
+                    if (fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), types)) {
                         typeUsed = true;
                     } else if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), owner) ||
                             TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getPackageName(), owner)) {
@@ -122,13 +139,14 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 }
 
                 String typeName = import_.getTypeName();
-                if (import_.isStatic()) {
-                    String imported = import_.getQualid().getSimpleName();
-                    if (TypeUtils.fullyQualifiedNamesAreEqual(typeName + "." + imported, type) && (force || !methodsAndFieldsUsed.contains(imported))) {
+                String imported = import_.getQualid().getSimpleName();
+                if (import_.isStatic() || (isKotlin && !"*".equals(imported))) {
+                    if (fullyQualifiedNamesAreEqual(typeName + "." + imported, types) && (force || !methodsAndFieldsUsed.contains(imported))) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
-                    } else if ("*".equals(imported) && (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) ||
+                    } else if ("*".equals(imported) && (fullyQualifiedNamesAreEqual(typeName, types) ||
+                            type.contains(".") && fullyQualifiedNamesAreEqual(typeName + type.substring(type.lastIndexOf('.')), types) ||
                             !owner.isEmpty() && TypeUtils.fullyQualifiedNamesAreEqual(typeName, owner))) {
                         if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
                             spaceForNextImport.set(import_.getPrefix());
@@ -138,12 +156,12 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                             methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
                             return unfoldStarImport(import_, methodsAndFieldsUsed, cu);
                         }
-                    } else if (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) && !methodsAndFieldsUsed.contains(imported)) {
+                    } else if (fullyQualifiedNamesAreEqual(typeName, types) && !methodsAndFieldsUsed.contains(imported)) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
                     }
-                } else if (!keepImport && TypeUtils.fullyQualifiedNamesAreEqual(typeName, type)) {
+                } else if (!keepImport && fullyQualifiedNamesAreEqual(typeName, types)) {
                     spaceForNextImport.set(import_.getPrefix());
                     return null;
                 } else if (!keepImport && import_.getPackageName().equals(owner) &&
@@ -182,6 +200,39 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         }
 
         return j;
+    }
+
+    private static void collectSupertypeNames(JavaType.FullyQualified fq, Set<String> types) {
+        JavaType.Class owningClass = TypeUtils.asClass(fq.getOwningClass());
+        if (owningClass != null) {
+            Queue<JavaType.FullyQualified> toVisit = new LinkedList<>(owningClass.getInterfaces());
+            Set<JavaType.FullyQualified> visited = new HashSet<>();
+            while (!toVisit.isEmpty()) {
+                JavaType.FullyQualified current = toVisit.poll();
+                if (!visited.add(current)) {
+                    continue;
+                }
+                toVisit.addAll(current.getInterfaces());
+            }
+            for (JavaType.FullyQualified current : visited) {
+                types.add(TypeUtils.toFullyQualifiedName(current.getFullyQualifiedName()));
+            }
+        }
+        Set<JavaType.FullyQualified> visitedSupertypes = new HashSet<>();
+        JavaType.FullyQualified current = fq;
+        while (current.getSupertype() != null && visitedSupertypes.add(current.getSupertype())) {
+            current = current.getSupertype();
+            types.add(TypeUtils.toFullyQualifiedName(current.getFullyQualifiedName()));
+        }
+    }
+
+    private boolean fullyQualifiedNamesAreEqual(String declaringType, Collection<String> types) {
+        for (String type : types) {
+            if (TypeUtils.fullyQualifiedNamesAreEqual(declaringType, type)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private long countTrailingLinebreaks(Space space) {
