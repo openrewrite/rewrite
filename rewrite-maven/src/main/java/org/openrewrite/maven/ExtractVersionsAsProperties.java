@@ -46,7 +46,8 @@ public class ExtractVersionsAsProperties extends Recipe {
                 Map<String, String> existingProps = loadExistingProperties(document.getRoot());
                 Map<String, String> groupSharedVersion = GroupVersionAnalyzer.analyze(document.getRoot(), existingProps);
                 propertyResolver = new PropertyResolver(groupSharedVersion, existingProps);
-                schedulePropertyRenames(document.getRoot(), existingProps, groupSharedVersion);
+                PropertyRenamer.findRenames(document.getRoot(), groupSharedVersion, existingProps)
+                    .forEach((oldKey, newKey) -> applyRename(oldKey, newKey, existingProps));
                 return super.visitDocument(document, ctx);
             }
 
@@ -64,12 +65,6 @@ public class ExtractVersionsAsProperties extends Recipe {
                         child -> child.getValue().get(),
                         (a, b) -> a,
                         LinkedHashMap::new));
-            }
-
-            private void schedulePropertyRenames(Xml.Tag root, Map<String, String> existingProps,
-                                                 Map<String, String> groupSharedVersion) {
-                PropertyRenamer.findRenames(root, existingProps, groupSharedVersion)
-                    .forEach((oldKey, newKey) -> applyRename(oldKey, newKey, existingProps));
             }
 
             private void applyRename(String oldKey, String newKey, Map<String, String> existingProps) {
@@ -175,8 +170,8 @@ public class ExtractVersionsAsProperties extends Recipe {
     private static class PropertyRenamer {
         // For deps in a shared-version group that already reference a non-standard ${propName},
         // returns oldKey→newKey pairs so the visitor can schedule RenamePropertyKey for each.
-        static Map<String, String> findRenames(Xml.Tag root, Map<String, String> existingProps,
-                                               Map<String, String> groupSharedVersion) {
+        static Map<String, String> findRenames(Xml.Tag root, Map<String, String> groupSharedVersion,
+                                               Map<String, String> existingProps) {
             return allDescendants(root)
                 .filter(tag -> "dependency".equals(tag.getName()) || "plugin".equals(tag.getName()))
                 .flatMap(tag -> toNonStandardRenameEntry(tag, existingProps, groupSharedVersion))
