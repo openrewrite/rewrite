@@ -227,6 +227,20 @@ func init() {
 	RegisterFactory("org.openrewrite.tree.ParseError", func() any { return &java.ParseError{Ident: uuid.New()} })
 	RegisterFactory("org.openrewrite.ParseExceptionResult", func() any { return java.ParseExceptionResult{} })
 
+	// PlainText — received only (the CLI's Go build step backfills one for any
+	// .go file the parser doesn't return); GoModTidy reads its imports.
+	RegisterFactory("org.openrewrite.text.PlainText", func() any { return &java.PlainText{Ident: uuid.New()} })
+
+	// java.time.* leaf values appear inside FileAttributes (creation /
+	// lastModified / lastAccess times) on PlainText files read from disk. We
+	// discard FileAttributes, but the receiver still instantiates each leaf via
+	// newObj before discarding its value — register benign factories so an
+	// otherwise-unknown type doesn't panic mid-receive.
+	RegisterFactory("java.time.ZonedDateTime", func() any { return "" })
+	RegisterFactory("java.time.Instant", func() any { return "" })
+	RegisterFactory("java.time.LocalDateTime", func() any { return "" })
+	RegisterFactory("java.time.OffsetDateTime", func() any { return "" })
+
 	// SourceFile-level types that implement RpcCodec
 	RegisterFactory("org.openrewrite.Checksum", func() any { return java.GenericMarker{JavaType: "org.openrewrite.Checksum"} })
 	RegisterFactory("org.openrewrite.FileAttributes", func() any { return java.GenericMarker{JavaType: "org.openrewrite.FileAttributes"} })

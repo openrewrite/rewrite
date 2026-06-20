@@ -480,23 +480,27 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *java.VariableDeclarations, par
 	if vd.TypeExpr != nil {
 		p.Visit(vd.TypeExpr, out)
 	}
-	// Then struct tag, reconstructed from LeadingAnnotations (one
-	// Annotation per `key:"value"` pair). Only emitted when this
-	// VariableDeclarations is a struct field — non-struct positions
-	// don't allow tags syntactically. Inner-leading / inner-trailing
-	// whitespace is normalized to gofmt's canonical zero-padding (we
-	// chose Option 1 in the design discussion: lossy on non-canonical
-	// input, exact on gofmt'd input).
-	if len(vd.LeadingAnnotations) > 0 && p.insideStructType() {
-		first := vd.LeadingAnnotations[0]
-		p.visitSpace(first.Prefix, out)
-		out.Append("`")
-		p.printAnnotationBody(first, out)
-		for _, ann := range vd.LeadingAnnotations[1:] {
-			p.visitSpace(ann.Prefix, out)
-			p.printAnnotationBody(ann, out)
+	// Then the struct field tag. A non-canonical tag (double-quoted, or with
+	// non-gofmt inner whitespace) is stored verbatim on a StructTag marker —
+	// emit it as-is so it round-trips exactly. Otherwise reconstruct the
+	// canonical backtick-wrapped `key:"value"` form from LeadingAnnotations
+	// (one Annotation per pair). Only emitted in struct-field position —
+	// non-struct positions don't allow tags syntactically.
+	if p.insideStructType() {
+		if st := java.FindMarker[golang.StructTag](vd.Markers); st != nil && st.Tag != nil {
+			p.visitSpace(st.Tag.Prefix, out)
+			out.Append(st.Tag.Source)
+		} else if len(vd.LeadingAnnotations) > 0 {
+			first := vd.LeadingAnnotations[0]
+			p.visitSpace(first.Prefix, out)
+			out.Append("`")
+			p.printAnnotationBody(first, out)
+			for _, ann := range vd.LeadingAnnotations[1:] {
+				p.visitSpace(ann.Prefix, out)
+				p.printAnnotationBody(ann, out)
+			}
+			out.Append("`")
 		}
-		out.Append("`")
 	}
 	// Then initializers
 	firstInit := true

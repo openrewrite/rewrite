@@ -536,10 +536,11 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 		}
 	})
 	var entries []java.Marker
-	if afterAny != nil {
-		entries = make([]java.Marker, len(afterAny))
-		for i, v := range afterAny {
-			entries[i] = v.(java.Marker)
+	for _, v := range afterAny {
+		// Skip a nil/non-Marker entry — an RPC NO_CHANGE delta resolved against
+		// a diverged baseline — instead of a panicking type assertion.
+		if m, ok := v.(java.Marker); ok {
+			entries = append(entries, m)
 		}
 	}
 	return java.Markers{ID: id, Entries: entries}

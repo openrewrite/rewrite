@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"go/ast"
 	"go/build"
+	"go/constant"
 	"go/importer"
 	"go/parser"
 	"go/token"
 	"go/types"
+	"math"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -72,19 +74,51 @@ type FileInput struct {
 	Content string
 }
 
+// FileImports returns the import paths declared in a single Go source file,
+// parsed imports-only. Unlike ParsePackage it ignores build constraints and
+// never type-checks, so it works for any file regardless of the host platform
+// — useful for unioning imports across build configurations the way
+// `go mod tidy` does (e.g. reading the dependencies of a `//go:build windows`
+// file on Linux, where it would otherwise be excluded from the LST). Returns
+// nil on parse error.
+func FileImports(content string) []string {
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "", content, parser.ImportsOnly)
+	if err != nil || f == nil {
+		return nil
+	}
+	out := make([]string, 0, len(f.Imports))
+	for _, spec := range f.Imports {
+		if spec.Path == nil {
+			continue
+		}
+		if p, err := strconv.Unquote(spec.Path.Value); err == nil && p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // Parse parses a single Go source file and returns its CompilationUnit.
 // Convenience wrapper around ParsePackage for the common one-file case;
 // type attribution that depends on sibling files in the same package
 // won't resolve here. Use ParsePackage when sibling files matter.
 func (gp *GoParser) Parse(sourcePath string, source string) (*golang.CompilationUnit, error) {
-	cus, err := gp.ParsePackage([]FileInput{{Path: sourcePath, Content: source}})
-	if err != nil {
-		return nil, err
-	}
-	if len(cus) == 0 {
+	files := gp.ParsePackage([]FileInput{{Path: sourcePath, Content: source}})
+	if len(files) == 0 {
 		return nil, fmt.Errorf("no compilation unit produced")
 	}
-	return cus[0], nil
+	switch f := files[0].(type) {
+	case *golang.CompilationUnit:
+		return f, nil
+	case *java.ParseError:
+		if cause := f.Cause(); cause != nil {
+			return nil, cause
+		}
+		return nil, fmt.Errorf("parse error in %s", sourcePath)
+	default:
+		return nil, fmt.Errorf("unexpected parse result %T for %s", files[0], sourcePath)
+	}
 }
 
 // ParsePackage parses every file in a single Go package together so
@@ -93,77 +127,101 @@ func (gp *GoParser) Parse(sourcePath string, source string) (*golang.Compilation
 // types.Info populated by one types.Config.Check call.
 //
 // All files MUST belong to the same package (same `package` clause).
-// Order in the returned slice matches the input order.
-func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, error) {
+//
+// It returns one SourceFile per build-included input, in input order: a
+// *golang.CompilationUnit when the file parses, or a *java.ParseError when
+// it does not. A single malformed file never takes down its siblings and
+// never silently disappears — it travels as a ParseError so the Java side
+// represents it as such instead of falling back to a PlainText/Quark.
+// Files the build context excludes (`//go:build` / OS-arch suffix) are
+// omitted: they are not part of this build, which is not a parse failure.
+func (gp *GoParser) ParsePackage(files []FileInput) []java.Tree {
 	if len(files) == 0 {
-		return nil, nil
-	}
-
-	// Filter out files excluded by the build context — `//go:build` /
-	// `// +build` constraints and OS/arch filename suffixes. Skipped
-	// files don't appear in the output at all (they're as if they
-	// weren't passed in).
-	filtered := make([]FileInput, 0, len(files))
-	for _, f := range files {
-		if MatchBuildContext(gp.BuildContext, filepath.Base(f.Path), f.Content) {
-			filtered = append(filtered, f)
-		}
-	}
-	files = filtered
-	if len(files) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	fset := token.NewFileSet()
+
+	// One outcome per build-included file, in input order: a parsed AST or
+	// the parse error. Build-excluded files are not represented at all.
+	type outcome struct {
+		input FileInput
+		ast   *ast.File // nil when err != nil
+		err   error
+	}
+	outcomes := make([]outcome, 0, len(files))
 	asts := make([]*ast.File, 0, len(files))
 	for _, f := range files {
+		if !MatchBuildContext(gp.BuildContext, filepath.Base(f.Path), f.Content) {
+			continue
+		}
 		a, err := parser.ParseFile(fset, f.Path, f.Content, parser.ParseComments)
 		if err != nil {
-			return nil, fmt.Errorf("parse %s: %w", f.Path, err)
+			outcomes = append(outcomes, outcome{input: f, err: err})
+			continue
 		}
+		outcomes = append(outcomes, outcome{input: f, ast: a})
 		asts = append(asts, a)
 	}
-
-	typeInfo := &types.Info{
-		Types:      make(map[ast.Expr]types.TypeAndValue),
-		Defs:       make(map[*ast.Ident]types.Object),
-		Uses:       make(map[*ast.Ident]types.Object),
-		Selections: make(map[*ast.SelectorExpr]*types.Selection),
-		// Instances records identifiers denoting generic functions/types that are
-		// instantiated with explicit type arguments, e.g. the `Map` in `Map[int]`.
-		// Used to distinguish generic instantiation from ordinary indexing.
-		Instances: make(map[*ast.Ident]types.Instance),
-	}
-	conf := types.Config{
-		Importer: gp.Importer,
-		// Don't fail on type errors — we want partial type info even when
-		// some imports can't be resolved.
-		Error: func(error) {},
+	if len(outcomes) == 0 {
+		return nil
 	}
 
-	// Use the first file's package name as the type-checker hint;
-	// types.Config.Check validates that all files agree.
-	pkgName := "main"
-	if asts[0].Name != nil {
-		pkgName = asts[0].Name.Name
-	}
-	_, _ = conf.Check(pkgName, fset, asts, typeInfo)
+	// Type-check every file that parsed, together, so cross-file references
+	// resolve. Skipped entirely when nothing parsed (all inputs failed).
+	var typeInfo *types.Info
+	var mapper *typeMapper
+	if len(asts) > 0 {
+		typeInfo = &types.Info{
+			Types:      make(map[ast.Expr]types.TypeAndValue),
+			Defs:       make(map[*ast.Ident]types.Object),
+			Uses:       make(map[*ast.Ident]types.Object),
+			Selections: make(map[*ast.SelectorExpr]*types.Selection),
+			// Instances records identifiers denoting generic functions/types that are
+			// instantiated with explicit type arguments, e.g. the `Map` in `Map[int]`.
+			// Used to distinguish generic instantiation from ordinary indexing.
+			Instances: make(map[*ast.Ident]types.Instance),
+		}
+		conf := types.Config{
+			Importer: gp.Importer,
+			// Don't fail on type errors — we want partial type info even when
+			// some imports can't be resolved.
+			Error: func(error) {},
+		}
 
-	mapper := newTypeMapper()
-	cus := make([]*golang.CompilationUnit, 0, len(files))
-	for i, f := range files {
+		// Hint the package name with the first parsed file's. Internal/external
+		// test files (`foo` vs `foo_test`) in the same directory are
+		// type-checked best-effort; errors are ignored, and imports (what
+		// `go mod tidy` needs) are captured regardless.
+		pkgName := "main"
+		for _, o := range outcomes {
+			if o.ast != nil && o.ast.Name != nil {
+				pkgName = o.ast.Name.Name
+				break
+			}
+		}
+		_, _ = conf.Check(pkgName, fset, asts, typeInfo)
+		mapper = newTypeMapper()
+	}
+
+	out := make([]java.Tree, 0, len(outcomes))
+	for _, o := range outcomes {
+		if o.err != nil {
+			out = append(out, java.NewParseError(o.input.Path, o.input.Content, o.err))
+			continue
+		}
 		ctx := &parseContext{
-			src:      []byte(f.Content),
+			src:      []byte(o.input.Content),
 			fset:     fset,
-			file:     fset.File(asts[i].Pos()),
-			astFile:  asts[i],
+			file:     fset.File(o.ast.Pos()),
+			astFile:  o.ast,
 			cursor:   0,
 			typeInfo: typeInfo,
 			mapper:   mapper,
 		}
-		cus = append(cus, ctx.mapFile(asts[i], f.Path))
+		out = append(out, ctx.mapFile(o.ast, o.input.Path))
 	}
-	return cus, nil
+	return out
 }
 
 // parseContext holds the state needed during AST-to-LST mapping.
@@ -1901,19 +1959,87 @@ func (ctx *parseContext) mapIdent(ident *ast.Ident) *java.Identifier {
 	return id
 }
 
-// mapBasicLit maps a basic literal (string, int, float, etc.)
+// mapBasicLit maps a basic literal (string, int, float, etc.).
+//
+// Source keeps the exact Go literal text (the printer emits Source, so output
+// is byte-identical), but Value is normalized into a form org.openrewrite's
+// J.Literal — a boxed Java primitive — can coerce. Go literal syntax (hex /
+// octal / binary / underscore integers, quoted runes) is not what Java's
+// Integer/Byte/Char.valueOf accepts, and Go's wider ranges (uint8 0..255,
+// int64) overflow the Java primitive the type maps to. Left un-normalized, V3's
+// coerceLiteralValue throws NumberFormatException mid-receive and desyncs the
+// whole RPC stream (surfacing as unrelated downstream NPEs).
 func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 	prefix := ctx.prefix(lit.Pos())
 	ctx.skip(len(lit.Value))
 
 	l := &java.Literal{ID: uuid.New(), Prefix: prefix, Value: lit.Value, Source: lit.Value}
 
-	// Type attribution for literal
-	if tv, ok := ctx.typeInfo.Types[lit]; ok {
+	tv, ok := ctx.typeInfo.Types[lit]
+	if ok {
 		l.Type = ctx.mapper.mapType(tv.Type)
 	}
 
+	// Normalize numeric/rune Value from the exact constant go/types computed.
+	// String literals pass through unchanged (Java coerces String as-is).
+	if ok && tv.Value != nil {
+		switch tv.Value.Kind() {
+		case constant.Int:
+			l.Value, l.Type = normalizeIntLiteral(tv.Value, lit.Kind, l.Type)
+		case constant.Float:
+			f, _ := constant.Float64Val(tv.Value)
+			l.Value = strconv.FormatFloat(f, 'g', -1, 64)
+		case constant.Complex:
+			// Java has no complex primitive; keep the real part as a double so
+			// coercion doesn't choke on Go's `i` suffix.
+			f, _ := constant.Float64Val(constant.Real(tv.Value))
+			l.Value = strconv.FormatFloat(f, 'g', -1, 64)
+		}
+	}
+
 	return l
+}
+
+// normalizeIntLiteral returns a Java-parseable Value and a primitive type wide
+// enough to hold it. A rune literal typed `char` becomes the character itself
+// (Java Character.charAt(0)) when it fits the Basic Multilingual Plane;
+// otherwise it is the numeric code point.
+func normalizeIntLiteral(v constant.Value, kind token.Token, typ java.JavaType) (string, java.JavaType) {
+	i, exact := constant.Int64Val(v)
+	if !exact {
+		// Exceeds int64 (a large uint64): use the signed wraparound so Java's
+		// Long.valueOf parses it, and widen the type to long.
+		if u, ok := constant.Uint64Val(v); ok {
+			return strconv.FormatInt(int64(u), 10), &java.JavaTypePrimitive{Keyword: "long"}
+		}
+		return v.String(), typ
+	}
+	if isPrimitive(typ, "char") {
+		if i >= 0 && i <= 0xFFFF {
+			return string(rune(i)), typ
+		}
+		// Supplementary-plane rune: a Java char can't hold it — treat as int.
+		return strconv.FormatInt(i, 10), &java.JavaTypePrimitive{Keyword: "int"}
+	}
+	return strconv.FormatInt(i, 10), widenIntType(typ, i)
+}
+
+// widenIntType promotes a Java primitive when the value doesn't fit it: a Go
+// byte (0..255) overflows Java's signed byte, and a Go int64 overflows Java int.
+func widenIntType(typ java.JavaType, i int64) java.JavaType {
+	if i < math.MinInt32 || i > math.MaxInt32 {
+		return &java.JavaTypePrimitive{Keyword: "long"}
+	}
+	if isPrimitive(typ, "byte") && (i < math.MinInt8 || i > math.MaxInt8) {
+		return &java.JavaTypePrimitive{Keyword: "int"}
+	}
+	return typ
+}
+
+// isPrimitive reports whether t is the given Java primitive keyword.
+func isPrimitive(t java.JavaType, keyword string) bool {
+	p, ok := t.(*java.JavaTypePrimitive)
+	return ok && p.Keyword == keyword
 }
 
 // hoistLeftPrefix detaches the leading whitespace from a node's first child
@@ -2959,7 +3085,21 @@ func (ctx *parseContext) mapStructTag(vd *java.VariableDeclarations, tag *ast.Ba
 	}
 
 	pairs := parseStructTagPairs(raw)
-	if len(pairs) == 0 {
+	if !isCanonicalStructTag(tag.Value, pairs) {
+		// Non-canonical tag — double-quoted (e.g. "form:\"idx\""), only
+		// partially parseable, or with non-gofmt inner whitespace — cannot be
+		// losslessly reconstructed from the decomposed `key:"value"` annotation
+		// form (the printer always re-emits canonical backtick-wrapped pairs).
+		// Store it verbatim so it round-trips exactly. Recipes get decomposed
+		// pairs only for canonical gofmt'd tags.
+		vd.Markers.Entries = append(vd.Markers.Entries, golang.StructTag{
+			Ident: uuid.New(),
+			Tag: &java.Literal{
+				ID:     uuid.New(),
+				Prefix: outerPrefix,
+				Source: tag.Value,
+			},
+		})
 		return
 	}
 
@@ -3106,6 +3246,33 @@ type structTagPair struct {
 	Key           string
 	QuotedValue   string // the value source including its surrounding quotes (e.g. `"name"`)
 	UnquotedValue string // the value contents after Go-string unquoting
+}
+
+// isCanonicalStructTag reports whether a struct tag literal can be losslessly
+// reconstructed from the decomposed `key:"value"` annotation form. That holds
+// only for backtick-delimited tags whose contents are exactly the concatenation
+// of their parsed pairs — i.e. gofmt's canonical form. Double-quoted tags
+// (which the printer would otherwise re-emit as backtick), tags with leading/
+// trailing or odd inner whitespace, and partially-parseable tags all fail here
+// and are stored verbatim instead so they round-trip exactly.
+func isCanonicalStructTag(tagValue string, pairs []structTagPair) bool {
+	if len(pairs) == 0 {
+		return false
+	}
+	if len(tagValue) < 2 || tagValue[0] != '`' || tagValue[len(tagValue)-1] != '`' {
+		return false
+	}
+	inner := tagValue[1 : len(tagValue)-1]
+	var b strings.Builder
+	for i, p := range pairs {
+		if i > 0 {
+			b.WriteString(p.PrefixWS)
+		}
+		b.WriteString(p.Key)
+		b.WriteByte(':')
+		b.WriteString(p.QuotedValue)
+	}
+	return b.String() == inner
 }
 
 // parseStructTagPairs scans a struct tag's contents (without the

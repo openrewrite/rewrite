@@ -253,26 +253,26 @@ func parsePackageGroups(t *testing.T, p *parser.GoParser, flat []SourceSpec) map
 
 	out := map[int]*golang.CompilationUnit{}
 	for dir, group := range byDir {
-		// Pre-filter against BuildContext so post-parse `cus` aligns
-		// with the included subset of `group`.
-		included := make([]indexed, 0, len(group))
 		files := make([]parser.FileInput, 0, len(group))
 		for _, g := range group {
-			if !parser.MatchBuildContext(p.BuildContext, path.Base(g.input.Path), g.input.Content) {
-				continue
-			}
-			included = append(included, g)
 			files = append(files, g.input)
 		}
-		if len(files) == 0 {
-			continue
+		idxByPath := make(map[string]int, len(group))
+		for _, g := range group {
+			idxByPath[g.input.Path] = g.idx
 		}
-		cus, err := p.ParsePackage(files)
-		if err != nil {
-			t.Fatalf("parse error in package %s: %v", dir, err)
-		}
-		for i, cu := range cus {
-			out[included[i].idx] = cu
+		// ParsePackage returns one SourceFile per build-included input,
+		// mapped back by source path; a parse failure arrives as a
+		// ParseError, which a test never expects, so fail loudly.
+		for _, sf := range p.ParsePackage(files) {
+			switch v := sf.(type) {
+			case *golang.CompilationUnit:
+				if idx, ok := idxByPath[v.SourcePath]; ok {
+					out[idx] = v
+				}
+			case *java.ParseError:
+				t.Fatalf("parse error in package %s (%s): %v", dir, v.SourcePath, v.Cause())
+			}
 		}
 	}
 	return out

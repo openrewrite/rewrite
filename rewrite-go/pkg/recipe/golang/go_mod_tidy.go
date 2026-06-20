@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser/modgraph"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang/internal"
@@ -85,17 +86,34 @@ func (r *GoModTidy) EditorWithData(acc any) recipe.TreeVisitor {
 
 // --- scan phase ---
 //
-// NOTE: `go mod tidy` unions imports across ALL build configurations
-// (every GOOS/GOARCH and build tag). This scanner only sees the imports of
-// the .go files present in the LST it is given. If the project was parsed
-// under a single build context (the default), platform-gated imports — e.g.
-// a windows-only dependency in a `//go:build windows` file — will be absent
-// and such modules can be misclassified as indirect. Full parity therefore
-// requires the project to be parsed so that all-platform files are included.
+// `go mod tidy` unions imports across ALL build configurations (every
+// GOOS/GOARCH and build tag). The Go parser type-checks under a single host
+// build context, so files excluded by that context (e.g. a `//go:build
+// windows` file on Linux) are not parsed into a Go.CompilationUnit — the CLI
+// represents them as PlainText instead. To avoid misclassifying their
+// dependencies as unused, the scanner also reads imports out of PlainText
+// `.go` files (parsed imports-only, which is platform-independent). This
+// recovers platform-gated imports without the full cost/ambiguity of
+// per-configuration type-checking.
 
 type goModTidyScanner struct {
 	visitor.GoVisitor
 	acc *tidyAcc
+}
+
+// Visit intercepts PlainText source files — which the framework's Go dispatch
+// has no case for — to harvest imports from build-excluded `.go` files. Every
+// other tree falls through to the normal Go dispatch.
+func (v *goModTidyScanner) Visit(t java.Tree, p any) java.Tree {
+	if pt, ok := t.(*java.PlainText); ok {
+		if strings.HasSuffix(pt.SourcePath, ".go") {
+			for _, imp := range parser.FileImports(pt.Text) {
+				v.acc.rawImports[imp] = true
+			}
+		}
+		return t
+	}
+	return v.GoVisitor.Visit(t, p)
 }
 
 func (v *goModTidyScanner) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {

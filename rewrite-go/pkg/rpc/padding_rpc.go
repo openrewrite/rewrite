@@ -173,7 +173,7 @@ func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
 func receiveLeftPaddedEnum[T any](r Receiver, q *ReceiveQueue, before java.LeftPadded[T], parse func(string) T) java.LeftPadded[T] {
 	result := q.Receive(before, func(v any) any {
 		beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, v)
-		return coerceLeftPaddedEnum(beforeSpace, elem, markers, parse)
+		return coerceLeftPaddedEnum(beforeSpace, elem, markers, parse, before.Element)
 	})
 	if result == nil {
 		return before
@@ -184,14 +184,19 @@ func receiveLeftPaddedEnum[T any](r Receiver, q *ReceiveQueue, before java.LeftP
 // coerceLeftPaddedEnum builds a LeftPadded[T] for an enum slot. The element is either
 // already a T (NO_CHANGE pass-through / pre-typed enum) or the enum's Java
 // enum-constant name as a string, which `parse` resolves to the T constant.
-func coerceLeftPaddedEnum[T any](before java.Space, elem any, m java.Markers, parse func(string) T) java.LeftPadded[T] {
+//
+// beforeElem is the receiver's baseline enum. When the element is absent — a
+// NO_CHANGE delta resolved against a baseline that diverged on an earlier
+// transport — we fall back to it rather than the zero value, which a Go-specific
+// operator (golang.Unary/Binary.Type) would otherwise print as "?".
+func coerceLeftPaddedEnum[T any](before java.Space, elem any, m java.Markers, parse func(string) T, beforeElem T) java.LeftPadded[T] {
 	if e, ok := elem.(T); ok {
 		return java.LeftPadded[T]{Before: before, Element: e, Markers: m}
 	}
 	if s, ok := elem.(string); ok {
 		return java.LeftPadded[T]{Before: before, Element: parse(s), Markers: m}
 	}
-	return java.LeftPadded[T]{Before: before, Markers: m}
+	return java.LeftPadded[T]{Before: before, Element: beforeElem, Markers: m}
 }
 
 // Accessor functions for generic padding types (using type switches for Go's type-parameterized structs)
@@ -316,7 +321,15 @@ func coerceToExpressionRP(rp any) java.RightPadded[java.Expression] {
 	if expr, ok := elem.(java.Expression); ok {
 		return java.RightPadded[java.Expression]{Element: expr, After: after, Markers: m}
 	}
-	panic(fmt.Sprintf("coerceToExpressionRP: element does not implement java.Expression (rp=%T elem=%T nil=%v)", rp, elem, elem == nil))
+	if elem == nil {
+		// A nil element is an RPC NO_CHANGE delta resolved against a diverged
+		// receiver baseline, not real corruption: degrade to an element-less
+		// padding instead of panicking. A panic here drops the whole file and
+		// poisons the batch stream (cascading into unrelated trees); a dropped
+		// element is recoverable. A non-nil wrong type IS a real bug → still panic.
+		return java.RightPadded[java.Expression]{After: after, Markers: m}
+	}
+	panic(fmt.Sprintf("coerceToExpressionRP: element does not implement java.Expression (rp=%T elem=%T)", rp, elem))
 }
 
 // coerceToStatementRP converts a RightPadded of any variant to RightPadded[Statement].
@@ -331,7 +344,12 @@ func coerceToStatementRP(rp any) java.RightPadded[java.Statement] {
 	if stmt, ok := elem.(java.Statement); ok {
 		return java.RightPadded[java.Statement]{Element: stmt, After: after, Markers: m}
 	}
-	panic(fmt.Sprintf("coerceToStatementRP: element does not implement java.Statement (rp=%T elem=%T nil=%v)", rp, elem, elem == nil))
+	if elem == nil {
+		// Nil element = RPC NO_CHANGE against a diverged baseline (see
+		// coerceToExpressionRP); degrade rather than crash the whole file.
+		return java.RightPadded[java.Statement]{After: after, Markers: m}
+	}
+	panic(fmt.Sprintf("coerceToStatementRP: element does not implement java.Statement (rp=%T elem=%T)", rp, elem))
 }
 
 // coerceLeftPaddedIdent converts a LeftPadded of any variant to LeftPadded[*Identifier].

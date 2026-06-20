@@ -54,6 +54,10 @@ func (r *GoReceiver) Visit(t java.Tree, p any) java.Tree {
 		c := *pe
 		return r.receiveParseError(&c, p.(*ReceiveQueue))
 	}
+	if pt, ok := t.(*java.PlainText); ok {
+		c := *pt
+		return r.receivePlainText(&c, p.(*ReceiveQueue))
+	}
 	if gm, ok := t.(*golang.GoMod); ok {
 		c := *gm
 		return receiveGoMod(&c, p.(*ReceiveQueue))
@@ -76,7 +80,17 @@ func (r *GoReceiver) receiveParseError(pe *java.ParseError, q *ReceiveQueue) *ja
 			pe.Ident = parsed
 		}
 	}
-	pe.Markers = receiveMarkersCodec(q, pe.Markers)
+	// markers is a nested object: consume its envelope via q.Receive, then read
+	// sub-fields in the onChange (matches JavaReceiver.PreVisit / receivePlainText).
+	// A direct receiveMarkersCodec call skips the envelope and desyncs the queue
+	// on any marker-bearing ParseError.
+	if result := q.Receive(pe.Markers, func(v any) any {
+		return receiveMarkersCodec(q, v.(java.Markers))
+	}); result != nil {
+		if mk, ok := result.(java.Markers); ok {
+			pe.Markers = mk
+		}
+	}
 	pe.SourcePath = receiveScalar[string](q, pe.SourcePath)
 	pe.CharsetName = receiveScalar[string](q, pe.CharsetName)
 	pe.CharsetBomMarked = receiveScalar[bool](q, pe.CharsetBomMarked)
@@ -84,6 +98,65 @@ func (r *GoReceiver) receiveParseError(pe *java.ParseError, q *ReceiveQueue) *ja
 	q.Receive(nil, nil) // fileAttributes
 	pe.Text = receiveScalar[string](q, pe.Text)
 	return pe
+}
+
+// receivePlainText deserializes a PlainText matching the canonical field order
+// in org.openrewrite.text.PlainTextRpcCodec (and rewrite-javascript's
+// text/rpc.ts): id, markers, sourcePath, charsetName, charsetBomMarked,
+// checksum, fileAttributes, text, snippets. The Go side only reads SourcePath
+// and Text; checksum / fileAttributes / each snippet's fields are consumed and
+// discarded so the wire stays in lockstep.
+func (r *GoReceiver) receivePlainText(pt *java.PlainText, q *ReceiveQueue) *java.PlainText {
+	idStr := receiveScalar[string](q, pt.Ident.String())
+	if idStr != "" {
+		if parsed, err := uuid.Parse(idStr); err == nil {
+			pt.Ident = parsed
+		}
+	}
+	// markers: a nested object — consume its envelope via q.Receive, then read
+	// its sub-fields in the onChange, mirroring JavaReceiver.PreVisit. Calling
+	// receiveMarkersCodec directly (as receiveParseError does) skips the
+	// envelope message and desyncs the queue on any real, marker-bearing file.
+	if result := q.Receive(pt.Markers, func(v any) any {
+		return receiveMarkersCodec(q, v.(java.Markers))
+	}); result != nil {
+		if mk, ok := result.(java.Markers); ok {
+			pt.Markers = mk
+		}
+	}
+	pt.SourcePath = receiveScalar[string](q, pt.SourcePath)
+	pt.CharsetName = receiveScalar[string](q, pt.CharsetName)
+	pt.CharsetBomMarked = receiveScalar[bool](q, pt.CharsetBomMarked)
+	// checksum — Checksum.rpcSend sends algorithm (string) + value (byte[]);
+	// nullable, so the onChange only runs when present (matches VisitCompilationUnit).
+	q.Receive(nil, func(v any) any {
+		receiveScalar[string](q, "") // algorithm
+		q.Receive(nil, nil)          // value
+		return nil
+	})
+	// fileAttributes — FileAttributes.rpcSend sends 7 sub-fields (3 timestamps,
+	// 3 bools, size); populated on files read from disk. The timestamps are
+	// java.time.ZonedDateTime leaves (see value_types factories).
+	q.Receive(nil, func(v any) any {
+		q.Receive(nil, nil) // creationTime
+		q.Receive(nil, nil) // lastModifiedTime
+		q.Receive(nil, nil) // lastAccessTime
+		q.Receive(nil, nil) // isReadable
+		q.Receive(nil, nil) // isWritable
+		q.Receive(nil, nil) // isExecutable
+		q.Receive(nil, nil) // size
+		return nil
+	})
+	pt.Text = receiveScalar[string](q, pt.Text)
+	// snippets: a list of {id, markers, text}; empty for files. Consume each
+	// element's fields to keep the queue aligned if a recipe ever produced one.
+	q.ReceiveList(nil, func(v any) any {
+		q.Receive(nil, nil) // snippet id
+		q.Receive(nil, nil) // snippet markers
+		q.Receive(nil, nil) // snippet text
+		return v
+	})
+	return pt
 }
 
 func (r *GoReceiver) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {

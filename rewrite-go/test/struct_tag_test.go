@@ -187,3 +187,57 @@ func TestStructTag_NonStructDoesNotEmitAnnotations(t *testing.T) {
 		}
 	}
 }
+
+// --- Parse/print idempotence for non-canonical tags ---
+//
+// These reproduce real corpus round-trip failures: a struct tag that can't be
+// losslessly reconstructed from the decomposed `key:"value"` annotation form is
+// stored verbatim on a StructTag marker and must round-trip byte-for-byte.
+
+// A struct tag written with double quotes (valid Go, seen in gin's
+// binding_test.go) was being DROPPED entirely, because its escaped inner quotes
+// don't parse as `key:"value"` pairs. It must now round-trip verbatim.
+func TestStructTag_DoubleQuotedRoundtrip(t *testing.T) {
+	src := "package main\n\ntype T struct {\n\tIdx int \"form:\\\"idx\\\"\"\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+	vd := parseStructAndFindField(t, src, "Idx")
+	if java.FindMarker[golang.StructTag](vd.Markers) == nil {
+		t.Errorf("expected a StructTag marker for the non-canonical (double-quoted) tag")
+	}
+	if len(vd.LeadingAnnotations) != 0 {
+		t.Errorf("non-canonical tag should not be decomposed into annotations, got %d", len(vd.LeadingAnnotations))
+	}
+}
+
+// A backtick tag with non-gofmt inner trailing whitespace (seen in caddy's
+// acmeserver.go: `json:"challenges,omitempty" `) was being normalized away.
+// It must now round-trip verbatim.
+func TestStructTag_InnerTrailingWhitespaceRoundtrip(t *testing.T) {
+	src := "package main\n\ntype T struct {\n\tX int `json:\"x\" `\n}\n"
+	cu, err := parser.NewGoParser().Parse("test.go", src)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if got := printer.Print(cu); got != src {
+		t.Errorf("roundtrip mismatch\nexpected: %q\nactual:   %q", src, got)
+	}
+}
+
+// Canonical gofmt'd tags remain decomposed into annotations (no marker), so
+// recipes still get structured access to the common case.
+func TestStructTag_CanonicalStillUsesAnnotations(t *testing.T) {
+	src := "package main\n\ntype T struct {\n\tName string `json:\"name\" db:\"name\"`\n}\n"
+	vd := parseStructAndFindField(t, src, "Name")
+	if java.FindMarker[golang.StructTag](vd.Markers) != nil {
+		t.Errorf("canonical tag should not emit a StructTag marker")
+	}
+	if got := len(vd.LeadingAnnotations); got != 2 {
+		t.Errorf("canonical tag should decompose into 2 annotations, got %d", got)
+	}
+}
