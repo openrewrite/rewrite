@@ -60,21 +60,54 @@ func (r *GoModTidy) Description() string {
 		"recompute go.sum, or remove provably-unused indirect requires."
 }
 
-// tidyAcc is the accumulator threaded across the scan phase.
+// tidyAcc is the accumulator threaded across the scan phase. Data is kept
+// PER-MODULE (keyed by the directory of each go.mod) so that a repository with
+// several modules — e.g. a root module plus a nested `internal/tools` module —
+// tidies each go.mod against only its own files. Without this, a nested
+// module's imports (such as the classic `//go:build tools` tools.go) would leak
+// into the root module's require set and get misclassified as direct.
 type tidyAcc struct {
-	// modulePath is the main module's path (from the `module` directive).
-	modulePath string
-	// rawImports is every import path seen across the project's .go files.
-	rawImports map[string]bool
-	// requireMods is the set of module paths declared in `require`.
-	requireMods map[string]bool
+	// goModDirs is the set of directories that contain a go.mod (module roots).
+	goModDirs map[string]bool
+	// modulePathByDir maps a module's directory to its declared module path.
+	modulePathByDir map[string]string
+	// requireModsByDir maps a module's directory to its declared require set.
+	requireModsByDir map[string]map[string]bool
+	// fileImports maps each .go file's source path to the imports it declares.
+	fileImports map[string][]string
 }
 
 func (r *GoModTidy) InitialValue(ctx *recipe.ExecutionContext) any {
 	return &tidyAcc{
-		rawImports:  map[string]bool{},
-		requireMods: map[string]bool{},
+		goModDirs:        map[string]bool{},
+		modulePathByDir:  map[string]string{},
+		requireModsByDir: map[string]map[string]bool{},
+		fileImports:      map[string][]string{},
 	}
+}
+
+// sourceDir returns the directory portion of a repo-relative source path
+// ("internal/tools/go.mod" -> "internal/tools"; "main.go" -> "").
+func sourceDir(p string) string {
+	if i := strings.LastIndex(p, "/"); i >= 0 {
+		return p[:i]
+	}
+	return ""
+}
+
+// ownerDir returns the directory of the most-specific module that contains the
+// file at fileDir — the longest go.mod directory that is fileDir or an ancestor
+// of it. The root module (dir "") owns anything no nested module claims.
+func ownerDir(fileDir string, dirs map[string]bool) string {
+	best, bestLen := "", -1
+	for d := range dirs {
+		if d == "" || fileDir == d || strings.HasPrefix(fileDir, d+"/") {
+			if len(d) > bestLen {
+				best, bestLen = d, len(d)
+			}
+		}
+	}
+	return best
 }
 
 func (r *GoModTidy) Scanner(acc any) recipe.TreeVisitor {
@@ -108,9 +141,7 @@ type goModTidyScanner struct {
 func (v *goModTidyScanner) Visit(t java.Tree, p any) java.Tree {
 	if pt, ok := t.(*java.PlainText); ok {
 		if strings.HasSuffix(pt.SourcePath, ".go") {
-			for _, imp := range parser.FileImports(pt.Text) {
-				v.acc.rawImports[imp] = true
-			}
+			v.acc.fileImports[pt.SourcePath] = parser.FileImports(pt.Text)
 		}
 		return t
 	}
@@ -119,33 +150,59 @@ func (v *goModTidyScanner) Visit(t java.Tree, p any) java.Tree {
 
 func (v *goModTidyScanner) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
 	if cu.Imports != nil {
+		imps := make([]string, 0, len(cu.Imports.Elements))
 		for _, rp := range cu.Imports.Elements {
 			if path := internal.ImportPath(rp.Element); path != "" {
-				v.acc.rawImports[path] = true
+				imps = append(imps, path)
 			}
 		}
+		v.acc.fileImports[cu.SourcePath] = imps
 	}
 	return v.GoVisitor.VisitCompilationUnit(cu, p)
 }
 
-func (v *goModTidyScanner) VisitGoModDirective(d *golang.GoModDirective, p any) java.Tree {
-	switch d.Keyword {
-	case "module":
-		if len(d.Values) > 0 {
-			v.acc.modulePath = d.Values[0].Text
-		}
-	case "require":
-		if len(d.Values) > 0 {
-			v.acc.requireMods[d.Values[0].Text] = true
-		}
-	case "":
-		// Block entry line: a require entry inside a `require ( … )` block
-		// has an empty keyword. Record its module path.
-		if len(d.Values) > 0 && looksLikeModulePath(d.Values[0].Text) {
-			v.acc.requireMods[d.Values[0].Text] = true
+// VisitGoMod records each module's declared path and require set, keyed by the
+// go.mod's directory, so the editor can tidy each module against only its own
+// files.
+func (v *goModTidyScanner) VisitGoMod(gm *golang.GoMod, p any) java.Tree {
+	dir := sourceDir(gm.SourcePath)
+	v.acc.goModDirs[dir] = true
+	modulePath, requires := parseGoModDeclared(gm)
+	if modulePath != "" {
+		v.acc.modulePathByDir[dir] = modulePath
+	}
+	v.acc.requireModsByDir[dir] = requires
+	return v.GoVisitor.VisitGoMod(gm, p)
+}
+
+// parseGoModDeclared extracts a go.mod's module path and the set of module paths
+// it declares in `require` (both single-line directives and block entries).
+func parseGoModDeclared(gm *golang.GoMod) (modulePath string, requires map[string]bool) {
+	requires = map[string]bool{}
+	for _, st := range gm.Statements {
+		switch s := st.Element.(type) {
+		case *golang.GoModDirective:
+			switch s.Keyword {
+			case "module":
+				if len(s.Values) > 0 {
+					modulePath = s.Values[0].Text
+				}
+			case "require":
+				if len(s.Values) > 0 {
+					requires[s.Values[0].Text] = true
+				}
+			}
+		case *golang.GoModBlock:
+			if s.Keyword == "require" {
+				for _, e := range s.Entries {
+					if path, _ := moduleOf(e.Element); path != "" {
+						requires[path] = true
+					}
+				}
+			}
 		}
 	}
-	return v.GoVisitor.VisitGoModDirective(d, p)
+	return modulePath, requires
 }
 
 // --- edit phase ---
@@ -153,6 +210,11 @@ func (v *goModTidyScanner) VisitGoModDirective(d *golang.GoModDirective, p any) 
 type goModTidyEditor struct {
 	visitor.GoVisitor
 	acc *tidyAcc
+	// Per-module scope for the go.mod currently being edited, set at the top of
+	// VisitGoMod so this module is tidied against only its own files.
+	curModulePath  string
+	curRequireMods map[string]bool
+	curImports     []string
 }
 
 // reqEntry is a single collected require entry during the rebuild.
@@ -162,8 +224,37 @@ type reqEntry struct {
 	indirect bool
 }
 
+// ownedImports returns the deduped imports of every scanned .go file whose
+// nearest-ancestor go.mod is the module at dir — i.e. the files that belong to
+// this module and not to a nested one.
+func (v *goModTidyEditor) ownedImports(dir string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for path, imps := range v.acc.fileImports {
+		if ownerDir(sourceDir(path), v.acc.goModDirs) != dir {
+			continue
+		}
+		for _, imp := range imps {
+			if !seen[imp] {
+				seen[imp] = true
+				out = append(out, imp)
+			}
+		}
+	}
+	return out
+}
+
 func (v *goModTidyEditor) VisitGoMod(gm *golang.GoMod, p any) java.Tree {
 	gm = v.GoVisitor.VisitGoMod(gm, p).(*golang.GoMod)
+
+	// Scope all import/require data to THIS module's directory.
+	dir := sourceDir(gm.SourcePath)
+	v.curModulePath = v.acc.modulePathByDir[dir]
+	v.curRequireMods = v.acc.requireModsByDir[dir]
+	if v.curRequireMods == nil {
+		v.curRequireMods = map[string]bool{}
+	}
+	v.curImports = v.ownedImports(dir)
 
 	separateIndirect := goVersionAtLeast(gm, 1, 17)
 
@@ -441,15 +532,12 @@ func (v *goModTidyEditor) computeTidySet(gm *golang.GoMod, res *golang.GoResolut
 		graph = r
 	}
 
-	mainImports := make([]string, 0, len(v.acc.rawImports))
-	for imp := range v.acc.rawImports {
-		mainImports = append(mainImports, imp)
-	}
+	mainImports := v.curImports
 	// TidyRequireSet = NeededModules (import-reachable) + the go>=1.17 pruning-
 	// completeness roots (test-transitive indirect deps under-selected by the
 	// pruned graph). The latter requires the go.mod text for synthetic re-
 	// resolution; it no-ops for go<1.17.
-	rs := modgraph.TidyRequireSet(mainImports, v.acc.modulePath, content, graph, src, separateIndirect)
+	rs := modgraph.TidyRequireSet(mainImports, v.curModulePath, content, graph, src, separateIndirect)
 	if !rs.Complete {
 		return nil, false
 	}
@@ -465,14 +553,14 @@ func (v *goModTidyEditor) computeTidySet(gm *golang.GoMod, res *golang.GoResolut
 }
 
 // directModules returns the set of required module paths that are directly
-// imported by some .go file in the project.
+// imported by some .go file belonging to the module currently being edited.
 func (v *goModTidyEditor) directModules() map[string]bool {
 	direct := map[string]bool{}
-	for imp := range v.acc.rawImports {
-		if internal.IsStdlib(imp) || internal.IsLocal(imp, v.acc.modulePath) {
+	for _, imp := range v.curImports {
+		if internal.IsStdlib(imp) || internal.IsLocal(imp, v.curModulePath) {
 			continue
 		}
-		if m := providingModule(imp, v.acc.requireMods); m != "" {
+		if m := providingModule(imp, v.curRequireMods); m != "" {
 			direct[m] = true
 		}
 	}
