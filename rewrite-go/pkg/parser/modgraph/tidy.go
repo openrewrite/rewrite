@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
 )
 
@@ -69,14 +70,17 @@ func TidyRequireSet(mainImports []string, mainModulePath, mainGoMod string, res 
 		roots[p] = v
 	}
 
+	// Build a requirement index once: every module version's direct requires,
+	// seeded for free from the already-resolved graph and lazily fetching only
+	// the few promoted roots that pruning left unloaded. Pruned MVS then runs
+	// entirely in memory — no per-iteration re-resolution.
+	idx := newReqIndex(res, mainGoMod, src)
+
 	// Iterate: under the current roots' PRUNED graph, promote any reachable
 	// module that is under-selected to a root. Adding roots raises selections,
 	// so repeat to a fixpoint (bounded by the number of candidates).
 	for {
-		sel, ok := prunedSelection(mainGoMod, roots, loaded, src)
-		if !ok {
-			return base // re-resolution failed; fall back rather than guess
-		}
+		sel := prunedSelectInMemory(roots, idx)
 		added := false
 		for path := range reachable {
 			if _, isRoot := roots[path]; isRoot {
@@ -114,43 +118,143 @@ func TidyRequireSet(mainImports []string, mainModulePath, mainGoMod string, res 
 	return out
 }
 
-// prunedSelection returns the MVS-selected version of every module under the
-// go>=1.17 PRUNED module graph rooted at the given root set. It builds a
-// synthetic go.mod (preserving the main module's go directive, replaces, and
-// excludes) requiring each root at its loaded version, then re-resolves.
-func prunedSelection(mainGoMod string, roots, loaded map[string]string, src ModSource) (map[string]string, bool) {
-	mf, err := modfile.Parse("go.mod", []byte(mainGoMod), nil)
-	if err != nil {
-		return nil, false
-	}
-	// Replace the require block with exactly our root set.
-	for _, r := range mf.Require {
-		_ = mf.DropRequire(r.Mod.Path)
-	}
-	for path := range roots {
-		v := loaded[path]
-		if v == "" {
-			v = roots[path]
-		}
-		if v == "" {
-			continue
-		}
-		_ = mf.AddRequire(path, v)
-	}
-	mf.Cleanup()
-	synthetic := modfile.Format(mf.Syntax)
+// reqIndex memoizes each module version's direct requirements (post-replace) and
+// go directive. It is seeded for free from an already-resolved graph (whose edges
+// cover every LOADED module) and lazily fetches the go.mod of any module that
+// pruning left unloaded — only ever the handful of pruned modules promoted to
+// roots. This lets prunedSelectInMemory run a pruned MVS without re-resolving.
+type reqIndex struct {
+	edges   map[string][]module.Version // "path@version" -> requires (post-replace)
+	gover   map[string]string           // "path@version" -> go directive
+	known   map[string]bool             // keys whose edges are fully populated
+	replace map[string]module.Version   // main module's version replacements
+	src     ModSource
+}
 
-	res, err := Resolve(synthetic, src)
-	if err != nil || !res.Complete {
-		return nil, false
+func newReqIndex(res Result, mainGoMod string, src ModSource) *reqIndex {
+	idx := &reqIndex{
+		edges:   map[string][]module.Version{},
+		gover:   map[string]string{},
+		known:   map[string]bool{},
+		replace: map[string]module.Version{},
+		src:     src,
 	}
-	sel := map[string]string{}
-	for _, m := range res.BuildList {
-		if !m.Main {
-			sel[m.Path] = m.Version
+	// Main module's version replacements (local-path replaces are skipped; they
+	// already mark the resolution incomplete upstream).
+	if mf, err := modfile.Parse("go.mod", []byte(mainGoMod), nil); err == nil {
+		for _, r := range mf.Replace {
+			if r.New.Version == "" {
+				continue
+			}
+			idx.replace[r.Old.Path] = r.New
+			idx.replace[r.Old.Path+"@"+r.Old.Version] = r.New
 		}
 	}
-	return sel, true
+	// Seed edges from the resolved graph. Every module that was LOADED contributes
+	// all of its require edges here, so its key is fully known.
+	for _, e := range res.Graph {
+		key := e.FromPath + "@" + e.FromVersion
+		idx.edges[key] = append(idx.edges[key], module.Version{Path: e.ToPath, Version: e.ToVersion})
+		idx.known[key] = true
+	}
+	for _, m := range res.BuildList {
+		idx.gover[m.Path+"@"+m.Version] = m.GoVersion
+	}
+	return idx
+}
+
+func (idx *reqIndex) applyReplace(m module.Version) module.Version {
+	if nv, ok := idx.replace[m.Path+"@"+m.Version]; ok {
+		return nv
+	}
+	if nv, ok := idx.replace[m.Path]; ok {
+		return nv
+	}
+	return m
+}
+
+// requires returns module path@version's direct requirements and go directive,
+// fetching and memoizing the go.mod when not already seeded.
+func (idx *reqIndex) requires(path, version string) ([]module.Version, string) {
+	key := path + "@" + version
+	if idx.known[key] {
+		return idx.edges[key], idx.gover[key]
+	}
+	idx.known[key] = true // memoize even on miss, so a failed fetch isn't retried
+	b, ok := idx.src.GoMod(path, version)
+	if !ok {
+		return nil, idx.gover[key]
+	}
+	df, err := modfile.Parse(key, b, nil)
+	if err != nil {
+		return nil, idx.gover[key]
+	}
+	if df.Go != nil {
+		idx.gover[key] = df.Go.Version
+	}
+	reqs := make([]module.Version, 0, len(df.Require))
+	for _, r := range df.Require {
+		reqs = append(reqs, idx.applyReplace(r.Mod))
+	}
+	idx.edges[key] = reqs
+	return reqs, idx.gover[key]
+}
+
+// prunedSelectInMemory computes the MVS-selected version of every module under the
+// go>=1.17 PRUNED module graph rooted at the given root set, reading requirements
+// from idx. It mirrors Resolve's traversal exactly: every loaded module's requires
+// become build-list nodes, but a module's requires are recursed into only when the
+// module is unpruned (its go directive is < 1.17).
+func prunedSelectInMemory(roots map[string]string, idx *reqIndex) map[string]string {
+	present := map[string]string{} // path -> selected version
+	loadPath := map[string]bool{}  // paths we recurse into
+	enqueued := map[string]bool{}
+	type pv struct{ path, version string }
+	var queue []pv
+
+	enqueue := func(m module.Version) {
+		k := m.Path + "@" + m.Version
+		if !enqueued[k] {
+			enqueued[k] = true
+			queue = append(queue, pv{m.Path, m.Version})
+		}
+	}
+	setNode := func(m module.Version) {
+		if v, ok := present[m.Path]; !ok || semver.Compare(m.Version, v) > 0 {
+			present[m.Path] = m.Version
+			if loadPath[m.Path] {
+				enqueue(m)
+			}
+		}
+	}
+	markLoad := func(m module.Version) {
+		loadPath[m.Path] = true
+		enqueue(m)
+	}
+
+	// Roots = the synthetic main module's requirements.
+	for path, ver := range roots {
+		m := module.Version{Path: path, Version: ver}
+		setNode(m)
+		markLoad(m)
+	}
+
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		if present[cur.path] != cur.version {
+			continue // superseded by a higher selected version
+		}
+		reqs, goV := idx.requires(cur.path, cur.version)
+		unpruned := goUnpruned(goV)
+		for _, req := range reqs {
+			setNode(req)
+			if unpruned {
+				markLoad(req)
+			}
+		}
+	}
+	return present
 }
 
 // testReachableModules returns the set of module paths reachable from the main

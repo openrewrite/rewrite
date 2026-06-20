@@ -55,6 +55,16 @@ func TestTidyRequireSetViaProxy(t *testing.T) {
 			goMod:   "module example.com/testtrans\n\ngo 1.25.0\n\nrequire github.com/stretchr/testify v1.9.0\n",
 			mainGo:  "package main\n\nimport _ \"github.com/stretchr/testify/assert\"\n\nfunc main() {}\n",
 		},
+		{
+			// gin genuinely EXERCISES the pruning-completeness promotion: it adds
+			// kr/text (via gopkg.in/check.v1) and go.uber.org/mock (via a
+			// dependency package's test) as indirect roots — modules under-
+			// selected by the pruned graph that the in-memory MVS must promote.
+			name:    "gin_pruning_completeness",
+			modPath: "example.com/ginapp",
+			goMod:   "module example.com/ginapp\n\ngo 1.25.0\n\nrequire github.com/gin-gonic/gin v1.10.0\n",
+			mainGo:  "package main\n\nimport _ \"github.com/gin-gonic/gin\"\n\nfunc main() {}\n",
+		},
 	}
 
 	httpGet := func(url string) ([]byte, int, error) {
