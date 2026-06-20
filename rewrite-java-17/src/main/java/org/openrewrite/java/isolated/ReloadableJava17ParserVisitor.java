@@ -848,12 +848,29 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         if (node.getPattern() instanceof JCBindingPattern b && b.var.mods.flags == Flags.FINAL) {
             modifier = new J.Modifier(randomId(), sourceBefore("final"), Markers.EMPTY, null, J.Modifier.Type.Final, emptyList());
         }
-        J clazz = convert(node.getType());
+        J clazz = convertInstanceOfTree(node);
         if (node.getPattern() instanceof JCBindingPattern b) {
             pattern = new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
                     type, typeMapping.variableType(b.var.sym));
         }
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY, expression, clazz, pattern, type, modifier);
+    }
+
+    private J convertInstanceOfTree(InstanceOfTree node) {
+        if (!(node.getPattern() instanceof JCBindingPattern b) || b.var.mods.annotations.isEmpty()) {
+            return convert(node.getType());
+        }
+
+        Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(b.var.mods.annotations, new HashMap<>());
+        List<J.Annotation> typeAnnotations = collectAnnotations(annotationPosTable);
+        TypeTree typeExpr = convert(node.getType());
+        if (typeAnnotations.isEmpty()) {
+            return typeExpr;
+        }
+
+        Space prefix = typeAnnotations.get(0).getPrefix();
+        return new J.AnnotatedType(randomId(), prefix, Markers.EMPTY,
+                ListUtils.mapFirst(typeAnnotations, a -> a.withPrefix(Space.EMPTY)), typeExpr);
     }
 
     @Override
