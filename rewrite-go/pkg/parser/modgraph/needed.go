@@ -199,6 +199,42 @@ func packageImports(src ModSource, mod, version, importPath string) ([]string, e
 	return out, nil
 }
 
+// packageImportsWithTests is like packageImports but returns the package's
+// ordinary imports and its test-file imports separately. Used by the pruning-
+// completeness pass, which must follow test imports of dependency packages.
+func packageImportsWithTests(src ModSource, mod, version, importPath string) (imports, testImports []string, err error) {
+	files, ok := src.PackageGoFiles(mod, version, importPath)
+	if !ok {
+		return nil, nil, errPackageNotFound
+	}
+	impSet, testSet := map[string]bool{}, map[string]bool{}
+	fset := token.NewFileSet()
+	for name, content := range files {
+		f, perr := goparser.ParseFile(fset, name, content, goparser.ImportsOnly)
+		if perr != nil {
+			continue
+		}
+		target := impSet
+		if strings.HasSuffix(name, "_test.go") {
+			target = testSet
+		}
+		for _, spec := range f.Imports {
+			p := strings.Trim(spec.Path.Value, "\"`")
+			if p != "" {
+				target[p] = true
+			}
+		}
+	}
+	keys := func(set map[string]bool) []string {
+		out := make([]string, 0, len(set))
+		for p := range set {
+			out = append(out, p)
+		}
+		return out
+	}
+	return keys(impSet), keys(testSet), nil
+}
+
 // isStdlibImport reports whether importPath is a standard-library package
 // (no dot in its first path segment). Mirrors gofmt/goimports' heuristic.
 func isStdlibImport(importPath string) bool {

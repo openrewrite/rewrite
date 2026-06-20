@@ -429,11 +429,11 @@ func (v *goModTidyEditor) computeTidySet(gm *golang.GoMod, res *golang.GoResolut
 
 	// Obtain a module graph to walk: prefer the parse-time graph when complete,
 	// else re-resolve now against the (network-backed, write-through) source.
+	content := printer.PrintGoMod(gm)
 	var graph modgraph.Result
 	if res != nil && res.GraphComplete && len(res.BuildList) > 0 {
 		graph = modgraph.FromMarker(*res)
 	} else {
-		content := printer.PrintGoMod(gm)
 		r, err := modgraph.Resolve([]byte(content), src)
 		if err != nil || !r.Complete || len(r.BuildList) == 0 {
 			return nil, false
@@ -445,7 +445,11 @@ func (v *goModTidyEditor) computeTidySet(gm *golang.GoMod, res *golang.GoResolut
 	for imp := range v.acc.rawImports {
 		mainImports = append(mainImports, imp)
 	}
-	rs := modgraph.NeededModules(mainImports, v.acc.modulePath, graph, src, separateIndirect)
+	// TidyRequireSet = NeededModules (import-reachable) + the go>=1.17 pruning-
+	// completeness roots (test-transitive indirect deps under-selected by the
+	// pruned graph). The latter requires the go.mod text for synthetic re-
+	// resolution; it no-ops for go<1.17.
+	rs := modgraph.TidyRequireSet(mainImports, v.acc.modulePath, content, graph, src, separateIndirect)
 	if !rs.Complete {
 		return nil, false
 	}
