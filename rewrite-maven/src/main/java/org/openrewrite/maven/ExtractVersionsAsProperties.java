@@ -24,8 +24,9 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static java.util.stream.Collectors.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -58,7 +59,7 @@ public class ExtractVersionsAsProperties extends Recipe {
             private Map<String, String> collectPropertiesFrom(Xml.Tag propsTag) {
                 return propsTag.getChildren().stream()
                     .filter(child -> child.getValue().isPresent())
-                    .collect(Collectors.toMap(
+                    .collect(toMap(
                         Xml.Tag::getName,
                         child -> child.getValue().get(),
                         (a, b) -> a,
@@ -148,12 +149,12 @@ public class ExtractVersionsAsProperties extends Recipe {
             return allDescendants(root)
                 .filter(tag -> "dependency".equals(tag.getName()) || "plugin".equals(tag.getName()))
                 .filter(tag -> tag.getChildValue("groupId").isPresent())
-                .collect(Collectors.groupingBy(
+                .collect(groupingBy(
                     tag -> tag.getChildValue("groupId").get(),
-                    Collectors.toList()))
+                    toList()))
                 .entrySet().stream()
                 .flatMap(groupEntry -> toSharedVersionEntry(groupEntry, existingProps))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
         }
 
         private static Stream<Map.Entry<String, String>> toSharedVersionEntry(
@@ -163,7 +164,7 @@ public class ExtractVersionsAsProperties extends Recipe {
                 .filter(Objects::nonNull)
                 .map(v -> PropertyResolver.resolveToLiteral(v, existingProps))
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+                .collect(toList());
             if (resolvedVersions.size() > 1 && new HashSet<>(resolvedVersions).size() == 1) {
                 return Stream.of(new AbstractMap.SimpleEntry<>(groupEntry.getKey(), resolvedVersions.get(0)));
             }
@@ -179,7 +180,7 @@ public class ExtractVersionsAsProperties extends Recipe {
             return allDescendants(root)
                 .filter(tag -> "dependency".equals(tag.getName()) || "plugin".equals(tag.getName()))
                 .flatMap(tag -> toNonStandardRenameEntry(tag, existingProps, groupSharedVersion))
-                .collect(Collectors.toMap(
+                .collect(toMap(
                     Map.Entry::getKey,
                     Map.Entry::getValue,
                     (a, b) -> a,
