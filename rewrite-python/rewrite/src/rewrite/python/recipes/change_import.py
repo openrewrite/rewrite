@@ -439,4 +439,13 @@ class ChangeImport(Recipe):
                     )
                 return multi
 
-        return ChangeImportVisitor()
+        if not old_module:
+            return ChangeImportVisitor()
+        # Gate on the as-written import: a file can only contain `import old_module`
+        # or `from old_module import ...` if it imports old_module, so this is a
+        # correct superset. uses_import (not uses_type) because the type checker
+        # canonicalizes aliases and drops removed symbols, both of which would make
+        # a type-based gate skip files this recipe must change.
+        from rewrite import Preconditions
+        from rewrite.python.preconditions import uses_import
+        return Preconditions.check(uses_import(old_module), ChangeImportVisitor())

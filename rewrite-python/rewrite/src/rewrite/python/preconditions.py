@@ -35,7 +35,7 @@ callable in unit tests without an active RPC connection.
 from __future__ import annotations
 
 from rewrite.preconditions import RecipeRef
-from rewrite.python.search import IsSourceFile, UsesMethod, UsesType
+from rewrite.python.search import IsSourceFile, UsesImport, UsesMethod, UsesType
 
 
 def has_source_path(file_pattern: str) -> RecipeRef:
@@ -89,6 +89,28 @@ def uses_type(
             "checkAssignability": check_assignability,
         },
         UsesType(fully_qualified_type),
+    )
+
+
+def uses_import(module: str) -> RecipeRef:
+    """Match files that import ``module`` (delegates to ``org.openrewrite.python.search.UsesImport``).
+
+    Gates on the as-written import syntax, not type attribution, so it works
+    for deprecated-import migrations where the type checker either
+    canonicalizes the alias (``from typing import List`` -> ``list``) or cannot
+    resolve a removed symbol (``from base64 import encodestring``). In both
+    cases :func:`uses_type` would miss the file; ``uses_import`` does not.
+
+    ``module`` is a dotted module path; a file matches if it imports that
+    module, a submodule, or a parent module of it.
+
+    Bundles a native :class:`UsesImport` visitor so unit tests without an
+    active RPC connection still see real filtering behavior.
+    """
+    return RecipeRef(
+        "org.openrewrite.python.search.UsesImport",
+        {"module": module},
+        UsesImport(module),
     )
 
 
