@@ -33,31 +33,33 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// GoModTidy emulates the go.mod-affecting behavior of `go mod tidy` that is
-// decidable from the parsed LST alone (no module graph / network access):
+// GoModTidy emulates `go mod tidy`'s effect on go.mod. It computes the exact
+// require set the toolchain would write — adding missing requires, removing
+// unused ones, classifying each as direct or `// indirect`, and including the
+// go>=1.17 pruning-completeness roots — then rewrites the `require` blocks
+// (sorted by module path/version, the toolchain's key).
 //
-//   - Re-marks each `require` entry as direct (no comment) or `// indirect`
-//     based on whether the module is imported by any .go file in the module.
-//   - Sorts entries within each `require` block lexicographically by module
-//     path (then version), the same key the go toolchain uses.
+// The require set is computed at recipe time from the resolved module graph,
+// the imports scanned from the project's .go files, and a dependency ModSource
+// (the local module cache plus a write-through GOPROXY reached over the CLI
+// HttpSender). When no source is available or resolution cannot complete (e.g.
+// offline), it degrades to an LST-only pass that re-marks and sorts the
+// existing requires without dropping anything. go.sum is NOT recomputed.
 //
-// It does NOT add missing requires, recompute go.sum, remove provably-unused
-// indirect requires, or perform MVS version selection — those require the
-// module graph and are out of scope for this LST-only phase.
-//
-// GoModTidy is a ScanningRecipe: the scan phase collects the set of imported
-// module paths across every .go file in the project, then the edit phase
-// rewrites the sibling go.mod.
+// GoModTidy is a ScanningRecipe: the scan phase records, per module, the
+// imports of every .go file it owns; the edit phase rewrites each go.mod
+// against only its own module's files (so multi-module repositories tidy
+// each go.mod independently).
 type GoModTidy struct {
 	recipe.ScanningBase
 }
 
 func (r *GoModTidy) Name() string        { return "org.openrewrite.golang.GoModTidy" }
-func (r *GoModTidy) DisplayName() string { return "Tidy go.mod (LST-only)" }
+func (r *GoModTidy) DisplayName() string { return "Tidy go.mod" }
 func (r *GoModTidy) Description() string {
-	return "Emulate the subset of `go mod tidy` that is decidable from source alone: re-mark `// indirect` " +
-		"requires from the import graph and sort `require` blocks. Does not add missing requires, " +
-		"recompute go.sum, or remove provably-unused indirect requires."
+	return "Emulate `go mod tidy`'s effect on go.mod: add missing requires, remove unused ones, " +
+		"classify each as direct or `// indirect` (including go>=1.17 pruning-completeness roots), " +
+		"and sort the `require` blocks. Does not recompute go.sum."
 }
 
 // tidyAcc is the accumulator threaded across the scan phase. Data is kept
@@ -263,7 +265,7 @@ func (v *goModTidyEditor) VisitGoMod(gm *golang.GoMod, p any) java.Tree {
 	// parse time (already pruned of unused modules, with missing ones added and
 	// // indirect classified). Otherwise fall back to the LST-only Phase 1:
 	// re-mark and sort the existing requires from the import scan.
-	res := findResolution(gm)
+	res := GetResolutionResult(gm)
 	authoritative := res != nil && res.GraphComplete && len(res.Requires) > 0
 
 	// Strip the existing require statements, remembering where the first one
@@ -305,12 +307,14 @@ func (v *goModTidyEditor) VisitGoMod(gm *golang.GoMod, p any) java.Tree {
 	}
 
 	// Determine the entries to emit, in priority order:
-	//  1. Compute the tidy require set NOW from the parse-time-resolved module
-	//     graph + the scanned imports + a ModSource (cache/proxy). This is the
-	//     production path: the marker carries the declared requires and the
-	//     resolved graph, and the precise set is computed at recipe time.
-	//  2. Use a pre-computed authoritative require set on the marker (tests).
-	//  3. LST-only Phase 1: re-mark and sort the declared requires.
+	//  1. Compute the exact tidy require set NOW from the resolved module graph,
+	//     the scanned imports, and a ModSource (cache + write-through proxy).
+	//     This is the production path.
+	//  2. Fall back to the require set the marker carries from parse-time
+	//     resolution, used when (1) cannot complete at recipe time but parse time
+	//     did resolve the full graph.
+	//  3. LST-only: re-mark the declared requires by direct-import and sort them,
+	//     preserving the existing set (the offline / no-ModSource degradation).
 	var entries []reqEntry
 	if computed, ok := v.computeTidySet(gm, res, separateIndirect, p); ok {
 		entries = computed
@@ -465,17 +469,6 @@ func goVersionAtLeast(gm *golang.GoMod, major, minor int) bool {
 	return true
 }
 
-// findResolution returns the GoResolutionResult marker attached to the go.mod,
-// or nil if none is present.
-func findResolution(gm *golang.GoMod) *golang.GoResolutionResult {
-	for i := range gm.Markers.Entries {
-		if r, ok := gm.Markers.Entries[i].(golang.GoResolutionResult); ok {
-			return &r
-		}
-	}
-	return nil
-}
-
 // headerInsertIndex returns the index just after the last leading header
 // directive (module / go / toolchain) in stmts, the natural spot to insert a
 // require block when none exists yet.
@@ -614,10 +607,4 @@ func providingModule(importPath string, requireMods map[string]bool) string {
 		}
 	}
 	return best
-}
-
-// looksLikeModulePath is a cheap heuristic to distinguish a require entry's
-// module path token from other directive tokens (versions, operators).
-func looksLikeModulePath(s string) bool {
-	return strings.Contains(s, ".") && !strings.HasPrefix(s, "v") && s != "=>"
 }
