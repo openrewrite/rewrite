@@ -4381,7 +4381,7 @@ public class GroovyParserVisitor {
             skip("?");
             JLeftPadded<J.Wildcard.Bound> bound = null;
             NameTree boundedType = null;
-            if (genericsType.getUpperBounds() != null) {
+            if (genericsType.getUpperBounds() != null && sourceStartsWith("extends")) {
                 bound = padLeft(sourceBefore("extends"), J.Wildcard.Bound.Extends);
                 boundedType = visitTypeTree(genericsType.getUpperBounds()[0]);
             } else if (genericsType.getLowerBound() != null) {
