@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	"golang.org/x/mod/module"
+	"golang.org/x/mod/sumdb/dirhash"
 )
 
 // ModSource supplies module metadata (go.mod files, and where available the
@@ -93,22 +94,33 @@ func (c *cacheSource) PackageGoFiles(modPath, version, importPath string) (map[s
 	if err != nil {
 		return nil, false
 	}
+	// Preferred: the extracted module tree (`$GOMODCACHE/<esc>@<ver>/...`),
+	// present when `go` has unzipped the module.
 	rel := strings.TrimPrefix(strings.TrimPrefix(importPath, modPath), "/")
 	dir := filepath.Join(c.root, ep+"@"+ev, filepath.FromSlash(rel))
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, false
-	}
-	files := map[string][]byte{}
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") {
-			continue
+	if entries, err := os.ReadDir(dir); err == nil {
+		files := map[string][]byte{}
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") {
+				continue
+			}
+			if b, err := os.ReadFile(filepath.Join(dir, e.Name())); err == nil {
+				files[e.Name()] = b
+			}
 		}
-		if b, err := os.ReadFile(filepath.Join(dir, e.Name())); err == nil {
-			files[e.Name()] = b
+		if len(files) > 0 {
+			return files, true
 		}
 	}
-	return files, len(files) > 0
+	// Fallback: the cached download zip (`cache/download/<esc>/@v/<ver>.zip`),
+	// which the write-through proxy persists even when `go` has never run, so a
+	// clean clone can serve dependency sources without any extraction step.
+	if raw, err := os.ReadFile(filepath.Join(c.download, ep, "@v", ev+".zip")); err == nil {
+		if entries, err := goFilesFromZip(raw); err == nil {
+			return packageFilesFromZipEntries(entries, modPath, version, importPath)
+		}
+	}
+	return nil, false
 }
 
 // ProxySource fetches module metadata from one or more GOPROXY base URLs using
@@ -117,6 +129,26 @@ func (c *cacheSource) PackageGoFiles(modPath, version, importPath string) (map[s
 // (this source only speaks the proxy protocol). If goproxy is empty,
 // https://proxy.golang.org is used.
 func ProxySource(goproxy string, get HTTPGet) ModSource {
+	return newProxySource(goproxy, get, "")
+}
+
+// ProxyWriteThroughSource is like ProxySource but additionally persists every
+// successfully fetched .mod and .zip (plus the computed .ziphash) into the
+// standard Go module download cache at gomodcache/cache/download, using the
+// exact on-disk layout `go mod download` produces. The first fetch of a
+// module@version costs a network round-trip; thereafter CacheSource (and the
+// real `go` toolchain) serve it offline. Writes are atomic (temp-file+rename),
+// so concurrent readers never observe a partial file. If gomodcache is empty it
+// behaves exactly like ProxySource (no persistence).
+func ProxyWriteThroughSource(goproxy, gomodcache string, get HTTPGet) ModSource {
+	cacheDir := ""
+	if gomodcache != "" {
+		cacheDir = filepath.Join(gomodcache, "cache", "download")
+	}
+	return newProxySource(goproxy, get, cacheDir)
+}
+
+func newProxySource(goproxy string, get HTTPGet, cacheDir string) *proxySource {
 	var bases []string
 	for _, p := range strings.FieldsFunc(goproxy, func(r rune) bool { return r == ',' || r == '|' }) {
 		p = strings.TrimSpace(p)
@@ -128,13 +160,16 @@ func ProxySource(goproxy string, get HTTPGet) ModSource {
 	if len(bases) == 0 {
 		bases = []string{"https://proxy.golang.org"}
 	}
-	return &proxySource{bases: bases, get: get, zips: map[string]map[string][]byte{}}
+	return &proxySource{bases: bases, get: get, cacheDir: cacheDir, zips: map[string]map[string][]byte{}}
 }
 
 type proxySource struct {
 	bases []string
 	get   HTTPGet
-	mu    sync.Mutex
+	// cacheDir, when non-empty, is GOMODCACHE/cache/download: fetched .mod/.zip
+	// are written through to it in the standard layout.
+	cacheDir string
+	mu       sync.Mutex
 	// zips caches the extracted contents of a module zip, keyed by
 	// "modPath@version" -> (full zip entry path -> bytes). A nil value records
 	// a failed download so it is not retried.
@@ -154,6 +189,7 @@ func (p *proxySource) GoMod(path, version string) ([]byte, bool) {
 	for _, base := range p.bases {
 		body, status, err := p.get(base + suffix)
 		if err == nil && status == 200 && len(body) > 0 {
+			p.persist(ep, ev, ".mod", body)
 			return body, true
 		}
 	}
@@ -171,25 +207,7 @@ func (p *proxySource) PackageGoFiles(modPath, version, importPath string) (map[s
 	if !ok {
 		return nil, false
 	}
-	rel := strings.TrimPrefix(strings.TrimPrefix(importPath, modPath), "/")
-	// Package files live directly under "<modPath>@<version>/<rel>/" — the
-	// package is exactly one directory level (no deeper recursion).
-	prefix := modPath + "@" + version + "/"
-	if rel != "" {
-		prefix += rel + "/"
-	}
-	files := map[string][]byte{}
-	for name, content := range entries {
-		if !strings.HasPrefix(name, prefix) {
-			continue
-		}
-		tail := name[len(prefix):]
-		if strings.Contains(tail, "/") || !strings.HasSuffix(tail, ".go") {
-			continue // a deeper subpackage or non-go file
-		}
-		files[tail] = content
-	}
-	return files, len(files) > 0
+	return packageFilesFromZipEntries(entries, modPath, version, importPath)
 }
 
 // moduleZip downloads (once) and extracts the module zip for modPath@version,
@@ -231,9 +249,47 @@ func (p *proxySource) downloadZip(modPath, version string) map[string][]byte {
 	if raw == nil {
 		return nil
 	}
-	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
+	entries, err := goFilesFromZip(raw)
 	if err != nil {
 		return nil
+	}
+	// Write through to the standard cache only after a successful parse, so we
+	// never persist a corrupt/truncated download.
+	p.persistZip(ep, ev, raw)
+	return entries
+}
+
+// persist atomically writes content to GOMODCACHE/cache/download/<ep>/@v/<ev><suffix>
+// when a write-through cache dir is configured. Best-effort: cache write
+// failures never affect resolution (the bytes are already in hand).
+func (p *proxySource) persist(ep, ev, suffix string, content []byte) {
+	if p.cacheDir == "" {
+		return
+	}
+	_ = atomicWriteFile(filepath.Join(p.cacheDir, ep, "@v", ev+suffix), content)
+}
+
+// persistZip writes the raw module zip and its computed h1: .ziphash (the value
+// `go` records in go.sum and the cache .ziphash file) into the standard cache.
+func (p *proxySource) persistZip(ep, ev string, raw []byte) {
+	if p.cacheDir == "" {
+		return
+	}
+	zipPath := filepath.Join(p.cacheDir, ep, "@v", ev+".zip")
+	if err := atomicWriteFile(zipPath, raw); err != nil {
+		return
+	}
+	if h, err := dirhash.HashZip(zipPath, dirhash.Hash1); err == nil {
+		_ = atomicWriteFile(filepath.Join(p.cacheDir, ep, "@v", ev+".ziphash"), []byte(h))
+	}
+}
+
+// goFilesFromZip extracts every .go file from a module zip, keyed by its full
+// "<module>@<version>/<path>" entry name.
+func goFilesFromZip(raw []byte) (map[string][]byte, error) {
+	zr, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
+	if err != nil {
+		return nil, err
 	}
 	entries := map[string][]byte{}
 	for _, f := range zr.File {
@@ -249,7 +305,57 @@ func (p *proxySource) downloadZip(modPath, version string) map[string][]byte {
 		rc.Close()
 		entries[f.Name] = buf.Bytes()
 	}
-	return entries
+	return entries, nil
+}
+
+// packageFilesFromZipEntries filters extracted zip entries down to the .go files
+// of exactly one package directory (importPath within modPath@version).
+func packageFilesFromZipEntries(entries map[string][]byte, modPath, version, importPath string) (map[string][]byte, bool) {
+	rel := strings.TrimPrefix(strings.TrimPrefix(importPath, modPath), "/")
+	prefix := modPath + "@" + version + "/"
+	if rel != "" {
+		prefix += rel + "/"
+	}
+	files := map[string][]byte{}
+	for name, content := range entries {
+		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		tail := name[len(prefix):]
+		if strings.Contains(tail, "/") || !strings.HasSuffix(tail, ".go") {
+			continue // a deeper subpackage or non-go file
+		}
+		files[tail] = content
+	}
+	return files, len(files) > 0
+}
+
+// atomicWriteFile writes data to path via a temp file + rename, creating parent
+// dirs as needed, so a concurrent reader never observes a partial file.
+func atomicWriteFile(path string, data []byte) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, ".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	return nil
 }
 
 // TieredSource tries each source in order, returning the first hit. Use it to

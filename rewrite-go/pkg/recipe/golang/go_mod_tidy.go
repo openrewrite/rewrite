@@ -25,6 +25,7 @@ import (
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser/modgraph"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang/internal"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
@@ -401,15 +402,22 @@ func headerInsertIndex(stmts []java.RightPadded[golang.GoModStatement]) int {
 }
 
 // computeTidySet computes the exact go.mod require set at recipe time from the
-// parse-time-resolved module graph (carried on the marker), the imports scanned
-// from the project's .go files, and the dependency ModSource installed in the
-// ExecutionContext (cache + GOPROXY via the CLI HttpSender). Returns ok=false
-// when any input is missing, so the caller falls back to the marker's
-// authoritative set (tests) or LST-only Phase 1.
+// resolved module graph, the imports scanned from the project's .go files, and
+// the dependency ModSource installed in the ExecutionContext (cache + write-
+// through GOPROXY via the CLI HttpSender).
+//
+// The graph is taken from the parse-time marker when it is complete; otherwise
+// it is re-resolved NOW against the same source. This matters because parse-time
+// resolution may be cold (cache-only / offline) while the recipe — which is
+// explicitly editing dependencies — is allowed to reach the network and warm
+// the shared cache. Without this, a cold parse would permanently pin the recipe
+// to the incomplete LST-only fallback even with the network available.
+//
+// Returns ok=false when the source is absent or resolution still cannot complete
+// (truly offline + cold cache, or a private module), so the caller falls back to
+// the marker's authoritative set (tests) or the LST-only set, which PRESERVES
+// the existing require/// indirect block rather than dropping unconfirmed deps.
 func (v *goModTidyEditor) computeTidySet(gm *golang.GoMod, res *golang.GoResolutionResult, separateIndirect bool, p any) ([]reqEntry, bool) {
-	if res == nil || !res.GraphComplete || len(res.BuildList) == 0 {
-		return nil, false
-	}
 	ctx, ok := p.(*recipe.ExecutionContext)
 	if !ok {
 		return nil, false
@@ -419,11 +427,25 @@ func (v *goModTidyEditor) computeTidySet(gm *golang.GoMod, res *golang.GoResolut
 		return nil, false
 	}
 
+	// Obtain a module graph to walk: prefer the parse-time graph when complete,
+	// else re-resolve now against the (network-backed, write-through) source.
+	var graph modgraph.Result
+	if res != nil && res.GraphComplete && len(res.BuildList) > 0 {
+		graph = modgraph.FromMarker(*res)
+	} else {
+		content := printer.PrintGoMod(gm)
+		r, err := modgraph.Resolve([]byte(content), src)
+		if err != nil || !r.Complete || len(r.BuildList) == 0 {
+			return nil, false
+		}
+		graph = r
+	}
+
 	mainImports := make([]string, 0, len(v.acc.rawImports))
 	for imp := range v.acc.rawImports {
 		mainImports = append(mainImports, imp)
 	}
-	rs := modgraph.NeededModules(mainImports, v.acc.modulePath, modgraph.FromMarker(*res), src, separateIndirect)
+	rs := modgraph.NeededModules(mainImports, v.acc.modulePath, graph, src, separateIndirect)
 	if !rs.Complete {
 		return nil, false
 	}

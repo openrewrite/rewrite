@@ -884,8 +884,10 @@ func (s *server) fetchHTTP(url string) ([]byte, int, error) {
 // HttpSender) on a miss. Best-effort: on any failure the marker keeps whatever
 // was resolved and GraphComplete reflects partiality.
 //
-// Proxy fetching is opt-in via MODERNE_GO_PROXY_RESOLVE to avoid unexpected
-// network during parsing; without it, only the local cache is consulted.
+// Proxy fetching is on by default (opt out with MODERNE_GO_OFFLINE or
+// GOPROXY=off). Fetched modules are written through to the standard module
+// cache, so the first parse warms it and every later parse/recipe run — across
+// projects on the machine — resolves the full graph offline.
 func (s *server) resolveModuleGraph(goModContent []byte, mrr *golang.GoResolutionResult) {
 	res, err := modgraph.Resolve(goModContent, s.moduleSource())
 	if err != nil {
@@ -896,16 +898,45 @@ func (s *server) resolveModuleGraph(goModContent []byte, mrr *golang.GoResolutio
 }
 
 // moduleSource builds the dependency-resolution source: the local module cache
-// first, then (when MODERNE_GO_PROXY_RESOLVE is set) a GOPROXY tier whose HTTP
-// is delegated to the Java HttpSender via the bidirectional Http method. The
-// same source is used at parse time and installed into the recipe
-// ExecutionContext for recipe-time re-resolution.
+// first, then (unless disabled) a write-through GOPROXY tier whose HTTP is
+// delegated to the Java HttpSender via the bidirectional Http method. Proxy
+// fetches persist .mod/.zip/.ziphash into the standard $GOMODCACHE/cache/download
+// layout, so the cache fills in on first use and is shared by every subsequent
+// lookup. The same source is used at parse time and installed into the recipe
+// ExecutionContext for recipe-time re-resolution, giving both the full graph.
 func (s *server) moduleSource() modgraph.ModSource {
-	sources := []modgraph.ModSource{modgraph.CacheSource(envOr("GOMODCACHE", defaultModCache()))}
-	if os.Getenv("MODERNE_GO_PROXY_RESOLVE") != "" {
-		sources = append(sources, modgraph.ProxySource(envOr("GOPROXY", "https://proxy.golang.org,direct"), s.fetchHTTP))
+	gomodcache := envOr("GOMODCACHE", defaultModCache())
+	sources := []modgraph.ModSource{modgraph.CacheSource(gomodcache)}
+	if proxyResolveEnabled() {
+		goproxy := envOr("GOPROXY", "https://proxy.golang.org,direct")
+		sources = append(sources, modgraph.ProxyWriteThroughSource(goproxy, gomodcache, s.fetchHTTP))
 	}
 	return modgraph.TieredSource(sources...)
+}
+
+// proxyResolveEnabled reports whether network module resolution is allowed.
+// On by default; disabled for air-gapped/offline runs via MODERNE_GO_OFFLINE,
+// GOPROXY=off, or an explicit MODERNE_GO_PROXY_RESOLVE=0/false/off.
+func proxyResolveEnabled() bool {
+	if isTruthy(os.Getenv("MODERNE_GO_OFFLINE")) {
+		return false
+	}
+	if strings.TrimSpace(os.Getenv("GOPROXY")) == "off" {
+		return false
+	}
+	if v, ok := os.LookupEnv("MODERNE_GO_PROXY_RESOLVE"); ok && !isTruthy(v) {
+		return false
+	}
+	return true
+}
+
+func isTruthy(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 func envOr(key, def string) string {
