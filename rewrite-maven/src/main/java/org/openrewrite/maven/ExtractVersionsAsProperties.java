@@ -31,83 +31,75 @@ import java.util.stream.Stream;
 @EqualsAndHashCode(callSuper = false)
 public class ExtractVersionsAsProperties extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Extract Maven dependency versions as properties";
-    }
+    String displayName = "Extract Maven dependency versions as properties";
 
-    @Override
-    public String getDescription() {
-        return "Extracts inlined dependency versions into the `<properties>` section and replaces them with `${property}` references.";
-    }
+    String description = "Extracts inlined dependency versions into the `<properties>` section and replaces them with `${property}` references.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new VersionExtractionVisitor();
+        return new MavenIsoVisitor<ExecutionContext>() {
+            private PropertyResolver propertyResolver;
+
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Map<String, String> existingProps = loadExistingProperties(document.getRoot());
+                Map<String, String> groupSharedVersion = GroupVersionAnalyzer.analyze(document.getRoot(), existingProps);
+                propertyResolver = new PropertyResolver(groupSharedVersion, existingProps);
+                schedulePropertyRenames(document.getRoot(), existingProps, groupSharedVersion);
+                return super.visitDocument(document, ctx);
+            }
+
+            private Map<String, String> loadExistingProperties(Xml.Tag root) {
+                return root.getChild("properties")
+                    .map(this::collectPropertiesFrom)
+                    .orElseGet(LinkedHashMap::new);
+            }
+
+            private Map<String, String> collectPropertiesFrom(Xml.Tag propsTag) {
+                return propsTag.getChildren().stream()
+                    .filter(child -> child.getValue().isPresent())
+                    .collect(Collectors.toMap(
+                        Xml.Tag::getName,
+                        child -> child.getValue().get(),
+                        (a, b) -> a,
+                        LinkedHashMap::new));
+            }
+
+            private void schedulePropertyRenames(Xml.Tag root, Map<String, String> existingProps,
+                                                 Map<String, String> groupSharedVersion) {
+                PropertyRenamer.findRenames(root, existingProps, groupSharedVersion)
+                    .forEach((oldKey, newKey) -> applyRename(oldKey, newKey, existingProps));
+            }
+
+            private void applyRename(String oldKey, String newKey, Map<String, String> existingProps) {
+                doAfterVisit(new RenamePropertyKey(oldKey, newKey).getVisitor());
+                propertyResolver.registerKey(newKey, existingProps.get(oldKey));
+            }
+
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (isDependencyTag() || isManagedDependencyTag() || isPluginTag() || isPluginDependencyTag()) {
+                    Optional<Xml.Tag> versionTag = tag.getChild("version");
+                    if (versionTag.isPresent()) {
+                        String version = versionTag.get().getValue().orElse(null);
+                        if (version != null && !PropertyResolver.isPropertyRef(version)) {
+                            String groupId = tag.getChildValue("groupId").orElse(null);
+                            String artifactId = tag.getChildValue("artifactId").orElse(null);
+                            if (artifactId != null) {
+                                String propertyKey = propertyResolver.resolvePropertyKey(groupId, artifactId, version);
+                                doAfterVisit(new AddPropertyVisitor(propertyKey, version, true));
+                                doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), "${" + propertyKey + "}"));
+                            }
+                        }
+                    }
+                }
+                return super.visitTag(tag, ctx);
+            }
+        };
     }
 
     private static Stream<Xml.Tag> allDescendants(Xml.Tag tag) {
         return Stream.concat(Stream.of(tag), tag.getChildren().stream().flatMap(ExtractVersionsAsProperties::allDescendants));
-    }
-
-    private static class VersionExtractionVisitor extends MavenIsoVisitor<ExecutionContext> {
-        private PropertyResolver propertyResolver;
-
-        @Override
-        public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-            Map<String, String> existingProps = loadExistingProperties(document.getRoot());
-            Map<String, String> groupSharedVersion = GroupVersionAnalyzer.analyze(document.getRoot(), existingProps);
-            propertyResolver = new PropertyResolver(groupSharedVersion, existingProps);
-            schedulePropertyRenames(document.getRoot(), existingProps, groupSharedVersion);
-            return super.visitDocument(document, ctx);
-        }
-
-        private static Map<String, String> loadExistingProperties(Xml.Tag root) {
-            return root.getChild("properties")
-                .map(VersionExtractionVisitor::collectPropertiesFrom)
-                .orElseGet(LinkedHashMap::new);
-        }
-
-        private static Map<String, String> collectPropertiesFrom(Xml.Tag propsTag) {
-            return propsTag.getChildren().stream()
-                .filter(child -> child.getValue().isPresent())
-                .collect(Collectors.toMap(
-                    Xml.Tag::getName,
-                    child -> child.getValue().get(),
-                    (a, b) -> a,
-                    LinkedHashMap::new));
-        }
-
-        private void schedulePropertyRenames(Xml.Tag root, Map<String, String> existingProps,
-                                             Map<String, String> groupSharedVersion) {
-            PropertyRenamer.findRenames(root, existingProps, groupSharedVersion)
-                .forEach((oldKey, newKey) -> applyRename(oldKey, newKey, existingProps));
-        }
-
-        private void applyRename(String oldKey, String newKey, Map<String, String> existingProps) {
-            doAfterVisit(new RenamePropertyKey(oldKey, newKey).getVisitor());
-            propertyResolver.registerKey(newKey, existingProps.get(oldKey));
-        }
-
-        @Override
-        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (isDependencyTag() || isManagedDependencyTag() || isPluginTag() || isPluginDependencyTag()) {
-                Optional<Xml.Tag> versionTag = tag.getChild("version");
-                if (versionTag.isPresent()) {
-                    String version = versionTag.get().getValue().orElse(null);
-                    if (version != null && !PropertyResolver.isPropertyRef(version)) {
-                        String groupId = tag.getChildValue("groupId").orElse(null);
-                        String artifactId = tag.getChildValue("artifactId").orElse(null);
-                        if (artifactId != null) {
-                            String propertyKey = propertyResolver.resolvePropertyKey(groupId, artifactId, version);
-                            doAfterVisit(new AddPropertyVisitor(propertyKey, version, true));
-                            doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), "${" + propertyKey + "}"));
-                        }
-                    }
-                }
-            }
-            return super.visitTag(tag, ctx);
-        }
     }
 
     private static class PropertyResolver {

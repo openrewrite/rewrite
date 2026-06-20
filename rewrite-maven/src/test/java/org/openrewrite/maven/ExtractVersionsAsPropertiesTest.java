@@ -29,6 +29,7 @@ class ExtractVersionsAsPropertiesTest implements RewriteTest {
         spec.recipe(new ExtractVersionsAsProperties());
     }
 
+    @DocumentExample
     @Test
     void extractsSingleDependencyVersionIntoNewPropertiesBlock() {
         rewriteRun(
