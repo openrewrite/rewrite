@@ -858,12 +858,10 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY, expression, clazz, pattern, type, modifier);
     }
 
-    private @Nullable J convertInstanceOfTree(InstanceOfTree node) {
-        if (!(node.getPattern() instanceof JCBindingPattern b)
-                || b.var.mods.annotations.isEmpty()
-                || node.getType() instanceof JCAnnotatedType) {
-                    return convert(node.getType());
-                }
+    private J convertInstanceOfTree(InstanceOfTree node) {
+        if (!(node.getPattern() instanceof JCBindingPattern b) || b.var.mods.annotations.isEmpty()) {
+            return convert(node.getType());
+        }
 
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(b.var.mods.annotations, new HashMap<>());
         List<J.Annotation> typeAnnotations = collectAnnotations(annotationPosTable);

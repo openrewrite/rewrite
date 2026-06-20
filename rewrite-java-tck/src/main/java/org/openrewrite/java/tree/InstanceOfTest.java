@@ -174,8 +174,9 @@ class InstanceOfTest implements RewriteTest {
     @MinimumJava17
     @Test
     void instanceofPatternMatchWithTypeUseAnnotation() {
-        // A TYPE_USE annotation is placed by the compiler into JCAnnotatedType (the type node
-        // itself), not in mods.annotations. The fix must not interfere with this existing path.
+        // In a binding pattern a leading annotation is parsed as a modifier of the binding
+        // variable, so even a TYPE_USE annotation ends up in mods.annotations (not in a
+        // JCAnnotatedType type node). It must be consumed from source before the type is converted.
         rewriteRun(
           java(
             """
@@ -187,6 +188,31 @@ class InstanceOfTest implements RewriteTest {
                   void test(Object obj) {
                       if (obj instanceof @NotNull String s) {
                           System.out.println(s);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @MinimumJava17
+    @Test
+    void instanceofPatternMatchWithLeadingAndQualifiedTypeUseAnnotation() {
+        // A leading non-TYPE_USE annotation (in mods.annotations) combined with a TYPE_USE
+        // annotation in mid-qualified-name position (which makes node.getType() a JCAnnotatedType).
+        // The leading annotation must still be consumed from source before converting the type.
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.*;
+              class Test {
+                  @Target(ElementType.TYPE_USE)
+                  @interface NotNull {}
+
+                  void test(Object actual) {
+                      if (actual instanceof @SuppressWarnings("rawtypes") java.util.@NotNull List list) {
+                          System.out.println(list.size());
                       }
                   }
               }

@@ -857,11 +857,9 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private J convertInstanceOfTree(InstanceOfTree node) {
-        if (!(node.getPattern() instanceof JCBindingPattern b)
-                || b.var.mods.annotations.isEmpty()
-                || node.getType() instanceof JCAnnotatedType) {
-                    return convert(node.getType());
-                }
+        if (!(node.getPattern() instanceof JCBindingPattern b) || b.var.mods.annotations.isEmpty()) {
+            return convert(node.getType());
+        }
 
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(b.var.mods.annotations, new HashMap<>());
         List<J.Annotation> typeAnnotations = collectAnnotations(annotationPosTable);
