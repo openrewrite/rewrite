@@ -115,6 +115,38 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/7569")
+    @Test
+    void doNotRemoveStaticImportForInheritedNestedType() {
+        rewriteRun(
+          java(
+            """
+              package com.helloworld;
+
+              import static com.helloworld.FakeUserAccountClient.UserAccountDataAuth;
+
+              import java.util.List;
+
+              class Main {
+                  List<UserAccountDataAuth> getUsers() {
+                      return List.of(UserAccountDataAuth.create());
+                  }
+              }
+
+              class FakeUserAccountClient implements UserAccountClient {}
+
+              interface UserAccountClient {
+                  record UserAccountDataAuth() {
+                      static UserAccountDataAuth create() {
+                          return new UserAccountDataAuth();
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void doNotRemoveImportUsedOnlyInNestedGeneric() {
         rewriteRun(
