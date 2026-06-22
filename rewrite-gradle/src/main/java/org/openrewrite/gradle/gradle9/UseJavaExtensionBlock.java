@@ -86,8 +86,8 @@ public class UseJavaExtensionBlock extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 // Spread the same fix into `subprojects { }` / `allprojects { }` configuration blocks, where the
                 // assignments delegate to each project's convention object just like at the top level.
-                if (!(getCursor().firstEnclosing(JavaSourceFile.class) instanceof G.CompilationUnit) ||
-                        !isProjectConfigurationBlock(m)) {
+                if (!isProjectConfigurationBlock(m) ||
+                        !(getCursor().firstEnclosing(JavaSourceFile.class) instanceof G.CompilationUnit)) {
                     return m;
                 }
                 J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
@@ -135,9 +135,11 @@ public class UseJavaExtensionBlock extends Recipe {
 
         J.MethodInvocation incomingBlock = (J.MethodInvocation) buildJavaBlock(versionsToMove, ctx);
 
-        List<Statement> withoutAssignments = ListUtils.map(statements, s -> compatibilityName(s) != null ? null : s);
         boolean[] merged = {false};
-        List<Statement> mapped = ListUtils.map(withoutAssignments, s -> {
+        List<Statement> mapped = ListUtils.map(statements, s -> {
+            if (compatibilityName(s) != null) {
+                return null;
+            }
             // The closure body of a configuration block returns its last statement, so unwrap `J.Return`
             // when looking for an existing `java { }` block to merge into.
             J.MethodInvocation javaBlock = asJavaBlock(s);
