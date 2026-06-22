@@ -23,7 +23,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser/modgraph"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
@@ -122,32 +121,19 @@ func (r *GoModTidy) EditorWithData(acc any) recipe.TreeVisitor {
 
 // --- scan phase ---
 //
-// `go mod tidy` unions imports across ALL build configurations (every
-// GOOS/GOARCH and build tag). The Go parser type-checks under a single host
-// build context, so files excluded by that context (e.g. a `//go:build
-// windows` file on Linux) are not parsed into a Go.CompilationUnit — the CLI
-// represents them as PlainText instead. To avoid misclassifying their
-// dependencies as unused, the scanner also reads imports out of PlainText
-// `.go` files (parsed imports-only, which is platform-independent). This
-// recovers platform-gated imports without the full cost/ambiguity of
-// per-configuration type-checking.
+// The scanner records, per source file, the imports of each Go.CompilationUnit,
+// plus each module's declared path and require set. Note that `go mod tidy`
+// unions imports across ALL build configurations (every GOOS/GOARCH and tag),
+// whereas the parser type-checks under one host build context — so files the
+// host context excludes (e.g. a `//go:build windows` file on Linux) are not
+// parsed into a CompilationUnit and their imports are not scanned here. That is
+// an accepted limitation: it only matters for a module imported SOLELY by a
+// platform-gated file, which is rare. (Recovering those would mean parsing the
+// excluded files imports-only — see ParsePackage, which currently omits them.)
 
 type goModTidyScanner struct {
 	visitor.GoVisitor
 	acc *tidyAcc
-}
-
-// Visit intercepts PlainText source files — which the framework's Go dispatch
-// has no case for — to harvest imports from build-excluded `.go` files. Every
-// other tree falls through to the normal Go dispatch.
-func (v *goModTidyScanner) Visit(t java.Tree, p any) java.Tree {
-	if pt, ok := t.(*java.PlainText); ok {
-		if strings.HasSuffix(pt.SourcePath, ".go") {
-			v.acc.fileImports[pt.SourcePath] = parser.FileImports(pt.Text)
-		}
-		return t
-	}
-	return v.GoVisitor.Visit(t, p)
 }
 
 func (v *goModTidyScanner) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {

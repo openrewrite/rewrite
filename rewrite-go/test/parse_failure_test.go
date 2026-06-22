@@ -18,9 +18,11 @@ package test
 
 import (
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
@@ -62,21 +64,39 @@ func TestParsePackageEmitsParseErrorForUnparseableFile(t *testing.T) {
 	}
 }
 
-// TestParsePackageOmitsBuildExcludedFiles verifies that a file excluded by
-// the build context (`//go:build ignore`) is omitted entirely — it is not
-// part of this build, so it must not surface as a ParseError (which would
-// be a spurious failure) nor as a CompilationUnit.
-func TestParsePackageOmitsBuildExcludedFiles(t *testing.T) {
+// TestParsePackageEmitsBuildExcludedFiles verifies that a file excluded by the
+// build context (a `//go:build windows` file on a non-Windows host) is still
+// parsed and emitted as a CompilationUnit — `go mod tidy` unions imports across
+// every platform, so a module imported only by a platform-gated file (cobra's
+// mousetrap is the canonical case) must remain visible. The excluded file is a
+// full, lossless CompilationUnit (it round-trips), just type-checked only with
+// the build-included set.
+func TestParsePackageEmitsBuildExcludedFiles(t *testing.T) {
 	sfs := parser.NewGoParser().ParsePackage([]parser.FileInput{
-		{Path: "main.go", Content: "package main\n\nfunc main() {}\n"},
-		{Path: "ignored.go", Content: "//go:build ignore\n\npackage main\n"},
+		{Path: "main.go", Content: "package main\n\nimport \"fmt\"\n\nfunc main() { fmt.Println() }\n"},
+		{Path: "win.go", Content: "//go:build windows\n\npackage main\n\nimport _ \"example.com/winonly\"\n"},
 	})
 
-	if len(sfs) != 1 {
-		t.Fatalf("expected only the build-included file, got %d source files", len(sfs))
+	if len(sfs) != 2 {
+		t.Fatalf("expected both the included and the build-excluded file as CompilationUnits, got %d", len(sfs))
 	}
-	if _, ok := sfs[0].(*golang.CompilationUnit); !ok {
-		t.Fatalf("expected a CompilationUnit, got %T", sfs[0])
+	var win *golang.CompilationUnit
+	for _, sf := range sfs {
+		cu, ok := sf.(*golang.CompilationUnit)
+		if !ok {
+			t.Fatalf("expected a CompilationUnit, got %T", sf)
+		}
+		if cu.SourcePath == "win.go" {
+			win = cu
+		}
+	}
+	if win == nil {
+		t.Fatal("the build-excluded win.go was not emitted as a CompilationUnit")
+	}
+	// Its windows-only import must be present (so the recipe can harvest it) and
+	// the file must round-trip losslessly.
+	if printed := printer.Print(win); !strings.Contains(printed, "example.com/winonly") {
+		t.Errorf("build-excluded file's import was lost; round-trip:\n%s", printed)
 	}
 }
 

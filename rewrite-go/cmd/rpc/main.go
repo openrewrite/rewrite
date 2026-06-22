@@ -475,11 +475,6 @@ func (s *server) handleGetLanguages() []string {
 	return []string{
 		"org.openrewrite.golang.tree.Go$CompilationUnit",
 		"org.openrewrite.golang.tree.GoMod",
-		// PlainText is the CLI Go build step's fallback for any .go file the
-		// parser doesn't return (e.g. files excluded by the host build
-		// context). Accepting it lets GoModTidy read those files' imports —
-		// `go mod tidy` unions imports across all build configurations.
-		"org.openrewrite.text.PlainText",
 	}
 }
 

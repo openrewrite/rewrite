@@ -74,31 +74,6 @@ type FileInput struct {
 	Content string
 }
 
-// FileImports returns the import paths declared in a single Go source file,
-// parsed imports-only. Unlike ParsePackage it ignores build constraints and
-// never type-checks, so it works for any file regardless of the host platform
-// — useful for unioning imports across build configurations the way
-// `go mod tidy` does (e.g. reading the dependencies of a `//go:build windows`
-// file on Linux, where it would otherwise be excluded from the LST). Returns
-// nil on parse error.
-func FileImports(content string) []string {
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, "", content, parser.ImportsOnly)
-	if err != nil || f == nil {
-		return nil
-	}
-	out := make([]string, 0, len(f.Imports))
-	for _, spec := range f.Imports {
-		if spec.Path == nil {
-			continue
-		}
-		if p, err := strconv.Unquote(spec.Path.Value); err == nil && p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
 // Parse parses a single Go source file and returns its CompilationUnit.
 // Convenience wrapper around ParsePackage for the common one-file case;
 // type attribution that depends on sibling files in the same package
@@ -133,8 +108,17 @@ func (gp *GoParser) Parse(sourcePath string, source string) (*golang.Compilation
 // it does not. A single malformed file never takes down its siblings and
 // never silently disappears — it travels as a ParseError so the Java side
 // represents it as such instead of falling back to a PlainText/Quark.
-// Files the build context excludes (`//go:build` / OS-arch suffix) are
-// omitted: they are not part of this build, which is not a parse failure.
+//
+// Files the build context excludes (`//go:build` / OS-arch suffix) ARE still
+// parsed and returned as CompilationUnits — `go mod tidy` unions imports across
+// every GOOS/GOARCH and tag, so a module imported only by, say, a
+// `//go:build windows` file (cobra's mousetrap) must still be visible. Build
+// exclusion concerns build INCLUSION, not parseability: such files are valid Go
+// and round-trip losslessly. They are parsed fully but type-checked only with
+// the build-included set (their platform-specific symbols would not resolve
+// here), so their syntax/imports are exact while type attribution is partial.
+// An excluded file that fails to parse is dropped (it is not part of this
+// build), rather than surfaced as a ParseError.
 func (gp *GoParser) ParsePackage(files []FileInput) []java.Tree {
 	if len(files) == 0 {
 		return nil
@@ -142,46 +126,67 @@ func (gp *GoParser) ParsePackage(files []FileInput) []java.Tree {
 
 	fset := token.NewFileSet()
 
-	// One outcome per build-included file, in input order: a parsed AST or
-	// the parse error. Build-excluded files are not represented at all.
+	// One outcome per file, in input order: a parsed AST (build-included or not)
+	// or, for an included file, the parse error.
 	type outcome struct {
-		input FileInput
-		ast   *ast.File // nil when err != nil
-		err   error
+		input    FileInput
+		ast      *ast.File // nil when err != nil
+		err      error
+		excluded bool // parsed for its imports, but not part of this build
 	}
 	outcomes := make([]outcome, 0, len(files))
-	asts := make([]*ast.File, 0, len(files))
+	asts := make([]*ast.File, 0, len(files)) // only build-included files get type-checked
 	for _, f := range files {
-		if !MatchBuildContext(gp.BuildContext, filepath.Base(f.Path), f.Content) {
-			continue
+		included := MatchBuildContext(gp.BuildContext, filepath.Base(f.Path), f.Content)
+		// Build-included files are parsed fully (and type-checked) so they map to
+		// faithful, type-attributed CompilationUnits. Build-EXCLUDED files are
+		// parsed IMPORTS-ONLY: we only need their imports for `go mod tidy`, and
+		// a full body cannot be mapped correctly without type info (e.g. the
+		// mapper needs types to tell a `(T)` conversion from a parenthesized
+		// expression). An imports-only AST has no such ambiguous constructs, so
+		// it maps to a small but valid CompilationUnit carrying just the imports.
+		mode := parser.ParseComments
+		if !included {
+			mode = parser.ImportsOnly
 		}
-		a, err := parser.ParseFile(fset, f.Path, f.Content, parser.ParseComments)
+		a, err := parser.ParseFile(fset, f.Path, f.Content, mode)
 		if err != nil {
-			outcomes = append(outcomes, outcome{input: f, err: err})
+			if included {
+				outcomes = append(outcomes, outcome{input: f, err: err})
+			}
+			// A build-excluded file that won't parse is simply dropped.
 			continue
 		}
-		outcomes = append(outcomes, outcome{input: f, ast: a})
-		asts = append(asts, a)
+		// A build-excluded file is only worth emitting for its imports; drop it
+		// when it has none (it contributes nothing to `go mod tidy` and would
+		// otherwise add an empty CompilationUnit to the LST).
+		if !included && len(a.Imports) == 0 {
+			continue
+		}
+		outcomes = append(outcomes, outcome{input: f, ast: a, excluded: !included})
+		if included {
+			asts = append(asts, a)
+		}
 	}
 	if len(outcomes) == 0 {
 		return nil
 	}
 
-	// Type-check every file that parsed, together, so cross-file references
-	// resolve. Skipped entirely when nothing parsed (all inputs failed).
-	var typeInfo *types.Info
-	var mapper *typeMapper
+	// Type-check the build-included files together so cross-file references
+	// resolve. typeInfo/mapper are always created (possibly empty, e.g. when a
+	// package's files are all build-excluded) so every outcome can be mapped.
+	typeInfo := &types.Info{
+		Types:      make(map[ast.Expr]types.TypeAndValue),
+		Defs:       make(map[*ast.Ident]types.Object),
+		Uses:       make(map[*ast.Ident]types.Object),
+		Selections: make(map[*ast.SelectorExpr]*types.Selection),
+		// Instances records identifiers denoting generic functions/types that are
+		// instantiated with explicit type arguments, e.g. the `Map` in `Map[int]`.
+		// Used to distinguish generic instantiation from ordinary indexing.
+		Instances: make(map[*ast.Ident]types.Instance),
+	}
+	mapper := newTypeMapper()
 	if len(asts) > 0 {
-		typeInfo = &types.Info{
-			Types:      make(map[ast.Expr]types.TypeAndValue),
-			Defs:       make(map[*ast.Ident]types.Object),
-			Uses:       make(map[*ast.Ident]types.Object),
-			Selections: make(map[*ast.SelectorExpr]*types.Selection),
-			// Instances records identifiers denoting generic functions/types that are
-			// instantiated with explicit type arguments, e.g. the `Map` in `Map[int]`.
-			// Used to distinguish generic instantiation from ordinary indexing.
-			Instances: make(map[*ast.Ident]types.Instance),
-		}
 		conf := types.Config{
 			Importer: gp.Importer,
 			// Don't fail on type errors — we want partial type info even when
@@ -201,7 +206,6 @@ func (gp *GoParser) ParsePackage(files []FileInput) []java.Tree {
 			}
 		}
 		_, _ = conf.Check(pkgName, fset, asts, typeInfo)
-		mapper = newTypeMapper()
 	}
 
 	out := make([]java.Tree, 0, len(outcomes))
@@ -218,6 +222,18 @@ func (gp *GoParser) ParsePackage(files []FileInput) []java.Tree {
 			cursor:   0,
 			typeInfo: typeInfo,
 			mapper:   mapper,
+		}
+		if o.excluded {
+			// Build-excluded files are parsed only to recover their imports for
+			// `go mod tidy`; they are not type-checked, so a node-level type
+			// lookup during mapping may be nil and panic. Recover and drop the
+			// file — it is not part of this build, so a spurious ParseError
+			// would be wrong. (Its imports are lost only when mapping fails,
+			// which is rare and almost always redundant with included files.)
+			if cu := ctx.safeMapFile(o.ast, o.input.Path); cu != nil {
+				out = append(out, cu)
+			}
+			continue
 		}
 		out = append(out, ctx.mapFile(o.ast, o.input.Path))
 	}
@@ -273,6 +289,17 @@ func (ctx *parseContext) prefixAndSkip(pos token.Pos, length int) java.Space {
 }
 
 // mapFile maps an ast.File to a CompilationUnit.
+// safeMapFile maps a file to a CompilationUnit, returning nil if mapping panics
+// (used for build-excluded files, which lack type info — see ParsePackage).
+func (ctx *parseContext) safeMapFile(file *ast.File, sourcePath string) (cu *golang.CompilationUnit) {
+	defer func() {
+		if recover() != nil {
+			cu = nil
+		}
+	}()
+	return ctx.mapFile(file, sourcePath)
+}
+
 func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *golang.CompilationUnit {
 	// "package" keyword
 	prefix := ctx.prefixAndSkip(file.Package, len("package"))

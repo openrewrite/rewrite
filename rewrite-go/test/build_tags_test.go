@@ -18,28 +18,25 @@ package test
 
 import (
 	"go/build"
+	"path/filepath"
 	"sort"
 	"testing"
 
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// parsedNames returns the file names included by ParsePackage for the
-// given build context — the names of files that survived `//go:build`
-// and filename-suffix constraint evaluation. These inputs are all
-// well-formed, so every included file is expected to be a CompilationUnit.
+// parsedNames returns the file names that are build-INCLUDED for the given
+// build context — the ones that survive `//go:build` and filename-suffix
+// constraint evaluation (i.e. would be type-checked with the package). Note
+// ParsePackage now also emits build-EXCLUDED files as CompilationUnits so
+// `go mod tidy` can see their imports; this helper exercises the constraint
+// evaluation itself, which decides build inclusion.
 func parsedNames(t *testing.T, buildCtx build.Context, files []parser.FileInput) []string {
 	t.Helper()
-	p := parser.NewGoParserWithBuildContext(buildCtx)
 	out := make([]string, 0, len(files))
-	for _, sf := range p.ParsePackage(files) {
-		switch v := sf.(type) {
-		case *golang.CompilationUnit:
-			out = append(out, v.SourcePath)
-		case *java.ParseError:
-			t.Fatalf("unexpected parse error for %s: %v", v.SourcePath, v.Cause())
+	for _, sf := range files {
+		if parser.MatchBuildContext(buildCtx, filepath.Base(sf.Path), sf.Content) {
+			out = append(out, sf.Path)
 		}
 	}
 	sort.Strings(out)

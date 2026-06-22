@@ -16,11 +16,7 @@
 
 package golang
 
-import (
-	"testing"
-
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
-)
+import "testing"
 
 func hasImport(imps []string, want string) bool {
 	for _, i := range imps {
@@ -31,50 +27,6 @@ func hasImport(imps []string, want string) bool {
 	return false
 }
 
-// TestScannerHarvestsPlainTextGoImports verifies the scan phase reads imports
-// out of a build-excluded `.go` file that the CLI represented as PlainText
-// (e.g. a `//go:build windows` file on Linux), so go mod tidy doesn't prune a
-// platform-only dependency it can no longer "see".
-func TestScannerHarvestsPlainTextGoImports(t *testing.T) {
-	r := &GoModTidy{}
-	acc := r.InitialValue(nil).(*tidyAcc)
-	scan := r.Scanner(acc)
-
-	scan.Visit(&java.PlainText{
-		SourcePath: "internal/sys_windows.go",
-		Text:       "//go:build windows\n\npackage sys\n\nimport (\n\t\"golang.org/x/sys/windows\"\n\t\"fmt\"\n)\n",
-	}, nil)
-
-	imps := acc.fileImports["internal/sys_windows.go"]
-	if !hasImport(imps, "golang.org/x/sys/windows") {
-		t.Errorf("expected windows-only import to be harvested from PlainText; got %v", imps)
-	}
-	if !hasImport(imps, "fmt") {
-		t.Errorf("expected fmt import to be harvested from PlainText; got %v", imps)
-	}
-}
-
-// TestScannerIgnoresNonGoPlainText verifies non-.go PlainText files (README,
-// go.sum, …) are left alone — only `.go` text is parsed for imports.
-func TestScannerIgnoresNonGoPlainText(t *testing.T) {
-	r := &GoModTidy{}
-	acc := r.InitialValue(nil).(*tidyAcc)
-	scan := r.Scanner(acc)
-
-	scan.Visit(&java.PlainText{
-		SourcePath: "README.md",
-		Text:       "import \"this is not go\"\n",
-	}, nil)
-
-	if len(acc.fileImports) != 0 {
-		t.Errorf("expected no imports harvested from a non-.go PlainText; got %v", acc.fileImports)
-	}
-}
-
-// TestOwnedImportsScopesByModule verifies a nested module's files are NOT
-// attributed to the root module — the prometheus `internal/tools` regression,
-// where a nested `//go:build tools` file's import leaked into the root go.mod
-// and was misclassified as a direct dependency.
 func TestOwnedImportsScopesByModule(t *testing.T) {
 	acc := &tidyAcc{
 		goModDirs:        map[string]bool{"": true, "internal/tools": true},
