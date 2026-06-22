@@ -39,7 +39,9 @@
     <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
     <PackageReference Include="Serilog" Version="4.2.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
-    <PackageReference Include="StreamJsonRpc" Version="2.20.20" />
+    <!-- 2.25.29 pulls in MessagePack 2.5.302, remediating CVE-2026-48109 (out-of-bounds read in the -->
+    <!-- LZ4 decompression path) that affected the MessagePack 2.5.187 carried by older StreamJsonRpc. -->
+    <PackageReference Include="StreamJsonRpc" Version="2.25.29" />
     <!-- xunit (assertion/fixture API only) is consumed by the public Test/ helpers (RewriteTest, RpcFixture, ...). -->
     <!-- The runner packages (Microsoft.NET.Test.Sdk, xunit.runner.visualstudio) live in the sibling OpenRewrite.Tests project. -->
     <PackageReference Include="xunit" Version="2.9.3" PrivateAssets="none" />
