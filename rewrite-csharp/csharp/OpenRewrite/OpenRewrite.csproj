@@ -22,6 +22,10 @@
     <!-- CS3021: need a CLSCompliant attribute because the assembly does not have a CLSCompliant attribute -->
     <!-- CA2255: ModuleInitializer used in library code is intentional for RPC type-name registration. -->
     <NoWarn>VSTHRD200;VSTHRD002;VSTHRD103;CS0114;CS8602;CS8603;CS8604;CS3021;CA2255</NoWarn>
+
+    <!-- Always emit a ref assembly. Consumers reference us as a ProjectReference (via symlink) -->
+    <!-- and MSBuild's reduced target set during cross-project compile expects obj/.../ref/OpenRewrite.dll. -->
+<!--    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>-->
   </PropertyGroup>
 
   <ItemGroup>
