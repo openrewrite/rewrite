@@ -294,7 +294,7 @@ public class ChangePropertyKey extends Recipe {
                         // property's original tree was the first top-level entry and is fully removed, auto-format
                         // would otherwise introduce a blank line before the new first entry.
                         boolean atDocumentRoot = getCursor().getParentOrThrow().getValue() instanceof Yaml.Document;
-                        String firstEntryPrefix = mergedMapping.getEntries().get(0).getPrefix();
+                        String firstEntryPrefix = atDocumentRoot ? mergedMapping.getEntries().get(0).getPrefix() : null;
                         m = maybeAutoFormat(m, mergedMapping, p, getCursor().getParentOrThrow());
                         if (atDocumentRoot && !m.getEntries().isEmpty()) {
                             m = m.withEntries(ListUtils.mapFirst(m.getEntries(), e -> e.withPrefix(firstEntryPrefix)));
@@ -323,11 +323,13 @@ public class ChangePropertyKey extends Recipe {
             int consumed = 0;
             while (consumed < segments.length - 1) {
                 Yaml.Mapping.Entry match = null;
+                int matchLength = 0;
                 for (Yaml.Mapping.Entry e : current.getEntries()) {
                     if (e.getValue() instanceof Yaml.Mapping) {
                         String[] keyParts = e.getKey().getValue().split("\\.");
                         if (consumed + keyParts.length < segments.length && matchesPrefix(segments, consumed, keyParts)) {
                             match = e;
+                            matchLength = keyParts.length;
                             break;
                         }
                     }
@@ -337,7 +339,7 @@ public class ChangePropertyKey extends Recipe {
                 }
                 nestKeys.add(match.getKey().getValue());
                 current = (Yaml.Mapping) match.getValue();
-                consumed += match.getKey().getValue().split("\\.").length;
+                consumed += matchLength;
             }
             if (nestKeys.isEmpty()) {
                 return null;
