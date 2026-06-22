@@ -15,23 +15,40 @@
  */
 package org.openrewrite.semver;
 
+import lombok.EqualsAndHashCode;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
 
+import java.util.Map;
 import java.util.Scanner;
 import java.util.regex.Pattern;
 
 @UtilityClass
 public class Semver {
 
+    /**
+     * Memoizes {@link #validate(String, String)} keyed on its {@code (toVersion, metadataPattern)}
+     * arguments. A version selector is a recipe parameter, so it is constant for the duration of a
+     * run yet {@code validate} is otherwise re-invoked for every dependency and every visit. Each
+     * invocation runs the full chain of selector-detection regexes (one {@code Pattern.matcher} per
+     * comparator type), which dominates {@code java.util.regex} CPU time during large recipe runs.
+     * Caching collapses the thousands of repeated calls to one computation per distinct selector.
+     * <p>
+     * Both valid <em>and</em> invalid results are cached: an {@link Validated} carries its validation
+     * errors, and re-deriving them is just as costly. The cached {@link VersionComparator}
+     * implementations store only final parsed fields and are immutable, so sharing them across the
+     * {@link java.util.concurrent.ForkJoinPool} that runs recipes is safe.
+     */
+    private static final Map<CacheKey, Validated<VersionComparator>> VALIDATE_CACHE = LruCache.bounded(1_024);
+
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean isVersion(@Nullable String version) {
         if (StringUtils.isBlank(version)) {
             return false;
         }
-        return LatestRelease.RELEASE_PATTERN.matcher(version).matches();
+        return ParsedVersion.parse(version).matches();
     }
 
     /**
@@ -49,6 +66,17 @@ public class Semver {
      * @return the validation result
      */
     public static Validated<VersionComparator> validate(String toVersion, @Nullable String metadataPattern) {
+        CacheKey key = new CacheKey(toVersion, metadataPattern);
+        Validated<VersionComparator> cached = VALIDATE_CACHE.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        Validated<VersionComparator> result = doValidate(toVersion, metadataPattern);
+        VALIDATE_CACHE.put(key, result);
+        return result;
+    }
+
+    private static Validated<VersionComparator> doValidate(String toVersion, @Nullable String metadataPattern) {
         String canonicalPattern = canonicalizeMetadataPattern(metadataPattern);
         return Validated.<VersionComparator, String>testNone(
                 "metadataPattern",
@@ -67,6 +95,19 @@ public class Semver {
                 .or(ExactVersionWithPattern.build(toVersion, canonicalPattern))
                 .or(ExactVersion.build(toVersion))
         );
+    }
+
+    @EqualsAndHashCode
+    private static final class CacheKey {
+        private final String toVersion;
+
+        @Nullable
+        private final String metadataPattern;
+
+        private CacheKey(String toVersion, @Nullable String metadataPattern) {
+            this.toVersion = toVersion;
+            this.metadataPattern = metadataPattern;
+        }
     }
 
     private static @Nullable String canonicalizeMetadataPattern(@Nullable String metadataPattern) {

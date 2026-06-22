@@ -147,4 +147,15 @@ class TypeCastTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void castToFunctionType() {
+        rewriteRun(
+          scala(
+            """
+            val f = x.asInstanceOf[A => B]
+            """
+          )
+        );
+    }
 }

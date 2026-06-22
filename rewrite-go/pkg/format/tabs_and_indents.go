@@ -30,7 +30,7 @@ import (
 // rewrite continuation alignments inside multi-line argument lists),
 // the visitor drives indentation from VisitBlock explicitly:
 //
-//   - For each `Block.Statements[i].Element`, the leftmost leaf's
+//   - For each `Block.Statements[i].Element`, the statement's own
 //     Prefix carries the inter-statement whitespace; we rewrite its
 //     indent (the post-newline portion) to `\t × (depth+1)`.
 //   - `Block.End` (the whitespace before `}`) is re-indented to
@@ -65,13 +65,13 @@ func (v *TabsAndIndentsVisitor) Visit(t java.Tree, p any) java.Tree {
 }
 
 // VisitBlock dispatches the body at depth+1 and re-indents each
-// statement's leftmost-leaf Prefix and the closing-brace `End`.
+// statement's Prefix and the closing-brace `End`.
 func (v *TabsAndIndentsVisitor) VisitBlock(block *java.Block, p any) java.J {
 	v.depth++
 	stmts := make([]java.RightPadded[java.Statement], len(block.Statements))
 	for i, rp := range block.Statements {
 		if rp.Element != nil {
-			fixed, _ := transformLeftmostPrefix(rp.Element, v.reindentSpace).(java.Statement)
+			fixed, _ := transformPrefix(rp.Element, v.reindentSpace).(java.Statement)
 			if fixed != nil {
 				rp.Element = fixed
 			}
@@ -101,7 +101,7 @@ func (v *TabsAndIndentsVisitor) VisitCase(c *java.Case, p any) java.J {
 	body := make([]java.RightPadded[java.Statement], len(c.Body))
 	for i, rp := range c.Body {
 		if rp.Element != nil {
-			fixed, _ := transformLeftmostPrefix(rp.Element, v.reindentSpace).(java.Statement)
+			fixed, _ := transformPrefix(rp.Element, v.reindentSpace).(java.Statement)
 			if fixed != nil {
 				rp.Element = fixed
 			}

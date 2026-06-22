@@ -19,17 +19,24 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ClassInfoList;
 import io.github.classgraph.ScanResult;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.Value;
 import lombok.With;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.PathUtils;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SourceSet;
 
+import java.beans.ConstructorProperties;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.*;
@@ -58,6 +65,39 @@ public class JavaSourceSet implements SourceSet {
      * Does not include java standard library types.
      */
     Map<String, List<JavaType.FullyQualified>> gavToTypes;
+
+    /**
+     * Factory used to parse {@link org.openrewrite.java.JavaTemplate} snippets applied
+     * inside source files in this source set. When attached, the factory's type
+     * resolution shares canonical {@link JavaType.Class} instances with the surrounding
+     * source file's parser rather than minting duplicates.
+     * <p>
+     * Transient and never serialized; consumers fall back to a fresh factory when null.
+     */
+    @NonFinal
+    @Setter
+    @With(AccessLevel.NONE)
+    @JsonIgnore
+    @ToString.Exclude
+    transient @Nullable JavaTypeFactory typeFactory;
+
+    public JavaSourceSet(UUID id, String name,
+                         List<JavaType.FullyQualified> classpath,
+                         Map<String, List<JavaType.FullyQualified>> gavToTypes) {
+        this(id, name, classpath, gavToTypes, null);
+    }
+
+    @ConstructorProperties({"id", "name", "classpath", "gavToTypes", "typeFactory"})
+    public JavaSourceSet(UUID id, String name,
+                         List<JavaType.FullyQualified> classpath,
+                         Map<String, List<JavaType.FullyQualified>> gavToTypes,
+                         @Nullable JavaTypeFactory typeFactory) {
+        this.id = id;
+        this.name = name;
+        this.classpath = classpath;
+        this.gavToTypes = gavToTypes;
+        this.typeFactory = typeFactory;
+    }
 
     /**
      * Registry of project names whose dependencies have been mutated by an earlier recipe in

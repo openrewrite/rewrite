@@ -39,8 +39,6 @@ import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.text.PlainText;
-import org.openrewrite.text.PlainTextVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import javax.net.ssl.SSLSocketFactory;
@@ -63,7 +61,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
-import static org.openrewrite.test.SourceSpecs.text;
 
 @SuppressWarnings({"HttpUrlsUsage"})
 class MavenPomDownloaderTest implements RewriteTest {
@@ -170,6 +167,35 @@ class MavenPomDownloaderTest implements RewriteTest {
                 fail();
             } catch (MavenDownloadingException ignore) {
             }
+        }
+
+        @Test
+        void unreachableHostProbedOncePerRun() {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            // Nothing listens on port 1, so connections are refused immediately.
+            String deadUri = "http://localhost:1/repo/";
+
+            List<String> probed = new ArrayList<>();
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void repositoryAccessFailed(String uri, Throwable t) {
+                    probed.add(uri);
+                }
+            });
+
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            // The same dead host declared under two different repository ids — as happens when
+            // several transitive POMs each declare the same (dead) repository. The per-repository
+            // normalization cache does not dedupe these by host, so without a host-level circuit
+            // breaker each one is re-probed (here, ~once; in a real run, once per artifact).
+            var repoA = MavenRepository.builder().id("a").uri(deadUri).build();
+            var repoB = MavenRepository.builder().id("b").uri(deadUri).build();
+
+            assertThat(downloader.normalizeRepository(repoA, ctx, null)).isNull();
+            assertThat(downloader.normalizeRepository(repoB, ctx, null)).isNull();
+
+            // The unreachable host must be probed only once; the second repository is skipped.
+            assertThat(probed).containsExactly(deadUri);
         }
 
         @Test
@@ -1663,33 +1689,96 @@ class MavenPomDownloaderTest implements RewriteTest {
           .anyMatch(c -> !"".equals(c));
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/7685")
     @Test
-    void doesNotThrowONMissingModuleWhenNot404() {
-        rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new PlainTextVisitor<>() {
-              @Override
-              public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                  List<MavenRepository> repositories = singletonList(new MavenRepository("cache-3", "https://artifactory.moderne.ninja/artifactory/moderne-cache-3/", null, null, null, null, null));
-                  GroupArtifact unexisting = new GroupArtifact("org.springframework.integration", "fail");
-                  GroupArtifact existing = new GroupArtifact("org.springframework.integration", "spring-integration-bom");
-                  MavenPomDownloader downloader = new MavenPomDownloader(ctx);
+    void doesNotThrowONMissingModuleWhenNot404() throws Exception {
+        // Mimics an Artifactory virtual repository accessed anonymously: it answers 401 (not 404)
+        // for artifacts it will not serve, and 200 for the ones it does. A local mock server keeps
+        // the test hermetic instead of depending on a live repository's (drifting) contents.
+        try (MockWebServer mockRepo = new MockWebServer()) {
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    String path = request.getPath() == null ? "" : request.getPath();
+                    // Existing group:artifact metadata
+                    if (path.endsWith("/org/springframework/integration/spring-integration-bom/maven-metadata.xml")) {
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <metadata>
+                                <groupId>org.springframework.integration</groupId>
+                                <artifactId>spring-integration-bom</artifactId>
+                                <versioning>
+                                    <latest>5.5.0</latest>
+                                    <release>5.5.0</release>
+                                    <versions>
+                                        <version>5.5.0</version>
+                                    </versions>
+                                </versioning>
+                            </metadata>
+                            """);
+                    }
+                    // Existing snapshot-version metadata
+                    if (path.endsWith("/com/fasterxml/jackson/jackson-base/2.19.3-SNAPSHOT/maven-metadata.xml")) {
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <metadata modelVersion="1.1.0">
+                                <groupId>com.fasterxml.jackson</groupId>
+                                <artifactId>jackson-base</artifactId>
+                                <version>2.19.3-SNAPSHOT</version>
+                                <versioning>
+                                    <snapshot>
+                                        <timestamp>20240101.000000</timestamp>
+                                        <buildNumber>1</buildNumber>
+                                    </snapshot>
+                                    <lastUpdated>20240101000000</lastUpdated>
+                                </versioning>
+                            </metadata>
+                            """);
+                    }
+                    // Existing release POM, declaring Gradle module metadata so the downloader fetches the `.module` side-car
+                    if (path.endsWith("/org/springframework/integration/spring-integration-bom/5.5.0/spring-integration-bom-5.5.0.pom")) {
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <project>
+                                <!-- do_not_remove: published-with-gradle-metadata -->
+                                <modelVersion>4.0.0</modelVersion>
+                                <groupId>org.springframework.integration</groupId>
+                                <artifactId>spring-integration-bom</artifactId>
+                                <version>5.5.0</version>
+                                <packaging>pom</packaging>
+                            </project>
+                            """);
+                    }
+                    // Everything else - missing artifacts and the Gradle `.module` side-car - answers 401, never 404.
+                    return new MockResponse().setResponseCode(401);
+                }
+            });
+            mockRepo.start();
 
-                  //Artifactory virtual anonymous repo returns 401 on unexisting and 404 for authenticated unexisting
-                  assertThrows(MavenDownloadingException.class, () -> downloader.downloadMetadata(unexisting, null, repositories));
-                  assertDoesNotThrow(() -> downloader.downloadMetadata(existing, null, repositories));
-                  //Artifactory virtual anonymous repo returns 401 on unexisting and 404 for authenticated unexisting
-                  assertThrows(MavenDownloadingException.class, () -> downloader.downloadMetadata(new GroupArtifactVersion("com.fasterxml.jackson", "jackson-base", "2.19.3"), null, repositories));
-                  //Artifactory virtual returns 200 anonymous and authenticated existing
-                  assertDoesNotThrow(() -> downloader.downloadMetadata(new GroupArtifactVersion("com.fasterxml.jackson", "jackson-base", "2.19.3-SNAPSHOT"), null, repositories));
-                  //Artifactory virtual anonymous repo returns 401 on unexisting and 404 for authenticated unexisting
-                  assertThrows(MavenDownloadingException.class, () -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.-1"), null, null, repositories));
-                  //Artifactory virtual returns 200 anonymous and authenticated existing
-                  assertDoesNotThrow(() -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.0"), null, null, repositories));
+            MavenPomDownloader downloader = new MavenPomDownloader(new InMemoryExecutionContext());
+            List<MavenRepository> repositories = singletonList(MavenRepository.builder()
+              .id("cache-3")
+              .uri(mockRepo.url("/").toString())
+              .knownToExist(true)
+              .build());
+            GroupArtifact unexisting = new GroupArtifact("org.springframework.integration", "fail");
+            GroupArtifact existing = new GroupArtifact("org.springframework.integration", "spring-integration-bom");
 
-                  return super.visitText(text, ctx);
-              }
-          })),
-          text("")
-        );
+            // Missing module: the repo answers 401 (not 404), but no metadata is retrievable -> still throws
+            assertThrows(MavenDownloadingException.class, () -> downloader.downloadMetadata(unexisting, null, repositories));
+            // Existing group:artifact metadata (200) -> does not throw
+            assertDoesNotThrow(() -> downloader.downloadMetadata(existing, null, repositories));
+            // Missing release-version metadata (401) -> throws
+            assertThrows(MavenDownloadingException.class, () -> downloader.downloadMetadata(new GroupArtifactVersion("com.fasterxml.jackson", "jackson-base", "2.19.3"), null, repositories));
+            // Existing snapshot-version metadata (200) -> does not throw
+            assertDoesNotThrow(() -> downloader.downloadMetadata(new GroupArtifactVersion("com.fasterxml.jackson", "jackson-base", "2.19.3-SNAPSHOT"), null, repositories));
+            // Missing POM version (401) -> throws
+            assertThrows(MavenDownloadingException.class, () -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.-1"), null, null, repositories));
+            // Existing POM whose Gradle `.module` side-car returns 401 (not 404) -> does not throw (PR #7685)
+            assertDoesNotThrow(() -> downloader.download(new GroupArtifactVersion(existing.getGroupId(), existing.getArtifactId(), "5.5.0"), null, null, repositories));
+        }
     }
 }

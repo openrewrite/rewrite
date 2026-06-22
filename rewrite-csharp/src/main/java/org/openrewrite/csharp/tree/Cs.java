@@ -7471,6 +7471,20 @@ public interface Cs extends J {
 
         List<JRightPadded<Expression>> warningCodes;
 
+        /**
+         * Whitespace between {@code #pragma} and {@code warning} (usually a single space).
+         */
+        @With
+        @Getter
+        Space keywordSpacing;
+
+        /**
+         * Whitespace between {@code warning} and the action keyword ({@code disable}/{@code restore}).
+         */
+        @With
+        @Getter
+        Space actionSpacing;
+
         public List<Expression> getWarningCodes() {
             return JRightPadded.getElements(warningCodes);
         }
@@ -7519,7 +7533,7 @@ public interface Cs extends J {
             }
 
             public PragmaWarningDirective withWarningCodes(List<JRightPadded<Expression>> warningCodes) {
-                return t.warningCodes == warningCodes ? t : new PragmaWarningDirective(t.id, t.prefix, t.markers, t.action, warningCodes);
+                return t.warningCodes == warningCodes ? t : new PragmaWarningDirective(t.id, t.prefix, t.markers, t.action, warningCodes, t.keywordSpacing, t.actionSpacing);
             }
         }
     }
@@ -7549,6 +7563,13 @@ public interface Cs extends J {
         @With
         @Getter
         Markers markers;
+
+        /**
+         * Whitespace between {@code #pragma} and {@code checksum} (usually a single space).
+         */
+        @With
+        @Getter
+        Space keywordSpacing;
 
         @With
         @Getter

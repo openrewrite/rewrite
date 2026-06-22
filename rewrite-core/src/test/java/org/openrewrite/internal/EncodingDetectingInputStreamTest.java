@@ -172,6 +172,52 @@ class EncodingDetectingInputStreamTest {
         assertThat(result).isEqualTo("Hütte");
     }
 
+    @Test
+    void utf8WithCjkAndStrayByteReDecodedAsUtf8() {
+        // UTF-8 Chinese "配置" contains byte 0x8D which is undefined in Windows-1252,
+        // plus a stray 0xAA byte (invalid in UTF-8).
+        // Without the fix, this would be detected as Windows-1252, causing
+        // garbled content and UnmappableCharacterException on write-back.
+        // With the fix, readFully() detects the canEncode failure and
+        // re-decodes as UTF-8, producing correct Chinese content.
+        String content = "# app配置，详见 http://example.com\n";
+        byte[] utf8Bytes = content.getBytes(UTF_8);
+        // Insert stray 0xAA byte at the boundary between ASCII and CJK (position 5)
+        // to avoid splitting a UTF-8 multi-byte sequence
+        byte[] withStrayByte = new byte[utf8Bytes.length + 1];
+        System.arraycopy(utf8Bytes, 0, withStrayByte, 0, 5);
+        withStrayByte[5] = (byte) 0xAA; // insert stray byte
+        System.arraycopy(utf8Bytes, 5, withStrayByte, 6, utf8Bytes.length - 5);
+
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(withStrayByte));
+        String result = is.readFully();
+
+        assertThat(is.getCharset()).isEqualTo(UTF_8);
+        assertThat(result).contains("配置");
+    }
+
+    @Test
+    void utf8WithCjkContentDetectedAsUtf8() {
+        // Pure UTF-8 CJK content should be detected as UTF-8
+        String cjk = "# 配置，详见 http://example.com\n# 关闭内置tomcat\n";
+        byte[] bytes = cjk.getBytes(UTF_8);
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        String result = is.readFully();
+        assertThat(is.getCharset()).isEqualTo(UTF_8);
+        assertThat(result).isEqualTo(cjk);
+    }
+
+    @Test
+    void genuineWindows1252StillDetectedAsWindows1252() {
+        // Genuine Windows-1252 content (Western European) should remain Windows-1252
+        String french = "Café résumé naïve";
+        byte[] bytes = french.getBytes(WINDOWS_1252);
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        String result = is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+        assertThat(result).isEqualTo(french);
+    }
+
     private static byte[] parseHex(String hex) {
         String[] parts = hex.trim().split("\\s+");
         byte[] bytes = new byte[parts.length];

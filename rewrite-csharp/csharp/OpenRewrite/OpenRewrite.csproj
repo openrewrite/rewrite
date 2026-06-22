@@ -25,7 +25,7 @@
 
     <!-- Always emit a ref assembly. Consumers reference us as a ProjectReference (via symlink) -->
     <!-- and MSBuild's reduced target set during cross-project compile expects obj/.../ref/OpenRewrite.dll. -->
-    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+<!--    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>-->
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,9 +33,9 @@
     <PackageReference Include="NuGet.Frameworks" Version="6.12.4" />
     <PackageReference Include="NuGet.Versioning" Version="6.12.4" />
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" PrivateAssets="none" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" PrivateAssets="none" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.0.0" PrivateAssets="none" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" PrivateAssets="none" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.3.0" PrivateAssets="none" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.3.0" PrivateAssets="none" />
     <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
     <PackageReference Include="Serilog" Version="4.2.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />

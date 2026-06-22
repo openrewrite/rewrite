@@ -2,7 +2,7 @@
 # Do not edit manually - regenerate with: python scripts/generate_stubs.py
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, List, Optional, TypeVar, Generic
+from typing import Any, ClassVar, List, Optional, Callable, IO, Iterable, TypeVar, Generic
 from typing_extensions import Self
 from uuid import UUID
 import weakref
@@ -64,8 +64,6 @@ class ParseError(SourceFile):
     @classmethod
     def build(cls, parser: 'Parser', input: ParserInput, relative_to: Optional[Path], ctx: ExecutionContext, exception: Exception, erroneous: Optional[SourceFile]) -> 'ParseError': ...
 
-    @property
-    def id(self) -> UUID: ...
     @property
     def markers(self) -> Markers: ...
     @property

@@ -865,6 +865,64 @@ describe("NodeResolutionResult marker", () => {
         });
     });
 
+    test("should drop engines when the value is a bare semver string (engine name absent)", () => {
+        // qs@5.2.1 publishes `engines: ">=0.10.40"` verbatim — a bare semver
+        // with no engine name. Java's NodeResolutionResult.ResolvedDependency
+        // expects Map<String,String> and a String over the RPC wire throws
+        // ClassCastException mid-stream, cascading the receive queue out of
+        // sync for every subsequent file in the build (silently dropping JS
+        // LSTs while reporting BUILD SUCCESS).
+        //
+        // npm itself drops this — npm-install-checks reads eng.node/eng.npm
+        // off the string, both undefined, so the constraint is ignored. We
+        // match that behavior rather than guess at an implicit engine name.
+        const marker = createNodeResolutionResultMarker(
+            "package.json",
+            {name: "test-project", version: "1.0.0", dependencies: {qs: "*"}},
+            {
+                name: "test-project",
+                version: "1.0.0",
+                lockfileVersion: 3,
+                packages: {
+                    "": {version: "1.0.0", dependencies: {qs: "*"}},
+                    "node_modules/qs": {
+                        version: "5.2.1",
+                        engines: ">=0.10.40" as any
+                    }
+                }
+            }
+        );
+
+        const qsDep = marker.dependencies.find(d => d.name === "qs");
+        expect(qsDep?.resolved?.engines).toBeUndefined();
+    });
+
+    test("should preserve engines list from legacy array of bare names", () => {
+        // e.g., lodash's package-lock entry has `engines: ["node", "rhino"]` —
+        // engine names with no version constraint. Preserve the list as
+        // {node: "*", rhino: "*"} so downstream recipes can still ask which
+        // engines a package declares support for.
+        const marker = createNodeResolutionResultMarker(
+            "package.json",
+            {name: "test-project", version: "1.0.0", dependencies: {lodash: "*"}},
+            {
+                name: "test-project",
+                version: "1.0.0",
+                lockfileVersion: 3,
+                packages: {
+                    "": {version: "1.0.0", dependencies: {lodash: "*"}},
+                    "node_modules/lodash": {
+                        version: "1.0.0",
+                        engines: ["node", "rhino"]
+                    }
+                }
+            }
+        );
+
+        const lodashDep = marker.dependencies.find(d => d.name === "lodash");
+        expect(lodashDep?.resolved?.engines).toEqual({node: "*", rhino: "*"});
+    });
+
     test("should resolve pnpm-style paths with version suffix", () => {
         // pnpm stores packages with version in the path: node_modules/package@version
         // This is different from npm's node_modules/package

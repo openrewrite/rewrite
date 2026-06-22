@@ -1433,8 +1433,11 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
     public J visitTypeParameter(TypeParameterTree node, Space fmt) {
         List<J.Annotation> annotations = convertAll(node.getAnnotations());
 
-        Expression name = buildName(node.getName().toString())
-                .withPrefix(sourceBefore(node.getName().toString()));
+        // Type parameter names are always a single identifier per the Java grammar
+        // (T, E, K, V, ?). No dotted names possible.
+        String typeParamName = node.getName().toString();
+        J.Identifier name = new J.Identifier(randomId(), sourceBefore(typeParamName),
+                Markers.EMPTY, emptyList(), typeParamName, null, null);
 
         // see https://docs.oracle.com/javase/tutorial/java/generics/bounded.html
         JContainer<TypeTree> bounds = node.getBounds().isEmpty() ? null :
@@ -1442,44 +1445,6 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                         convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim), Markers.EMPTY);
 
         return new J.TypeParameter(randomId(), fmt, Markers.EMPTY, annotations, emptyList(), name, bounds);
-    }
-
-    private <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {
-        String[] parts = fullyQualifiedName.split("\\.");
-
-        String fullName = "";
-        Expression expr = null;
-        for (int i = 0; i < parts.length; i++) {
-            String part = parts[i];
-            if (i == 0) {
-                fullName = part;
-                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), part, null, null);
-            } else {
-                fullName += "." + part;
-
-                int endOfPrefix = indexOfNextNonWhitespace(0, part);
-                Space identFmt = endOfPrefix > 0 ? format(part, 0, endOfPrefix) : EMPTY;
-
-                Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
-                //noinspection ResultOfMethodCallIgnored
-                whitespaceSuffix.matches();
-                Space namePrefix = i == parts.length - 1 ? EMPTY : format(whitespaceSuffix.group(1));
-
-                expr = new J.FieldAccess(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        expr,
-                        padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, emptyList(), part.trim(), null, null)),
-                        (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
-                                JavaType.ShallowClass.build(fullName) :
-                                null
-                );
-            }
-        }
-
-        //noinspection unchecked,ConstantConditions
-        return (T) expr;
     }
 
     @Override

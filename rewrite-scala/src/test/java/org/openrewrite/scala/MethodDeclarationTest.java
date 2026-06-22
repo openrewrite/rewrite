@@ -414,6 +414,35 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void parenthesizedReturnType() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(x: Int): (Int => Unit) = {
+                    _ => ()
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void parenthesizedReturnTypeWithExtraSpaces() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f  :  (  Int  ) = 1
+                  def g: ( ( Int ) ) = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void functionTypeAsDefaultParameter() {
         rewriteRun(
             scala(
@@ -509,6 +538,18 @@ class MethodDeclarationTest implements RewriteTest {
                 )
             );
         }
+
+        @Test
+        void multipleAnonymousParameters() {
+            rewriteRun(
+                scala(
+                    """
+                    object Test:
+                      def foo(using Me, Perf): Int = 1
+                    """
+                )
+            );
+        }
     }
 
     @Nested
@@ -574,6 +615,36 @@ class MethodDeclarationTest implements RewriteTest {
                     extension (s: String)
                       def shout: String = s.toUpperCase
                       def whisper: String = s.toLowerCase
+                    """
+                )
+            );
+        }
+
+        @Test
+        void extensionWithTypeParameter() {
+            rewriteRun(
+                scala(
+                    """
+                    extension [A](question: Question[A])
+                      def timeFilter: Question[A] = question
+                    """
+                )
+            );
+        }
+
+        @Test
+        void bracelessExtensionWithBraceBlockMethodBody() {
+            // A `{` inside a method body must not be mistaken for the extension's
+            // opening brace, which would make the parser treat this braceless
+            // (indented) extension as brace-delimited.
+            rewriteRun(
+                scala(
+                    """
+                    extension (g: Int)
+                      def rankable =
+                        {
+                          2
+                        }
                     """
                 )
             );
@@ -755,6 +826,113 @@ class MethodDeclarationTest implements RewriteTest {
             def f: String =
               try "x"
               catch case e: Exception => throw e
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedParameterListsOnSeparateLines() {
+        rewriteRun(
+          scala(
+            """
+            def f(a: Int)
+                (b: Int): Int = a + b
+            """
+          )
+        );
+    }
+
+    @Test
+    void multilineParameterListWithTrailingLineComment() {
+        rewriteRun(
+          scala(
+            """
+            def resize(
+                size: Int // either the width or the height! the other one will be preserved
+            ): Url = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedParameterListWithTrailingLineComment() {
+        rewriteRun(
+          scala(
+            """
+            def f(a: Int)(
+                b: Int // either the width or the height! the other one will be preserved
+            ): Int = a + b
+            """
+          )
+        );
+    }
+
+    @Test
+    void longLineCommentBeforeParameterList() {
+        rewriteRun(
+          scala(
+            """
+            def resize // either the width or the height! the other one will be preserved
+            (size: Int): Int = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void emptyParameterListWithInteriorLineComment() {
+        rewriteRun(
+          scala(
+            """
+            def resize( // either the width or the height! the other one will be preserved
+            ): Int = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void emptyParameterListWithInteriorBlockComment() {
+        rewriteRun(
+          scala(
+            """
+            def resize(/* nothing here */): Int = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void asInstanceOfInProcedureSyntaxBody() {
+        // Procedure-syntax bodies are reparsed with a nonzero offset; the cursor update
+        // after `asInstanceOf[...]` must apply that offset or it swallows the following
+        // statement's leading whitespace (`x.asInstanceOf[B]\ny` -> `x.asInstanceOf[B]y`).
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def m() {
+                x.asInstanceOf[B]
+                y
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void procedureSyntaxSetter() {
+        rewriteRun(
+          scala(
+            """
+            trait T {
+              def engine_=(x: Int) {
+                println(x)
+              }
+            }
             """
           )
         );

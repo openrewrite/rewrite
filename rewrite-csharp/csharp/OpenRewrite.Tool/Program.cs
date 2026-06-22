@@ -21,6 +21,9 @@ using Serilog;
 var logFile = args.FirstOrDefault(a => a.StartsWith("--log-file="))
     ?.Substring("--log-file=".Length);
 
+var recipeInstallDir = args.FirstOrDefault(a => a.StartsWith("--recipe-install-dir="))
+    ?.Substring("--recipe-install-dir=".Length);
+
 var loggerConfig = new LoggerConfiguration();
 if (logFile != null)
 {
@@ -43,5 +46,5 @@ sw.Stop();
 Log.Debug("<< Parser warmup ({Elapsed})", sw.Elapsed);
 
 Log.Information("Starting RPC server");
-await RewriteRpcServer.RunAsync();
+await RewriteRpcServer.RunAsync(recipeInstallDir: recipeInstallDir);
 Log.Information("RPC server exited");

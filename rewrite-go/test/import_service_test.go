@@ -92,6 +92,52 @@ func TestImportService_AddImportViaDoAfterVisit(t *testing.T) {
 	spec.RewriteRun(t, Golang(before, after))
 }
 
+func TestMaybeAddImport_DeduplicatesPendingVisitors(t *testing.T) {
+	v := visitor.Init(&maybeAddImportPendingVisitor{})
+	recipes.MaybeAddImport(v, "fmt", nil, false)
+	recipes.MaybeAddImport(v, "fmt", nil, false)
+
+	if got := len(v.PendingAfterVisits()); got != 1 {
+		t.Fatalf("expected one pending AddImport visitor, got %d", got)
+	}
+}
+
+type maybeAddImportPendingVisitor struct{ visitor.GoVisitor }
+
+func TestMaybeAddImport_AddsImportViaDoAfterVisit(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&maybeAddFmtImportRecipe{})
+	before := `
+		package main
+
+		func main() {}
+	`
+	after := `
+		package main
+
+		import "fmt"
+
+		func main() {}
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+type maybeAddFmtImportRecipe struct{ recipe.Base }
+
+func (r *maybeAddFmtImportRecipe) Name() string        { return "test.MaybeAddFmtImport" }
+func (r *maybeAddFmtImportRecipe) DisplayName() string { return "Add fmt import via MaybeAddImport" }
+func (r *maybeAddFmtImportRecipe) Description() string { return "Test recipe." }
+func (r *maybeAddFmtImportRecipe) Editor() recipe.TreeVisitor {
+	return visitor.Init(&maybeAddFmtVisitor{})
+}
+
+type maybeAddFmtVisitor struct{ visitor.GoVisitor }
+
+func (v *maybeAddFmtVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
+	cu = v.GoVisitor.VisitCompilationUnit(cu, p).(*golang.CompilationUnit)
+	recipes.MaybeAddImport(v, "fmt", nil, false)
+	return cu
+}
+
 // TestImportService_RemoveImport via DoAfterVisit.
 func TestImportService_RemoveImportViaDoAfterVisit(t *testing.T) {
 	spec := NewRecipeSpec().WithRecipe(&removeFmtImportRecipe{})

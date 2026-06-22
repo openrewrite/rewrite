@@ -25,6 +25,7 @@ recipeList:
       addIfMissing: false
   # Map notation has been deprecated in 9.1+
   - org.openrewrite.gradle.DependencyUseStringNotation
+  - org.openrewrite.gradle.gradle9.OneDependencyDeclarationPerStatement
   - org.openrewrite.gradle.gradle9.UseMainClassProperty
   - org.openrewrite.gradle.gradle9.UseMainClassPropertyForApplication
   # JavaPluginConvention was removed in Gradle 9; top-level sourceCompatibility / targetCompatibility no longer work
@@ -32,3 +33,7 @@ recipeList:
   - org.openrewrite.gradle.gradle9.RewriteSpreadAllInConfigurationsBlock
   # version = { } is invalid Gradle DSL; the closure form version { } must be used
   - org.openrewrite.gradle.gradle9.UseVersionClosure
+  # Depending on the current project by its own module coordinates is deprecated in 9.3
+  - org.openrewrite.gradle.gradle9.UseProjectDependencyInsteadOfModuleCoordinates
+  # DomainObjectCollection.findAll(Closure) is deprecated in 9.4 in favor of matching(Spec)
+  - org.openrewrite.gradle.gradle9.UseMatchingInsteadOfFindAll

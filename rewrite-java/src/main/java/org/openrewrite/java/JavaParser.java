@@ -234,8 +234,6 @@ public interface JavaParser extends Parser {
         @Nullable
         protected JavaTypeFactory javaTypeFactory;
 
-        protected JavaTypeFactory.@Nullable Provider typeFactoryProvider;
-
         @Nullable
         protected Collection<Input> dependsOn;
 
@@ -253,11 +251,11 @@ public interface JavaParser extends Parser {
         }
 
         /**
-         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} or
-         * {@link #typeFactoryProvider} instead. The cache becomes an implementation
-         * detail of the default {@link org.openrewrite.java.internal.DefaultJavaTypeFactory}.
-         * For now, calls are still honored and the cache is wrapped into the default factory
-         * when no explicit factory is configured.
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} instead.
+         * The cache becomes an implementation detail of the default
+         * {@link org.openrewrite.java.internal.DefaultJavaTypeFactory}. For now, calls
+         * are still honored and the cache is wrapped into the default factory when no
+         * explicit factory is configured.
          */
         @Deprecated
         public B typeCache(JavaTypeCache javaTypeCache) {
@@ -267,11 +265,6 @@ public interface JavaParser extends Parser {
 
         public B typeFactory(JavaTypeFactory javaTypeFactory) {
             this.javaTypeFactory = javaTypeFactory;
-            return (B) this;
-        }
-
-        public B typeFactoryProvider(JavaTypeFactory.Provider provider) {
-            this.typeFactoryProvider = provider;
             return (B) this;
         }
 
@@ -370,19 +363,12 @@ public interface JavaParser extends Parser {
         }
 
         /**
-         * Resolve the {@link JavaTypeFactory} to use for this parser. An explicit factory
-         * set via {@link #typeFactory} wins; otherwise the {@link #typeFactoryProvider}
-         * (if any) is invoked with the resolved classpath. Returns {@code null} when
-         * neither is configured — the caller falls back to a default factory.
+         * Resolve the {@link JavaTypeFactory} to use for this parser. Returns the explicit
+         * factory set via {@link #typeFactory}, or {@code null} when none is configured —
+         * the caller falls back to a default factory.
          */
         protected @Nullable JavaTypeFactory resolvedTypeFactory() {
-            if (javaTypeFactory != null) {
-                return javaTypeFactory;
-            }
-            if (typeFactoryProvider != null) {
-                return typeFactoryProvider.create(new ArrayList<>(resolvedClasspath()), null);
-            }
-            return null;
+            return javaTypeFactory;
         }
 
         @Override

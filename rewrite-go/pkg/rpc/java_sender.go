@@ -17,6 +17,8 @@
 package rpc
 
 import (
+	"strconv"
+
 	"github.com/google/uuid"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
@@ -115,8 +117,25 @@ func (s *JavaSender) VisitLiteral(lit *java.Literal, p any) java.J {
 	q.GetAndSend(lit, func(v any) any { return v.(*java.Literal).Value }, nil)
 	// valueSource (source text)
 	q.GetAndSend(lit, func(v any) any { return v.(*java.Literal).Source }, nil)
-	// unicodeEscapes (empty for Go)
-	q.GetAndSendList(lit, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	// unicodeEscapes (typically empty for Go)
+	q.GetAndSendList(lit,
+		func(v any) []any {
+			escapes := v.(*java.Literal).UnicodeEscapes
+			result := make([]any, len(escapes))
+			for i, e := range escapes {
+				result[i] = e
+			}
+			return result
+		},
+		func(v any) any {
+			e := v.(java.UnicodeEscape)
+			return strconv.Itoa(e.ValueSourceIndex) + e.CodePoint
+		},
+		func(v any) {
+			e := v.(java.UnicodeEscape)
+			q.GetAndSend(e, func(x any) any { return x.(java.UnicodeEscape).ValueSourceIndex }, nil)
+			q.GetAndSend(e, func(x any) any { return x.(java.UnicodeEscape).CodePoint }, nil)
+		})
 	// type (as ref)
 	q.GetAndSend(lit, func(v any) any { return AsRef(v.(*java.Literal).Type) },
 		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
@@ -163,34 +182,18 @@ func (s *JavaSender) VisitBlock(b *java.Block, p any) java.J {
 
 func (s *JavaSender) VisitReturn(r *java.Return, p any) java.J {
 	q := p.(*SendQueue)
-	// Java's J.Return has a single expression; Go has multiple
-	// The first expression maps to J.Return.expression
-	q.GetAndSend(r, func(v any) any {
-		exprs := v.(*java.Return).Expressions
-		if len(exprs) > 0 {
-			return exprs[0].Element
-		}
-		return nil
-	}, func(v any) { s.Visit(v.(java.Tree), q) })
+	// Mirrors Java's J.Return: a single, nullable expression. Multi-value Go
+	// returns are golang.Return, handled by GoSender.VisitGoReturn.
+	q.GetAndSend(r, func(v any) any { return v.(*java.Return).Expression },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return r
 }
 
 func (s *JavaSender) VisitIf(i *java.If, p any) java.J {
 	q := p.(*SendQueue)
-	// ifCondition - reuse cached ControlParentheses if available, otherwise create new
-	q.GetAndSend(i, func(v any) any {
-		ifNode := v.(*java.If)
-		if ifNode.ConditionCP != nil {
-			cp := *ifNode.ConditionCP
-			cp.Tree = java.RightPadded[java.Expression]{Element: ifNode.Condition, After: cp.Tree.After}
-			return &cp
-		}
-		return &java.ControlParentheses{
-			ID:      uuid.New(),
-			Markers: java.Markers{ID: uuid.New()},
-			Tree:    java.RightPadded[java.Expression]{Element: ifNode.Condition, After: java.EmptySpace},
-		}
-	}, func(v any) { s.Visit(v.(java.Tree), q) })
+	// ifCondition - the condition is already a ControlParentheses, matching J.If
+	q.GetAndSend(i, func(v any) any { return v.(*java.If).Condition },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// thenPart (right-padded)
 	q.GetAndSend(i, func(v any) any {
 		return java.RightPadded[java.Statement]{
@@ -253,7 +256,7 @@ func (s *JavaSender) VisitMethodDeclaration(md *java.MethodDeclaration, p any) j
 	// Go's MethodDeclaration maps to parts of Java's MethodDeclaration
 	// Java sends: leadingAnnotations, modifiers, typeParameters, returnTypeExpression,
 	//   name annotations, name, parameters, dimensionsAfterName, throws, body, defaultValue, methodType
-	// Go: receiver, name, parameters, returnType, body, methodType
+	// A method receiver lives on the wrapping Go$MethodDeclaration, not here.
 
 	// leadingAnnotations (`//go:` directives modeled as J.Annotation)
 	q.GetAndSendList(md,
@@ -268,7 +271,7 @@ func (s *JavaSender) VisitMethodDeclaration(md *java.MethodDeclaration, p any) j
 		func(v any) any { return extractID(v) },
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	// modifiers (empty for Go)
-	q.GetAndSendList(md, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(md, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// typeParameters (`[T any]` declaration-site generics; nil for non-generic funcs)
 	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).TypeParameters },
 		func(v any) { s.Visit(v.(java.Tree), q) })
@@ -276,7 +279,7 @@ func (s *JavaSender) VisitMethodDeclaration(md *java.MethodDeclaration, p any) j
 	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).ReturnType },
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	// name annotations (empty)
-	q.GetAndSendList(md, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(md, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// name
 	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).Name },
 		func(v any) { s.Visit(v.(java.Tree), q) })
@@ -284,7 +287,7 @@ func (s *JavaSender) VisitMethodDeclaration(md *java.MethodDeclaration, p any) j
 	q.GetAndSend(md, func(v any) any { return v.(*java.MethodDeclaration).Parameters },
 		func(v any) { sendContainer(s, v, q) })
 	// dimensionsAfterName (empty for Go — no C-style array method returns)
-	q.GetAndSendList(md, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(md, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// throws (nil for Go)
 	q.GetAndSend(md, func(_ any) any { return nil }, nil)
 	// body
@@ -301,7 +304,7 @@ func (s *JavaSender) VisitMethodDeclaration(md *java.MethodDeclaration, p any) j
 func (s *JavaSender) VisitTypeParameters(tps *java.TypeParameters, p any) java.J {
 	q := p.(*SendQueue)
 	// annotations (empty for Go)
-	q.GetAndSendList(tps, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(tps, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// typeParameters (list of right-padded J$TypeParameter)
 	q.GetAndSendList(tps,
 		func(v any) []any {
@@ -320,9 +323,9 @@ func (s *JavaSender) VisitTypeParameters(tps *java.TypeParameters, p any) java.J
 func (s *JavaSender) VisitTypeParameter(tp *java.TypeParameter, p any) java.J {
 	q := p.(*SendQueue)
 	// annotations (empty for Go)
-	q.GetAndSendList(tp, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(tp, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// modifiers (empty for Go)
-	q.GetAndSendList(tp, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(tp, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// name
 	q.GetAndSend(tp, func(v any) any { return v.(*java.TypeParameter).Name },
 		func(v any) { s.Visit(v.(java.Tree), q) })
@@ -400,28 +403,11 @@ func (s *JavaSender) VisitForEachLoop(f *java.ForEachLoop, p any) java.J {
 
 func (s *JavaSender) VisitForEachControl(fc *java.ForEachControl, p any) java.J {
 	q := p.(*SendQueue)
-	// Go sends: key (right-padded), value (right-padded), operator (left-padded string), iterable
-	// Java GolangReceiver override reads this format
-	q.GetAndSend(fc, func(v any) any {
-		k := v.(*java.ForEachControl).Key
-		if k == nil {
-			return nil
-		}
-		return *k
-	}, func(v any) { sendRightPadded(s, v, q) })
-	q.GetAndSend(fc, func(v any) any {
-		val := v.(*java.ForEachControl).Value
-		if val == nil {
-			return nil
-		}
-		return *val
-	}, func(v any) { sendRightPadded(s, v, q) })
-	q.GetAndSend(fc, func(v any) any {
-		op := v.(*java.ForEachControl).Operator
-		return java.LeftPadded[string]{Before: op.Before, Element: op.Element.String(), Markers: op.Markers}
-	}, func(v any) { sendLeftPadded(s, v, q) })
+	// Mirrors J.ForEachLoop.Control: variable (right-padded), iterable (right-padded).
+	q.GetAndSend(fc, func(v any) any { return v.(*java.ForEachControl).Variable },
+		func(v any) { sendRightPadded(s, v, q) })
 	q.GetAndSend(fc, func(v any) any { return v.(*java.ForEachControl).Iterable },
-		func(v any) { s.Visit(v.(java.Tree), q) })
+		func(v any) { sendRightPadded(s, v, q) })
 	return fc
 }
 
@@ -543,8 +529,15 @@ func (s *JavaSender) VisitMethodInvocation(mi *java.MethodInvocation, p any) jav
 		}
 		return *sel
 	}, func(v any) { sendRightPadded(s, v, q) })
-	// typeParameters (nil for Go)
-	q.GetAndSend(mi, func(_ any) any { return nil }, nil)
+	// typeParameters (explicit call-site type args, e.g. `[int]` in `Map[int](42)`;
+	// nullable container — dereference so sendContainer sees a value Container)
+	q.GetAndSend(mi, func(v any) any {
+		tp := v.(*java.MethodInvocation).TypeParameters
+		if tp == nil {
+			return nil
+		}
+		return *tp
+	}, func(v any) { sendContainer(s, v, q) })
 	// name
 	q.GetAndSend(mi, func(v any) any { return v.(*java.MethodInvocation).Name },
 		func(v any) { s.Visit(v.(java.Tree), q) })
@@ -607,7 +600,7 @@ func (s *JavaSender) VisitVariableDeclarator(vd *java.VariableDeclarator, p any)
 	q.GetAndSend(vd, func(v any) any { return v.(*java.VariableDeclarator).Name },
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	// dimensionsAfterName (empty for Go)
-	q.GetAndSendList(vd, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(vd, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// initializer (left-padded, nullable) — dereference pointer
 	q.GetAndSend(vd, func(v any) any {
 		init := v.(*java.VariableDeclarator).Initializer
@@ -627,7 +620,7 @@ func (s *JavaSender) VisitArrayType(at *java.ArrayType, p any) java.J {
 	q.GetAndSend(at, func(v any) any { return v.(*java.ArrayType).ElementType },
 		func(v any) { s.Visit(v.(java.Tree), q) })
 	// annotations (empty for Go)
-	q.GetAndSendList(at, func(_ any) []any { return nil }, func(_ any) any { return nil }, nil)
+	q.GetAndSendList(at, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// dimension (left-padded)
 	q.GetAndSend(at, func(v any) any { return v.(*java.ArrayType).Dimension },
 		func(v any) { sendLeftPadded(s, v, q) })

@@ -675,15 +675,15 @@ class KotlinTypeMappingTest {
             );
         }
 
-        // Unary increments (`n++`, `--n`) flow through the type() dispatch with a
-        // ConeClassLikeType so they get the JVM primitive remap. AssignmentOperation
-        // and Binary expression types come from a different code path that doesn't
-        // currently go through that dispatch and still surface as `kotlin.Int`.
+        // All operator expressions on Kotlin primitives flow through the type()
+        // dispatch with a ConeClassLikeType and get the JVM primitive remap, so
+        // `kotlin.Int` surfaces uniformly as `int` across unary, binary, and
+        // assignment-operator forms.
         @CsvSource(value = {
           "n++~int",
           "--n~int",
-          "n += a~kotlin.Int",
-          "n = a + b~kotlin.Int"
+          "n += a~int",
+          "n = a + b~int"
         }, delimiter = '~')
         @ParameterizedTest
         void operatorOverload(String p1, String p2) {
@@ -1663,7 +1663,10 @@ class KotlinTypeMappingTest {
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.Library{name=arrayOf,return=kotlin.Array<int>,parameters=[kotlin.Array<Generic{? extends Generic{T}}>]}");
+                                // arrayOf is a library-origin top-level function with no real declaring
+                                // class (the old `kotlin.Library` placeholder was a synthetic stand-in);
+                                // declaringType is now {undefined} reflecting that.
+                                assertThat(method.getMethodType().toString()).isEqualTo("{undefined}{name=arrayOf,return=kotlin.Array<int>,parameters=[kotlin.Array<Generic{? extends Generic{T}}>]}");
                                 found.set(true);
                                 return super.visitMethodInvocation(method, integer);
                             }

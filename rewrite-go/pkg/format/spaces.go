@@ -99,17 +99,14 @@ func ensureSingleSpace(s java.Space) java.Space {
 	return s
 }
 
-// ensureLeadingSingleSpace ensures the leftmost leaf of an Expression
-// has a single-space Prefix. Walks the leftmost spine via
-// transformLeftmostPrefix so the rule works whether the leading
-// whitespace lives directly on the expression (Identifier, Literal,
-// Unary, Parentheses) or on a deeper leftmost descendant (Binary's
-// Left, FieldAccess's Target, etc.).
+// ensureLeadingSingleSpace ensures an Expression's Prefix is a single
+// space. The parser attaches the leading whitespace to the outermost
+// element, so this operates on the expression's own Prefix.
 func ensureLeadingSingleSpace(e java.Expression) java.Expression {
 	if e == nil {
 		return e
 	}
-	out := transformLeftmostPrefix(e, ensureSingleSpace)
+	out := transformPrefix(e, ensureSingleSpace)
 	if r, ok := out.(java.Expression); ok {
 		return r
 	}

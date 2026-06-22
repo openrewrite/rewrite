@@ -74,6 +74,61 @@ func TestGenericFuncTypeParametersSurviveRpc(t *testing.T) {
 	}
 }
 
+// Explicit call-site type arguments — the `[int]` in `Map[int](42)` — are
+// carried on MethodInvocation.TypeParameters and must survive the RPC round-trip.
+func TestGenericCallTypeArgumentsSurviveRpc(t *testing.T) {
+	for _, tc := range []struct {
+		src   string
+		count int
+	}{
+		{"package main\n\nfunc Id[T any](x T) T {\n\treturn x\n}\n\nfunc main() {\n\t_ = Id[int](42)\n}\n", 1},
+		{"package main\n\nfunc Pair[A any, B any](a A, b B) {\n}\n\nfunc main() {\n\tPair[int, string](1, \"x\")\n}\n", 2},
+	} {
+		// given
+		cu, err := parser.NewGoParser().Parse("x.go", tc.src)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+
+		// when
+		got := rpcRoundTrip(t, cu)
+
+		// then
+		mi := findFirstCallInMain(t, got)
+		if mi.TypeParameters == nil {
+			t.Fatalf("call-site type arguments lost over RPC for %q", tc.src)
+		}
+		if len(mi.TypeParameters.Elements) != tc.count {
+			t.Errorf("expected %d type arguments, got %d for %q", tc.count, len(mi.TypeParameters.Elements), tc.src)
+		}
+		if printed := printer.Print(got); printed != tc.src {
+			t.Errorf("RPC round-trip mismatch\nexpected:\n%s\nactual:\n%s", tc.src, printed)
+		}
+	}
+}
+
+func findFirstCallInMain(t *testing.T, cu *golang.CompilationUnit) *java.MethodInvocation {
+	t.Helper()
+	for _, rp := range cu.Statements {
+		md, ok := rp.Element.(*java.MethodDeclaration)
+		if !ok || md.Body == nil || md.Name == nil || md.Name.Name != "main" {
+			continue
+		}
+		for _, st := range md.Body.Statements {
+			switch e := st.Element.(type) {
+			case *java.MethodInvocation:
+				return e
+			case *java.Assignment:
+				if mi, ok := e.Value.Element.(*java.MethodInvocation); ok {
+					return mi
+				}
+			}
+		}
+	}
+	t.Fatalf("no MethodInvocation found in main()")
+	return nil
+}
+
 func TestGenericTypeDeclTypeParametersSurviveRpc(t *testing.T) {
 	for _, src := range []string{
 		"package main\n\ntype Pair[T any] struct {\n\tFirst  T\n\tSecond T\n}\n",

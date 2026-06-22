@@ -55,6 +55,10 @@ func (s *GoSender) Visit(t java.Tree, p any) java.Tree {
 		s.sendParseError(pe, p.(*SendQueue))
 		return pe
 	}
+	if gm, ok := t.(*golang.GoMod); ok {
+		sendGoMod(gm, p.(*SendQueue))
+		return gm
+	}
 	return s.GoVisitor.Visit(t, p)
 }
 
@@ -206,6 +210,15 @@ func (s *GoSender) VisitKeyValue(kv *golang.KeyValue, p any) java.J {
 	q.GetAndSend(kv, func(v any) any { return v.(*golang.KeyValue).Value },
 		func(v any) { sendLeftPadded(s, v, q) })
 	return kv
+}
+
+func (s *GoSender) VisitGoArrayType(at *golang.ArrayType, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(at, func(v any) any { return v.(*golang.ArrayType).Length },
+		func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(at, func(v any) any { return v.(*golang.ArrayType).ElementType },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return at
 }
 
 func (s *GoSender) VisitSlice(sl *golang.Slice, p any) java.J {
@@ -362,6 +375,38 @@ func (s *GoSender) VisitTypeDecl(td *golang.TypeDecl, p any) java.J {
 	return td
 }
 
+func (s *GoSender) VisitDeclarationBlock(db *golang.DeclarationBlock, p any) java.J {
+	q := p.(*SendQueue)
+	// leadingAnnotations (`//go:` directives modeled as J.Annotation)
+	q.GetAndSendList(db,
+		func(v any) []any {
+			anns := v.(*golang.DeclarationBlock).LeadingAnnotations
+			result := make([]any, len(anns))
+			for i, a := range anns {
+				result[i] = a
+			}
+			return result
+		},
+		func(v any) any { return extractID(v) },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	// kind (enum name)
+	q.GetAndSend(db, func(v any) any {
+		if v.(*golang.DeclarationBlock).Kind == golang.DeclConst {
+			return "CONST"
+		}
+		return "VAR"
+	}, nil)
+	// Specs — dereference pointer so sendContainer gets a value type
+	q.GetAndSend(db, func(v any) any {
+		sp := v.(*golang.DeclarationBlock).Specs
+		if sp == nil {
+			return nil
+		}
+		return *sp
+	}, func(v any) { sendContainer(s, v, q) })
+	return db
+}
+
 func (s *GoSender) VisitMultiAssignment(ma *golang.MultiAssignment, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSendList(ma,
@@ -389,6 +434,40 @@ func (s *GoSender) VisitMultiAssignment(ma *golang.MultiAssignment, p any) java.
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
 	return ma
+}
+
+func (s *GoSender) VisitGoReturn(ret *golang.Return, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSendList(ret,
+		func(v any) []any {
+			exprs := v.(*golang.Return).Expressions
+			result := make([]any, len(exprs))
+			for i, e := range exprs {
+				result[i] = e
+			}
+			return result
+		},
+		func(v any) any { return containerElementID(v) },
+		func(v any) { sendRightPadded(s, v, q) })
+	return ret
+}
+
+func (s *GoSender) VisitGoMethodDeclaration(md *golang.MethodDeclaration, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(md, func(v any) any { return v.(*golang.MethodDeclaration).Receiver },
+		func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(md, func(v any) any { return v.(*golang.MethodDeclaration).Declaration },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return md
+}
+
+func (s *GoSender) VisitStatementWithInit(swi *golang.StatementWithInit, p any) java.J {
+	q := p.(*SendQueue)
+	q.GetAndSend(swi, func(v any) any { return v.(*golang.StatementWithInit).Init },
+		func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(swi, func(v any) any { return v.(*golang.StatementWithInit).Statement },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return swi
 }
 
 func (s *GoSender) VisitCommClause(cc *golang.CommClause, p any) java.J {

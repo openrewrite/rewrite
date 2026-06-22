@@ -156,7 +156,7 @@ class NewArrayTest implements RewriteTest {
 
     @Test
     void significantCharactersInComments() {
-        // visitNewArrayWithType — `]` in block comment inside Array element type
+        // `new Array[T](...)` — `]` in block comment inside Array element type
         rewriteRun(
             scala(
                 """

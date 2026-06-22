@@ -44,10 +44,8 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
                       </notes>
                   </suppress>
               </suppressions>""",
-            """
-              <?xml version="1.0" encoding="UTF-8" ?>
-              <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-              </suppressions>""",
+            // The file is removed altogether once no suppressions remain
+            (String) null,
             spec -> spec.path("suppressions.xml"))
         );
     }
@@ -70,10 +68,8 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
                                     </suppress>
                                 </suppressions>"""
                                 .formatted(dayBeforeYesterdayString),
-                        """
-                                <?xml version="1.0" encoding="UTF-8" ?>
-                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-                                </suppressions>""",
+                        // The file is removed altogether once no suppressions remain
+                        (String) null,
                         spec -> spec.path("suppressions.xml"))
         );
     }
@@ -134,10 +130,8 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
                                     </suppress>
                                 </suppressions>""")
                                 .formatted(dayBeforeYesterdayString, dayBeforeYesterdayStringNoZ),
-                        """
-                                <?xml version="1.0" encoding="UTF-8" ?>
-                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-                                </suppressions>""",
+                        // The file is removed altogether once no suppressions remain
+                        (String) null,
                         spec -> spec.path("suppressions.xml"))
         );
     }
@@ -179,6 +173,19 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
                                     </suppress>
                                 </suppressions>""",
                         spec -> spec.path("suppressions.xml"))
+        );
+    }
+
+    @Test
+    void removesEmptySuppressionsFile() {
+        rewriteRun(
+          xml("""
+              <?xml version="1.0" encoding="UTF-8" ?>
+              <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+              </suppressions>""",
+            // An OWASP suppressions file without any suppressions is removed altogether
+            (String) null,
+            spec -> spec.path("suppressions.xml"))
         );
     }
 

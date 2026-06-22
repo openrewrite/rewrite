@@ -350,16 +350,6 @@ func coerceLeftPaddedIdent(lp any) java.LeftPadded[*java.Identifier] {
 	return java.LeftPadded[*java.Identifier]{Before: before, Markers: m}
 }
 
-// parseAssignOpDefaulting parses a Go assignment operator, defaulting to "=" rather
-// than crashing the recipe on an unrecognized spelling. Used as the receiveLeftPaddedEnum
-// parser for AssignOp slots.
-func parseAssignOpDefaulting(s string) java.AssignOp {
-	if op := java.ParseAssignOp(s); op != 0 {
-		return op
-	}
-	return java.AssignOpEquals
-}
-
 func leftPaddedBefore(lp any) any {
 	switch v := lp.(type) {
 	case java.LeftPadded[java.J]:
@@ -375,8 +365,6 @@ func leftPaddedBefore(lp any) any {
 	case java.LeftPadded[java.UnaryOperator]:
 		return v.Before
 	case java.LeftPadded[java.Space]:
-		return v.Before
-	case java.LeftPadded[java.AssignOp]:
 		return v.Before
 	case java.LeftPadded[string]:
 		return v.Before
@@ -403,8 +391,6 @@ func leftPaddedElement(lp any) any {
 		return v.Element
 	case java.LeftPadded[java.Space]:
 		return v.Element
-	case java.LeftPadded[java.AssignOp]:
-		return v.Element
 	case java.LeftPadded[string]:
 		return v.Element
 	case java.LeftPadded[bool]:
@@ -430,8 +416,6 @@ func leftPaddedMarkers(lp any) any {
 		return v.Markers
 	case java.LeftPadded[java.Space]:
 		return v.Markers
-	case java.LeftPadded[java.AssignOp]:
-		return v.Markers
 	case java.LeftPadded[string]:
 		return v.Markers
 	case java.LeftPadded[bool]:
@@ -444,7 +428,7 @@ func leftPaddedMarkers(lp any) any {
 // leftPaddedFromElement creates a LeftPadded with the correct generic type
 // based on the element's concrete type.
 // leftPaddedFromElement infers a LeftPadded's generic type from the element's concrete
-// type. Enum-valued slots (operators, AssignOp) do NOT come through here — they use
+// type. Enum-valued slots (operators) do NOT come through here — they use
 // receiveLeftPaddedEnum, which resolves the ambiguous wire name via a caller-supplied
 // parser — so this only handles unambiguous element kinds.
 func leftPaddedFromElement(before java.Space, elem any, markers java.Markers) any {

@@ -18,12 +18,11 @@ ChangeMethodName recipe for Python that delegates to Java's ChangeMethodName.
 This recipe renames method invocations matching a pattern.
 """
 from dataclasses import field
-from typing import Any, Optional
 
-from rewrite import ExecutionContext, Recipe, TreeVisitor, option
+from rewrite import Recipe, option
 from rewrite.decorators import categorize
 from rewrite.marketplace import Python
-from rewrite.rpc.java_recipe import prepare_java_recipe, JavaRecipeVisitor, PreparedJavaRecipe
+from rewrite.rpc.rpc_recipe import RpcRecipe
 
 
 @categorize(Python)
@@ -77,7 +76,6 @@ class ChangeMethodName(Recipe):
         self.new_method_name = new_method_name
         self.match_overrides = match_overrides
         self.ignore_definition = ignore_definition
-        self._prepared_recipe: Optional[PreparedJavaRecipe] = None
 
     @property
     def name(self) -> str:
@@ -91,16 +89,11 @@ class ChangeMethodName(Recipe):
     def description(self) -> str:
         return "Rename method invocations matching a pattern."
 
-    def editor(self) -> TreeVisitor[Any, ExecutionContext]:
-        if self._prepared_recipe is None:
-            self._prepared_recipe = prepare_java_recipe(
-                "org.openrewrite.java.ChangeMethodName",
-                {
-                    "methodPattern": self.method_pattern,
-                    "newMethodName": self.new_method_name,
-                    "matchOverrides": self.match_overrides,
-                    "ignoreDefinition": self.ignore_definition
-                }
-            )
-
-        return JavaRecipeVisitor(self._prepared_recipe)
+    def recipe_list(self) -> list[Recipe]:
+        return [RpcRecipe(
+            "org.openrewrite.java.ChangeMethodName",
+            methodPattern=self.method_pattern,
+            newMethodName=self.new_method_name,
+            matchOverrides=self.match_overrides,
+            ignoreDefinition=self.ignore_definition,
+        )]

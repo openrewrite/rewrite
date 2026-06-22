@@ -477,11 +477,13 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 	}
 
 	for i, src := range flat {
-		// Non-Go sources (e.g. go.mod) are not yet parsed on the Go side.
-		// We round-trip them verbatim so project layouts compose, but skip
-		// tree-walks and recipe application.
 		if !strings.HasSuffix(src.Path, ".go") {
-			if src.After != nil && *src.After != src.Before {
+			// go.mod parses into a lossless LST, so recipes can run against
+			// it. Other non-Go sources (e.g. go.sum) have no LST yet and
+			// round-trip verbatim.
+			if path.Base(src.Path) == "go.mod" {
+				spec.rewriteGoMod(t, src)
+			} else if src.After != nil && *src.After != src.Before {
 				t.Errorf("non-Go source %q: harness cannot apply recipes to it yet", src.Path)
 			}
 			continue
@@ -511,6 +513,14 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 		if errs := ValidateSpaces(cu); len(errs) > 0 {
 			for _, e := range errs {
 				t.Errorf("space validation: %s", e)
+			}
+		}
+
+		// Assert leading whitespace is attached to the outermost LST element
+		// for every parsed source.
+		if errs := WhitespaceAttachmentViolations(cu); len(errs) > 0 {
+			for _, e := range errs {
+				t.Errorf("whitespace attachment: %s", e)
 			}
 		}
 
@@ -554,6 +564,66 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 		} else if src.After != nil {
 			t.Error("after state specified but no recipe configured")
 		}
+	}
+}
+
+// rewriteGoMod parses a go.mod source into its lossless LST, checks
+// parse-print idempotence, and (if a recipe is configured) applies it and
+// compares the printed result to the expected after-state. Mirrors the
+// .go path in RewriteRun, but uses the go.mod-specific parser/printer since
+// GoMod is a SourceFile that is not a *golang.CompilationUnit.
+func (spec *RecipeSpec) rewriteGoMod(t *testing.T, src SourceSpec) {
+	t.Helper()
+
+	gm, err := parser.ParseGoModFile(src.Path, src.Before)
+	if err != nil {
+		t.Fatalf("go.mod parse error: %v", err)
+	}
+
+	// Attach any markers contributed by GoProject(...) wrappers (e.g. the
+	// GoResolutionResult / GoProject markers) so recipes can read them.
+	for _, m := range src.Markers {
+		gm = gm.WithMarkers(java.AddMarker(gm.Markers, m))
+	}
+
+	if spec.CheckParsePrintIdempotence {
+		if printed := printer.PrintGoMod(gm); printed != src.Before {
+			t.Errorf("go.mod parse-print idempotence failed\n\nexpected:\n%s\n\nactual:\n%s\n\ndiff positions:", src.Before, printed)
+			showDiff(t, src.Before, printed)
+		}
+	}
+
+	if spec.Recipe == nil {
+		if src.After != nil {
+			t.Error("after state specified but no recipe configured")
+		}
+		return
+	}
+
+	result := runRecipe(spec.Recipe, gm)
+	if result == nil {
+		if src.After != nil {
+			t.Error("recipe returned nil (deleted source file) but expected an after state")
+		}
+		return
+	}
+	resultGoMod, ok := result.(*golang.GoMod)
+	if !ok {
+		t.Fatalf("recipe returned %T, want *golang.GoMod", result)
+	}
+
+	mp := spec.MarkerPrinter
+	if mp == nil {
+		mp = printer.DefaultMarkerPrinter
+	}
+	actual := printer.PrintGoModWithMarkers(resultGoMod, mp)
+	if src.After != nil {
+		if actual != *src.After {
+			t.Errorf("recipe result mismatch\n\nexpected:\n%s\n\nactual:\n%s", *src.After, actual)
+			showDiff(t, *src.After, actual)
+		}
+	} else if actual != src.Before {
+		t.Errorf("recipe made unexpected changes\n\nexpected (no change):\n%s\n\nactual:\n%s", src.Before, actual)
 	}
 }
 

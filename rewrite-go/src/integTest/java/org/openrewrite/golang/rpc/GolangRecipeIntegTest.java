@@ -114,6 +114,71 @@ class GolangRecipeIntegTest implements RewriteTest {
     }
 
     /**
+     * Renames an identifier declared inside a grouped {@code const ( ... )}
+     * block. This only works if the grouped declarations (modeled as
+     * Go.DeclarationBlock) round-trip their inner specs to the Java side —
+     * before DeclarationBlock existed the group's contents were not
+     * serialized, so a Java recipe could not see or rename {@code x}.
+     */
+    @Test
+    void renameVarInsideGroupedBlock() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier ident, org.openrewrite.ExecutionContext ctx) {
+                  if ("x".equals(ident.getSimpleName())) {
+                      return ident.withSimpleName("flag");
+                  }
+                  return ident;
+              }
+          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          go(
+            """
+              package main
+
+              const (
+              \tx = 1
+              \ty = 2
+              )
+              """,
+            """
+              package main
+
+              const (
+              \tflag = 1
+              \ty = 2
+              )
+              """
+          )
+        );
+    }
+
+    /**
+     * Grouped {@code var ( ... )} / {@code const ( ... )} blocks survive a
+     * full Java RPC round-trip with no changes (idempotent print).
+     */
+    @Test
+    void groupedDeclarationBlockRoundTrip() {
+        rewriteRun(
+          go(
+            """
+              package main
+
+              var (
+              \ta int
+              \tb = 2
+              )
+
+              const (
+              \tc = 3
+              \td = 4
+              )
+              """
+          )
+        );
+    }
+
+    /**
      * Tests Go-native recipe execution via the full RPC Visit path.
      * The RenameXToFlag recipe has a real Go Editor() that visits identifiers.
      * This exercises: PrepareRecipe → Visit → getObjectFromJava → Go visitor →
@@ -220,6 +285,38 @@ class GolangRecipeIntegTest implements RewriteTest {
         assertThat(result).isNotNull().isInstanceOf(SourceFile.class);
     }
 
+    /**
+     * A Java recipe that iterates {@code J.MethodDeclaration#getModifiers()} —
+     * exactly what {@code ModifierOrder} does — must not NPE on a Go function.
+     * Go functions have no modifiers, but {@code J.MethodDeclaration#modifiers}
+     * is a non-null Java contract; before the fix the Go sender emitted the
+     * modifiers list as a nil slice, which deserialized to {@code null} on the
+     * Java side and threw {@code NullPointerException: Cannot invoke
+     * "java.util.List.iterator()" because "modifiers" is null}.
+     */
+    @Test
+    void iteratingModifiersDoesNotNpe() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, org.openrewrite.ExecutionContext ctx) {
+                  for (J.Modifier modifier : method.getModifiers()) {
+                      assertThat(modifier).isNotNull();
+                  }
+                  return super.visitMethodDeclaration(method, ctx);
+              }
+          })),
+          go(
+            """
+              package main
+
+              func hello() {
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void renameIdentifier() {
         rewriteRun(
@@ -307,8 +404,8 @@ class GolangRecipeIntegTest implements RewriteTest {
 
               import "fmt"
 
-              func main() {/*~~>*/
-              \tfmt.Println("hello")
+              func main() {
+              \t/*~~>*/fmt.Println("hello")
               }
               """
           )

@@ -71,3 +71,19 @@ func withPrefix[T java.Tree](t T, prefix java.Space) T {
 	}
 	return t
 }
+
+// transformPrefix applies f to t's own Prefix and returns the updated
+// node, or t unchanged when f is a no-op. The parser attaches
+// inter-statement / inter-expression whitespace to the outermost element,
+// so format passes manipulate that whitespace directly on the node itself.
+func transformPrefix(t java.Tree, f func(java.Space) java.Space) java.Tree {
+	if t == nil {
+		return nil
+	}
+	cur := getPrefix(t)
+	next := f(cur)
+	if next.Whitespace == cur.Whitespace && len(next.Comments) == len(cur.Comments) {
+		return t
+	}
+	return withPrefix(t, next)
+}

@@ -37,6 +37,7 @@ import org.jetbrains.kotlin.ir.util.properties
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeMapping
 import org.openrewrite.java.internal.JavaTypeFactory
+import org.openrewrite.java.tree.Flag
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.JavaType.GenericTypeVariable
 import org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*
@@ -72,15 +73,11 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
         }
 
         val signature = signatureBuilder.signature(type)
-        val existing: JavaType? = typeFactory.get(signature)
-        if (existing != null) {
-            return existing
-        }
 
         val baseType = if (type is IrSimpleType) type.classifier.owner else type
         when (baseType) {
             is IrFile -> {
-                return fileType(signature)
+                return fileType(baseType, signature)
             }
 
             is IrClass -> {
@@ -163,25 +160,24 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
     }
 
     private fun externalPackageFragment(signature: String): JavaType {
-        val packageFragment = JavaType.ShallowClass.build(signature)
-        typeFactory.put(signature, packageFragment)
-        return packageFragment
+        // External package fragment names a package, not a class.
+        return JavaType.Unknown.getInstance()
     }
 
     private fun alias(type: IrTypeAlias, signature: String): JavaType {
-        val aliased = type(type.expandedType)
-        typeFactory.put(signature, aliased)
-        return aliased
+        return type(type.expandedType)
     }
 
-    private fun fileType(signature: String): JavaType {
-        val existing = typeFactory.get<JavaType.FullyQualified>(signature)
-        if (existing != null) {
-            return existing
+    private fun fileType(file: IrFile, signature: String): JavaType {
+        // The file's JVM facade class is synthesized at codegen and has no
+        // IrClass. But its declared top-level functions correspond exactly to
+        // the methods on the facade. Populate them into a canonical Class so
+        // MethodMatcher and FQN-based lookups work.
+        return typeFactory.computeClass(signature, Flag.Public.getBitMask(), JavaType.FullyQualified.Kind.Class) { stub ->
+            val methods = file.declarations.filterIsInstance<IrSimpleFunction>()
+                .mapNotNull { methodDeclarationType(it) }
+            stub.unsafeSet(null, null, null, null, null, null, methods)
         }
-        val fileType = JavaType.ShallowClass.build(signature)
-        typeFactory.put(signature, fileType)
-        return fileType
     }
 
     private fun classType(type: Any, signature: String): JavaType {
@@ -190,14 +186,9 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
         }
         val irClass = type as? IrClass ?: (type as IrSimpleType).classifier.owner as IrClass
         val fqn: String = signatureBuilder.classSignature(irClass)
-        val cachedAtFqn: JavaType.FullyQualified? = typeFactory.get(fqn)
-        val clazz: JavaType.Class = if (cachedAtFqn is JavaType.Parameterized) {
-            cachedAtFqn.type as JavaType.Class
-        } else if (cachedAtFqn is JavaType.Class) {
-            cachedAtFqn
-        } else {
-            typeFactory.computeClass(fqn, fqn, mapToFlagsBitmap(irClass.visibility, irClass.modality, irClass.kind),
-                mapKind(irClass.kind), irClass) { c ->
+        val clazz: JavaType.Class = typeFactory.computeClass(fqn,
+            mapToFlagsBitmap(irClass.visibility, irClass.modality, irClass.kind),
+            mapKind(irClass.kind)) { c ->
                 var supertype: JavaType.FullyQualified? = null
                 var interfaceTypes: MutableList<IrType>? = null
                 if (signature != "java.lang.Object") {
@@ -293,11 +284,10 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
                     }
                 }
                 c.unsafeSet(typeParameters, supertype, owner, listAnnotations(irClass.annotations), interfaces, fields, methods)
-            }
         }
 
         if (irClass.typeParameters.isNotEmpty()) {
-            return typeFactory.computeParameterized(signature, type) { pt ->
+            return typeFactory.computeParameterized(signature) { pt ->
                 pt.unsafeSet(clazz, null as List<JavaType>?)
                 val typeParameters: MutableList<JavaType> = ArrayList(irClass.typeParameters.size)
                 val params = if (type is IrSimpleType) type.arguments else (type as IrClass).typeParameters
@@ -312,7 +302,7 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
 
     private fun generic(type: IrTypeParameter, signature: String): JavaType {
         val name = type.name.asString()
-        return typeFactory.computeGenericTypeVariable(signature, name, INVARIANT, type) { gtv ->
+        return typeFactory.computeGenericTypeVariable(signature, name, INVARIANT) { gtv ->
             var bounds: MutableList<JavaType>? = null
             if (type.isReified) {
                 throw UnsupportedOperationException("Add support for reified generic types.")
@@ -369,7 +359,10 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
             methodFlags = methodFlags or (1L shl 3) // Static flag
         }
         val name = if (function is IrConstructor) "<constructor>" else function.name.asString()
-        return typeFactory.computeMethod(signature, methodFlags, name, paramNamesArr, null, null, function) { method ->
+        val finalParamNames = paramNamesArr
+        return typeFactory.methodFor(signature, {
+            JavaType.Method(null, methodFlags, null, name, null, finalParamNames, null, null, null, null, null)
+        }) { method ->
             var declaringType = when (val irParent = function.parent) {
                 is IrField -> TypeUtils.asFullyQualified(type(irParent.parent))
                 else -> TypeUtils.asFullyQualified(type(irParent))
@@ -414,7 +407,9 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
         val paramNamesArr: kotlin.Array<String> = kotlin.Array(ownerRegularParams.size) { ownerRegularParams[it].name.asString() }
         val flags = mapToFlagsBitmap(type.symbol.owner.visibility)
         val name = type.symbol.owner.name.asString()
-        return typeFactory.computeMethod(signature, flags, name, paramNamesArr, null, null, type) { method ->
+        return typeFactory.methodFor(signature, {
+            JavaType.Method(null, flags, null, name, null, paramNamesArr, null, null, null, null, null)
+        }) { method ->
             var declaringType = TypeUtils.asFullyQualified(type(type.symbol.owner.parent))
             if (declaringType is JavaType.Parameterized) {
                 declaringType = declaringType.type
@@ -442,7 +437,9 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
         val ownerRegularParams = type.symbol.owner.parameters.filter { it.kind == IrParameterKind.Regular }
         val paramNamesArr: kotlin.Array<String> = kotlin.Array(ownerRegularParams.size) { ownerRegularParams[it].name.asString() }
         val flags = mapToFlagsBitmap(type.symbol.owner.visibility)
-        return typeFactory.computeMethod(signature, flags, "<constructor>", paramNamesArr, null, null, type) { method ->
+        return typeFactory.methodFor(signature, {
+            JavaType.Method(null, flags, null, "<constructor>", null, paramNamesArr, null, null, null, null, null)
+        }) { method ->
             var declaringType = TypeUtils.asFullyQualified(type(type.symbol.owner.parent))
             if (declaringType is JavaType.Parameterized) {
                 declaringType = declaringType.type
@@ -519,7 +516,7 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
             is IrStarProjection -> INVARIANT
             else -> throw UnsupportedOperationException("Unexpected type projection: " + type.javaClass)
         }
-        return typeFactory.computeGenericTypeVariable(signature, "?", variance, type) { gtv ->
+        return typeFactory.computeGenericTypeVariable(signature, "?", variance) { gtv ->
             val bounds: List<JavaType>? = if (type is IrTypeProjection) listOf(type(type.type)) else null
             gtv.unsafeSet("?", variance, bounds)
         }
@@ -531,7 +528,8 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
     }
 
     private fun variableType(property: IrProperty, signature: String): JavaType.Variable {
-        return typeFactory.computeVariable(signature, 0, property.name.asString(), property) { variable ->
+        return typeFactory.variableFor(signature) {
+            val variable = JavaType.Variable(null, 0, property.name.asString(), null, null, null)
             val annotations = listAnnotations(property.annotations)
             var owner = type(property.parent)
             if (owner is JavaType.Parameterized) {
@@ -545,6 +543,7 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
                 throw UnsupportedOperationException("Unsupported typeRef for property: $signature")
             }
             variable.unsafeSet(owner, typeRef, annotations)
+            variable
         }
     }
 
@@ -554,7 +553,8 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
     }
 
     private fun variableType(variable: IrField, signature: String): JavaType.Variable {
-        return typeFactory.computeVariable(signature, 0, variable.name.asString(), variable) { vt ->
+        return typeFactory.variableFor(signature) {
+            val vt = JavaType.Variable(null, 0, variable.name.asString(), null, null, null)
             val annotations = listAnnotations(variable.annotations)
             var owner = type(variable.parent)
             if (owner is JavaType.Parameterized) {
@@ -562,6 +562,7 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
             }
             val typeRef = type(variable.type)
             vt.unsafeSet(owner, typeRef, annotations)
+            vt
         }
     }
 
@@ -571,7 +572,8 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
     }
 
     private fun variableType(variable: IrVariable, signature: String): JavaType.Variable {
-        return typeFactory.computeVariable(signature, 0, variable.name.asString(), variable) { vt ->
+        return typeFactory.variableFor(signature) {
+            val vt = JavaType.Variable(null, 0, variable.name.asString(), null, null, null)
             val annotations = listAnnotations(variable.annotations)
             var owner = type(variable.parent)
             if (owner is JavaType.Parameterized) {
@@ -579,6 +581,7 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
             }
             val typeRef = type(variable.type)
             vt.unsafeSet(owner, typeRef, annotations)
+            vt
         }
     }
 
@@ -588,7 +591,8 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
     }
 
     private fun variableType(valueParameter: IrValueParameter, signature: String): JavaType.Variable {
-        return typeFactory.computeVariable(signature, 0, valueParameter.name.asString(), valueParameter) { variable ->
+        return typeFactory.variableFor(signature) {
+            val variable = JavaType.Variable(null, 0, valueParameter.name.asString(), null, null, null)
             val annotations = listAnnotations(valueParameter.annotations)
             var owner = type(valueParameter.parent)
             if (owner is JavaType.Parameterized) {
@@ -596,6 +600,7 @@ class KotlinIrTypeMapping(private val typeFactory: JavaTypeFactory) : JavaTypeMa
             }
             val typeRef = type(valueParameter.type)
             variable.unsafeSet(owner, typeRef, annotations)
+            variable
         }
     }
 

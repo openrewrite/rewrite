@@ -151,7 +151,7 @@ public class AnnotationTemplateGenerator {
                 before.insert(0, cu.getPackageDeclaration().withPrefix(Space.EMPTY).printTrimmed(cursor) + ";\n");
             }
             List<J.ClassDeclaration> classes = cu.getClasses();
-            if (!"$Placeholder".equals(classes.get(classes.size() - 1).getName().getSimpleName())) {
+            if (classes.isEmpty() || !"$Placeholder".equals(classes.get(classes.size() - 1).getName().getSimpleName())) {
                 addDummyAnnotationType(after);
             }
             return;

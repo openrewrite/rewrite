@@ -54,10 +54,18 @@ public class RpcVisitor : TreeVisitor<Tree, ExecutionContext>
         {
             return _rpc.VisitOnRemote(_visitorName, treeId, sourceFileType, ctxId);
         }
-        catch
+        catch (Exception ex)
         {
-            // The Java-side visitor may not be able to handle this tree type
-            // (e.g., a JavaVisitor receiving an Xml.Document). Return unchanged.
+            // A Java-side visitor may legitimately be unable to handle this tree
+            // type (e.g. a JavaVisitor asked to visit an Xml.Document), in which
+            // case skipping it and leaving the tree unchanged is correct. But a
+            // serialization/protocol failure also surfaces here, and silently
+            // swallowing every exception hides real bugs (it masked a wire-format
+            // mismatch as a no-op for some time). Log before continuing so the
+            // failure is diagnosable without aborting the whole recipe run.
+            Serilog.Log.Debug(ex,
+                "RPC visit delegation to {VisitorName} failed for {SourcePath} ({SourceFileType}); leaving the tree unchanged",
+                _visitorName, sf.SourcePath, sourceFileType);
             return tree;
         }
     }

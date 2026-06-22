@@ -464,7 +464,10 @@ func (s *server) handleRequest(req *jsonRPCRequest) *jsonRPCResponse {
 
 // handleGetLanguages returns the supported language types.
 func (s *server) handleGetLanguages() []string {
-	return []string{"org.openrewrite.golang.tree.Go$CompilationUnit"}
+	return []string{
+		"org.openrewrite.golang.tree.Go$CompilationUnit",
+		"org.openrewrite.golang.tree.GoMod",
+	}
 }
 
 // parseRequest is the parameter type for Parse.
@@ -655,12 +658,38 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		}
 	}
 
+	// Parse every go.mod input into a lossless GoMod LST, attaching a
+	// GoResolutionResult marker so recipes can read module metadata
+	// without re-parsing. Mirrors the .go path but produces a GoMod
+	// SourceFile instead of a CompilationUnit.
+	goModByIdx := make(map[int]*golang.GoMod, len(resolvedInputs))
+	for _, r := range resolvedInputs {
+		if filepath.Base(r.sourcePath) != "go.mod" {
+			continue
+		}
+		gm, err := goparser.ParseGoModFile(r.sourcePath, r.source)
+		if err != nil {
+			parseErrByIdx[r.idx] = err
+			continue
+		}
+		if mrr, err := goparser.ParseGoMod(r.sourcePath, r.source); err == nil && mrr != nil && mrr.ModulePath != "" {
+			gm.Markers.Entries = append(gm.Markers.Entries, *mrr)
+		}
+		goModByIdx[r.idx] = gm
+	}
+
 	// Emit results in input order.
 	ids := make([]string, 0, len(req.Inputs))
 	for _, r := range resolvedInputs {
 		if cu, ok := cuByIdx[r.idx]; ok && cu != nil {
 			id := cu.ID.String()
 			s.localObjects[id] = cu
+			ids = append(ids, id)
+			continue
+		}
+		if gm, ok := goModByIdx[r.idx]; ok && gm != nil {
+			id := gm.Ident.String()
+			s.localObjects[id] = gm
 			ids = append(ids, id)
 			continue
 		}
@@ -754,6 +783,9 @@ func (s *server) handlePrint(params json.RawMessage) (any, *rpcError) {
 			return printer.PrintWithMarkers(cu, mp), nil
 		}
 		return printer.Print(cu), nil
+	}
+	if gm, ok := obj.(*golang.GoMod); ok {
+		return printer.PrintGoMod(gm), nil
 	}
 	if t, ok := obj.(java.Tree); ok {
 		if mp != nil {
@@ -1148,6 +1180,26 @@ func (s *server) handleGetMarketplace(params json.RawMessage) (any, *rpcError) {
 // wire-format marketplaceDescriptor expected by Java. Recursive fields
 // (recipeList, preconditions) are populated. Cycle protection is handled
 // upstream by recipe.Describe.
+// delegateDescriptor builds a minimal stand-in descriptor for a recipe the host will resolve
+// locally via the delegatesTo response. The host reads only delegatesTo for delegated recipes
+// and ignores this descriptor, but the response type requires one.
+func delegateDescriptor(name string) marketplaceDescriptor {
+	return marketplaceDescriptor{
+		Name:          name,
+		DisplayName:   name,
+		InstanceName:  name,
+		Description:   "",
+		Tags:          []string{},
+		Options:       []marketplaceOption{},
+		Preconditions: []marketplaceDescriptor{},
+		RecipeList:    []marketplaceDescriptor{},
+		DataTables:    []any{},
+		Maintainers:   []any{},
+		Contributors:  []any{},
+		Examples:      []any{},
+	}
+}
+
 func marketplaceDescriptorFromRecipe(desc recipe.RecipeDescriptor) marketplaceDescriptor {
 	options := make([]marketplaceOption, 0, len(desc.Options))
 	for _, opt := range desc.Options {
@@ -1325,7 +1377,27 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 
 	reg, ok := s.registry.FindRecipe(req.ID)
 	if !ok {
-		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("Unknown recipe: %s", req.ID)}
+		// The host re-prepares every sub-recipe of a composite by id while building
+		// RpcRecipe.getRecipeList(). A sub-recipe that delegates to a Java recipe is not
+		// registered here, so a miss means the host owns this recipe: answer with delegatesTo
+		// so the host resolves the id locally (the Java recipe is on its classpath) rather than
+		// failing with "Unknown recipe".
+		options := req.Options
+		if options == nil {
+			options = map[string]any{}
+		}
+		recipeID := uuid.New().String()
+		return prepareRecipeResponse{
+			ID:                recipeID,
+			Descriptor:        delegateDescriptor(req.ID),
+			EditVisitor:       "edit:" + recipeID,
+			EditPreconditions: []any{},
+			ScanPreconditions: []any{},
+			DelegatesTo: &delegatesToResponse{
+				RecipeName: req.ID,
+				Options:    options,
+			},
+		}, nil
 	}
 
 	// Create recipe instance with options
@@ -2045,7 +2117,42 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		})
 	}
 
-	s.logger.Printf("ParseProject: parsed %d files across %d module(s)", len(items), len(mods))
+	// Emit each go.mod as a lossless GoMod LST so recipes operate on the
+	// module file directly instead of plain text. Mirrors the single-file
+	// Parse path; the GoResolutionResult — already parsed above for module
+	// context — is attached as a marker when available.
+	for _, modPath := range disc.goMods {
+		data, err := os.ReadFile(modPath)
+		if err != nil {
+			continue
+		}
+		// Relativize before building the LST so the GoMod's own SourcePath
+		// matches the response item (and the compilation units) — the Java
+		// side reads SourcePath off the serialized object, not the item.
+		sourcePath := modPath
+		if req.RelativeTo != nil && *req.RelativeTo != "" {
+			if rel, err := filepath.Rel(*req.RelativeTo, modPath); err == nil {
+				sourcePath = rel
+			}
+		}
+		gm, err := goparser.ParseGoModFile(sourcePath, string(data))
+		if err != nil {
+			s.logger.Printf("ParseProject: skip go.mod LST %s: %v", modPath, err)
+			continue
+		}
+		if m, ok := mods[filepath.Dir(modPath)]; ok && m.mrr != nil {
+			gm.Markers.Entries = append(gm.Markers.Entries, *m.mrr)
+		}
+		id := gm.Ident.String()
+		s.localObjects[id] = gm
+		items = append(items, parseProjectResponseItem{
+			ID:             id,
+			SourceFileType: "org.openrewrite.golang.tree.GoMod",
+			SourcePath:     sourcePath,
+		})
+	}
+
+	s.logger.Printf("ParseProject: parsed %d sources across %d module(s)", len(items), len(mods))
 	return items, nil
 }
 

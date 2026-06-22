@@ -138,6 +138,25 @@ func IsNumeric(t java.JavaType) bool {
 	return false
 }
 
+// IsInt checks if the type is a Go integer type (int, int8…int64, uint…uintptr, byte, rune).
+func IsInt(t java.JavaType) bool {
+	if p, ok := t.(*java.JavaTypePrimitive); ok {
+		switch p.Keyword {
+		case "int", "int8", "int16", "int32", "int64",
+			"uint", "uint8", "uint16", "uint32", "uint64", "uintptr",
+			"byte", "rune":
+			return true
+		}
+	}
+	switch GetFullyQualifiedName(t) {
+	case "int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64", "uintptr",
+		"byte", "rune":
+		return true
+	}
+	return false
+}
+
 // IsBool checks if the type is the Go `bool` type.
 func IsBool(t java.JavaType) bool {
 	if p, ok := t.(*java.JavaTypePrimitive); ok {
@@ -200,11 +219,15 @@ func TypeOfExpression(expr java.Expression) java.JavaType {
 	case *java.FieldAccess:
 		return n.Type
 	case *java.TypeCast:
-		return n.Type
+		if n.Clazz != nil {
+			return TypeOfExpression(n.Clazz.Tree.Element)
+		}
 	case *java.ArrayAccess:
 		return n.Type
 	case *java.Parentheses:
-		return n.Type
+		return TypeOfExpression(n.Tree.Element)
+	case *java.ControlParentheses:
+		return TypeOfExpression(n.Tree.Element)
 	case *java.MethodInvocation:
 		if n.MethodType != nil {
 			return n.MethodType.ReturnType

@@ -200,6 +200,38 @@ class TypeApplyTest implements RewriteTest {
     }
 
     @Test
+    void summonTypeApplyIsMethodInvocation() {
+        rewriteRun(
+          scala(
+            """
+              val x = summon[Foo]
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<J.MethodInvocation> summon = new AtomicReference<>();
+                new ScalaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        if ("summon".equals(method.getSimpleName())) {
+                            summon.set(method);
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                }.visit(cu, 0);
+
+                assertThat(summon.get())
+                  .as("summon[Foo] should be a method invocation, not crammed into an identifier")
+                  .isNotNull();
+                assertThat(summon.get().getArguments()).isEmpty();
+                assertThat(summon.get().getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class)).isPresent();
+                assertThat(summon.get().getTypeParameters()).singleElement().satisfies(typeParameter ->
+                  assertThat(typeParameter).isInstanceOf(J.Identifier.class)
+                    .extracting(t -> ((J.Identifier) t).getSimpleName()).isEqualTo("Foo"));
+            })
+          )
+        );
+    }
+
+    @Test
     void significantCharactersInComments() {
         // visitTypeApply — `)` in line comment closing the value-arg list of a type-applied call
         rewriteRun(

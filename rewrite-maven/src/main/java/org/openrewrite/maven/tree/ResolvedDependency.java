@@ -121,59 +121,106 @@ public class ResolvedDependency implements Serializable {
     }
 
     public List<ResolvedDependency> findDependencies(String groupId, String artifactId) {
-        return findDependencies0(groupId, artifactId, newSetFromMap(new IdentityHashMap<>()));
+        List<ResolvedDependency> found = new ArrayList<>();
+        findDependencies0(groupId, artifactId, isExact(groupId), isExact(artifactId), null, found);
+        return found;
     }
 
-    private List<ResolvedDependency> findDependencies0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
-        List<ResolvedDependency> dependencies = new ArrayList<>();
-        if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
-            dependencies.add(this);
-        } else if (!visited.add(this)) {
-            return emptyList();
+    private void findDependencies0(@Nullable String groupId, @Nullable String artifactId, boolean groupExact,
+                                   boolean artifactExact, @Nullable Set<ResolvedDependency> visited,
+                                   List<ResolvedDependency> found) {
+        if (matches(getGroupId(), groupId, groupExact) && matches(getArtifactId(), artifactId, artifactExact)) {
+            found.add(this);
+        } else {
+            if (visited == null) {
+                visited = newSetFromMap(new IdentityHashMap<>());
+            }
+            if (!visited.add(this)) {
+                return;
+            }
         }
-        for (ResolvedDependency dependency : this.dependencies) {
-            dependency.findDependencies0(groupId, artifactId, visited).stream()
-                    .filter(found -> {
-                        if (getRequested().getExclusions() != null) {
-                            for (GroupArtifact exclusion : getRequested().getExclusions()) {
-                                if (matchesGlob(found.getGroupId(), exclusion.getGroupId()) &&
-                                        matchesGlob(found.getArtifactId(), exclusion.getArtifactId())) {
-                                    return false;
-                                }
-                            }
-                        }
-                        return true;
-                    }).forEach(dependencies::add);
+        List<ResolvedDependency> dependencies = this.dependencies;
+        if (dependencies.isEmpty()) {
+            return;
         }
-        return dependencies;
+        if (visited == null) {
+            // Reached only when this dependency matched (and so was not added above); allocate for the recursion.
+            visited = newSetFromMap(new IdentityHashMap<>());
+        }
+        List<GroupArtifact> exclusions = requested == null ? null : requested.getExclusions();
+        boolean hasExclusions = exclusions != null && !exclusions.isEmpty();
+        for (int i = 0, size = dependencies.size(); i < size; i++) {
+            ResolvedDependency dependency = dependencies.get(i);
+            if (hasExclusions) {
+                int start = found.size();
+                dependency.findDependencies0(groupId, artifactId, groupExact, artifactExact, visited, found);
+                for (int j = found.size() - 1; j >= start; j--) {
+                    if (isExcluded(found.get(j), exclusions)) {
+                        found.remove(j);
+                    }
+                }
+            } else {
+                dependency.findDependencies0(groupId, artifactId, groupExact, artifactExact, visited, found);
+            }
+        }
     }
 
     public @Nullable ResolvedDependency findDependency(@Nullable String groupId, @Nullable String artifactId) {
-        return findDependency0(groupId, artifactId, newSetFromMap(new IdentityHashMap<>()));
+        return findDependency0(groupId, artifactId, isExact(groupId), isExact(artifactId), null);
     }
 
-    private @Nullable ResolvedDependency findDependency0(@Nullable String groupId, @Nullable String artifactId, Set<ResolvedDependency> visited) {
-        if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
+    private @Nullable ResolvedDependency findDependency0(@Nullable String groupId, @Nullable String artifactId,
+                                                         boolean groupExact, boolean artifactExact,
+                                                         @Nullable Set<ResolvedDependency> visited) {
+        if (matches(getGroupId(), groupId, groupExact) && matches(getArtifactId(), artifactId, artifactExact)) {
             return this;
-        } else if (!visited.add(this)) {
+        }
+        List<ResolvedDependency> dependencies = this.dependencies;
+        if (dependencies.isEmpty()) {
             return null;
         }
-        outer:
-        for (ResolvedDependency dependency : this.dependencies) {
-            ResolvedDependency found = dependency.findDependency0(groupId, artifactId, visited);
-            if (found != null) {
-                if (getRequested().getExclusions() != null) {
-                    for (GroupArtifact exclusion : getRequested().getExclusions()) {
-                        if (matchesGlob(found.getGroupId(), exclusion.getGroupId()) &&
-                                matchesGlob(found.getArtifactId(), exclusion.getArtifactId())) {
-                            continue outer;
-                        }
-                    }
-                }
+        if (visited == null) {
+            visited = newSetFromMap(new IdentityHashMap<>());
+        }
+        if (!visited.add(this)) {
+            return null;
+        }
+        List<GroupArtifact> exclusions = requested == null ? null : requested.getExclusions();
+        for (int i = 0, size = dependencies.size(); i < size; i++) {
+            ResolvedDependency found = dependencies.get(i).findDependency0(groupId, artifactId, groupExact, artifactExact, visited);
+            if (found != null && !isExcluded(found, exclusions)) {
                 return found;
             }
         }
         return null;
+    }
+
+    /**
+     * @param pattern a groupId or artifactId glob pattern
+     * @return {@code true} when {@code pattern} contains no glob metacharacters and so can be compared with a
+     * case-insensitive {@link String#equalsIgnoreCase} rather than the more expensive
+     * {@link org.openrewrite.internal.StringUtils#matchesGlob}.
+     * {@code null} (matches everything) and patterns containing {@code *}/{@code ?} return {@code false}.
+     */
+    private static boolean isExact(@Nullable String pattern) {
+        return pattern != null && pattern.indexOf('*') < 0 && pattern.indexOf('?') < 0;
+    }
+
+    private static boolean matches(String value, @Nullable String pattern, boolean exact) {
+        return exact ? value.equalsIgnoreCase(pattern) : matchesGlob(value, pattern);
+    }
+
+    private static boolean isExcluded(ResolvedDependency found, @Nullable List<GroupArtifact> exclusions) {
+        if (exclusions != null) {
+            for (int i = 0, size = exclusions.size(); i < size; i++) {
+                GroupArtifact exclusion = exclusions.get(i);
+                if (matchesGlob(found.getGroupId(), exclusion.getGroupId()) &&
+                        matchesGlob(found.getArtifactId(), exclusion.getArtifactId())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Override

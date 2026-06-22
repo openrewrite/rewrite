@@ -83,6 +83,15 @@ func (v *GoVisitor) AfterVisits() []AfterVisitor {
 	return out
 }
 
+// PendingAfterVisits returns the currently queued follow-up visitors
+// without clearing the queue. Helper APIs use this to keep convenience
+// methods like MaybeAddImport idempotent before the drain runs.
+func (v *GoVisitor) PendingAfterVisits() []AfterVisitor {
+	out := make([]AfterVisitor, len(v.afterVisits))
+	copy(out, v.afterVisits)
+	return out
+}
+
 // Visit dispatches to the appropriate visit method based on the node's concrete type.
 //
 // Lifecycle:
@@ -112,6 +121,14 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 	switch n := t.(type) {
 	case *golang.CompilationUnit:
 		return v.self().VisitCompilationUnit(n, p)
+	case *golang.GoMod:
+		return v.self().VisitGoMod(n, p)
+	case *golang.GoModDirective:
+		return v.self().VisitGoModDirective(n, p)
+	case *golang.GoModBlock:
+		return v.self().VisitGoModBlock(n, p)
+	case *golang.GoModValue:
+		return v.self().VisitGoModValue(n, p)
 	case *java.Identifier:
 		return v.self().VisitIdentifier(n, p)
 	case *java.Literal:
@@ -136,6 +153,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitMethodInvocation(n, p)
 	case *java.VariableDeclarations:
 		return v.self().VisitVariableDeclarations(n, p)
+	case *golang.DeclarationBlock:
+		return v.self().VisitDeclarationBlock(n, p)
 	case *java.VariableDeclarator:
 		return v.self().VisitVariableDeclarator(n, p)
 	case *java.Import:
@@ -208,6 +227,8 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitStatementExpression(n, p)
 	case *golang.PointerType:
 		return v.self().VisitPointerType(n, p)
+	case *golang.ArrayType:
+		return v.self().VisitGoArrayType(n, p)
 	case *golang.Channel:
 		return v.self().VisitChannel(n, p)
 	case *golang.FuncType:
@@ -226,6 +247,12 @@ func (v *GoVisitor) Visit(t java.Tree, p any) java.Tree {
 		return v.self().VisitInterfaceType(n, p)
 	case *golang.MultiAssignment:
 		return v.self().VisitMultiAssignment(n, p)
+	case *golang.Return:
+		return v.self().VisitGoReturn(n, p)
+	case *golang.MethodDeclaration:
+		return v.self().VisitGoMethodDeclaration(n, p)
+	case *golang.StatementWithInit:
+		return v.self().VisitStatementWithInit(n, p)
 	case *golang.CommClause:
 		return v.self().VisitCommClause(n, p)
 	case *golang.Unary:
@@ -255,6 +282,12 @@ type VisitorI interface {
 	Visit(t java.Tree, p any) java.Tree
 	PreVisit(t java.Tree, p any) java.Tree
 	VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J
+	// go.mod nodes are Tree, not J (their tokens are not Java
+	// expressions), so these return java.Tree rather than java.J.
+	VisitGoMod(gm *golang.GoMod, p any) java.Tree
+	VisitGoModDirective(d *golang.GoModDirective, p any) java.Tree
+	VisitGoModBlock(b *golang.GoModBlock, p any) java.Tree
+	VisitGoModValue(val *golang.GoModValue, p any) java.Tree
 	VisitIdentifier(ident *java.Identifier, p any) java.J
 	VisitLiteral(lit *java.Literal, p any) java.J
 	VisitBinary(bin *java.Binary, p any) java.J
@@ -267,6 +300,7 @@ type VisitorI interface {
 	VisitFieldAccess(fa *java.FieldAccess, p any) java.J
 	VisitMethodInvocation(mi *java.MethodInvocation, p any) java.J
 	VisitVariableDeclarations(vd *java.VariableDeclarations, p any) java.J
+	VisitDeclarationBlock(db *golang.DeclarationBlock, p any) java.J
 	VisitVariableDeclarator(vd *java.VariableDeclarator, p any) java.J
 	VisitImport(imp *java.Import, p any) java.J
 	VisitUnary(unary *java.Unary, p any) java.J
@@ -288,6 +322,7 @@ type VisitorI interface {
 	VisitEmpty(empty *java.Empty, p any) java.J
 	VisitAnnotation(ann *java.Annotation, p any) java.J
 	VisitArrayType(at *java.ArrayType, p any) java.J
+	VisitGoArrayType(at *golang.ArrayType, p any) java.J
 	VisitParentheses(paren *java.Parentheses, p any) java.J
 	VisitTypeCast(tc *java.TypeCast, p any) java.J
 	VisitControlParentheses(cp *java.ControlParentheses, p any) java.J
@@ -312,6 +347,9 @@ type VisitorI interface {
 	VisitStructType(st *golang.StructType, p any) java.J
 	VisitInterfaceType(it *golang.InterfaceType, p any) java.J
 	VisitMultiAssignment(ma *golang.MultiAssignment, p any) java.J
+	VisitGoReturn(ret *golang.Return, p any) java.J
+	VisitGoMethodDeclaration(md *golang.MethodDeclaration, p any) java.J
+	VisitStatementWithInit(s *golang.StatementWithInit, p any) java.J
 	VisitCommClause(cc *golang.CommClause, p any) java.J
 	VisitGoUnary(u *golang.Unary, p any) java.J
 	VisitGoBinary(b *golang.Binary, p any) java.J
@@ -355,6 +393,44 @@ func (v *GoVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java
 	return cu
 }
 
+func (v *GoVisitor) VisitGoMod(gm *golang.GoMod, p any) java.Tree {
+	gm = gm.WithPrefix(v.self().VisitSpace(gm.Prefix, p))
+	gm = gm.WithMarkers(v.visitMarkers(gm.Markers, p))
+	gm = gm.WithStatements(visitGoModStatementList(v, gm.Statements, p))
+	gm = gm.WithEof(v.self().VisitSpace(gm.Eof, p))
+	return gm
+}
+
+func (v *GoVisitor) VisitGoModDirective(d *golang.GoModDirective, p any) java.Tree {
+	d = d.WithPrefix(v.self().VisitSpace(d.Prefix, p))
+	d = d.WithMarkers(v.visitMarkers(d.Markers, p))
+	values := make([]*golang.GoModValue, 0, len(d.Values))
+	for _, val := range d.Values {
+		visited := v.self().Visit(val, p)
+		if visited == nil {
+			continue
+		}
+		values = append(values, visited.(*golang.GoModValue))
+	}
+	d = d.WithValues(values)
+	return d
+}
+
+func (v *GoVisitor) VisitGoModBlock(b *golang.GoModBlock, p any) java.Tree {
+	b = b.WithPrefix(v.self().VisitSpace(b.Prefix, p))
+	b = b.WithMarkers(v.visitMarkers(b.Markers, p))
+	b.BeforeLParen = v.self().VisitSpace(b.BeforeLParen, p)
+	b = b.WithEntries(visitGoModStatementList(v, b.Entries, p))
+	b.BeforeRParen = v.self().VisitSpace(b.BeforeRParen, p)
+	return b
+}
+
+func (v *GoVisitor) VisitGoModValue(val *golang.GoModValue, p any) java.Tree {
+	val = val.WithPrefix(v.self().VisitSpace(val.Prefix, p))
+	val = val.WithMarkers(v.visitMarkers(val.Markers, p))
+	return val
+}
+
 func (v *GoVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
 	ident = ident.WithPrefix(v.self().VisitSpace(ident.Prefix, p))
 	ident = ident.WithMarkers(v.visitMarkers(ident.Markers, p))
@@ -386,20 +462,24 @@ func (v *GoVisitor) VisitBlock(block *java.Block, p any) java.J {
 func (v *GoVisitor) VisitReturn(ret *java.Return, p any) java.J {
 	ret = ret.WithPrefix(v.self().VisitSpace(ret.Prefix, p))
 	ret = ret.WithMarkers(v.visitMarkers(ret.Markers, p))
-	ret.Expressions = visitRightPaddedExpressionList(v, ret.Expressions, p)
+	if ret.Expression != nil {
+		ret.Expression = visitAndCast[java.Expression](v, ret.Expression, p)
+	}
 	return ret
+}
+
+func (v *GoVisitor) VisitGoReturn(ret *golang.Return, p any) java.J {
+	c := *ret
+	c.Prefix = v.self().VisitSpace(c.Prefix, p)
+	c.Markers = v.visitMarkers(c.Markers, p)
+	c.Expressions = visitRightPaddedExpressionList(v, c.Expressions, p)
+	return &c
 }
 
 func (v *GoVisitor) VisitIf(ifStmt *java.If, p any) java.J {
 	ifStmt = ifStmt.WithPrefix(v.self().VisitSpace(ifStmt.Prefix, p))
 	ifStmt = ifStmt.WithMarkers(v.visitMarkers(ifStmt.Markers, p))
-	if ifStmt.Init != nil {
-		init := *ifStmt.Init
-		init.Element = v.self().Visit(init.Element, p).(java.Statement)
-		init.After = v.self().VisitSpace(init.After, p)
-		ifStmt.Init = &init
-	}
-	ifStmt = ifStmt.WithCondition(visitExpression(v, ifStmt.Condition, p))
+	ifStmt = ifStmt.WithCondition(visitAndCast[*java.ControlParentheses](v, ifStmt.Condition, p))
 	ifStmt = ifStmt.WithThen(visitAndCast[*java.Block](v, ifStmt.Then, p))
 	if ifStmt.ElsePart != nil {
 		ep := *ifStmt.ElsePart
@@ -447,12 +527,6 @@ func (v *GoVisitor) VisitMethodDeclaration(md *java.MethodDeclaration, p any) ja
 		}
 		md = md.WithLeadingAnnotations(anns)
 	}
-	if md.Receiver != nil {
-		recv := *md.Receiver
-		recv.Before = v.self().VisitSpace(recv.Before, p)
-		recv.Elements = visitRightPaddedList(v, recv.Elements, p)
-		md.Receiver = &recv
-	}
 	md = md.WithName(visitAndCast[*java.Identifier](v, md.Name, p))
 	if md.TypeParameters != nil {
 		md = md.WithTypeParameters(visitAndCast[*java.TypeParameters](v, md.TypeParameters, p))
@@ -466,6 +540,26 @@ func (v *GoVisitor) VisitMethodDeclaration(md *java.MethodDeclaration, p any) ja
 		md = md.WithBody(visitAndCast[*java.Block](v, md.Body, p))
 	}
 	return md
+}
+
+func (v *GoVisitor) VisitGoMethodDeclaration(md *golang.MethodDeclaration, p any) java.J {
+	c := *md
+	c.Prefix = v.self().VisitSpace(c.Prefix, p)
+	c.Markers = v.visitMarkers(c.Markers, p)
+	c.Receiver.Before = v.self().VisitSpace(c.Receiver.Before, p)
+	c.Receiver.Elements = visitRightPaddedList(v, c.Receiver.Elements, p)
+	c.Declaration = visitAndCast[*java.MethodDeclaration](v, c.Declaration, p)
+	return &c
+}
+
+func (v *GoVisitor) VisitStatementWithInit(s *golang.StatementWithInit, p any) java.J {
+	c := *s
+	c.Prefix = v.self().VisitSpace(c.Prefix, p)
+	c.Markers = v.visitMarkers(c.Markers, p)
+	c.Init.Element = v.self().Visit(c.Init.Element, p).(java.Statement)
+	c.Init.After = v.self().VisitSpace(c.Init.After, p)
+	c.Statement = v.self().Visit(c.Statement, p).(java.Statement)
+	return &c
 }
 
 func (v *GoVisitor) VisitTypeParameters(tps *java.TypeParameters, p any) java.J {
@@ -512,6 +606,12 @@ func (v *GoVisitor) VisitMethodInvocation(mi *java.MethodInvocation, p any) java
 		mi.Select = &sel
 	}
 	mi = mi.WithName(visitAndCast[*java.Identifier](v, mi.Name, p))
+	if mi.TypeParameters != nil {
+		tp := *mi.TypeParameters
+		tp.Before = v.self().VisitSpace(tp.Before, p)
+		tp.Elements = visitRightPaddedList(v, tp.Elements, p)
+		mi.TypeParameters = &tp
+	}
 	mi.Arguments.Before = v.self().VisitSpace(mi.Arguments.Before, p)
 	mi.Arguments.Elements = visitRightPaddedList(v, mi.Arguments.Elements, p)
 	return mi
@@ -535,13 +635,30 @@ func (v *GoVisitor) VisitVariableDeclarations(vd *java.VariableDeclarations, p a
 		vd.TypeExpr = visitExpression(v, vd.TypeExpr, p)
 	}
 	vd.Variables = visitRightPaddedList(v, vd.Variables, p)
-	if vd.Specs != nil {
-		specs := *vd.Specs
+	return vd
+}
+
+func (v *GoVisitor) VisitDeclarationBlock(db *golang.DeclarationBlock, p any) java.J {
+	db = db.WithPrefix(v.self().VisitSpace(db.Prefix, p))
+	db = db.WithMarkers(v.visitMarkers(db.Markers, p))
+	if len(db.LeadingAnnotations) > 0 {
+		anns := make([]*java.Annotation, 0, len(db.LeadingAnnotations))
+		for _, a := range db.LeadingAnnotations {
+			visited := v.self().Visit(a, p)
+			if visited == nil {
+				continue
+			}
+			anns = append(anns, visited.(*java.Annotation))
+		}
+		db = db.WithLeadingAnnotations(anns)
+	}
+	if db.Specs != nil {
+		specs := *db.Specs
 		specs.Before = v.self().VisitSpace(specs.Before, p)
 		specs.Elements = visitRightPaddedList(v, specs.Elements, p)
-		vd.Specs = &specs
+		db.Specs = &specs
 	}
-	return vd
+	return db
 }
 
 func (v *GoVisitor) VisitVariableDeclarator(vd *java.VariableDeclarator, p any) java.J {
@@ -643,20 +760,10 @@ func (v *GoVisitor) VisitForEachLoop(forEach *java.ForEachLoop, p any) java.J {
 func (v *GoVisitor) VisitForEachControl(control *java.ForEachControl, p any) java.J {
 	control = control.WithPrefix(v.self().VisitSpace(control.Prefix, p))
 	control = control.WithMarkers(v.visitMarkers(control.Markers, p))
-	if control.Key != nil {
-		key := *control.Key
-		key.Element = visitExpression(v, key.Element, p)
-		key.After = v.self().VisitSpace(key.After, p)
-		control.Key = &key
-	}
-	if control.Value != nil {
-		value := *control.Value
-		value.Element = visitExpression(v, value.Element, p)
-		value.After = v.self().VisitSpace(value.After, p)
-		control.Value = &value
-	}
-	control.Operator.Before = v.self().VisitSpace(control.Operator.Before, p)
-	control.Iterable = visitExpression(v, control.Iterable, p)
+	control.Variable.Element = visitAndCast[java.Statement](v, control.Variable.Element, p)
+	control.Variable.After = v.self().VisitSpace(control.Variable.After, p)
+	control.Iterable.Element = visitExpression(v, control.Iterable.Element, p)
+	control.Iterable.After = v.self().VisitSpace(control.Iterable.After, p)
 	return control
 }
 
@@ -790,10 +897,16 @@ func (v *GoVisitor) VisitArrayType(at *java.ArrayType, p any) java.J {
 	at = at.WithPrefix(v.self().VisitSpace(at.Prefix, p))
 	at = at.WithMarkers(v.visitMarkers(at.Markers, p))
 	at.Dimension.Before = v.self().VisitSpace(at.Dimension.Before, p)
-	if at.Length != nil {
-		at.Length = visitExpression(v, at.Length, p)
-	}
 	at.Dimension.Element = v.self().VisitSpace(at.Dimension.Element, p)
+	at.ElementType = visitExpression(v, at.ElementType, p)
+	return at
+}
+
+func (v *GoVisitor) VisitGoArrayType(at *golang.ArrayType, p any) java.J {
+	at = at.WithPrefix(v.self().VisitSpace(at.Prefix, p))
+	at = at.WithMarkers(v.visitMarkers(at.Markers, p))
+	at.Length.Element = visitExpression(v, at.Length.Element, p)
+	at.Length.After = v.self().VisitSpace(at.Length.After, p)
 	at.ElementType = visitExpression(v, at.ElementType, p)
 	return at
 }
@@ -1065,6 +1178,23 @@ func visitAndCast[T java.Tree](v *GoVisitor, t java.Tree, p any) T {
 		return zero
 	}
 	return result.(T)
+}
+
+// visitGoModStatementList visits a right-padded list of go.mod statements.
+// GoModStatement is a java.Tree (not java.J), so the J-constrained
+// visitRightPaddedList helper can't be reused here.
+func visitGoModStatementList(v *GoVisitor, list []java.RightPadded[golang.GoModStatement], p any) []java.RightPadded[golang.GoModStatement] {
+	result := make([]java.RightPadded[golang.GoModStatement], 0, len(list))
+	for _, rp := range list {
+		visited := v.self().Visit(rp.Element, p)
+		if visited == nil {
+			continue
+		}
+		rp.Element = visited.(golang.GoModStatement)
+		rp.After = v.self().VisitSpace(rp.After, p)
+		result = append(result, rp)
+	}
+	return result
 }
 
 func visitExpression(v *GoVisitor, expr java.Expression, p any) java.Expression {

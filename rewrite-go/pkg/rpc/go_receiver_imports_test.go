@@ -47,7 +47,6 @@ func makeImport(path string) *java.Import {
 			ID:     uuid.New(),
 			Source: `"` + path + `"`,
 			Value:  path,
-			Kind:   java.StringLiteral,
 		},
 	}
 }

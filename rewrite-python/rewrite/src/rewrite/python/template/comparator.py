@@ -97,7 +97,7 @@ class PythonComparatorVisitor:
         # Special cases
         if isinstance(pattern, j.Literal):
             return self._compare_literal(
-                cast(j.Literal, pattern), cast(j.Literal, target)
+                pattern, cast(j.Literal, target)
             )
         if isinstance(pattern, j.Empty):
             return True

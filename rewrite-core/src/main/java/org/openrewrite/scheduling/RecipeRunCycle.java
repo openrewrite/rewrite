@@ -37,6 +37,7 @@ import org.openrewrite.table.SourcesFileResults;
 
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.rpc.RewriteRpc;
+import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RpcRecipe;
 import org.openrewrite.rpc.request.BatchVisit;
 import org.openrewrite.rpc.request.BatchVisitResponse;
@@ -81,11 +82,42 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     long cycleStartTime = System.nanoTime();
     AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
 
+    /**
+     * The run timeout in nanoseconds, resolved lazily and cached. A negative value
+     * means "not yet resolved". Stored as a primitive so that {@link #isTimedOut(Recipe)}
+     * can compare elapsed nanos directly, avoiding a {@link Duration} allocation per call.
+     */
+    @NonFinal
+    long runTimeoutNanos = -1;
+
     @Getter
     Set<Recipe> madeChangesInThisCycle = newSetFromMap(new IdentityHashMap<>());
 
     public int getRecipePosition() {
         return allRecipeStack.getRecipePosition();
+    }
+
+    /**
+     * Whether the elapsed time for this cycle has exceeded the run timeout, firing the
+     * timeout callbacks (at most once) if so. The run timeout is fixed for the duration of a
+     * cycle, so it is resolved from the {@link ExecutionContext} lazily on first access and
+     * cached to avoid a message lookup for every recipe and source file. Resolved lazily
+     * (rather than in a field initializer) because {@code ctx} is not yet assigned when field
+     * initializers run.
+     */
+    private boolean isTimedOut(Recipe recipe) {
+        if (runTimeoutNanos < 0) {
+            runTimeoutNanos = ctx.getMessage(ExecutionContext.RUN_TIMEOUT, Duration.ofMinutes(4)).toNanos();
+        }
+        if (System.nanoTime() - cycleStartTime > runTimeoutNanos) {
+            if (thrownErrorOnTimeout.compareAndSet(false, true)) {
+                RecipeTimeoutException t = new RecipeTimeoutException(recipe);
+                ctx.getOnError().accept(t);
+                ctx.getOnTimeout().accept(t, ctx);
+            }
+            return true;
+        }
+        return false;
     }
 
     public LSS scanSources(LSS sourceSet) {
@@ -94,7 +126,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 BatchState scanBatch = new BatchState();
 
                 SourceFile result = allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
-                    Recipe recipe = recipeStack.peek();
+                    Recipe recipe = leaf(recipeStack);
                     if (source == null) {
                         return null;
                     }
@@ -183,7 +215,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             batch.rpc.batchVisit(source, ctx, rootCursor, batch.items);
         } catch (Throwable t) {
             if (!batch.recipeStacks.isEmpty()) {
-                handleError(batch.recipeStacks.get(0).peek(), source, source, t);
+                handleError(leaf(batch.recipeStacks.get(0)), source, source, t);
             }
         }
 
@@ -193,7 +225,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     public LSS generateSources(LSS sourceSet) {
         if (isScanningRequired()) {
             List<SourceFile> generatedInThisCycle = allRecipeStack.reduce(sourceSet, recipe, ctx, (acc, recipeStack) -> {
-                Recipe recipe = recipeStack.peek();
+                Recipe recipe = leaf(recipeStack);
                 if (recipe instanceof ScanningRecipe) {
                     assert acc != null;
                     //noinspection unchecked
@@ -268,7 +300,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     private static class BatchState {
         @Nullable RewriteRpc rpc;
         final List<BatchVisit.BatchVisitItem> items = new ArrayList<>();
-        final List<Stack<Recipe>> recipeStacks = new ArrayList<>();
+        final List<List<Recipe>> recipeStacks = new ArrayList<>();
         @Nullable SourceFile originalBeforeBatch;
 
         void clear() {
@@ -284,7 +316,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         BatchState batch = new BatchState();
 
         SourceFile result = allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
-            Recipe recipe = recipeStack.peek();
+            Recipe recipe = leaf(recipeStack);
             if (source == null) {
                 return null;
             }
@@ -312,13 +344,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             SourceFile after = src;
 
             try {
-                Duration duration = Duration.ofNanos(System.nanoTime() - cycleStartTime);
-                if (duration.compareTo(ctx.getMessage(ExecutionContext.RUN_TIMEOUT, Duration.ofMinutes(4))) > 0) {
-                    if (thrownErrorOnTimeout.compareAndSet(false, true)) {
-                        RecipeTimeoutException t = new RecipeTimeoutException(recipe);
-                        ctx.getOnError().accept(t);
-                        ctx.getOnTimeout().accept(t, ctx);
-                    }
+                if (isTimedOut(recipe)) {
                     return src;
                 }
 
@@ -332,7 +358,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     // otherwise the BatchVisit RPC fails on the remote side and the resulting
                     // exception gets attached to the source as a Markup$Error, falsely marking
                     // the file as modified.
-                    if (currentRpc.getLanguages().contains(src.getClass().getName())) {
+                    //
+                    // Compare against the canonical source file type, not the raw class name:
+                    // lazily-loaded LSTs (e.g. the Moderne CLI's V3 format) hand the scheduler
+                    // generated subclasses of the real tree type, whose getClass().getName() is
+                    // the subclass name. getLanguages() reports canonical type names (the same
+                    // ones used as the RPC sourceFileType), so a raw name comparison never
+                    // matches for those, silently dropping every batched recipe but the last.
+                    if (currentRpc.getLanguages().contains(DynamicDispatchRpcCodec.canonicalSourceFileType(src.getClass()))) {
                         RpcRecipe rpcRecipe = (RpcRecipe) recipe;
                         // Evaluate the precondition locally before batching. The non-batch
                         // path runs the precondition via getVisitor()'s Preconditions.check
@@ -433,7 +466,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 if (!(t instanceof RecipeRunException)) {
                     source = Markup.error(source, t);
                 }
-                source = handleError(batch.recipeStacks.get(0).peek(), originalBefore, source, t);
+                source = handleError(leaf(batch.recipeStacks.get(0)), originalBefore, source, t);
                 if (source != null && source != beforeError) {
                     source = addRecipesThatMadeChanges(batch.recipeStacks.get(0), source);
                 }
@@ -449,8 +482,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
         for (int i = 0; i < response.getResults().size(); i++) {
             BatchVisitResponse.BatchVisitResult r = response.getResults().get(i);
-            Stack<Recipe> recipeStack = batch.recipeStacks.get(i);
-            Recipe recipe = recipeStack.peek();
+            List<Recipe> recipeStack = batch.recipeStacks.get(i);
+            Recipe recipe = leaf(recipeStack);
 
             if (r.isModified() || r.isHasNewMessages()) {
                 madeChangesInThisCycle.add(recipe);
@@ -479,7 +512,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         SourceFile fetched;
         if (anyModified) {
             // Fetch final tree state from remote
-            fetched = rpc.getObject(originalBefore.getId().toString(), originalBefore.getClass().getName());
+            fetched = rpc.getObject(originalBefore.getId().toString(), DynamicDispatchRpcCodec.canonicalSourceFileType(originalBefore.getClass()));
         } else {
             fetched = source;
         }
@@ -609,12 +642,12 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
      * Avoids the O(recipes × treeSize) cost of traversing the tree per recipe.
      */
     private void recordBatchSourceFileResultFast(@Nullable SourceFile before, @Nullable SourceFile after,
-                                                  Stack<Recipe> recipeStack,
+                                                  List<Recipe> recipeStack,
                                                   Map<String, List<SearchResults.Row>> searchResultsByRecipe,
                                                   ExecutionContext ctx) {
         String beforePath = (before == null) ? "" : before.getSourcePath().toString();
         String afterPath = (after == null) ? "" : after.getSourcePath().toString();
-        Recipe recipe = recipeStack.peek();
+        Recipe recipe = leaf(recipeStack);
         Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after)) ?
                 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
 
@@ -649,12 +682,12 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
      * recipe in the batch).
      */
     private void recordBatchSourceFileResult(@Nullable SourceFile before, @Nullable SourceFile after,
-                                             Stack<Recipe> recipeStack,
+                                             List<Recipe> recipeStack,
                                              Map<UUID, String> attributionMap,
                                              ExecutionContext ctx) {
         String beforePath = (before == null) ? "" : before.getSourcePath().toString();
         String afterPath = (after == null) ? "" : after.getSourcePath().toString();
-        Recipe recipe = recipeStack.peek();
+        Recipe recipe = leaf(recipeStack);
         Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after)) ?
                 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
 
@@ -683,10 +716,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         }
     }
 
-    protected void recordSourceFileResultAndSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, Stack<Recipe> recipeStack, ExecutionContext ctx) {
+    protected void recordSourceFileResultAndSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, List<Recipe> recipeStack, ExecutionContext ctx) {
         String beforePath = (before == null) ? "" : before.getSourcePath().toString();
         String afterPath = (after == null) ? "" : after.getSourcePath().toString();
-        Recipe recipe = recipeStack.peek();
+        Recipe recipe = leaf(recipeStack);
         Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after)) ?
                 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
 
@@ -759,6 +792,13 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         ));
 
         return after;
+    }
+
+    /**
+     * @return The recipe at the tip of the path (the recipe currently doing work).
+     */
+    private static Recipe leaf(List<Recipe> recipeStack) {
+        return recipeStack.get(recipeStack.size() - 1);
     }
 
     private static <S extends SourceFile> S addRecipesThatMadeChanges(List<Recipe> recipeStack, S afterFile) {

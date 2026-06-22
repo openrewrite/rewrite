@@ -24,8 +24,10 @@ cross-file deduplication.
 from __future__ import annotations
 
 import json
+import os
 import select
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -45,11 +47,45 @@ class TyTypesClient:
             result = client.get_types("/path/to/file.py")
     """
 
-    def __init__(self):
+    def __init__(self, virtual_env: Optional[str] = None):
+        """Create a client and start the ``ty-types --serve`` subprocess.
+
+        Args:
+            virtual_env: Optional path to a virtual environment whose
+                ``site-packages`` ty-types should use to resolve the project's
+                third-party dependencies. When provided it is exported as
+                ``VIRTUAL_ENV`` to the subprocess and takes precedence over the
+                running interpreter's ``sys.prefix`` fallback. The normal parse
+                path uses this to point ty-types at a dependency workspace built
+                from the project's ``pyproject.toml`` so that supertypes reaching
+                into installed dependencies (e.g. ``class User(BaseModel)``)
+                resolve.
+        """
         self._process: Optional[subprocess.Popen] = None
         self._request_id: int = 0
         self._initialized = False
         self._project_root: Optional[str] = None
+        self._virtual_env: Optional[str] = str(virtual_env) if virtual_env else None
+
+        # Cumulative type table for the lifetime of this ``--serve`` session.
+        #
+        # ty's ``--serve`` session deduplicates type descriptors: each type is
+        # emitted in full exactly once, in the first ``getTypes`` response that
+        # references it, and later responses reference it by id only. When a
+        # whole project is parsed through one shared session (see
+        # ``handle_parse_project``), a type first seen in an earlier file (e.g.
+        # ``pydantic.BaseModel``) is therefore absent from later files'
+        # responses. Because each file builds its own per-file registry, those
+        # later files could not resolve such cross-file references — supertypes
+        # of first-party classes silently degraded to ``Unknown``.
+        #
+        # Accumulating every descriptor here, keyed by ty's session-stable type
+        # ids, lets per-file mappings fall back to the cumulative table for any
+        # id missing from their own response, restoring resolution while keeping
+        # ty's dedup performance benefit. It is reset whenever a new session
+        # starts (a fresh client, or ``initialize`` with a different root) so no
+        # state leaks across unrelated parses.
+        self.session_types: Dict[int, Dict[str, Any]] = {}
 
         self._start_process()
 
@@ -74,12 +110,63 @@ class TyTypesClient:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                env=self._subprocess_env(virtual_env=self._virtual_env),
             )
         except FileNotFoundError:
             self._process = None
             raise RuntimeError(
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
+
+    @staticmethod
+    def _subprocess_env(base_env: Optional[Dict[str, str]] = None,
+                        prefix: Optional[str] = None,
+                        base_prefix: Optional[str] = None,
+                        virtual_env: Optional[str] = None) -> Dict[str, str]:
+        """Build the environment for the ty-types subprocess.
+
+        ty-types resolves a project's third-party packages by discovering the
+        active Python environment, primarily via ``VIRTUAL_ENV``.
+
+        Precedence:
+
+        1. An explicit ``virtual_env`` (a dependency workspace built from the
+           project's ``pyproject.toml``) is exported as ``VIRTUAL_ENV`` and wins
+           over everything else. This is the normal parse path: the interpreter
+           running the parse (e.g. the CLI's RPC server) does not have the
+           project's dependencies installed, so ty must be pointed at a venv that
+           does, otherwise imports like ``pydantic`` — and the supertypes
+           reachable through them — resolve to ``Unknown``.
+        2. Otherwise, an inherited ``VIRTUAL_ENV`` is respected.
+        3. Otherwise, when the interpreter running the parse is itself a virtual
+           environment (``prefix`` differs from ``base_prefix``) — e.g. tests
+           launched through an absolute interpreter path rather than an activated
+           venv — fall back to that interpreter's environment.
+
+        The interpreter checks (``prefix``/``base_prefix``) and ``virtual_env``
+        are injectable to keep this unit-testable.
+        """
+        env = dict(os.environ if base_env is None else base_env)
+
+        def _point_at(venv: str) -> None:
+            env['VIRTUAL_ENV'] = venv
+            bin_dir = os.path.join(venv, 'Scripts' if os.name == 'nt' else 'bin')
+            env['PATH'] = bin_dir + os.pathsep + env.get('PATH', '')
+
+        # 1. Explicit dependency workspace venv takes precedence, overriding any
+        #    inherited VIRTUAL_ENV (which would point at the parser's own env).
+        if virtual_env:
+            _point_at(virtual_env)
+            return env
+
+        prefix = sys.prefix if prefix is None else prefix
+        base_prefix = sys.base_prefix if base_prefix is None else base_prefix
+
+        # 2./3. Only when the caller hasn't already pinned an environment and we
+        #       are inside a virtual environment.
+        if 'VIRTUAL_ENV' not in env and prefix != base_prefix:
+            _point_at(prefix)
+        return env
 
     @staticmethod
     def _find_binary() -> Optional[Path]:
@@ -157,6 +244,9 @@ class TyTypesClient:
 
         if self._initialized:
             self.shutdown()
+            # A different project root means a brand-new ty session whose type
+            # ids start over; drop the accumulated table so ids don't collide.
+            self.session_types.clear()
             self._start_process()
 
         result = self._send_request("initialize", {"projectRoot": project_root})
@@ -179,11 +269,21 @@ class TyTypesClient:
         """
         if not self._initialized:
             return None
-        return self._send_request(
+        result = self._send_request(
             "getTypes",
             {"file": file_path, "includeDisplay": include_display},
             timeout=timeout,
         )
+        if result:
+            # Fold this response's type table into the cumulative session table.
+            # Keys are stringified ids in the JSON payload; ty keeps ids stable
+            # across the session, and each descriptor is emitted in full only on
+            # first sight, so ``setdefault`` preserves that full descriptor.
+            types = result.get('types')
+            if types:
+                for type_id_str, descriptor in types.items():
+                    self.session_types.setdefault(int(type_id_str), descriptor)
+        return result
 
     @property
     def is_available(self) -> bool:

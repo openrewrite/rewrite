@@ -26,11 +26,20 @@ namespace OpenRewrite.CSharp;
 internal class CSharpTypeMapping
 {
     private readonly SemanticModel _model;
-    private readonly Dictionary<ISymbol, JavaType> _typeCache = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ISymbol, JavaType> _typeCache;
 
-    public CSharpTypeMapping(SemanticModel model)
+    /// <param name="model">Semantic model for the document being parsed.</param>
+    /// <param name="sharedTypeCache">
+    /// Optional symbol→JavaType cache shared across all documents in the same project
+    /// (Roslyn Compilation). Symbols are interned per Compilation, so sharing this cache
+    /// makes a given type resolve to a single JavaType instance across the whole project,
+    /// letting the RPC layer (asRef) serialize it once instead of once per referencing file.
+    /// When null, a fresh per-document cache is used (single-file parsing, tests).
+    /// </param>
+    public CSharpTypeMapping(SemanticModel model, Dictionary<ISymbol, JavaType>? sharedTypeCache = null)
     {
         _model = model;
+        _typeCache = sharedTypeCache ?? new Dictionary<ISymbol, JavaType>(SymbolEqualityComparer.Default);
     }
 
     /// <summary>

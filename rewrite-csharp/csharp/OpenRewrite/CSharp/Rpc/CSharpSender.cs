@@ -495,6 +495,8 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public override J VisitPragmaWarningDirective(PragmaWarningDirective pwd, RpcSendQueue q)
     {
         q.GetAndSend(pwd, p => (object)p.Action);
+        q.GetAndSend(pwd, p => p.KeywordSpacing, space => VisitSpace(space, q));
+        q.GetAndSend(pwd, p => p.ActionSpacing, space => VisitSpace(space, q));
         q.GetAndSendList(pwd, p => p.WarningCodes,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         return pwd;
@@ -558,6 +560,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     // ---- PragmaChecksumDirective ----
     public override J VisitPragmaChecksumDirective(PragmaChecksumDirective pcd, RpcSendQueue q)
     {
+        q.GetAndSend(pcd, p => p.KeywordSpacing, space => VisitSpace(space, q));
         q.GetAndSend(pcd, p => (object)p.Arguments);
         return pcd;
     }

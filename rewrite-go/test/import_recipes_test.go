@@ -82,6 +82,45 @@ func TestAddImport_AddsToFileWithNoImports(t *testing.T) {
 	spec.RewriteRun(t, Golang(before, after))
 }
 
+func TestAddImport_AddsAliasedImportToFileWithNoImports(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "net/http/pprof", Alias: strPtr("_")})
+	before := `
+		package main
+
+		func main() {}
+	`
+	after := `
+		package main
+
+		import _ "net/http/pprof"
+
+		func main() {}
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
+func TestAddImport_PromotesAliasedImportToGroupedBlock(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "fmt"})
+	before := `
+		package main
+
+		import _ "net/http/pprof"
+
+		func main() {}
+	`
+	after := `
+		package main
+
+		import (
+			_ "net/http/pprof"
+			"fmt"
+		)
+
+		func main() {}
+	`
+	spec.RewriteRun(t, Golang(before, after))
+}
+
 func TestAddImport_OnlyIfReferenced_NoOpWhenNotReferenced(t *testing.T) {
 	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{
 		PackagePath:      "github.com/x/y",

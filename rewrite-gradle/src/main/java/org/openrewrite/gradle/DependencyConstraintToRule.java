@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -207,7 +208,7 @@ public class DependencyConstraintToRule extends Recipe {
                         p + ".requested.name == '" + groupArtifactVersion.getArtifactId() + "') {\n}";
                 newIf = GroovyParser.builder().build()
                         .parse(ctx, snippet)
-                        .map(G.CompilationUnit.class::cast)
+                        .map(requireParsed(G.CompilationUnit.class))
                         .map(cu -> cu.getStatements().get(1))
                         .map(J.If.class::cast)
                         .findFirst()
@@ -218,7 +219,7 @@ public class DependencyConstraintToRule extends Recipe {
                         p + ".requested.name == \"" + groupArtifactVersion.getArtifactId() + "\") {\n}";
                 newIf = KotlinParser.builder().isKotlinScript(true).build()
                         .parse(ctx, snippet)
-                        .map(K.CompilationUnit.class::cast)
+                        .map(requireParsed(K.CompilationUnit.class))
                         .map(cu -> (J.Block) cu.getStatements().get(0))
                         .map(block -> (J.If) block.getStatements().get(1))
                         .findFirst()
@@ -303,7 +304,7 @@ public class DependencyConstraintToRule extends Recipe {
                     newStatements = GroovyParser.builder()
                             .build()
                             .parse(ctx, snippet)
-                            .map(G.CompilationUnit.class::cast)
+                            .map(requireParsed(G.CompilationUnit.class))
                             .map(G.CompilationUnit::getStatements)
                             .findFirst()
                             .orElseThrow(() -> new IllegalStateException("Unable to produce a new block statement"));
@@ -317,7 +318,7 @@ public class DependencyConstraintToRule extends Recipe {
                             .isKotlinScript(true)
                             .build()
                             .parse(ctx, snippet)
-                            .map(K.CompilationUnit.class::cast)
+                            .map(requireParsed(K.CompilationUnit.class))
                             .map(cu -> (J.Block) cu.getStatements().get(0))
                             .map(J.Block::getStatements)
                             .findFirst()
@@ -374,7 +375,7 @@ public class DependencyConstraintToRule extends Recipe {
                                             "    resolutionStrategy.eachDependency { details ->\n" +
                                             "    }\n" +
                                             "}")
-                            .map(G.CompilationUnit.class::cast)
+                            .map(requireParsed(G.CompilationUnit.class))
                             .map(G.CompilationUnit::getStatements)
                             .map(it -> it.get(0))
                             .map(J.MethodInvocation.class::cast)
@@ -411,7 +412,7 @@ public class DependencyConstraintToRule extends Recipe {
                                                             "    resolutionStrategy.eachDependency { details ->}\n" +
                                                             "}").getBytes(StandardCharsets.UTF_8)))
                             ), null, ctx)
-                            .map(K.CompilationUnit.class::cast)
+                            .map(requireParsed(K.CompilationUnit.class))
                             .map(k -> (J.Block) k.getStatements().get(0))
                             .map(J.Block::getStatements)
                             .map(it -> it.get(0))

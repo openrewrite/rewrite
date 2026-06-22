@@ -222,11 +222,15 @@ func (v *replaceTimeSinceVisitor) VisitMethodInvocation(mi *tree.MethodInvocatio
 
     // Side-effect: queue an `import "xerrors"` to land after the main
     // visit completes. The harness drains the queue automatically.
-    svc := recipe.Service[*golang.ImportService](nil)
-    v.DoAfterVisit(svc.AddImportVisitor("xerrors", nil, false /* unconditional */))
+    golang.MaybeAddImport(v, "xerrors", nil, false /* unconditional */)
     return mi
 }
 ```
+
+`MaybeAddImport(v, path, alias, onlyIfReferenced)` is the convenience
+form for add-import side effects. It queues the same `AddImport` visitor
+and de-duplicates equivalent pending requests before the after-visit
+drain runs.
 
 `ImportService` exposes four visitors:
 

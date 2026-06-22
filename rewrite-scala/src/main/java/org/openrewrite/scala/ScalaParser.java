@@ -95,8 +95,18 @@ public class ScalaParser implements Parser {
             inputList.add(input);
         }
 
-        // Batch compile all sources with type checking
-        Map<String, ScalaCompilerContext.ParseResult> compiledResults = compilerContext.compileAll(inputList);
+        // Batch compile all sources with type checking. If the batch fails as a
+        // whole, degrade to per-file parsing below so a single bad input (or a
+        // transient failure) yields a ParseError for that input only instead of
+        // failing the entire parse stream.
+        Map<String, ScalaCompilerContext.ParseResult> compiledResults;
+        try {
+            compiledResults = compilerContext.compileAll(inputList);
+        } catch (Throwable t) {
+            ctx.getOnError().accept(t);
+            compiledResults = Collections.emptyMap();
+        }
+        Map<String, ScalaCompilerContext.ParseResult> finalCompiledResults = compiledResults;
 
         // Map results back to SourceFiles
         return inputList.stream()
@@ -105,7 +115,7 @@ public class ScalaParser implements Parser {
                     pctx.getParsingListener().startedParsing(input);
 
                     try {
-                        ScalaCompilerContext.ParseResult parseResult = compiledResults.get(input.getPath().toString());
+                        ScalaCompilerContext.ParseResult parseResult = finalCompiledResults.get(input.getPath().toString());
 
                         // Fall back to single-file parse if batch didn't include this file
                         if (parseResult == null) {
@@ -182,8 +192,6 @@ public class ScalaParser implements Parser {
         @Nullable
         private JavaTypeFactory typeFactory;
 
-        private JavaTypeFactory.@Nullable Provider typeFactoryProvider;
-
         private boolean logCompilationWarningsAndErrors = false;
         private final List<NamedStyles> styles = new ArrayList<>();
 
@@ -197,7 +205,6 @@ public class ScalaParser implements Parser {
             this.artifactNames = base.artifactNames;
             this.typeCache = base.typeCache;
             this.typeFactory = base.typeFactory;
-            this.typeFactoryProvider = base.typeFactoryProvider;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
         }
@@ -239,8 +246,8 @@ public class ScalaParser implements Parser {
         }
 
         /**
-         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} or
-         * {@link #typeFactoryProvider} instead. The cache becomes an implementation
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} instead.
+         * The cache becomes an implementation
          * detail of the default {@link DefaultJavaTypeFactory}.
          */
         @Deprecated
@@ -253,12 +260,6 @@ public class ScalaParser implements Parser {
         @SuppressWarnings("unused")
         public Builder typeFactory(JavaTypeFactory typeFactory) {
             this.typeFactory = typeFactory;
-            return this;
-        }
-
-        @SuppressWarnings("unused")
-        public Builder typeFactoryProvider(JavaTypeFactory.Provider provider) {
-            this.typeFactoryProvider = provider;
             return this;
         }
 
@@ -281,9 +282,6 @@ public class ScalaParser implements Parser {
         public ScalaParser build() {
             Collection<Path> cp = resolvedClasspath();
             JavaTypeFactory factory = typeFactory;
-            if (factory == null && typeFactoryProvider != null) {
-                factory = typeFactoryProvider.create(cp == null ? new ArrayList<>() : new ArrayList<>(cp), null);
-            }
             if (factory == null) {
                 factory = new DefaultJavaTypeFactory(typeCache);
             }

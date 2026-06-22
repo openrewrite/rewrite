@@ -38,6 +38,7 @@ import org.jetbrains.kotlin.ir.builders.irBlockBody
 import org.jetbrains.kotlin.ir.builders.irCall
 import org.jetbrains.kotlin.ir.builders.irCallConstructor
 import org.jetbrains.kotlin.ir.builders.irDelegatingConstructorCall
+import org.jetbrains.kotlin.ir.builders.irInt
 import org.jetbrains.kotlin.ir.builders.irReturn
 import org.jetbrains.kotlin.ir.builders.irString
 import org.jetbrains.kotlin.ir.declarations.IrClass
@@ -58,6 +59,9 @@ import org.jetbrains.kotlin.ir.expressions.IrTypeOperatorCall
 import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
 import org.jetbrains.kotlin.ir.expressions.IrReturn
+import org.jetbrains.kotlin.ir.expressions.IrSpreadElement
+import org.jetbrains.kotlin.ir.expressions.IrVararg
+import org.jetbrains.kotlin.ir.expressions.IrVarargElement
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
@@ -123,11 +127,10 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val RECIPE_FQN: FqName = FqName("org.openrewrite.recipe")
         val RECIPES_FQN: FqName = FqName("org.openrewrite.recipes")
 
-        const val REWRITE_ADVICE_0_TO = "org.openrewrite.RewriteAdvice0.to"
-        const val REWRITE_ADVICE_1_TO = "org.openrewrite.RewriteAdvice1.to"
-        const val REWRITE_ADVICE_2_TO = "org.openrewrite.RewriteAdvice2.to"
+        val REWRITE_ADVICE_TO_FQNS: Set<String> = (0..12).map { "org.openrewrite.RewriteAdvice$it.to" }.toSet()
 
-        val REWRITE_ADVICE_TO_FQNS = setOf(REWRITE_ADVICE_0_TO, REWRITE_ADVICE_1_TO, REWRITE_ADVICE_2_TO)
+        /** The `.strictArity()` opt-out modifier wrapping a `to` call. */
+        const val REWRITE_RULE_STRICT_ARITY_FQN = "org.openrewrite.RewriteRule.strictArity"
 
         const val EDIT_SCOPE_REWRITE_FQN = "org.openrewrite.EditScope.rewrite"
         const val RECIPE_BUILDER_EDIT_FQN = "org.openrewrite.RecipeBuilder.edit"
@@ -139,6 +142,35 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
          * `FirNotNullableTransformer` in the Kotlin compiler.
          */
         const val CHECK_NOT_NULL_FQN = "kotlin.internal.ir.CHECK_NOT_NULL"
+
+        /**
+         * Sentinel that marks the variadic-run position in a generated after
+         * template. The runtime ([GeneratedRecipeSupport]) replaces it with the
+         * right number of `#{any()}` placeholders for the matched call's args.
+         * Control-char-fenced so it can never collide with real source text.
+         */
+        const val VARARGS_SENTINEL = "VARARGS"
+
+        /**
+         * Kotlin builtin → Java FQN, for typing the fixed prefix params of a
+         * varargs MethodMatcher spec. `JavaType.Method` carries Java types even
+         * for Kotlin sources, so `kotlin.String` must be spelled
+         * `java.lang.String` for the matcher to fire.
+         */
+        val KOTLIN_BUILTIN_TO_JAVA_FQN: Map<String, String> = mapOf(
+            "kotlin.String" to "java.lang.String",
+            "kotlin.CharSequence" to "java.lang.CharSequence",
+            "kotlin.Any" to "java.lang.Object",
+            "kotlin.Throwable" to "java.lang.Throwable",
+            "kotlin.Int" to "int",
+            "kotlin.Long" to "long",
+            "kotlin.Short" to "short",
+            "kotlin.Byte" to "byte",
+            "kotlin.Boolean" to "boolean",
+            "kotlin.Char" to "char",
+            "kotlin.Float" to "float",
+            "kotlin.Double" to "double",
+        )
     }
 
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
@@ -146,6 +178,12 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         for (file in moduleFragment.files) {
             processFile(file, ctx)
         }
+        // Replace the FIR-side default bodies of mapped-type fallback
+        // extensions (synthesized in `RecipeFirMappedTypeFallbackExtension`)
+        // with actual calls to the underlying Java instance method. Without
+        // this pass the generated extensions would throw the FIR-default
+        // stub at runtime.
+        MappedTypeFallbackBodyGenerator.generate(moduleFragment, pluginContext)
     }
 
     // ------------------------------------------------------------------
@@ -221,10 +259,13 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
         val supportClassId = ClassId.topLevel(FqName("org.openrewrite.kotlin.recipe.GeneratedRecipeSupport"))
         val supportClassSymbol = pluginContext.referenceClass(supportClassId)
+        // Resolve by name (each helper name is unique). Arity varies: the two
+        // method-invocation helpers carry a 4th `strictArgCount` param; the
+        // not-null / property helpers stay at 3.
         val supportFns = supportClassSymbol
             ?.owner?.declarations
             ?.filterIsInstance<IrSimpleFunction>()
-            ?.filter { it.dispatchReceiverParameter == null && it.valueParameters.size == 3 }
+            ?.filter { it.dispatchReceiverParameter == null }
             .orEmpty()
         val kotlinHelper = supportFns.firstOrNull { it.name.asString() == "methodInvocationRewrite" }?.symbol
         val javaHelper = supportFns.firstOrNull { it.name.asString() == "methodInvocationRewriteJava" }?.symbol
@@ -466,32 +507,49 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
          * Routes the helper selection to a `J.FieldAccess`-walking visitor.
          */
         val propertyAccess: Boolean,
+        /**
+         * For `.strictArity()` recipes on a varargs callee: the exact number of
+         * call-site arguments to require at runtime (the matcher is still `..`
+         * because a varargs method can only be matched by `..`). -1 disables the
+         * guard (variadic-by-default, or a non-varargs callee).
+         */
+        val strictArgCount: Int,
     )
 
     private fun pickHelperSymbol(
         templates: RewriteTemplates,
         ctx: RecipeIrGenContext,
     ): IrSimpleFunctionSymbol? {
-        // v1: always dispatch to the Kotlin helper. Plan §Design.4 reasoned
-        // about which SOURCES the visitor walks (JavaVisitor walks both .java
-        // and .kt via TreeVisitorAdapter), but the TEMPLATE engine must match
-        // the recipe author's source language. Recipes authored in Kotlin
-        // carry Kotlin syntax in their before/after templates — trailing
-        // lambdas, `<Type>` arg lists, extension calls, `..<` — none of which
-        // JavaTemplate can parse. Always-Kotlin works because recipes
-        // authored under this DSL are by definition in .kt source.
+        // v2: route all-Java method-invocation bodies through the Java helper
+        // (JavaVisitor + JavaTemplate). The LST-structural classifier decides
+        // "all-Java": if the before/after lambdas don't structurally reference
+        // any K.* tree node, JavaVisitor matches the same call sites against
+        // both Java and Kotlin sources (via TreeVisitorAdapter) and
+        // JavaTemplate can parse the after template — none of the after-
+        // template syntax that's Kotlin-only (trailing lambdas, `<Type>` arg
+        // lists, extension calls, `..<`) can appear without dragging a K.*
+        // reference into the lambdas. So the classifier is sufficient.
         //
-        // `methodInvocationRewriteJava` exists for a future cross-language
-        // path (`java { rewrite { } to { } }` explicit shape) and for recipes
-        // authored in Java someday; v1 has no way to reach it from the DSL.
-        // The LST-structural classifier still computes [usesKotlinTreeNode]
-        // — it's plumbing for the eventual third helper (JavaVisitor +
-        // KotlinTemplate) the plan deferred.
-        @Suppress("UNUSED_VARIABLE")
+        // Three Kotlin-only shapes are never safe to route to Java:
+        //   - property access (`d.inHours` is Kotlin property syntax;
+        //     the Java visitor walks `J.FieldAccess`, a different LST node)
+        //   - wrapped-in-not-null (`!!` is a Kotlin-only operator)
+        //   - chained calls (the chain encoding's `\t`-separated spec is only
+        //     parsed by the Kotlin helper; the Java helper splits on `\n` only)
+        //
+        // The Java symbol may legitimately be null when authors compile
+        // against a rewrite-kotlin without [GeneratedRecipeSupport.methodInvocationRewriteJava]
+        // (i.e. older snapshots) — fall back to the Kotlin helper in that case
+        // so the recipe still compiles, even though it won't match Java
+        // sources without TreeVisitorAdapter glue.
         val classifierResult = templates.usesKotlinTreeNode
+        val isChain = templates.matcherSpecs.any { it.contains('\t') }
+        val canRouteToJava = !classifierResult && !isChain
         return when {
             templates.propertyAccess -> ctx.propertyAccessRewriteKotlinSymbol
             templates.wrappedInNotNull -> ctx.methodInvocationRewriteKotlinNotNullSymbol
+            canRouteToJava -> ctx.methodInvocationRewriteJavaSymbol
+                ?: ctx.methodInvocationRewriteKotlinSymbol
             else -> ctx.methodInvocationRewriteKotlinSymbol
         }
     }
@@ -527,11 +585,27 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val editBlockArg = editCall.getValueArgument(0) as? IrFunctionExpression ?: return null
         val editStmts = (editBlockArg.function.body as? IrBlockBody)?.statements ?: return null
 
-        // The edit block's sole statement should be the `rewrite { } to { }` call.
+        // The edit block's sole statement should be the `rewrite { } to { }`
+        // call, optionally wrapped in a trailing `.strictArity()` opt-out.
+        // Since `to` returns `RewriteRule` (non-Unit), a bare clause is wrapped
+        // by K2 in an IMPLICIT_COERCION_TO_UNIT when the edit lambda returns
+        // Unit — peel that so we see the underlying call.
         val rewriteStmt = editStmts.singleOrNull() ?: return null
-        val toCall = (rewriteStmt as? IrReturn)?.value as? IrCall
-            ?: rewriteStmt as? IrCall
-            ?: return null
+        val rawStmt = (rewriteStmt as? IrReturn)?.value ?: rewriteStmt
+        val unwrappedStmt = if (rawStmt is IrTypeOperatorCall &&
+            rawStmt.operator == IrTypeOperator.IMPLICIT_COERCION_TO_UNIT
+        ) {
+            rawStmt.argument
+        } else {
+            rawStmt
+        }
+        val outermostCall = unwrappedStmt as? IrCall ?: return null
+        val strict = outermostCall.symbol.owner.kotlinFqName.asString() == REWRITE_RULE_STRICT_ARITY_FQN
+        val toCall = if (strict) {
+            outermostCall.dispatchReceiver as? IrCall ?: return null
+        } else {
+            outermostCall
+        }
         val toCallFqn = toCall.symbol.owner.kotlinFqName.asString()
         if (toCallFqn !in REWRITE_ADVICE_TO_FQNS) return null
         val rewriteCall = toCall.dispatchReceiver as? IrCall ?: return null
@@ -575,16 +649,41 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             // recipe must pick one or the other.
             if (beforeLambdas[i].propertyAccess != propertyAccessForAll) return null
         }
+        // Variadic groups only flow through the plain method-invocation helpers;
+        // not-null / chain shapes use visitor entries without run support.
+        if (beforeLambdas.any { it.varargGroup != null && (it.wrappedInNotNull || it.inner != null) }) return null
+        // `.strictArity()` is incompatible with the spread form (a spread has no
+        // fixed count to pin). Compute the exact arg count for the runtime guard
+        // — only meaningful for varargs callees; -1 disables it.
+        if (strict && beforeLambdas.any { it.varargGroup?.isSpread == true }) return null
+        val strictArgCount = if (strict) {
+            val counts = beforeLambdas.filter { it.varargGroup != null }.map { it.argSignatures.size }.toSet()
+            when {
+                counts.isEmpty() -> -1
+                counts.size == 1 -> counts.single()
+                else -> return null
+            }
+        } else {
+            -1
+        }
         // Mixed-shape multi-before: each before gets its own
         // substitution-source CSV (since the after-lambda params bind to
         // different positions in each before — receiver in one, arg-N in
         // another). The after TEMPLATE is required to be identical across
         // all befores; if it isn't, the after lambda's IR was somehow
         // different per-before, which the runtime helper can't dispatch on.
-        val firstTemplate = buildAfterTemplate(afterArg, sourceText, beforeLambdas[0]) ?: return null
+        // Whether the generated visitor will use JavaTemplate (vs KotlinTemplate)
+        // — mirrors `pickHelperSymbol`. Drives placeholder type spelling: Java
+        // templates need `java.lang.String`, Kotlin templates `kotlin.String`.
+        val isChain = beforeLambdas.any { it.inner != null }
+        val usesKotlinTreeNode = classifyKotlinPromotion(beforeExprs + afterArg)
+        val javaTemplate = !usesKotlinTreeNode && !notNullForAll && !propertyAccessForAll &&
+            !isChain && ctx.methodInvocationRewriteJavaSymbol != null
+
+        val firstTemplate = buildAfterTemplate(afterArg, sourceText, beforeLambdas[0], strict, javaTemplate) ?: return null
         val csvs = mutableListOf(firstTemplate.second)
         for (i in 1 until beforeLambdas.size) {
-            val nextTemplate = buildAfterTemplate(afterArg, sourceText, beforeLambdas[i]) ?: return null
+            val nextTemplate = buildAfterTemplate(afterArg, sourceText, beforeLambdas[i], strict, javaTemplate) ?: return null
             if (nextTemplate.first != firstTemplate.first) return null
             csvs += nextTemplate.second
         }
@@ -609,7 +708,6 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // the delimiter and dispatch per-matcher.
         val csvField = if (csvs.size == 1) csvs[0] else csvs.joinToString("\n")
 
-        val usesKotlinTreeNode = classifyKotlinPromotion(beforeExprs + afterArg)
         return RewriteTemplates(
             matcherSpecs = matcherSpecs,
             afterTemplate = firstTemplate.first,
@@ -617,6 +715,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             usesKotlinTreeNode = usesKotlinTreeNode,
             wrappedInNotNull = notNullForAll,
             propertyAccess = propertyAccessForAll,
+            strictArgCount = strictArgCount,
         )
     }
 
@@ -628,14 +727,22 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * LST-structural classifier. Scans all type references inside the before
-     * + after lambdas; returns true if ANY references a Kotlin-specific tree
-     * node (FQN starts with `org.openrewrite.kotlin.tree.K.`).
+     * LST-structural classifier. Scans the before + after lambdas; returns
+     * true if ANY of:
+     *  - a value-parameter type references a Kotlin-specific tree node
+     *    (FQN starts with `org.openrewrite.kotlin.tree.K.`)
+     *  - a call expression resolves to a callee in the `kotlin.*` package
+     *    namespace (Kotlin stdlib function or extension — `String.lowercase`,
+     *    `StringBuilder.appendLine`, `kotlin.enumValues`, etc.)
      *
-     * Per plan §Design.4: method-name / callee-package / API-level signals are
-     * NOT used. The MethodMatcher spec, resolved at FIR time pre-inline,
-     * already encodes the Kotlin-extension target correctly even when the
-     * generated visitor is Java-rooted.
+     * The call-FQN check exists because v2 dispatch routes the non-Kotlin
+     * case through `JavaTemplate`, which can't parse Kotlin-extension call
+     * syntax in the after-template. If a Kotlin-stdlib callee appears
+     * anywhere in the lambdas, the recipe stays on the Kotlin helper.
+     *
+     * Per plan §Design.4: only LST-structural and callee-namespace signals
+     * drive promotion. The MethodMatcher spec built at FIR time pre-inline
+     * still works against either visitor's matched node.
      */
     private fun classifyKotlinPromotion(lambdas: List<IrFunctionExpression>): Boolean {
         var found = false
@@ -656,6 +763,21 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 }
                 expression.acceptChildrenVoid(this)
             }
+
+            override fun visitCall(expression: IrCall) {
+                if (found) return
+                // Callee FQN in the `kotlin.*` namespace promotes to Kotlin:
+                // JavaTemplate can't parse Kotlin-extension call syntax in
+                // the after-template (`s.lowercase()`, `sb.appendLine("x")`,
+                // `enumValues<E>()` all resolve to `kotlin.text.lowercase`,
+                // `kotlin.text.StringsKt.appendLine`, `kotlin.enumValues`).
+                val fqn = expression.symbol.owner.kotlinFqName.asString()
+                if (fqn == "kotlin" || fqn.startsWith("kotlin.")) {
+                    found = true
+                    return
+                }
+                expression.acceptChildrenVoid(this)
+            }
         }
         for (lambda in lambdas) lambda.acceptChildrenVoid(visitor)
         return found
@@ -673,7 +795,34 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     private sealed class ArgSig {
         class ParamRef(val symbol: IrValueSymbol) : ArgSig()
         class LiteralConst(val kind: org.jetbrains.kotlin.ir.expressions.IrConstKind, val value: Any?) : ArgSig()
+
+        /**
+         * A Kotlin spread (`*args`) of an array-typed param into a callee's
+         * varargs slot. Only valid as the trailing flattened sig of a varargs
+         * callee. Carries the array param symbol — the whole run is captured as
+         * one group (see [VarargGroup]).
+         */
+        class VarargSpread(val symbol: IrValueSymbol) : ArgSig()
     }
+
+    /**
+     * The variadic capture of a before-lambda whose root call targets a method
+     * whose declared last parameter is varargs (`Object...`). Built from the
+     * args the author placed into that slot — either plain "by example" element
+     * refs (`asList(a, b, c)`) or a single spread (`asList(*args)`).
+     *
+     * [startArgIndex] (`k`) is the flattened position where the varargs run
+     * begins — i.e. the number of fixed declared prefix params. At a matched
+     * call site the group absorbs `getArguments()[k..end]`. [memberSymbols] are
+     * the param symbols bound to the slot, in source order (one entry for the
+     * spread form; N for the by-example form). The after-template references
+     * them as a single contiguous run that expands to the matched args.
+     */
+    private class VarargGroup(
+        val startArgIndex: Int,
+        val memberSymbols: List<IrValueSymbol>,
+        val isSpread: Boolean,
+    )
 
     private class BeforeLambda(
         val params: List<IrValueParameter>,
@@ -725,6 +874,14 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
          * — those routes use different visitor entries.
          */
         val inner: BeforeLambda? = null,
+        /**
+         * Set when the root call targets a varargs method and the author placed
+         * ≥1 arg into the varargs slot. Drives variadic-by-default matching: the
+         * matcher becomes `prefix…, ..` and the after-template carries the group
+         * as one expandable run. Null for non-varargs callees (or chain/not-null/
+         * property shapes, which keep the fixed-arity path). See [VarargGroup].
+         */
+        val varargGroup: VarargGroup? = null,
     )
 
     private fun validateBeforeLambda(
@@ -864,9 +1021,51 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             else -> return null
         }
 
+        val isVarargsCallee = rootCall.symbol.owner.valueParameters.lastOrNull()?.varargElementType != null
         val sigs = mutableListOf<ArgSig>()
+        var varargGroup: VarargGroup? = null
         for (i in 0 until rootCall.valueArgumentsCount) {
-            val arg = unwrapImplicitCasts(rootCall.getValueArgument(i)) ?: continue
+            val rawArg = rootCall.getValueArgument(i) ?: continue
+            // A call to a varargs method lowers the trailing args into a single
+            // IrVararg at the varargs param's slot. Flatten its elements: plain
+            // refs are "by example" run members; a lone `*args` is a spread
+            // capturing the whole run. Either way they form a VarargGroup that
+            // drives variadic-by-default matching downstream.
+            if (rawArg is IrVararg) {
+                val k = sigs.size
+                val members = mutableListOf<IrValueSymbol>()
+                var sawSpread = false
+                for (element: IrVarargElement in rawArg.elements) {
+                    if (element is IrSpreadElement) {
+                        // `*args` — one lone spread of an array param. v1 rejects
+                        // mixing a spread with other elements in the same slot.
+                        if (rawArg.elements.size != 1) return null
+                        val spreadExpr = unwrapImplicitCasts(element.expression)
+                        if (spreadExpr !is IrGetValue || spreadExpr.symbol !in paramSyms) return null
+                        sigs += ArgSig.VarargSpread(spreadExpr.symbol)
+                        members += spreadExpr.symbol
+                        sawSpread = true
+                    } else {
+                        when (val elemExpr = unwrapImplicitCasts(element as? IrExpression)) {
+                            is IrGetValue -> {
+                                if (elemExpr.symbol !in paramSyms) return null
+                                sigs += ArgSig.ParamRef(elemExpr.symbol)
+                                members += elemExpr.symbol
+                            }
+                            // A literal in the varargs slot can't anchor a
+                            // pass-through run — reject for v1.
+                            else -> return null
+                        }
+                    }
+                }
+                // Only a genuinely varargs callee forms a group; an empty
+                // by-example slot has nothing to carry.
+                if (isVarargsCallee && members.isNotEmpty()) {
+                    varargGroup = VarargGroup(startArgIndex = k, memberSymbols = members, isSpread = sawSpread)
+                }
+                continue
+            }
+            val arg = unwrapImplicitCasts(rawArg) ?: continue
             when (arg) {
                 is IrGetValue -> {
                     if (arg.symbol !in paramSyms) return null
@@ -879,7 +1078,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // Property accessors take 0 value args; a non-empty arg signature here
         // means the IR is method-style despite a getter-shaped symbol.
         val finalPropertyAccess = propertyAccess && sigs.isEmpty()
-        return BeforeLambda(params, rootCall, sigs, receiverParamSymbol, wrappedInNotNull, finalPropertyAccess)
+        return BeforeLambda(params, rootCall, sigs, receiverParamSymbol, wrappedInNotNull, finalPropertyAccess,
+            varargGroup = varargGroup)
     }
 
     /**
@@ -977,6 +1177,10 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                     CanonicalArgSig.ParamIdx(idx)
                 }
                 is ArgSig.LiteralConst -> CanonicalArgSig.Literal(sig.kind, sig.value)
+                is ArgSig.VarargSpread -> {
+                    val idx = paramIdxBySymbol[sig.symbol] ?: return@map CanonicalArgSig.Unknown
+                    CanonicalArgSig.Vararg(idx)
+                }
             }
         }
         return CanonicalSignature(receiverIdx, args)
@@ -989,6 +1193,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
     private sealed class CanonicalArgSig {
         data class ParamIdx(val idx: Int) : CanonicalArgSig()
+        data class Vararg(val idx: Int) : CanonicalArgSig()
         data class Literal(val kind: org.jetbrains.kotlin.ir.expressions.IrConstKind, val value: Any?) : CanonicalArgSig()
         object Unknown : CanonicalArgSig()
     }
@@ -1086,9 +1291,35 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     private fun computeArgsPattern(owner: IrSimpleFunction): String {
         val isDispatched = owner.dispatchReceiverParameter != null
         val extReceiverArg = if (!isDispatched && owner.extensionReceiverParameter != null) 1 else 0
-        val jvmArgCount = owner.valueParameters.size + extReceiverArg
+        val params = owner.valueParameters
+        if (params.lastOrNull()?.varargElementType != null) {
+            // Varargs callee: a `JavaType.Method` declares the varargs slot as a
+            // single array parameter, so only a trailing `..` can ever match it
+            // (a fixed `*,*,*` spec never will — `MethodMatcherTest
+            // .varargsMatchesArrayType`). Type the fixed prefix params so we
+            // don't also match a same-named sibling overload such as
+            // `String.format(Locale, String, Object...)`.
+            val tokens = mutableListOf<String>()
+            repeat(extReceiverArg) { tokens += "*" }
+            for (i in 0 until params.size - 1) {
+                tokens += matcherParamType(params[i].type)
+            }
+            tokens += ".."
+            return tokens.joinToString(",")
+        }
+        val jvmArgCount = params.size + extReceiverArg
         if (jvmArgCount == 0) return ""
         return List(jvmArgCount) { "*" }.joinToString(",")
+    }
+
+    /**
+     * Render a fixed prefix parameter's type as a MethodMatcher type token,
+     * mapping Kotlin builtins back to the Java FQN the matcher resolves against.
+     * Falls back to `*` when the type can't be named.
+     */
+    private fun matcherParamType(type: IrType): String {
+        val fqn = type.classFqName?.asString() ?: return "*"
+        return KOTLIN_BUILTIN_TO_JAVA_FQN[fqn] ?: fqn
     }
 
     private fun computeJvmFacadeFqn(fn: IrSimpleFunction): String? {
@@ -1149,6 +1380,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         fnExpr: IrFunctionExpression,
         sourceText: String,
         before: BeforeLambda,
+        strict: Boolean,
+        javaTemplate: Boolean,
     ): Pair<String, String>? {
         val fn = fnExpr.function
         val afterParams = fn.valueParameters
@@ -1159,6 +1392,21 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             is IrReturn -> singleStmt.value
             is IrExpression -> singleStmt
             else -> return null
+        }
+
+        // Variadic run: when the before targets a varargs method (and the
+        // recipe didn't opt into strict arity) the args placed in the varargs
+        // slot are carried as ONE expandable run, not fixed captures.
+        // `groupAfterSyms` are the after-lambda param symbols (positional twins
+        // of the before's group members) that make up that run — they're
+        // excluded from normal placeholder mapping and re-emitted as a single
+        // sentinel the runtime expands per matched call.
+        val group = if (strict) null else before.varargGroup
+        val groupBeforeSyms: Set<IrValueSymbol> = group?.memberSymbols?.toSet() ?: emptySet()
+        val groupAfterSyms: Set<IrValueSymbol> = if (group == null) emptySet() else buildSet {
+            for (i in before.params.indices) {
+                if (before.params[i].symbol in groupBeforeSyms) add(afterParams[i].symbol)
+            }
         }
 
         // Substitution source encoding:
@@ -1177,6 +1425,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
 
         val paramSymToSource = HashMap<IrValueSymbol, String>(afterParams.size)
         for (i in 0 until afterParams.size) {
+            val afterSym = afterParams[i].symbol
+            if (afterSym in groupAfterSyms) continue  // emitted as the variadic run below
             val beforeParamSym = before.params[i].symbol
             val source: String = when {
                 beforeParamSym == before.receiverParamSymbol -> outerSrc(-1)
@@ -1198,7 +1448,7 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                     } else return null
                 }
             }
-            paramSymToSource[afterParams[i].symbol] = source
+            paramSymToSource[afterSym] = source
         }
 
         data class LiteralSlot(val src: String, val sig: ArgSig.LiteralConst, var consumed: Boolean = false)
@@ -1251,9 +1501,14 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             val startOffset: Int,
             val endOffset: Int,
             val source: String,
-            val typeFqn: String?,
+            // The exact text to splice in at this span: a `#{any(T)}` placeholder
+            // for a normal capture, or the variadic sentinel for the run.
+            val render: String,
         )
         val spots = mutableListOf<Spot>()
+        // Group-member references in the after body, folded into one run below.
+        data class GroupRef(val startOffset: Int, val endOffset: Int, val symbol: IrValueSymbol)
+        val groupRefs = mutableListOf<GroupRef>()
 
         // `accept(visitor, null)` includes `expr` itself; `acceptChildrenVoid`
         // would only visit its children. The distinction matters for after
@@ -1265,12 +1520,16 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             override fun visitElement(element: IrElement) { element.acceptChildrenVoid(this) }
 
             override fun visitGetValue(expression: IrGetValue) {
+                if (expression.symbol in groupAfterSyms) {
+                    groupRefs += GroupRef(expression.startOffset, expression.endOffset, expression.symbol)
+                    return
+                }
                 val src = paramSymToSource[expression.symbol] ?: return
                 spots += Spot(
                     startOffset = expression.startOffset,
                     endOffset = expression.endOffset,
                     source = src,
-                    typeFqn = renderPlaceholderType(expression.symbol.owner.type),
+                    render = renderPlaceholder(renderPlaceholderType(expression.symbol.owner.type, javaTemplate)),
                 )
             }
 
@@ -1282,10 +1541,34 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                     startOffset = expression.startOffset,
                     endOffset = expression.endOffset,
                     source = slot.src,
-                    typeFqn = renderPlaceholderType(expression.type),
+                    render = renderPlaceholder(renderPlaceholderType(expression.type, javaTemplate)),
                 )
             }
         }, null)
+
+        // Fold the group-member references into one run spot. The runtime
+        // expands the sentinel to one `#{any()}` per matched arg and splices
+        // `getArguments()[k..end]` at this ordinal (source `V<k>`).
+        if (group != null) {
+            if (groupRefs.isEmpty()) return null                       // after must reference the run
+            val seen = groupRefs.map { it.symbol }.toSet()
+            if (seen.size != groupRefs.size) return null               // a member used twice
+            if (seen != groupAfterSyms) return null                    // missing / extra members
+            val runStartRaw = groupRefs.minOf { it.startOffset }
+            val runEnd = groupRefs.maxOf { it.endOffset }
+            // Spread form (`*args`): swallow the leading `*` (and any horizontal
+            // whitespace) so the sentinel replaces the whole spread expression.
+            val runStart = if (group.isSpread) {
+                var s = runStartRaw
+                while (s > 0 && (sourceText[s - 1] == ' ' || sourceText[s - 1] == '\t')) s--
+                if (s > 0 && sourceText[s - 1] == '*') s - 1 else runStartRaw
+            } else {
+                runStartRaw
+            }
+            // Contiguity: no normal capture may sit inside the run span.
+            if (spots.any { it.startOffset < runEnd && it.endOffset > runStart }) return null
+            spots += Spot(runStart, runEnd, "V${group.startArgIndex}", VARARGS_SENTINEL)
+        }
 
         val inSliceSpots = mutableListOf<Spot>()
         val prependSpots = mutableListOf<Spot>()
@@ -1313,13 +1596,13 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             templateBuilder.replace(
                 spot.startOffset - sliceStart,
                 spot.endOffset - sliceStart,
-                renderPlaceholder(spot.typeFqn),
+                spot.render,
             )
         }
         val template = if (prependSpots.isEmpty()) {
             templateBuilder.toString()
         } else {
-            "${renderPlaceholder(prependSpots.single().typeFqn)}.$templateBuilder"
+            "${prependSpots.single().render}.$templateBuilder"
         }
 
         val orderedSources = mutableListOf<String>()
@@ -1330,8 +1613,17 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         return template to csv
     }
 
-    private fun renderPlaceholderType(type: IrType): String? =
-        type.classFqName?.asString()
+    private fun renderPlaceholderType(type: IrType, javaTemplate: Boolean): String? {
+        val fqn = type.classFqName?.asString() ?: return null
+        // On the JavaTemplate path, map Kotlin builtin reference types to their
+        // Java FQN so the placeholder (`#{any(java.lang.String)}`) resolves the
+        // templated call's method type. Only remap reference FQNs (those with a
+        // dot); leave primitives (`int`) and non-builtins alone. KotlinTemplate
+        // keeps the Kotlin spelling, which is what it resolves against.
+        if (!javaTemplate) return fqn
+        val mapped = KOTLIN_BUILTIN_TO_JAVA_FQN[fqn]
+        return if (mapped != null && mapped.contains('.')) mapped else fqn
+    }
 
     private fun renderPlaceholder(typeFqn: String?): String =
         if (typeFqn != null) "#{any($typeFqn)}" else "#{any()}"
@@ -1461,6 +1753,11 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
                 factoryCall.arguments[0] = irString(templates.matcherSpecs.joinToString("\n"))
                 factoryCall.arguments[1] = irString(templates.afterTemplate)
                 factoryCall.arguments[2] = irString(templates.substitutionSourcesCsv)
+                // The method-invocation helpers take a 4th `strictArgCount`;
+                // the not-null / property helpers don't.
+                if (helperSymbol.owner.valueParameters.size >= 4) {
+                    factoryCall.arguments[3] = irInt(templates.strictArgCount)
+                }
                 +irReturn(factoryCall)
             }
         }

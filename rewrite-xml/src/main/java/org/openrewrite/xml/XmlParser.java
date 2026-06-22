@@ -92,6 +92,7 @@ public class XmlParser implements Parser {
                 lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
                 XMLParser parser = new XMLParser(new CommonTokenStream(lexer));
+                parser.htmlMode = isHtmlLike(path);
                 parser.removeErrorListeners();
                 parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
@@ -114,6 +115,18 @@ public class XmlParser implements Parser {
     @Override
     public Stream<SourceFile> parse(@Language("xml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
+    }
+
+    /**
+     * Whether unclosed HTML void elements (e.g. {@code <br>}) should be tolerated for the given path.
+     * Enabled for HTML-like sources where void elements are idiomatically written without a slash.
+     */
+    private static boolean isHtmlLike(@Nullable Path path) {
+        if (path == null) {
+            return false;
+        }
+        String p = path.toString().toLowerCase();
+        return p.endsWith(".jsp") || p.endsWith(".jspx") || p.endsWith(".html") || p.endsWith(".htm");
     }
 
     @Override

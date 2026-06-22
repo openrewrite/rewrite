@@ -198,8 +198,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
             if (matchesGlob(dm.getGroupId(), groupId) && matchesGlob(dm.getArtifactId(), artifactId)) {
                 ManagedDependency req = dm.getRequested();
-                String reqGroup = req.getGroupId();
-                if (reqGroup.equals(tag.getChildValue("groupId").orElse(null)) &&
+                if (req != null &&
+                        req.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
                         req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
                         dm.getScope() == tag.getChildValue("scope").map(Scope::fromName).orElse(null)) {
                     return true;
@@ -208,8 +208,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (dm.getBomGav() != null) {
                 if (matchesGlob(dm.getBomGav().getGroupId(), groupId) && matchesGlob(dm.getBomGav().getArtifactId(), artifactId)) {
                     ManagedDependency requestedBom = dm.getRequestedBom();
-                    //noinspection ConstantConditions
-                    if (requestedBom.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
+                    if (requestedBom != null &&
+                            requestedBom.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
                             requestedBom.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null))) {
                         return true;
                     }

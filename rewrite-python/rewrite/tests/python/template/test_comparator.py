@@ -15,7 +15,7 @@
 """Tests for PatternMatchingComparator."""
 
 import pytest
-from uuid import uuid4
+from rewrite import random_id
 
 from rewrite import Markers
 from rewrite.java import Space
@@ -541,9 +541,9 @@ class TestCaptureSemantics:
         pattern_tree = TemplateEngine.get_template_tree("{x} + {x}", captures)
 
         # Create a target where both sides reference the same identifier (same UUID)
-        shared_ident = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "a", None, None)
+        shared_ident = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "a", None, None)
         target_tree = j.Binary(
-            uuid4(), Space.EMPTY, Markers.EMPTY,
+            random_id(), Space.EMPTY, Markers.EMPTY,
             shared_ident,
             j.JLeftPadded(Space.EMPTY, j.Binary.Type.Addition, Markers.EMPTY),
             shared_ident,
@@ -871,8 +871,8 @@ class TestDefaultFallthrough:
 
     def test_empty_sentinel_nodes_match(self):
         """Two Empty sentinel nodes should match (explicitly handled)."""
-        empty1 = j.Empty(uuid4(), Space.EMPTY, Markers.EMPTY)
-        empty2 = j.Empty(uuid4(), Space.EMPTY, Markers.EMPTY)
+        empty1 = j.Empty(random_id(), Space.EMPTY, Markers.EMPTY)
+        empty2 = j.Empty(random_id(), Space.EMPTY, Markers.EMPTY)
         cursor = _make_cursor(empty1)
 
         comparator = PatternMatchingComparator({})
@@ -908,9 +908,9 @@ class TestGenericIteration:
 
     def test_star_expression_matches_structurally(self):
         """py.Star (previously unhandled) now matches via generic iteration."""
-        expr = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "args", None, None)
-        star1 = py.Star(uuid4(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
-        star2 = py.Star(uuid4(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
+        expr = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "args", None, None)
+        star1 = py.Star(random_id(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
+        star2 = py.Star(random_id(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
         cursor = _make_cursor(star1)
 
         comparator = PythonComparatorVisitor()
@@ -918,9 +918,9 @@ class TestGenericIteration:
 
     def test_star_kind_mismatch_rejects(self):
         """py.Star with different Kind enum values should not match."""
-        expr = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "args", None, None)
-        star_list = py.Star(uuid4(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
-        star_dict = py.Star(uuid4(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.DICT, expr, None)
+        expr = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "args", None, None)
+        star_list = py.Star(random_id(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
+        star_dict = py.Star(random_id(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.DICT, expr, None)
         cursor = _make_cursor(star_list)
 
         comparator = PythonComparatorVisitor()
@@ -928,11 +928,11 @@ class TestGenericIteration:
 
     def test_previously_unhandled_types_no_longer_rejected(self):
         """The generic approach handles any dataclass node — no more default rejection."""
-        expr = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        expr = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
         # py.Star was NOT handled in the old comparator — would have been rejected.
         # Now handled via generic iteration.
-        star1 = py.Star(uuid4(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
-        star2 = py.Star(uuid4(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
+        star1 = py.Star(random_id(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
+        star2 = py.Star(random_id(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
         cursor = _make_cursor(star1)
 
         # Using the full PatternMatchingComparator (not just Layer 1) to verify
@@ -943,12 +943,12 @@ class TestGenericIteration:
 
     def test_nested_python_binary_with_negation_matches(self):
         """py.Binary nodes with matching negation should match via generic iteration."""
-        left = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
-        right = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "y", None, None)
+        left = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        right = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "y", None, None)
         op = j.JLeftPadded(Space.EMPTY, py.Binary.Type.In, Markers.EMPTY)
         # Both have negation (i.e., "not in")
-        bin1 = py.Binary(uuid4(), Space.EMPTY, Markers.EMPTY, left, op, Space.EMPTY, right, None)
-        bin2 = py.Binary(uuid4(), Space.EMPTY, Markers.EMPTY, left, op, Space.EMPTY, right, None)
+        bin1 = py.Binary(random_id(), Space.EMPTY, Markers.EMPTY, left, op, Space.EMPTY, right, None)
+        bin2 = py.Binary(random_id(), Space.EMPTY, Markers.EMPTY, left, op, Space.EMPTY, right, None)
         cursor = _make_cursor(bin1)
 
         visitor = PythonComparatorVisitor()
@@ -956,13 +956,13 @@ class TestGenericIteration:
 
     def test_python_binary_negation_mismatch(self):
         """py.Binary 'in' vs 'not in' should NOT match (negation difference)."""
-        left = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
-        right = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "y", None, None)
+        left = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        right = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "y", None, None)
         op = j.JLeftPadded(Space.EMPTY, py.Binary.Type.In, Markers.EMPTY)
         # "x in y" (no negation)
-        bin_in = py.Binary(uuid4(), Space.EMPTY, Markers.EMPTY, left, op, None, right, None)
+        bin_in = py.Binary(random_id(), Space.EMPTY, Markers.EMPTY, left, op, None, right, None)
         # "x not in y" (has negation)
-        bin_not_in = py.Binary(uuid4(), Space.EMPTY, Markers.EMPTY, left, op, Space.EMPTY, right, None)
+        bin_not_in = py.Binary(random_id(), Space.EMPTY, Markers.EMPTY, left, op, Space.EMPTY, right, None)
         cursor = _make_cursor(bin_in)
 
         visitor = PythonComparatorVisitor()
@@ -975,10 +975,10 @@ class TestLayer2TypeAwareness:
     def test_lenient_mode_allows_one_sided_none_type(self):
         """In lenient mode, a node with type=None should match one with a type."""
         # Pattern: identifier with no type
-        pattern = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        pattern = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
         # Target: identifier with a type
         target = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "x",
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "x",
             JavaType.Primitive.String, None
         )
         cursor = _make_cursor(target)
@@ -988,9 +988,9 @@ class TestLayer2TypeAwareness:
 
     def test_strict_mode_rejects_one_sided_none_type(self):
         """In strict mode, a node with type=None should NOT match one with a type."""
-        pattern = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        pattern = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
         target = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "x",
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "x",
             JavaType.Primitive.String, None
         )
         cursor = _make_cursor(target)
@@ -1001,11 +1001,11 @@ class TestLayer2TypeAwareness:
     def test_matching_primitive_types(self):
         """Two identifiers with the same Primitive type should match."""
         pattern = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "x",
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "x",
             JavaType.Primitive.Int, None
         )
         target = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "x",
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "x",
             JavaType.Primitive.Int, None
         )
         cursor = _make_cursor(target)
@@ -1016,11 +1016,11 @@ class TestLayer2TypeAwareness:
     def test_mismatching_primitive_types(self):
         """Two identifiers with different Primitive types should not match."""
         pattern = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "x",
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "x",
             JavaType.Primitive.Int, None
         )
         target = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "x",
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "x",
             JavaType.Primitive.String, None
         )
         cursor = _make_cursor(target)
@@ -1038,13 +1038,13 @@ class TestLayer2TypeAwareness:
 
         # Pattern: path.join() with select "path"
         pattern_select = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "path", None, None
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "path", None, None
         )
         pattern_name = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "join", None, None
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "join", None, None
         )
         pattern = j.MethodInvocation(
-            uuid4(), Space.EMPTY, Markers.EMPTY,
+            random_id(), Space.EMPTY, Markers.EMPTY,
             j.JRightPadded(pattern_select, Space.EMPTY, Markers.EMPTY),
             None,
             pattern_name,
@@ -1054,13 +1054,13 @@ class TestLayer2TypeAwareness:
 
         # Target: os_path.join() with select "os_path" (different name)
         target_select = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "os_path", None, None
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "os_path", None, None
         )
         target_name = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "join", None, None
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "join", None, None
         )
         target = j.MethodInvocation(
-            uuid4(), Space.EMPTY, Markers.EMPTY,
+            random_id(), Space.EMPTY, Markers.EMPTY,
             j.JRightPadded(target_select, Space.EMPTY, Markers.EMPTY),
             None,
             target_name,
@@ -1085,23 +1085,23 @@ class TestLayer2TypeAwareness:
         )
 
         name_join = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "join", None, None
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "join", None, None
         )
         name_split = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "split", None, None
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "split", None, None
         )
         select = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "path", None, None
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "path", None, None
         )
         empty_args = j.JContainer(Space.EMPTY, [], Markers.EMPTY)
 
         pattern = j.MethodInvocation(
-            uuid4(), Space.EMPTY, Markers.EMPTY,
+            random_id(), Space.EMPTY, Markers.EMPTY,
             j.JRightPadded(select, Space.EMPTY, Markers.EMPTY),
             None, name_join, empty_args, p_method_type,
         )
         target = j.MethodInvocation(
-            uuid4(), Space.EMPTY, Markers.EMPTY,
+            random_id(), Space.EMPTY, Markers.EMPTY,
             j.JRightPadded(select, Space.EMPTY, Markers.EMPTY),
             None, name_split, empty_args, t_method_type,
         )
@@ -1112,8 +1112,8 @@ class TestLayer2TypeAwareness:
 
     def test_both_none_types_match(self):
         """When both nodes have type=None, they should always match."""
-        pattern = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
-        target = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        pattern = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        target = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
         cursor = _make_cursor(target)
 
         # Even in strict mode, both-None is fine
@@ -1136,7 +1136,7 @@ class TestLayer3CaptureWithLayers:
         pattern_tree = TemplateEngine.get_template_tree("{x}", captures)
         # Construct a typed target
         target = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "hello",
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "hello",
             JavaType.Primitive.String, None
         )
         cursor = _make_cursor(target)
@@ -1154,14 +1154,14 @@ class TestLayer3CaptureWithLayers:
 
         # Construct a typed target method invocation
         target_name = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "print", None, None
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "print", None, None
         )
         target_arg = j.Identifier(
-            uuid4(), Space.EMPTY, Markers.EMPTY, [], "hello",
+            random_id(), Space.EMPTY, Markers.EMPTY, [], "hello",
             JavaType.Primitive.String, None
         )
         target = j.MethodInvocation(
-            uuid4(), Space.EMPTY, Markers.EMPTY,
+            random_id(), Space.EMPTY, Markers.EMPTY,
             None, None, target_name,
             j.JContainer(
                 Space.EMPTY,

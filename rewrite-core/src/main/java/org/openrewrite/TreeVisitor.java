@@ -246,12 +246,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
                     }
                 }
                 if (t != tree && t != null && p instanceof ExecutionContext) {
-                    ExecutionContext ctx = (ExecutionContext) p;
-                    for (TreeObserver.Subscription observer : ctx.getObservers()) {
-                        if (observer.isSubscribed(tree)) {
-                            t = observer.treeChanged(getCursor(), t, tree);
-                        }
-                    }
+                    t = notifyObservers(tree, t, (ExecutionContext) p);
                 }
             }
 
@@ -259,11 +254,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
 
             if (topLevel) {
                 if (t != null && afterVisit != null) {
-                    for (TreeVisitor<?, P> v : afterVisit) {
-                        v.setCursor(getCursor());
-                        //noinspection unchecked
-                        t = (T) v.visit(t, p);
-                    }
+                    t = applyAfterVisitors(t, p);
                 }
 
                 afterVisit = null;
@@ -280,6 +271,34 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
 
         //noinspection unchecked
         return isAcceptable ? t : (T) tree;
+    }
+
+    /**
+     * Dispatches a changed tree to any subscribed {@link TreeObserver}s. Extracted from
+     * {@link #visit(Tree, Object)} so that this rarely-taken path does not count against that
+     * method's inlining budget.
+     */
+    private T notifyObservers(Tree tree, T t, ExecutionContext ctx) {
+        for (TreeObserver.Subscription observer : ctx.getObservers()) {
+            if (observer.isSubscribed(tree)) {
+                t = observer.treeChanged(getCursor(), t, tree);
+            }
+        }
+        return t;
+    }
+
+    /**
+     * Runs the visitors registered via {@link #doAfterVisit(TreeVisitor)} once the top-level tree has
+     * been visited. Extracted from {@link #visit(Tree, Object)} so that this rarely-taken path does not
+     * count against that method's inlining budget.
+     */
+    private @Nullable T applyAfterVisitors(@Nullable T t, P p) {
+        for (TreeVisitor<?, P> v : afterVisit) {
+            v.setCursor(getCursor());
+            //noinspection unchecked
+            t = (T) v.visit(t, p);
+        }
+        return t;
     }
 
     public void visit(@Nullable List<? extends T> nodes, P p) {
@@ -333,33 +352,48 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
         return mine.isAssignableFrom(theirs);
     }
 
+    /**
+     * Memoizes the (purely reflective) tree-type resolution per visitor class. Resolving the tree type
+     * walks type variables and the generic superclass hierarchy, which is too expensive to repeat for
+     * every node a non-adaptable visitor encounters. A {@link ClassValue} is used rather than a bounded
+     * cache because the key space (visitor classes) is naturally bounded and tied to class lifecycle, so
+     * it never needs eviction and does not pin classloaders.
+     */
     @SuppressWarnings("rawtypes")
-    protected Class<? extends Tree> visitorTreeType(Class<? extends TreeVisitor> v) {
-        for (TypeVariable<? extends Class<? extends TreeVisitor>> tp : v.getTypeParameters()) {
-            for (Type bound : tp.getBounds()) {
-                if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
-                    //noinspection unchecked
-                    return (Class<? extends Tree>) bound;
-                }
-            }
-        }
-
-        Type sup = v.getGenericSuperclass();
-        for (int i = 0; i < 20; i++) {
-            if (sup instanceof ParameterizedType) {
-                for (Type bound : ((ParameterizedType) sup).getActualTypeArguments()) {
+    private static final ClassValue<Class<? extends Tree>> TREE_TYPES = new ClassValue<Class<? extends Tree>>() {
+        @Override
+        protected Class<? extends Tree> computeValue(Class<?> v) {
+            for (TypeVariable<?> tp : v.getTypeParameters()) {
+                for (Type bound : tp.getBounds()) {
                     if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
                         //noinspection unchecked
                         return (Class<? extends Tree>) bound;
                     }
                 }
-                sup = ((ParameterizedType) sup).getRawType();
-            } else if (sup instanceof Class) {
-                sup = ((Class<?>) sup).getGenericSuperclass();
             }
+
+            Type sup = v.getGenericSuperclass();
+            for (int i = 0; i < 20; i++) {
+                if (sup instanceof ParameterizedType) {
+                    for (Type bound : ((ParameterizedType) sup).getActualTypeArguments()) {
+                        if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
+                            //noinspection unchecked
+                            return (Class<? extends Tree>) bound;
+                        }
+                    }
+                    sup = ((ParameterizedType) sup).getRawType();
+                } else if (sup instanceof Class) {
+                    sup = ((Class<?>) sup).getGenericSuperclass();
+                }
+            }
+            throw new IllegalArgumentException("Expected to find a tree type somewhere in the type parameters of the " +
+                                               "type hierarchy of visitor " + v.getName());
         }
-        throw new IllegalArgumentException("Expected to find a tree type somewhere in the type parameters of the " +
-                                           "type hierarchy of visitor " + getClass().getName());
+    };
+
+    @SuppressWarnings("rawtypes")
+    protected Class<? extends Tree> visitorTreeType(Class<? extends TreeVisitor> v) {
+        return TREE_TYPES.get(v);
     }
 
     public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo) {

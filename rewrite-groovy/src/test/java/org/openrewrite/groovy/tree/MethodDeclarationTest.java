@@ -128,6 +128,33 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void dynamicTypedArgumentsNamedLikeModifiers() {
+        rewriteRun(
+          groovy(
+            """
+              class T {
+                  private String fromEnv(template, id, defaultValue) {
+                      return defaultValue
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration fromEnv = (J.MethodDeclaration) ((J.ClassDeclaration) cu.getStatements().getFirst())
+                  .getBody().getStatements().getFirst();
+                for (var param : fromEnv.getParameters()) {
+                    assertThat(((J.VariableDeclarations) param).getModifiers()).isEmpty();
+                }
+                assertThat(fromEnv.getParameters()).satisfiesExactly(
+                  p -> assertThat(((J.VariableDeclarations) p).getVariables().getFirst().getSimpleName()).isEqualTo("template"),
+                  p -> assertThat(((J.VariableDeclarations) p).getVariables().getFirst().getSimpleName()).isEqualTo("id"),
+                  p -> assertThat(((J.VariableDeclarations) p).getVariables().getFirst().getSimpleName()).isEqualTo("defaultValue")
+                );
+            })
+          )
+        );
+    }
+
+    @Test
     void varargsArguments() {
         rewriteRun(
           groovy(

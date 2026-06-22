@@ -4006,8 +4006,12 @@ public interface J extends Tree {
          * after the return type. For example: {@code byte toByteArray()[]}.
          */
         @With
-        @Getter
+        @Nullable
         List<JLeftPadded<Space>> dimensionsAfterName;
+
+        public List<JLeftPadded<Space>> getDimensionsAfterName() {
+            return dimensionsAfterName == null ? emptyList() : dimensionsAfterName;
+        }
 
         @Nullable
         JContainer<NameTree> throwz;

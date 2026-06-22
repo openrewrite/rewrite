@@ -29,7 +29,12 @@
 /** XML parser derived from ANTLR v4 ref guide book example */
 parser grammar XMLParser;
 
-options { tokenVocab=XMLLexer; }
+// This grammar is generated for multiple targets (Java into rewrite-xml, C# into rewrite-csharp), so
+// it must not contain target-specific members. The htmlMode flag and isVoidElement(...) referenced by
+// the void-element predicate below live in a hand-written superclass provided per target:
+//   - Java: org.openrewrite.xml.internal.grammar.XMLParserBase
+//   - C#:   OpenRewrite.Xml.Grammar.XMLParserBase (must be supplied when regenerating the C# sources)
+options { tokenVocab=XMLLexer; superClass=XMLParserBase; }
 
 document
     :   UTF_ENCODING_BOM? prolog element?
@@ -77,8 +82,18 @@ content
          jspscriptlet | jspexpression | jspdeclaration | jspcomment | chardata) ;
 
 element
-    :   OPEN Name attribute* CLOSE content* OPEN '/' Name CLOSE
-    |   OPEN Name attribute* '/>'
+    :   OPEN name=Name attribute*
+        (   '/>'
+        |   CLOSE
+            (   {isVoidElement($name.text)}? voidClose // HTML void element, e.g. <br> with no closing tag
+            |   content* OPEN '/' Name CLOSE
+            )
+        )
+    ;
+
+// Empty marker rule, present in the parse tree only when an HTML void element was matched.
+voidClose
+    :
     ;
 
 jspdirective

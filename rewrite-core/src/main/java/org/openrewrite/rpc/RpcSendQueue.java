@@ -229,7 +229,12 @@ public class RpcSendQueue {
         protected @Nullable String computeValue(Class<?> afterType) {
             Package pkg = afterType.getPackage();
             if (afterType.isPrimitive() || afterType.isArray() || (pkg != null && pkg.getName().startsWith("java.lang")) ||
-                afterType.equals(UUID.class) || Iterable.class.isAssignableFrom(afterType)) {
+                afterType.equals(UUID.class) || Iterable.class.isAssignableFrom(afterType) ||
+                Map.class.isAssignableFrom(afterType)) {
+                // A plain Map (like a Collection) is serialized structurally and needs no
+                // valueType. Sending one would make the receiver treat the map as a typed
+                // object and inject type/identity metadata keys (e.g. "@c"/"@ref") that leak
+                // into the map as real entries, corrupting it (see RpcObjectData#getValue).
                 return null;
             } else if (Enum.class.isAssignableFrom(afterType) && !JAVA_TYPE_NAME.concat("$Primitive").equals(afterType.getName())) {
                 // FIXME special case for `JavaType.Primitive` here
@@ -242,6 +247,17 @@ public class RpcSendQueue {
             if (jt != null && pkg != null && !pkg.getName().equals(JAVA_TYPE_PACKAGE) && jt.isAssignableFrom(afterType)) {
                 Class<?> superclass = afterType.getSuperclass();
                 if (superclass != null && !Object.class.equals(superclass)) {
+                    return superclass.getName();
+                }
+            }
+
+            // Synthetic tree subclasses generated outside the org.openrewrite packages
+            // -- must be reported to the remote as their real (super) type, not the proxy
+            // class name, which the remote has no codec/factory for.
+            if (pkg != null && !pkg.getName().startsWith("org.openrewrite")) {
+                Class<?> superclass = afterType.getSuperclass();
+                Package superPkg = superclass == null ? null : superclass.getPackage();
+                if (superPkg != null && superPkg.getName().startsWith("org.openrewrite") && !Object.class.equals(superclass)) {
                     return superclass.getName();
                 }
             }

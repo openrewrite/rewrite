@@ -517,6 +517,41 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void junitBom_5_to_6() {
+        rewriteRun(
+          spec ->
+            spec.beforeRecipe(withToolingApi())
+              .recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "6.x", null)),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                testImplementation(platform('org.junit:junit-bom:5.9.3'))
+              }
+
+              java {
+                toolchain {
+                  languageVersion = JavaLanguageVersion.of(17)
+                }
+              }
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .doesNotContain("5.9.3")
+                .containsPattern("junit-bom:6.\\d+(.\\d+)?")
+                .actual())
+          )
+        );
+    }
+
+    @Test
     void mapNotationVariable() {
         rewriteRun(
           buildGradle(
@@ -3080,6 +3115,43 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   implementation('com.google.guava:guava:30.1.1-jre')
                   implementation('org.openrewrite:rewrite-core:8.0.0') {
                       version { strictly('8.0.0') }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void springBoot3xBomDepManagementLatestPatch() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot-dependencies", "latest.patch", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.0'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.springframework.boot:spring-boot-dependencies:3.1.0"
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.0'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.springframework.boot:spring-boot-dependencies:3.1.12"
                   }
               }
               """

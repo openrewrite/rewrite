@@ -41,10 +41,12 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
@@ -232,7 +234,7 @@ class RecipeSchedulerTest implements RewriteTest {
                     @Override
                     protected void recordSourceFileResultAndSearchResults(
                             @Nullable SourceFile before, @Nullable SourceFile after,
-                            java.util.Stack<Recipe> recipeStack, ExecutionContext ctx) {
+                            List<Recipe> recipeStack, ExecutionContext ctx) {
                         if (before instanceof PlainText) {
                             beforeContents.add(((PlainText) before).getText());
                         }
@@ -264,6 +266,31 @@ class RecipeSchedulerTest implements RewriteTest {
     }
 
     @Test
+    void firesRecipeTimeoutWhenCycleExceedsRunTimeout() {
+        AtomicReference<Throwable> timedOut = new AtomicReference<>();
+        var ctx = new InMemoryExecutionContext(
+          t -> {
+          },
+          Duration.ZERO,
+          (t, c) -> timedOut.set(t));
+        rewriteRun(
+          spec -> spec
+            .executionContext(ctx)
+            .recipe(toRecipe(() -> new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    return text.withText("changed");
+                }
+            })),
+          // No "after": a zero run timeout fires before any edit, so the file is left unchanged.
+          text("hello")
+        );
+        assertThat(timedOut.get())
+          .as("onTimeout should be invoked with a RecipeTimeoutException once the cycle exceeds the run timeout")
+          .isInstanceOf(RecipeTimeoutException.class);
+    }
+
+    @Test
     void recordsGeneratedSourceFiles() {
         List<String> generatedPaths = new java.util.ArrayList<>();
 
@@ -279,7 +306,7 @@ class RecipeSchedulerTest implements RewriteTest {
                     @Override
                     protected void recordSourceFileResultAndSearchResults(
                             @Nullable SourceFile before, @Nullable SourceFile after,
-                            java.util.Stack<Recipe> recipeStack, ExecutionContext ctx) {
+                            List<Recipe> recipeStack, ExecutionContext ctx) {
                         // Track files that were generated (before is null)
                         if (before == null && after != null) {
                             generatedPaths.add(after.getSourcePath().toString());

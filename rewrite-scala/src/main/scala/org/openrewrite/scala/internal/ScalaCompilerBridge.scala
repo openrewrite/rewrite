@@ -45,6 +45,32 @@ class ScalaCompilerBridge {
   }
 
   /**
+   * Creates a fully configured compiler context on a new `ContextBase`:
+   * Scala 2 compat source version, `postfixOps`, the given reporter, and
+   * (when non-empty) output directory and classpath.
+   */
+  private def configuredContext(reporter: StoreReporter, classpath: String, outputDir: String = null): Context = {
+    val fresh = new ParsingDriver().getInitialContext.fresh
+    // Accept both Scala 2 and Scala 3 syntax (including indentation-based).
+    fresh.setSetting(fresh.settings.source, "3.6-migration")
+    // Enable `postfixOps` so the parser emits `PostfixOp` AST nodes for trailing
+    // postfix calls (e.g., `xs filter p list`). Without this, Dotty's parser
+    // silently drops the trailing token rather than emitting an AST node.
+    fresh.setSetting(fresh.settings.language, List(
+      new dotty.tools.dotc.config.Settings.Setting.ChoiceWithHelp[String]("postfixOps", "")
+    ))
+    fresh.setReporter(reporter)
+    // Send compiler output to a designated dir so .class files don't pollute cwd.
+    if (outputDir != null) {
+      fresh.setSetting(fresh.settings.outputDir, dotty.tools.io.AbstractFile.getDirectory(outputDir))
+    }
+    if (classpath.nonEmpty) {
+      fresh.setSetting(fresh.settings.classpath, classpath)
+    }
+    fresh
+  }
+
+  /**
    * Batch-compile multiple Scala source files through the typer phase.
    * Returns a map from path to ScalaParseResult, each containing both the
    * untyped tree (for formatting fidelity) and the typed tree (for type info).
@@ -54,53 +80,45 @@ class ScalaCompilerBridge {
   def compileAll(sources: JList[SourceEntry], classpath: JList[String], outputDir: String = null): JMap[String, ScalaParseResult] = {
     val results = new HashMap[String, ScalaParseResult]()
 
-    val driver = new ParsingDriver()
-    val baseCtx: Context = driver.getInitialContext
-
     // Buffer diagnostics in-memory so they don't leak to stderr via Dotty's default ConsoleReporter.
     val storeReporter = new StoreReporter(null)
 
-    // Configure source version, output directory, and classpath.
-    val configuredCtx: Context = {
-      val fresh = baseCtx.fresh
-      // Accept both Scala 2 and Scala 3 syntax (including indentation-based).
-      fresh.setSetting(fresh.settings.source, "3.6-migration")
-      // Enable `postfixOps` so the parser emits `PostfixOp` AST nodes for trailing
-      // postfix calls (e.g., `xs filter p list`). Without this, Dotty's parser
-      // silently drops the trailing token rather than emitting an AST node.
-      fresh.setSetting(fresh.settings.language, List(
-        new dotty.tools.dotc.config.Settings.Setting.ChoiceWithHelp[String]("postfixOps", "")
-      ))
-      fresh.setReporter(storeReporter)
-      // Send compiler output to a designated dir so .class files don't pollute cwd.
-      if (outputDir != null) {
-        fresh.setSetting(fresh.settings.outputDir, dotty.tools.io.AbstractFile.getDirectory(outputDir))
-      }
-      val cpString = ScalaCompilerBridge.buildClasspath(classpath)
-      if (cpString.nonEmpty) {
-        fresh.setSetting(fresh.settings.classpath, cpString)
-      }
-      fresh
-    }
+    val cpString = ScalaCompilerBridge.buildClasspath(classpath)
+    val configuredCtx: Context = configuredContext(storeReporter, cpString, outputDir)
 
     // Create the Run up front. Run construction initializes Definitions and
     // ContextBase state (e.g., `ctx.base.TypeBoundsEmpty`) that the parser
     // requires when it sees `A with B` types — those go through
-    // `untpd.makeAndType` → `Definitions.andType`, which would NPE on an
-    // uninitialized base. Parsing under `run.runContext` keeps that path safe.
+    // `untpd.makeAndType` → `Definitions.andType`, which would throw
+    // MissingCoreLibraryException on an uninitialized base. Parsing under
+    // `run.runContext` keeps that path safe.
     //
-    // Run construction requires the Scala stdlib on the classpath (to resolve
-    // `scala.Any`, etc.). Some callers (e.g. ScalaTemplate-style usage that
-    // intentionally narrows the classpath) supply none, so fall back to the
-    // configured base context if Run init fails. Code paths that don't hit
-    // `with` types continue to parse fine; `with` types will fail loudly.
-    val compiler = new Compiler()
+    // Run construction requires the Scala stdlib on dotty's classpath (to
+    // resolve `scala.Any`, etc.). When the caller's classpath lacks it — or
+    // overrides dotty's default lookup, as in a fat-jar environment — retry
+    // with the compiler's own core library jars (located via ProtectionDomain)
+    // appended, but use the resulting Run for *parsing only*: callers that
+    // narrow the classpath (e.g. ScalaTemplate) do so to avoid type
+    // resolution, so type attribution stays off for them; they only need the
+    // initialized ContextBase so `with` types parse. The retry needs an
+    // entirely new context: the failed attempt has already initialized (and
+    // cached) the ContextBase's platform classpath, so updating the setting
+    // on a `fresh` of the same base would have no effect. Only if the retry
+    // also fails do we fall back to a bare context, where `with` types fail
+    // per-file.
     val (runOpt, parseContext): (Option[Run], Context) =
       try {
-        val r = compiler.newRun(using configuredCtx)
+        val r = (new Compiler()).newRun(using configuredCtx)
         (Some(r), r.runContext)
       } catch {
-        case _: Throwable => (None, configuredCtx)
+        case _: Throwable =>
+          try {
+            val healedCp = ScalaCompilerBridge.appendStdlib(cpString)
+            val r = (new Compiler()).newRun(using configuredContext(storeReporter, healedCp, outputDir))
+            (None, r.runContext)
+          } catch {
+            case _: Throwable => (None, configuredCtx)
+          }
       }
     given ctx: Context = parseContext
 
@@ -111,15 +129,22 @@ class ScalaCompilerBridge {
     val srcIter = sources.iterator()
     while (srcIter.hasNext) {
       val entry = srcIter.next()
-      val parsed = parseOne(entry.path, entry.content)
+      try {
+        val parsed = parseOne(entry.path, entry.content)
 
-      results.put(entry.path, buildResult(parsed, new ArrayList[ScalaWarning]()))
+        results.put(entry.path, buildResult(parsed, new ArrayList[ScalaWarning]()))
 
-      // Track unit for batch type-checking. The *raw* parsed tree (pre-unwrap)
-      // is what the typer needs — it's the form the parser actually produced.
-      parsed.unit.untpdTree = parsed.rawTree
-      units.add(parsed.unit)
-      sourceEntries.add(entry)
+        // Track unit for batch type-checking. The *raw* parsed tree (pre-unwrap)
+        // is what the typer needs — it's the form the parser actually produced.
+        parsed.unit.untpdTree = parsed.rawTree
+        units.add(parsed.unit)
+        sourceEntries.add(entry)
+      } catch {
+        case _: Throwable =>
+          // Leave this entry out of the results so the caller falls back to a
+          // single-file parse, surfacing the failure as a ParseError for this
+          // file only instead of aborting the whole batch.
+      }
     }
 
     // Phase 2: Attempt batch type-checking (only if we managed to create a Run).
@@ -200,27 +225,23 @@ class ScalaCompilerBridge {
     // Buffer diagnostics in-memory so they don't leak to stderr via Dotty's default ConsoleReporter.
     val storeReporter = new StoreReporter(null)
 
-    // Create our custom driver and get a proper context with Scala 2 compat.
+    val configuredCtx: Context = configuredContext(storeReporter, "")
+
     // Best-effort Run init so `ctx.base` is wired up for `A with B` parsing
-    // (which goes through `Definitions.andType` and NPEs on a bare context);
-    // fall back to the raw context if no Scala stdlib is on the classpath.
-    val driver = new ParsingDriver()
-    val configuredCtx: Context = {
-      val fresh = driver.getInitialContext.fresh
-      fresh.setSetting(fresh.settings.source, "3.6-migration")
-      // Enable `postfixOps` so the parser emits `PostfixOp` AST nodes for trailing
-      // postfix calls (e.g., `xs filter p list`). Without this, Dotty's parser
-      // silently drops the trailing token rather than emitting an AST node.
-      fresh.setSetting(fresh.settings.language, List(
-        new dotty.tools.dotc.config.Settings.Setting.ChoiceWithHelp[String]("postfixOps", "")
-      ))
-      fresh.setReporter(storeReporter)
-      fresh
-    }
+    // (which goes through `Definitions.andType` and throws on a bare context).
+    // Same self-heal as compileAll: when dotty's default classpath lookup
+    // can't find the stdlib (fat-jar environments), retry Run construction on
+    // a new context with the compiler's own core library jars; only then
+    // degrade to the bare context, where `A with B` types fail to parse.
     given Context = try {
       (new Compiler()).newRun(using configuredCtx).runContext
     } catch {
-      case _: Throwable => configuredCtx
+      case _: Throwable =>
+        try {
+          (new Compiler()).newRun(using configuredContext(storeReporter, ScalaCompilerBridge.appendStdlib(""))).runContext
+        } catch {
+          case _: Throwable => configuredCtx
+        }
     }
 
     val parsed = parseOne(path, content)
@@ -359,17 +380,37 @@ object ScalaCompilerBridge {
       }
     }
     if (hasScalaArtifact) {
-      for (cls <- StdlibProbeClasses) {
-        locateJar(cls).foreach { jar =>
-          if (!present.contains(fileName(jar))) {
-            if (sb.nonEmpty) sb.append(File.pathSeparator)
-            sb.append(jar)
-            present.add(fileName(jar))
-          }
+      appendStdlibTo(sb, present)
+    }
+    sb.toString()
+  }
+
+  /**
+   * Append the compiler's own core library jars (located via `ProtectionDomain`)
+   * to an existing classpath string, skipping entries already present. Used to
+   * retry `Run` construction when the configured classpath lacks the Scala
+   * stdlib that dotty's `Definitions` needs to initialize.
+   */
+  private[internal] def appendStdlib(cpString: String): String = {
+    val sb = new StringBuilder(cpString)
+    val present = new LinkedHashSet[String]()
+    if (cpString.nonEmpty) {
+      cpString.split(File.pathSeparator).foreach(e => if (e.nonEmpty) present.add(fileName(e)))
+    }
+    appendStdlibTo(sb, present)
+    sb.toString()
+  }
+
+  private def appendStdlibTo(sb: StringBuilder, present: LinkedHashSet[String]): Unit = {
+    for (cls <- StdlibProbeClasses) {
+      locateJar(cls).foreach { jar =>
+        if (!present.contains(fileName(jar))) {
+          if (sb.nonEmpty) sb.append(File.pathSeparator)
+          sb.append(jar)
+          present.add(fileName(jar))
         }
       }
     }
-    sb.toString()
   }
 
   private def isScalaArtifact(fileName: String): Boolean = {

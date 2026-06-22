@@ -284,8 +284,6 @@ public class KotlinParser implements Parser {
         @Nullable
         private JavaTypeFactory typeFactory;
 
-        private JavaTypeFactory.@Nullable Provider typeFactoryProvider;
-
         private boolean logCompilationWarningsAndErrors;
         private final List<NamedStyles> styles = new ArrayList<>();
         private String moduleName = "main";
@@ -305,7 +303,6 @@ public class KotlinParser implements Parser {
             this.dependsOn = base.dependsOn;
             this.typeCache = base.typeCache;
             this.typeFactory = base.typeFactory;
-            this.typeFactoryProvider = base.typeFactoryProvider;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
             this.moduleName = base.moduleName;
@@ -377,8 +374,8 @@ public class KotlinParser implements Parser {
         }
 
         /**
-         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} or
-         * {@link #typeFactoryProvider} instead. The cache becomes an implementation
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} instead.
+         * The cache becomes an implementation
          * detail of the default {@link org.openrewrite.java.internal.DefaultJavaTypeFactory}.
          */
         @Deprecated
@@ -390,12 +387,6 @@ public class KotlinParser implements Parser {
         @SuppressWarnings("unused")
         public Builder typeFactory(JavaTypeFactory typeFactory) {
             this.typeFactory = typeFactory;
-            return this;
-        }
-
-        @SuppressWarnings("unused")
-        public Builder typeFactoryProvider(JavaTypeFactory.Provider provider) {
-            this.typeFactoryProvider = provider;
             return this;
         }
 
@@ -428,9 +419,6 @@ public class KotlinParser implements Parser {
         public KotlinParser build() {
             Collection<Path> cp = resolvedClasspath();
             JavaTypeFactory factory = typeFactory;
-            if (factory == null && typeFactoryProvider != null) {
-                factory = typeFactoryProvider.create(cp == null ? new ArrayList<>() : new ArrayList<>(cp), null);
-            }
             if (factory == null) {
                 factory = new DefaultJavaTypeFactory(typeCache);
             }

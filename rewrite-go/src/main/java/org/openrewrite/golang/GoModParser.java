@@ -26,8 +26,9 @@ import org.openrewrite.golang.marker.GoResolutionResult.Replace;
 import org.openrewrite.golang.marker.GoResolutionResult.ResolvedDependency;
 import org.openrewrite.golang.marker.GoResolutionResult.Retract;
 import org.openrewrite.golang.marker.GoResolutionResult.Require;
+import org.openrewrite.golang.rpc.GoRewriteRpc;
+import org.openrewrite.golang.tree.GoMod;
 import org.openrewrite.text.PlainText;
-import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -104,21 +105,37 @@ public class GoModParser implements Parser {
     private static final Pattern GO_SUM_LINE = Pattern.compile(
             "^\\s*(\\S+)\\s+(\\S+?)(/go\\.mod)?\\s+h1:(\\S+)\\s*$");
 
-    private final PlainTextParser delegate = new PlainTextParser();
-
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        return delegate.parseInputs(sources, relativeTo, ctx).map(sf -> {
-            if (!(sf instanceof PlainText)) {
-                return sf;
-            }
-            PlainText pt = (PlainText) sf;
-            GoResolutionResult marker = parseMarker(pt);
-            if (marker == null) {
-                return sf;
-            }
-            return pt.withMarkers(pt.getMarkers().addIfAbsent(marker));
-        });
+        // Parse on the Go side (via golang.org/x/mod/modfile) into a lossless GoMod LST.
+        // The Go server attaches the GoResolutionResult marker during parsing.
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        return rpc.parse(sources, relativeTo, this, GoMod.class.getName(), ctx)
+                .map(GoModParser::withSumHashes);
+    }
+
+    /**
+     * Enrich the {@link GoResolutionResult} marker with hashes from a sibling
+     * {@code go.sum}, if one is readable on disk next to the go.mod. The Go-side
+     * parser only sees go.mod content (sources travel as strings over RPC), so
+     * go.sum resolution stays here.
+     */
+    private static SourceFile withSumHashes(SourceFile sf) {
+        if (!(sf instanceof GoMod)) {
+            return sf;
+        }
+        GoMod gm = (GoMod) sf;
+        return gm.getMarkers().findFirst(GoResolutionResult.class)
+                .filter(marker -> marker.getModulePath() != null && !marker.getModulePath().isEmpty())
+                .map(marker -> {
+                    List<ResolvedDependency> resolved = parseSumSibling(gm.getSourcePath());
+                    if (resolved.isEmpty()) {
+                        return sf;
+                    }
+                    return (SourceFile) gm.withMarkers(
+                            gm.getMarkers().setByType(marker.withResolvedDependencies(resolved)));
+                })
+                .orElse(sf);
     }
 
     @Override
@@ -354,7 +371,7 @@ public class GoModParser implements Parser {
 
     public static class Builder extends Parser.Builder {
         public Builder() {
-            super(PlainText.class);
+            super(GoMod.class);
         }
 
         @Override

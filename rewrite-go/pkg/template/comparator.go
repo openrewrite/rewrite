@@ -130,12 +130,12 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 		return c.matchStatementList(p.Statements, cand.Statements)
 	case *java.Return:
 		cand := candidate.(*java.Return)
+		return c.matchNode(p.Expression, cand.Expression)
+	case *golang.Return:
+		cand := candidate.(*golang.Return)
 		return c.matchExpressionRightPaddedList(p.Expressions, cand.Expressions)
 	case *java.If:
 		cand := candidate.(*java.If)
-		if !c.matchOptionalRightPaddedStmt(p.Init, cand.Init) {
-			return false
-		}
 		if !c.matchNode(p.Condition, cand.Condition) {
 			return false
 		}
@@ -143,6 +143,12 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 			return false
 		}
 		return c.matchOptionalRightPaddedJ(p.ElsePart, cand.ElsePart)
+	case *golang.StatementWithInit:
+		cand := candidate.(*golang.StatementWithInit)
+		if !c.matchNode(p.Init.Element, cand.Init.Element) {
+			return false
+		}
+		return c.matchNode(p.Statement, cand.Statement)
 	case *java.Else:
 		cand := candidate.(*java.Else)
 		return c.matchNode(cand.Body.Element, p.Body.Element)
@@ -152,6 +158,9 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 			return false
 		}
 		return c.matchOptionalNode(p.Body, cand.Body)
+	case *golang.MethodDeclaration:
+		cand := candidate.(*golang.MethodDeclaration)
+		return c.matchNode(p.Declaration, cand.Declaration)
 	case *java.VariableDeclarations:
 		cand := candidate.(*java.VariableDeclarations)
 		if !c.matchOptionalExpression(p.TypeExpr, cand.TypeExpr) {
@@ -197,7 +206,10 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 		return c.matchNode(p.Index.Element, cand.Index.Element)
 	case *java.ArrayType:
 		cand := candidate.(*java.ArrayType)
-		if !c.matchOptionalExpression(p.Length, cand.Length) {
+		return c.matchNode(p.ElementType, cand.ElementType)
+	case *golang.ArrayType:
+		cand := candidate.(*golang.ArrayType)
+		if !c.matchNode(p.Length.Element, cand.Length.Element) {
 			return false
 		}
 		return c.matchNode(p.ElementType, cand.ElementType)
@@ -225,18 +237,10 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 			c.matchNode(p.Body, cand.Body)
 	case *java.ForEachControl:
 		cand := candidate.(*java.ForEachControl)
-		if !c.matchOptionalRightPaddedExpr2(p.Key, cand.Key) {
-			return false
-		}
-		if !c.matchOptionalRightPaddedExpr2(p.Value, cand.Value) {
-			return false
-		}
-		return c.matchNode(p.Iterable, cand.Iterable)
+		return c.matchNode(p.Variable.Element, cand.Variable.Element) &&
+			c.matchNode(p.Iterable.Element, cand.Iterable.Element)
 	case *java.Switch:
 		cand := candidate.(*java.Switch)
-		if !c.matchOptionalRightPaddedStmt(p.Init, cand.Init) {
-			return false
-		}
 		if !c.matchOptionalRightPaddedExpr(p.Tag, cand.Tag) {
 			return false
 		}
@@ -436,10 +440,6 @@ func (c *patternComparator) matchOptionalRightPaddedExpr(pattern, candidate *jav
 		return false
 	}
 	return c.matchNode(pattern.Element, candidate.Element)
-}
-
-func (c *patternComparator) matchOptionalRightPaddedExpr2(pattern, candidate *java.RightPadded[java.Expression]) bool {
-	return c.matchOptionalRightPaddedExpr(pattern, candidate)
 }
 
 func (c *patternComparator) matchOptionalRightPaddedJ(pattern, candidate *java.RightPadded[java.J]) bool {

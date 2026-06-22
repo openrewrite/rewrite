@@ -24,6 +24,7 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.internal.grammar.XMLParserBaseVisitor;
+import org.openrewrite.xml.marker.HtmlVoidElement;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
@@ -331,10 +332,19 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     List<Content> content = null;
                     String beforeTagDelimiterPrefix;
                     Xml.Tag.Closing closeTag = null;
+                    Markers markers = Markers.EMPTY;
 
                     if (ctx.SLASH_CLOSE() != null) {
                         beforeTagDelimiterPrefix = prefix(ctx.SLASH_CLOSE());
                         advanceCursor(ctx.SLASH_CLOSE().getSymbol().getStopIndex() + 1);
+                    } else if (ctx.voidClose() != null) {
+                        // HTML void element written without a self-closing slash, e.g. <br>.
+                        // It has no content and no closing tag, but prints with a bare '>'.
+                        beforeTagDelimiterPrefix = ctx.CLOSE(0) == null ? "" : prefix(ctx.CLOSE(0));
+                        if (ctx.CLOSE(0) != null) {
+                            advanceCursor(ctx.CLOSE(0).getSymbol().getStopIndex() + 1);
+                        }
+                        markers = markers.add(new HtmlVoidElement(randomId()));
                     } else {
                         beforeTagDelimiterPrefix = ctx.CLOSE(0) == null ? "" : prefix(ctx.CLOSE(0));
                         if (ctx.CLOSE(0) != null) {
@@ -367,7 +377,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         }
                     }
 
-                    return new Xml.Tag(randomId(), prefix, Markers.EMPTY, name, attributes,
+                    return new Xml.Tag(randomId(), prefix, markers, name, attributes,
                             content, closeTag, beforeTagDelimiterPrefix);
                 }
         );

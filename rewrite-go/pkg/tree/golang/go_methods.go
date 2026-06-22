@@ -190,6 +190,54 @@ func (n *MultiAssignment) WithID(id uuid.UUID) java.J {
 func (n *MultiAssignment) GetPrefix() java.Space    { return n.Prefix }
 func (n *MultiAssignment) GetMarkers() java.Markers { return n.Markers }
 
+func (n *Return) GetID() uuid.UUID { return n.ID }
+func (n *Return) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *Return) GetPrefix() java.Space    { return n.Prefix }
+func (n *Return) GetMarkers() java.Markers { return n.Markers }
+
+func (n *MethodDeclaration) GetID() uuid.UUID { return n.ID }
+func (n *MethodDeclaration) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *MethodDeclaration) GetPrefix() java.Space    { return n.Prefix }
+func (n *MethodDeclaration) GetMarkers() java.Markers { return n.Markers }
+
+func (n *StatementWithInit) GetID() uuid.UUID { return n.ID }
+func (n *StatementWithInit) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *StatementWithInit) GetPrefix() java.Space    { return n.Prefix }
+func (n *StatementWithInit) GetMarkers() java.Markers { return n.Markers }
+
+func (n *ArrayType) GetID() uuid.UUID { return n.ID }
+func (n *ArrayType) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *ArrayType) GetPrefix() java.Space    { return n.Prefix }
+func (n *ArrayType) GetMarkers() java.Markers { return n.Markers }
+
 func (n *PointerType) GetID() uuid.UUID { return n.ID }
 func (n *PointerType) WithID(id uuid.UUID) java.J {
 	if n.ID == id {
@@ -309,6 +357,18 @@ func (n *TypeDecl) WithID(id uuid.UUID) java.J {
 }
 func (n *TypeDecl) GetPrefix() java.Space    { return n.Prefix }
 func (n *TypeDecl) GetMarkers() java.Markers { return n.Markers }
+
+func (n *DeclarationBlock) GetID() uuid.UUID { return n.ID }
+func (n *DeclarationBlock) WithID(id uuid.UUID) java.J {
+	if n.ID == id {
+		return n
+	}
+	c := *n
+	c.ID = id
+	return &c
+}
+func (n *DeclarationBlock) GetPrefix() java.Space    { return n.Prefix }
+func (n *DeclarationBlock) GetMarkers() java.Markers { return n.Markers }
 
 func (n *TypeList) GetID() uuid.UUID { return n.ID }
 func (n *TypeList) WithID(id uuid.UUID) java.J {

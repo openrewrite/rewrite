@@ -504,6 +504,56 @@ public open class EditScope internal constructor() : LanguageHost() {
     @Suppress("UNUSED_PARAMETER")
     public fun <P1, P2, R> rewrite(first: (P1, P2) -> R, vararg rest: (P1, P2) -> R): RewriteAdvice2<P1, P2, R> = pluginRequired()
 
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, R> rewrite(before: (P1, P2, P3) -> R): RewriteAdvice3<P1, P2, P3, R> = pluginRequired()
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, R> rewrite(first: (P1, P2, P3) -> R, vararg rest: (P1, P2, P3) -> R): RewriteAdvice3<P1, P2, P3, R> = pluginRequired()
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, R> rewrite(before: (P1, P2, P3, P4) -> R): RewriteAdvice4<P1, P2, P3, P4, R> = pluginRequired()
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, R> rewrite(first: (P1, P2, P3, P4) -> R, vararg rest: (P1, P2, P3, P4) -> R): RewriteAdvice4<P1, P2, P3, P4, R> = pluginRequired()
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, R> rewrite(before: (P1, P2, P3, P4, P5) -> R): RewriteAdvice5<P1, P2, P3, P4, P5, R> = pluginRequired()
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, R> rewrite(first: (P1, P2, P3, P4, P5) -> R, vararg rest: (P1, P2, P3, P4, P5) -> R): RewriteAdvice5<P1, P2, P3, P4, P5, R> = pluginRequired()
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, R> rewrite(before: (P1, P2, P3, P4, P5, P6) -> R): RewriteAdvice6<P1, P2, P3, P4, P5, P6, R> = pluginRequired()
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, R> rewrite(first: (P1, P2, P3, P4, P5, P6) -> R, vararg rest: (P1, P2, P3, P4, P5, P6) -> R): RewriteAdvice6<P1, P2, P3, P4, P5, P6, R> = pluginRequired()
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, P7, R> rewrite(before: (P1, P2, P3, P4, P5, P6, P7) -> R): RewriteAdvice7<P1, P2, P3, P4, P5, P6, P7, R> = pluginRequired()
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, P7, R> rewrite(first: (P1, P2, P3, P4, P5, P6, P7) -> R, vararg rest: (P1, P2, P3, P4, P5, P6, P7) -> R): RewriteAdvice7<P1, P2, P3, P4, P5, P6, P7, R> = pluginRequired()
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, P7, P8, R> rewrite(before: (P1, P2, P3, P4, P5, P6, P7, P8) -> R): RewriteAdvice8<P1, P2, P3, P4, P5, P6, P7, P8, R> = pluginRequired()
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, P7, P8, R> rewrite(first: (P1, P2, P3, P4, P5, P6, P7, P8) -> R, vararg rest: (P1, P2, P3, P4, P5, P6, P7, P8) -> R): RewriteAdvice8<P1, P2, P3, P4, P5, P6, P7, P8, R> = pluginRequired()
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, P7, P8, P9, R> rewrite(before: (P1, P2, P3, P4, P5, P6, P7, P8, P9) -> R): RewriteAdvice9<P1, P2, P3, P4, P5, P6, P7, P8, P9, R> = pluginRequired()
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, P7, P8, P9, R> rewrite(first: (P1, P2, P3, P4, P5, P6, P7, P8, P9) -> R, vararg rest: (P1, P2, P3, P4, P5, P6, P7, P8, P9) -> R): RewriteAdvice9<P1, P2, P3, P4, P5, P6, P7, P8, P9, R> = pluginRequired()
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, R> rewrite(before: (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10) -> R): RewriteAdvice10<P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, R> = pluginRequired()
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, R> rewrite(first: (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10) -> R, vararg rest: (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10) -> R): RewriteAdvice10<P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, R> = pluginRequired()
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, R> rewrite(before: (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11) -> R): RewriteAdvice11<P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, R> = pluginRequired()
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, R> rewrite(first: (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11) -> R, vararg rest: (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11) -> R): RewriteAdvice11<P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, R> = pluginRequired()
+
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, R> rewrite(before: (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12) -> R): RewriteAdvice12<P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, R> = pluginRequired()
+    @Suppress("UNUSED_PARAMETER")
+    public fun <P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, R> rewrite(first: (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12) -> R, vararg rest: (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12) -> R): RewriteAdvice12<P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, R> = pluginRequired()
+
     private fun <T> pluginRequired(): T = error(
         "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin. " +
             "Add rewrite-kotlin to `kotlinCompilerPluginClasspath` (plugin id `org.openrewrite.kotlin.recipe`)."
@@ -527,23 +577,109 @@ public open class GenerateScope internal constructor(public val ctx: ExecutionCo
 // rewrite { } to { } type stubs — populated at IR time by the K2 plugin.
 // ---------------------------------------------------------------------------
 
+/**
+ * The result of a `rewrite { } to { }` clause. Exists so the optional
+ * `.strictArity()` opt-out can chain off it: by default a clause whose before
+ * targets a varargs method matches call sites with any number of trailing
+ * arguments (variadic-by-default); `(rewrite { } to { }).strictArity()` pins it
+ * to the exact arity the author wrote. Like the rest of the declarative shape
+ * this is an `error(...)` stub — the K2 plugin rewrites the whole clause at IR
+ * time and this body never runs.
+ */
+@RecipeDsl public class RewriteRule internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public fun strictArity(): Unit = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
+}
+
 @RecipeDsl public class RewriteAdvice0<R> internal constructor() {
     @Suppress("UNUSED_PARAMETER")
-    public infix fun <R2> to(after: () -> R2): Unit = error(
+    public infix fun <R2> to(after: () -> R2): RewriteRule = error(
         "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
     )
 }
 
 @RecipeDsl public class RewriteAdvice1<P, R> internal constructor() {
     @Suppress("UNUSED_PARAMETER")
-    public infix fun <R2> to(after: (P) -> R2): Unit = error(
+    public infix fun <R2> to(after: (P) -> R2): RewriteRule = error(
         "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
     )
 }
 
 @RecipeDsl public class RewriteAdvice2<P1, P2, R> internal constructor() {
     @Suppress("UNUSED_PARAMETER")
-    public infix fun <R2> to(after: (P1, P2) -> R2): Unit = error(
+    public infix fun <R2> to(after: (P1, P2) -> R2): RewriteRule = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
+}
+
+@RecipeDsl public class RewriteAdvice3<P1, P2, P3, R> internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public infix fun <R2> to(after: (P1, P2, P3) -> R2): RewriteRule = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
+}
+
+@RecipeDsl public class RewriteAdvice4<P1, P2, P3, P4, R> internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public infix fun <R2> to(after: (P1, P2, P3, P4) -> R2): RewriteRule = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
+}
+
+@RecipeDsl public class RewriteAdvice5<P1, P2, P3, P4, P5, R> internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public infix fun <R2> to(after: (P1, P2, P3, P4, P5) -> R2): RewriteRule = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
+}
+
+@RecipeDsl public class RewriteAdvice6<P1, P2, P3, P4, P5, P6, R> internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public infix fun <R2> to(after: (P1, P2, P3, P4, P5, P6) -> R2): RewriteRule = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
+}
+
+@RecipeDsl public class RewriteAdvice7<P1, P2, P3, P4, P5, P6, P7, R> internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public infix fun <R2> to(after: (P1, P2, P3, P4, P5, P6, P7) -> R2): RewriteRule = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
+}
+
+@RecipeDsl public class RewriteAdvice8<P1, P2, P3, P4, P5, P6, P7, P8, R> internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public infix fun <R2> to(after: (P1, P2, P3, P4, P5, P6, P7, P8) -> R2): RewriteRule = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
+}
+
+@RecipeDsl public class RewriteAdvice9<P1, P2, P3, P4, P5, P6, P7, P8, P9, R> internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public infix fun <R2> to(after: (P1, P2, P3, P4, P5, P6, P7, P8, P9) -> R2): RewriteRule = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
+}
+
+@RecipeDsl public class RewriteAdvice10<P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, R> internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public infix fun <R2> to(after: (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10) -> R2): RewriteRule = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
+}
+
+@RecipeDsl public class RewriteAdvice11<P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, R> internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public infix fun <R2> to(after: (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11) -> R2): RewriteRule = error(
+        "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
+    )
+}
+
+@RecipeDsl public class RewriteAdvice12<P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12, R> internal constructor() {
+    @Suppress("UNUSED_PARAMETER")
+    public infix fun <R2> to(after: (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10, P11, P12) -> R2): RewriteRule = error(
         "Recipe DSL: `rewrite { } to { }` requires the rewrite-kotlin K2 compiler plugin.",
     )
 }

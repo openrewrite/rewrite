@@ -425,6 +425,12 @@ def handle_parse(params: dict) -> List[str]:
     # Absent for older clients; absent or unknown keys are silently ignored.
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
+    # Path to a virtual environment with the project's dependencies installed,
+    # provisioned and forwarded by the caller (the CLI build step in production;
+    # a test/template helper in-repo). Points ty-types at the deps so supertypes
+    # reaching into third-party packages resolve (e.g. a first-party class
+    # extending pydantic.BaseModel). The handler never provisions deps itself.
+    dependency_path = params.get('dependencyPath')
     results = []
 
     # If no relativeTo provided, try to infer from absolute input paths
@@ -442,7 +448,9 @@ def handle_parse(params: dict) -> List[str]:
     tmpdir = None
     try:
         from rewrite.python.ty_client import TyTypesClient
-        ty_client = TyTypesClient()
+        # Point ty-types at the caller-provisioned dependency environment (if any)
+        # so supertypes reaching into third-party packages resolve.
+        ty_client = TyTypesClient(virtual_env=dependency_path)
         if relative_to:
             ty_client.initialize(relative_to)
         else:
@@ -505,6 +513,8 @@ def handle_parse_project(params: dict) -> List[dict]:
     # Per-request explicit override (mirror of the Parse RPC options carrier).
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
+    # Caller-provisioned dependency environment for ty-types (see handle_parse).
+    dependency_path = params.get('dependencyPath')
 
     # Resolve project-level language version once for the whole walk; each
     # file may still override it via in-source signals inside parse_python_source.
@@ -516,7 +526,9 @@ def handle_parse_project(params: dict) -> List[dict]:
     ty_client = None
     try:
         from rewrite.python.ty_client import TyTypesClient
-        ty_client = TyTypesClient()
+        # Point ty-types at the caller-provisioned dependency environment (if any)
+        # so supertypes reaching into third-party packages resolve.
+        ty_client = TyTypesClient(virtual_env=dependency_path)
         ty_client.initialize(project_path)
     except (ImportError, RuntimeError):
         pass
@@ -655,6 +667,7 @@ def handle_reset(params: dict) -> bool:
     remote_objects.clear()
     remote_refs.clear()
     _prepared_recipes.clear()
+    _delegating_recipes.clear()
     _prepared_editor_overrides.clear()
     _prepared_edit_preconditions.clear()
     _execution_contexts.clear()
@@ -723,8 +736,18 @@ def _pip_install_recipe_package(package_name: str, version: Optional[str], targe
     import subprocess
 
     target_dir.mkdir(parents=True, exist_ok=True)
-    spec = f"{package_name}=={version}" if version else package_name
-    cmd = [sys.executable, "-m", "pip", "install", "--target", str(target_dir), spec]
+    # Accept a full PEP 440 specifier (">=1.0", "~=1.4", "==1.0", …). A bare
+    # version (no comparator) defaults to an exact "==" match.
+    if version:
+        spec = f"{package_name}{version}" if version[0] in "=<>!~" else f"{package_name}=={version}"
+    else:
+        spec = package_name
+    # --upgrade is required: `pip install --target` refuses to replace an
+    # already-populated package directory without it, otherwise leaving stale
+    # files from a previously-installed version. The caller only reaches here
+    # for a version not already present (see handle_install_recipes), so this
+    # is the version-change path that must overwrite cleanly.
+    cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "--target", str(target_dir), spec]
     logger.info(f"pip install: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -738,17 +761,48 @@ def _pip_install_recipe_package(package_name: str, version: Optional[str], targe
     importlib.invalidate_caches()
 
 
+def _pip_install_local_path(local_path: Path, target_dir: Path) -> None:
+    import importlib
+    import subprocess
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    # Local recipe sources are mutable, so --force-reinstall picks up changed
+    # content even when the version is unchanged, and --upgrade lets pip replace
+    # the existing files under --target (which it otherwise refuses to do).
+    # `pip install <path>` also resolves and installs the local package's
+    # dependencies — a Python source dir, unlike a packaged npm/NuGet artifact,
+    # does not carry its dependencies alongside it.
+    cmd = [
+        sys.executable, "-m", "pip", "install",
+        "--force-reinstall", "--upgrade",
+        "--target", str(target_dir), str(local_path),
+    ]
+    logger.info(f"pip install: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"pip install failed for {local_path} (target={target_dir}):\n{result.stderr}"
+        )
+
+    target_str = str(target_dir.resolve())
+    if target_str not in sys.path:
+        sys.path.insert(0, target_str)
+    importlib.invalidate_caches()
+
+
 def handle_install_recipes(params: dict) -> dict:
     """Handle an InstallRecipes RPC request.
 
     Activates a recipe package in the marketplace. When `--recipe-install-dir`
-    is configured, a package spec that isn't already installed is pip-installed
-    into that directory before activation; otherwise the package must have been
+    is configured, the package is pip-installed into that directory before
+    activation — a named spec that isn't already installed, or a local path
+    together with its dependencies; otherwise the package must have been
     installed by the caller.
 
     Args:
         params: Dict containing either:
-            - 'recipes': str - A local file path (package already installed to target)
+            - 'recipes': str - A local file path (installed into the recipe-install
+              dir, with its dependencies, when one is configured)
             - 'recipes': {'packageName': str, 'version': str|None} - A package spec
 
     Returns:
@@ -772,9 +826,17 @@ def handle_install_recipes(params: dict) -> dict:
     recipes_added = 0
 
     if isinstance(recipes, str):
-        # Local file path - package should already be installed by caller
+        # Local file path. When a recipe-install dir is configured, install the
+        # local package (and its dependencies) into it before activating — a
+        # Python source dir doesn't carry its deps, so a direct import would fail
+        # for any recipe with third-party dependencies. Without an install dir,
+        # the package must have been provisioned by the caller.
         local_path = Path(recipes)
-        logger.info(f"Activating recipes from local path: {recipes}")
+        if _recipe_install_dir is not None:
+            logger.info(f"Installing recipes from local path: {recipes}")
+            _pip_install_local_path(local_path, _recipe_install_dir)
+        else:
+            logger.info(f"Activating recipes from local path: {recipes}")
 
         # Find and import the package
         # For local paths, we look for the package name from setup.py/pyproject.toml
@@ -1064,6 +1126,26 @@ def _category_descriptor_to_dict(descriptor) -> dict:
     }
 
 
+def _delegate_descriptor(name: str) -> dict:
+    """Minimal stand-in descriptor for a recipe the host resolves locally via a delegatesTo
+    response. The host reads only delegatesTo for delegated recipes and ignores this descriptor,
+    but the response shape requires one."""
+    return {
+        'name': name,
+        'displayName': name,
+        'description': '',
+        'tags': [],
+        'estimatedEffortPerOccurrence': None,
+        'options': [],
+        'preconditions': [],
+        'recipeList': [],
+        'dataTables': [],
+        'maintainers': [],
+        'contributors': [],
+        'examples': [],
+    }
+
+
 def _recipe_descriptor_to_dict(descriptor) -> dict:
     """Convert a RecipeDescriptor to a dict for JSON serialization."""
     return {
@@ -1106,6 +1188,14 @@ def _serialize_value(value) -> Any:
 
 # Prepared recipes storage - maps recipe IDs to recipe instances
 _prepared_recipes: Dict[str, Any] = {}
+# RpcRecipe references discovered in a composite's recipe_list(), keyed by the
+# referenced recipe id. An RpcRecipe has no Python implementation and no no-arg
+# constructor, so it cannot live in the marketplace. We register it here when a
+# composite is prepared; when the JVM later round-trips PrepareRecipe for the
+# referenced id (from its RpcRecipe.getRecipeList()), handle_prepare_recipe
+# resolves it here and answers with a delegatesTo response so the JVM runs the
+# real recipe natively.
+_delegating_recipes: Dict[str, Any] = {}
 # Cached bare-editor visitors keyed by prepared recipe id. Populated at
 # PrepareRecipe time when recipe.editor() returns a Preconditions.check
 # wrapper: we strip the wrapper, register the precondition's wire identity
@@ -1143,7 +1233,18 @@ def _get_visitor_registry() -> Dict[str, type]:
 
 def _install_sub_recipes(recipe, marketplace) -> None:
     """Ensure sub-recipes from recipe_list() are registered in the marketplace."""
+    from rewrite.rpc.rpc_recipe import RpcRecipe
+
     for sub_recipe in recipe.recipe_list():
+        if isinstance(sub_recipe, RpcRecipe):
+            # An RpcRecipe is a reference to a recipe on another peer, with no
+            # Python implementation and no no-arg constructor, so it can't be
+            # installed in the marketplace. Register it so a later PrepareRecipe
+            # round-trip for its id resolves to it (and answers with
+            # delegatesTo). It has no sub-recipes of its own, so there is nothing
+            # to recurse into.
+            _delegating_recipes[sub_recipe.java_recipe_name] = sub_recipe
+            continue
         if not marketplace.find_recipe(sub_recipe.name):
             marketplace.install(type(sub_recipe), [])
             _install_sub_recipes(sub_recipe, marketplace)
@@ -1178,12 +1279,50 @@ def handle_prepare_recipe(params: dict) -> dict:
 
     logger.debug(f"PrepareRecipe: id={recipe_name}, options={options}")
 
+    # An RpcRecipe referenced from a composite's recipe_list() has no Python
+    # implementation: answer with a delegatesTo response so the JVM instantiates
+    # and runs the real recipe natively (full ScanningRecipe lifecycle,
+    # non-Python source files). See _install_sub_recipes / _delegating_recipes.
+    if recipe_name in _delegating_recipes:
+        recipe = _delegating_recipes[recipe_name]
+        prepared_id = generate_id()
+        _prepared_recipes[prepared_id] = recipe
+        return {
+            'id': prepared_id,
+            'descriptor': _recipe_descriptor_to_dict(recipe.descriptor()),
+            'editVisitor': f'edit:{prepared_id}',
+            'editPreconditions': [],
+            'scanVisitor': None,
+            'scanPreconditions': [],
+            'delegatesTo': {
+                'recipeName': recipe.java_recipe_name,
+                'options': recipe.delegates_to_options,
+            },
+        }
+
     marketplace = _get_marketplace()
 
     # Look up the recipe - returns (RecipeDescriptor, Type[Recipe]) tuple
     recipe_info = marketplace.find_recipe(recipe_name)
     if recipe_info is None:
-        raise ValueError(f"Recipe not found: {recipe_name}")
+        # The host re-prepares every sub-recipe of a composite by id while building
+        # RpcRecipe.getRecipeList(). A sub-recipe that delegates to a Java recipe and was not
+        # captured in _delegating_recipes is not in this marketplace, so a miss means the host
+        # owns this recipe: answer with a delegatesTo response so the JVM resolves the id locally
+        # (the Java recipe is on its classpath), rather than failing with "Recipe not found".
+        prepared_id = generate_id()
+        return {
+            'id': prepared_id,
+            'descriptor': _delegate_descriptor(recipe_name),
+            'editVisitor': f'edit:{prepared_id}',
+            'editPreconditions': [],
+            'scanVisitor': None,
+            'scanPreconditions': [],
+            'delegatesTo': {
+                'recipeName': recipe_name,
+                'options': options,
+            },
+        }
 
     _descriptor, recipe_class = recipe_info
     if recipe_class is None:
@@ -1336,7 +1475,7 @@ def _condition_wire_entry(condition) -> Optional[Dict[str, Any]]:
     intact so the gate runs Python-side as a fallback.
     """
     from rewrite.preconditions import CompositePrecondition, RecipeRef
-    from rewrite.rpc.java_recipe import PreparedJavaRecipe
+    from rewrite.rpc.rpc_recipe import PreparedJavaRecipe
 
     if isinstance(condition, CompositePrecondition):
         operands: List[Dict[str, Any]] = []

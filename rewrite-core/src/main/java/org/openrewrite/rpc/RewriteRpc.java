@@ -293,8 +293,8 @@ public class RewriteRpc {
         String pId = maybeUnwrapExecutionContext(p);
         List<String> cursorIds = getCursorIds(cursor);
 
-        String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
-                .getClass().getName();
+        String sourceFileType = DynamicDispatchRpcCodec.canonicalSourceFileType(
+                (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class)).getClass());
         Supplier<VisitResponse> doSend = () -> send("Visit", new Visit(visitorName, sourceFileType, null,
                 tree.getId().toString(), pId, cursorIds), VisitResponse.class);
         VisitResponse response = p instanceof ExecutionContext
@@ -313,8 +313,8 @@ public class RewriteRpc {
         String pId = maybeUnwrapExecutionContext(p);
         List<String> cursorIds = getCursorIds(cursor);
 
-        String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
-                .getClass().getName();
+        String sourceFileType = DynamicDispatchRpcCodec.canonicalSourceFileType(
+                (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class)).getClass());
         Supplier<BatchVisitResponse> doSend = () -> send("BatchVisit",
                 new BatchVisit(sourceFileType, treeId, pId, cursorIds, visitors),
                 BatchVisitResponse.class);
@@ -556,7 +556,7 @@ public class RewriteRpc {
         String treeId = tree.getId().toString();
         localObjects.put(treeId, tree);
         SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : parent.firstEnclosingOrThrow(SourceFile.class);
-        String sourceFileType = sourceFile.getClass().getName();
+        String sourceFileType = DynamicDispatchRpcCodec.canonicalSourceFileType(sourceFile.getClass());
 
         return send(
                 "Print",

@@ -858,11 +858,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         if (!method.getMarkers().findFirst(CompactConstructor.class).isPresent()) {
             visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
         }
-        for (JLeftPadded<Space> dimension : method.getDimensionsAfterName()) {
-            visitSpace(dimension.getBefore(), Space.Location.DIMENSION_PREFIX, p);
-            p.append('[');
-            visitSpace(dimension.getElement(), Space.Location.DIMENSION, p);
-            p.append(']');
+        // Older LSTs may not have this field
+        //noinspection ConstantValue
+        if (method.getDimensionsAfterName() != null) {
+            for (JLeftPadded<Space> dimension : method.getDimensionsAfterName()) {
+                visitSpace(dimension.getBefore(), Space.Location.DIMENSION_PREFIX, p);
+                p.append('[');
+                visitSpace(dimension.getElement(), Space.Location.DIMENSION, p);
+                p.append(']');
+            }
         }
         visitContainer("throws", method.getPadding().getThrows(), JContainer.Location.THROWS, ",", null, p);
         visit(method.getBody(), p);

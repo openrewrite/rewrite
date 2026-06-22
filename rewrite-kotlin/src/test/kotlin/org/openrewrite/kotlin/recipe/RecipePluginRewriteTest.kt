@@ -24,7 +24,9 @@ import org.openrewrite.java.search.UsesField
 import org.openrewrite.java.search.UsesMethod
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
+import org.openrewrite.test.TypeValidation
 import org.openrewrite.kotlin.Assertions.kotlin
+import org.openrewrite.java.Assertions.java
 
 /**
  * End-to-end recipe execution for the canonical Phase 3 shape:
@@ -1039,6 +1041,256 @@ class RecipePluginRewriteTest : RewriteTest {
         assertThat(r.description).isEqualTo("Test description")
         assertThat(r.getTags()).containsExactlyInAnyOrder("test", "smoke")
         assertThat(r.estimatedEffortPerOccurrence?.toMinutes()).isEqualTo(3L)
+    }
+
+    @Test
+    fun `variadic by-example — asList to List_of matches any arity`() {
+        // The author writes a representative 3-arg shape; because `asList` is a
+        // varargs method the recipe generalizes to ANY arity (2, 4, even 0).
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseListOf = recipe(
+                    displayName = "Use List.of",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { a: Any, b: Any, c: Any -> java.util.Arrays.asList(a, b, c) } to { a, b, c -> java.util.List.of(a, b, c) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseListOf",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            java(
+                """
+                import java.util.Arrays;
+                import java.util.List;
+                class A {
+                    List<Object> two = Arrays.asList(1, 2);
+                    List<Object> four = Arrays.asList(1, 2, 3, 4);
+                    List<Object> none = Arrays.asList();
+                }
+                """.trimIndent(),
+                """
+                import java.util.Arrays;
+                import java.util.List;
+                class A {
+                    List<Object> two = java.util.List.of(1, 2);
+                    List<Object> four = java.util.List.of(1, 2, 3, 4);
+                    List<Object> none = java.util.List.of();
+                }
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `variadic by-example — Kotlin source fixture`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseListOf = recipe(
+                    displayName = "Use List.of",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { a: Any, b: Any, c: Any -> java.util.Arrays.asList(a, b, c) } to { a, b, c -> java.util.List.of(a, b, c) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseListOf",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            kotlin(
+                """
+                fun use() {
+                    java.util.Arrays.asList(1, 2, 3, 4, 5)
+                }
+                """.trimIndent(),
+                """
+                fun use() {
+                    java.util.List.of(1, 2, 3, 4, 5)
+                }
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `variadic spread — asList(star args) to List_of(star args)`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseListOf = recipe(
+                    displayName = "Use List.of",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { args: Array<Any> -> java.util.Arrays.asList(*args) } to { args -> java.util.List.of(*args) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseListOf",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            java(
+                """
+                import java.util.Arrays;
+                import java.util.List;
+                class A {
+                    List<Object> xs = Arrays.asList(1, 2, 3);
+                }
+                """.trimIndent(),
+                """
+                import java.util.Arrays;
+                import java.util.List;
+                class A {
+                    List<Object> xs = java.util.List.of(1, 2, 3);
+                }
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `prefix plus variadic — String_format to formatted`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseFormatted = recipe(
+                    displayName = "Use String.formatted",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { fmt: String, a: Any, b: Any -> java.lang.String.format(fmt, a, b) } to { fmt, a, b -> fmt.formatted(a, b) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseFormatted",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            java(
+                """
+                class A {
+                    String s = String.format("%s %s %s", 1, 2, 3);
+                }
+                """.trimIndent(),
+                """
+                class A {
+                    String s = "%s %s %s".formatted(1, 2, 3);
+                }
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `reorder — move trailing exception ahead of the varargs run`() {
+        // The slf4j-style migration: internal `log(msg, throwable, params...)`
+        // becomes `error(msg, params..., throwable)` — the fixed Throwable
+        // jumps from before the varargs run to after it.
+        val r = loadCompiledRecipe(
+            source = """
+                package demo
+                import org.openrewrite.recipe
+                class Log {
+                    fun internal(msg: String, t: Throwable, vararg params: Any) {}
+                    fun error(msg: String, vararg params: Any) {}
+                }
+                val ReorderLog = recipe(
+                    displayName = "Reorder log args",
+                    description = "..."
+                ) {
+                    edit {
+                        rewrite { log: Log, msg: String, t: Throwable, a: Any, b: Any -> log.internal(msg, t, a, b) } to { log, msg, t, a, b -> log.error(msg, a, b, t) }
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "ReorderLog",
+            packageName = "demo",
+        )
+        rewriteRun(
+            // `Log` is a full source so the before is properly typed and matched.
+            // The rewritten `log.error(...)` still needs method-invocation type
+            // validation relaxed: the generated recipe's JavaTemplate parses the
+            // after template with a JDK-only classpath, so it can't re-attribute
+            // a method on the test's own `demo.Log` (a real recipe targeting a
+            // classpath type like org.slf4j.Logger resolves fine). Same reason
+            // ~9 other tests in this file use TypeValidation.none(); the reorder
+            // itself is asserted by the before/after text.
+            { spec -> spec.recipe(r).typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()) },
+            java(
+                """
+                package demo;
+                class Log {
+                    void internal(String msg, Throwable t, Object... params) {}
+                    void error(String msg, Object... params) {}
+                }
+                """.trimIndent(),
+            ),
+            java(
+                """
+                package demo;
+                class Use {
+                    void m(Log log, RuntimeException ex) {
+                        log.internal("boom", ex, 1, 2, 3);
+                    }
+                }
+                """.trimIndent(),
+                """
+                package demo;
+                class Use {
+                    void m(Log log, RuntimeException ex) {
+                        log.error("boom", 1, 2, 3, ex);
+                    }
+                }
+                """.trimIndent(),
+            ),
+        )
+    }
+
+    @Test
+    fun `strictArity — opt out of variadic matching`() {
+        val r = loadCompiledRecipe(
+            source = """
+                import org.openrewrite.recipe
+                val UseListOfExactly2 = recipe(
+                    displayName = "Use List.of for exactly 2 args",
+                    description = "..."
+                ) {
+                    edit {
+                        (rewrite { a: Any, b: Any -> java.util.Arrays.asList(a, b) } to { a, b -> java.util.List.of(a, b) }).strictArity()
+                    }
+                }
+            """.trimIndent(),
+            propertyName = "UseListOfExactly2",
+        )
+        rewriteRun(
+            { spec -> spec.recipe(r) },
+            java(
+                """
+                import java.util.Arrays;
+                import java.util.List;
+                class A {
+                    List<Object> two = Arrays.asList(1, 2);
+                    List<Object> three = Arrays.asList(1, 2, 3);
+                }
+                """.trimIndent(),
+                """
+                import java.util.Arrays;
+                import java.util.List;
+                class A {
+                    List<Object> two = java.util.List.of(1, 2);
+                    List<Object> three = Arrays.asList(1, 2, 3);
+                }
+                """.trimIndent(),
+            ),
+        )
     }
 
     private fun loadCompiledRecipe(source: String, propertyName: String, packageName: String = ""): Recipe {

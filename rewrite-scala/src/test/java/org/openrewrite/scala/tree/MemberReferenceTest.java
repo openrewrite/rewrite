@@ -50,6 +50,19 @@ class MemberReferenceTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void memberReferenceAfterMethodInvocationWithoutWhitespaceBeforeUnderscore() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  def events = find()_
+                }
+                """
+            )
+        );
+    }
     
     @Test
     void staticMemberReference() {

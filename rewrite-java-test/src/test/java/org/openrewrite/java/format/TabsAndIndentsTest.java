@@ -2772,4 +2772,30 @@ class TabsAndIndentsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8096")
+    @Test
+    void ternaryAsLambdaBodyArgument() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Optional;
+
+              class A {
+                  Optional<String> repository(String in) {
+                      return Optional.of(in);
+                  }
+
+                  public String convert(String in) {
+                      var optionalConverter = repository(in);
+                      return optionalConverter.map(arg -> arg.isEmpty()
+                              ? in.toLowerCase()
+                              : in
+                      ).orElse(in);
+                  }
+              }
+              """
+          )
+        );
+    }
 }

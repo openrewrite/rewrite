@@ -320,3 +320,34 @@ func (v *methodMatcherVisitor) VisitMethodInvocation(mi *java.MethodInvocation, 
 	}
 	return mi
 }
+
+// TypeOfExpression for Parentheses and TypeCast must DERIVE the type from the
+// inner expression (mirroring Java's J.Parentheses.getType / J.TypeCast.getType),
+// since neither struct stores a Type field.
+func TestTypeOfExpressionDerivesThroughWrappers(t *testing.T) {
+	// given
+	strType := &java.JavaTypeClass{FullyQualifiedName: "string"}
+	inner := &java.Identifier{Name: "s", Type: strType}
+
+	parens := &java.Parentheses{
+		Tree: java.RightPadded[java.Expression]{Element: inner},
+	}
+	cast := &java.TypeCast{
+		Clazz: &java.ControlParentheses{
+			Tree: java.RightPadded[java.Expression]{Element: inner},
+		},
+		Expr: &java.Identifier{Name: "x"},
+	}
+
+	// when
+	parensType := TypeOfExpression(parens)
+	castType := TypeOfExpression(cast)
+
+	// then
+	if parensType != strType {
+		t.Errorf("Parentheses: got %v, want derived inner type %v", parensType, strType)
+	}
+	if castType != strType {
+		t.Errorf("TypeCast: got %v, want derived Clazz type %v", castType, strType)
+	}
+}

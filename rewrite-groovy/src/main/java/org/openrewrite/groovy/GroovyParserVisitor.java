@@ -17,6 +17,7 @@ package org.openrewrite.groovy;
 
 import groovy.lang.GroovySystem;
 import groovy.transform.Canonical;
+import groovy.transform.CompileDynamic;
 import groovy.transform.Field;
 import groovy.transform.Generated;
 import groovy.transform.Immutable;
@@ -1056,10 +1057,15 @@ public class GroovyParserVisitor {
                 List<J.Modifier> paramModifiers = getModifiers();
                 TypeTree paramType;
                 if (param.isDynamicTyped()) {
+                    // Dynamic-typed Groovy params are implicitly java.lang.Object.
+                    // param.getType() returns ClassHelper.OBJECT_TYPE; route through
+                    // typeMapping.type so the parser's canonical computeClass path
+                    // populates the body rather than seeding a ShallowClass.
+                    JavaType objectType = typeMapping.type(param.getType());
                     if (sourceStartsWith("java.lang.Object")) {
-                        paramType = new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), skip(name()), JavaType.ShallowClass.build("java.lang.Object"), null);
+                        paramType = new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), skip(name()), objectType, null);
                     } else {
-                        paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null);
+                        paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", objectType, null);
                     }
                 } else {
                     paramType = visitTypeTree(param.getType());
@@ -1530,7 +1536,11 @@ public class GroovyParserVisitor {
                     skip(classSuffix);
                 }
             }
-            queue.add(TypeTree.build(name)
+            // Intermediate segments inside the dotted name get fresh
+            // ShallowClasses from TypeTree.build; the outermost type comes from
+            // the resolved ClassNode and overrides what TypeTree.build assigned
+            // for the leaf.
+            queue.add(TypeTree.build(name, null)
                     .withType(typeMapping.type(type))
                     .withPrefix(prefix));
         }
@@ -1680,6 +1690,9 @@ public class GroovyParserVisitor {
                     case "!in":
                         gBinaryOp = G.Binary.Type.NotIn;
                         break;
+                    case "!instanceof":
+                        gBinaryOp = G.Binary.Type.NotInstanceOf;
+                        break;
                     case "<=>":
                         gBinaryOp = G.Binary.Type.Spaceship;
                         break;
@@ -1734,6 +1747,15 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitBlockStatement(BlockStatement block) {
+            if (isUnwrappedDesugaredResourceBlock(block)) {
+                // A try-with-resources without a catch or finally clause is desugared by Groovy 4 into a
+                // bare block (rather than being wrapped in a TryCatchStatement like the cases that have a
+                // catch/finally). Re-wrap it so the try-with-resources handling in visitTryCatchFinally applies.
+                BlockStatement wrapper = new BlockStatement();
+                wrapper.addStatement(block);
+                visitTryCatchFinally(new TryCatchStatement(wrapper, EmptyStatement.INSTANCE));
+                return;
+            }
             Space fmt = EMPTY;
             Space staticInitPadding = EMPTY;
             boolean isStaticInit = sourceStartsWith("static");
@@ -1793,13 +1815,15 @@ public class GroovyParserVisitor {
             Parameter param = node.getVariable();
             TypeTree paramType;
             Space paramPrefix = whitespace();
-            // Groovy allows catch variables to omit their type, shorthand for being of type java.lang.Exception
-            // Can't use isSynthetic() here because groovy doesn't record the line number on the Parameter
+            // Groovy allows catch variables to omit their type, shorthand for being of type java.lang.Exception.
+            // Can't use isSynthetic() here because groovy doesn't record the line number on the Parameter.
+            // param.getType() is the synthesized ClassNode for Exception; route through typeMapping.type so the
+            // parser's canonical computeClass path populates the body rather than seeding a ShallowClass.
             if (Exception.class.getName().equals(param.getType().getName()) &&
                     !source.startsWith("Exception", cursor) &&
                     !source.startsWith("java.lang.Exception", cursor)) {
                 paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, emptyList(), "",
-                        JavaType.ShallowClass.build(Exception.class.getName()), null);
+                        typeMapping.type(param.getType()), null);
             } else {
                 paramType = visitTypeTree(param.getOriginType()).withPrefix(paramPrefix);
             }
@@ -2665,6 +2689,18 @@ public class GroovyParserVisitor {
                     }
                     select = JRightPadded.build(selectExpr).withAfter(afterSelect);
                 }
+
+                // Handle explicit "this." receiver when Groovy's AST marks the call as implicit-this.
+                // This occurs in interface default methods where `this.method()` is represented
+                // with isImplicitThis() == true despite the explicit receiver in source.
+                if (select == null && source.startsWith("this", cursor) &&
+                        cursor + 4 < source.length() && source.charAt(cursor + 4) == '.') {
+                    Expression thisIdent = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "this", null, null);
+                    skip("this");
+                    Space afterSelect = sourceBefore(".");
+                    select = JRightPadded.build(thisIdent).withAfter(afterSelect);
+                }
+
                 JContainer<Expression> typeParameters = call.getGenericsTypes() != null ? visitTypeParameterizations(call.getGenericsTypes()) : null;
                 // Closure invocations that are written as closure.call() and closure() are parsed into identical MethodCallExpression
                 // closure() has implicitThis set to false
@@ -3009,6 +3045,13 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitTernaryExpression(TernaryExpression ternary) {
+            // AST transformations like @Slf4j create synthetic ternary guards (e.g. log.isInfoEnabled() ? log.info(...) : null)
+            // whose boolean condition has no source position. Only the true-branch exists in the original source, so skip
+            // the synthetic wrapper and visit only the true expression to avoid corrupting the cursor.
+            if (ternary.getBooleanExpression().getLineNumber() < 0) {
+                queue.add(doVisit(ternary.getTrueExpression()));
+                return;
+            }
             queue.add(insideParentheses(ternary, fmt -> new J.Ternary(randomId(), fmt, Markers.EMPTY,
                     doVisit(ternary.getBooleanExpression()),
                     padLeft(sourceBefore("?"), doVisit(ternary.getTrueExpression())),
@@ -3129,6 +3172,9 @@ public class GroovyParserVisitor {
             // Groovy 4 desugars try-with-resources at parse time (getResourceStatements() is always empty).
             // Detect from source: if "(" follows "try", parse resources from source text.
             JContainer<J.Try.Resource> resources = null;
+            // The body lives at the bottom of the nested resource structure; it defaults to the try
+            // statement itself when there are no resources, and is reassigned as resources are consumed.
+            org.codehaus.groovy.ast.stmt.Statement bodyStatement = node.getTryStatement();
             boolean hasTryWithResources = source.charAt(indexOfNextNonWhitespace(cursor, source)) == '(';
             if (hasTryWithResources) {
                 Space beforeParen = sourceBefore("(");
@@ -3146,7 +3192,6 @@ public class GroovyParserVisitor {
                     resourceVar = resourceVar.withPrefix(EMPTY);
 
                     TryCatchStatement innerTry = (TryCatchStatement) innerBlock.getStatements().get(innerBlock.getStatements().size() - 1);
-                    boolean hasMoreResources = isDesugaredResourceBlock(innerTry.getTryStatement());
 
                     int nextNonWs = indexOfNextNonWhitespace(cursor, source);
                     boolean semicolonPresent = nextNonWs < source.length() && source.charAt(nextNonWs) == ';';
@@ -3160,36 +3205,23 @@ public class GroovyParserVisitor {
                             resourceVar.withPrefix(EMPTY), semicolonPresent);
                     skip(";");
 
+                    // Whether another resource follows must be decided from the source, not the AST:
+                    // a nested try-with-resources in the body desugars to the same shape as an additional
+                    // resource, so only the closing ')' of the resource list can disambiguate them.
+                    boolean hasMoreResources = source.charAt(indexOfNextNonWhitespace(cursor, source)) != ')';
                     if (hasMoreResources) {
                         resourceList.add(padRight(tryResource, EMPTY));
                         current = innerTry.getTryStatement();
                     } else {
                         resourceList.add(padRight(tryResource, sourceBefore(")")));
+                        bodyStatement = innerTry.getTryStatement();
                         break;
                     }
                 }
                 resources = JContainer.build(beforeParen, resourceList, Markers.EMPTY);
             }
 
-            // When try-with-resources, find the actual body by walking down the nested structure
-            // to the innermost TryCatchStatement's tryStmt.
-            J.Block body;
-            if (hasTryWithResources) {
-                org.codehaus.groovy.ast.stmt.Statement current = node.getTryStatement();
-                TryCatchStatement innerTry = null;
-                while (isDesugaredResourceBlock(current)) {
-                    BlockStatement innerBlock = (BlockStatement) ((BlockStatement) current).getStatements().get(0);
-                    innerTry = (TryCatchStatement) innerBlock.getStatements().get(innerBlock.getStatements().size() - 1);
-                    if (isDesugaredResourceBlock(innerTry.getTryStatement())) {
-                        current = innerTry.getTryStatement();
-                    } else {
-                        break;
-                    }
-                }
-                body = doVisit(innerTry != null ? innerTry.getTryStatement() : node.getTryStatement());
-            } else {
-                body = doVisit(node.getTryStatement());
-            }
+            J.Block body = doVisit(bodyStatement);
 
             // Handle catches, merging multi-catch statements.
             // Groovy 4 splits catch(A | B e) into separate CatchStatements at the same source position.
@@ -3338,6 +3370,19 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitDoWhileLoop(DoWhileStatement loop) {
+            Space fmt = sourceBefore("do");
+            Statement body = doVisit(loop.getLoopBlock());
+            Space beforeWhile = sourceBefore("while");
+            J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
+                    JRightPadded.build((Expression) doVisit(loop.getBooleanExpression().getExpression()))
+                            .withAfter(sourceBefore(")")));
+            queue.add(new J.DoWhileLoop(randomId(), fmt, Markers.EMPTY,
+                    JRightPadded.build(body).withAfter(beforeWhile),
+                    padLeft(EMPTY, condition)));
+        }
+
+        @Override
         public void visitWhileLoop(WhileStatement loop) {
             Space fmt = sourceBefore("while");
             queue.add(new J.WhileLoop(randomId(), fmt, Markers.EMPTY,
@@ -3446,7 +3491,7 @@ public class GroovyParserVisitor {
             Space importPrefix = sourceBefore("import");
             JLeftPadded<Boolean> statik = importNode.isStatic() ? padLeft(sourceBefore("static"), true) : padLeft(EMPTY, false);
             Space space = whitespace();
-            J.FieldAccess qualid = TypeTree.build(name()).withPrefix(space);
+            J.FieldAccess qualid = buildImportQualid(importNode, space);
             JLeftPadded<J.Identifier> alias = null;
             if (sourceStartsWith("as", "\n", " ")) {
                 alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), name(), null, null));
@@ -3461,7 +3506,7 @@ public class GroovyParserVisitor {
 
     // The groovy compiler discards these annotations in favour of other transform annotations,
     // so they must be parsed by hand when found in source.
-    private static final Class<?>[] DISCARDED_TRANSFORM_ANNOTATIONS = {Canonical.class, Immutable.class, groovy.transform.Synchronized.class};
+    private static final Class<?>[] DISCARDED_TRANSFORM_ANNOTATIONS = {Canonical.class, CompileDynamic.class, Immutable.class, groovy.transform.Synchronized.class};
 
     public List<J.Annotation> visitAndGetAnnotations(AnnotatedNode node, RewriteGroovyClassVisitor classVisitor) {
         if (node.getAnnotations().isEmpty()) {
@@ -3551,7 +3596,7 @@ public class GroovyParserVisitor {
                 if (Character.isJavaIdentifierStart(c) && !isKeywordLiteral) {
                     String name = name();
                     if (!name.isEmpty()) {
-                        return TypeTree.build(name)
+                        return TypeTree.build(name, null)
                                 .withType(typeMapping.type(value.getType()))
                                 .withPrefix(prefix);
                     }
@@ -3587,6 +3632,27 @@ public class GroovyParserVisitor {
 
     private <T> JRightPadded<T> padRight(T tree, Space right, Markers markers) {
         return new JRightPadded<>(tree, right, markers);
+    }
+
+    /**
+     * Detects the "unwrapped" desugared form of a try-with-resources that has no catch or finally clause.
+     * Groovy 4 desugars such a statement into a bare block of the shape
+     * {@code [resourceDecl, __$$primaryExc decl, TryCatchStatement]} rather than wrapping it in an
+     * enclosing {@link TryCatchStatement}. The synthetic {@code __$$primaryExc} primary-exception holder is
+     * what distinguishes it from an ordinary user-authored block.
+     */
+    private static boolean isUnwrappedDesugaredResourceBlock(BlockStatement block) {
+        List<org.codehaus.groovy.ast.stmt.Statement> stmts = block.getStatements();
+        if (stmts.size() < 3 || !(stmts.get(stmts.size() - 1) instanceof TryCatchStatement)) {
+            return false;
+        }
+        org.codehaus.groovy.ast.stmt.Statement primaryExc = stmts.get(stmts.size() - 2);
+        if (primaryExc instanceof ExpressionStatement &&
+                ((ExpressionStatement) primaryExc).getExpression() instanceof DeclarationExpression) {
+            org.codehaus.groovy.ast.expr.Expression left = ((DeclarationExpression) ((ExpressionStatement) primaryExc).getExpression()).getLeftExpression();
+            return left instanceof VariableExpression && ((VariableExpression) left).getName().startsWith("__$$primaryExc");
+        }
+        return false;
     }
 
     /**
@@ -3683,16 +3749,30 @@ public class GroovyParserVisitor {
         String maybeFullyQualified = name();
         String[] parts = maybeFullyQualified.split("\\.");
 
-        String fullName = "";
+        // Walk classNode's outer-class chain (outermost first) and align it
+        // with the trailing segments of the source name. The leaf class is
+        // always the last segment of any reference; everything before the
+        // class-chain alignment is package prefix.
+        List<ClassNode> classChain = new ArrayList<>();
+        for (ClassNode c = classNode; c != null; c = c.getOuterClass()) {
+            classChain.add(0, c);
+        }
+        int classChainStart = parts.length - classChain.size();
+
         Expression expr = null;
         for (int i = 0; i < parts.length; i++) {
             String part = parts[i];
-            if (i == 0) {
-                fullName = part;
-                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), part, typeMapping.type(classNode), null);
-            } else {
-                fullName += "." + part;
 
+            JavaType segmentType = null;
+            int classIdx = i - classChainStart;
+            if (classIdx >= 0 && classIdx < classChain.size()) {
+                JavaType t = typeMapping.type(classChain.get(classIdx));
+                segmentType = t instanceof JavaType.Parameterized ? ((JavaType.Parameterized) t).getType() : t;
+            }
+
+            if (i == 0) {
+                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), part, segmentType, null);
+            } else {
                 Matcher whitespacePrefix = whitespacePrefixPattern.matcher(part);
                 Space identFmt = whitespacePrefix.matches() ? format(whitespacePrefix.group(0)) : EMPTY;
 
@@ -3707,9 +3787,7 @@ public class GroovyParserVisitor {
                         Markers.EMPTY,
                         expr,
                         padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, emptyList(), part.trim(), null, null)),
-                        (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
-                                JavaType.ShallowClass.build(fullName) :
-                                null
+                        segmentType
                 );
             }
         }
@@ -3940,8 +4018,10 @@ public class GroovyParserVisitor {
                 MethodCallExpression expr = (MethodCallExpression) node;
                 // The trait AST transformation rewrites implicit-this calls inside trait method bodies to use a synthetic
                 // $self variable expression that has no source position; without a valid object position there's nothing
-                // to scan, so skip the parenthesis-level computation.
-                if (expr.getObjectExpression().getLineNumber() < 0) {
+                // to scan, so skip the parenthesis-level computation. Similarly, AST transformations like @Slf4j can
+                // produce synthetic MethodCallExpressions (e.g. log.isInfoEnabled()) whose own line number is -1 even
+                // though the object expression has a valid position; guard against that to avoid a negative array index.
+                if (expr.getObjectExpression().getLineNumber() < 0 || expr.getLineNumber() < 0) {
                     return null;
                 }
                 return determineParenthesisLevel(expr, expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
@@ -4074,19 +4154,32 @@ public class GroovyParserVisitor {
 
     private List<J.Modifier> getModifiers() {
         List<J.Modifier> modifiers = new ArrayList<>();
-        Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.keySet());
-        String currentModifier = possibleModifiers.stream().filter(this::sourceStartsWith).findFirst().orElse(null);
-        while (currentModifier != null) {
-            possibleModifiers.remove(currentModifier);
-            modifiers.add(new J.Modifier(randomId(), whitespace(), Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
-            skip(currentModifier);
-            currentModifier = possibleModifiers.stream()
-                    // Try to avoid confusing a variable name with an incidentally similar modifier keyword like `def defaultPublicStaticFinal = 0`
-                    .filter(modifierName -> sourceStartsWith(modifierName, "\n", " ", ")"))
-                    .findFirst()
-                    .orElse(null);
+        String keyword;
+        while ((keyword = nextModifierKeyword()) != null) {
+            modifiers.add(new J.Modifier(randomId(), whitespace(), Markers.EMPTY, keyword, modifierNameToType.get(keyword), emptyList()));
+            skip(keyword);
         }
         return modifiers;
+    }
+
+    /**
+     * Peeks at the next token without consuming it and returns it only if it is a modifier keyword whose end falls
+     * on an identifier boundary. Requiring the character after the keyword to not be an identifier part keeps a
+     * variable name from being mistaken for an incidentally similar keyword (e.g. {@code defaultValue} is not the
+     * {@code def} keyword), while still recognizing a keyword that is immediately followed by punctuation such as
+     * {@code def(key, value)} destructuring.
+     */
+    private @Nullable String nextModifierKeyword() {
+        int start = indexOfNextNonWhitespace(cursor, source);
+        for (String keyword : modifierNameToType.keySet()) {
+            if (source.startsWith(keyword, start)) {
+                int after = start + keyword.length();
+                if (after >= source.length() || !isJavaIdentifierPart(source.charAt(after))) {
+                    return keyword;
+                }
+            }
+        }
+        return null;
     }
 
     private <G2 extends J> JRightPadded<G2> maybeSemicolon(G2 g) {
@@ -4121,6 +4214,117 @@ public class GroovyParserVisitor {
         String result = source.substring(cursor, i);
         cursor += i - cursor;
         return result;
+    }
+
+    /**
+     * Build the {@link J.FieldAccess} qualid of a {@link J.Import} by walking the
+     * source dotted name segment-by-segment, assigning each class-level segment
+     * its resolved {@link JavaType} directly from the {@link ImportNode}'s
+     * {@link ClassNode} chain.
+     * <p>
+     * Layout of the dotted name:
+     * <pre>
+     *   pkg.pkg...pkg . OuterClass.NestedClass...LeafClass [ . staticMember ] [ . * ]
+     *   ^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^   ^
+     *   types=null      types from classChain                type=null        skipped
+     * </pre>
+     * The trailing {@code *} of a star import is read by the caller (or stops the
+     * walk here), so this method only produces typed FieldAccess nodes for
+     * identifier segments.
+     */
+    private J.FieldAccess buildImportQualid(ImportNode importNode, Space prefix) {
+        // Build the [outermost, ..., leaf] chain of resolved class types so each class segment
+        // carries its own type. ClassNode.getOuterClass() is unreliable for resolved import types
+        // (it returns null even for nested classes like java.util.Map.Entry), so instead we walk
+        // the owning-class links of the attributed leaf type, which proper type attribution
+        // populates from the JVM enclosing-class chain. Empty for star/package imports and for
+        // types that can't be resolved (asFullyQualified returns null for JavaType.Unknown).
+        List<JavaType.FullyQualified> classChain = new ArrayList<>();
+        if (importNode.getType() != null) {
+            JavaType leaf = typeMapping.type(importNode.getType());
+            if (leaf instanceof JavaType.Parameterized) {
+                leaf = ((JavaType.Parameterized) leaf).getType();
+            }
+            for (JavaType.FullyQualified c = TypeUtils.asFullyQualified(leaf); c != null; c = c.getOwningClass()) {
+                classChain.add(0, c);
+            }
+        }
+        int packageSegmentCount = 0;
+        if (!classChain.isEmpty()) {
+            String pkg = classChain.get(0).getPackageName();
+            if (!pkg.isEmpty()) {
+                packageSegmentCount = 1;
+                for (int i = 0; i < pkg.length(); i++) {
+                    if (pkg.charAt(i) == '.') packageSegmentCount++;
+                }
+            }
+        }
+
+        // Whitespace model (mirrors TypeTree.build):
+        //   identifier prefix    = whitespace AFTER the dot, BEFORE the identifier
+        //   JLeftPadded.before   = whitespace BEFORE the dot (= previous segment's trailing whitespace)
+        //   FieldAccess.prefix   = whitespace before the whole expression (set on outermost at the end)
+        Expression expr = null;
+        Space beforeIdent = EMPTY;
+        Space beforeDot = EMPTY;
+        int segmentIndex = 0;
+        while (cursor < source.length()) {
+            char c = source.charAt(cursor);
+            String segment;
+            if (c == '*') {
+                segment = "*";
+                cursor++;
+            } else if (Character.isJavaIdentifierStart(c)) {
+                int identStart = cursor;
+                while (cursor < source.length() && isJavaIdentifierPart(source.charAt(cursor))) {
+                    cursor++;
+                }
+                segment = source.substring(identStart, cursor);
+            } else {
+                break;
+            }
+
+            JavaType segmentType = null;
+            if (!"*".equals(segment)) {
+                int classIdx = segmentIndex - packageSegmentCount;
+                if (classIdx >= 0 && classIdx < classChain.size()) {
+                    segmentType = classChain.get(classIdx);
+                }
+            }
+
+            if (segmentIndex == 0) {
+                expr = new J.Identifier(randomId(), beforeIdent, Markers.EMPTY, emptyList(),
+                        segment, segmentType, null);
+            } else {
+                expr = new J.FieldAccess(randomId(), EMPTY, Markers.EMPTY, expr,
+                        new JLeftPadded<>(beforeDot, new J.Identifier(randomId(), beforeIdent,
+                                Markers.EMPTY, emptyList(), segment, null, null), Markers.EMPTY),
+                        segmentType);
+            }
+            segmentIndex++;
+
+            if ("*".equals(segment)) {
+                break;
+            }
+
+            int savedCursor = cursor;
+            Space trailingWs = whitespace();
+            if (cursor < source.length() && source.charAt(cursor) == '.') {
+                cursor++;
+                beforeDot = trailingWs;
+                beforeIdent = whitespace();
+            } else {
+                cursor = savedCursor;
+                break;
+            }
+        }
+
+        // Outermost prefix carries the whitespace after `import`/`static`. Setting
+        // it on the outer FieldAccess (rather than the innermost Identifier)
+        // matches what TypeTree.build did and keeps the prefix attached to the
+        // qualid replacement target for recipes like ChangePackage.
+        //noinspection ConstantConditions
+        return ((J.FieldAccess) expr).withPrefix(prefix);
     }
 
     /*
@@ -4177,7 +4381,7 @@ public class GroovyParserVisitor {
             skip("?");
             JLeftPadded<J.Wildcard.Bound> bound = null;
             NameTree boundedType = null;
-            if (genericsType.getUpperBounds() != null) {
+            if (genericsType.getUpperBounds() != null && sourceStartsWith("extends")) {
                 bound = padLeft(sourceBefore("extends"), J.Wildcard.Bound.Extends);
                 boundedType = visitTypeTree(genericsType.getUpperBounds()[0]);
             } else if (genericsType.getLowerBound() != null) {
