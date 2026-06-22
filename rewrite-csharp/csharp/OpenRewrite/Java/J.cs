@@ -64,7 +64,12 @@ public sealed class NullSafe : Marker, IRpcCodec<NullSafe>, IEquatable<NullSafe>
     public NullSafe WithDotPrefix(Space dotPrefix) =>
         ReferenceEquals(dotPrefix, DotPrefix) ? this : new(Id, dotPrefix);
 
-    public static NullSafe Instance { get; } = new(Guid.Empty);
+    // Distinct fixed UUID per singleton marker. A shared Guid.Empty collides across
+    // marker types in every UUID-keyed path of the V3 marker table (intern table,
+    // findById, multi-project extern resolveById) — resolving any zero-UUID marker
+    // returns whichever type was stored first, silently swapping e.g. NullSafe for
+    // NullCoalescing and dropping `?.`/`??` from printed C# so migration patches fail.
+    public static NullSafe Instance { get; } = new(new Guid("1e5a0001-0000-4000-8000-000000000001"));
 
     public void RpcSend(NullSafe after, RpcSendQueue q)
     {
@@ -95,7 +100,7 @@ public sealed class OmitParentheses(
     public OmitParentheses WithId(Guid id) =>
         id == Id ? this : new(id);
 
-    public static OmitParentheses Instance { get; } = new(Guid.Empty);
+    public static OmitParentheses Instance { get; } = new(new Guid("1e5a0002-0000-4000-8000-000000000002"));
     public void RpcSend(OmitParentheses after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
     public OmitParentheses RpcReceive(OmitParentheses before, RpcReceiveQueue q) =>
         before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
