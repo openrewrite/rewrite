@@ -37,7 +37,7 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
-import org.openrewrite.maven.cache.MavenMetadataValidation;
+import org.openrewrite.maven.cache.MavenMetadataCacheEntry;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.tree.*;
@@ -1925,11 +1925,11 @@ class MavenPomDownloaderTest implements RewriteTest {
                   new MockResponse().setResponseCode(200).setHeader("ETag", "\"v1\"").setBody(METADATA_V1)));
                 server.start();
 
-                // A cache that always misses and uses the no-op default getMavenMetadataForRevalidation,
-                // so every lookup falls back to a plain, unconditional download.
-                MavenPomCache nonRevalidating = new RetainingPomCache() {
+                // A cache that always misses and never retains a validator, so every lookup falls back
+                // to a plain, unconditional download.
+                MavenPomCache nonRevalidating = new InMemoryMavenPomCache() {
                     @Override
-                    public @Nullable MavenMetadataValidation getMavenMetadataForRevalidation(URI repo, GroupArtifactVersion gav) {
+                    public @Nullable MavenMetadataCacheEntry getMavenMetadata(URI repo, GroupArtifactVersion gav) {
                         return null;
                     }
                 };
@@ -1945,35 +1945,26 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         /**
-         * A cache that always reports a miss from {@link #getMavenMetadata} (simulating an elapsed
-         * freshness window) yet retains the last-stored value and its validators for revalidation.
+         * A cache that always reports its retained entries as {@linkplain MavenMetadataCacheEntry#isExpired()
+         * expired} (simulating an elapsed freshness window), so a cached value is never served directly
+         * but its validators still drive a conditional GET.
          */
         static class RetainingPomCache extends InMemoryMavenPomCache {
-            private final Map<String, MavenMetadataValidation> retained = new HashMap<>();
+            private final Map<String, MavenMetadataCacheEntry> retained = new HashMap<>();
 
             private static String key(URI repo, GroupArtifactVersion gav) {
                 return repo + "|" + gav;
             }
 
             @Override
-            public @Nullable Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
-                return null;
+            public @Nullable MavenMetadataCacheEntry getMavenMetadata(URI repo, GroupArtifactVersion gav) {
+                MavenMetadataCacheEntry entry = retained.get(key(repo, gav));
+                return entry == null ? null : entry.withExpired(true);
             }
 
             @Override
-            public void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata) {
-                retained.put(key(repo, gav), new MavenMetadataValidation(metadata, null, null));
-            }
-
-            @Override
-            public void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata,
-                                         @Nullable String etag, @Nullable String lastModified) {
-                retained.put(key(repo, gav), new MavenMetadataValidation(metadata, etag, lastModified));
-            }
-
-            @Override
-            public @Nullable MavenMetadataValidation getMavenMetadataForRevalidation(URI repo, GroupArtifactVersion gav) {
-                return retained.get(key(repo, gav));
+            public void putMavenMetadata(URI repo, GroupArtifactVersion gav, MavenMetadataCacheEntry metadata) {
+                retained.put(key(repo, gav), metadata);
             }
         }
     }

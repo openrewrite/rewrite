@@ -32,7 +32,7 @@ import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
-import org.openrewrite.maven.cache.MavenMetadataValidation;
+import org.openrewrite.maven.cache.MavenMetadataCacheEntry;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
@@ -188,7 +188,7 @@ public class MavenPomDownloader {
      * still raise {@link HttpSenderResponseException}, preserving the existing error handling.
      */
     private MetadataDownload requestMetadata(MavenRepository repo, String uriString,
-                                             @Nullable MavenMetadataValidation revalidation) throws HttpSenderResponseException, IOException {
+                                             @Nullable MavenMetadataCacheEntry revalidation) throws HttpSenderResponseException, IOException {
         try {
             HttpSender.Request.Builder request = applyConditionalHeaders(httpSender.get(uriString), revalidation);
             return sendMetadataRequest(applyAuthenticationAndTimeoutToRequest(repo, request).build());
@@ -206,7 +206,7 @@ public class MavenPomDownloader {
     }
 
     private static HttpSender.Request.Builder applyConditionalHeaders(HttpSender.Request.Builder request,
-                                                                      @Nullable MavenMetadataValidation revalidation) {
+                                                                      @Nullable MavenMetadataCacheEntry revalidation) {
         if (revalidation != null) {
             if (revalidation.getEtag() != null) {
                 request.withHeader("If-None-Match", revalidation.getEtag());
@@ -353,12 +353,17 @@ public class MavenPomDownloader {
             }
             attemptedUris.add(repo.getUri());
             URI repoUri = URI.create(repo.getUri());
-            Optional<MavenMetadata> cached = mavenCache.getMavenMetadata(repoUri, gav);
-            Optional<MavenMetadata> result = cached;
-            // Validators captured from a fresh download, persisted alongside the metadata so a later
-            // expiry can be revalidated with a conditional GET rather than a full re-download.
+            MavenMetadataCacheEntry cached = mavenCache.getMavenMetadata(repoUri, gav);
+            // A fresh cache hit (value or negative) is served directly; a miss or an expired entry
+            // leaves result null so the download path below runs (revalidating when validators exist).
+            Optional<MavenMetadata> result = cached == null || cached.isExpired() ? null : Optional.ofNullable(cached.getMetadata());
+            // Validators captured from this iteration's download/304, persisted alongside the metadata so
+            // a later expiry can be revalidated with a conditional GET rather than a full re-download.
             String fetchedEtag = null;
             String fetchedLastModified = null;
+            // Whether this iteration produced the value (download, file read, derivation, or 304), so we
+            // only (re)cache freshly obtained values and leave an untouched cache hit alone.
+            boolean produced = false;
             if (result == null) {
                 // Not in the cache, attempt to download it.
                 boolean cacheEmptyResult = false;
@@ -376,19 +381,21 @@ public class MavenPomDownloader {
                             MavenMetadata parsed = MavenMetadata.parse(Files.readAllBytes(path));
                             if (parsed != null) {
                                 result = Optional.of(parsed);
+                                produced = true;
                             }
                         }
                     } else {
-                        // If a (possibly expired) entry with a validator was retained, revalidate it
-                        // with a conditional GET so an unchanged metadata can be confirmed by a cheap
-                        // 304 instead of re-downloading and re-parsing the body.
-                        MavenMetadataValidation revalidation = mavenCache.getMavenMetadataForRevalidation(repoUri, gav);
+                        // If an expired entry with a validator was retained, revalidate it with a
+                        // conditional GET so an unchanged metadata can be confirmed by a cheap 304
+                        // instead of re-downloading and re-parsing the body.
+                        MavenMetadataCacheEntry revalidation = cached != null && cached.isExpired() ? cached : null;
                         MetadataDownload download = requestMetadata(repo, baseUri + "maven-metadata.xml", revalidation);
                         if (download.getCode() == 304 && revalidation != null && revalidation.getMetadata() != null) {
                             // Not Modified: reuse the cached value, skipping the parse entirely.
                             result = Optional.of(revalidation.getMetadata());
                             fetchedEtag = download.getEtag() != null ? download.getEtag() : revalidation.getEtag();
                             fetchedLastModified = download.getLastModified() != null ? download.getLastModified() : revalidation.getLastModified();
+                            produced = true;
                             Counter.builder("rewrite.maven.metadata.revalidated")
                                     .tag("repositoryUri", repo.getUri())
                                     .register(Metrics.globalRegistry)
@@ -399,6 +406,7 @@ public class MavenPomDownloader {
                                 result = Optional.of(parsed);
                                 fetchedEtag = download.getEtag();
                                 fetchedLastModified = download.getLastModified();
+                                produced = true;
                             }
                         }
                     }
@@ -424,6 +432,7 @@ public class MavenPomDownloader {
                                     .register(Metrics.globalRegistry)
                                     .increment();
                             result = Optional.of(derivedMeta);
+                            produced = true;
                         }
                     } catch (HttpSenderResponseException | MavenDownloadingException | IOException e) {
                         repositoryResponses.put(repo, e.getMessage());
@@ -432,7 +441,7 @@ public class MavenPomDownloader {
                 if (result == null && cacheEmptyResult) {
                     // If there was no fatal failure while attempting to find metadata and there was no metadata retrieved
                     // from the current repo, cache an empty result.
-                    mavenCache.putMavenMetadata(repoUri, gav, null);
+                    mavenCache.putMavenMetadata(repoUri, gav, MavenMetadataCacheEntry.fresh(null, null, null));
                 }
             } else if (!result.isPresent()) {
                 repositoryResponses.put(repo, "Did not attempt to download because of a previous failure to retrieve from this repository.");
@@ -445,11 +454,10 @@ public class MavenPomDownloader {
                 } else {
                     mavenMetadata = mergeMetadata(mavenMetadata, result.get());
                 }
-                // Only (re)cache when this iteration produced the value (a download, file read, derivation,
-                // or 304 revalidation). A value served straight from the cache is left untouched, so its
-                // stored validators are preserved rather than overwritten with nulls.
-                if (cached == null) {
-                    mavenCache.putMavenMetadata(repoUri, gav, result.get(), fetchedEtag, fetchedLastModified);
+                // Only (re)cache the value this iteration produced; a value served straight from the
+                // cache is left untouched so its stored validators aren't overwritten with nulls.
+                if (produced) {
+                    mavenCache.putMavenMetadata(repoUri, gav, MavenMetadataCacheEntry.fresh(result.get(), fetchedEtag, fetchedLastModified));
                 }
             }
         }

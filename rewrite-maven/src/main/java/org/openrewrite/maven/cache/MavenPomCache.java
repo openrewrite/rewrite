@@ -29,48 +29,24 @@ public interface MavenPomCache {
 
     void putResolvedDependencyPom(ResolvedGroupArtifactVersion dependency, ResolvedPom resolved);
 
+    /**
+     * Look up a cached {@code maven-metadata.xml} entry. A {@code null} return is a cache miss. A
+     * non-null {@link MavenMetadataCacheEntry} carries the value (or a negative result, when its
+     * {@link MavenMetadataCacheEntry#getMetadata() metadata} is {@code null}) together with any HTTP
+     * validators; if the entry's freshness window has elapsed the cache marks it
+     * {@link MavenMetadataCacheEntry#isExpired() expired}, signalling the caller to revalidate it
+     * with a conditional GET rather than serving it directly.
+     */
     @Nullable
-    Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav);
-
-    void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata);
+    MavenMetadataCacheEntry getMavenMetadata(URI repo, GroupArtifactVersion gav);
 
     /**
-     * Return a possibly-stale cached metadata entry together with its HTTP validators (ETag /
-     * Last-Modified) so the caller can revalidate it with a conditional GET instead of a full
-     * re-download. This is consulted only after {@link #getMavenMetadata} has reported a miss
-     * (e.g. because the entry's freshness window has elapsed), giving caches a chance to retain a
-     * validator past the point at which they stop serving the value directly.
-     * <p>
-     * The default implementation returns {@code null}, meaning "no validator available"; callers
-     * then fall back to an unconditional download, preserving pre-existing behavior.
-     *
-     * @param repo the repository the metadata would be downloaded from
-     * @param gav  the group/artifact (and optionally version) the metadata describes
-     * @return a validator-carrying entry, or {@code null} if none is retained
+     * Store a {@code maven-metadata.xml} entry, including any HTTP validators (ETag / Last-Modified)
+     * the origin returned, so that a later expiry can be revalidated cheaply via a conditional GET.
+     * The entry is supplied {@linkplain MavenMetadataCacheEntry#fresh fresh}; the cache owns when it
+     * subsequently considers the entry expired.
      */
-    default @Nullable MavenMetadataValidation getMavenMetadataForRevalidation(URI repo, GroupArtifactVersion gav) {
-        return null;
-    }
-
-    /**
-     * Store metadata along with the HTTP validators returned by the origin, so that a later expiry
-     * can be revalidated cheaply via {@link #getMavenMetadataForRevalidation}. Re-storing a value
-     * that was confirmed unchanged by a {@code 304} response also refreshes the entry's freshness.
-     * <p>
-     * The default implementation delegates to {@link #putMavenMetadata(URI, GroupArtifactVersion,
-     * MavenMetadata)}, discarding the validators; caches that do not support conditional requests
-     * therefore behave exactly as before.
-     *
-     * @param repo         the repository the metadata was downloaded from
-     * @param gav          the group/artifact (and optionally version) the metadata describes
-     * @param metadata     the metadata value, or {@code null} for a negative result
-     * @param etag         the {@code ETag} response header, or {@code null}
-     * @param lastModified the {@code Last-Modified} response header, or {@code null}
-     */
-    default void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata,
-                                  @Nullable String etag, @Nullable String lastModified) {
-        putMavenMetadata(repo, gav, metadata);
-    }
+    void putMavenMetadata(URI repo, GroupArtifactVersion gav, MavenMetadataCacheEntry metadata);
 
     @Nullable
     Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException;
