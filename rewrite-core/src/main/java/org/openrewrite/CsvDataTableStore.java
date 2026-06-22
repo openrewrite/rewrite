@@ -271,11 +271,9 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
      * memory at once.
      */
     private Stream<Object> streamRows(Path path, @Nullable RowMetadata meta, int prefixCount, int suffixCount) {
-        // Open and set up parsing eagerly so that open/parse failures surface to the
-        // caller exactly as the previous eager implementation did -- it caught only
-        // java.io.IOException, while the stream factories and the Univocity parser throw
-        // unchecked exceptions, so those always propagated. Only a stream-*close*
-        // IOException was swallowed there, which the onClose handler below preserves.
+        // Open the stream and set up the parser eagerly so I/O and parser-setup failures
+        // surface synchronously to the caller rather than mid-iteration; only a close-time
+        // IOException is swallowed (see onClose below).
         InputStream is = inputStreamFactory.apply(path);
         CsvParser parser;
         try {

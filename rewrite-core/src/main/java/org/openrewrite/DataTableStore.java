@@ -32,6 +32,12 @@ import java.util.stream.Stream;
  * Each data table bucket is identified by the data table's class name and
  * its {@link DataTable#getGroup() group} (for community tables) or
  * {@link DataTable#getInstanceName()} (for private tables).
+ * <p>
+ * A stream returned by {@code getRows} may hold an open file handle
+ * ({@link CsvDataTableStore} streams rows lazily from disk). Either consume it
+ * fully or use it in a try-with-resources; closing is idempotent and releases
+ * any underlying resources even when iteration is short-circuited
+ * (e.g. {@code findFirst}, {@code limit}).
  */
 public interface DataTableStore {
 
@@ -73,6 +79,8 @@ public interface DataTableStore {
      * @param group          the group identifying the bucket, or null for ungrouped
      * @param <Row>          the row type
      * @return a stream of typed rows, or an empty stream if no rows exist
+     * @apiNote The returned stream may hold an open file handle; consume it fully or close it
+     * (try-with-resources). Closing is idempotent and safe after short-circuiting.
      */
     @SuppressWarnings("unchecked")
     default <Row> Stream<Row> getRows(Class<? extends DataTable<Row>> dataTableClass, @Nullable String group) {

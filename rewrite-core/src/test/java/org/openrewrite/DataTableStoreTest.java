@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -394,6 +395,30 @@ class DataTableStoreTest {
             assertThat(rows.get(0)).isEqualTo(new TestTable.Row("value with, comma"));
             assertThat(rows.get(1)).isEqualTo(new TestTable.Row("value with \"quotes\""));
             assertThat(rows.get(2)).isEqualTo(new TestTable.Row("value with\nnewline"));
+        }
+    }
+
+    @Test
+    void csvStoreGetRowsShortCircuit(@TempDir Path tempDir) {
+        try (CsvDataTableStore store = new CsvDataTableStore(tempDir)) {
+            TestTable table = new TestTable(Recipe.noop());
+            List<String> names = List.of("alice", "bob", "carol", "dave", "erin", "frank");
+            for (String name : names) {
+                store.insertRow(table, ctx(), new TestTable.Row(name));
+            }
+
+            // Short-circuit: consume only the first row inside try-with-resources, leaving the
+            // rest of the rows undrained. Unlike the fully-draining tests, this exercises the
+            // lazy stream's partial-consumption + close path.
+            try (Stream<TestTable.Row> rows = store.getRows(TestTable.class)) {
+                Optional<TestTable.Row> first = rows.findFirst();
+                assertThat(first).contains(new TestTable.Row("alice"));
+            }
+
+            // Short-circuiting and closing must not corrupt store state: a subsequent full read
+            // still returns every row in order.
+            List<TestTable.Row> all = store.getRows(TestTable.class).collect(Collectors.toList());
+            assertThat(all).extracting(TestTable.Row::getName).containsExactlyElementsOf(names);
         }
     }
 
