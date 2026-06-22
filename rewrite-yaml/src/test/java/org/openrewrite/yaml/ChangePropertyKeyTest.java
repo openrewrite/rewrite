@@ -852,6 +852,103 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/1047")
+    @Test
+    void relocatesPropertyIntoExistingMappingAtDifferentRoot() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey(
+            "project.metrics.prometheus.enabled",
+            "management.prometheus.metrics.export.enabled",
+            true,
+            null,
+            null
+          )),
+          yaml(
+            """
+              project:
+                metrics:
+                  prometheus:
+                    enabled: true
+                    percentiles: [0.99, 0.9]
+              management:
+                prometheus:
+                  test: true
+              """,
+            """
+              project:
+                metrics:
+                  prometheus:
+                    percentiles: [0.99, 0.9]
+              management:
+                prometheus:
+                  test: true
+                  metrics.export.enabled: true
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/1047")
+    @Test
+    void relocatesPropertyToNewRootWhenNoExistingPrefix() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey(
+            "project.metrics.prometheus.enabled",
+            "management.prometheus.metrics.export.enabled",
+            true,
+            null,
+            null
+          )),
+          yaml(
+            """
+              project:
+                metrics:
+                  prometheus:
+                    enabled: true
+                    percentiles: [0.99, 0.9]
+              """,
+            """
+              project:
+                metrics:
+                  prometheus:
+                    percentiles: [0.99, 0.9]
+              management.prometheus.metrics.export.enabled: true
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/1047")
+    @Test
+    void relocatesSoleSequencePropertyIntoExistingMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey(
+            "project.metrics.prometheus.enabled",
+            "management.prometheus.metrics.export.enabled",
+            true,
+            null,
+            null
+          )),
+          yaml(
+            """
+              project:
+                metrics:
+                  prometheus:
+                    enabled: [0.99, 0.9]
+              management:
+                prometheus:
+                  test: true
+              """,
+            """
+              management:
+                prometheus:
+                  test: true
+                  metrics.export.enabled: [0.99, 0.9]
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2881")
     @Test
     void embedIndentedPropertyIntoExisting() {
