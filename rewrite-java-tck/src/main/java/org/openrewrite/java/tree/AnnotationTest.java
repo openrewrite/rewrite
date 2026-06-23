@@ -690,4 +690,64 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3881")
+    @Test
+    void annotatedVarargs() {
+        rewriteRun(
+          java(
+            """
+              package com.example;
+
+              import org.jspecify.annotations.NonNull;
+
+              class Test {
+                  void method(@NonNull String @NonNull ... args) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3881")
+    @Test
+    void annotatedVarargsFinal() {
+        rewriteRun(
+          java(
+            """
+              package com.example;
+
+              import org.jspecify.annotations.NonNull;
+
+              class Test {
+                  private String method(@NonNull final String @NonNull... args) {
+                      return "";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3881")
+    @Test
+    void multipleParametersWithAnnotatedVarargs() {
+        rewriteRun(
+          java(
+            """
+              package com.example;
+
+              import org.jspecify.annotations.NonNull;
+
+              class Test {
+                  public static int resolvePoolSize(@NonNull String propertyName, @NonNull String value,
+                          @NonNull String @NonNull... magicValues) {
+                      return 0;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

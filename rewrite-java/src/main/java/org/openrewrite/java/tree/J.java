@@ -6232,6 +6232,7 @@ public interface J extends Tree {
         @With
         @Nullable
         @Getter
+        @Deprecated
         Space varargs;
 
         @Deprecated
