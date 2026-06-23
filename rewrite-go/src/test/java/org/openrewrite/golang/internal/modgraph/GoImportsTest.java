@@ -87,6 +87,24 @@ class GoImportsTest {
     }
 
     @Test
+    void backtickRawStringImports() {
+        // bytedance/sonic (and others) write import paths as raw strings.
+        String src =
+          "package p\n" +
+          "\n" +
+          "import (\n" +
+          "\t`github.com/bytedance/sonic/ast`\n" +
+          "\t_ `github.com/bytedance/sonic/internal/rt`\n" +
+          ")\n" +
+          "\n" +
+          "import `golang.org/x/arch/x86/x86asm`\n";
+        assertThat(GoImports.parse(src)).containsExactlyInAnyOrder(
+          "github.com/bytedance/sonic/ast",
+          "github.com/bytedance/sonic/internal/rt",
+          "golang.org/x/arch/x86/x86asm");
+    }
+
+    @Test
     void noImports() {
         assertThat(GoImports.parse("package p\n\nfunc main() {}\n")).isEmpty();
     }

@@ -81,7 +81,7 @@ public final class GoImports {
             return;
         }
         char c = peek();
-        if (c == '"') {
+        if (c == '"' || c == '`') {
             out.add(readString());
             return;
         }
@@ -92,7 +92,7 @@ public final class GoImports {
                 readIdent();
             }
             skipSpaceAndComments();
-            if (!atEnd() && peek() == '"') {
+            if (!atEnd() && (peek() == '"' || peek() == '`')) {
                 out.add(readString());
             }
             return;
@@ -121,11 +121,23 @@ public final class GoImports {
         }
     }
 
-    // Reads a double-quoted Go string literal (peek == '"'), returning its
-    // unescaped content. Import paths only ever use the basic escapes.
+    // Reads a Go string literal import path (peek == '"' or '`'), returning its
+    // content. Raw strings (backticks) take no escapes; interpreted strings
+    // ("...") only ever use the basic escapes in an import path. Go code in the
+    // wild uses both forms — e.g. bytedance/sonic writes imports in backticks.
     private String readString() {
-        i++; // consume opening quote
+        char quote = s.charAt(i++); // consume opening quote (" or `)
         StringBuilder sb = new StringBuilder();
+        if (quote == '`') {
+            while (!atEnd()) {
+                char c = s.charAt(i++);
+                if (c == '`') {
+                    break;
+                }
+                sb.append(c);
+            }
+            return sb.toString();
+        }
         while (!atEnd()) {
             char c = s.charAt(i++);
             if (c == '\\' && !atEnd()) {
