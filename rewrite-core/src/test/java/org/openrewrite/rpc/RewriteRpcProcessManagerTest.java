@@ -20,12 +20,15 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.openrewrite.marketplace.RecipeMarketplace;
 
 import java.io.ByteArrayInputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,13 +43,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  * construction and decrements it on {@link RewriteRpc#shutdown()}, so the counter mirrors
  * the count of live node subprocesses without spawning any.
  */
+// The shared static CountingRpc.live counter, reset per test by newManager(), is only
+// safe under sequential execution; pin it so enabling method-level parallelism elsewhere
+// can't corrupt these assertions.
+@Execution(ExecutionMode.SAME_THREAD)
 class RewriteRpcProcessManagerTest {
 
     /**
      * A no-op {@link RewriteRpc} that tracks how many instances are currently "alive".
      * Stands in for a spawned node server so the manager's create/dispose accounting can be
      * asserted without real subprocesses. Its backing {@link JsonRpc} reads an
-     * already-at-EOF stream, so its reader thread exits immediately rather than lingering.
+     * already-at-EOF stream and spins up a {@link java.util.concurrent.ForkJoinPool} on
+     * construction; {@link #shutdown()} chains to {@link RewriteRpc#shutdown()} to tear that
+     * pool down so its worker threads don't accumulate across the many stubs this suite builds.
      */
     static class CountingRpc extends RewriteRpc {
         static final AtomicInteger live = new AtomicInteger();
@@ -73,7 +82,24 @@ class RewriteRpcProcessManagerTest {
             if (!shutdown) {
                 shutdown = true;
                 live.decrementAndGet();
+                // Tear down the backing JsonRpc ForkJoinPool so its worker threads don't
+                // accumulate across the hundreds of stubs this suite constructs.
+                super.shutdown();
             }
+        }
+    }
+
+    /**
+     * A {@link CountingRpc} whose {@link #shutdown()} decrements the live counter (so accounting
+     * stays accurate) and then throws, modelling a server whose teardown fails — e.g. a node
+     * process reporting a non-zero exit code. Used to assert that one failed teardown does not
+     * strand the remaining servers.
+     */
+    static class ThrowingRpc extends CountingRpc {
+        @Override
+        public void shutdown() {
+            super.shutdown();
+            throw new RuntimeException("simulated shutdown failure");
         }
     }
 
@@ -196,15 +222,21 @@ class RewriteRpcProcessManagerTest {
         List<Thread> threads = new ArrayList<>();
         AtomicInteger started = new AtomicInteger();
         Object park = new Object();
+        AtomicBoolean released = new AtomicBoolean();
         for (int i = 0; i < concurrent; i++) {
             Thread t = new Thread(() -> {
                 manager.getOrStart();
                 started.incrementAndGet();
                 synchronized (park) {
-                    try {
-                        park.wait();
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
+                    // Guarded wait: if notifyAll() fires before this thread parks, the
+                    // released flag is already set, so we never block on a missed wakeup.
+                    while (!released.get()) {
+                        try {
+                            park.wait();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
                     }
                 }
             }, "rpc-test-live-" + i);
@@ -224,10 +256,56 @@ class RewriteRpcProcessManagerTest {
                 .hasValue(0);
 
         synchronized (park) {
+            released.set(true);
             park.notifyAll();
         }
         for (Thread t : threads) {
-            t.join();
+            // Bounded join so a regression that strands a worker fails fast instead of hanging the suite.
+            t.join(10_000);
+            assertThat(t.isAlive()).as("parked worker %s should have been released", t.getName()).isFalse();
         }
+    }
+
+    @Test
+    void shutdownAllKeepsGoingWhenAServerShutdownThrows() throws InterruptedException {
+        RewriteRpcProcessManager<CountingRpc> manager = newManager();
+
+        // One healthy server on this thread and one whose teardown throws, owned by a dead thread.
+        // shutdownAll() must tear down both — a single failing shutdown cannot strand the rest.
+        manager.getOrStart();
+        runOnDeadThread(() -> {
+            manager.setFactory(ThrowingRpc::new);
+            manager.getOrStart();
+        });
+        assertThat(CountingRpc.live).hasValue(2);
+
+        manager.shutdownAll();
+
+        assertThat(manager.liveCount()).isZero();
+        assertThat(CountingRpc.live)
+                .as("a throwing teardown must not strand the healthy server")
+                .hasValue(0);
+    }
+
+    @Test
+    void shutdownReapsDeadOrphanWhoseShutdownThrows() throws InterruptedException {
+        RewriteRpcProcessManager<CountingRpc> manager = newManager();
+
+        // This thread owns a healthy server; a dead thread left behind an orphan whose teardown
+        // throws. shutdown() reaps the orphan in its finally block and must swallow the failure
+        // while still tearing down the calling thread's own server.
+        manager.getOrStart();
+        runOnDeadThread(() -> {
+            manager.setFactory(ThrowingRpc::new);
+            manager.getOrStart();
+        });
+        assertThat(CountingRpc.live).hasValue(2);
+
+        manager.shutdown();
+
+        assertThat(manager.liveCount()).isZero();
+        assertThat(CountingRpc.live)
+                .as("reaping a dead orphan whose shutdown throws must not strand other servers")
+                .hasValue(0);
     }
 }

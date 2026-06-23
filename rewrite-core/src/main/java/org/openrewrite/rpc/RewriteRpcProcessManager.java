@@ -38,13 +38,16 @@ import java.util.function.Supplier;
  * any server whose owning thread terminates before calling {@code shutdown()}
  * (ForkJoinPool ManagedBlocker compensation threads, cached/elastic pool threads
  * that die on their idle timeout, …) would otherwise survive — and accumulate
- * without bound — until JVM exit. To keep the live-server count bounded by the
- * number of currently-live RPC threads rather than the total number of threads
- * ever created, this manager tracks every started server in a process-wide,
- * thread-keyed registry and {@linkplain #reapDeadThreads() reaps} servers whose
- * owning thread is no longer alive. Reaping a dead thread's server is always safe
- * because a dead thread cannot be mid-RPC, which is what makes it sound to do
- * even while other threads are running concurrent RPC work.
+ * without bound — until JVM exit. To keep the number of live servers in check,
+ * this manager tracks every started server in a process-wide, thread-keyed
+ * registry and {@linkplain #reapDeadThreads() reaps} servers whose owning thread
+ * is no longer alive. Reaping is activity-driven: it runs when a new RPC thread
+ * starts a server (in {@link #getOrStart()}) and on {@link #shutdown()}, so a
+ * dead thread's server lingers only until the next such event — the residual is
+ * bounded by the number of RPC threads that have retired since the last reap,
+ * not by the total number of threads ever created. Reaping a dead thread's
+ * server is always safe because a dead thread cannot be mid-RPC, which is what
+ * makes it sound to do even while other threads are running concurrent RPC work.
  */
 public class RewriteRpcProcessManager<R extends RewriteRpc> {
     /**
@@ -75,9 +78,10 @@ public class RewriteRpcProcessManager<R extends RewriteRpc> {
         // previously-retired threads should be cleaned up before adding another.
         reapDeadThreads();
         R started = factory.get().get();
-        // Start the process outside the map's computeIfAbsent lock; for a per-thread
-        // key there is no contention, but putIfAbsent keeps us correct if a server
-        // somehow already got registered for this thread.
+        // Construct the server before touching the map. Only the current thread ever
+        // inserts its own key, so putIfAbsent's loser branch can fire only if this
+        // thread re-entered getOrStart() during construction; if it did, shut the
+        // duplicate down and keep the already-registered server.
         R prior = rpcByThread.putIfAbsent(current, started);
         if (prior != null) {
             started.shutdown();
@@ -91,7 +95,7 @@ public class RewriteRpcProcessManager<R extends RewriteRpc> {
     }
 
     public void reset() {
-        R current = rpcByThread.get(Thread.currentThread());
+        R current = get();
         if (current != null) {
             current.reset();
         }
@@ -117,9 +121,15 @@ public class RewriteRpcProcessManager<R extends RewriteRpc> {
     /**
      * Shut down <em>every</em> live server across all threads, driving the live-server
      * count to zero. Unlike {@link #reapDeadThreads()} this also stops servers owned by
-     * currently-live threads, so it must only be called when no RPC work is in flight —
-     * e.g. on JVM/service shutdown. Calling it while a concurrent run is parsing or
-     * printing would tear that run's server out from under it.
+     * currently-live threads, so it must only be called once no thread is doing — or
+     * about to do — RPC work, e.g. on JVM/service shutdown. A server is registered only
+     * after it is constructed in {@link #getOrStart()}, so calling this concurrently with
+     * {@code getOrStart()} could let a just-created server register after the sweep and
+     * survive; calling it mid parse/print would tear that run's server out from under it.
+     * <p>
+     * This is not required for correctness on JVM exit: each RPC subprocess registers its
+     * own JVM-exit shutdown hook, so {@code shutdownAll()} only bounds the live-server
+     * count earlier within a long-running JVM.
      */
     public void shutdownAll() {
         for (Thread t : rpcByThread.keySet()) {

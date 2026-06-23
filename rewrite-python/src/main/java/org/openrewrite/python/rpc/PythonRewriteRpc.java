@@ -87,6 +87,11 @@ public class PythonRewriteRpc extends RewriteRpc {
         process.shutdown();
     }
 
+    /**
+     * Shut down the current thread's Python RPC server, and reap any servers whose
+     * owning thread has since died. Reaping is scoped to dead threads only — a server
+     * owned by a still-live thread is never touched.
+     */
     public static void shutdownCurrent() {
         MANAGER.shutdown();
     }
