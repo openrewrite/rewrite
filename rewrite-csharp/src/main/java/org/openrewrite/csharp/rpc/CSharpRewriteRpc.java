@@ -89,6 +89,15 @@ public class CSharpRewriteRpc extends RewriteRpc {
         MANAGER.shutdown();
     }
 
+    /**
+     * Shut down every C# RPC server across all threads. Only call this when no
+     * C# parsing or printing is in flight (e.g. on JVM/service shutdown);
+     * {@link #shutdownCurrent()} already reaps servers orphaned by dead threads.
+     */
+    public static void shutdownAll() {
+        MANAGER.shutdownAll();
+    }
+
     public InstallRecipesResponse installRecipes(java.io.File recipes) {
         return send(
                 "InstallRecipes",

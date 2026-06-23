@@ -91,6 +91,15 @@ public class PythonRewriteRpc extends RewriteRpc {
         MANAGER.shutdown();
     }
 
+    /**
+     * Shut down every Python RPC server across all threads. Only call this when no
+     * Python parsing or printing is in flight (e.g. on JVM/service shutdown);
+     * {@link #shutdownCurrent()} already reaps servers orphaned by dead threads.
+     */
+    public static void shutdownAll() {
+        MANAGER.shutdownAll();
+    }
+
     public static void resetCurrent() {
         MANAGER.reset();
     }

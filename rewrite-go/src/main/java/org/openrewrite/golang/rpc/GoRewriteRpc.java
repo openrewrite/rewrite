@@ -94,6 +94,15 @@ public class GoRewriteRpc extends RewriteRpc {
         MANAGER.shutdown();
     }
 
+    /**
+     * Shut down every Go RPC server across all threads. Only call this when no
+     * Go parsing or printing is in flight (e.g. on JVM/service shutdown);
+     * {@link #shutdownCurrent()} already reaps servers orphaned by dead threads.
+     */
+    public static void shutdownAll() {
+        MANAGER.shutdownAll();
+    }
+
     public static void resetCurrent() {
         MANAGER.reset();
     }

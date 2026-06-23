@@ -94,6 +94,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         MANAGER.shutdown();
     }
 
+    /**
+     * Shut down every JavaScript RPC server across all threads. Only call this when no
+     * JavaScript parsing or printing is in flight (e.g. on JVM/service shutdown);
+     * {@link #shutdownCurrent()} already reaps servers orphaned by dead threads.
+     */
+    public static void shutdownAll() {
+        MANAGER.shutdownAll();
+    }
+
     public static void resetCurrent() {
         MANAGER.reset();
     }
