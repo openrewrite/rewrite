@@ -346,10 +346,7 @@ public class RewriteRpc {
     // from a GOPROXY at recipe time).
     private void setHttpSenderFrom(@Nullable Object p) {
         if (p instanceof ExecutionContext) {
-            HttpSender sender = HttpSenderExecutionContextView.view((ExecutionContext) p).getHttpSender();
-            if (sender != null) {
-                this.httpSender = sender;
-            }
+            this.httpSender = HttpSenderExecutionContextView.view((ExecutionContext) p).getHttpSender();
         }
     }
 
