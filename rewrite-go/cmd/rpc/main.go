@@ -89,7 +89,7 @@ type rpcError struct {
 // subtrees' data (whitespace) on the print transport.
 type server struct {
 	localObjects  map[string]any
-	remoteObjects map[string]any // last-synced state shared by both directions
+	remoteObjects map[string]any  // last-synced state shared by both directions
 	localRefs     map[uintptr]int // SEND ref table (persistent)
 	remoteRefs    map[int]any     // RECEIVE ref table (persistent)
 	batchSize     int
@@ -879,8 +879,8 @@ func (s *server) fetchHTTP(url string) ([]byte, int, error) {
 // HttpSender) on a miss. Best-effort: on any failure the marker keeps whatever
 // was resolved and GraphComplete reflects partiality.
 //
-// Proxy fetching is on by default (opt out with MODERNE_GO_OFFLINE or
-// GOPROXY=off). Fetched modules are written through to the standard module
+// Proxy fetching is on by default and disabled the Go-native way with
+// GOPROXY=off. Fetched modules are written through to the standard module
 // cache, so the first parse warms it and every later parse/recipe run — across
 // projects on the machine — resolves the full graph offline.
 func (s *server) resolveModuleGraph(goModContent []byte, mrr *golang.GoResolutionResult) {
@@ -909,29 +909,15 @@ func (s *server) moduleSource() modgraph.ModSource {
 	return modgraph.TieredSource(sources...)
 }
 
-// proxyResolveEnabled reports whether network module resolution is allowed.
-// On by default; disabled for air-gapped/offline runs via MODERNE_GO_OFFLINE,
-// GOPROXY=off, or an explicit MODERNE_GO_PROXY_RESOLVE=0/false/off.
+// proxyResolveEnabled reports whether the GOPROXY tier should be added. Network
+// module resolution is on by default — like rewrite's other ecosystems we
+// attempt the network (via the CLI HttpSender) and degrade gracefully to the
+// local cache and the existing require set when it is unavailable. It is
+// disabled the Go-native way, GOPROXY=off, the standard mechanism for
+// air-gapped builds. (A GOPROXY list such as "https://corp,off" still enables
+// the proxy; only the bare value "off" means no network.)
 func proxyResolveEnabled() bool {
-	if isTruthy(os.Getenv("MODERNE_GO_OFFLINE")) {
-		return false
-	}
-	if strings.TrimSpace(os.Getenv("GOPROXY")) == "off" {
-		return false
-	}
-	if v, ok := os.LookupEnv("MODERNE_GO_PROXY_RESOLVE"); ok && !isTruthy(v) {
-		return false
-	}
-	return true
-}
-
-func isTruthy(v string) bool {
-	switch strings.ToLower(strings.TrimSpace(v)) {
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return false
-	}
+	return strings.TrimSpace(os.Getenv("GOPROXY")) != "off"
 }
 
 func envOr(key, def string) string {
