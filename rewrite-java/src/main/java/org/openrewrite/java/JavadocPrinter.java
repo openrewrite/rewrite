@@ -20,6 +20,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.marker.LineComment;
+import org.openrewrite.java.marker.Varargs;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -434,7 +435,12 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
             beforeSyntax(arrayType, Space.Location.ARRAY_TYPE_PREFIX, p);
             visit(arrayType.getElementType(), p);
             visit(arrayType.getAnnotations(), p);
-            if (arrayType.getDimension() != null) {
+            if (arrayType.getMarkers().findFirst(Varargs.class).isPresent()) {
+                if (arrayType.getDimension() != null) {
+                    visitSpace(arrayType.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p);
+                }
+                p.append("...");
+            } else if (arrayType.getDimension() != null) {
                 visitSpace(arrayType.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p);
                 p.append('[');
                 visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);

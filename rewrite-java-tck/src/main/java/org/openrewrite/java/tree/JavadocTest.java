@@ -24,6 +24,8 @@ import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -2129,6 +2131,38 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3575")
+    @Test
+    void varargsReferenceModeledAsArrayType() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  /**
+                   * Reference: {@link A#varargsMethod(String...)}.
+                   */
+                  public static void varargsMethod(String... args) {
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean foundVarargs = new AtomicBoolean();
+                new org.openrewrite.java.JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Integer p) {
+                        if (arrayType.getMarkers().findFirst(org.openrewrite.java.marker.Varargs.class).isPresent()) {
+                            assertThat(((J.Identifier) arrayType.getElementType()).getSimpleName()).isEqualTo("String");
+                            foundVarargs.set(true);
+                        }
+                        return super.visitArrayType(arrayType, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(foundVarargs).as("varargs reference should be a J.ArrayType carrying the Varargs marker").isTrue();
+            })
           )
         );
     }
