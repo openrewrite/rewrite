@@ -50,7 +50,9 @@ public class ChangeFrom extends Recipe {
     String oldTag;
 
     @Option(displayName = "Old digest",
-            description = "Only match images with digests matching this glob pattern. If null, matches any digest or no digest.",
+            description = "Only match images with digests matching this glob pattern. If null, matches any digest or no " +
+                    "digest. If empty (`\"\"`), matches only images that have no digest, which is useful for skipping " +
+                    "digest-pinned `FROM`s so deliberate pins are left untouched.",
             example = "sha256:*",
             required = false)
     @Nullable
@@ -90,14 +92,6 @@ public class ChangeFrom extends Recipe {
             required = false)
     @Nullable
     String newPlatform;
-
-    @Option(displayName = "Keep digest-pinned images",
-            description = "When `true`, any `FROM` that carries a digest (`@sha256:...`) is left untouched, " +
-                    "preserving deliberate pins. The check is per-`FROM`, so other stages in a multi-stage " +
-                    "build are still changed. Defaults to `false` (current behavior).",
-            required = false)
-    @Nullable
-    Boolean keepDigestPinned;
 
     @Override
     public String getDisplayName() {
@@ -150,7 +144,9 @@ public class ChangeFrom extends Recipe {
         if (oldTag != null) {
             matcher.tag(oldTag);
         }
-        if (oldDigest != null) {
+        // Empty oldDigest is a sentinel: match only FROMs without a digest
+        boolean requireNoDigest = oldDigest != null && oldDigest.isEmpty();
+        if (oldDigest != null && !requireNoDigest) {
             matcher.digest(oldDigest);
         }
         if (oldPlatform != null) {
@@ -160,8 +156,8 @@ public class ChangeFrom extends Recipe {
         return matcher.asVisitor((image, ctx) -> {
             Docker.From f = image.getTree();
 
-            // Leave deliberate digest pins (@sha256:...) untouched when requested
-            if (Boolean.TRUE.equals(keepDigestPinned) && image.isDigestPinned()) {
+            // oldDigest="" matches only FROMs without a digest; leave digest-pinned ones untouched
+            if (requireNoDigest && image.isDigestPinned()) {
                 return f;
             }
 
