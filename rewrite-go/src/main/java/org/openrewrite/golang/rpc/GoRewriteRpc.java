@@ -15,6 +15,8 @@
  */
 package org.openrewrite.golang.rpc;
 
+import io.moderne.jsonrpc.JsonRpc;
+import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -22,6 +24,16 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.golang.GolangParser;
+import org.openrewrite.golang.internal.modgraph.CacheSource;
+import org.openrewrite.golang.internal.modgraph.ModSource;
+import org.openrewrite.golang.internal.modgraph.ProxySource;
+import org.openrewrite.golang.internal.modgraph.RequireSet;
+import org.openrewrite.golang.internal.modgraph.ResolveResult;
+import org.openrewrite.golang.internal.modgraph.Resolver;
+import org.openrewrite.golang.internal.modgraph.TieredSource;
+import org.openrewrite.golang.internal.modgraph.Tidy;
+import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
@@ -37,11 +49,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -71,6 +85,67 @@ public class GoRewriteRpc extends RewriteRpc {
         this.command = command;
         this.commandEnv = commandEnv;
         this.process = process;
+    }
+
+    /**
+     * Registers {@code GoModResolveTidy}: the Go peer's go.mod recipe delegates
+     * the entire {@code go mod tidy} require-set computation to this method, which
+     * runs the pure-Java module resolver. All GOPROXY HTTP happens here, inside
+     * the host, through the configured {@link HttpSender} — so no peer-initiated
+     * fetch crosses the RPC boundary. The peer passes the GOPROXY/GOMODCACHE it
+     * resolved from the environment; resolution degrades gracefully to the cache
+     * when the proxy is disabled ({@code GOPROXY=off}) or unreachable.
+     */
+    @Override
+    protected void registerLanguageMethods(JsonRpc jsonRpc) {
+        jsonRpc.rpc("GoModResolveTidy", new JsonRpcMethod<GoModResolveTidyRequest>() {
+            @Override
+            protected Object handle(GoModResolveTidyRequest request) {
+                return resolveTidy(request, getHttpSender());
+            }
+        });
+    }
+
+    /**
+     * Runs the pure-Java module resolver for a {@code GoModResolveTidy} request
+     * and returns the {@code {direct, indirect, complete}} response map. Extracted
+     * from the RPC handler so it can be exercised directly. All GOPROXY HTTP is
+     * performed through {@code sender} (falling back to a direct sender only when
+     * none is configured); {@code GOPROXY=off} resolves cache-only.
+     */
+    static Map<String, Object> resolveTidy(GoModResolveTidyRequest request, @Nullable HttpSender sender) {
+        HttpSender http = sender != null ? sender : new HttpUrlConnectionSender();
+        String gomodcache = request.gomodcache == null || request.gomodcache.isEmpty() ? null : request.gomodcache;
+
+        List<ModSource> tiers = new ArrayList<>();
+        if (gomodcache != null) {
+            tiers.add(new CacheSource(gomodcache));
+        }
+        if (request.goproxy != null && !"off".equals(request.goproxy.trim())) {
+            tiers.add(new ProxySource(request.goproxy, http, gomodcache));
+        }
+        ModSource src = new TieredSource(tiers.toArray(new ModSource[0]));
+
+        List<String> mainImports = request.mainImports == null ? Collections.emptyList() : request.mainImports;
+        ResolveResult res = Resolver.resolve(request.goMod.getBytes(StandardCharsets.UTF_8), src);
+        RequireSet rs = Tidy.tidyRequireSet(mainImports, request.modulePath, request.goMod, res, src,
+          request.separateIndirect);
+
+        Map<String, Object> out = new HashMap<>();
+        out.put("direct", rs.direct());
+        out.put("indirect", rs.indirect());
+        out.put("complete", rs.complete());
+        return out;
+    }
+
+    /** Request body for the {@code GoModResolveTidy} RPC method. */
+    static class GoModResolveTidyRequest {
+        public String goMod;
+        public @Nullable List<String> mainImports;
+        public String modulePath;
+        public boolean separateIndirect;
+        public @Nullable String goproxy;
+        public @Nullable String gomodcache;
     }
 
     public static @Nullable GoRewriteRpc get() {

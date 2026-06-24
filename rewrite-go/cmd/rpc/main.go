@@ -20,7 +20,6 @@ package main
 
 import (
 	"bufio"
-	"encoding/base64"
 	"encoding/csv"
 	"encoding/json"
 	"flag"
@@ -40,7 +39,6 @@ import (
 	"github.com/grafana/pyroscope-go"
 
 	goparser "github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser/modgraph"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/preconditions"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
@@ -829,95 +827,53 @@ func mapMarkerPrinter(mp *string) printer.MarkerPrinter {
 	}
 }
 
-// fetchHTTP performs an HTTP GET by delegating to the Java side over
-// bidirectional RPC, which executes the request through the CLI-configured
-// OpenRewrite HttpSender (proxy, auth, TLS all honored). Returns the response
-// body and status code. Used by the module-graph resolver to fetch dependency
-// go.mod files from a GOPROXY when they are not in the local module cache.
-func (s *server) fetchHTTP(url string) ([]byte, int, error) {
+// resolveTidyViaJava computes the `go mod tidy` require set by delegating to the
+// pure-Java module resolver over bidirectional RPC. The Java side performs all
+// GOPROXY HTTP through the CLI-configured OpenRewrite HttpSender (proxy, auth,
+// TLS honored) and writes fetched modules through to the standard module cache,
+// so no network egress originates from this peer. We pass the GOPROXY/GOMODCACHE
+// resolved from the environment; GOPROXY=off degrades to cache-only on the host.
+func (s *server) resolveTidyViaJava(content string, mainImports []string, modulePath string, separateIndirect bool) (recipes.TidyRequireSet, bool) {
 	s.httpMu.Lock()
 	defer s.httpMu.Unlock()
-	params, _ := json.Marshal(map[string]any{"url": url, "method": "GET"})
+	params, _ := json.Marshal(map[string]any{
+		"goMod":            content,
+		"mainImports":      mainImports,
+		"modulePath":       modulePath,
+		"separateIndirect": separateIndirect,
+		"goproxy":          envOr("GOPROXY", "https://proxy.golang.org,direct"),
+		"gomodcache":       envOr("GOMODCACHE", defaultModCache()),
+	})
 	req, _ := json.Marshal(map[string]any{
 		"jsonrpc": "2.0",
-		"id":      "go-Http",
-		"method":  "Http",
+		"id":      "go-GoModResolveTidy",
+		"method":  "GoModResolveTidy",
 		"params":  json.RawMessage(params),
 	})
 	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(req))
 	if _, err := s.writer.Write(append([]byte(header), req...)); err != nil {
-		return nil, 0, err
+		return recipes.TidyRequireSet{}, false
 	}
 	resp, err := s.readMessage()
 	if err != nil {
-		return nil, 0, err
+		return recipes.TidyRequireSet{}, false
 	}
 	raw := resp.Result
 	if raw == nil {
 		raw = resp.Params
 	}
 	if raw == nil {
-		return nil, 0, fmt.Errorf("Http: empty response")
+		return recipes.TidyRequireSet{}, false
 	}
 	var out struct {
-		Status int    `json:"status"`
-		Body   string `json:"body"` // base64
+		Direct   map[string]string `json:"direct"`
+		Indirect map[string]string `json:"indirect"`
+		Complete bool              `json:"complete"`
 	}
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, 0, err
+		return recipes.TidyRequireSet{}, false
 	}
-	body, err := base64.StdEncoding.DecodeString(out.Body)
-	if err != nil {
-		return nil, 0, err
-	}
-	return body, out.Status, nil
-}
-
-// resolveModuleGraph enriches a go.mod's GoResolutionResult marker with the
-// resolved module graph + build list. Dependency go.mod files are read from the
-// local module cache first and fetched from the GOPROXY (via the Java
-// HttpSender) on a miss. Best-effort: on any failure the marker keeps whatever
-// was resolved and GraphComplete reflects partiality.
-//
-// Proxy fetching is on by default and disabled the Go-native way with
-// GOPROXY=off. Fetched modules are written through to the standard module
-// cache, so the first parse warms it and every later parse/recipe run — across
-// projects on the machine — resolves the full graph offline.
-func (s *server) resolveModuleGraph(goModContent []byte, mrr *golang.GoResolutionResult) {
-	res, err := modgraph.Resolve(goModContent, s.moduleSource())
-	if err != nil {
-		s.logger.Printf("resolveModuleGraph: %v", err)
-		return
-	}
-	modgraph.ApplyTo(res, mrr)
-}
-
-// moduleSource builds the dependency-resolution source: the local module cache
-// first, then (unless disabled) a write-through GOPROXY tier whose HTTP is
-// delegated to the Java HttpSender via the bidirectional Http method. Proxy
-// fetches persist .mod/.zip/.ziphash into the standard $GOMODCACHE/cache/download
-// layout, so the cache fills in on first use and is shared by every subsequent
-// lookup. The same source is used at parse time and installed into the recipe
-// ExecutionContext for recipe-time re-resolution, giving both the full graph.
-func (s *server) moduleSource() modgraph.ModSource {
-	gomodcache := envOr("GOMODCACHE", defaultModCache())
-	sources := []modgraph.ModSource{modgraph.CacheSource(gomodcache)}
-	if proxyResolveEnabled() {
-		goproxy := envOr("GOPROXY", "https://proxy.golang.org,direct")
-		sources = append(sources, modgraph.ProxyWriteThroughSource(goproxy, gomodcache, s.fetchHTTP))
-	}
-	return modgraph.TieredSource(sources...)
-}
-
-// proxyResolveEnabled reports whether the GOPROXY tier should be added. Network
-// module resolution is on by default — like rewrite's other ecosystems we
-// attempt the network (via the CLI HttpSender) and degrade gracefully to the
-// local cache and the existing require set when it is unavailable. It is
-// disabled the Go-native way, GOPROXY=off, the standard mechanism for
-// air-gapped builds. (A GOPROXY list such as "https://corp,off" still enables
-// the proxy; only the bare value "off" means no network.)
-func proxyResolveEnabled() bool {
-	return strings.TrimSpace(os.Getenv("GOPROXY")) != "off"
+	return recipes.TidyRequireSet{Direct: out.Direct, Indirect: out.Indirect, Complete: out.Complete}, true
 }
 
 func envOr(key, def string) string {
@@ -1164,10 +1120,10 @@ func (s *server) resolveExecutionContext(pid *string) *recipe.ExecutionContext {
 		s.preparedContexts[*pid] = ctx
 	}
 	s.installDataTableStore(ctx)
-	// Make the dependency-resolution source available so recipes that mutate
-	// dependencies can re-resolve the module model at recipe time (network via
-	// the Java HttpSender).
-	recipes.SetModSource(ctx, s.moduleSource())
+	// Install the recipe-time tidy resolver, which delegates the require-set
+	// computation to the pure-Java module resolver on the host (all GOPROXY HTTP
+	// runs there through the CLI HttpSender).
+	recipes.SetTidyResolver(ctx, s.resolveTidyViaJava)
 	return ctx
 }
 
@@ -2083,9 +2039,8 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if sumData, err := os.ReadFile(sumPath); err == nil {
 			mrr.ResolvedDependencies = goparser.ParseGoSum(string(sumData))
 		}
-		// Enrich with the resolved module graph + build list (cache, then
-		// GOPROXY via the Java HttpSender) so recipes get the full graph.
-		s.resolveModuleGraph(data, mrr)
+		// The marker carries only the declared model at parse time; the resolved
+		// build list is computed on demand by the Java resolver at recipe time.
 		mods[filepath.Dir(modPath)] = &modCtx{dir: filepath.Dir(modPath), mrr: mrr}
 	}
 

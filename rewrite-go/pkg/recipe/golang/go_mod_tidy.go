@@ -23,7 +23,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser/modgraph"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang/internal"
@@ -246,14 +245,6 @@ func (v *goModTidyEditor) VisitGoMod(gm *golang.GoMod, p any) java.Tree {
 
 	separateIndirect := goVersionAtLeast(gm, 1, 17)
 
-	// When the go.mod carries a fully-resolved GoResolutionResult, its Requires
-	// list is the authoritative require set the package-import graph computed at
-	// parse time (already pruned of unused modules, with missing ones added and
-	// // indirect classified). Otherwise fall back to the LST-only Phase 1:
-	// re-mark and sort the existing requires from the import scan.
-	res := GetResolutionResult(gm)
-	authoritative := res != nil && res.GraphComplete && len(res.Requires) > 0
-
 	// Strip the existing require statements, remembering where the first one
 	// was and its leading whitespace.
 	firstIdx := -1
@@ -293,21 +284,14 @@ func (v *goModTidyEditor) VisitGoMod(gm *golang.GoMod, p any) java.Tree {
 	}
 
 	// Determine the entries to emit, in priority order:
-	//  1. Compute the exact tidy require set NOW from the resolved module graph,
-	//     the scanned imports, and a ModSource (cache + write-through proxy).
-	//     This is the production path.
-	//  2. Fall back to the require set the marker carries from parse-time
-	//     resolution, used when (1) cannot complete at recipe time but parse time
-	//     did resolve the full graph.
-	//  3. LST-only: re-mark the declared requires by direct-import and sort them,
-	//     preserving the existing set (the offline / no-ModSource degradation).
+	//  1. Compute the exact tidy require set NOW via the Java resolver (the
+	//     scanned imports + the current go.mod, with dependency metadata fetched
+	//     on the host through the CLI HttpSender). This is the production path.
+	//  2. LST-only: re-mark the declared requires by direct-import and sort them,
+	//     preserving the existing set (the offline / no-resolver degradation).
 	var entries []reqEntry
-	if computed, ok := v.computeTidySet(gm, res, separateIndirect, p); ok {
+	if computed, ok := v.computeTidySet(gm, separateIndirect, p); ok {
 		entries = computed
-	} else if authoritative {
-		for _, r := range res.Requires {
-			entries = append(entries, reqEntry{r.ModulePath, r.Version, r.Indirect})
-		}
 	} else {
 		direct := v.directModules()
 		for _, e := range collected {
@@ -471,53 +455,30 @@ func headerInsertIndex(stmts []java.RightPadded[golang.GoModStatement]) int {
 	return idx
 }
 
-// computeTidySet computes the exact go.mod require set at recipe time from the
-// resolved module graph, the imports scanned from the project's .go files, and
-// the dependency ModSource installed in the ExecutionContext (cache + write-
-// through GOPROXY via the CLI HttpSender).
+// computeTidySet computes the exact go.mod require set at recipe time by
+// delegating to the pure-Java module resolver over RPC: it sends the current
+// go.mod text, the imports scanned from the project's .go files, and the module
+// path, and receives back the direct/indirect require set. All dependency
+// metadata (go.mod/zip) is fetched on the host through the CLI HttpSender, so no
+// network egress originates from this peer.
 //
-// The graph is taken from the parse-time marker when it is complete; otherwise
-// it is re-resolved NOW against the same source. This matters because parse-time
-// resolution may be cold (cache-only / offline) while the recipe — which is
-// explicitly editing dependencies — is allowed to reach the network and warm
-// the shared cache. Without this, a cold parse would permanently pin the recipe
-// to the incomplete LST-only fallback even with the network available.
-//
-// Returns ok=false when the source is absent or resolution still cannot complete
-// (truly offline + cold cache, or a private module), so the caller falls back to
-// the marker's authoritative set (tests) or the LST-only set, which PRESERVES
-// the existing require/// indirect block rather than dropping unconfirmed deps.
-func (v *goModTidyEditor) computeTidySet(gm *golang.GoMod, res *golang.GoResolutionResult, separateIndirect bool, p any) ([]reqEntry, bool) {
+// Returns ok=false when no resolver is installed (running outside the CLI) or
+// resolution could not complete (truly offline + cold cache, or a private
+// module), so the caller falls back to the LST-only set, which PRESERVES the
+// existing require/// indirect block rather than dropping unconfirmed deps.
+func (v *goModTidyEditor) computeTidySet(gm *golang.GoMod, separateIndirect bool, p any) ([]reqEntry, bool) {
 	ctx, ok := p.(*recipe.ExecutionContext)
 	if !ok {
 		return nil, false
 	}
-	src := ModSourceFrom(ctx)
-	if src == nil {
+	resolve := TidyResolverFrom(ctx)
+	if resolve == nil {
 		return nil, false
 	}
 
-	// Obtain a module graph to walk: prefer the parse-time graph when complete,
-	// else re-resolve now against the (network-backed, write-through) source.
 	content := printer.PrintGoMod(gm)
-	var graph modgraph.Result
-	if res != nil && res.GraphComplete && len(res.BuildList) > 0 {
-		graph = modgraph.FromMarker(*res)
-	} else {
-		r, err := modgraph.Resolve([]byte(content), src)
-		if err != nil || !r.Complete || len(r.BuildList) == 0 {
-			return nil, false
-		}
-		graph = r
-	}
-
-	mainImports := v.curImports
-	// TidyRequireSet = NeededModules (import-reachable) + the go>=1.17 pruning-
-	// completeness roots (test-transitive indirect deps under-selected by the
-	// pruned graph). The latter requires the go.mod text for synthetic re-
-	// resolution; it no-ops for go<1.17.
-	rs := modgraph.TidyRequireSet(mainImports, v.curModulePath, content, graph, src, separateIndirect)
-	if !rs.Complete {
+	rs, ok := resolve(content, v.curImports, v.curModulePath, separateIndirect)
+	if !ok || !rs.Complete {
 		return nil, false
 	}
 

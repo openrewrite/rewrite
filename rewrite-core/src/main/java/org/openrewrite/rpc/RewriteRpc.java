@@ -38,12 +38,8 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.ipc.http.HttpSender;
-import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
 import java.io.PrintStream;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.nio.file.Files;
@@ -243,39 +239,28 @@ public class RewriteRpc {
             }
         });
 
-        // Http: lets the RPC peer (e.g. the Go module-graph resolver fetching
-        // dependency go.mod files from a GOPROXY) perform an HTTP GET through
-        // the configured HttpSender, so proxy/auth/TLS are honored. Returns the
-        // status code and base64-encoded body.
-        jsonRpc.rpc("Http", new JsonRpcMethod<HttpRequest>() {
-            @Override
-            protected Object handle(HttpRequest request) {
-                HttpSender sender = httpSender != null ? httpSender : new HttpUrlConnectionSender();
-                Map<String, Object> out = new HashMap<>();
-                try (HttpSender.Response response = sender.get(request.url).send()) {
-                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                    try (InputStream in = response.getBody()) {
-                        byte[] buf = new byte[8192];
-                        for (int n; (n = in.read(buf)) != -1; ) {
-                            bos.write(buf, 0, n);
-                        }
-                    }
-                    out.put("status", response.getCode());
-                    out.put("body", Base64.getEncoder().encodeToString(bos.toByteArray()));
-                } catch (Exception e) {
-                    out.put("status", 0);
-                    out.put("body", "");
-                }
-                return out;
-            }
-        });
+        // Language-specific RPC methods (registered by subclasses) are bound
+        // here, before jsonRpc.bind(). This is where, for example, the Go
+        // support registers its module-graph resolver — keeping domain-specific,
+        // network-performing methods out of the generic core protocol.
+        registerLanguageMethods(jsonRpc);
 
         jsonRpc.bind();
     }
 
     /**
-     * Configure the {@link HttpSender} used by the {@code Http} RPC method.
-     * Typically set from a parse/recipe ExecutionContext so the peer's HTTP
+     * Hook for a subclass to register additional, language-specific RPC methods
+     * on the bidirectional channel before it is bound. The default registers
+     * nothing. Implementations may delegate network calls to {@link
+     * #getHttpSender()} so proxy/auth/TLS are honored. Invoked from the
+     * constructor, so implementations must not rely on subclass instance state.
+     */
+    protected void registerLanguageMethods(JsonRpc jsonRpc) {
+    }
+
+    /**
+     * Configure the {@link HttpSender} a language method may use to perform HTTP
+     * on the peer's behalf. Typically set from a parse/recipe ExecutionContext so
      * fetches use the CLI-configured sender (proxy, auth, TLS).
      */
     public RewriteRpc setHttpSender(@Nullable HttpSender httpSender) {
@@ -283,12 +268,9 @@ public class RewriteRpc {
         return this;
     }
 
-    /**
-     * Request body for the {@code Http} RPC method.
-     */
-    static class HttpRequest {
-        public String url;
-        public @Nullable String method;
+    /** The configured {@link HttpSender}, for use by language RPC methods. */
+    protected @Nullable HttpSender getHttpSender() {
+        return httpSender;
     }
 
     public RewriteRpc livenessCheck(Supplier<? extends @Nullable RuntimeException> livenessCheck) {
