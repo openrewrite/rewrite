@@ -28,7 +28,7 @@ class ChangeFromTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04", null, null));
+        spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04", null, null, null));
     }
 
     @DocumentExample
@@ -67,7 +67,7 @@ class ChangeFromTest implements RewriteTest {
     @Test
     void changeBaseImageWithAs() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("golang", "1.20", null, null, "golang", "1.21", null, null)),
+          spec -> spec.recipe(new ChangeFrom("golang", "1.20", null, null, "golang", "1.21", null, null, null)),
           docker(
             """
               FROM golang:1.20 AS builder
@@ -130,7 +130,7 @@ class ChangeFromTest implements RewriteTest {
     @Test
     void changeWithGlobPattern() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "ubuntu", "22.04", null, null)),
+          spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "ubuntu", "22.04", null, null, null)),
           docker(
             """
               FROM ubuntu:20.04
@@ -147,7 +147,7 @@ class ChangeFromTest implements RewriteTest {
     @Test
     void changeWithGlobPatternMultipleMatches() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "ubuntu", "22.04", null, null)),
+          spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "ubuntu", "22.04", null, null, null)),
           docker(
             """
               FROM ubuntu:18.04 AS base
@@ -166,7 +166,7 @@ class ChangeFromTest implements RewriteTest {
     @Test
     void changeWithWildcardImageName() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("*/ubuntu", "20.04", null, null, "docker.io/library/ubuntu", "22.04", null, null)),
+          spec -> spec.recipe(new ChangeFrom("*/ubuntu", "20.04", null, null, "docker.io/library/ubuntu", "22.04", null, null, null)),
           docker(
             """
               FROM gcr.io/ubuntu:20.04
@@ -181,7 +181,7 @@ class ChangeFromTest implements RewriteTest {
     @Test
     void addPlatformFlag() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "20.04", null, "linux/arm64")),
+          spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "20.04", null, "linux/arm64", null)),
           docker(
             """
               FROM ubuntu:20.04
@@ -198,7 +198,7 @@ class ChangeFromTest implements RewriteTest {
     @Test
     void updatePlatformFlag() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "20.04", null, "linux/arm64")),
+          spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "20.04", null, "linux/arm64", null)),
           docker(
             """
               FROM --platform=linux/amd64 ubuntu:20.04
@@ -215,7 +215,7 @@ class ChangeFromTest implements RewriteTest {
     @Test
     void removePlatformFlag() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, "linux/amd64", "ubuntu", null, null, "")),
+          spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, "linux/amd64", "ubuntu", null, null, "", null)),
           docker(
             """
               FROM --platform=linux/amd64 ubuntu:20.04
@@ -232,7 +232,7 @@ class ChangeFromTest implements RewriteTest {
     @Test
     void changeImageAndPlatform() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04", null, "linux/arm64")),
+          spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04", null, "linux/arm64", null)),
           docker(
             """
               FROM --platform=linux/amd64 ubuntu:20.04
@@ -249,7 +249,7 @@ class ChangeFromTest implements RewriteTest {
     @Test
     void onlyChangeImageWithMatchingPlatform() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, "linux/amd64", "ubuntu", "22.04", null, "")),
+          spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, "linux/amd64", "ubuntu", "22.04", null, "", null)),
           docker(
             """
               FROM --platform=linux/amd64 ubuntu:20.04
@@ -272,7 +272,7 @@ class ChangeFromTest implements RewriteTest {
     @Test
     void changeImageAndPlatformWhenMatchingOldPlatform() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, "linux/amd64", "ubuntu", "22.04", null, "linux/arm64")),
+          spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, "linux/amd64", "ubuntu", "22.04", null, "linux/arm64", null)),
           docker(
             """
               FROM --platform=linux/amd64 ubuntu:20.04
@@ -296,7 +296,7 @@ class ChangeFromTest implements RewriteTest {
     void changeBaseImageWithDoubleQuotedString() {
         // Quoted strings are parsed as a single unit, so we match the full image reference as the image name
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu:20.04", null, null, null, "ubuntu", "22.04", null, null)),
+          spec -> spec.recipe(new ChangeFrom("ubuntu:20.04", null, null, null, "ubuntu", "22.04", null, null, null)),
           docker(
             """
               FROM "ubuntu:20.04"
@@ -314,7 +314,7 @@ class ChangeFromTest implements RewriteTest {
     void changeBaseImageWithDoubleQuotedStringPreservesAs() {
         // Quoted strings are parsed as a single unit, so we match the full image reference as the image name
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu:20.04", null, null, null, "ubuntu", "22.04", null, null)),
+          spec -> spec.recipe(new ChangeFrom("ubuntu:20.04", null, null, null, "ubuntu", "22.04", null, null, null)),
           docker(
             """
               FROM "ubuntu:20.04" as builder
@@ -332,7 +332,7 @@ class ChangeFromTest implements RewriteTest {
     void changeBaseImageWithSingleQuotedString() {
         // Quoted strings are parsed as a single unit, so we match the full image reference as the image name
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu:20.04", null, null, null, "ubuntu", "22.04", null, null)),
+          spec -> spec.recipe(new ChangeFrom("ubuntu:20.04", null, null, null, "ubuntu", "22.04", null, null, null)),
           docker(
             """
               FROM 'ubuntu:20.04'
@@ -350,7 +350,7 @@ class ChangeFromTest implements RewriteTest {
     void changeBaseImageWithSingleQuotedStringPreservesTrailingComment() {
         // Quoted strings are parsed as a single unit, so we match the full image reference as the image name
         rewriteRun(
-          spec -> spec.recipe(new ChangeFrom("ubuntu:20.04", null, null, null, "ubuntu", "22.04", null, null)),
+          spec -> spec.recipe(new ChangeFrom("ubuntu:20.04", null, null, null, "ubuntu", "22.04", null, null, null)),
           docker(
             """
               FROM 'ubuntu:20.04' # Trailing comment
@@ -370,7 +370,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void matchesImageWithEnvironmentVariableInTag() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "ubuntu", "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "ubuntu", "22.04", null, null, null)),
               docker(
                 """
                   FROM ubuntu:${TAG}
@@ -387,7 +387,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void matchesImageWithEnvironmentVariableInDigest() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, "*", null, "ubuntu", "22.04", "", null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, "*", null, "ubuntu", "22.04", "", null, null)),
               docker(
                 """
                   FROM ubuntu@${DIGEST}
@@ -404,7 +404,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void matchesImageWithEnvironmentVariableInName() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("*", "20.04", null, null, "ubuntu", "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("*", "20.04", null, null, "ubuntu", "22.04", null, null, null)),
               docker(
                 """
                   FROM ${IMAGE_NAME}:20.04
@@ -421,7 +421,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void matchesBothLiteralAndEnvironmentVariableImages() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "ubuntu", "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, "ubuntu", "22.04", null, null, null)),
               docker(
                 """
                   FROM ubuntu:20.04 AS base
@@ -438,7 +438,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void doesNotMatchWhenNeitherPatternNorImageCanMatch() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("alpine", null, null, null, "alpine", "3.18", null, null)),
+              spec -> spec.recipe(new ChangeFrom("alpine", null, null, null, "alpine", "3.18", null, null, null)),
               docker(
                 """
                   FROM ubuntu:${TAG}
@@ -451,7 +451,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void matchesFullyParameterizedImageWithWildcard() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("*", null, null, null, "ubuntu", "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("*", null, null, null, "ubuntu", "22.04", null, null, null)),
               docker(
                 """
                   FROM ${REGISTRY}/${IMAGE}:${TAG}
@@ -472,7 +472,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeImageWithTagAndDigestToNewTag() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "*", null, "ubuntu", "22.04", "", null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "*", null, "ubuntu", "22.04", "", null, null)),
               docker(
                 """
                   FROM ubuntu:20.04@sha256:abc123def456
@@ -489,7 +489,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeImageWithTagAndDigestToNewDigest() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "*", null, "ubuntu", "", "sha256:newdigest789", null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "*", null, "ubuntu", "", "sha256:newdigest789", null, null)),
               docker(
                 """
                   FROM ubuntu:20.04@sha256:abc123def456
@@ -506,7 +506,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeImageWithTagAndDigestToNewTagAndDigest() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "*", null, "ubuntu", "22.04", "sha256:newdigest789", null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "*", null, "ubuntu", "22.04", "sha256:newdigest789", null, null)),
               docker(
                 """
                   FROM ubuntu:20.04@sha256:abc123def456
@@ -523,7 +523,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void matchImageWithTagAndDigestUsingWildcards() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", "*", "*", null, "ubuntu", "22.04", "", null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "*", "*", null, "ubuntu", "22.04", "", null, null)),
               docker(
                 """
                   FROM ubuntu:20.04@sha256:abc123
@@ -542,7 +542,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeImageWithTagAndDigestPreservesAs() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "*", null, "ubuntu", "22.04", "", null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "*", null, "ubuntu", "22.04", "", null, null)),
               docker(
                 """
                   FROM ubuntu:20.04@sha256:abc123 AS builder
@@ -559,7 +559,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeImageWithTagAndDigestPreservesPlatform() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "*", null, "ubuntu", "22.04", "", null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "*", null, "ubuntu", "22.04", "", null, null)),
               docker(
                 """
                   FROM --platform=linux/amd64 ubuntu:20.04@sha256:abc123
@@ -576,7 +576,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeImageWithRegistryTagAndDigest() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("my.registry.com/ubuntu", "*", "*", null, "my.registry.com/ubuntu", "22.04", "", null)),
+              spec -> spec.recipe(new ChangeFrom("my.registry.com/ubuntu", "*", "*", null, "my.registry.com/ubuntu", "22.04", "", null, null)),
               docker(
                 """
                   FROM my.registry.com/ubuntu:20.04@sha256:abc123
@@ -593,7 +593,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void noChangeWhenTagDoesNotMatch() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", "18.04", "*", null, "ubuntu", "22.04", "", null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "18.04", "*", null, "ubuntu", "22.04", "", null, null)),
               docker(
                 """
                   FROM ubuntu:20.04@sha256:abc123
@@ -610,7 +610,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeSimpleTag() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", null, null, null)),
               docker(
                 """
                   FROM ubuntu:20.04
@@ -627,7 +627,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeTagWithOldTagPattern() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.*", null, null, null, "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.*", null, null, null, "22.04", null, null, null)),
               docker(
                 """
                   FROM ubuntu:20.04
@@ -644,7 +644,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void noChangeWhenOldTagPatternDoesNotMatch() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", "18.*", null, null, null, "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "18.*", null, null, null, "22.04", null, null, null)),
               docker(
                 """
                   FROM ubuntu:20.04
@@ -657,7 +657,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeTagPreservesImageNameWithRegistry() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("my.registry.com/ubuntu", null, null, null, null, "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("my.registry.com/ubuntu", null, null, null, null, "22.04", null, null, null)),
               docker(
                 """
                   FROM my.registry.com/ubuntu:20.04
@@ -674,7 +674,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeTagWithGlobImagePattern() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("*/ubuntu", null, null, null, null, "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("*/ubuntu", null, null, null, null, "22.04", null, null, null)),
               docker(
                 """
                   FROM my.registry.com/ubuntu:20.04
@@ -691,7 +691,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeTagPreservesFlags() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", null, null, null)),
               docker(
                 """
                   FROM --platform=linux/amd64 ubuntu:20.04
@@ -708,7 +708,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeTagPreservesAsClause() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("golang", null, null, null, null, "1.21", null, null)),
+              spec -> spec.recipe(new ChangeFrom("golang", null, null, null, null, "1.21", null, null, null)),
               docker(
                 """
                   FROM golang:1.20 AS builder
@@ -725,7 +725,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeTagToDigest() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "", "sha256:abc123def456", null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "", "sha256:abc123def456", null, null)),
               docker(
                 """
                   FROM ubuntu:20.04
@@ -742,7 +742,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeDigestToTag() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", "", null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", "", null, null)),
               docker(
                 """
                   FROM ubuntu@sha256:olddigest123
@@ -759,7 +759,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void addTagToUntaggedImage() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", null, null, null)),
               docker(
                 """
                   FROM ubuntu
@@ -776,7 +776,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void addDigestToUntaggedImage() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, null, "sha256:abc123", null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, null, "sha256:abc123", null, null)),
               docker(
                 """
                   FROM ubuntu
@@ -793,7 +793,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void matchAnyImage() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("*", "latest", null, null, null, "1.0", null, null)),
+              spec -> spec.recipe(new ChangeFrom("*", "latest", null, null, null, "1.0", null, null, null)),
               docker(
                 """
                   FROM ubuntu:latest
@@ -812,7 +812,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeTagPreservesImageNameWithEnvVar() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("*/ubuntu", null, null, null, null, "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("*/ubuntu", null, null, null, null, "22.04", null, null, null)),
               docker(
                 """
                   ARG REGISTRY=docker.io
@@ -831,7 +831,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void noChangeWhenAlreadyHasDesiredTag() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", null, null, null)),
               docker(
                 """
                   FROM ubuntu:22.04
@@ -844,7 +844,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void changeTagInMultipleStages() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", null, null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "22.04", null, null, null)),
               docker(
                 """
                   FROM ubuntu:20.04 AS base
@@ -873,7 +873,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void noChangeWhenImageNameDoesNotMatch() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("debian", null, null, null, null, "12", null, null)),
+              spec -> spec.recipe(new ChangeFrom("debian", null, null, null, null, "12", null, null, null)),
               docker(
                 """
                   FROM ubuntu:20.04
@@ -890,7 +890,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void removeTagWithEmptyString() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "", null, null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "", null, null, null)),
               docker(
                 """
                   FROM ubuntu:20.04
@@ -907,7 +907,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void removeDigestWithEmptyString() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, null, "", null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, null, "", null, null)),
               docker(
                 """
                   FROM ubuntu@sha256:abc123
@@ -924,7 +924,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void removePlatformWithEmptyString() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, null, null, "")),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, null, null, "", null)),
               docker(
                 """
                   FROM --platform=linux/amd64 ubuntu:20.04
@@ -941,7 +941,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void noChangeWhenTagAlreadyAbsent() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "", null, null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, "", null, null, null)),
               docker(
                 """
                   FROM ubuntu
@@ -954,7 +954,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void noChangeWhenDigestAlreadyAbsent() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, null, "", null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, null, "", null, null)),
               docker(
                 """
                   FROM ubuntu:20.04
@@ -971,7 +971,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void singleTagCapturePreservesSuffix() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("openjdk", "8*", null, null, "eclipse-temurin", "17$1", null, null)),
+              spec -> spec.recipe(new ChangeFrom("openjdk", "8*", null, null, "eclipse-temurin", "17$1", null, null, null)),
               docker(
                 """
                   FROM openjdk:8-jdk-alpine
@@ -986,7 +986,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void singleTagCaptureWithEmptySuffix() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("openjdk", "8*", null, null, "eclipse-temurin", "17$1", null, null)),
+              spec -> spec.recipe(new ChangeFrom("openjdk", "8*", null, null, "eclipse-temurin", "17$1", null, null, null)),
               docker(
                 """
                   FROM openjdk:8
@@ -1001,7 +1001,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void hyphenPrefixedCapture() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("openjdk", "8-*", null, null, "eclipse-temurin", "17-$1", null, null)),
+              spec -> spec.recipe(new ChangeFrom("openjdk", "8-*", null, null, "eclipse-temurin", "17-$1", null, null, null)),
               docker(
                 """
                   FROM openjdk:8-jdk-noble
@@ -1016,7 +1016,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void dollarZeroSubstitutesFullOriginalField() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "$0-lts", null, null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "$0-lts", null, null, null)),
               docker(
                 """
                   FROM ubuntu:20.04
@@ -1031,7 +1031,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void multipleCapturesPreserved() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("repo", "*-jdk-*", null, null, "repo", "$1-jre-$2", null, null)),
+              spec -> spec.recipe(new ChangeFrom("repo", "*-jdk-*", null, null, "repo", "$1-jre-$2", null, null, null)),
               docker(
                 """
                   FROM repo:8-jdk-alpine
@@ -1046,7 +1046,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void backslashDollarIsLiteral() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04-\\$VAR", null, null)),
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04-\\$VAR", null, null, null)),
               docker(
                 """
                   FROM ubuntu:20.04
@@ -1061,7 +1061,7 @@ class ChangeFromTest implements RewriteTest {
         @Test
         void imageNameCapture() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeFrom("*/openjdk", "8", null, null, "$1/eclipse-temurin", "17", null, null)),
+              spec -> spec.recipe(new ChangeFrom("*/openjdk", "8", null, null, "$1/eclipse-temurin", "17", null, null, null)),
               docker(
                 """
                   FROM gcr.io/openjdk:8
@@ -1075,20 +1075,103 @@ class ChangeFromTest implements RewriteTest {
 
         @Test
         void validationRejectsBackrefWithoutCapture() {
-            assertThat(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04-$1", null, null).validate().isInvalid())
+            assertThat(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04-$1", null, null, null).validate().isInvalid())
               .isTrue();
         }
 
         @Test
         void validationRejectsBackrefBeyondCaptureCount() {
-            assertThat(new ChangeFrom("ubuntu", "20.*", null, null, "ubuntu", "22.$2", null, null).validate().isInvalid())
+            assertThat(new ChangeFrom("ubuntu", "20.*", null, null, "ubuntu", "22.$2", null, null, null).validate().isInvalid())
               .isTrue();
         }
 
         @Test
         void validationAcceptsDollarZeroWithoutCaptures() {
-            assertThat(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "$0-lts", null, null).validate().isValid())
+            assertThat(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "$0-lts", null, null, null).validate().isValid())
               .isTrue();
+        }
+    }
+
+    @Nested
+    class DigestPinned implements RewriteTest {
+
+        @Test
+        void keepDigestPinnedSkipsTagUpgradeOnDigestedFrom() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04", null, null, true)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123def456
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void keepDigestPinnedPreservesPinWhenRecipeWouldStripIt() {
+            // newDigest="" would normally remove the pin; the guard leaves the whole FROM untouched.
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("registry.example.com/runtime", "*", null, null,
+                "registry.example.com/runtime", "3-jdk21", "", null, true)),
+              docker(
+                """
+                  FROM registry.example.com/runtime:3.9.16-jdk21@sha256:abcdef1234567890
+                  RUN ./build.sh
+                  """
+              )
+            );
+        }
+
+        @Test
+        void keepDigestPinnedStillUpgradesUnpinnedFrom() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04", null, null, true)),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void digestedFromChangedWhenGuardExplicitlyOff() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "*", null, "ubuntu", "22.04", "", null, false)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123def456
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void keepDigestPinnedIsPerFromInMultiStage() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04", null, null, true)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123 AS pinned
+                  FROM ubuntu:20.04 AS floating
+                  """,
+                """
+                  FROM ubuntu:20.04@sha256:abc123 AS pinned
+                  FROM ubuntu:22.04 AS floating
+                  """
+              )
+            );
         }
     }
 }

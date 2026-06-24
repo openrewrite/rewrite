@@ -91,6 +91,14 @@ public class ChangeFrom extends Recipe {
     @Nullable
     String newPlatform;
 
+    @Option(displayName = "Keep digest-pinned images",
+            description = "When `true`, any `FROM` that carries a digest (`@sha256:...`) is left untouched, " +
+                    "preserving deliberate pins. The check is per-`FROM`, so other stages in a multi-stage " +
+                    "build are still changed. Defaults to `false` (current behavior).",
+            required = false)
+    @Nullable
+    Boolean keepDigestPinned;
+
     @Override
     public String getDisplayName() {
         return "Change Docker FROM";
@@ -151,6 +159,11 @@ public class ChangeFrom extends Recipe {
 
         return matcher.asVisitor((image, ctx) -> {
             Docker.From f = image.getTree();
+
+            // Leave deliberate digest pins (@sha256:...) untouched when requested
+            if (Boolean.TRUE.equals(keepDigestPinned) && image.isDigestPinned()) {
+                return f;
+            }
 
             // Check if any change is needed
             String currentImageName = image.getImageName();
