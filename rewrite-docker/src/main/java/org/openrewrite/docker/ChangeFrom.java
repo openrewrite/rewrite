@@ -144,8 +144,8 @@ public class ChangeFrom extends Recipe {
         if (oldTag != null) {
             matcher.tag(oldTag);
         }
-        // A real (non-empty) glob configures the matcher; oldDigest="" is the "no digest" sentinel (handled below).
-        // The null check is required here: a negated equals like !"".equals(oldDigest) would also let null through.
+        // Only a real (non-empty) glob configures the matcher; oldDigest="" is the "no digest"
+        // sentinel handled per-FROM below, so it must not configure the matcher's digest filter.
         if (oldDigest != null && !oldDigest.isEmpty()) {
             matcher.digest(oldDigest);
         }
