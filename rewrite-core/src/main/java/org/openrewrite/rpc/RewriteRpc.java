@@ -36,10 +36,7 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-
 import java.io.PrintStream;
-import java.util.HashMap;
-import java.util.Map;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -236,35 +233,7 @@ public class RewriteRpc {
             }
         });
 
-        // Language-specific RPC methods (registered by subclasses) are bound
-        // here, before jsonRpc.bind(). This is where, for example, the Go
-        // support registers its module-graph resolver — keeping domain-specific,
-        // network-performing methods out of the generic core protocol.
-        registerLanguageMethods(jsonRpc);
-
         jsonRpc.bind();
-    }
-
-    /**
-     * Hook for a subclass to register additional, language-specific RPC methods
-     * on the bidirectional channel before it is bound. The default registers
-     * nothing. A method that needs the current operation's {@link
-     * org.openrewrite.ExecutionContext} (e.g. to honor a CLI-configured
-     * HttpSender) can capture it via {@link #beforeSend(Object)}. Invoked from
-     * the constructor, so implementations must not rely on subclass instance
-     * state.
-     */
-    protected void registerLanguageMethods(JsonRpc jsonRpc) {
-    }
-
-    /**
-     * Hook invoked just before an operation (visit, batch visit, generate) is
-     * dispatched to the peer, with that operation's parameter — typically the
-     * {@link org.openrewrite.ExecutionContext}. Subclasses may react, for
-     * example by capturing the context so a language RPC method serving the
-     * peer's callback can use it. The default does nothing.
-     */
-    protected void beforeSend(@Nullable Object p) {
     }
 
     public RewriteRpc livenessCheck(Supplier<? extends @Nullable RuntimeException> livenessCheck) {
@@ -318,7 +287,6 @@ public class RewriteRpc {
     }
 
     public <P> @Nullable Tree visit(Tree tree, String visitorName, P p, @Nullable Cursor cursor) {
-        beforeSend(p);
         // Set the local state of this tree, so that when the remote asks for it, we know what to send.
         localObjects.put(tree.getId().toString(), tree);
 
@@ -339,7 +307,6 @@ public class RewriteRpc {
 
     public <P> BatchVisitResponse batchVisit(Tree tree, P p, @Nullable Cursor cursor,
                                              List<BatchVisit.BatchVisitItem> visitors) {
-        beforeSend(p);
         String treeId = tree.getId().toString();
         localObjects.put(treeId, tree);
 
@@ -357,7 +324,6 @@ public class RewriteRpc {
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
-        beforeSend(ctx);
         String ctxId = maybeUnwrapExecutionContext(ctx);
         GenerateResponse response = RewriteRpcExecutionContextView.view(ctx).withInFlightSlot(() ->
                 send("Generate", new Generate(remoteRecipeId, ctxId), GenerateResponse.class));

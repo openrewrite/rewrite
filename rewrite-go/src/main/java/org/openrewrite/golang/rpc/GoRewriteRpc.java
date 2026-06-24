@@ -15,15 +15,16 @@
  */
 package org.openrewrite.golang.rpc;
 
-import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.AccessLevel;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.golang.GolangParser;
 import org.openrewrite.golang.internal.modgraph.CacheSource;
 import org.openrewrite.golang.internal.modgraph.ModSource;
@@ -40,6 +41,8 @@ import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.request.BatchVisit;
+import org.openrewrite.rpc.request.BatchVisitResponse;
 import org.openrewrite.rpc.request.Parse;
 import org.openrewrite.rpc.request.ParseResponse;
 import org.openrewrite.tree.ParseError;
@@ -57,6 +60,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -82,9 +86,10 @@ public class GoRewriteRpc extends RewriteRpc {
 
     /**
      * The HttpSender of the operation currently being dispatched to the Go peer,
-     * captured from its ExecutionContext (see {@link #beforeSend}). It lets the
-     * {@code GoModResolveTidy} handler perform GOPROXY fetches through the
-     * CLI-configured sender when the Go recipe calls back during that operation.
+     * captured from its ExecutionContext by the visit/batchVisit/generate
+     * overrides (and {@link #parseProject}). It lets the {@code GoModResolveTidy}
+     * handler perform GOPROXY fetches through the CLI-configured sender when the
+     * Go recipe calls back during that operation.
      */
     @Getter(AccessLevel.NONE)
     private volatile @Nullable HttpSender httpSender;
@@ -95,32 +100,55 @@ public class GoRewriteRpc extends RewriteRpc {
         this.command = command;
         this.commandEnv = commandEnv;
         this.process = process;
-    }
 
-    @Override
-    protected void beforeSend(@Nullable Object p) {
-        if (p instanceof ExecutionContext) {
-            this.httpSender = HttpSenderExecutionContextView.view((ExecutionContext) p).getHttpSender();
-        }
-    }
-
-    /**
-     * Registers {@code GoModResolveTidy}: the Go peer's go.mod recipe delegates
-     * the entire {@code go mod tidy} require-set computation to this method, which
-     * runs the pure-Java module resolver. All GOPROXY HTTP happens here, inside
-     * the host, through the configured {@link HttpSender} — so no peer-initiated
-     * fetch crosses the RPC boundary. The peer passes the GOPROXY/GOMODCACHE it
-     * resolved from the environment; resolution degrades gracefully to the cache
-     * when the proxy is disabled ({@code GOPROXY=off}) or unreachable.
-     */
-    @Override
-    protected void registerLanguageMethods(JsonRpc jsonRpc) {
-        jsonRpc.rpc("GoModResolveTidy", new JsonRpcMethod<GoModResolveTidyRequest>() {
+        // Register the Go module-graph resolver on the same bidirectional channel
+        // — the Go peer's go.mod recipe delegates the entire `go mod tidy`
+        // require-set computation here, to the pure-Java resolver. All GOPROXY
+        // HTTP happens inside the host through the captured HttpSender, so no
+        // peer-initiated fetch crosses the RPC boundary; the peer passes the
+        // GOPROXY/GOMODCACHE it resolved from the environment, and resolution
+        // degrades gracefully to the cache when the proxy is off or unreachable.
+        //
+        // The channel's method table is a ConcurrentHashMap consulted at dispatch
+        // time, so registering after super()'s jsonRpc.bind() is safe;
+        // GoModResolveTidy is only ever invoked during a recipe run, long after
+        // construction.
+        process.getRpcClient().rpc("GoModResolveTidy", new JsonRpcMethod<GoModResolveTidyRequest>() {
             @Override
             protected Object handle(GoModResolveTidyRequest request) {
                 return resolveTidy(request, httpSender);
             }
         });
+    }
+
+    // The visit/batchVisit/generate overrides capture the operation's HttpSender
+    // (from its ExecutionContext) so the GoModResolveTidy handler can route
+    // GOPROXY fetches through the CLI-configured sender when the Go recipe calls
+    // back during that operation.
+
+    @Override
+    public <P> @Nullable Tree visit(Tree tree, String visitorName, P p, @Nullable Cursor cursor) {
+        captureHttpSender(p);
+        return super.visit(tree, visitorName, p, cursor);
+    }
+
+    @Override
+    public <P> BatchVisitResponse batchVisit(Tree tree, P p, @Nullable Cursor cursor,
+                                             List<BatchVisit.BatchVisitItem> visitors) {
+        captureHttpSender(p);
+        return super.batchVisit(tree, p, cursor, visitors);
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
+        captureHttpSender(ctx);
+        return super.generate(remoteRecipeId, ctx);
+    }
+
+    private void captureHttpSender(@Nullable Object p) {
+        if (p instanceof ExecutionContext) {
+            this.httpSender = HttpSenderExecutionContextView.view((ExecutionContext) p).getHttpSender();
+        }
     }
 
     /**
