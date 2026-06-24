@@ -1096,6 +1096,69 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/8114")
+    @Test
+    void seeMethodReferenceWithNamedParameter() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * @see #bar(String str)
+                   */
+                  void foo() {
+                  }
+
+                  void bar(String str) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/8114")
+    @Test
+    void seeMethodReferenceWithNamedParameters() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * @see #bar(String str, int count)
+                   */
+                  void foo() {
+                  }
+
+                  void bar(String str, int count) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/8114")
+    @Test
+    void linkMethodReferenceWithNamedVarargsParameter() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * {@link #bar(String... strs)}
+                   */
+                  void foo() {
+                  }
+
+                  void bar(String... strs) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     // see
     @Test
     void see() {
