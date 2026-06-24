@@ -45,6 +45,8 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.*;
+import java.lang.management.ManagementFactory;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -254,6 +256,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private final Map<String, String> environment = new HashMap<>();
         private final Set<String> unsetEnvNames = new LinkedHashSet<>();
         private static final Path DEFAULT_NPX_PATH = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");
+        private static final AtomicLong LOG_SEQ = new AtomicLong();
+        private static final String JVM_ID = ManagementFactory.getRuntimeMXBean().getName().replaceAll("[^A-Za-z0-9]", "_");
         private Supplier<@Nullable Path> npxPathSupplier = () -> DEFAULT_NPX_PATH;
         private @Nullable Path log;
         private @Nullable Path metricsCsv;
@@ -399,6 +403,28 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             Path npxPath = npxPathSupplier.get();
             if (npxPath == null) {
                 npxPath = DEFAULT_NPX_PATH;
+            }
+
+            // Diagnostic hook: when no explicit log file is configured, honor a directory
+            // supplied via the `rewrite.rpc.logDir` system property (or `REWRITE_RPC_LOG_DIR`
+            // environment variable) and write this server's stdout/stderr there. This lets CI
+            // capture the Node process output even when the RPC server dies at startup before
+            // any request completes. No effect when neither is set.
+            Path log = this.log;
+            if (log == null) {
+                String logDir = System.getProperty("rewrite.rpc.logDir");
+                if (logDir == null) {
+                    logDir = System.getenv("REWRITE_RPC_LOG_DIR");
+                }
+                if (logDir != null && !logDir.isEmpty()) {
+                    try {
+                        Path dir = Paths.get(logDir);
+                        Files.createDirectories(dir);
+                        log = dir.resolve("js-rpc-" + JVM_ID + "-" + LOG_SEQ.incrementAndGet() + ".log");
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                }
             }
 
             DynamicDispatchRpcCodec.requireCodecFor(Json.Document.class.getName());

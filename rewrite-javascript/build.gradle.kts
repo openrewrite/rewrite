@@ -221,6 +221,9 @@ testing {
                 all {
                     testTask.configure {
                         dependsOn(npmBuild, npmFixturesBuild)
+                        // Capture the Node RPC server's stdout/stderr so CI can diagnose
+                        // startup crashes (the default server otherwise discards stderr).
+                        systemProperty("rewrite.rpc.logDir", layout.buildDirectory.dir("rpc-logs").get().asFile.absolutePath)
                     }
                 }
             }
