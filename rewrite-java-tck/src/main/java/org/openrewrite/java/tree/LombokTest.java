@@ -933,6 +933,85 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
+    void delegateRemovedByLombokIsRecoveredFromSource() {
+        // When another Lombok annotation on the class triggers a full processing round, Lombok deletes the
+        // `@Delegate` annotation from the AST after generating the delegating methods, but leaves it in the source.
+        // The parser must reconstruct it from source so that printing remains idempotent.
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              import lombok.Getter;
+              import lombok.experimental.Delegate;
+
+              @Getter
+              public class ValidList<E> implements List<E> {
+
+                  @Delegate
+                  private List<E> list = new ArrayList<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void delegateRemovedByLombokWithPrecedingAnnotation() {
+        // The annotation immediately preceding the Lombok-erased `@Delegate` must be preserved as-is while
+        // `@Delegate` is reconstructed from source.
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              import lombok.Getter;
+              import lombok.experimental.Delegate;
+
+              @Getter
+              public class ValidList<E> implements List<E> {
+
+                  @Deprecated
+                  @Delegate
+                  private List<E> list = new ArrayList<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void delegateWithArgumentsRemovedByLombokIsRecoveredFromSource() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              import lombok.Getter;
+              import lombok.experimental.Delegate;
+
+              @Getter
+              public class ValidList<E> implements List<E> {
+
+                  private interface Simple {
+                      boolean add(Object o);
+                  }
+
+                  @Delegate(types = Simple.class)
+                  private List<E> list = new ArrayList<>();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void utilityClass() {
         rewriteRun(
           java(

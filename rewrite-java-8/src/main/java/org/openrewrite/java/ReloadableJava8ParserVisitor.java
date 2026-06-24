@@ -2213,15 +2213,36 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         noSpace = false;
                     }
                     if (!word.get().isEmpty()) {
+                        String keyword = word.get();
+                        // `@interface` is an annotation type declaration, not an annotation usage
+                        boolean isAnnotation = keyword.charAt(0) == '@' && !"@interface".equals(keyword);
                         Modifier matching = null;
-                        for (Modifier modifier : modifiers.getFlags()) {
-                            if (modifier.name().toLowerCase().equals(word.get())) {
-                                matching = modifier;
-                                break;
+                        if (!isAnnotation) {
+                            for (Modifier modifier : modifiers.getFlags()) {
+                                if (modifier.name().toLowerCase().equals(keyword)) {
+                                    matching = modifier;
+                                    break;
+                                }
                             }
                         }
 
-                        if (matching == null) {
+                        if (isAnnotation) {
+                            // An annotation that is present in the source but was removed from the AST by Lombok
+                            // (e.g. `@Delegate`, which Lombok deletes after generating the delegating methods).
+                            // Reconstruct it from the source so that printing remains idempotent rather than
+                            // letting the cursor desync and corrupt the following type expression. The cursor
+                            // already sits right after the previously converted modifier or annotation.
+                            J.Annotation annotation = sourceAnnotation();
+                            if (afterFirstModifier) {
+                                currentAnnotations.add(annotation);
+                            } else {
+                                leadingAnnotations.add(annotation);
+                            }
+                            word.set("");
+                            afterLastModifierPosition = cursor;
+                            lastAnnotationPosition = cursor;
+                            i = cursor - 1;
+                        } else if (matching == null) {
                             this.cursor = afterLastModifierPosition;
                             break;
                         } else {
@@ -2245,6 +2266,52 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 leadingAnnotations.isEmpty() ? emptyList() : leadingAnnotations,
                 sortedModifiers.isEmpty() ? emptyList() : sortedModifiers
         );
+    }
+
+    /**
+     * Reconstructs an annotation from the source text when no corresponding {@link JCAnnotation} is available,
+     * which happens when Lombok deletes a user-written annotation (such as {@code @Delegate}) from the AST after
+     * handling it. The reconstructed annotation carries no type attribution because Lombok erased it, but it
+     * preserves the source so that the parse-to-print loop stays idempotent. Assumes the cursor is positioned at
+     * (optional) whitespace immediately preceding the {@code @}.
+     */
+    private J.Annotation sourceAnnotation() {
+        Space prefix = sourceBefore("@");
+        int nameStart = cursor;
+        while (cursor < source.length() &&
+                (Character.isJavaIdentifierPart(source.charAt(cursor)) || source.charAt(cursor) == '.')) {
+            cursor++;
+        }
+        J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(),
+                source.substring(nameStart, cursor), null, null);
+
+        JContainer<Expression> args = null;
+        int saveCursor = cursor;
+        Space argsPrefix = whitespace();
+        if (cursor < source.length() && source.charAt(cursor) == '(') {
+            cursor++; // skip '('
+            int argsStart = cursor;
+            int depth = 1;
+            while (cursor < source.length() && depth > 0) {
+                char ch = source.charAt(cursor);
+                if (ch == '(') {
+                    depth++;
+                } else if (ch == ')') {
+                    if (--depth == 0) {
+                        break;
+                    }
+                }
+                cursor++;
+            }
+            String argsText = source.substring(argsStart, cursor);
+            Expression arg = argsText.isEmpty() ?
+                    new J.Empty(randomId(), EMPTY, Markers.EMPTY) :
+                    new J.Literal(randomId(), EMPTY, Markers.EMPTY, null, argsText, null, JavaType.Primitive.None);
+            args = JContainer.build(argsPrefix, singletonList(padRight(arg, sourceBefore(")"))), Markers.EMPTY);
+        } else {
+            cursor = saveCursor;
+        }
+        return new J.Annotation(randomId(), prefix, Markers.EMPTY, name, args);
     }
 
     private J.Modifier mapModifier(Modifier mod, List<J.Annotation> annotations) {
