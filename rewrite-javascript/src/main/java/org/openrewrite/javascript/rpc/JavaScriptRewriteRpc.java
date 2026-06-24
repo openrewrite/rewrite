@@ -451,8 +451,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/rewrite-javascript-version.txt"));
                 cmd = Stream.of(
                         npxPath.toString(),
-                        // For SNAPSHOT versions, assume npm link has been run and don't use --package
-                        version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
+                        // For unpublished local builds, assume npm link has been run and don't use --package
+                        isLocallyLinkedVersion(version) ? null : "--package=@openrewrite/rewrite@" + version,
                         "rewrite-rpc",
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
@@ -490,6 +490,19 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+        }
+
+        /**
+         * Whether {@code version} refers to a locally-built, unpublished package that must be
+         * resolved through {@code npm link} rather than fetched from the npm registry via
+         * {@code npx --package}. This covers plain {@code -SNAPSHOT} versions (local builds) as
+         * well as the dated-snapshot form produced on CI, where the {@code SNAPSHOT} token is
+         * replaced by a {@code yyyyMMdd-HHmmss} commit timestamp (e.g. {@code 0.1.0-20260624-090742}).
+         * Passing such a version to {@code npx --package} fails with npm {@code ETARGET} because no
+         * matching version exists in the registry.
+         */
+        static boolean isLocallyLinkedVersion(String version) {
+            return version.endsWith("-SNAPSHOT") || version.matches(".*-\\d{8}-\\d{6}");
         }
     }
 }
