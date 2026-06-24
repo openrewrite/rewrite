@@ -17,6 +17,7 @@ package org.openrewrite.golang.rpc;
 
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
+import lombok.AccessLevel;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -79,12 +80,28 @@ public class GoRewriteRpc extends RewriteRpc {
     private final Map<String, String> commandEnv;
     private final RewriteRpcProcess process;
 
+    /**
+     * The HttpSender of the operation currently being dispatched to the Go peer,
+     * captured from its ExecutionContext (see {@link #beforeSend}). It lets the
+     * {@code GoModResolveTidy} handler perform GOPROXY fetches through the
+     * CLI-configured sender when the Go recipe calls back during that operation.
+     */
+    @Getter(AccessLevel.NONE)
+    private volatile @Nullable HttpSender httpSender;
+
     GoRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers,
                  String command, Map<String, String> commandEnv) {
         super(process.getRpcClient(), marketplace, resolvers);
         this.command = command;
         this.commandEnv = commandEnv;
         this.process = process;
+    }
+
+    @Override
+    protected void beforeSend(@Nullable Object p) {
+        if (p instanceof ExecutionContext) {
+            this.httpSender = HttpSenderExecutionContextView.view((ExecutionContext) p).getHttpSender();
+        }
     }
 
     /**
@@ -101,7 +118,7 @@ public class GoRewriteRpc extends RewriteRpc {
         jsonRpc.rpc("GoModResolveTidy", new JsonRpcMethod<GoModResolveTidyRequest>() {
             @Override
             protected Object handle(GoModResolveTidyRequest request) {
-                return resolveTidy(request, getHttpSender());
+                return resolveTidy(request, httpSender);
             }
         });
     }
@@ -311,9 +328,10 @@ public class GoRewriteRpc extends RewriteRpc {
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
-        // Route the Go module-graph resolver's GOPROXY fetches through the
-        // CLI-configured HttpSender (handled by the "Http" RPC method).
-        setHttpSender(HttpSenderExecutionContextView.view(ctx).getHttpSender());
+        // Capture this parse's HttpSender so the Go module-graph resolver's
+        // GOPROXY fetches (if the parser calls back) go through the CLI-configured
+        // sender. Recipe-time operations capture it via beforeSend instead.
+        this.httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {

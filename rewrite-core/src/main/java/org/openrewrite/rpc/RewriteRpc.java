@@ -36,8 +36,6 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import org.openrewrite.HttpSenderExecutionContextView;
-import org.openrewrite.ipc.http.HttpSender;
 
 import java.io.PrintStream;
 import java.util.HashMap;
@@ -67,7 +65,6 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc {
     private final JsonRpc jsonRpc;
-    private volatile @Nullable HttpSender httpSender;
     private final AtomicInteger batchSize = new AtomicInteger(1000);
     private Duration timeout = Duration.ofSeconds(30);
     private Supplier<? extends @Nullable RuntimeException> livenessCheck = () -> null;
@@ -251,26 +248,23 @@ public class RewriteRpc {
     /**
      * Hook for a subclass to register additional, language-specific RPC methods
      * on the bidirectional channel before it is bound. The default registers
-     * nothing. Implementations may delegate network calls to {@link
-     * #getHttpSender()} so proxy/auth/TLS are honored. Invoked from the
-     * constructor, so implementations must not rely on subclass instance state.
+     * nothing. A method that needs the current operation's {@link
+     * org.openrewrite.ExecutionContext} (e.g. to honor a CLI-configured
+     * HttpSender) can capture it via {@link #beforeSend(Object)}. Invoked from
+     * the constructor, so implementations must not rely on subclass instance
+     * state.
      */
     protected void registerLanguageMethods(JsonRpc jsonRpc) {
     }
 
     /**
-     * Configure the {@link HttpSender} a language method may use to perform HTTP
-     * on the peer's behalf. Typically set from a parse/recipe ExecutionContext so
-     * fetches use the CLI-configured sender (proxy, auth, TLS).
+     * Hook invoked just before an operation (visit, batch visit, generate) is
+     * dispatched to the peer, with that operation's parameter — typically the
+     * {@link org.openrewrite.ExecutionContext}. Subclasses may react, for
+     * example by capturing the context so a language RPC method serving the
+     * peer's callback can use it. The default does nothing.
      */
-    public RewriteRpc setHttpSender(@Nullable HttpSender httpSender) {
-        this.httpSender = httpSender;
-        return this;
-    }
-
-    /** The configured {@link HttpSender}, for use by language RPC methods. */
-    protected @Nullable HttpSender getHttpSender() {
-        return httpSender;
+    protected void beforeSend(@Nullable Object p) {
     }
 
     public RewriteRpc livenessCheck(Supplier<? extends @Nullable RuntimeException> livenessCheck) {
@@ -323,17 +317,8 @@ public class RewriteRpc {
         return visit(sourceFile, visitorName, p, null);
     }
 
-    // Make the HttpSender from the current operation's ExecutionContext available
-    // to the peer's Http RPC method (e.g. the Go module-graph resolver fetching
-    // from a GOPROXY at recipe time).
-    private void setHttpSenderFrom(@Nullable Object p) {
-        if (p instanceof ExecutionContext) {
-            this.httpSender = HttpSenderExecutionContextView.view((ExecutionContext) p).getHttpSender();
-        }
-    }
-
     public <P> @Nullable Tree visit(Tree tree, String visitorName, P p, @Nullable Cursor cursor) {
-        setHttpSenderFrom(p);
+        beforeSend(p);
         // Set the local state of this tree, so that when the remote asks for it, we know what to send.
         localObjects.put(tree.getId().toString(), tree);
 
@@ -354,7 +339,7 @@ public class RewriteRpc {
 
     public <P> BatchVisitResponse batchVisit(Tree tree, P p, @Nullable Cursor cursor,
                                              List<BatchVisit.BatchVisitItem> visitors) {
-        setHttpSenderFrom(p);
+        beforeSend(p);
         String treeId = tree.getId().toString();
         localObjects.put(treeId, tree);
 
@@ -372,7 +357,7 @@ public class RewriteRpc {
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
-        setHttpSenderFrom(ctx);
+        beforeSend(ctx);
         String ctxId = maybeUnwrapExecutionContext(ctx);
         GenerateResponse response = RewriteRpcExecutionContextView.view(ctx).withInFlightSlot(() ->
                 send("Generate", new Generate(remoteRecipeId, ctxId), GenerateResponse.class));
