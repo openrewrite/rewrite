@@ -1174,5 +1174,20 @@ class ChangeFromTest implements RewriteTest {
               )
             );
         }
+
+        @Test
+        void digestGlobDoesNotMatchUnpinnedFrom() {
+            // A non-empty digest glob requires a digest to be present, so an unpinned FROM is not
+            // matched. This is the opposite of oldDigest="" (which matches only unpinned FROMs).
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "sha256:*", null, "ubuntu", "22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
     }
 }

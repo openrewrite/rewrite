@@ -145,8 +145,7 @@ public class ChangeFrom extends Recipe {
             matcher.tag(oldTag);
         }
         // Empty oldDigest is a sentinel: match only FROMs without a digest
-        boolean requireNoDigest = oldDigest != null && oldDigest.isEmpty();
-        if (oldDigest != null && !requireNoDigest) {
+        if (oldDigest != null && !oldDigest.isEmpty()) {
             matcher.digest(oldDigest);
         }
         if (oldPlatform != null) {
@@ -157,7 +156,7 @@ public class ChangeFrom extends Recipe {
             Docker.From f = image.getTree();
 
             // oldDigest="" matches only FROMs without a digest; leave digest-pinned ones untouched
-            if (requireNoDigest && image.isDigestPinned()) {
+            if (oldDigest != null && oldDigest.isEmpty() && image.isDigestPinned()) {
                 return f;
             }
 
