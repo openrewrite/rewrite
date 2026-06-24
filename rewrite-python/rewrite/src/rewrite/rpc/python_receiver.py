@@ -1219,7 +1219,7 @@ def _receive_search_result(marker, q: RpcReceiveQueue):
     from rewrite.markers import SearchResult
 
     # SearchResult sends: id, description
-    before_id = str(marker.id) if marker and marker.id else None
+    before_id = id_to_str(marker._id) if marker is not None and marker._id is not None else None
     id_str = q.receive(before_id)
     description = q.receive(marker.description if marker else None)
 
@@ -1236,7 +1236,7 @@ def _receive_parse_exception_result(marker, q: RpcReceiveQueue):
     from rewrite.markers import ParseExceptionResult
 
     # Receive in Java's send order: id, parserType, exceptionType, message, treeType
-    id_str = q.receive(str(marker.id) if marker else None)
+    id_str = q.receive(id_to_str(marker._id) if marker is not None and marker._id is not None else None)
     parser_type = q.receive(marker.parser_type if marker else None)
     exception_type = q.receive(marker.exception_type if marker else None)
     message = q.receive(marker.message if marker else None)
@@ -1282,7 +1282,7 @@ def _receive_markup_marker(marker, q: RpcReceiveQueue, cls):
     Matches Java's Markup.{Warn,Error,Info,Debug}.rpcReceive().
     """
 
-    id_str = q.receive(str(marker.id) if marker else None)
+    id_str = q.receive(id_to_str(marker._id) if marker is not None and marker._id is not None else None)
     message = q.receive(marker.message if marker else None)
     detail = q.receive(marker.detail if marker else None)
 
@@ -1799,7 +1799,7 @@ def _receive_parse_error(parse_error, q: RpcReceiveQueue):
     from pathlib import Path
 
     # Receive all fields in order (matching Java's ParseError.rpcSend)
-    id_str = q.receive(str(parse_error.id) if parse_error else None)
+    id_str = q.receive(id_to_str(parse_error._id) if parse_error is not None and parse_error._id is not None else None)
     markers = q.receive_markers(parse_error.markers if parse_error else None)
     source_path = q.receive(str(parse_error.source_path) if parse_error else None)
     charset_name = q.receive(parse_error.charset_name if parse_error else None)
