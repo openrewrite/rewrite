@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.java.marker.JavadocParameterName;
 import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.marker.LineComment;
 import org.openrewrite.java.marker.Varargs;
@@ -549,6 +550,11 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
                 JRightPadded<? extends J> node = nodes.get(i);
                 visit(node.getElement(), p);
                 visitSpace(node.getAfter(), location.getAfterLocation(), p);
+                // A non-standard parameter name following a parameter type in a Javadoc method
+                // reference (e.g. `str` in `#bar(String str)`) is kept out of the whitespace and
+                // re-emitted here verbatim.
+                node.getElement().getMarkers().findFirst(JavadocParameterName.class)
+                        .ifPresent(name -> p.append(name.getName()));
                 if (i < nodes.size() - 1) {
                     p.append(suffixBetween);
                 }

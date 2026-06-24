@@ -1096,6 +1096,66 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Test
+    void seeMethodReferenceWithNamedParameter() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * @see #bar(String str)
+                   */
+                  void foo() {
+                  }
+
+                  void bar(String str) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void seeMethodReferenceWithNamedParameters() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * @see #bar(String str, int count)
+                   */
+                  void foo() {
+                  }
+
+                  void bar(String str, int count) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void linkMethodReferenceWithNamedVarargsParameter() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * {@link #bar(String... strs)}
+                   */
+                  void foo() {
+                  }
+
+                  void bar(String... strs) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     // see
     @Test
     void see() {
