@@ -1096,6 +1096,7 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/8114")
     @Test
     void seeMethodReferenceWithNamedParameter() {
         rewriteRun(
@@ -1116,6 +1117,7 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/8114")
     @Test
     void seeMethodReferenceWithNamedParameters() {
         rewriteRun(
@@ -1136,6 +1138,7 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/8114")
     @Test
     void linkMethodReferenceWithNamedVarargsParameter() {
         rewriteRun(
