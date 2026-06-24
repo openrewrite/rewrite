@@ -144,7 +144,8 @@ public class ChangeFrom extends Recipe {
         if (oldTag != null) {
             matcher.tag(oldTag);
         }
-        // Empty oldDigest is a sentinel: match only FROMs without a digest
+        // A real (non-empty) glob configures the matcher; oldDigest="" is the "no digest" sentinel (handled below).
+        // The null check is required here: a negated equals like !"".equals(oldDigest) would also let null through.
         if (oldDigest != null && !oldDigest.isEmpty()) {
             matcher.digest(oldDigest);
         }
@@ -156,7 +157,7 @@ public class ChangeFrom extends Recipe {
             Docker.From f = image.getTree();
 
             // oldDigest="" matches only FROMs without a digest; leave digest-pinned ones untouched
-            if (oldDigest != null && oldDigest.isEmpty() && image.isDigestPinned()) {
+            if ("".equals(oldDigest) && image.isDigestPinned()) {
                 return f;
             }
 
