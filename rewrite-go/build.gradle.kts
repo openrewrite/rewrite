@@ -146,7 +146,10 @@ val prepareGoRpcSources = tasks.register<Sync>("prepareGoRpcSources") {
         exclude("**/*_test.go")
         exclude("**/testdata/**")
     }
-    from(rootProject.file("LICENSE"))
+    // rewrite-go is published under the Moderne Source Available License, so the
+    // packaged RPC source ships the module's MSAL LICENSE.md (not the repo-root
+    // Apache LICENSE).
+    from(file("LICENSE.md"))
 }
 
 sourceSets.named("main") {

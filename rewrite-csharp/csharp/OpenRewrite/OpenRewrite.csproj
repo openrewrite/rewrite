@@ -14,6 +14,7 @@
     <PackageProjectUrl>https://docs.openrewrite.org</PackageProjectUrl>
     <RepositoryUrl>https://github.com/openrewrite/rewrite</RepositoryUrl>
     <PackageTags>openrewrite;refactoring;csharp;dotnet</PackageTags>
+    <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <!-- VSTHRD200: RPC method names must match Java-side protocol (no Async suffix) -->
     <!-- VSTHRD002: Synchronous waits needed for RPC interop with Java peer -->
@@ -48,6 +49,11 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!-- Moderne Source Available License, shipped at the nupkg root (see PackageLicenseFile). -->
+  <ItemGroup>
+    <None Include="../../LICENSE.md" Pack="true" PackagePath="" />
   </ItemGroup>
 
 </Project>
