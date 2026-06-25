@@ -102,6 +102,9 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     @SuppressWarnings("NotNullFieldNotInitialized")
     private DocCommentTable docCommentTable;
 
+    @Nullable
+    private JCCompilationUnit compilationUnit;
+
     private int cursor = 0;
 
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
@@ -615,6 +618,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitCompilationUnit(CompilationUnitTree node, Space fmt) {
         JCCompilationUnit cu = (JCCompilationUnit) node;
+        this.compilationUnit = cu;
 
         if (node.getTypeDecls().isEmpty() || cu.getPackageName() != null || !node.getImports().isEmpty()) {
             // if the package and imports are empty, allow the formatting to apply to the first class declaration.
@@ -2467,9 +2471,9 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     /**
      * Reconstructs an annotation from the source text when no corresponding {@link JCAnnotation} is available,
      * which happens when Lombok deletes a user-written annotation (such as {@code @Delegate}) from the AST after
-     * handling it. The reconstructed annotation carries no type attribution because Lombok erased it, but it
-     * preserves the source so that the parse-to-print loop stays idempotent. Assumes the cursor is positioned at
-     * (optional) whitespace immediately preceding the {@code @}.
+     * handling it. The annotation type is resolved from the compilation unit's imports so the reconstructed
+     * annotation keeps its type attribution; only the (also erased) arguments are reproduced verbatim from source.
+     * Assumes the cursor is positioned at (optional) whitespace immediately preceding the {@code @}.
      */
     private J.Annotation sourceAnnotation() {
         Space prefix = sourceBefore("@");
@@ -2478,8 +2482,9 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 (Character.isJavaIdentifierPart(source.charAt(cursor)) || source.charAt(cursor) == '.')) {
             cursor++;
         }
+        String annotationName = source.substring(nameStart, cursor);
         J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(),
-                source.substring(nameStart, cursor), null, null);
+                annotationName, resolveErasedAnnotationType(annotationName), null);
 
         JContainer<Expression> args = null;
         int saveCursor = cursor;
@@ -2508,6 +2513,27 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             cursor = saveCursor;
         }
         return new J.Annotation(randomId(), prefix, Markers.EMPTY, name, args);
+    }
+
+    /**
+     * Resolves the {@link JavaType} of an annotation that Lombok erased from the AST, using the still-resolved
+     * single-type imports of the compilation unit. Returns {@code null} when the type cannot be resolved (e.g. a
+     * wildcard import), in which case the reconstructed annotation simply has no type attribution.
+     */
+    private @Nullable JavaType resolveErasedAnnotationType(String annotationName) {
+        if (compilationUnit == null) {
+            return null;
+        }
+        String simpleName = annotationName.substring(annotationName.lastIndexOf('.') + 1);
+        for (ImportTree jcImport : compilationUnit.getImports()) {
+            if (jcImport.getQualifiedIdentifier() instanceof JCFieldAccess) {
+                JCFieldAccess qualid = (JCFieldAccess) jcImport.getQualifiedIdentifier();
+                if (qualid.sym instanceof Symbol.ClassSymbol && simpleName.equals(qualid.name.toString())) {
+                    return typeMapping.type(qualid.sym.type);
+                }
+            }
+        }
+        return null;
     }
 
     private J.Modifier mapModifier(Modifier mod, List<J.Annotation> annotations) {

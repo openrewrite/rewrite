@@ -33,6 +33,7 @@ import org.openrewrite.test.TypeValidation;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.CollectionAssert.assertThatCollection;
 import static org.openrewrite.java.Assertions.java;
 
@@ -953,7 +954,13 @@ class LombokTest implements RewriteTest {
                   @Delegate
                   private List<E> list = new ArrayList<>();
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.Annotation delegate = field.getLeadingAnnotations().get(0);
+                // The erased annotation is reconstructed *with* its type attribution, not as a null stub
+                assertThat(TypeUtils.isOfClassType(delegate.getType(), "lombok.experimental.Delegate")).isTrue();
+            })
           )
         );
     }
