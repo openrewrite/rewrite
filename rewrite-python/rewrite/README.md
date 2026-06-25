@@ -116,10 +116,13 @@ Then install and run it against a repository whose Python LSTs you've built,
 passing each option as a `-P` parameter:
 
 ```bash
+# From your recipe project directory, install it into the CLI's marketplace:
 mod config recipes pip install .
+
+# Build the LSTs for the repository you want to refactor, then run the recipe:
 mod build /path/to/your/repo
 mod run /path/to/your/repo --recipe=com.yourorg.RenameFunctionCall \
-    -Pold_name=assertEquals -Pnew_name=assertEqual
+    -P old_name=assertEquals -P new_name=assertEqual
 ```
 
 ## Learn more
