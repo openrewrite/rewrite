@@ -633,6 +633,23 @@ class MethodDeclarationTest implements RewriteTest {
         }
 
         @Test
+        void consecutiveBracelessExtensionsWithMethodCallBody() {
+            // Two consecutive braceless extensions where the first's method body is a
+            // method invocation used to duplicate the first extension on print.
+            rewriteRun(
+                scala(
+                    """
+                    extension (pk: Int)
+                      def a: Int = foo()
+
+                    extension (v: Int)
+                      def c: Int = v
+                    """
+                )
+            );
+        }
+
+        @Test
         void bracelessExtensionWithBraceBlockMethodBody() {
             // A `{` inside a method body must not be mistaken for the extension's
             // opening brace, which would make the parser treat this braceless
