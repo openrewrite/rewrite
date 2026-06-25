@@ -220,6 +220,57 @@ class AssertionsTest implements RewriteTest {
     }
 
     @Test
+    void multimoduleSubprojectGetsItsOwnGradleProjectOnGradle9() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://downloads.gradle.org/distributions/gradle-9.5.1-bin.zip"))),
+          //language=groovy
+          settingsGradle(
+            """
+              rootProject.name = 'root'
+              include 'sub'
+              """
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              """,
+            spec -> spec
+              .path("build.gradle")
+              .afterRecipe(cu -> {
+                  Optional<GradleProject> gp = cu.getMarkers().findFirst(GradleProject.class);
+                  assertThat(gp).isPresent();
+                  assertThat(gp.get().getPath()).isEqualTo(":");
+              })
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation 'com.google.guava:guava:33.0.0-jre'
+              }
+              """,
+            spec -> spec
+              .path("sub/build.gradle")
+              .afterRecipe(cu -> {
+                  Optional<GradleProject> gp = cu.getMarkers().findFirst(GradleProject.class);
+                  assertThat(gp).isPresent();
+                  assertThat(gp.get().getPath()).isEqualTo(":sub");
+                  assertThat(gp.get().getConfiguration("compileClasspath"))
+                    .as("subproject's own configurations should be resolved")
+                    .isNotNull();
+              })
+          )
+        );
+    }
+
+    @Test
     void multimoduleResolvesAgainstBuildRoot() {
         rewriteRun(
           spec -> spec.beforeRecipe(Assertions.withToolingApi(URI.create("https://downloads.gradle.org/distributions/gradle-9.5.1-bin.zip"))),

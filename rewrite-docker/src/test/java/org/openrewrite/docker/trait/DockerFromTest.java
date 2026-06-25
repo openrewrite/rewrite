@@ -212,6 +212,48 @@ class DockerFromTest implements RewriteTest {
         }
 
         @Test
+        void digestPinnedImageIsDigestPinned() {
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
+                    assertThat(image.isDigestPinned()).isTrue();
+                    return SearchResult.found(image.getTree());
+                })
+              )),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123
+                  """,
+                """
+                  ~~>FROM ubuntu:20.04@sha256:abc123
+                  """
+              )
+            );
+        }
+
+        @Test
+        void taggedImageWithoutDigestIsNotDigestPinned() {
+            // Distinct from isUnpinned(): a specific tag is "pinned" by tag but not by digest.
+            rewriteRun(
+              spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                new DockerFrom.Matcher().asVisitor((image, ctx) -> {
+                    assertThat(image.isDigestPinned()).isFalse();
+                    assertThat(image.isUnpinned()).isFalse();
+                    return SearchResult.found(image.getTree());
+                })
+              )),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  """,
+                """
+                  ~~>FROM ubuntu:20.04
+                  """
+              )
+            );
+        }
+
+        @Test
         void detectsQuoteStyle() {
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(() ->

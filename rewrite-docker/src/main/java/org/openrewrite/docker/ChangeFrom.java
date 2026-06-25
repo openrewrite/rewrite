@@ -50,7 +50,9 @@ public class ChangeFrom extends Recipe {
     String oldTag;
 
     @Option(displayName = "Old digest",
-            description = "Only match images with digests matching this glob pattern. If null, matches any digest or no digest.",
+            description = "Only match images with digests matching this glob pattern. If null, matches any digest or no " +
+                    "digest. If empty (`\"\"`), matches only images that have no digest, which is useful for skipping " +
+                    "digest-pinned `FROM`s so deliberate pins are left untouched.",
             example = "sha256:*",
             required = false)
     @Nullable
@@ -142,7 +144,9 @@ public class ChangeFrom extends Recipe {
         if (oldTag != null) {
             matcher.tag(oldTag);
         }
-        if (oldDigest != null) {
+        // A real (non-empty) glob configures the matcher; oldDigest="" is the "no digest" sentinel (handled below).
+        // The null check is required here: a negated equals like !"".equals(oldDigest) would also let null through.
+        if (oldDigest != null && !oldDigest.isEmpty()) {
             matcher.digest(oldDigest);
         }
         if (oldPlatform != null) {
@@ -151,6 +155,11 @@ public class ChangeFrom extends Recipe {
 
         return matcher.asVisitor((image, ctx) -> {
             Docker.From f = image.getTree();
+
+            // oldDigest="" matches only FROMs without a digest; leave digest-pinned ones untouched
+            if ("".equals(oldDigest) && image.isDigestPinned()) {
+                return f;
+            }
 
             // Check if any change is needed
             String currentImageName = image.getImageName();

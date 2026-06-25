@@ -291,6 +291,18 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void primaryConstructorWithModifierBeforeAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Inject
+              class FooImpl internal @Inject constructor(provider: String)
+              """
+          )
+        );
+    }
+
+    @Test
     void implicitConstructorWithSuperType() {
         rewriteRun(
           kotlin(
