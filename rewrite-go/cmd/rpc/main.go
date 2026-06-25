@@ -90,6 +90,12 @@ type server struct {
 	// Prepared recipe instances keyed by unique ID
 	preparedRecipes map[string]recipe.Recipe
 
+	// Recipe name (fully qualified id) keyed by the same prepared recipe ID.
+	// Used to produce a meaningful error when an edit/scan run is attempted
+	// on a recipe that was registered descriptor-only (nil instance) — i.e.
+	// the workspace binary is stale or missing its implementation.
+	preparedRecipeNames map[string]string
+
 	// Bare editor cached at PrepareRecipe time when an editor was wrapped in
 	// preconditions.Check(...). Subsequent dispatch via instantiateVisitor
 	// returns the unwrapped editor — otherwise the precondition would also
@@ -203,6 +209,7 @@ func newServer(cfg serverConfig) *server {
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
 		preparedRecipes:         make(map[string]recipe.Recipe),
+		preparedRecipeNames:     make(map[string]string),
 		preparedEditorOverrides: make(map[string]recipe.TreeVisitor),
 		preparedAccumulators:    make(map[string]any),
 		preparedContexts:        make(map[string]*recipe.ExecutionContext),
@@ -1011,6 +1018,7 @@ func (s *server) handleReset() bool {
 	s.reverseRemoteObjects = make(map[string]any)
 	s.reverseRemoteRefs = make(map[int]any)
 	s.preparedRecipes = make(map[string]recipe.Recipe)
+	s.preparedRecipeNames = make(map[string]string)
 	s.preparedEditorOverrides = make(map[string]recipe.TreeVisitor)
 	s.preparedAccumulators = make(map[string]any)
 	s.preparedContexts = make(map[string]*recipe.ExecutionContext)
@@ -1415,6 +1423,7 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 	// callers echo it back to identify the prepared instance.
 	recipeID := uuid.New().String()
 	s.preparedRecipes[recipeID] = instance
+	s.preparedRecipeNames[recipeID] = req.ID
 
 	resp := prepareRecipeResponse{
 		ID:                recipeID,
@@ -1531,8 +1540,21 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 		return nil, &rpcError{Code: -32602, Message: "Unknown recipe: " + recipeID}
 	}
 	if r == nil {
-		// Installer-loaded recipes have no implementation in Go
-		return &visitResponse{Modified: false}, nil
+		// The recipe was registered descriptor-only (nil instance) yet an
+		// edit/scan run is being dispatched against it. A descriptor-only
+		// registration exists purely so the recipe can be listed in the
+		// marketplace; the real implementation is supposed to overwrite it
+		// when the recipe binary is activated (see Registry.RegisterWithCategories).
+		// Reaching here means it never was — fail loudly rather than silently
+		// reporting "no changes", which masks a stale or missing workspace binary.
+		name := s.preparedRecipeNames[recipeID]
+		if name == "" {
+			name = recipeID
+		}
+		return nil, &rpcError{
+			Code:    -32603,
+			Message: fmt.Sprintf("recipe %q is registered as metadata only and has no executable implementation in this server build; the workspace binary is stale or missing", name),
+		}
 	}
 
 	// Get the tree from Java via bidirectional RPC
