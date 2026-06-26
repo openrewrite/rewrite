@@ -246,6 +246,42 @@ testing {
 // `next`), and the duplicate-publish guard. The dedicated workflow filename is also what the
 // package's npm Trusted Publisher (OIDC) record matches against. CI/release workflows still
 // publish to Sonatype, PyPI, NuGet as before.
+//
+// npm publishing is decoupled from the Maven snapshot publish (it runs in a separate
+// `workflow_run` triggered by `ci`, because npm Trusted Publisher binds to a single workflow
+// filename). To still give every Maven snapshot a 1:1 npm counterpart carrying the identical
+// version reference, this task records the exact unique snapshot version that Gradle assigned to
+// `org.openrewrite:rewrite-javascript` (e.g. `8.86.0-20260625.164513-55`). Gradle's maven-publish
+// computes that version client-side and stages the very `maven-metadata.xml` it uploads under
+// `build/tmp/publish<Pub>PublicationTo<Repo>Repository/snapshot-maven-metadata.xml`; we read the
+// `<value>` straight from that local file — no network read-back. The `ci` run uploads the
+// recorded version as an artifact and `npm-publish.yml` pins the npm version to it.
+val recordPublishedSnapshotVersion = tasks.register("recordPublishedSnapshotVersion") {
+    description = "Records the unique Sonatype snapshot version of rewrite-javascript for npm-publish to mirror."
+    val baseVersion = project.version.toString()
+    val buildDirectory = layout.buildDirectory
+    val versionFile = buildDirectory.file("npm/publishedVersion.txt")
+    onlyIf { baseVersion.endsWith("-SNAPSHOT") }
+    doLast {
+        val staged = buildDirectory.dir("tmp").get().asFile.walkTopDown()
+            .firstOrNull { it.name == "snapshot-maven-metadata.xml" }
+        val resolved = staged?.readText()
+            ?.let { Regex("<value>([^<]+)</value>").find(it)?.groupValues?.get(1) }
+        if (resolved == null) {
+            logger.warn("Could not find the staged snapshot metadata under build/tmp; " +
+                    "npm-publish will fall back to its default version derivation.")
+            return@doLast
+        }
+        val out = versionFile.get().asFile
+        out.parentFile.mkdirs()
+        out.writeText(resolved)
+        logger.lifecycle("Recorded published snapshot version for npm: $resolved")
+    }
+}
+
+tasks.named("publish") {
+    finalizedBy(recordPublishedSnapshotVersion)
+}
 
 // ============================================
 // JavaScript Test Support Tasks
