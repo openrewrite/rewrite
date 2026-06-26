@@ -5184,7 +5184,8 @@ class ScalaTreeVisitor(
               val afterCursor = source.substring(cursor, classEnd)
               val braceIndex = positionOfNextIn(afterCursor, "{", 0)
               // For Scala 3 braceless: look for `:` at end of line (not `: Type` annotation).
-              // A braceless body colon is followed by a newline, not by a type name.
+              // A braceless body colon is followed by a newline (or a trailing comment),
+              // not by a type name.
               val colonIndex = {
                 var result = -1
                 var idx = positionOfNextIn(afterCursor, ":", 0)
@@ -5194,8 +5195,12 @@ class ScalaTreeVisitor(
                   } else {
                     val afterColon = afterCursor.substring(idx + 1)
                     val nextNonSpace = afterColon.indexWhere(c => c != ' ' && c != '\t')
-                    if (nextNonSpace < 0 || afterColon.charAt(nextNonSpace) == '\n' || afterColon.charAt(nextNonSpace) == '\r') {
-                      result = idx // `:` followed by newline = braceless body
+                    val startsComment = nextNonSpace >= 0 && nextNonSpace + 1 < afterColon.length &&
+                      afterColon.charAt(nextNonSpace) == '/' &&
+                      (afterColon.charAt(nextNonSpace + 1) == '/' || afterColon.charAt(nextNonSpace + 1) == '*')
+                    if (nextNonSpace < 0 || afterColon.charAt(nextNonSpace) == '\n' ||
+                        afterColon.charAt(nextNonSpace) == '\r' || startsComment) {
+                      result = idx // `:` followed by newline or trailing comment = braceless body
                     }
                   }
                   if (result < 0) idx = positionOfNextIn(afterCursor, ":", idx + 1)

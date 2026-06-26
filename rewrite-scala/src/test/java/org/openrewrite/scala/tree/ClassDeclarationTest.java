@@ -521,4 +521,16 @@ class ClassDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void colonBodyWithTrailingCommentAfterColon() {
+        rewriteRun(
+            scala(
+                """
+                case class Matchup(users: Users): // score is x10
+                  def nonEmpty = true
+                """
+            )
+        );
+    }
 }
