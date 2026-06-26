@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.NameCaseConvention.Compiled;
+import org.openrewrite.trait.Comments;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.Iterator;
@@ -79,22 +80,11 @@ public class AddCommentToProperty extends Recipe {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 String prop = getProperty(getCursor());
                 if (keyMatcher.matchesGlob(prop)) {
-                    String prefix = e.getPrefix();
-                    // Don't add duplicate comments
-                    if (!prefix.contains("# " + comment)) {
-                        String indentation = extractIndentation(prefix);
-                        String newPrefix = prefix + "# " + comment + "\n" + indentation;
-                        e = e.withPrefix(newPrefix);
-                    }
+                    return Comments.of(new Cursor(getCursor().getParentOrThrow(), e)).comment(" " + comment);
                 }
                 return e;
             }
         });
-    }
-
-    private static String extractIndentation(String prefix) {
-        int lastNewline = prefix.lastIndexOf('\n');
-        return lastNewline >= 0 ? prefix.substring(lastNewline + 1) : prefix;
     }
 
     private static String getProperty(Cursor cursor) {

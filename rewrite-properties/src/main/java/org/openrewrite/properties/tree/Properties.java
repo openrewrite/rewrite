@@ -19,9 +19,11 @@ import lombok.*;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.CommentService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.internal.PropertiesPrinter;
+import org.openrewrite.properties.service.PropertiesCommentService;
 
 import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
@@ -37,6 +39,7 @@ public interface Properties extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+        //noinspection DataFlowIssue
         return (R) acceptProperties(v.adapt(PropertiesVisitor.class), p);
     }
 
@@ -113,6 +116,15 @@ public interface Properties extends Tree {
             return new PropertiesPrinter<>();
         }
 
+        @SuppressWarnings("unchecked")
+        @Override
+        public <S, T extends S> T service(Class<S> service) {
+            if (CommentService.class.getName().equals(service.getName())) {
+                return (T) new PropertiesCommentService();
+            }
+            return SourceFileWithReferences.super.service(service);
+        }
+
         @Nullable
         @NonFinal
         transient SoftReference<References> references;
@@ -182,7 +194,7 @@ public interface Properties extends Tree {
             public static Delimiter getDelimiter(String value) {
                 return "=".equals(value.trim()) ? Delimiter.EQUALS :
                             ":".equals(value.trim()) ? Delimiter.COLON :
-                            "".equals(value.trim()) ? Delimiter.NONE :
+                            value.trim().isEmpty() ? Delimiter.NONE :
                                     Delimiter.EQUALS;
             }
         }

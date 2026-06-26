@@ -21,9 +21,11 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.CommentService;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
+import org.openrewrite.yaml.service.YamlCommentService;
 
 import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
@@ -41,6 +43,7 @@ public interface Yaml extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+        //noinspection DataFlowIssue
         return (R) acceptYaml(v.adapt(YamlVisitor.class), p);
     }
 
@@ -94,8 +97,9 @@ public interface Yaml extends Tree {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
-        public SourceFile withCharset(Charset charset) {
+        public Yaml.Documents withCharset(Charset charset) {
             return withCharsetName(charset.name());
         }
 
@@ -133,6 +137,15 @@ public interface Yaml extends Tree {
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new YamlPrinter<>();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <S, T extends S> T service(Class<S> service) {
+            if (CommentService.class.getName().equals(service.getName())) {
+                return (T) new YamlCommentService();
+            }
+            return SourceFileWithReferences.super.service(service);
         }
 
         @Nullable
@@ -498,7 +511,6 @@ public interface Yaml extends Tree {
              * Set to true when this entry is part of a sequence like:
              * - 1
              * - 2
-             *
              * And false when this entry is part of a sequence like:
              * [1, 2]
              */

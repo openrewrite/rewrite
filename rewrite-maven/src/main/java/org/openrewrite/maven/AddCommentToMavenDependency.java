@@ -17,19 +17,15 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.trait.Comments;
+import org.openrewrite.trait.Comments.Placement;
 import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
-
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -68,21 +64,10 @@ public class AddCommentToMavenDependency extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 if (matcher.matches(getCursor()) &&
-                        (isDependencyTag(groupId, artifactId) || isPluginTag(groupId, artifactId))
-                        && tag.getContent() != null) {
-                    boolean containsComment = tag.getContent().stream()
-                            .anyMatch(c -> c instanceof Xml.Comment &&
-                                    commentText.equals(((Xml.Comment) c).getText()));
-                    if (!containsComment) {
-                        List<Content> contents = new ArrayList<>(tag.getContent());
-                        Xml.Comment customComment = new Xml.Comment(
-                                randomId(),
-                                contents.get(0).getPrefix(),
-                                Markers.EMPTY,
-                                commentText);
-                        contents.add(0, customComment);
-                        return t.withContent(contents);
-                    }
+                        (isDependencyTag(groupId, artifactId) || isPluginTag(groupId, artifactId)) &&
+                        t.getContent() != null) {
+                    return Comments.of(new Cursor(getCursor().getParentOrThrow(), t))
+                            .comment(commentText, Placement.FIRST_CHILD);
                 }
                 return t;
             }
