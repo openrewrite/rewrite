@@ -85,6 +85,10 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         if (Files.exists(tempDir.resolve("rpc.log"))) {
             System.out.println(Files.readString(tempDir.resolve("rpc.log")));
         }
+        // Restore the default factory so this test's per-test @TempDir-backed
+        // factory does not leak into later test classes that lazily (re)start
+        // the RPC process on the same thread.
+        JavaScriptRewriteRpc.resetFactory();
     }
 
     @Override
@@ -116,6 +120,30 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             spec -> spec.path("package.json")
           )
         );
+    }
+
+    @Test
+    void startsWhenLogParentDirectoryIsMissing() {
+        // given a log path whose parent directory does not exist yet (mimics a
+        // torn-down @TempDir that a stale factory still references)
+        Path missingParent = tempDir.resolve("does-not-exist-yet");
+        Path log = missingParent.resolve("rpc.log");
+        assertThat(Files.exists(missingParent)).isFalse();
+
+        // when starting the RPC process configured to log there
+        JavaScriptRewriteRpc rpc = JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .log(log)
+          .get();
+
+        // then the process starts and the log (with its parent) is created
+        // rather than failing with NoSuchFileException
+        try {
+            assertThat(rpc).isNotNull();
+            assertThat(Files.exists(log)).isTrue();
+        } finally {
+            rpc.shutdown();
+        }
     }
 
     @Test
