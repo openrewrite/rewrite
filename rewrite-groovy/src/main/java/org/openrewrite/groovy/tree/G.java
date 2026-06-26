@@ -22,8 +22,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.internal.GroovyIdentifierValidationService;
 import org.openrewrite.groovy.internal.GroovyWhitespaceValidationService;
 import org.openrewrite.groovy.service.GroovyAutoFormatService;
+import org.openrewrite.internal.IdentifierValidationService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
@@ -149,20 +151,20 @@ public interface G extends J {
         public <S, T extends S> T service(Class<S> service) {
             String serviceName = service.getName();
             try {
-                Class<S> serviceClass;
                 if (GroovyAutoFormatService.class.getName().equals(serviceName)) {
-                    serviceClass = service;
+                    return (T) service.getConstructor().newInstance();
                 } else if (AutoFormatService.class.getName().equals(serviceName)) {
-                    serviceClass = (Class<S>) service.getClassLoader().loadClass(GroovyAutoFormatService.class.getName());
+                    return (T) service.getClassLoader().loadClass(GroovyAutoFormatService.class.getName()).getConstructor().newInstance();
                 } else if (WhitespaceValidationService.class.getName().equals(serviceName)) {
-                    serviceClass = (Class<S>) service.getClassLoader().loadClass(GroovyWhitespaceValidationService.class.getName());
-                } else {
-                    return JavaSourceFile.super.service(service);
+                    return (T) service.getClassLoader().loadClass(GroovyWhitespaceValidationService.class.getName()).getConstructor().newInstance();
+                } else if (IdentifierValidationService.class.getName().equals(serviceName)) {
+                    return (T) service.getClassLoader().loadClass(GroovyIdentifierValidationService.class.getName()).getConstructor().newInstance();
                 }
-                return (T) serviceClass.getConstructor().newInstance();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+            // Delegate unknown services outside the try so an UnsupportedOperationException is not re-wrapped.
+            return JavaSourceFile.super.service(service);
         }
 
         List<JRightPadded<Statement>> statements;

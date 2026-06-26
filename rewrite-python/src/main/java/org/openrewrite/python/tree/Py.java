@@ -21,8 +21,10 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.internal.IdentifierValidationService;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.python.internal.PythonIdentifierValidationService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.python.PythonVisitor;
@@ -555,6 +557,9 @@ public interface Py extends J {
         public <S, T extends S> T service(Class<S> service) {
             if (AutoFormatService.class.getName().equals(service.getName())) {
                 return (T) new PythonAutoFormatService();
+            }
+            if (IdentifierValidationService.class.getName().equals(service.getName())) {
+                return (T) new PythonIdentifierValidationService();
             }
             return JavaSourceFile.super.service(service);
         }

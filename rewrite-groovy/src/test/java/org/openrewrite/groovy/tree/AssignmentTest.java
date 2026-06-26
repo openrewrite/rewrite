@@ -18,6 +18,7 @@ package org.openrewrite.groovy.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
@@ -311,6 +312,9 @@ class AssignmentTest implements RewriteTest {
     @Test
     void destructuringAssignmentWithFullyQualifiedType() {
         rewriteRun(
+          // The fully-qualified type `java.lang.String` is stored as a single dotted J.Identifier rather than a
+          // J.FieldAccess, which the identifier-name validation flags. Allow it until the parser models this as a FieldAccess.
+          spec -> spec.typeValidationOptions(TypeValidation.builder().allowInvalidIdentifierNames(true).build()),
           groovy(
             """
               def (String key, java.lang.String value) = "a1:b2".split(":")

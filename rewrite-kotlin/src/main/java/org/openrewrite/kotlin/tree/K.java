@@ -20,6 +20,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.IdentifierValidationService;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
@@ -28,6 +29,7 @@ import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
+import org.openrewrite.kotlin.internal.KotlinIdentifierValidationService;
 import org.openrewrite.kotlin.internal.KotlinPrinter;
 import org.openrewrite.kotlin.service.KotlinAutoFormatService;
 import org.openrewrite.kotlin.service.KotlinImportService;
@@ -346,22 +348,22 @@ public interface K extends J {
         public <S, T extends S> T service(Class<S> service) {
             String serviceName = service.getName();
             try {
-                Class<S> serviceClass;
                 if (KotlinImportService.class.getName().equals(serviceName)) {
-                    serviceClass = service;
+                    return (T) service.getConstructor().newInstance();
                 } else if (ImportService.class.getName().equals(serviceName)) {
-                    serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinImportService.class.getName());
+                    return (T) service.getClassLoader().loadClass(KotlinImportService.class.getName()).getConstructor().newInstance();
                 } else if (KotlinAutoFormatService.class.getName().equals(serviceName)) {
-                    serviceClass = service;
+                    return (T) service.getConstructor().newInstance();
                 } else if (AutoFormatService.class.getName().equals(serviceName)) {
-                    serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinAutoFormatService.class.getName());
-                } else {
-                    return JavaSourceFile.super.service(service);
+                    return (T) service.getClassLoader().loadClass(KotlinAutoFormatService.class.getName()).getConstructor().newInstance();
+                } else if (IdentifierValidationService.class.getName().equals(serviceName)) {
+                    return (T) service.getClassLoader().loadClass(KotlinIdentifierValidationService.class.getName()).getConstructor().newInstance();
                 }
-                return (T) serviceClass.getConstructor().newInstance();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+            // Delegate unknown services outside the try so an UnsupportedOperationException is not re-wrapped.
+            return JavaSourceFile.super.service(service);
         }
     }
 

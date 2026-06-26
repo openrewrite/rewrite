@@ -224,6 +224,11 @@ public interface Go extends J {
                 T t = (T) new org.openrewrite.golang.service.GolangImportService();
                 return t;
             }
+            if (org.openrewrite.internal.IdentifierValidationService.class.getName().equals(service.getName())) {
+                @SuppressWarnings("unchecked")
+                T t = (T) new org.openrewrite.golang.internal.GoIdentifierValidationService();
+                return t;
+            }
             return JavaSourceFile.super.service(service);
         }
 
