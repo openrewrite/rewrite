@@ -937,4 +937,18 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void parameterWithInfixType() {
+        rewriteRun(
+          scala(
+            """
+            class AsyncDb
+            class InsightDb
+            type @@[A, B] = A
+            def f(x: AsyncDb @@ InsightDb) = x
+            """
+          )
+        );
+    }
 }
