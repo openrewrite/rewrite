@@ -452,6 +452,40 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Test
+    void twoBracedPackages() {
+        rewriteRun(
+          scala(
+            """
+            package a {
+              val x = 42
+            }
+
+            package b {
+              val y = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void nestedBracedPackages() {
+        rewriteRun(
+          scala(
+            """
+            package outer {
+              package inner {
+                val x = 1
+              }
+
+              val y = 2
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void classUsingAnonymousContextParameter() {
         rewriteRun(
           scala(

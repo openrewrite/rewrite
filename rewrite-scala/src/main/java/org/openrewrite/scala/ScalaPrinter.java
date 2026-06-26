@@ -38,7 +38,6 @@ import org.openrewrite.scala.marker.DottedMatch;
 import org.openrewrite.scala.marker.Implicit;
 import org.openrewrite.scala.marker.IndentedSyntax;
 import org.openrewrite.scala.marker.InfixTypeNotation;
-import org.openrewrite.scala.marker.PackageBraces;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TypeProjection;
@@ -645,6 +644,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
         if (tree instanceof S.CompilationUnit) {
             return visitScalaCompilationUnit((S.CompilationUnit) tree, p);
+        } else if (tree instanceof S.PackageDeclaration) {
+            return visitScalaPackageDeclaration((S.PackageDeclaration) tree, p);
         } else if (tree instanceof S.Wildcard) {
             return visitWildcard((S.Wildcard) tree, p);
         } else if (tree instanceof S.TuplePattern) {
@@ -735,17 +736,17 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visit(statement, p);
         }
 
-        if (scu.getPackageDeclaration() != null) {
-            Optional<PackageBraces> braces = scu.getPackageDeclaration().getMarkers().findFirst(PackageBraces.class);
-            if (braces.isPresent()) {
-                p.append(braces.get().afterBody());
-                p.append('}');
-            }
-        }
-
         visitSpace(scu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
         afterSyntax(scu, p);
         return scu;
+    }
+
+    public J visitScalaPackageDeclaration(S.PackageDeclaration pkg, PrintOutputCapture<P> p) {
+        beforeSyntax(pkg, Space.Location.PACKAGE_PREFIX, p);
+        visit(pkg.getName(), p);
+        visit(pkg.getBody(), p);
+        afterSyntax(pkg, p);
+        return pkg;
     }
 
     @Override
@@ -755,11 +756,6 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visit(pkg.getExpression(), p);
         if (pkg.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
             p.append(':');
-        }
-        Optional<PackageBraces> braces = pkg.getMarkers().findFirst(PackageBraces.class);
-        if (braces.isPresent()) {
-            p.append(braces.get().beforeBrace());
-            p.append('{');
         }
         if (pkg.getMarkers().findFirst(PackageSemicolon.class).isPresent()) {
             p.append(';');
