@@ -2,6 +2,10 @@
 
 import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
 import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
+import com.hierynomus.gradle.license.tasks.LicenseCheck
+import com.hierynomus.gradle.license.tasks.LicenseFormat
+import nl.javadude.gradle.plugins.license.License
+import java.util.Calendar
 
 plugins {
     id("org.openrewrite.build.language-library")
@@ -31,9 +35,12 @@ tasks.withType<Javadoc>().configureEach {
 }
 
 // Test fixtures for the GoMod conformance corpus are .gomod / .gosum / .json
-// files; none of these formats accept a leading license header. Go sources and
-// vendored third-party code are likewise excluded from the license header check
-// (.go files carry their own header management; vendor/ is third-party).
+// files; none of these formats accept a leading license header. The default
+// license task excludes all .go files (the vendored Go staged into main
+// resources must never be stamped); first-party Go sources are instead managed
+// by the dedicated licenseGo / licenseFormatGo tasks below, which scope precisely
+// to our own code. vendor/ (third-party) and testdata/ (sample user programs)
+// are never stamped.
 configure<nl.javadude.gradle.plugins.license.LicenseExtension> {
     excludePatterns.addAll(listOf(
         "**/*.gomod",
@@ -44,7 +51,54 @@ configure<nl.javadude.gradle.plugins.license.LicenseExtension> {
         "**/go.sum",
         "**/vendor/**",
     ))
+
+    // A /* */ header style for Go that tolerates leading build-constraint lines.
+    // Go requires `//go:build` (and legacy `// +build`) to precede the package
+    // clause and allows only line comments and blank lines before them, so a
+    // block-comment license header must come *after* the constraint. skipLinePattern
+    // keeps that leading line in place and applies/detects the header below it; for
+    // files without a constraint it behaves exactly like SLASHSTAR_STYLE.
+    headerDefinitions.create("go_slashstar_style") {
+        withFirstLine("/*")
+        withBeforeEachLine(" * ")
+        withEndLine(" */")
+        withSkipLinePattern("^//\\s*(go:build|\\+build).*\$")
+        withFirstLineDetectionDetectionPattern("(\\s|\\t)*/\\*.*\$")
+        withLastLineDetectionDetectionPattern(".*\\*/(\\s|\\t)*\$")
+        multiline()
+        withNoBlankLines()
+    }
 }
+
+// First-party Go sources use a blank-line header variant (not the <p> form used
+// by .java/.cs/.ts), so they get their own header template. The shared
+// LicenseExtension excludes **/*.go globally; that exclude is applied to every
+// License task via conventionMapping, i.e. only when the task does not set its
+// own excludes. These tasks therefore set excludes explicitly to override it and
+// actually scan our Go — while still skipping vendor/ and testdata/.
+val goLicenseHeader = file("${rootProject.projectDir}/gradle/msalLicenseHeaderGo.txt")
+val goLicenseExcludes = listOf("**/vendor/**", "**/testdata/**")
+fun License.configureForFirstPartyGo() {
+    group = "license"
+    source = fileTree(projectDir) { include("cmd/**/*.go", "pkg/**/*.go", "test/**/*.go", "*.go") }
+    setExcludes(goLicenseExcludes)
+    header = goLicenseHeader
+    mapping("go", "go_slashstar_style")
+    ext["year"] = Calendar.getInstance().get(Calendar.YEAR)
+}
+
+val licenseGo by tasks.registering(LicenseCheck::class) {
+    description = "Check license headers on first-party Go files"
+    configureForFirstPartyGo()
+}
+
+val licenseFormatGo by tasks.registering(LicenseFormat::class) {
+    description = "Apply license headers to first-party Go files"
+    configureForFirstPartyGo()
+}
+
+tasks.named("licenseMain") { dependsOn(licenseGo) }
+tasks.named("licenseFormatMain") { dependsOn(licenseFormatGo) }
 
 // ============================================
 // Go RPC Source Packaging
@@ -92,7 +146,10 @@ val prepareGoRpcSources = tasks.register<Sync>("prepareGoRpcSources") {
         exclude("**/*_test.go")
         exclude("**/testdata/**")
     }
-    from(rootProject.file("LICENSE"))
+    // rewrite-go is published under the Moderne Source Available License, so the
+    // packaged RPC source ships the module's MSAL LICENSE.md (not the repo-root
+    // Apache LICENSE).
+    from(file("LICENSE.md"))
 }
 
 sourceSets.named("main") {

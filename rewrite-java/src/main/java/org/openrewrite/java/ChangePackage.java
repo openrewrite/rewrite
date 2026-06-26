@@ -29,7 +29,6 @@ import org.openrewrite.trait.Reference;
 
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
@@ -109,9 +108,9 @@ public class ChangePackage extends Recipe {
                             }
                         }
                     }
-                    // Fully qualified javadoc references are excluded from TypesInUse
-                    // (they don't affect imports), but they still need package renaming.
-                    if (hasJavadocReferenceToPackage(cu, oldPackageName, recursive, recursivePackageNamePrefix)) {
+                    // Fully qualified documentation-comment references are excluded from TypesInUse's
+                    // import-retention set (they don't affect imports), but they still need package renaming.
+                    if (cu.getTypesInUse().hasDocReferenceInPackage(oldPackageName, recursive)) {
                         return SearchResult.found(cu);
                     }
                 } else if (tree instanceof SourceFileWithReferences) {
@@ -535,50 +534,6 @@ public class ChangePackage extends Recipe {
                    !packageName.startsWith(newPackageName);
         }
 
-    }
-
-    private static boolean hasJavadocReferenceToPackage(JavaSourceFile cu, String packageName, boolean recursive, String recursivePrefix) {
-        return new JavaIsoVisitor<AtomicBoolean>() {
-            boolean inJavadocReference;
-
-            @Override
-            public @Nullable J visit(@Nullable Tree tree, AtomicBoolean f) {
-                // Once a matching reference is found, skip the rest of the traversal.
-                return f.get() ? (J) tree : super.visit(tree, f);
-            }
-
-            @Override
-            protected JavadocVisitor<AtomicBoolean> getJavadocVisitor() {
-                // Field accesses only carry a fully qualified package reference worth checking when
-                // they appear inside a Javadoc reference, so let the Javadoc delegate flag that scope
-                // rather than re-walking each field access's ancestors during the descent.
-                return new JavadocVisitor<AtomicBoolean>(this) {
-                    @Override
-                    public Javadoc visitReference(Javadoc.Reference reference, AtomicBoolean f) {
-                        inJavadocReference = true;
-                        try {
-                            return super.visitReference(reference, f);
-                        } finally {
-                            inJavadocReference = false;
-                        }
-                    }
-                };
-            }
-
-            @Override
-            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicBoolean f) {
-                if (inJavadocReference && !f.get()) {
-                    JavaType type = fieldAccess.getType();
-                    if (type instanceof JavaType.FullyQualified) {
-                        String pkg = ((JavaType.FullyQualified) type).getPackageName();
-                        if (pkg.equals(packageName) || recursive && pkg.startsWith(recursivePrefix)) {
-                            f.set(true);
-                        }
-                    }
-                }
-                return super.visitFieldAccess(fieldAccess, f);
-            }
-        }.reduce(cu, new AtomicBoolean()).get();
     }
 
     @Value

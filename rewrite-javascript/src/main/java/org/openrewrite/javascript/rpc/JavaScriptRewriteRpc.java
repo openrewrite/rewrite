@@ -37,6 +37,7 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -84,6 +85,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
     public static void setFactory(Builder builder) {
         MANAGER.setFactory(builder);
+    }
+
+    public static void resetFactory() {
+        MANAGER.resetFactory();
     }
 
     @Override
@@ -486,10 +491,21 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
-                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
+                        .log(log == null ? null : new PrintStream(openLog(log)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+        }
+
+        private static OutputStream openLog(Path log) throws IOException {
+            // The parent directory may not exist yet (e.g. a previously configured
+            // temp directory that has since been deleted), so create it defensively
+            // rather than failing the (re)start of the RPC process.
+            Path parent = log.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            return Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE);
         }
 
         /**

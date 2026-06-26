@@ -166,6 +166,101 @@ class UsesMethod(TreeVisitor[Tree, Any]):
         return found[0]
 
 
+class UsesImport(TreeVisitor[Tree, Any]):
+    """Match files that import a given module, by import *syntax* rather than
+    type attribution.
+
+    Mirrors ``org.openrewrite.python.search.UsesImport``. Reads the as-written
+    import path off ``Py.MultiImport`` statements, so it is robust to two
+    failure modes that make :class:`UsesType` unusable for gating
+    import-migration recipes:
+
+    * the type checker canonicalizes aliases (``from typing import List``
+      resolves to ``list``), erasing the deprecated import path; and
+    * removed/unresolvable symbols (``from base64 import encodestring``) get
+      no type attribution at all.
+
+    ``module`` is a dotted module path (e.g. ``"datetime"``, ``"os.path"``).
+    A file matches if it imports that module, a submodule of it, or a parent
+    module of it — a generous superset, which is what a precondition wants
+    (over-matching merely runs the gated visitor; under-matching would skip a
+    file the recipe should change).
+    """
+
+    def __init__(self, module: str) -> None:
+        self._module = module
+
+    def visit(
+        self,
+        tree: Optional[Tree],
+        p: Any,
+        parent: Optional[Cursor] = None,
+    ) -> Optional[Tree]:
+        if not isinstance(tree, SourceFile):
+            return tree
+        if self._tree_uses_import(tree):
+            return SearchResult.found(tree)
+        return tree
+
+    def _tree_uses_import(self, tree: Tree) -> bool:
+        from rewrite.java.tree import Import
+        from rewrite.python.tree import MultiImport
+        from rewrite.python.import_utils import get_name_string, get_qualid_name
+
+        multi_imports: list = []
+        standalone_imports: list = []
+        child_ids: set = set()
+
+        def collect(node: Any) -> None:
+            if isinstance(node, MultiImport):
+                multi_imports.append(node)
+                for imp in node.names:
+                    child_ids.add(id(imp))
+            elif isinstance(node, Import):
+                standalone_imports.append(node)
+
+        _walk(tree, collect)
+
+        for multi in multi_imports:
+            if multi.from_ is not None:
+                # `from <module> import ...` — the module is the `from` clause.
+                if _import_path_matches(get_name_string(multi.from_), self._module):
+                    return True
+            else:
+                # `import <a>, <b>` — each name's qualid is itself a module.
+                for imp in multi.names:
+                    if _import_path_matches(get_qualid_name(imp.qualid), self._module):
+                        return True
+
+        # A truly standalone J.Import (not a MultiImport child) is an
+        # `import <module>` whose qualid is the module. Children of a `from`
+        # MultiImport are imported *names*, not modules, so they are excluded.
+        for imp in standalone_imports:
+            if id(imp) in child_ids:
+                continue
+            if _import_path_matches(get_qualid_name(imp.qualid), self._module):
+                return True
+
+        return False
+
+
+def _import_path_matches(imported: str, query: str) -> bool:
+    """True when an as-written import path references the queried module.
+
+    Matches the module exactly, a submodule of it (``import os.path`` for
+    query ``os``), or a parent of it (``import os`` for query ``os.path``,
+    since ``os.path`` is then reachable). Dotted-boundary aware so ``os`` does
+    not match ``ossaudiodev``.
+    """
+    if not imported or not query:
+        return False
+    return (
+        imported == query
+        or imported.startswith(query + ".")
+        or query.startswith(imported + ".")
+    )
+
+
 def _fully_qualified_name(type_obj: Any) -> Optional[str]:
     """Best-effort accessor for a ``JavaType.FullyQualified``-shaped
     object's fully-qualified name. Returns ``None`` when the type isn't
@@ -216,4 +311,4 @@ def _walk(node: Any, visit_fn) -> None:
                     stack.append(val)
 
 
-__all__ = ["IsSourceFile", "UsesType", "UsesMethod"]
+__all__ = ["IsSourceFile", "UsesType", "UsesMethod", "UsesImport"]

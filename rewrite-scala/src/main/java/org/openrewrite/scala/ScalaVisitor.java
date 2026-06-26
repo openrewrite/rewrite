@@ -399,6 +399,20 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return e;
     }
 
+    public J visitScalaPackageDeclaration(S.PackageDeclaration pkg, P p) {
+        S.PackageDeclaration pd = pkg;
+        pd = pd.withPrefix(visitSpace(pd.getPrefix(), Space.Location.PACKAGE_PREFIX, p));
+        pd = pd.withMarkers(visitMarkers(pd.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(pd, p);
+        if (!(temp instanceof S.PackageDeclaration)) {
+            return temp;
+        }
+        pd = (S.PackageDeclaration) temp;
+        pd = pd.withName(visitAndCast(pd.getName(), p));
+        pd = pd.withBody(visitAndCast(pd.getBody(), p));
+        return pd;
+    }
+
     public J visitFor(S.For forLoop, P p) {
         S.For f = forLoop;
         f = f.withPrefix(visitSpace(f.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

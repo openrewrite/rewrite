@@ -45,6 +45,22 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Test
+    void trailingSemicolonWhenRhsOnNextLine() {
+        // Dotty extends the val span to include the trailing ';' when the rhs is on
+        // its own line, so the cursor moves past it; the ';' must still round-trip.
+        rewriteRun(
+          scala(
+            """
+            class Foo {
+              val x =
+                1;
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void emptyFile() {
         rewriteRun(
           scala("")
@@ -430,6 +446,40 @@ class CompilationUnitTest implements RewriteTest {
             val x = f: a =>
               b =>
                 a + b
+            """
+          )
+        );
+    }
+
+    @Test
+    void twoBracedPackages() {
+        rewriteRun(
+          scala(
+            """
+            package a {
+              val x = 42
+            }
+
+            package b {
+              val y = 1
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void nestedBracedPackages() {
+        rewriteRun(
+          scala(
+            """
+            package outer {
+              package inner {
+                val x = 1
+              }
+
+              val y = 2
+            }
             """
           )
         );

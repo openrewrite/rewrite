@@ -969,16 +969,19 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
+        List<J.Annotation> lastAnnotations = new ArrayList<>();
         List<J.Modifier> modifiers = new ArrayList<>();
         Set<PsiElement> consumedSpaces = preConsumedInfix(constructor);
 
         if (constructor.getModifierList() != null) {
             KtModifierList ktModifierList = constructor.getModifierList();
-            modifiers.addAll(mapModifiers(ktModifierList, leadingAnnotations, emptyList(), data));
+            modifiers.addAll(mapModifiers(ktModifierList, leadingAnnotations, lastAnnotations, data));
         }
 
         if (constructor.getConstructorKeyword() != null) {
-            modifiers.add(mapModifier(constructor.getConstructorKeyword(), emptyList(), consumedSpaces));
+            // Annotations between the visibility modifier and the `constructor` keyword (e.g. `internal @Inject constructor`)
+            // are attached to the keyword modifier so they print in their original source position.
+            modifiers.add(mapModifier(constructor.getConstructorKeyword(), lastAnnotations, consumedSpaces));
         }
 
         JavaType.Method type = methodDeclarationType(constructor);

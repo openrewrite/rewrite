@@ -218,6 +218,39 @@ public class SourcePositionService {
             }
 
             @Override
+            public J visitTry(J.Try tryable, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                JContainer<J.Try.Resource> resources = tryable.getPadding().getResources();
+                // JavaPrinter#visitTry prints the resources directly rather than through visitContainer/visitRightPadded,
+                // so the generic findJContainer search never matches. Replicate that printing here while tracking the span.
+                if (findJContainer == null || resources == null ||
+                        (List<?>) resources.getPadding().getElements() != (List<?>) findJContainer.getPadding().getElements()) {
+                    return super.visitTry(tryable, p);
+                }
+                beforeSyntax(tryable, Space.Location.TRY_PREFIX, p);
+                p.append("try");
+                visitSpace(resources.getBefore(), Space.Location.TRY_RESOURCES, p);
+                p.append('(');
+                List<JRightPadded<J.Try.Resource>> elements = resources.getPadding().getElements();
+                for (int i = 0; i < elements.size(); i++) {
+                    JRightPadded<J.Try.Resource> paddedResource = elements.get(i);
+                    J.Try.Resource resource = paddedResource.getElement();
+                    if (i == 0) {
+                        resource = startFind(resource, p);
+                    } else {
+                        visitSpace(resource.getPrefix(), Space.Location.TRY_RESOURCE, p);
+                    }
+                    visitMarkers(resource.getMarkers(), p);
+                    visit(resource.getVariableDeclarations(), p);
+                    if (resource.isTerminatedWithSemicolon()) {
+                        p.append(';');
+                    }
+                    visitSpace(paddedResource.getAfter(), Space.Location.TRY_RESOURCE_SUFFIX, p);
+                }
+                found.set(true);
+                return tryable;
+            }
+
+            @Override
             protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<TreeVisitor<?, ?>> p) {
                 if (findJContainer != null && nodes == findJContainer.getPadding().getElements()) {
                     for (int i = 0; i < nodes.size(); i++) {

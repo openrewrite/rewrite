@@ -19,9 +19,12 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static java.time.Duration.ofSeconds;
 
 class PackageManagerExecutorTest {
 
@@ -39,6 +42,26 @@ class PackageManagerExecutorTest {
         PackageManagerExecutor missing =
                 PackageManagerExecutor.forTesting("definitely-not-a-real-binary-2026", 30);
         assertThat(missing.find()).isNull();
+    }
+
+    @Test
+    void closesChildStdinSoStdinReadingProcessesDoNotHang() {
+        // given a process whose timeout is far longer than this test is willing to wait, running a
+        // command that reads stdin until EOF (`cat`). If stdin stayed an open pipe it would block
+        // until the timeout, the exact failure mode behind pnpm's cold-store install hang.
+        assumeTrue(!System.getProperty("os.name").toLowerCase().contains("windows"),
+                "uses the POSIX `cat` to read stdin to EOF");
+        String cat = PackageManagerExecutor.which("cat");
+        assumeTrue(cat != null, "cat must be available");
+        PackageManagerExecutor executor = PackageManagerExecutor.forTesting("cat", 120);
+
+        // when run with no input provided
+        PackageManagerExecutor.RunResult result = assertTimeoutPreemptively(ofSeconds(15), () ->
+                executor.run(Paths.get("."), cat, Collections.<String, String>emptyMap()));
+
+        // then it sees EOF immediately and exits cleanly rather than hanging on the open pipe
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getExitCode()).isEqualTo(0);
     }
 
     @Test

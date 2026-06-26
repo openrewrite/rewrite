@@ -473,4 +473,24 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void unboundedWildcardInMethod() {
+        rewriteRun(
+          groovy(
+            """
+                    class C {
+                       // these two method together fails
+                        String a(def a1) {
+                            Map<String, ?> r = b(a1)
+                            return r.key
+                        }
+                        Map<String, ?> b(def b) {
+                        }
+                    }
+
+              """
+          )
+        );
+    }
+
 }

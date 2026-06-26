@@ -156,10 +156,14 @@ public class Assertions {
                         } else if (sourceFile.getSourcePath().endsWith("build.gradle") || sourceFile.getSourcePath().endsWith("build.gradle.kts")) {
                             OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), tempDirectory.resolve(sourceFile.getSourcePath()).toFile(), initScriptContents);
                             GradleProject gradleProject = model.getGradleProject();
+                            GradleProject projectForPath = model.getGradleProjectsByPath().get(gradlePathFor(tempDirectory, projectDir, sourceFile));
+                            if (projectForPath != null) {
+                                gradleProject = projectForPath;
+                            }
                             allRepositories.addAll(gradleProject.getMavenRepositories());
                             allBuildscriptRepositories.addAll(gradleProject.getBuildscript().getMavenRepositories());
                             sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().setByType(gradleProject)));
-                            gradleProjects.put(getDirectory(sourceFile), model.getGradleProject());
+                            gradleProjects.put(getDirectory(sourceFile), gradleProject);
                         } else if (sourceFile.getSourcePath().toString().endsWith(".gradle") || sourceFile.getSourcePath().toString().endsWith(".gradle.kts")) {
                             freestandingScriptFound = true;
                         }
@@ -231,5 +235,17 @@ public class Assertions {
             return parent.toString();
         }
         return "";
+    }
+
+    private static String gradlePathFor(Path tempDirectory, Path projectDir, SourceFile sourceFile) {
+        Path buildFileDir = tempDirectory.resolve(sourceFile.getSourcePath()).getParent();
+        if (buildFileDir == null) {
+            return ":";
+        }
+        String relative = projectDir.relativize(buildFileDir).toString();
+        if (relative.isEmpty()) {
+            return ":";
+        }
+        return ":" + relative.replace(File.separatorChar, ':').replace('/', ':');
     }
 }

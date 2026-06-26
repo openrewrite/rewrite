@@ -742,7 +742,12 @@ def _pip_install_recipe_package(package_name: str, version: Optional[str], targe
         spec = f"{package_name}{version}" if version[0] in "=<>!~" else f"{package_name}=={version}"
     else:
         spec = package_name
-    cmd = [sys.executable, "-m", "pip", "install", "--target", str(target_dir), spec]
+    # --upgrade is required: `pip install --target` refuses to replace an
+    # already-populated package directory without it, otherwise leaving stale
+    # files from a previously-installed version. The caller only reaches here
+    # for a version not already present (see handle_install_recipes), so this
+    # is the version-change path that must overwrite cleanly.
+    cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "--target", str(target_dir), spec]
     logger.info(f"pip install: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -756,17 +761,48 @@ def _pip_install_recipe_package(package_name: str, version: Optional[str], targe
     importlib.invalidate_caches()
 
 
+def _pip_install_local_path(local_path: Path, target_dir: Path) -> None:
+    import importlib
+    import subprocess
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    # Local recipe sources are mutable, so --force-reinstall picks up changed
+    # content even when the version is unchanged, and --upgrade lets pip replace
+    # the existing files under --target (which it otherwise refuses to do).
+    # `pip install <path>` also resolves and installs the local package's
+    # dependencies — a Python source dir, unlike a packaged npm/NuGet artifact,
+    # does not carry its dependencies alongside it.
+    cmd = [
+        sys.executable, "-m", "pip", "install",
+        "--force-reinstall", "--upgrade",
+        "--target", str(target_dir), str(local_path),
+    ]
+    logger.info(f"pip install: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"pip install failed for {local_path} (target={target_dir}):\n{result.stderr}"
+        )
+
+    target_str = str(target_dir.resolve())
+    if target_str not in sys.path:
+        sys.path.insert(0, target_str)
+    importlib.invalidate_caches()
+
+
 def handle_install_recipes(params: dict) -> dict:
     """Handle an InstallRecipes RPC request.
 
     Activates a recipe package in the marketplace. When `--recipe-install-dir`
-    is configured, a package spec that isn't already installed is pip-installed
-    into that directory before activation; otherwise the package must have been
+    is configured, the package is pip-installed into that directory before
+    activation — a named spec that isn't already installed, or a local path
+    together with its dependencies; otherwise the package must have been
     installed by the caller.
 
     Args:
         params: Dict containing either:
-            - 'recipes': str - A local file path (package already installed to target)
+            - 'recipes': str - A local file path (installed into the recipe-install
+              dir, with its dependencies, when one is configured)
             - 'recipes': {'packageName': str, 'version': str|None} - A package spec
 
     Returns:
@@ -790,9 +826,17 @@ def handle_install_recipes(params: dict) -> dict:
     recipes_added = 0
 
     if isinstance(recipes, str):
-        # Local file path - package should already be installed by caller
+        # Local file path. When a recipe-install dir is configured, install the
+        # local package (and its dependencies) into it before activating — a
+        # Python source dir doesn't carry its deps, so a direct import would fail
+        # for any recipe with third-party dependencies. Without an install dir,
+        # the package must have been provisioned by the caller.
         local_path = Path(recipes)
-        logger.info(f"Activating recipes from local path: {recipes}")
+        if _recipe_install_dir is not None:
+            logger.info(f"Installing recipes from local path: {recipes}")
+            _pip_install_local_path(local_path, _recipe_install_dir)
+        else:
+            logger.info(f"Activating recipes from local path: {recipes}")
 
         # Find and import the package
         # For local paths, we look for the package name from setup.py/pyproject.toml

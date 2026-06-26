@@ -29,6 +29,7 @@ import org.openrewrite.scala.marker.AmpersandIntersection
 import org.openrewrite.scala.marker.DottedMatch
 import org.openrewrite.scala.marker.ExtraConstructorParamLists
 import org.openrewrite.scala.marker.Implicit
+import org.openrewrite.scala.marker.InfixTypeNotation
 import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedSyntax
 import org.openrewrite.scala.marker.OmitBraces
@@ -4358,14 +4359,17 @@ class ScalaTreeVisitor(
     // Detect Scala 3 paren-less form (`for x <- xs do body`): after `for`, the next
     // non-whitespace is neither `(` nor `{`. The single-generator J.ForEachLoop
     // shortcut assumes parens, so for paren-less route through buildSFor.
-    val isParenless = {
+    val openDelim: Char = {
       val forStart = Math.max(0, forTree.span.start - offsetAdjustment)
       var i = forStart + 3 // skip "for"
       while (i < source.length && source.charAt(i).isWhitespace) i += 1
-      i < source.length && source.charAt(i) != '(' && source.charAt(i) != '{'
+      if (i < source.length) source.charAt(i) else ' '
     }
+    // The single-generator J.ForEachLoop shortcut always prints with parens, so only
+    // take it for the paren form. The brace form `for { x <- xs } { body }` and the
+    // Scala 3 paren-less form must route through buildSFor, which preserves brackets.
     val enums = forTree.enums
-    if (!isParenless && enums.size == 1) {
+    if (openDelim == '(' && enums.size == 1) {
       enums.head match {
         case genFrom: untpd.GenFrom if genFrom.pat.isInstanceOf[Trees.Ident[?]] =>
           return visitSimpleForEach(forTree, genFrom)
@@ -8145,8 +8149,7 @@ class ScalaTreeVisitor(
       visitRepeatedType(po)
     case tuple: untpd.Tuple => visitTupleType(tuple)
     case parens: untpd.Parens => visitParenthesizedType(parens)
-    case infix: untpd.InfixOp if infix.op != null &&
-        (infix.op.name.toString == "|" || infix.op.name.toString == "&") =>
+    case infix: untpd.InfixOp if infix.op != null =>
       visitTypeOperatorInfix(infix)
     case _ =>
       visitTree(tpt) match {
@@ -8157,16 +8160,52 @@ class ScalaTreeVisitor(
   }
 
   /**
-   * Scala 3 operator-form intersection (`A & B`) and union (`A | B`) types are parsed as an
-   * `untpd.InfixOp`. They are modeled structurally — `&` as a `J.IntersectionType` (flagged
-   * with `AmpersandIntersection` so the printer emits `&` rather than `with`) and `|` as an
-   * `S.UnionType` — rather than crammed whole into a single `J.Identifier`. This fixes every
-   * type-annotation position at once (params, return types, ascriptions, bounds, tuple and
-   * function components, ...).
+   * Type-level infix operators are parsed as an `untpd.InfixOp`. They are modeled
+   * structurally rather than crammed whole into a single `J.Identifier`:
+   *   - `&` as a `J.IntersectionType` (flagged with `AmpersandIntersection` so the
+   *     printer emits `&` rather than `with`),
+   *   - `|` as an `S.UnionType`,
+   *   - any other operator (`A @@ B`, `A =:= B`, ...) as a `J.ParameterizedType`
+   *     (since Scala desugars `A op B` to `op[A, B]`) flagged with `InfixTypeNotation`
+   *     so the printer re-emits the infix form.
+   * This fixes every type-annotation position at once (params, return types,
+   * ascriptions, bounds, tuple and function components, ...).
    */
   private def visitTypeOperatorInfix(infix: untpd.InfixOp): TypeTree =
-    if (infix.op.name.toString == "&") visitIntersectionInfixType(infix)
-    else visitUnionInfixType(infix)
+    infix.op.name.toString match {
+      case "&" => visitIntersectionInfixType(infix)
+      case "|" => visitUnionInfixType(infix)
+      case _ => visitGeneralInfixType(infix)
+    }
+
+  /**
+   * Model a general type-level infix operator `A op B` as `op[A, B]` (a
+   * `J.ParameterizedType` whose `clazz` is the operator identifier and whose two type
+   * parameters are the left and right operands), flagged with `InfixTypeNotation` so the
+   * printer re-emits the source `A op B` form. The space before the operator is stored as
+   * the left operand's right-padding; the space before the right operand is its own prefix.
+   */
+  private def visitGeneralInfixType(infix: untpd.InfixOp): TypeTree = {
+    val opName = infix.op.name.toString
+    val prefix = extractPrefix(infix.span)
+    val left = asExpression(visitTypeTree(infix.left))
+    if (left == null) return ident(extractSource(infix.span), prefix)
+    val beforeOp = sourceBefore(opName)
+    val right = asExpression(visitTypeTree(infix.right))
+    if (right == null) return ident(extractSource(infix.span), prefix)
+    updateCursor(infix.span.end)
+    val elements = new util.ArrayList[JRightPadded[Expression]](2)
+    elements.add(new JRightPadded[Expression](left, beforeOp, Markers.EMPTY))
+    elements.add(new JRightPadded[Expression](right, Space.EMPTY, Markers.EMPTY))
+    new J.ParameterizedType(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY.add(InfixTypeNotation.create()),
+      ident(opName),
+      JContainer.build(Space.EMPTY, elements, Markers.EMPTY),
+      typeOfTree(infix)
+    )
+  }
 
   /**
    * Flatten a (possibly chained) type-level infix `A op B op C` into its leaf operands in
@@ -8757,6 +8796,13 @@ class ScalaTreeVisitor(
    */
   private def consumeTrailingSemicolon(statEnd: Int, nextStart: Int): (Space, Markers) = {
     val trailStart = Math.max(statEnd, cursor)
+    // When the statement's rhs sits on its own line, Dotty extends the statement
+    // span to include the trailing `;`, so the cursor already moved past it. The
+    // forward scan below would miss it, dropping the explicit separator on print.
+    // Recognize that already-absorbed `;` here so it is preserved via the marker.
+    if (trailStart > 0 && trailStart <= source.length && source.charAt(trailStart - 1) == ';') {
+      return (Space.EMPTY, Markers.EMPTY.add(new Semicolon(Tree.randomId())))
+    }
     if (trailStart >= nextStart || nextStart > source.length) {
       return (Space.EMPTY, Markers.EMPTY)
     }
