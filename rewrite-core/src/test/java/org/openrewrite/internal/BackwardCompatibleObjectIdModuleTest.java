@@ -146,6 +146,31 @@ class BackwardCompatibleObjectIdModuleTest {
     }
 
     @Test
+    void idPropertyIsAlwaysSerializedFirst() throws IOException {
+        // Jackson emits the @JsonIdentityInfo id property immediately after START_OBJECT, before any bean field, so a
+        // reader could decide the encoding from the first field alone. We deliberately do NOT rely on that (the scan in
+        // deserialize() tolerates any position) because this module reads LSTs at runtime — if the invariant were ever
+        // broken (a custom serializer on a @ref type, an off-spec writer), short-circuiting on the first field would
+        // throw UnresolvedForwardReference and take down the whole recipe run. This test pins the invariant in both the
+        // JSON and the production Smile path, so a change that moved @ref fails loudly here instead.
+        assertIdPropertyFirst(mapper);
+        assertIdPropertyFirst(configure(JsonMapper.builder(new SmileFactory())
+          .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+          .build()
+          .registerModule(new ParameterNamesModule())
+          .registerModule(new BackwardCompatibleObjectIdModule())));
+    }
+
+    private static void assertIdPropertyFirst(ObjectMapper m) throws IOException {
+        byte[] bytes = m.writeValueAsBytes(new Node("payload", Collections.emptyList()));
+        try (JsonParser p = m.getFactory().createParser(bytes)) {
+            assertThat(p.nextToken()).isEqualTo(JsonToken.START_OBJECT);
+            assertThat(p.nextToken()).isEqualTo(JsonToken.FIELD_NAME);
+            assertThat(p.currentName()).isEqualTo("@ref");
+        }
+    }
+
+    @Test
     void markerTypesRoundTripWithTheModuleInstalled() throws IOException {
         // Markers are deserialized polymorphically (see @JsonTypeInfo on Marker) and are excluded from this module's
         // wrapping. The exclusion has no observable behavioral consequence (polymorphic dispatch means a wrapped
