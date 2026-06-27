@@ -37,19 +37,28 @@ import (
 
 func TestCoerceLeftPaddedEnum_AmbiguousNameResolvesByParser(t *testing.T) {
 	// "Addition" is valid for BOTH operator enums; the supplied parser decides which.
-	asAssign := coerceLeftPaddedEnum(java.EmptySpace, "Addition", java.Markers{}, java.ParseAssignmentOperator)
+	asAssign := coerceLeftPaddedEnum(java.EmptySpace, "Addition", java.Markers{}, java.ParseAssignmentOperator, java.AssignmentOperator(0))
 	if asAssign.Element != java.AddAssign {
 		t.Errorf("ParseAssignmentOperator: want AddAssign, got %v", asAssign.Element)
 	}
-	asBinary := coerceLeftPaddedEnum(java.EmptySpace, "Addition", java.Markers{}, java.ParseBinaryOperator)
+	asBinary := coerceLeftPaddedEnum(java.EmptySpace, "Addition", java.Markers{}, java.ParseBinaryOperator, java.BinaryOperator(0))
 	if asBinary.Element != java.Add {
 		t.Errorf("ParseBinaryOperator: want Add, got %v", asBinary.Element)
 	}
 }
 
+func TestCoerceLeftPaddedEnum_AbsentElementFallsBackToBaseline(t *testing.T) {
+	// A NO_CHANGE delta against a diverged baseline yields neither a typed enum
+	// nor a wire string; the baseline enum must be preserved (not zeroed → "?").
+	got := coerceLeftPaddedEnum(java.EmptySpace, nil, java.Markers{}, java.ParseBinaryOperator, java.Add)
+	if got.Element != java.Add {
+		t.Errorf("absent element: want baseline Add, got %v", got.Element)
+	}
+}
+
 func TestCoerceLeftPaddedEnum_PreTypedEnumPassThrough(t *testing.T) {
 	// NO_CHANGE hands back the already-typed enum; it must survive.
-	got := coerceLeftPaddedEnum(java.EmptySpace, java.OrAssign, java.Markers{}, java.ParseAssignmentOperator)
+	got := coerceLeftPaddedEnum(java.EmptySpace, java.OrAssign, java.Markers{}, java.ParseAssignmentOperator, java.AssignmentOperator(0))
 	if got.Element != java.OrAssign {
 		t.Errorf("pre-typed pass-through: want OrAssign, got %v", got.Element)
 	}

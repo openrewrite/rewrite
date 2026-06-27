@@ -29,15 +29,20 @@ import (
 // both in the same package. The shared types.Info should populate B's
 // definition AND A's reference with the same types.Object.
 func TestParsePackageResolvesCrossFileSymbols(t *testing.T) {
-	cus, err := parser.NewGoParser().ParsePackage([]parser.FileInput{
+	sfs := parser.NewGoParser().ParsePackage([]parser.FileInput{
 		{Path: "main.go", Content: "package main\n\nfunc main() { helper() }\n"},
 		{Path: "helper.go", Content: "package main\n\nfunc helper() {}\n"},
 	})
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
+	if len(sfs) != 2 {
+		t.Fatalf("expected 2 source files, got %d", len(sfs))
 	}
-	if len(cus) != 2 {
-		t.Fatalf("expected 2 CUs, got %d", len(cus))
+	cus := make([]*golang.CompilationUnit, 0, len(sfs))
+	for _, sf := range sfs {
+		cu, ok := sf.(*golang.CompilationUnit)
+		if !ok {
+			t.Fatalf("expected CompilationUnit, got %T", sf)
+		}
+		cus = append(cus, cu)
 	}
 
 	mainTypes := collectIdentTypes(cus[0])

@@ -76,7 +76,17 @@ func (r *GoReceiver) receiveParseError(pe *java.ParseError, q *ReceiveQueue) *ja
 			pe.Ident = parsed
 		}
 	}
-	pe.Markers = receiveMarkersCodec(q, pe.Markers)
+	// markers is a nested object: consume its envelope via q.Receive, then read
+	// sub-fields in the onChange (matches JavaReceiver.PreVisit).
+	// A direct receiveMarkersCodec call skips the envelope and desyncs the queue
+	// on any marker-bearing ParseError.
+	if result := q.Receive(pe.Markers, func(v any) any {
+		return receiveMarkersCodec(q, v.(java.Markers))
+	}); result != nil {
+		if mk, ok := result.(java.Markers); ok {
+			pe.Markers = mk
+		}
+	}
 	pe.SourcePath = receiveScalar[string](q, pe.SourcePath)
 	pe.CharsetName = receiveScalar[string](q, pe.CharsetName)
 	pe.CharsetBomMarked = receiveScalar[bool](q, pe.CharsetBomMarked)

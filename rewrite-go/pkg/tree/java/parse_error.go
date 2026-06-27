@@ -16,7 +16,11 @@
 
 package java
 
-import "github.com/google/uuid"
+import (
+	"errors"
+
+	"github.com/google/uuid"
+)
 
 // ParseError represents a source file that failed to parse.
 // Mirrors org.openrewrite.tree.ParseError on the Java side.
@@ -37,6 +41,19 @@ type ParseError struct {
 // the default arm. RPC senders/receivers special-case it ahead of the
 // dispatch.
 func (*ParseError) IsTree() {}
+
+// Cause reconstructs the parse error from the ParseExceptionResult marker
+// (the message captured by NewParseError), or nil when none is present.
+// Lets callers that need a Go error — e.g. the single-file Parse wrapper —
+// recover it without threading the original error alongside the tree.
+func (pe *ParseError) Cause() error {
+	for _, m := range pe.Markers.Entries {
+		if per, ok := m.(ParseExceptionResult); ok {
+			return errors.New(per.Message)
+		}
+	}
+	return nil
+}
 
 // NewParseError creates a ParseError from a source path, source text, and error.
 func NewParseError(sourcePath string, source string, err error) *ParseError {

@@ -584,8 +584,14 @@ func (r *JavaReceiver) VisitSwitch(sw *java.Switch, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *sw // shallow copy to avoid mutating remoteObjects baseline
 	sw = &c
-	// selector - Java sends ControlParentheses, extract inner Expression for Tag
-	if cpResult := q.Receive(nil, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
+	// selector - Java sends ControlParentheses, extract inner Expression for Tag.
+	// Pass the baseline wrapped as the sender wraps it so a CHANGE delta resolves
+	// the tag expression's NO_CHANGE inner spaces against the baseline.
+	var selBefore any
+	if sw.Tag != nil {
+		selBefore = &java.ControlParentheses{Tree: java.RightPadded[java.Expression]{Element: sw.Tag.Element, After: java.EmptySpace}}
+	}
+	if cpResult := q.Receive(selBefore, func(v any) any { return r.Visit(v.(java.Tree), q) }); cpResult != nil {
 		if cp, ok := cpResult.(*java.ControlParentheses); ok {
 			if _, isEmpty := cp.Tree.Element.(*java.Empty); !isEmpty {
 				sw.Tag = &java.RightPadded[java.Expression]{
@@ -605,8 +611,11 @@ func (r *JavaReceiver) VisitCase(cs *java.Case, p any) java.J {
 	cs = &c
 	q.Receive(nil, nil) // type enum
 	cs.Expressions = receiveContainer[java.Expression](r, q, cs.Expressions)
-	// statements - Java sends Container<RightPadded<Statement>>, extract to Go's []RightPadded[Statement]
-	if result := q.Receive(nil, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
+	// statements - Java sends Container<RightPadded<Statement>>, extract to Go's
+	// []RightPadded[Statement]. Pass the baseline container so a CHANGE delta
+	// resolves the statements' NO_CHANGE inner spaces against the baseline.
+	stmtsBefore := java.Container[java.Statement]{Elements: cs.Body}
+	if result := q.Receive(stmtsBefore, func(v any) any { return receiveContainerTyped[java.Statement](r, q, v) }); result != nil {
 		cont := result.(java.Container[java.Statement])
 		cs.Body = cont.Elements
 	}

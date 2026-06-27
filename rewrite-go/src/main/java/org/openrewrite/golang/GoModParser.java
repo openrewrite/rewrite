@@ -233,7 +233,12 @@ public class GoModParser implements Parser {
                 replaces,
                 excludes,
                 retracts,
-                resolved
+                resolved,
+                // Module graph is resolved separately (by the Go modgraph resolver at
+                // parse time); the Java text parser leaves it empty.
+                new ArrayList<>(),
+                new ArrayList<>(),
+                false
         );
     }
 

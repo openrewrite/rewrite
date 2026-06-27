@@ -91,3 +91,61 @@ func TestGoModRPCPreservesResolutionMarker(t *testing.T) {
 		t.Fatalf("marker fields not preserved: %#v", found)
 	}
 }
+
+// TestGoModRPCPreservesModuleGraph verifies the resolved module graph fields
+// added to GoResolutionResult survive the Go↔wire round-trip in lockstep with
+// the Java codec.
+func TestGoModRPCPreservesModuleGraph(t *testing.T) {
+	content := "module example.com/foo\n\ngo 1.21\n\nrequire github.com/x/y v1.2.3\n"
+	before, err := parser.ParseGoModFile("go.mod", content)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	marker := golang.NewGoResolutionResult("example.com/foo", "1.21", "", "go.mod")
+	marker.BuildList = []golang.GoModule{
+		{ModulePath: "example.com/foo", Version: "", GoVersion: "1.21", Main: true},
+		{ModulePath: "github.com/x/y", Version: "v1.2.3", GoVersion: "1.18",
+			ModuleHash: "h1:zip=", GoModHash: "h1:mod="},
+		{ModulePath: "github.com/x/dep", Version: "v0.4.0", GoVersion: "1.16", GoModHash: "h1:onlymod="},
+	}
+	marker.Graph = []golang.GoModuleEdge{
+		{FromPath: "example.com/foo", FromVersion: "", ToPath: "github.com/x/y", ToVersion: "v1.2.3"},
+		{FromPath: "github.com/x/y", FromVersion: "v1.2.3", ToPath: "github.com/x/dep", ToVersion: "v0.4.0", Indirect: true},
+	}
+	marker.GraphComplete = true
+	before.Markers.Entries = append(before.Markers.Entries, marker)
+
+	seed := &golang.GoMod{Ident: before.Ident}
+	got := roundTripNode(t, before, seed).(*golang.GoMod)
+
+	var found *golang.GoResolutionResult
+	for i := range got.Markers.Entries {
+		if r, ok := got.Markers.Entries[i].(golang.GoResolutionResult); ok {
+			found = &r
+		}
+	}
+	if found == nil {
+		t.Fatalf("GoResolutionResult marker lost in round-trip")
+	}
+	if !found.GraphComplete {
+		t.Errorf("GraphComplete not preserved")
+	}
+	if len(found.BuildList) != 3 {
+		t.Fatalf("BuildList length: want 3, got %d", len(found.BuildList))
+	}
+	xy := found.BuildList[1]
+	if xy.ModulePath != "github.com/x/y" || xy.Version != "v1.2.3" || xy.GoVersion != "1.18" ||
+		xy.ModuleHash != "h1:zip=" || xy.GoModHash != "h1:mod=" {
+		t.Errorf("BuildList[1] not preserved: %#v", xy)
+	}
+	if !found.BuildList[0].Main {
+		t.Errorf("main module flag not preserved")
+	}
+	if len(found.Graph) != 2 {
+		t.Fatalf("Graph length: want 2, got %d", len(found.Graph))
+	}
+	e := found.Graph[1]
+	if e.FromPath != "github.com/x/y" || e.ToPath != "github.com/x/dep" || e.ToVersion != "v0.4.0" || !e.Indirect {
+		t.Errorf("Graph[1] edge not preserved: %#v", e)
+	}
+}

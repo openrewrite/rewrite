@@ -75,8 +75,8 @@ func TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs(t *testing.T) {
 	// Pre-seed state a live session would hold from prior successful cycles:
 	//  - a baseline that diverges from Java's once the receive panics, and
 	//  - a shared ref the panic must NOT wipe.
-	s.reverseRemoteObjects[id] = "STALE-BASELINE"
-	s.reverseRemoteRefs[5] = "shared-value-from-earlier-transfer"
+	s.remoteObjects[id] = "STALE-BASELINE"
+	s.remoteRefs[5] = "shared-value-from-earlier-transfer"
 
 	// Transfer 1: must panic mid-receive.
 	panicked := func() (p bool) {
@@ -93,12 +93,12 @@ func TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs(t *testing.T) {
 	}
 
 	// Containment: the diverged per-id baseline is dropped.
-	if v, ok := s.reverseRemoteObjects[id]; ok {
-		t.Errorf("reverseRemoteObjects[%q] should be deleted after a receive panic, still present: %v", id, v)
+	if v, ok := s.remoteObjects[id]; ok {
+		t.Errorf("remoteObjects[%q] should be deleted after a receive panic, still present: %v", id, v)
 	}
 	// ...but the shared ref table survives.
-	if got := s.reverseRemoteRefs[5]; got != "shared-value-from-earlier-transfer" {
-		t.Errorf("reverseRemoteRefs[5] should survive a receive panic, got %v", got)
+	if got := s.remoteRefs[5]; got != "shared-value-from-earlier-transfer" {
+		t.Errorf("remoteRefs[5] should survive a receive panic, got %v", got)
 	}
 
 	// Transfer 2: a fresh request on the same server must succeed cleanly,
@@ -107,7 +107,7 @@ func TestGetObjectFromJavaPanicResetsBaselineButKeepsRefs(t *testing.T) {
 	if got != "package main\n" {
 		t.Errorf("transfer 2: want clean ADD value %q, got %#v", "package main\n", got)
 	}
-	if s.reverseRemoteObjects[id] != "package main\n" {
-		t.Errorf("transfer 2: baseline should be repopulated, got %#v", s.reverseRemoteObjects[id])
+	if s.remoteObjects[id] != "package main\n" {
+		t.Errorf("transfer 2: baseline should be repopulated, got %#v", s.remoteObjects[id])
 	}
 }

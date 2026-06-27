@@ -54,24 +54,36 @@ func (*GoMod) IsSourceFile() {}
 func (n *GoMod) GetSourcePath() string { return n.SourcePath }
 
 func (n *GoMod) WithPrefix(prefix java.Space) *GoMod {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *GoMod) WithMarkers(markers java.Markers) *GoMod {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
 }
 
 func (n *GoMod) WithStatements(statements []java.RightPadded[GoModStatement]) *GoMod {
+	if java.SameSlice(n.Statements, statements) {
+		return n
+	}
 	c := *n
 	c.Statements = statements
 	return &c
 }
 
 func (n *GoMod) WithEof(eof java.Space) *GoMod {
+	if java.SpaceEqual(n.Eof, eof) {
+		return n
+	}
 	c := *n
 	c.Eof = eof
 	return &c
@@ -108,18 +120,27 @@ func (*GoModDirective) IsTree()           {}
 func (*GoModDirective) isGoModStatement() {}
 
 func (n *GoModDirective) WithPrefix(prefix java.Space) *GoModDirective {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *GoModDirective) WithMarkers(markers java.Markers) *GoModDirective {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
 }
 
 func (n *GoModDirective) WithValues(values []*GoModValue) *GoModDirective {
+	if java.SameSlice(n.Values, values) {
+		return n
+	}
 	c := *n
 	c.Values = values
 	return &c
@@ -145,18 +166,27 @@ func (*GoModBlock) IsTree()           {}
 func (*GoModBlock) isGoModStatement() {}
 
 func (n *GoModBlock) WithPrefix(prefix java.Space) *GoModBlock {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *GoModBlock) WithMarkers(markers java.Markers) *GoModBlock {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
 }
 
 func (n *GoModBlock) WithEntries(entries []java.RightPadded[GoModStatement]) *GoModBlock {
+	if java.SameSlice(n.Entries, entries) {
+		return n
+	}
 	c := *n
 	c.Entries = entries
 	return &c
@@ -175,18 +205,27 @@ type GoModValue struct {
 func (*GoModValue) IsTree() {}
 
 func (n *GoModValue) WithPrefix(prefix java.Space) *GoModValue {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *GoModValue) WithMarkers(markers java.Markers) *GoModValue {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
 }
 
 func (n *GoModValue) WithText(text string) *GoModValue {
+	if n.Text == text {
+		return n
+	}
 	c := *n
 	c.Text = text
 	return &c

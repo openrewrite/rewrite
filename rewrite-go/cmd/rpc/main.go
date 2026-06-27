@@ -75,17 +75,22 @@ type rpcError struct {
 }
 
 // server holds the RPC state.
+//
+// A SINGLE unified baseline is shared by both directions, matching every other
+// language peer (Java RewriteRpc, rewrite-javascript, rewrite-csharp,
+// rewrite-python): remoteObjects is "the last state of an object that Go and
+// Java agree on" and is used as the diff baseline whether Go is serving a
+// GetObject (Java pulls from Go) or pulling one (Go pulls from Java). localRefs
+// is the persistent SEND ref table (object → ref id); remoteRefs is the
+// persistent RECEIVE ref table (ref id → object). An earlier split into
+// reverse* maps desynced the two sides' baselines/refs and dropped unchanged
+// subtrees' data (whitespace) on the print transport.
 type server struct {
 	localObjects  map[string]any
-	remoteObjects map[string]any // forward direction: tracks what Java has from Go
-	localRefs     map[uintptr]int
-	remoteRefs    map[int]any
+	remoteObjects map[string]any  // last-synced state shared by both directions
+	localRefs     map[uintptr]int // SEND ref table (persistent)
+	remoteRefs    map[int]any     // RECEIVE ref table (persistent)
 	batchSize     int
-
-	// Separate state for reverse GetObject (Java→Go) to avoid conflating
-	// with forward direction state
-	reverseRemoteObjects map[string]any
-	reverseRemoteRefs    map[int]any
 
 	// Prepared recipe instances keyed by unique ID
 	preparedRecipes map[string]recipe.Recipe
@@ -127,8 +132,11 @@ type server struct {
 	metricsWriter *csv.Writer
 	metricsMu     sync.Mutex
 
-	reader    *bufio.Reader
-	writer    io.Writer
+	reader *bufio.Reader
+	writer io.Writer
+	// httpMu serializes bidirectional Http requests so concurrent fetches do
+	// not interleave on the single duplex stream.
+	httpMu    sync.Mutex
 	logger    *log.Logger
 	registry  *recipe.Registry
 	installer *installer.Installer
@@ -206,8 +214,6 @@ func newServer(cfg serverConfig) *server {
 		remoteObjects:           make(map[string]any),
 		localRefs:               make(map[uintptr]int),
 		remoteRefs:              make(map[int]any),
-		reverseRemoteObjects:    make(map[string]any),
-		reverseRemoteRefs:       make(map[int]any),
 		preparedRecipes:         make(map[string]recipe.Recipe),
 		preparedRecipeNames:     make(map[string]string),
 		preparedEditorOverrides: make(map[string]recipe.TreeVisitor),
@@ -625,43 +631,47 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		groups[dir] = append(groups[dir], fileEntry{idx: r.idx, input: goparser.FileInput{Path: r.sourcePath, Content: r.source}})
 	}
 
-	// Parse each group; collect CUs by their original input index so the
-	// returned IDs land in input-order. Pre-filter against the parser's
-	// BuildContext so the post-parse `cus` slice aligns 1:1 with the
-	// `included` subset of the group.
+	// Parse each group; collect results by their original input index so the
+	// returned IDs land in input-order. ParsePackage returns one SourceFile
+	// per build-included input — a CompilationUnit or, for a file that fails
+	// to parse, a ParseError — mapped back by source path. Build-excluded
+	// files are absent and fall through to the emit loop's fallback.
 	cuByIdx := make(map[int]*golang.CompilationUnit, len(resolvedInputs))
-	parseErrByIdx := make(map[int]error)
+	peByIdx := make(map[int]*java.ParseError)
 	for _, group := range groups {
-		included := make([]fileEntry, 0, len(group))
 		files := make([]goparser.FileInput, 0, len(group))
+		idxBySourcePath := make(map[string]int, len(group))
 		for _, g := range group {
-			if !goparser.MatchBuildContext(p.BuildContext, filepath.Base(g.input.Path), g.input.Content) {
-				continue
-			}
-			included = append(included, g)
 			files = append(files, g.input)
+			idxBySourcePath[g.input.Path] = g.idx
 		}
-		if len(files) == 0 {
-			continue
-		}
-		cus, err := func() (out []*golang.CompilationUnit, err error) {
+		sfs, err := func() (out []java.Tree, err error) {
 			defer func() {
 				if r := recover(); r != nil {
 					err = fmt.Errorf("panic: %v", r)
 				}
 			}()
-			return p.ParsePackage(files)
+			return p.ParsePackage(files), nil
 		}()
 		if err != nil {
-			// Whole-package parse failure — record per-file ParseErrors
-			// for every file the build context didn't exclude.
-			for _, g := range included {
-				parseErrByIdx[g.idx] = err
+			// Whole-package panic — represent every file as a ParseError
+			// rather than dropping the group.
+			for _, g := range group {
+				peByIdx[g.idx] = java.NewParseError(g.input.Path, g.input.Content, err)
 			}
 			continue
 		}
-		for i, cu := range cus {
-			cuByIdx[included[i].idx] = cu
+		for _, sf := range sfs {
+			switch v := sf.(type) {
+			case *golang.CompilationUnit:
+				if idx, ok := idxBySourcePath[v.SourcePath]; ok {
+					cuByIdx[idx] = v
+				}
+			case *java.ParseError:
+				if idx, ok := idxBySourcePath[v.SourcePath]; ok {
+					peByIdx[idx] = v
+				}
+			}
 		}
 	}
 
@@ -676,7 +686,7 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		}
 		gm, err := goparser.ParseGoModFile(r.sourcePath, r.source)
 		if err != nil {
-			parseErrByIdx[r.idx] = err
+			peByIdx[r.idx] = java.NewParseError(r.sourcePath, r.source, err)
 			continue
 		}
 		if mrr, err := goparser.ParseGoMod(r.sourcePath, r.source); err == nil && mrr != nil && mrr.ModulePath != "" {
@@ -685,7 +695,10 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		goModByIdx[r.idx] = gm
 	}
 
-	// Emit results in input order.
+	// Emit results in input order. Every input yields exactly one id (the
+	// Java side maps ids to inputs positionally): a CompilationUnit, a
+	// GoMod, or — for a file that failed to parse or was build-excluded — a
+	// ParseError. Nothing is silently dropped.
 	ids := make([]string, 0, len(req.Inputs))
 	for _, r := range resolvedInputs {
 		if cu, ok := cuByIdx[r.idx]; ok && cu != nil {
@@ -700,12 +713,11 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			ids = append(ids, id)
 			continue
 		}
-		err := parseErrByIdx[r.idx]
-		if err == nil {
-			err = fmt.Errorf("no compilation unit produced")
+		pe, ok := peByIdx[r.idx]
+		if !ok {
+			pe = java.NewParseError(r.sourcePath, r.source, fmt.Errorf("no compilation unit produced"))
 		}
-		s.logger.Printf("Parse error for %s: %v", r.sourcePath, err)
-		pe := java.NewParseError(r.sourcePath, r.source, err)
+		s.logger.Printf("Parse error for %s: %v", r.sourcePath, pe.Cause())
 		id := pe.Ident.String()
 		s.localObjects[id] = pe
 		ids = append(ids, id)
@@ -736,15 +748,14 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	}
 
 	before := s.remoteObjects[req.ID]
-	// Use a fresh ref map for each GetObject to avoid ref ID collisions
-	// between the reverse direction (Java→Go) and forward direction (Go→Java).
-	localRefs := make(map[uintptr]int)
 
-	// Collect all batches into a single result
+	// Collect all batches into a single result. The persistent send ref table
+	// (localRefs) is shared across GetObject calls so Java's receive ref table
+	// stays in sync — matching the other language peers.
 	var result []rpc.RpcObjectData
 	q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
 		result = append(result, batch...)
-	}, localRefs)
+	}, s.localRefs)
 
 	sender := rpc.NewGoSender()
 	q.Send(obj, before, func(v any) {
@@ -823,15 +834,82 @@ func mapMarkerPrinter(mp *string) printer.MarkerPrinter {
 	}
 }
 
+// resolveTidyViaJava computes the `go mod tidy` require set by delegating to the
+// pure-Java module resolver over bidirectional RPC. The Java side performs all
+// GOPROXY HTTP through the CLI-configured OpenRewrite HttpSender (proxy, auth,
+// TLS honored) and writes fetched modules through to the standard module cache,
+// so no network egress originates from this peer. We pass the GOPROXY/GOMODCACHE
+// resolved from the environment; GOPROXY=off degrades to cache-only on the host.
+func (s *server) resolveTidyViaJava(content string, mainImports []string, modulePath string, separateIndirect bool) (recipes.TidyRequireSet, bool) {
+	s.httpMu.Lock()
+	defer s.httpMu.Unlock()
+	params, _ := json.Marshal(map[string]any{
+		"goMod":            content,
+		"mainImports":      mainImports,
+		"modulePath":       modulePath,
+		"separateIndirect": separateIndirect,
+		"goproxy":          envOr("GOPROXY", "https://proxy.golang.org,direct"),
+		"gomodcache":       envOr("GOMODCACHE", defaultModCache()),
+	})
+	req, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "go-GoModResolveTidy",
+		"method":  "GoModResolveTidy",
+		"params":  json.RawMessage(params),
+	})
+	header := fmt.Sprintf("Content-Length: %d\r\n\r\n", len(req))
+	if _, err := s.writer.Write(append([]byte(header), req...)); err != nil {
+		return recipes.TidyRequireSet{}, false
+	}
+	resp, err := s.readMessage()
+	if err != nil {
+		return recipes.TidyRequireSet{}, false
+	}
+	raw := resp.Result
+	if raw == nil {
+		raw = resp.Params
+	}
+	if raw == nil {
+		return recipes.TidyRequireSet{}, false
+	}
+	var out struct {
+		Direct   map[string]string `json:"direct"`
+		Indirect map[string]string `json:"indirect"`
+		Complete bool              `json:"complete"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return recipes.TidyRequireSet{}, false
+	}
+	return recipes.TidyRequireSet{Direct: out.Direct, Indirect: out.Indirect, Complete: out.Complete}, true
+}
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+func defaultModCache() string {
+	if gp := os.Getenv("GOPATH"); gp != "" {
+		return filepath.Join(strings.SplitN(gp, string(os.PathListSeparator), 2)[0], "pkg", "mod")
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, "go", "pkg", "mod")
+	}
+	return ""
+}
+
 // getObjectFromJava fetches an object from the Java side via bidirectional RPC.
 // For Print, Java holds the (potentially modified) tree. We need to request it back.
 // Supports multi-batch transfers: each GetObject call returns one batch, and
 // subsequent calls are made until the END_OF_OBJECT marker is received.
 func (s *server) getObjectFromJava(id string, sourceFileType string) any {
-	// Use reverse-direction tracking if available; otherwise fall back to
-	// localObjects (the tree Go originally parsed and sent to Java via forward
-	// GetObject). This matches Java's remoteObjects baseline.
-	before := s.reverseRemoteObjects[id]
+	// Diff baseline is the unified remoteObjects (the last state Go and Java
+	// agreed on) — the SAME map Java uses when it computes the diff it sends us,
+	// and the same one handleGetObject uses when serving. Fall back to
+	// localObjects on a cold cache (the tree Go parsed and sent earlier).
+	before := s.remoteObjects[id]
 	if before == nil {
 		before = s.localObjects[id]
 	}
@@ -884,7 +962,7 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 		return batch
 	}
 
-	q := rpc.NewReceiveQueue(s.reverseRemoteRefs, fetchBatch)
+	q := rpc.NewReceiveQueue(s.remoteRefs, fetchBatch)
 
 	receiver := rpc.NewGoReceiver()
 
@@ -899,14 +977,13 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 		// Mirrors the getObject recovery in RewriteRpc (Java) and rewrite-rpc.ts
 		// (JS): on failure they `remoteObjects.remove(id)` and rethrow.
 		//
-		// The shared ref table is intentionally left intact. Java's
-		// reverse-direction send refs are connection-scoped (cleared only on
-		// Reset), so discarding ours would make Java's bare {ref:N} look-ups
-		// fail with "received reference to unknown object: N" — turning a single
-		// failed request into a fresh cascade.
+		// The shared ref table is intentionally left intact. Java's send refs are
+		// connection-scoped (cleared only on Reset), so discarding ours would make
+		// Java's bare {ref:N} look-ups fail with "received reference to unknown
+		// object: N" — turning a single failed request into a fresh cascade.
 		defer func() {
 			if r := recover(); r != nil {
-				delete(s.reverseRemoteObjects, id)
+				delete(s.remoteObjects, id)
 				panic(r) // surface as one clear error via safeHandleRequest
 			}
 		}()
@@ -930,7 +1007,10 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 	}()
 
 	if obj != nil {
-		s.reverseRemoteObjects[id] = obj
+		// We are now in sync with Java on this object — record it as the shared
+		// baseline (used by both directions) and as our local copy. Mirrors
+		// rewrite-python get_object_from_java / RewriteRpc.getObject.
+		s.remoteObjects[id] = obj
 		s.localObjects[id] = obj
 	}
 
@@ -1015,8 +1095,6 @@ func (s *server) handleReset() bool {
 	s.remoteObjects = make(map[string]any)
 	s.localRefs = make(map[uintptr]int)
 	s.remoteRefs = make(map[int]any)
-	s.reverseRemoteObjects = make(map[string]any)
-	s.reverseRemoteRefs = make(map[int]any)
 	s.preparedRecipes = make(map[string]recipe.Recipe)
 	s.preparedRecipeNames = make(map[string]string)
 	s.preparedEditorOverrides = make(map[string]recipe.TreeVisitor)
@@ -1050,6 +1128,10 @@ func (s *server) resolveExecutionContext(pid *string) *recipe.ExecutionContext {
 		s.preparedContexts[*pid] = ctx
 	}
 	s.installDataTableStore(ctx)
+	// Install the recipe-time tidy resolver, which delegates the require-set
+	// computation to the pure-Java module resolver on the host (all GOPROXY HTTP
+	// runs there through the CLI HttpSender).
+	recipes.SetTidyResolver(ctx, s.resolveTidyViaJava)
 	return ctx
 }
 
@@ -1614,11 +1696,13 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	// since tree nodes contain slices which are not comparable).
 	modified := !treeIdentical(before, after)
 
-	// Store the result — update both localObjects (for forward GetObject)
-	// and reverseRemoteObjects (baseline for reverse getObjectFromJava in Print)
+	// Store the result in localObjects ONLY. Java does not have `after` yet — it
+	// will pull it via a forward GetObject, which diffs against the unchanged
+	// remoteObjects baseline (the original) to produce the correct delta. Writing
+	// `after` into the baseline here would make that diff a no-op and silently
+	// drop the recipe's edits. Mirrors rewrite-python/rewrite-csharp handle_visit.
 	if after != nil {
 		s.localObjects[req.TreeID] = after
-		s.reverseRemoteObjects[req.TreeID] = after
 	} else {
 		delete(s.localObjects, req.TreeID)
 	}
@@ -1803,11 +1887,10 @@ func (s *server) handleBatchVisit(params json.RawMessage) (any, *rpcError) {
 		}
 	}
 
-	// Store the final tree under both req.treeId and its own id (if different),
-	// matching the JS pattern.
+	// Store the final tree in localObjects only (Java pulls it via forward
+	// GetObject, diffing against the unchanged baseline). See handleVisit.
 	if current != nil {
 		s.localObjects[req.TreeID] = current
-		s.reverseRemoteObjects[req.TreeID] = current
 	}
 
 	return &batchVisitResponse{Results: results}, nil
@@ -1941,7 +2024,10 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		switch {
 		case filepath.Base(path) == "go.mod":
 			disc.goMods = append(disc.goMods, path)
-		case strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go"):
+		case strings.HasSuffix(path, ".go"):
+			// Include _test.go files: `go mod tidy` accounts for test-only
+			// imports (e.g. testify), so the LST must carry them for an
+			// import-graph-based tidy to avoid pruning test dependencies.
 			disc.goFiles = append(disc.goFiles, path)
 		}
 		return nil
@@ -1975,6 +2061,8 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if sumData, err := os.ReadFile(sumPath); err == nil {
 			mrr.ResolvedDependencies = goparser.ParseGoSum(string(sumData))
 		}
+		// The marker carries only the declared model at parse time; the resolved
+		// build list is computed on demand by the Java resolver at recipe time.
 		mods[filepath.Dir(modPath)] = &modCtx{dir: filepath.Dir(modPath), mrr: mrr}
 	}
 
@@ -2083,60 +2171,83 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	// don't appear in the response — handled here so the post-parse
 	// `cus` slice aligns with the `included` subset of entries.
 	cuByIdx := make(map[int]*golang.CompilationUnit, len(disc.goFiles))
+	peByIdx := make(map[int]*java.ParseError)
 	for key, entries := range groups {
 		p := goparser.NewGoParser()
 		if pi, ok := piByModule[key.moduleDir]; ok {
 			p.Importer = pi
 		}
-		included := make([]fileEntry, 0, len(entries))
 		inputs := make([]goparser.FileInput, 0, len(entries))
+		idxBySourcePath := make(map[string]int, len(entries))
 		for _, e := range entries {
-			if !goparser.MatchBuildContext(p.BuildContext, filepath.Base(e.sourcePath), e.content) {
-				continue
-			}
-			included = append(included, e)
 			inputs = append(inputs, goparser.FileInput{Path: e.sourcePath, Content: e.content})
+			idxBySourcePath[e.sourcePath] = e.idx
 		}
-		if len(inputs) == 0 {
-			continue
-		}
-		cus, err := func() (out []*golang.CompilationUnit, err error) {
+		sfs, err := func() (out []java.Tree, err error) {
 			defer func() {
 				if r := recover(); r != nil {
 					err = fmt.Errorf("panic: %v", r)
 				}
 			}()
-			return p.ParsePackage(inputs)
+			return p.ParsePackage(inputs), nil
 		}()
 		if err != nil {
-			for _, e := range included {
+			// Whole-package panic — represent every file as a ParseError so
+			// none silently drops to a PlainText/Quark on the Java side.
+			for _, e := range entries {
 				s.logger.Printf("ParseProject: parse error in %s: %v", e.path, err)
+				peByIdx[e.idx] = java.NewParseError(e.sourcePath, e.content, err)
 			}
 			continue
 		}
-		for i, cu := range cus {
-			cuByIdx[included[i].idx] = cu
+		// ParsePackage returns one SourceFile per build-included file (a CU
+		// or, for a file that fails to parse, a ParseError), mapped back by
+		// source path. Build-excluded files are absent — correctly omitted,
+		// since they are not part of this build.
+		for _, sf := range sfs {
+			switch v := sf.(type) {
+			case *golang.CompilationUnit:
+				if idx, ok := idxBySourcePath[v.SourcePath]; ok {
+					cuByIdx[idx] = v
+				}
+			case *java.ParseError:
+				if idx, ok := idxBySourcePath[v.SourcePath]; ok {
+					s.logger.Printf("ParseProject: parse error in %s: %v", v.SourcePath, v.Cause())
+					peByIdx[idx] = v
+				}
+			}
 		}
 	}
 
-	// Emit results in input order, attaching the owning module's marker
-	// to each cu so Java-side recipes can read module dependency info.
+	// Emit results in input order. A parsed file emits a CompilationUnit
+	// (with the owning module's marker so Java-side recipes can read module
+	// dependency info); a file that failed to parse emits a ParseError so it
+	// round-trips losslessly instead of dropping to a PlainText/Quark on the
+	// Java side. Build-excluded files appear in neither map and are omitted.
 	items := make([]parseProjectResponseItem, 0, len(disc.goFiles))
 	for _, o := range order {
-		cu, ok := cuByIdx[o.idx]
-		if !ok || cu == nil {
+		if cu, ok := cuByIdx[o.idx]; ok && cu != nil {
+			if o.modCtx != nil {
+				cu.Markers = java.AddMarker(cu.Markers, *o.modCtx.mrr)
+			}
+			id := cu.ID.String()
+			s.localObjects[id] = cu
+			items = append(items, parseProjectResponseItem{
+				ID:             id,
+				SourceFileType: "org.openrewrite.golang.tree.Go$CompilationUnit",
+				SourcePath:     o.sourcePath,
+			})
 			continue
 		}
-		if o.modCtx != nil {
-			cu.Markers = java.AddMarker(cu.Markers, *o.modCtx.mrr)
+		if pe, ok := peByIdx[o.idx]; ok {
+			id := pe.Ident.String()
+			s.localObjects[id] = pe
+			items = append(items, parseProjectResponseItem{
+				ID:             id,
+				SourceFileType: "org.openrewrite.tree.ParseError",
+				SourcePath:     o.sourcePath,
+			})
 		}
-		id := cu.ID.String()
-		s.localObjects[id] = cu
-		items = append(items, parseProjectResponseItem{
-			ID:             id,
-			SourceFileType: "org.openrewrite.golang.tree.Go$CompilationUnit",
-			SourcePath:     o.sourcePath,
-		})
 	}
 
 	// Emit each go.mod as a lossless GoMod LST so recipes operate on the

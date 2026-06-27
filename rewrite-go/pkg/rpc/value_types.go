@@ -130,6 +130,8 @@ func init() {
 	RegisterValueType(reflect.TypeOf(golang.GoExclude{}), "org.openrewrite.golang.marker.GoResolutionResult$Exclude")
 	RegisterValueType(reflect.TypeOf(golang.GoRetract{}), "org.openrewrite.golang.marker.GoResolutionResult$Retract")
 	RegisterValueType(reflect.TypeOf(golang.GoResolvedDependency{}), "org.openrewrite.golang.marker.GoResolutionResult$ResolvedDependency")
+	RegisterValueType(reflect.TypeOf(golang.GoModule{}), "org.openrewrite.golang.marker.GoResolutionResult$GoModule")
+	RegisterValueType(reflect.TypeOf(golang.GoModuleEdge{}), "org.openrewrite.golang.marker.GoResolutionResult$GoModuleEdge")
 
 	// JavaType types
 	RegisterValueType(reflect.TypeOf((*java.JavaTypeClass)(nil)), "org.openrewrite.java.tree.JavaType$Class")
@@ -225,6 +227,16 @@ func init() {
 	RegisterFactory("org.openrewrite.tree.ParseError", func() any { return &java.ParseError{Ident: uuid.New()} })
 	RegisterFactory("org.openrewrite.ParseExceptionResult", func() any { return java.ParseExceptionResult{} })
 
+	// java.time.* leaf values appear inside FileAttributes (creation /
+	// lastModified / lastAccess times) on any source file read from disk. We
+	// discard FileAttributes, but the receiver still instantiates each leaf via
+	// newObj before discarding its value — register benign factories so an
+	// otherwise-unknown type doesn't panic mid-receive.
+	RegisterFactory("java.time.ZonedDateTime", func() any { return "" })
+	RegisterFactory("java.time.Instant", func() any { return "" })
+	RegisterFactory("java.time.LocalDateTime", func() any { return "" })
+	RegisterFactory("java.time.OffsetDateTime", func() any { return "" })
+
 	// SourceFile-level types that implement RpcCodec
 	RegisterFactory("org.openrewrite.Checksum", func() any { return java.GenericMarker{JavaType: "org.openrewrite.Checksum"} })
 	RegisterFactory("org.openrewrite.FileAttributes", func() any { return java.GenericMarker{JavaType: "org.openrewrite.FileAttributes"} })
@@ -267,6 +279,8 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$Exclude", func() any { return golang.GoExclude{} })
 	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$Retract", func() any { return golang.GoRetract{} })
 	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$ResolvedDependency", func() any { return golang.GoResolvedDependency{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$GoModule", func() any { return golang.GoModule{} })
+	RegisterFactory("org.openrewrite.golang.marker.GoResolutionResult$GoModuleEdge", func() any { return golang.GoModuleEdge{} })
 
 	RegisterFactory("org.openrewrite.java.tree.Space", func() any { return java.Space{} })
 	RegisterFactory("org.openrewrite.marker.Markers", func() any { return java.Markers{} })
