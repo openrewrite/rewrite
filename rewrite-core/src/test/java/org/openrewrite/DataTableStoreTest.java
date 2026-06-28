@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SuppressWarnings("DataFlowIssue")
 class DataTableStoreTest {
@@ -568,5 +570,44 @@ class DataTableStoreTest {
         PlainText after = (PlainText) run.getChangeset().getAllResults().getFirst().getAfter();
         assertThat(after).isNotNull();
         assertThat(after.getText()).isEqualTo("hello-scanned-read:hello");
+    }
+
+    @Test
+    void multipleWritersShareOneFileWithSingleHeader(@TempDir Path tempDir) throws IOException {
+        Map<String, String> prefix = new LinkedHashMap<>();
+        prefix.put("repositoryOrigin", "github.com/acme/x");
+        TestTable table = new TestTable(Recipe.noop());
+
+        try (CsvDataTableStore a = new CsvDataTableStore(tempDir, prefix, Collections.emptyMap());
+             CsvDataTableStore b = new CsvDataTableStore(tempDir, prefix, Collections.emptyMap())) {
+            a.insertRow(table, ctx(), new TestTable.Row("alice"));
+            b.insertRow(table, ctx(), new TestTable.Row("bob"));
+            a.insertRow(table, ctx(), new TestTable.Row("carol"));
+        }
+
+        Path csv = tempDir.resolve(table.getName() + ".csv");
+        List<String> lines = Files.readAllLines(csv);
+        long headerLines = lines.stream().filter(l -> l.startsWith("repositoryOrigin,")).count();
+        assertThat(headerLines).as("exactly one header across both writers").isEqualTo(1);
+        String content = String.join("\n", lines);
+        assertThat(content).contains("alice").contains("bob").contains("carol");
+    }
+
+    @Test
+    void appendingWithMismatchedColumnsThrows(@TempDir Path tempDir) {
+        TestTable table = new TestTable(Recipe.noop());
+        Map<String, String> originPrefix = new LinkedHashMap<>();
+        originPrefix.put("repositoryOrigin", "github.com/acme/x");
+        try (CsvDataTableStore a = new CsvDataTableStore(tempDir, originPrefix, Collections.emptyMap())) {
+            a.insertRow(table, ctx(), new TestTable.Row("alice"));
+        }
+
+        Map<String, String> branchPrefix = new LinkedHashMap<>();
+        branchPrefix.put("repositoryBranch", "main");
+        try (CsvDataTableStore b = new CsvDataTableStore(tempDir, branchPrefix, Collections.emptyMap())) {
+            assertThatThrownBy(() -> b.insertRow(table, ctx(), new TestTable.Row("bob")))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("must agree on column order");
+        }
     }
 }

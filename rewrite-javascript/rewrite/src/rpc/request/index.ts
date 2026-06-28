@@ -23,3 +23,4 @@ export * from "./print";
 export * from "./visit";
 export * from "./batch-visit";
 export * from "./trace-get-object";
+export * from "./set-data-table-store";

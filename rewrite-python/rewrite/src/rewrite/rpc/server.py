@@ -1212,8 +1212,8 @@ _execution_contexts: Dict[str, Any] = {}
 _recipe_accumulators: Dict[str, Any] = {}
 # Phase tracking for recipes - maps recipe IDs to 'scan' or 'edit'
 _recipe_phases: Dict[str, str] = {}
-# Data table output directory - if set, data tables will be written to CSV files
-_data_table_output_dir: Optional[str] = None
+# Host-configured store (via SetDataTableStore); None means per-context in-memory default.
+_configured_data_table_store: Optional[Any] = None
 
 # Registry mapping fully-qualified visitor names to visitor classes.
 # Used to instantiate visitors by name when dispatched via RPC (e.g., auto-format).
@@ -1260,22 +1260,15 @@ def handle_prepare_recipe(params: dict) -> dict:
     4. Returning the descriptor and visitor info
 
     Args:
-        params: dict with 'id' (recipe name), optional 'options', and optional 'dataTableOutputDir'
+        params: dict with 'id' (recipe name) and optional 'options'
 
     Returns:
         dict with 'id', 'descriptor', 'editVisitor', and precondition info
     """
-    global _data_table_output_dir
-
     recipe_name = params.get('id')
     if recipe_name is None:
         raise ValueError("Recipe 'id' is required")
     options = params.get('options', {})
-
-    # Set up data table output directory if specified
-    if 'dataTableOutputDir' in params:
-        _data_table_output_dir = params['dataTableOutputDir']
-        logger.info(f"Data table output directory set to: {_data_table_output_dir}")
 
     logger.debug(f"PrepareRecipe: id={recipe_name}, options={options}")
 
@@ -1511,6 +1504,34 @@ def _find_prepared_id(recipe) -> Optional[str]:
     return None
 
 
+def handle_set_data_table_store(params: dict) -> bool:
+    """Install the host-configured store: ``CSV`` writes raw CSV at ``outputDir``, else in-memory."""
+    global _configured_data_table_store
+
+    from rewrite.data_table import CsvDataTableStore, InMemoryDataTableStore
+
+    kind = params.get('kind')
+    output_dir = params.get('outputDir')
+    if kind == 'CSV' and output_dir:
+        prefix_columns = params.get('prefixColumns') or {}
+        suffix_columns = params.get('suffixColumns') or {}
+        _configured_data_table_store = CsvDataTableStore(
+            output_dir, prefix_columns, suffix_columns)
+        logger.info(f"SetDataTableStore: CSV store at {output_dir}")
+    else:
+        _configured_data_table_store = InMemoryDataTableStore()
+        logger.info("SetDataTableStore: in-memory (NOOP) store")
+
+    return True
+
+
+def _install_data_table_store(ctx) -> None:
+    """Install the host-configured store on a recipe-run context (no-op when unconfigured)."""
+    if _configured_data_table_store is not None:
+        from rewrite.data_table import DATA_TABLE_STORE
+        ctx.put_message(DATA_TABLE_STORE, _configured_data_table_store)
+
+
 def handle_visit(params: dict) -> dict:
     """Handle a Visit RPC request.
 
@@ -1541,15 +1562,11 @@ def handle_visit(params: dict) -> dict:
     else:
         from rewrite import InMemoryExecutionContext
         ctx = InMemoryExecutionContext()
-        # Set up data table store if output directory is configured
-        if _data_table_output_dir:
-            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
-            store = CsvDataTableStore(_data_table_output_dir)
-            store.accept_rows(True)
-            ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
             local_objects[p_id] = ctx
+
+    _install_data_table_store(ctx)
 
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
@@ -1619,14 +1636,11 @@ def handle_batch_visit(params: dict) -> dict:
     else:
         from rewrite import InMemoryExecutionContext
         ctx = InMemoryExecutionContext()
-        if _data_table_output_dir:
-            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
-            store = CsvDataTableStore(_data_table_output_dir)
-            store.accept_rows(True)
-            ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
             local_objects[p_id] = ctx
+
+    _install_data_table_store(ctx)
 
     # Fetch tree once from Java
     tree = get_object_from_java(tree_id, source_file_type)
@@ -1811,15 +1825,11 @@ def handle_generate(params: dict) -> dict:
     else:
         from rewrite import InMemoryExecutionContext
         ctx = InMemoryExecutionContext()
-        # Set up data table store if output directory is configured
-        if _data_table_output_dir:
-            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
-            store = CsvDataTableStore(_data_table_output_dir)
-            store.accept_rows(True)
-            ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
             local_objects[p_id] = ctx
+
+    _install_data_table_store(ctx)
 
     # Only scanning recipes can generate files
     from rewrite.recipe import ScanningRecipe
@@ -1859,6 +1869,7 @@ def handle_request(method: str, params: dict) -> Any:
         'InstallRecipes': handle_install_recipes,
         'GetMarketplace': handle_get_marketplace,
         'PrepareRecipe': handle_prepare_recipe,
+        'SetDataTableStore': handle_set_data_table_store,
         'Visit': handle_visit,
         'BatchVisit': handle_batch_visit,
         'Generate': handle_generate,

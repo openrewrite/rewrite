@@ -17,6 +17,7 @@ package org.openrewrite.golang.rpc;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.DataTableStore;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
@@ -318,7 +319,7 @@ public class GoRewriteRpc extends RewriteRpc {
         private @Nullable Path log;
         private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;
-        private @Nullable Path dataTablesCsvDir;
+        private @Nullable DataTableStore dataTableStore;
         private @Nullable Path workingDirectory;
         private boolean traceRpcMessages;
 
@@ -370,8 +371,8 @@ public class GoRewriteRpc extends RewriteRpc {
             return this;
         }
 
-        public Builder dataTablesCsvDir(@Nullable Path dataTablesCsvDir) {
-            this.dataTablesCsvDir = dataTablesCsvDir;
+        public Builder dataTableStore(@Nullable DataTableStore dataTableStore) {
+            this.dataTableStore = dataTableStore;
             return this;
         }
 
@@ -415,7 +416,6 @@ public class GoRewriteRpc extends RewriteRpc {
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                     metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                     recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize(),
-                    dataTablesCsvDir == null ? null : "--data-tables-csv-dir=" + dataTablesCsvDir.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null
             );
 
@@ -434,6 +434,7 @@ public class GoRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
+                        .dataTableStore(dataTableStore)
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);

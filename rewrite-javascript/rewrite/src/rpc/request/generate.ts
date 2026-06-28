@@ -17,6 +17,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor} from "../../tree";
 import {ExecutionContext} from "../../execution";
+import {DATA_TABLE_STORE, DataTableStore} from "../../data-table";
 import {withMetrics} from "./metrics";
 
 export interface GenerateResponse {
@@ -33,6 +34,7 @@ export class Generate {
                   preparedRecipes: Map<String, Recipe>,
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string) => any,
+                  dataTableStore: () => DataTableStore | undefined,
                   metricsCsv?: string): void {
         connection.onRequest(
             new rpc.RequestType<Generate, GenerateResponse, Error>("Generate"),
@@ -54,6 +56,10 @@ export class Generate {
                             recipeCursors.set(recipe, cursor);
                         }
                         const ctx = await getObject(request.p) as ExecutionContext;
+                        const store = dataTableStore();
+                        if (store) {
+                            ctx.messages[DATA_TABLE_STORE] = store;
+                        }
                         const acc = recipe.accumulator(cursor, ctx);
                         const generated = await recipe.generate(acc, ctx)
 

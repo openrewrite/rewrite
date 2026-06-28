@@ -51,6 +51,9 @@ public class RewriteRpcServer
     private readonly ConcurrentDictionary<string, Recipe> _preparedRecipes = new();
     private readonly ConcurrentDictionary<string, object?> _recipeAccumulators = new();
     private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
+
+    private volatile IDataTableStore? _configuredDataTableStore;
+
     private string? _recipesProjectDir;
     private readonly string? _recipeInstallDir;
     private JsonRpc? _jsonRpc;
@@ -1509,6 +1512,13 @@ public class RewriteRpcServer
         return (Tree)_localObjects[treeId]!;
     }
 
+    [JsonRpcMethod("SetDataTableStore", UseSingleObjectParameterDeserialization = true)]
+    public Task<bool> SetDataTableStore(SetDataTableStoreRequest request)
+    {
+        _configuredDataTableStore = request.ToDataTableStore();
+        return Task.FromResult(true);
+    }
+
     /// <summary>
     /// JSON-RPC handler and public API for resetting all cached state.
     /// When called via JSON-RPC from the remote process, clears local caches.
@@ -1559,12 +1569,16 @@ public class RewriteRpcServer
     private ExecutionContext GetOrCreateExecutionContext(string? pId)
     {
         if (pId != null && _executionContexts.TryGetValue(pId, out var existing))
+        {
+            InstallDataTableStore(existing);
             return existing;
+        }
 
         var ctx = new ExecutionContext();
         // Inject the build context captured during ParseSolution so that
         // reattestation (MSBuildProjectHelper) can materialize build files
         _buildContext?.StoreIn(ctx);
+        InstallDataTableStore(ctx);
 
         if (pId != null)
         {
@@ -1572,6 +1586,15 @@ public class RewriteRpcServer
             _localObjects[pId] = ctx;
         }
         return ctx;
+    }
+
+    private void InstallDataTableStore(ExecutionContext ctx)
+    {
+        var store = _configuredDataTableStore;
+        if (store != null)
+        {
+            ctx.PutMessage(DataTable<object>.DataTableStoreKey, store);
+        }
     }
 
     /// <summary>
@@ -1658,6 +1681,34 @@ public class GetObjectRequest
 {
     public string Id { get; set; } = "";
     public string? SourceFileType { get; set; }
+}
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[JsonDerivedType(typeof(Csv), "CSV")]
+[JsonDerivedType(typeof(NoOp), "NOOP")]
+public abstract class SetDataTableStoreRequest
+{
+    public abstract IDataTableStore ToDataTableStore();
+
+    public sealed class Csv : SetDataTableStoreRequest
+    {
+        public string? OutputDir { get; set; }
+        public Dictionary<string, string>? PrefixColumns { get; set; }
+        public Dictionary<string, string>? SuffixColumns { get; set; }
+
+        public override IDataTableStore ToDataTableStore() =>
+            string.IsNullOrEmpty(OutputDir)
+                ? new InMemoryDataTableStore()
+                : new CsvDataTableStore(
+                    OutputDir,
+                    PrefixColumns ?? new Dictionary<string, string>(),
+                    SuffixColumns ?? new Dictionary<string, string>());
+    }
+
+    public sealed class NoOp : SetDataTableStoreRequest
+    {
+        public override IDataTableStore ToDataTableStore() => new InMemoryDataTableStore();
+    }
 }
 
 public class ParseRequest
