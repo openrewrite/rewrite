@@ -169,8 +169,7 @@ var dashRun = regexp.MustCompile(`-+`)
 var leadingTrailingDash = regexp.MustCompile(`^-|-$`)
 
 // SanitizeScope produces a filesystem-safe identifier from a scope string,
-// matching JS data-table.ts:85-103. Lowercase, non-alnum→dash, collapse
-// dashes, truncate to 30 at a word boundary, suffix with a 4-char sha256.
+// byte-identical to Java's CsvDataTableStore.sanitize for ASCII input.
 func SanitizeScope(scope string) string {
 	s := strings.ToLower(scope)
 	s = nonAlnum.ReplaceAllString(s, "-")
@@ -186,43 +185,57 @@ func SanitizeScope(scope string) string {
 	return s + "-" + hex.EncodeToString(sum[:2])
 }
 
-// CsvDataTableStore writes rows directly to CSV files as they are inserted.
-// One file per (recipe, dataTable, group) tuple, opened append-mode and
-// kept open for the store's lifetime.
+// ColumnValue is a static prefix/suffix column. Order matters: all writers
+// sharing one CSV file must agree on the column order.
+type ColumnValue struct {
+	Name  string
+	Value string
+}
+
+// CsvDataTableStore writes rows directly to raw .csv files, one per (recipe, dataTable, group).
 type CsvDataTableStore struct {
-	outputDir  string
-	mu         sync.Mutex
-	files      map[string]*os.File
-	dataTables map[string]DataTableLike
+	outputDir     string
+	prefixColumns []ColumnValue
+	suffixColumns []ColumnValue
+	mu            sync.Mutex
+	dataTables    map[string]DataTableLike
 }
 
 func NewCsvDataTableStore(outputDir string) (*CsvDataTableStore, error) {
+	return NewCsvDataTableStoreWithColumns(outputDir, nil, nil)
+}
+
+func NewCsvDataTableStoreWithColumns(outputDir string, prefix, suffix []ColumnValue) (*CsvDataTableStore, error) {
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return nil, fmt.Errorf("create dataTables output dir: %w", err)
 	}
 	return &CsvDataTableStore{
-		outputDir:  outputDir,
-		files:      map[string]*os.File{},
-		dataTables: map[string]DataTableLike{},
+		outputDir:     outputDir,
+		prefixColumns: prefix,
+		suffixColumns: suffix,
+		dataTables:    map[string]DataTableLike{},
 	}, nil
 }
 
-// Close flushes and closes all CSV files. Call on server Reset / shutdown.
-func (s *CsvDataTableStore) Close() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, f := range s.files {
-		_ = f.Close()
-	}
-	s.files = map[string]*os.File{}
-}
+// Close is a no-op: each row is written with its own short-lived append handle.
+func (s *CsvDataTableStore) Close() {}
 
+// fileKey mirrors Java's CsvDataTableStore.fileKey exactly so a table shared by
+// a Java and a Go recipe resolves to the same filename; a DEFAULT table returns
+// the bare FQN because that is what the Java host writes it under.
 func fileKey(dt DataTableLike) string {
-	scope := dt.InstanceName()
-	if dt.Group() != "" {
-		scope = scope + "-" + dt.Group()
+	desc := dt.Descriptor()
+	name := desc.Name
+	if group := dt.Group(); group != "" {
+		if group == name {
+			return name
+		}
+		return name + "--" + SanitizeScope(group)
 	}
-	return SanitizeScope(dt.Descriptor().Name + "-" + scope)
+	if instanceName := dt.InstanceName(); instanceName != desc.DisplayName {
+		return name + "--" + SanitizeScope(instanceName)
+	}
+	return name
 }
 
 func (s *CsvDataTableStore) InsertRow(dt DataTableLike, _ *ExecutionContext, row any) {
@@ -230,31 +243,45 @@ func (s *CsvDataTableStore) InsertRow(dt DataTableLike, _ *ExecutionContext, row
 	defer s.mu.Unlock()
 
 	key := fileKey(dt)
-	f, ok := s.files[key]
-	if !ok {
-		csvPath := filepath.Join(s.outputDir, key+".csv")
-		newFile, err := os.OpenFile(csvPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			return // best-effort; fail silently rather than crash a recipe
-		}
-		// Header preamble + column header row, written once when the file is created.
-		desc := dt.Descriptor()
+	csvPath := filepath.Join(s.outputDir, key+".csv")
+	s.dataTables[key] = dt
+	desc := dt.Descriptor()
+
+	// Decide the header by file existence so writers sharing one file write it
+	// exactly once; column NAMES (not display names) match the Java writer.
+	_, statErr := os.Stat(csvPath)
+	fileExists := statErr == nil
+
+	// Short-lived O_APPEND handle per row so a concurrent appender (the Java
+	// host sharing this file) isn't clobbered.
+	f, err := os.OpenFile(csvPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return // best-effort; fail silently rather than crash a recipe
+	}
+	defer func() { _ = f.Close() }()
+
+	if !fileExists {
 		preamble := fmt.Sprintf("# @name %s\n# @instanceName %s\n# @group %s\n",
 			desc.Name, dt.InstanceName(), dt.Group())
-		header := make([]string, 0, len(desc.Columns))
-		for _, c := range desc.Columns {
-			header = append(header, csvEscape(c.DisplayName))
+		header := make([]string, 0, len(s.prefixColumns)+len(desc.Columns)+len(s.suffixColumns))
+		for _, c := range s.prefixColumns {
+			header = append(header, csvEscape(c.Name))
 		}
-		_, _ = newFile.WriteString(preamble + strings.Join(header, ",") + "\n")
-		f = newFile
-		s.files[key] = f
-		s.dataTables[key] = dt
+		for _, c := range desc.Columns {
+			header = append(header, csvEscape(c.Name))
+		}
+		for _, c := range s.suffixColumns {
+			header = append(header, csvEscape(c.Name))
+		}
+		_, _ = f.WriteString(preamble + strings.Join(header, ",") + "\n")
 	}
 
-	// Reflect the row by column name. Rows are typically structs with field
-	// names matching column names (case-insensitive).
-	desc := dt.Descriptor()
-	values := make([]string, 0, len(desc.Columns))
+	// Reflect the row by column name; rows are typically structs with field
+	// names matching column names (case-insensitive), or maps keyed by column name.
+	values := make([]string, 0, len(s.prefixColumns)+len(desc.Columns)+len(s.suffixColumns))
+	for _, c := range s.prefixColumns {
+		values = append(values, csvEscape(c.Value))
+	}
 	rv := reflect.ValueOf(row)
 	if rv.Kind() == reflect.Ptr {
 		rv = rv.Elem()
@@ -275,6 +302,9 @@ func (s *CsvDataTableStore) InsertRow(dt DataTableLike, _ *ExecutionContext, row
 			}
 		}
 		values = append(values, csvEscape(v))
+	}
+	for _, c := range s.suffixColumns {
+		values = append(values, csvEscape(c.Value))
 	}
 	_, _ = f.WriteString(strings.Join(values, ",") + "\n")
 }

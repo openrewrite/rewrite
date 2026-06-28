@@ -271,6 +271,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         private @Nullable Path workingDirectory;
 
+        private @Nullable DataTableStore dataTableStore;
+
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
             return this;
@@ -399,6 +401,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        /**
+         * Where recipes in the JavaScript runtime write data table rows, conveyed via the
+         * {@link org.openrewrite.rpc.request.SetDataTableStore} handshake.
+         */
+        public Builder dataTableStore(@Nullable DataTableStore dataTableStore) {
+            this.dataTableStore = dataTableStore;
+            return this;
+        }
+
         @Override
         public JavaScriptRewriteRpc get() {
             Path npxPath = npxPathSupplier.get();
@@ -465,6 +476,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
+                        .dataTableStore(dataTableStore)
                         .log(log == null ? null : new PrintStream(openLog(log)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);

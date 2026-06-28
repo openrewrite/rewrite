@@ -45,6 +45,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -92,6 +93,11 @@ public class RewriteRpc {
     final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
 
     private @Nullable List<String> remoteLanguages;
+
+    private volatile @Nullable DataTableStore configuredDataTableStore;
+
+    private @Nullable SetDataTableStore pendingDataTableStore;
+    private boolean dataTableStoreSent;
 
     /**
      * Creates a new RPC interface that can be used to communicate with a remote.
@@ -150,12 +156,21 @@ public class RewriteRpc {
         this.marketplace = marketplace;
         this.resolvers.addAll(resolvers);
 
+        // Install the configured store on each reconstructed ExecutionContext, keeping that out of the handlers.
+        BiFunction<String, @Nullable String, ?> getRecipeObject = (id, sourceFileType) -> {
+            Object o = getObject(id, sourceFileType);
+            DataTableStore store = configuredDataTableStore;
+            if (store != null && o instanceof ExecutionContext) {
+                DataTableExecutionContextView.view((ExecutionContext) o).setDataTableStore(store);
+            }
+            return o;
+        };
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
-                this::getObject, this::getCursor));
+                getRecipeObject, this::getCursor));
         jsonRpc.rpc("BatchVisit", new BatchVisit.Handler(localObjects, preparedRecipes,
-                this::getObject, this::getCursor));
+                getRecipeObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes,
-                this::getObject));
+                getRecipeObject));
         jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects,
                 localRefs, log, () -> traceGetObject.get().isSend()));
         jsonRpc.rpc("GetMarketplace", new JsonRpcMethod<Void>() {
@@ -219,6 +234,8 @@ public class RewriteRpc {
         }));
         jsonRpc.rpc("Parse", new Parse.Handler(localObjects, () -> parsers));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
+        jsonRpc.rpc("SetDataTableStore", new SetDataTableStore.Handler(
+                store -> configuredDataTableStore = store));
         jsonRpc.rpc("Reset", new JsonRpcMethod<Void>() {
             @Override
             protected Boolean handle(Void noParams) {
@@ -256,6 +273,31 @@ public class RewriteRpc {
         return this;
     }
 
+    /**
+     * Configure where recipes in the remote runtime write data table rows. Only the store's
+     * configuration crosses the boundary (lazily, before the first visit/generate), never rows.
+     * A {@code null} or non-conveyable store leaves the remote on its own default.
+     *
+     * @see SetDataTableStore
+     */
+    public RewriteRpc dataTableStore(@Nullable DataTableStore store) {
+        this.pendingDataTableStore = SetDataTableStore.from(store);
+        this.dataTableStoreSent = false;
+        return this;
+    }
+
+    private void ensureDataTableStoreSent() {
+        if (pendingDataTableStore != null && !dataTableStoreSent) {
+            send("SetDataTableStore", pendingDataTableStore, Boolean.class);
+            dataTableStoreSent = true;
+        }
+    }
+
+    @VisibleForTesting
+    public @Nullable DataTableStore getConfiguredDataTableStore() {
+        return configuredDataTableStore;
+    }
+
     public void shutdown() {
         PrintStream logOut = log.get();
         if (logOut != null) {
@@ -287,6 +329,7 @@ public class RewriteRpc {
     }
 
     public <P> @Nullable Tree visit(Tree tree, String visitorName, P p, @Nullable Cursor cursor) {
+        ensureDataTableStoreSent();
         // Set the local state of this tree, so that when the remote asks for it, we know what to send.
         localObjects.put(tree.getId().toString(), tree);
 
@@ -307,6 +350,7 @@ public class RewriteRpc {
 
     public <P> BatchVisitResponse batchVisit(Tree tree, P p, @Nullable Cursor cursor,
                                              List<BatchVisit.BatchVisitItem> visitors) {
+        ensureDataTableStoreSent();
         String treeId = tree.getId().toString();
         localObjects.put(treeId, tree);
 
@@ -324,6 +368,7 @@ public class RewriteRpc {
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
+        ensureDataTableStoreSent();
         String ctxId = maybeUnwrapExecutionContext(ctx);
         GenerateResponse response = RewriteRpcExecutionContextView.view(ctx).withInFlightSlot(() ->
                 send("Generate", new Generate(remoteRecipeId, ctxId), GenerateResponse.class));

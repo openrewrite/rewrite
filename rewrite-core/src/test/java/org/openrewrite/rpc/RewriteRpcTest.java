@@ -24,6 +24,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.marker.Markup;
@@ -241,6 +242,33 @@ class RewriteRpcTest implements RewriteTest {
         Recipe recipe = client.prepareRecipe("org.openrewrite.text.Find",
           Map.of("find", "hello"));
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Find text");
+    }
+
+    @Test
+    void dataTableStoreConfigurationCrossesRpc(@TempDir Path tmp) {
+        client.dataTableStore(new CsvDataTableStore(tmp,
+          java.util.Collections.singletonMap("repositoryOrigin", "github.com/acme/example"),
+          java.util.Collections.emptyMap()));
+
+        // A trivial remote visit triggers the lazy SetDataTableStore handshake.
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              @SneakyThrows
+              public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                  client.visit((SourceFile) tree, PlainTextVisitor.class.getName(), 0);
+                  stopAfterPreVisit();
+                  return tree;
+              }
+          })),
+          text("hello world")
+        );
+
+        DataTableStore remote = server.getConfiguredDataTableStore();
+        assertThat(remote).isInstanceOf(CsvDataTableStore.class);
+        CsvDataTableStore csv = (CsvDataTableStore) remote;
+        assertThat(csv.getOutputDir()).isEqualTo(tmp.toAbsolutePath().normalize());
+        assertThat(csv.getPrefixColumns()).containsEntry("repositoryOrigin", "github.com/acme/example");
     }
 
     @Disabled("Disabled until https://github.com/openrewrite/rewrite/pull/5260 is complete")
