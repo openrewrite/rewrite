@@ -24,7 +24,6 @@ import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleResolver;
@@ -421,8 +420,14 @@ public class RewriteRpc {
     }
 
     public Recipe prepareRecipe(String id, Map<String, Object> options) {
+        // Required-option validation is enforced server-side: PrepareRecipe instantiates the whole
+        // tree there and validates each recipe's option values (root and children alike), which a
+        // host-side check on the root descriptor alone cannot cover.
         PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
+        return recipeFromPrepareResponse(r);
+    }
 
+    Recipe recipeFromPrepareResponse(PrepareRecipeResponse r) {
         if (r.getDelegatesTo() != null) {
             PrepareRecipeResponse.DelegatesTo d = r.getDelegatesTo();
             RecipeListing listing = marketplace.findRecipe(d.getRecipeName());
@@ -433,16 +438,9 @@ public class RewriteRpc {
             }
             return listing.prepare(resolvers, d.getOptions());
         }
-
-        // FIXME do this validation on the server side instead
-        for (OptionDescriptor option : r.getDescriptor().getOptions()) {
-            if (option.isRequired() && !options.containsKey(option.getName())) {
-                throw new IllegalArgumentException("Missing required option `" + option.getName() + "` for recipe `" + id + "`.");
-            }
-        }
-
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(),
-                matchAll(r.getEditPreconditions()), r.getScanVisitor(), matchAll(r.getScanPreconditions()));
+                matchAll(r.getEditPreconditions()), r.getScanVisitor(), matchAll(r.getScanPreconditions()),
+                r.getRecipeList());
     }
 
     private @Nullable TreeVisitor<?, ExecutionContext> matchAll(List<PrepareRecipeResponse.Precondition> preconditions) {
