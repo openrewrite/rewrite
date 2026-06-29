@@ -33,8 +33,10 @@ import {
     TraceGetObject,
     Visit,
     VisitResponse,
-    BatchVisit
+    BatchVisit,
+    SetDataTableStore
 } from "./request";
+import {DataTableStore} from "../data-table";
 import {RecipeMarketplace} from "../marketplace";
 import {initializeMetricsCsv} from "./request/metrics";
 import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
@@ -46,7 +48,21 @@ import {ReferenceMap} from "../reference";
 import {GetLanguages} from "./request/get-languages";
 
 export class RewriteRpc {
-    private static _global?: RewriteRpc;
+    /**
+     * Key for the active {@link RewriteRpc} connection on {@link globalThis}.
+     *
+     * It deliberately lives on `globalThis` rather than as a `static` field:
+     * a recipe package that bundles `@openrewrite/rewrite` (or resolves it from
+     * its own `node_modules`) loads a *separate copy* of this module, with its
+     * own class object and therefore its own statics. A `static` field set by
+     * the host would be invisible to such a copy, so `RewriteRpc.get()` (e.g.
+     * via `prepareJavaRecipe`) would return `undefined` and throw "no active
+     * RewriteRpc connection" — surfacing during `InstallRecipes` as the
+     * misleading "Ensure the constructor can be called without any arguments".
+     * {@link Symbol.for} resolves to the same symbol across every module copy,
+     * so all copies share the one active connection. See gh-7968.
+     */
+    private static readonly GLOBAL_KEY: symbol = Symbol.for("org.openrewrite.rpc.RewriteRpc.global");
 
     private readonly snowflake = SnowflakeId();
 
@@ -61,6 +77,8 @@ export class RewriteRpc {
     private remoteLanguages?: string[];
     private readonly logger?: rpc.Logger;
     private traceGetObject: TraceGetObject = {receive: false, send: false};
+
+    private configuredDataTableStore?: DataTableStore;
 
     constructor(readonly connection: MessageConnection = rpc.createMessageConnection(
                     new rpc.StreamMessageReader(process.stdin),
@@ -84,12 +102,14 @@ export class RewriteRpc {
         const getObject = (id: string, sourceFileType?: string) => this.getObject(id, sourceFileType);
         const getCursor = (cursorIds: string[] | undefined, sourceFileType?: string) => this.getCursor(cursorIds, sourceFileType);
         const traceGetObject = () => this.traceGetObject.send;
+        const dataTableStore = () => this.configuredDataTableStore;
 
         const marketplace = options.marketplace || new RecipeMarketplace();
 
-        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
-        BatchVisit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
-        Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, options.metricsCsv);
+        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, dataTableStore, options.metricsCsv);
+        BatchVisit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, dataTableStore, options.metricsCsv);
+        Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, dataTableStore, options.metricsCsv);
+        SetDataTableStore.handle(this.connection, store => this.configuredDataTableStore = store, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
             this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
         GetMarketplace.handle(this.connection, marketplace, options.metricsCsv);
@@ -108,15 +128,27 @@ export class RewriteRpc {
             }
         )
 
+        // Clears local caches. Captured here so it can close over the
+        // constructor-local `preparedRecipes` while still being callable
+        // from the public `reset()` method on the class.
+        const clearLocalState = () => {
+            this.localObjects.clear();
+            this.localObjectIds.clear();
+            this.remoteObjects.clear();
+            this.remoteRefs.clear();
+            this.localRefs.clear();
+            preparedRecipes.clear();
+            this.remoteLanguages = undefined;
+        };
+        this.clearLocalState = clearLocalState;
+
         this.connection.onRequest(
             new rpc.RequestType0<boolean, Error>("Reset"),
             async () => {
-                this.localObjects.clear();
-                this.localObjectIds.clear();
-                this.remoteObjects.clear();
-                this.remoteRefs.clear();
-                this.localRefs.clear();
-                preparedRecipes.clear();
+                // Inbound Reset only clears local state — never sends a Reset
+                // back to the originator. Mirrors the Java handler in
+                // RewriteRpc.java around line 222.
+                clearLocalState();
                 return true;
             }
         )
@@ -125,12 +157,28 @@ export class RewriteRpc {
         this.connection.listen();
     }
 
+    private readonly clearLocalState!: () => void;
+
+    /**
+     * Reset both the remote and local RPC caches. Sends a `Reset` request to the
+     * remote — which clears the remote's state without sending one back — and
+     * then clears local caches. Use this between independent operations (e.g.
+     * between tests) so accumulated objects and prepared recipes don't leak
+     * across boundaries.
+     */
+    async reset(): Promise<void> {
+        await this.connection.sendRequest(
+            new rpc.RequestType0<boolean, Error>("Reset"),
+        );
+        this.clearLocalState();
+    }
+
     static set(value: RewriteRpc) {
-        this._global = value;
+        (globalThis as any)[RewriteRpc.GLOBAL_KEY] = value;
     }
 
     static get(): RewriteRpc | undefined {
-        return this._global;
+        return (globalThis as any)[RewriteRpc.GLOBAL_KEY];
     }
 
     end(): RewriteRpc {

@@ -118,4 +118,53 @@ class FindCommittersTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void identitiesOnlyCommittersHaveNoPerDayDetail() {
+        // GitProvenance.CommitHistory.identities() yields committers with an empty commitsByDay.
+        // FindCommitters must not throw on the empty per-day map and should report a null last commit.
+        var git = new GitProvenance(
+          randomId(), "https://github.com/org/repo.git", "main", "123", null, null,
+          List.of(new GitProvenance.Committer("Jon", "jkschneider@gmail.com", new TreeMap<>()))
+        );
+
+        rewriteRun(
+          spec -> spec.dataTable(DistinctCommitters.Row.class, rows -> {
+              assertThat(rows).satisfiesExactly(
+                r -> {
+                    assertThat(r.getEmail()).isEqualTo("jkschneider@gmail.com");
+                    assertThat(r.getLastCommit()).isNull();
+                    assertThat(r.getCommits()).isZero();
+                }
+              );
+          }),
+          text(
+            "hi",
+            spec -> spec.mapBeforeRecipe(pt -> pt.withMarkers(pt.getMarkers().add(git)))
+          )
+        );
+    }
+
+    @Test
+    void identitiesOnlyCommittersSurviveDateFilter() {
+        // identities-only committers carry no dates, so a fromDate filter can't evaluate them; they are
+        // surfaced rather than silently dropped (consistent with the no-date path).
+        var git = new GitProvenance(
+          randomId(), "https://github.com/org/repo.git", "main", "123", null, null,
+          List.of(new GitProvenance.Committer("Jon", "jkschneider@gmail.com", new TreeMap<>()))
+        );
+
+        rewriteRun(
+          spec -> spec.recipe(new FindCommitters("2023-01-01"))
+            .dataTable(DistinctCommitters.Row.class, rows -> {
+                assertThat(rows).satisfiesExactly(
+                  r -> assertThat(r.getEmail()).isEqualTo("jkschneider@gmail.com")
+                );
+            }),
+          text(
+            "hi",
+            spec -> spec.mapBeforeRecipe(pt -> pt.withMarkers(pt.getMarkers().add(git)))
+          )
+        );
+    }
 }

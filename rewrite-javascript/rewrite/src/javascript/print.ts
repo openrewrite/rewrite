@@ -1815,7 +1815,16 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         }
     }
 
-    override async visitSpace(space: J.Space, p: PrintOutputCapture): Promise<J.Space> {
+    override async visitSpace(space: J.Space | undefined, p: PrintOutputCapture): Promise<J.Space> {
+        // Recipes can mutate trees in ways that drop required Space fields (e.g. a
+        // RightPadded with `after` left undefined). The hot path is BatchVisit →
+        // print, so throwing here aborts the formatter for the whole file and the
+        // caller falls back to "essential formatting", losing Prettier output.
+        // Treat a missing Space as empty: produces correct text and keeps the
+        // recipe on the fast path.
+        if (!space) {
+            return emptySpace;
+        }
         p.append(space.whitespace!);
 
         const comments = space.comments;

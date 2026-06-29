@@ -22,6 +22,8 @@ import {updateIfChanged} from "../util";
 export * from "./queue";
 export * from "../reference";
 export {RewriteRpc} from "./rewrite-rpc";
+export {RpcRecipe, RpcVisitor} from "./recipe";
+export {prepareJavaRecipe} from "./java-recipe";
 
 RpcCodecs.registerCodec(TreeKind.Checksum, {
     async rpcReceive(before: Checksum, q: RpcReceiveQueue): Promise<Checksum> {

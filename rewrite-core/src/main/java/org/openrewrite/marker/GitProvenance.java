@@ -24,9 +24,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.GitRemote;
 import org.openrewrite.Incubating;
 import org.openrewrite.jgit.api.Git;
+import org.openrewrite.jgit.api.LogCommand;
 import org.openrewrite.jgit.api.errors.GitAPIException;
 import org.openrewrite.jgit.lib.*;
 import org.openrewrite.jgit.revwalk.RevCommit;
+import org.openrewrite.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.openrewrite.jgit.transport.RemoteConfig;
 import org.openrewrite.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.marker.ci.BuildEnvironment;
@@ -38,11 +40,15 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyNavigableMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
@@ -195,17 +201,49 @@ public class GitProvenance extends Reference implements Marker {
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir,
                                                                @Nullable BuildEnvironment environment,
                                                                GitRemote.@Nullable Parser gitRemoteParser) {
+        return fromProjectDirectory(projectDir, environment, gitRemoteParser, CommitHistory.full());
+    }
+
+    /**
+     * The cheap provenance fields (origin, branch, change, autocrlf, eol, remote) are always computed.
+     * Only the optional, expensive commit-history walk that populates {@link #getCommitters()} is
+     * configurable, via {@link CommitHistory}.
+     *
+     * @param projectDir      The project directory.
+     * @param environment     In detached head scenarios, the branch is best
+     *                        determined from a {@link BuildEnvironment} marker if possible.
+     * @param gitRemoteParser Parses the remote url into a {@link GitRemote}. Custom remotes can be registered to it,
+     *                        or a default with known git hosting services can be used.
+     * @param commitHistory   Controls how much of the commit history to walk and how much per-committer
+     *                        detail to retain. Use {@link CommitHistory#none()} to skip the walk entirely
+     *                        (in which case {@link #getCommitters()} is {@code null}), {@link CommitHistory#full()}
+     *                        for the entire history, or a bounded preset such as {@link CommitHistory#since(LocalDate)}
+     *                        or {@link CommitHistory#lastCommits(int)}.
+     * @return A marker containing git provenance information.
+     */
+    public static @Nullable GitProvenance fromProjectDirectory(Path projectDir,
+                                                               @Nullable BuildEnvironment environment,
+                                                               GitRemote.@Nullable Parser gitRemoteParser,
+                                                               CommitHistory commitHistory) {
         if (gitRemoteParser == null) {
             gitRemoteParser = new GitRemote.Parser();
         }
         if (environment != null) {
             if (environment instanceof JenkinsBuildEnvironment) {
                 JenkinsBuildEnvironment jenkinsBuildEnvironment = (JenkinsBuildEnvironment) environment;
-                try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
-                    String branch = jenkinsBuildEnvironment.getLocalBranch() != null ?
-                            jenkinsBuildEnvironment.getLocalBranch() :
-                            localBranchName(repository, jenkinsBuildEnvironment.getBranch());
-                    return fromGitConfig(repository, branch, getChangeset(repository), gitRemoteParser);
+                try {
+                    RepositoryContext ctx = openRepository(projectDir.toFile());
+                    if (ctx == null) {
+                        return null;
+                    }
+                    try (Repository repository = ctx.repository) {
+                        String branch = jenkinsBuildEnvironment.getLocalBranch() != null ?
+                                jenkinsBuildEnvironment.getLocalBranch() :
+                                ctx.branch != null ? ctx.branch :
+                                        localBranchName(repository, jenkinsBuildEnvironment.getBranch());
+                        String changeset = ctx.changeset != null ? ctx.changeset : getChangeset(repository);
+                        return fromGitConfig(repository, branch, changeset, gitRemoteParser, commitHistory, ctx.committerStart, ctx.linkedWorktree);
+                    }
                 } catch (IllegalArgumentException | GitAPIException e) {
                     // Silently ignore if the project directory is not a git repository
                     printRequireGitDirOrWorkTreeException(e);
@@ -217,18 +255,18 @@ public class GitProvenance extends Reference implements Marker {
                 File gitDir = new RepositoryBuilder().findGitDir(projectDir.toFile()).getGitDir();
                 if (gitDir != null && gitDir.exists()) {
                     //it has been cloned with --depth > 0
-                    return fromGitConfig(projectDir, gitRemoteParser);
+                    return fromGitConfig(projectDir, gitRemoteParser, commitHistory);
                 } else {
                     //there is not .git config
                     try {
                         return environment.buildGitProvenance();
                     } catch (IncompleteGitConfigException e) {
-                        return fromGitConfig(projectDir, gitRemoteParser);
+                        return fromGitConfig(projectDir, gitRemoteParser, commitHistory);
                     }
                 }
             }
         } else {
-            return fromGitConfig(projectDir, gitRemoteParser);
+            return fromGitConfig(projectDir, gitRemoteParser, commitHistory);
         }
     }
 
@@ -238,14 +276,20 @@ public class GitProvenance extends Reference implements Marker {
         }
     }
 
-    private static @Nullable GitProvenance fromGitConfig(Path projectDir, GitRemote.Parser gitRemoteParser) {
-        String branch = null;
-        try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
-            String changeset = getChangeset(repository);
-            if (!repository.getBranch().equals(changeset)) {
-                branch = repository.getBranch();
+    private static @Nullable GitProvenance fromGitConfig(Path projectDir, GitRemote.Parser gitRemoteParser, CommitHistory commitHistory) {
+        try {
+            RepositoryContext ctx = openRepository(projectDir.toFile());
+            if (ctx == null) {
+                return null;
             }
-            return fromGitConfig(repository, branch, changeset, gitRemoteParser);
+            try (Repository repository = ctx.repository) {
+                String branch = ctx.branch;
+                String changeset = ctx.changeset != null ? ctx.changeset : getChangeset(repository);
+                if (branch == null && !ctx.linkedWorktree && !repository.getBranch().equals(changeset)) {
+                    branch = repository.getBranch();
+                }
+                return fromGitConfig(repository, branch, changeset, gitRemoteParser, commitHistory, ctx.committerStart, ctx.linkedWorktree);
+            }
         } catch (IllegalArgumentException e) {
             printRequireGitDirOrWorkTreeException(e);
             return null;
@@ -254,11 +298,111 @@ public class GitProvenance extends Reference implements Marker {
         }
     }
 
-    private static @Nullable GitProvenance fromGitConfig(Repository repository, @Nullable String branch, @Nullable String changeset, GitRemote.Parser gitRemoteParser) {
+    /**
+     * Opens the git repository for {@code projectDir}, transparently handling linked git worktrees. The
+     * shaded JGit predates {@code commondir} support and so cannot open a worktree's private gitdir
+     * (it would report the repository as bare with no refs or objects). For a worktree we instead open
+     * the shared common repository, which owns the objects, refs, and config, and recover this
+     * worktree's branch and HEAD from its own gitdir.
+     */
+    private static @Nullable RepositoryContext openRepository(File projectDir) throws IOException {
+        File gitDir = new RepositoryBuilder().findGitDir(projectDir).getGitDir();
+        File commonDir = gitDir == null ? null : commonDir(gitDir);
+        if (commonDir == null) {
+            // A normal repository (or a shallow clone). Build exactly as before; a missing git dir
+            // throws IllegalArgumentException, which callers translate to a null provenance.
+            return new RepositoryContext(new RepositoryBuilder().findGitDir(projectDir).build(), null, null, null, false);
+        }
+        // A linked worktree: open the shared common repository and derive HEAD from the worktree gitdir.
+        Repository repository = new RepositoryBuilder().setGitDir(commonDir).build();
+        try {
+            String[] head = readWorktreeHead(gitDir);
+            ObjectId headId = head[1] == null ? null : repository.resolve(head[1]);
+            String changeset = headId == null ? null : headId.getName();
+            return new RepositoryContext(repository, head[0], changeset, headId, true);
+        } catch (IOException | RuntimeException e) {
+            // Don't leak the open repository if reading the worktree's HEAD fails (e.g. a corrupt worktree).
+            repository.close();
+            throw e;
+        }
+    }
+
+    /**
+     * @return the shared common git directory if {@code gitDir} is a linked worktree's private gitdir
+     * (i.e. it contains a {@code commondir} file), or {@code null} for a normal repository.
+     */
+    private static @Nullable File commonDir(File gitDir) {
+        File commonDirFile = new File(gitDir, "commondir");
+        if (!commonDirFile.isFile()) {
+            return null;
+        }
+        try {
+            String content = new String(Files.readAllBytes(commonDirFile.toPath()), StandardCharsets.UTF_8).trim();
+            File common = new File(content);
+            if (!common.isAbsolute()) {
+                common = new File(gitDir, content);
+            }
+            return common.getCanonicalFile();
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Reads a worktree's own {@code HEAD}.
+     *
+     * @return a two element array of {@code [branchName, refOrSha]}; {@code branchName} is {@code null}
+     * for a detached HEAD, and {@code refOrSha} is the symbolic ref (e.g. {@code refs/heads/main}) or the
+     * commit sha to resolve against the shared common repository.
+     */
+    private static String[] readWorktreeHead(File gitDir) throws IOException {
+        String head = new String(Files.readAllBytes(new File(gitDir, "HEAD").toPath()), StandardCharsets.UTF_8).trim();
+        if (head.startsWith("ref:")) {
+            String ref = head.substring(4).trim();
+            String branch = ref.startsWith("refs/heads/") ? ref.substring("refs/heads/".length()) : null;
+            return new String[]{branch, ref};
+        }
+        return new String[]{null, head.isEmpty() ? null : head};
+    }
+
+    /**
+     * The opened repository together with the branch, changeset, and committer-walk start that a linked
+     * worktree's own HEAD implies. For a normal repository the latter three are {@code null}, so callers
+     * fall back to reading them from the repository's HEAD as before.
+     */
+    private static class RepositoryContext {
+        final Repository repository;
+
+        @Nullable
+        final String branch;
+
+        @Nullable
+        final String changeset;
+
+        @Nullable
+        final ObjectId committerStart;
+
+        /** Whether {@link #repository} is the shared common repository of a linked worktree, in which
+         * case its own HEAD belongs to a different checkout and must not be consulted for branch/changeset. */
+        final boolean linkedWorktree;
+
+        RepositoryContext(Repository repository, @Nullable String branch, @Nullable String changeset,
+                          @Nullable ObjectId committerStart, boolean linkedWorktree) {
+            this.repository = repository;
+            this.branch = branch;
+            this.changeset = changeset;
+            this.committerStart = committerStart;
+            this.linkedWorktree = linkedWorktree;
+        }
+    }
+
+    private static @Nullable GitProvenance fromGitConfig(Repository repository, @Nullable String branch, @Nullable String changeset, GitRemote.Parser gitRemoteParser, CommitHistory commitHistory, @Nullable ObjectId committerStart, boolean linkedWorktree) {
         if (repository.isBare()) {
             return null;
         }
-        if (branch == null) {
+        if (branch == null && !linkedWorktree) {
+            // A linked worktree's branch is authoritative from its own HEAD (null means genuinely
+            // detached); resolving from the shared repository's HEAD would report a different checkout's branch.
             branch = resolveBranchFromGitConfig(repository);
         }
         String remoteOriginUrl = getRemoteOriginUrl(repository);
@@ -268,9 +412,14 @@ public class GitProvenance extends Reference implements Marker {
         } else {
             remote = gitRemoteParser.parse(remoteOriginUrl);
         }
+        // null (not emptyList) when the walk is skipped, so consumers can distinguish
+        // "committers were not computed" from "walked the history and found nobody". For a linked
+        // worktree whose own HEAD couldn't be resolved, leave committers null rather than walking from
+        // the shared repository's HEAD, which belongs to a different checkout.
+        List<Committer> committers = commitHistory.isEnabled() && !(linkedWorktree && committerStart == null) ?
+                getCommitters(repository, committerStart, commitHistory) : null;
         return new GitProvenance(randomId(), remoteOriginUrl, branch, changeset,
-                getAutocrlf(repository), getEOF(repository),
-                getCommitters(repository), remote);
+                getAutocrlf(repository), getEOF(repository), committers, remote);
     }
 
     static @Nullable String resolveBranchFromGitConfig(Repository repository) {
@@ -370,9 +519,14 @@ public class GitProvenance extends Reference implements Marker {
         }
     }
 
-    private static List<Committer> getCommitters(Repository repository) {
+    private static List<Committer> getCommitters(Repository repository, @Nullable ObjectId from, CommitHistory commitHistory) {
         try (Git git = Git.open(repository.getDirectory())) {
-            ObjectId head = repository.readOrigHead();
+            // A linked worktree supplies its own HEAD (the repository is the shared common one, whose
+            // HEAD/ORIG_HEAD belong to a different checkout). Otherwise prefer ORIG_HEAD, then HEAD.
+            ObjectId head = from;
+            if (head == null) {
+                head = repository.readOrigHead();
+            }
             if (head == null) {
                 Ref headRef = repository.getRefDatabase().findRef("HEAD");
                 if (headRef == null || headRef.getObjectId() == null) {
@@ -381,22 +535,43 @@ public class GitProvenance extends Reference implements Marker {
                 head = headRef.getObjectId();
             }
 
+            LogCommand log = git.log().add(head);
+            CommitHistory.Scope scope = commitHistory.getScope();
+            switch (scope.getKind()) {
+                case SINCE:
+                    // CommitTimeRevFilter.after throws StopWalkException on the first commit older than the
+                    // cutoff, which prunes the walk (real CPU savings). Because git timestamps are
+                    // non-monotonic, this is an approximation, exactly like `git log --since`.
+                    log.setRevFilter(CommitTimeRevFilter.after(
+                            Date.from(requireNonNull(scope.getSince()).atStartOfDay(ZoneId.systemDefault()).toInstant())));
+                    break;
+                case LAST_COMMITS:
+                    log.setMaxCount(scope.getMaxCommits());
+                    break;
+                case NONE:
+                case FULL:
+                default:
+                    break;
+            }
+
+            boolean perDay = commitHistory.getDetail() == CommitHistory.Detail.COMMITS_BY_DAY;
             Map<String, String> committerName = new HashMap<>();
             Map<String, NavigableMap<LocalDate, Integer>> commitMap = new HashMap<>();
-            for (RevCommit commit : git.log().add(head).call()) {
+            for (RevCommit commit : log.call()) {
                 PersonIdent who = commit.getAuthorIdent();
                 committerName.putIfAbsent(who.getEmailAddress(), who.getName());
-                commitMap.computeIfAbsent(who.getEmailAddress(),
-                        email -> new TreeMap<>()).compute(who.getWhen().toInstant().atZone(who.getTimeZone().toZoneId())
-                                .toLocalDate(),
-                        (day, count) -> count == null ? 1 : count + 1);
+                if (perDay) {
+                    commitMap.computeIfAbsent(who.getEmailAddress(),
+                            email -> new TreeMap<>()).compute(who.getWhen().toInstant().atZone(who.getTimeZone().toZoneId())
+                                    .toLocalDate(),
+                            (day, count) -> count == null ? 1 : count + 1);
+                }
             }
             return committerName.entrySet().stream()
-                    .map(c -> new Committer(
-                            c.getValue(),
-                            c.getKey(),
-                            commitMap.get(c.getKey()))
-                    ).collect(toList());
+                    .map(c -> {
+                        NavigableMap<LocalDate, Integer> byDay = perDay ? commitMap.get(c.getKey()) : emptyNavigableMap();
+                        return new Committer(c.getValue(), c.getKey(), byDay);
+                    }).collect(toList());
         } catch (IOException | GitAPIException e) {
             return emptyList();
         }
@@ -432,6 +607,130 @@ public class GitProvenance extends Reference implements Marker {
         CRLF,
         LF,
         Native
+    }
+
+    /**
+     * Controls the optional, expensive commit-history walk that {@link GitProvenance} performs to
+     * populate {@link GitProvenance#getCommitters()}. The cheap provenance fields (origin, branch,
+     * change, autocrlf, eol, remote) are always computed and are not affected by this type.
+     * <p>
+     * Two axes are bounded here, but only through named presets, so the combination space stays small
+     * and every reachable state is meaningful:
+     * <ul>
+     *   <li><b>Scope</b> &mdash; how far back the walk goes: {@link #none()} (don't walk),
+     *       {@link #full()} (entire history), {@link #since(LocalDate)} / {@link #sinceDaysAgo(int)}
+     *       (pruned at a date), or {@link #lastCommits(int)} (a hard commit cap).</li>
+     *   <li><b>Detail</b> &mdash; how much per-committer information is retained, and only applies when we
+     *       walk: {@link Detail#COMMITTERS} (identities only) or {@link Detail#COMMITS_BY_DAY} (the full
+     *       per-day breakdown). Override it with {@link #withDetail(Detail)}.</li>
+     * </ul>
+     * The off-switch lives on the scope axis, so {@code since(date).withDetail(...)} can never collapse
+     * to "walk nothing." This is a factory <em>input</em> only; it is never stored on the marker and
+     * never serialized.
+     */
+    @Value
+    @Incubating(since = "8.85.0")
+    public static class CommitHistory {
+        Scope scope;
+        Detail detail;
+
+        private CommitHistory(Scope scope, Detail detail) {
+            this.scope = scope;
+            this.detail = detail;
+        }
+
+        /** Skip the walk entirely. {@link GitProvenance#getCommitters()} will be {@code null}. */
+        public static CommitHistory none() {
+            return new CommitHistory(Scope.none(), Detail.COMMITS_BY_DAY);
+        }
+
+        /** Walk the entire reachable history, retaining the full per-day commit breakdown. */
+        public static CommitHistory full() {
+            return new CommitHistory(Scope.full(), Detail.COMMITS_BY_DAY);
+        }
+
+        /**
+         * Walk commits committed on or after {@code since}, retaining the full per-day breakdown. The walk
+         * is pruned at the cutoff by commit time (like {@code git log --since}); because git timestamps are
+         * non-monotonic this is an approximation. Note the per-day breakdown is keyed by author date, which
+         * for rebased or cherry-picked commits can differ from the commit date the cutoff is applied to.
+         */
+        public static CommitHistory since(LocalDate since) {
+            return new CommitHistory(Scope.since(since), Detail.COMMITS_BY_DAY);
+        }
+
+        /** Walk commits committed within the last {@code days} days, retaining the full per-day breakdown. */
+        public static CommitHistory sinceDaysAgo(int days) {
+            return since(LocalDate.now().minusDays(days));
+        }
+
+        /** Walk at most {@code maxCommits} commits (an exact cap), retaining the full per-day breakdown. */
+        public static CommitHistory lastCommits(int maxCommits) {
+            if (maxCommits < 0) {
+                throw new IllegalArgumentException("maxCommits must be non-negative, but was " + maxCommits);
+            }
+            return new CommitHistory(Scope.lastCommits(maxCommits), Detail.COMMITS_BY_DAY);
+        }
+
+        /**
+         * Walk the entire reachable history but retain only the distinct committer identities (name and
+         * email), discarding the per-day breakdown. Cheaper to hold and serialize; the resulting
+         * {@link Committer}s have an empty {@link Committer#getCommitsByDay()}.
+         */
+        public static CommitHistory identities() {
+            return new CommitHistory(Scope.full(), Detail.COMMITTERS);
+        }
+
+        /**
+         * Override the detail axis on any scope, e.g. {@code CommitHistory.since(date).withDetail(COMMITTERS)}.
+         * Has no observable effect when the scope is {@link #none()} (the walk is skipped regardless).
+         */
+        public CommitHistory withDetail(Detail detail) {
+            return new CommitHistory(scope, detail);
+        }
+
+        boolean isEnabled() {
+            return scope.getKind() != Scope.Kind.NONE;
+        }
+
+        /** How far back the commit walk extends. Constructed only through {@link CommitHistory}'s presets. */
+        @Value
+        static class Scope {
+            enum Kind {
+                NONE, FULL, SINCE, LAST_COMMITS
+            }
+
+            Kind kind;
+
+            @Nullable
+            LocalDate since;
+
+            int maxCommits;
+
+            static Scope none() {
+                return new Scope(Kind.NONE, null, -1);
+            }
+
+            static Scope full() {
+                return new Scope(Kind.FULL, null, -1);
+            }
+
+            static Scope since(LocalDate since) {
+                return new Scope(Kind.SINCE, since, -1);
+            }
+
+            static Scope lastCommits(int maxCommits) {
+                return new Scope(Kind.LAST_COMMITS, null, maxCommits);
+            }
+        }
+
+        /** How much per-committer detail to retain. Applies only when the history is walked. */
+        public enum Detail {
+            /** Distinct committer identities only (name + email); {@code commitsByDay} is empty. */
+            COMMITTERS,
+            /** The full per-day commit breakdown (the historical default). */
+            COMMITS_BY_DAY
+        }
     }
 
     @Value

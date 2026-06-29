@@ -153,4 +153,16 @@ class NewArrayTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void significantCharactersInComments() {
+        // `new Array[T](...)` — `]` in block comment inside Array element type
+        rewriteRun(
+            scala(
+                """
+                val arr = new Array[Int /* ] */](5)
+                """
+            )
+        );
+    }
 }

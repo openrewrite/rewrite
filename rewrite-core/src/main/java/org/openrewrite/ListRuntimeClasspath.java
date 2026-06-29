@@ -15,20 +15,19 @@
  */
 package org.openrewrite;
 
-import io.github.classgraph.ClassGraph;
-import io.github.classgraph.Resource;
-import io.github.classgraph.ResourceList;
-import io.github.classgraph.ScanResult;
 import lombok.Getter;
 import org.openrewrite.table.ClasspathReport;
 
-import java.net.URI;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.Enumeration;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
 import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.groupingBy;
 
 public class ListRuntimeClasspath extends ScanningRecipe<Integer> {
     transient ClasspathReport report = new ClasspathReport(this);
@@ -51,18 +50,25 @@ public class ListRuntimeClasspath extends ScanningRecipe<Integer> {
 
     @Override
     public Collection<? extends SourceFile> generate(Integer acc, ExecutionContext ctx) {
-        try (ScanResult result = new ClassGraph().scan()) {
-            ResourceList resources = result.getResourcesWithExtension(".jar");
-            Map<String, List<Resource>> classpathEntriesWithJarResources = resources.stream()
-                    .collect(groupingBy(it -> it.getClasspathElementURI().toString()));
-            for (URI classPathUri : result.getClasspathURIs()) {
-                List<Resource> jarResources = classpathEntriesWithJarResources.get(classPathUri.toString());
-                if (jarResources == null || jarResources.isEmpty()) {
-                    report.insertRow(ctx, new ClasspathReport.Row(classPathUri.toString(), ""));
-                } else {
-                    for (Resource r : jarResources) {
-                        report.insertRow(ctx, new ClasspathReport.Row(classPathUri.toString(), r.getPath()));
+        String classpath = System.getProperty("java.class.path");
+        if (classpath != null) {
+            for (String entry : classpath.split(System.getProperty("path.separator"))) {
+                Path path = Paths.get(entry);
+                if (Files.isRegularFile(path) && entry.endsWith(".jar")) {
+                    try (JarFile jarFile = new JarFile(path.toFile())) {
+                        Enumeration<JarEntry> entries = jarFile.entries();
+                        while (entries.hasMoreElements()) {
+                            JarEntry jarEntry = entries.nextElement();
+                            if (!jarEntry.isDirectory() && jarEntry.getName().endsWith(".jar")) {
+                                report.insertRow(ctx, new ClasspathReport.Row(
+                                        path.toUri().toString(), jarEntry.getName()));
+                            }
+                        }
+                    } catch (IOException ignored) {
+                        report.insertRow(ctx, new ClasspathReport.Row(path.toUri().toString(), ""));
                     }
+                } else {
+                    report.insertRow(ctx, new ClasspathReport.Row(path.toUri().toString(), ""));
                 }
             }
         }

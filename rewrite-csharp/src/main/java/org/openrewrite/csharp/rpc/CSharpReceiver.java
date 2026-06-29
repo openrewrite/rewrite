@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.csharp.tree.CsDocComment;
+import org.openrewrite.csharp.tree.CsDocCommentRawComment;
 import org.openrewrite.csharp.tree.Linq;
 import org.openrewrite.java.internal.rpc.JavaReceiver;
 import org.openrewrite.java.tree.*;
@@ -144,6 +146,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     @Override
     public J visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, RpcReceiveQueue q) {
         return pragmaChecksumDirective
+                .withKeywordSpacing(q.receive(pragmaChecksumDirective.getKeywordSpacing(), space -> visitSpace(space, q)))
                 .withArguments(q.receiveAndGet(pragmaChecksumDirective.getArguments(), (String s) -> s));
     }
 
@@ -729,6 +732,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     public J visitPragmaWarningDirective(Cs.PragmaWarningDirective pragmaWarningDirective, RpcReceiveQueue q) {
         return pragmaWarningDirective
                 .withAction(q.receiveAndGet(pragmaWarningDirective.getAction(), toEnum(Cs.PragmaWarningDirective.PragmaWarningAction.class)))
+                .withKeywordSpacing(q.receive(pragmaWarningDirective.getKeywordSpacing(), space -> visitSpace(space, q)))
+                .withActionSpacing(q.receive(pragmaWarningDirective.getActionSpacing(), space -> visitSpace(space, q)))
                 .getPadding().withWarningCodes(q.receiveList(pragmaWarningDirective.getPadding().getWarningCodes(), el -> visitRightPadded(el, q)));
     }
 
@@ -738,7 +743,8 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withSetting(q.receiveAndGet(nullableDirective.getSetting(), toEnum(Cs.NullableDirective.NullableSetting.class)))
                 .withTarget(q.receiveAndGet(nullableDirective.getTarget(), toEnum(Cs.NullableDirective.NullableTarget.class)))
                 .withHashSpacing(q.receive(nullableDirective.getHashSpacing()))
-                .withTrailingComment(q.receive(nullableDirective.getTrailingComment()));
+                .withTrailingComment(q.receive(nullableDirective.getTrailingComment()))
+                .withKeywordSpacing(q.receive(nullableDirective.getKeywordSpacing()));
     }
 
     @Override
@@ -877,6 +883,34 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
+        }
+
+        @Override
+        public Space visitSpace(Space space, RpcReceiveQueue q) {
+            return space
+                    .withComments(q.receiveList(space.getComments(), c -> {
+                        if (c instanceof CsDocComment.DocComment) {
+                            return (Comment) new CsDocCommentReceiver(delegate).visit((CsDocComment.DocComment) c, q);
+                        }
+                        if (c instanceof CsDocCommentRawComment) {
+                            CsDocCommentRawComment dc = (CsDocCommentRawComment) c;
+                            q.receive(dc.isMultiline()); // consume; always true
+                            return new CsDocCommentRawComment(
+                                    q.receive(dc.getText()),
+                                    q.receive(dc.getSuffix()),
+                                    q.receive(dc.getMarkers())
+                            );
+                        }
+                        if (c instanceof TextComment) {
+                            TextComment tc = (TextComment) c;
+                            return tc.withMultiline(q.receive(tc.isMultiline()))
+                                    .withText(q.receive(tc.getText()))
+                                    .withSuffix(q.receive(tc.getSuffix()))
+                                    .withMarkers(q.receive(tc.getMarkers()));
+                        }
+                        return c;
+                    }))
+                    .withWhitespace(q.receive(space.getWhitespace()));
         }
     }
 }

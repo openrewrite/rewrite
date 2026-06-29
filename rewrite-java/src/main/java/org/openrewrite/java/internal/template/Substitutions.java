@@ -166,7 +166,33 @@ public class Substitutions {
                 return TypeUtils.toString(genericType.getBounds().get(0));
             }
         }
-        return TypeUtils.toString(type).replace("$", ".");
+        if (type instanceof JavaType.FullyQualified) {
+            JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
+            String fqn = fq.getFullyQualifiedName();
+            for (int i = 0; i < fqn.length(); i++) {
+                if (fqn.charAt(i) == '$' && i + 1 < fqn.length() && Character.isDigit(fqn.charAt(i + 1))) {
+                    // Anonymous classes and types declared inside them (e.g., "Foo$1" or "Foo$1$Bar")
+                    // cannot be expressed as valid Java source code; use the supertype instead
+                    return getTypeName(fq.getSupertype());
+                }
+            }
+        }
+        String typeName = TypeUtils.toString(type).replace("$", ".");
+        if (containsLocalOrAnonymousClassName(typeName)) {
+            // The type string contains a local or anonymous class name (e.g., "Map<String, Test.1Inner>")
+            // which is not valid Java source code. Fall back to java.lang.Object for the entire type.
+            return "java.lang.Object";
+        }
+        return typeName;
+    }
+
+    private static boolean containsLocalOrAnonymousClassName(String typeName) {
+        for (int i = 0; i < typeName.length() - 1; i++) {
+            if (typeName.charAt(i) == '.' && Character.isDigit(typeName.charAt(i + 1))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String substituteUntyped(Object parameter, int index) {

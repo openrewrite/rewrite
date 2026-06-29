@@ -2429,7 +2429,15 @@ class ChangeParentPomTest implements RewriteTest {
                       </parent>
                     </project>
                     """,
-                    spec -> spec.path("pom.xml")
+                    spec -> spec.path("pom.xml").afterRecipe(doc -> {
+                        MavenResolutionResult result = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                        // Root's modules should also have updated dependency management
+                        assertThat(result.getModules()).isNotEmpty();
+                        MavenResolutionResult childModule = result.getModules().get(0);
+                        assertThat(childModule.getPom().getDependencyManagement())
+                            .describedAs("Root's child module should have new junit 6.0.1 entries in dependency management")
+                            .anyMatch(dep -> dep.getGav().toString().equals("org.junit.jupiter:junit-jupiter:6.0.1"));
+                    })
                 ),
                 mavenProject(
                     "sample-rest",
@@ -2473,6 +2481,13 @@ class ChangeParentPomTest implements RewriteTest {
                                 .noneMatch(dep -> dep.getGav().toString().equals("org.junit.jupiter:junit-jupiter:5.10.3"));
                             assertThat(result.getParent().getPom().getDependencyManagement())
                                 .describedAs("Parent's dependency management should contain new junit 6.0.1 entries")
+                                .anyMatch(dep -> dep.getGav().toString().equals("org.junit.jupiter:junit-jupiter:6.0.1"));
+                            // Verify child's own resolved dependency management reflects the new grandparent
+                            assertThat(result.getPom().getDependencyManagement())
+                                .describedAs("Child's own dependency management should not contain old junit 5.10.3 entries")
+                                .noneMatch(dep -> dep.getGav().toString().equals("org.junit.jupiter:junit-jupiter:5.10.3"));
+                            assertThat(result.getPom().getDependencyManagement())
+                                .describedAs("Child's own dependency management should contain new junit 6.0.1 entries")
                                 .anyMatch(dep -> dep.getGav().toString().equals("org.junit.jupiter:junit-jupiter:6.0.1"));
                         })
                     )

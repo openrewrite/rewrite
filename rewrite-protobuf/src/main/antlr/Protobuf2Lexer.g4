@@ -11,6 +11,7 @@ EXTEND          : 'extend';
 FIXED32         : 'fixed32';
 FIXED64         : 'fixed64';
 FLOAT           : 'float';
+GROUP           : 'group';
 IMPORT          : 'import';
 INT32           : 'int32';
 INT64           : 'int64';

@@ -44,6 +44,10 @@
       "types": "./dist/test/index.d.ts",
       "default": "./dist/test/index.js"
     },
+    "./test/java-rpc": {
+      "types": "./dist/test/java-rpc.d.ts",
+      "default": "./dist/test/java-rpc.js"
+    },
     "./yaml": {
       "types": "./dist/yaml/index.d.ts",
       "default": "./dist/yaml/index.js"
@@ -68,12 +72,12 @@
     "diff": "^8.0.0",
     "jsonc-parser": "^3.3.1",
     "mutative": "^1.3.0",
-    "picomatch": "^4.0.3",
+    "picomatch": "^4.0.4",
     "semver": "^7.7.4",
     "tmp-promise": "^3.0.3",
     "typescript": "^5.8.3",
     "vscode-jsonrpc": "^8.2.1",
-    "yaml": "^2.6.1"
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@types/benchmark": "^2.1.5",
@@ -83,10 +87,16 @@
     "@types/tmp": "^0.2.6",
     "benchmark": "^2.1.4",
     "bun": "^1.3.5",
-    "vitest": "^4.0.18"
+    "prettier": "^3.7.4",
+    "vitest": "^4.1.8"
   },
   "optionalDependencies": {
+    "@pyroscope/nodejs": "^0.4.0",
     "prettier": "^3.7.4"
+  },
+  "overrides": {
+    "tmp": "^0.2.7",
+    "lodash": "^4.18.1"
   },
   "bin": {
     "rewrite-rpc": "./dist/rpc/server.js"

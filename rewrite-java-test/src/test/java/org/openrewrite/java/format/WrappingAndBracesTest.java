@@ -1654,6 +1654,113 @@ class WrappingAndBracesTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/8073")
+    void tryWithResourcesChopIfTooLong() {
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces,
+            wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(ChopIfTooLong).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt"); BufferedReader br = new BufferedReader(fr); FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt");
+                           BufferedReader br = new BufferedReader(fr);
+                           FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/8073")
+    void tryWithResourcesChopIfTooLongWithBody() {
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces,
+            wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(ChopIfTooLong).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt"); BufferedReader br = new BufferedReader(fr); FileWriter fw = new FileWriter("output.txt")) {
+                          String line = br.readLine();
+                          while (line != null) {
+                              fw.write(line);
+                              line = br.readLine();
+                          }
+                      } catch (IOException e) {
+                          throw new RuntimeException(e);
+                      }
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt");
+                           BufferedReader br = new BufferedReader(fr);
+                           FileWriter fw = new FileWriter("output.txt")) {
+                          String line = br.readLine();
+                          while (line != null) {
+                              fw.write(line);
+                              line = br.readLine();
+                          }
+                      } catch (IOException e) {
+                          throw new RuntimeException(e);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/8073")
+    void tryWithResourcesChopIfTooLongNotLongEnough() {
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces,
+            wrap -> wrap.withTryWithResources(wrap.getTryWithResources().withWrap(ChopIfTooLong).withAlignWhenMultiline(true))
+          ),
+          java(
+            """
+              import java.io.*;
+
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt"); BufferedReader br = new BufferedReader(fr)) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void tryCatchOnNewLine() {
         rewriteRun(
           autoFormat(

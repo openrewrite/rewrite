@@ -17,14 +17,37 @@ package org.openrewrite.java.service;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.format.AutoFormatVisitor;
+import org.openrewrite.java.format.BlankLinesVisitor;
+import org.openrewrite.java.format.NormalizeFormatVisitor;
 
 @Incubating(since = "8.2.0")
 public class AutoFormatService {
 
     public <P> JavaVisitor<P> autoFormatVisitor(@Nullable Tree stopAfter) {
         return new AutoFormatVisitor<>(stopAfter);
+    }
+
+    /**
+     * Returns the language-appropriate {@link NormalizeFormatVisitor}. Edit
+     * recipes that mutate an LST node — e.g. by removing a leading annotation
+     * — can leave whitespace stranded on inner elements (modifier/kind
+     * prefixes), violating the "whitespace lives on the outermost element"
+     * convention. Running this visitor on the result moves the whitespace
+     * back to the outermost element so downstream passes ({@link BlankLinesVisitor}
+     * in particular) can normalize it.
+     */
+    public <P> JavaVisitor<P> normalizeFormatVisitor(@Nullable Tree stopAfter) {
+        return new NormalizeFormatVisitor<>(stopAfter);
+    }
+
+    /**
+     * Returns the language-appropriate {@link BlankLinesVisitor}.
+     */
+    public <P> JavaVisitor<P> blankLinesVisitor(SourceFile sourceFile, @Nullable Tree stopAfter) {
+        return new BlankLinesVisitor<>(sourceFile, stopAfter);
     }
 }

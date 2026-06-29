@@ -81,6 +81,19 @@ class ObjectDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void finalObject() {
+        rewriteRun(
+            scala(
+                """
+                final object Foo {
+                  val x = 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void companionObject() {
         rewriteRun(
             scala(
@@ -115,6 +128,21 @@ class ObjectDeclarationTest implements RewriteTest {
                   object Inner {
                     val x = 1
                   }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitModuleDef — `{` in line comment before object body
+        rewriteRun(
+            scala(
+                """
+                object Foo // {
+                {
+                  val x = 1
                 }
                 """
             )

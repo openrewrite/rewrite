@@ -52,7 +52,9 @@ public class JsonPathMatcher {
     private JsonPathParser.@Nullable JsonPathContext parsed;
 
     public JsonPathMatcher(String jsonPath) {
-        this.jsonPath = jsonPath;
+        this.jsonPath = jsonPath.endsWith(".") && jsonPath.length() > 1
+                ? jsonPath.substring(0, jsonPath.length() - 1)
+                : jsonPath;
     }
 
     public <T> Optional<T> find(Cursor cursor) {

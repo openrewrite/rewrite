@@ -34,6 +34,7 @@ import {
 } from "../../src/javascript";
 import {J} from "../../src/java";
 import {withDir} from "tmp-promise";
+import {PrepareRecipe, PrepareRecipeResponse} from "../../src/rpc/request/prepare-recipe";
 
 describe("Rewrite RPC", () => {
     const spec = new RecipeSpec();
@@ -250,6 +251,37 @@ describe("Rewrite RPC", () => {
                 "hello"
             )
         );
+    });
+
+    test("prepareRecipeWithRpcSubRecipeInRecipeList", async () => {
+        // A composite recipe whose recipeList() mixes a local recipe with an
+        // already-prepared remote (RpcRecipe) sub-recipe — the shape of e.g.
+        // Angular's UpgradeToAngular21, which lists upgradeDependencyVersion()
+        // (a Java recipe prepared over RPC). Preparing it must not try to
+        // re-install the RpcRecipe by its (no-arg-incompatible) constructor.
+        const recipe = await client.prepareRecipe("org.openrewrite.example.text.with-rpc-sub-recipe");
+        const descriptor = await recipe.descriptor();
+        expect(descriptor.recipeList.map(r => r.name)).toContain(
+            "org.openrewrite.example.text.remote-change-text"
+        );
+    });
+
+    test("preparing an unknown recipe id delegates to the host instead of failing", async () => {
+        // When the host builds RpcRecipe.getRecipeList() it re-prepares every child by
+        // id over RPC. A child that delegates to a Java recipe (e.g. Angular's
+        // upgradeDependencyVersion() -> org.openrewrite.javascript.UpgradeDependencyVersion)
+        // is an RpcRecipe that installSubRecipes intentionally does NOT register in this
+        // marketplace, so findRecipe misses. Rather than throwing "Could not find recipe
+        // with id ...", the server must tell the host to resolve it locally via delegatesTo
+        // (the Java recipe is on the host's classpath).
+        const response: PrepareRecipeResponse = await (client as any).connection.sendRequest(
+            new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
+            new PrepareRecipe("org.openrewrite.javascript.UpgradeDependencyVersion", {newVersion: "19.x"})
+        );
+        expect(response.delegatesTo).toEqual({
+            recipeName: "org.openrewrite.javascript.UpgradeDependencyVersion",
+            options: {newVersion: "19.x"}
+        });
     });
 
     test("runRecipeWithCrossModuleRecipeList", async () => {

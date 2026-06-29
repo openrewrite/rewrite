@@ -16,10 +16,70 @@
 package org.openrewrite.semver;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Validated;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SemverTest {
+    @Test
+    void cachesValidationResultByVersionAndMetadataPattern() {
+        Validated<VersionComparator> first = Semver.validate("1.5.1", null);
+        assertThat(first.isValid()).isTrue();
+        assertThat(Semver.validate("1.5.1", null)).isSameAs(first);
+    }
+
+    @Test
+    void cachesInvalidValidationResults() {
+        Validated<VersionComparator> first = Semver.validate("1 - 2.x", null);
+        assertThat(first.isValid()).isFalse();
+        assertThat(Semver.validate("1 - 2.x", null)).isSameAs(first);
+    }
+
+    @Test
+    void distinguishesNullAndNonNullMetadataPattern() {
+        Validated<VersionComparator> withoutPattern = Semver.validate("latest.patch", null);
+        Validated<VersionComparator> withPattern = Semver.validate("latest.patch", "+backpatch*");
+        assertThat(withPattern).isNotSameAs(withoutPattern);
+        assertThat(Semver.validate("latest.patch", null)).isSameAs(withoutPattern);
+        assertThat(Semver.validate("latest.patch", "+backpatch*")).isSameAs(withPattern);
+    }
+
+    @Test
+    void concurrentValidationReturnsConsistentResults() throws Exception {
+        String[] selectors = {"latest.release", "1.x", "1.5 - 2", "^1.5", "1.5.1"};
+        Class<?>[] expectedTypes = {LatestRelease.class, XRange.class, HyphenRange.class, CaretRange.class, ExactVersion.class};
+
+        int threads = 16;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        try {
+            List<Callable<Void>> tasks = new ArrayList<>();
+            for (int t = 0; t < threads; t++) {
+                tasks.add(() -> {
+                    for (int iteration = 0; iteration < 1_000; iteration++) {
+                        for (int i = 0; i < selectors.length; i++) {
+                            Validated<VersionComparator> validated = Semver.validate(selectors[i], null);
+                            assertThat(validated.isValid()).isTrue();
+                            assertThat(validated.getValue()).isInstanceOf(expectedTypes[i]);
+                        }
+                    }
+                    return null;
+                });
+            }
+            for (Future<Void> future : executor.invokeAll(tasks)) {
+                future.get();
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     @Test
     void validToVersion() {
         assertThat(Semver.validate("latest.release", null).getValue())

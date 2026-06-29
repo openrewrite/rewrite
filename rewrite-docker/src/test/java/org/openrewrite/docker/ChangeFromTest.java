@@ -21,6 +21,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.docker.Assertions.docker;
 
 class ChangeFromTest implements RewriteTest {
@@ -954,6 +955,232 @@ class ChangeFromTest implements RewriteTest {
         void noChangeWhenDigestAlreadyAbsent() {
             rewriteRun(
               spec -> spec.recipe(new ChangeFrom("ubuntu", null, null, null, null, null, "", null)),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class Captures implements RewriteTest {
+
+        @Test
+        void singleTagCapturePreservesSuffix() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("openjdk", "8*", null, null, "eclipse-temurin", "17$1", null, null)),
+              docker(
+                """
+                  FROM openjdk:8-jdk-alpine
+                  """,
+                """
+                  FROM eclipse-temurin:17-jdk-alpine
+                  """
+              )
+            );
+        }
+
+        @Test
+        void singleTagCaptureWithEmptySuffix() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("openjdk", "8*", null, null, "eclipse-temurin", "17$1", null, null)),
+              docker(
+                """
+                  FROM openjdk:8
+                  """,
+                """
+                  FROM eclipse-temurin:17
+                  """
+              )
+            );
+        }
+
+        @Test
+        void hyphenPrefixedCapture() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("openjdk", "8-*", null, null, "eclipse-temurin", "17-$1", null, null)),
+              docker(
+                """
+                  FROM openjdk:8-jdk-noble
+                  """,
+                """
+                  FROM eclipse-temurin:17-jdk-noble
+                  """
+              )
+            );
+        }
+
+        @Test
+        void dollarZeroSubstitutesFullOriginalField() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "$0-lts", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  """,
+                """
+                  FROM ubuntu:20.04-lts
+                  """
+              )
+            );
+        }
+
+        @Test
+        void multipleCapturesPreserved() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("repo", "*-jdk-*", null, null, "repo", "$1-jre-$2", null, null)),
+              docker(
+                """
+                  FROM repo:8-jdk-alpine
+                  """,
+                """
+                  FROM repo:8-jre-alpine
+                  """
+              )
+            );
+        }
+
+        @Test
+        void backslashDollarIsLiteral() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04-\\$VAR", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  """,
+                """
+                  FROM ubuntu:22.04-$VAR
+                  """
+              )
+            );
+        }
+
+        @Test
+        void imageNameCapture() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("*/openjdk", "8", null, null, "$1/eclipse-temurin", "17", null, null)),
+              docker(
+                """
+                  FROM gcr.io/openjdk:8
+                  """,
+                """
+                  FROM gcr.io/eclipse-temurin:17
+                  """
+              )
+            );
+        }
+
+        @Test
+        void validationRejectsBackrefWithoutCapture() {
+            assertThat(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04-$1", null, null).validate().isInvalid())
+              .isTrue();
+        }
+
+        @Test
+        void validationRejectsBackrefBeyondCaptureCount() {
+            assertThat(new ChangeFrom("ubuntu", "20.*", null, null, "ubuntu", "22.$2", null, null).validate().isInvalid())
+              .isTrue();
+        }
+
+        @Test
+        void validationAcceptsDollarZeroWithoutCaptures() {
+            assertThat(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "$0-lts", null, null).validate().isValid())
+              .isTrue();
+        }
+    }
+
+    @Nested
+    class DigestPinned implements RewriteTest {
+
+        @Test
+        void emptyOldDigestSkipsDigestPinnedFrom() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "", null, "ubuntu", "22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123def456
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void emptyOldDigestPreservesPinWhenRecipeWouldStripIt() {
+            // newDigest="" would normally remove the pin; oldDigest="" skips the FROM entirely.
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("registry.example.com/runtime", "*", "", null,
+                "registry.example.com/runtime", "3-jdk21", "", null)),
+              docker(
+                """
+                  FROM registry.example.com/runtime:3.9.16-jdk21@sha256:abcdef1234567890
+                  RUN ./build.sh
+                  """
+              )
+            );
+        }
+
+        @Test
+        void emptyOldDigestStillUpgradesUnpinnedFrom() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "", null, "ubuntu", "22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu:22.04
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void nullOldDigestStillChangesDigestPinnedFrom() {
+            // Default (oldDigest=null) is unchanged: the digest-pinned FROM is matched and its tag upgraded.
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", null, null, "ubuntu", "22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123def456
+                  RUN apt-get update
+                  """,
+                """
+                  FROM ubuntu:22.04@sha256:abc123def456
+                  RUN apt-get update
+                  """
+              )
+            );
+        }
+
+        @Test
+        void emptyOldDigestIsPerFromInMultiStage() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "", null, "ubuntu", "22.04", null, null)),
+              docker(
+                """
+                  FROM ubuntu:20.04@sha256:abc123 AS pinned
+                  FROM ubuntu:20.04 AS floating
+                  """,
+                """
+                  FROM ubuntu:20.04@sha256:abc123 AS pinned
+                  FROM ubuntu:22.04 AS floating
+                  """
+              )
+            );
+        }
+
+        @Test
+        void digestGlobDoesNotMatchUnpinnedFrom() {
+            // A non-empty digest glob requires a digest to be present, so an unpinned FROM is not
+            // matched. This is the opposite of oldDigest="" (which matches only unpinned FROMs).
+            rewriteRun(
+              spec -> spec.recipe(new ChangeFrom("ubuntu", "20.04", "sha256:*", null, "ubuntu", "22.04", null, null)),
               docker(
                 """
                   FROM ubuntu:20.04

@@ -1,5 +1,20 @@
 # rewrite-scala Guidelines
 
+## J.Unknown is forbidden
+
+**NOTHING should map to J.Unknown.** The parser must throw an exception for any
+Scala syntax it cannot map to a proper J-type or S-type. This ensures we discover
+gaps immediately rather than silently degrading to lossy source-text preservation.
+
+If the parser encounters a tree node it doesn't handle:
+1. Map it to the correct J-type — think carefully about which one fits.
+2. If no J-type works, create an S-type (Scala-specific AST node).
+3. If the syntax is genuinely new/unknown, **throw an exception** so the gap is
+   caught by tests, not silently swallowed.
+
+**Never use J.Unknown, visitUnknown, or raw source text as the value of a J-type
+field.** These break the semantic model and prevent recipes from operating on code.
+
 ## LST Mapping Rules
 
 **Never fall back to raw source text as the value of a J-type field.** Every AST element
@@ -7,13 +22,13 @@ must be mapped to a proper J-type (or S-type) with correct structure. Stuffing s
 text into an identifier name, unknown source, or string field breaks the semantic model
 and prevents recipes from operating on that code.
 
-If a Scala construct doesn't map cleanly to an existing J-type:
-1. Think harder about which J-type fits — type bounds, annotations, modifiers, and
-   containers are more expressive than they first appear.
-2. If no J-type works, consider whether an S-type (Scala-specific AST node) is needed.
-3. Ask before resorting to `J.Unknown` — it should only be used as a last resort for
-   truly unmappable syntax, and even then the tree inside the Unknown should be
-   properly structured when possible.
+**Map to the semantically correct type.** Don't use `J.TypeCast` for type ascription
+(`expr: Type`) — that's not a cast. Don't use `J.Literal` for interpolated strings —
+they have internal structure. If the right type doesn't exist in J.*, create an S.* type.
+
+**Never store LST elements inside markers.** Markers are metadata that influence how
+an LST element is printed (like `Curried`, `OmitBraces`), not containers for additional
+AST subtrees.
 
 ## Critical Principles
 
@@ -21,8 +36,7 @@ If a Scala construct doesn't map cleanly to an existing J-type:
 to a rich type (J.* or S.*), never revert it back to J.Unknown.
 
 **Cursor management:** When a visitor method calls `extractPrefix` or `extractSource`
-and then falls back to `visitUnknown`, always restore the cursor first so the Unknown
-node gets the correct prefix whitespace.
+and then falls back, always restore the cursor first.
 
 ## Testing
 

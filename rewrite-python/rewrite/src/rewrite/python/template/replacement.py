@@ -17,8 +17,8 @@
 from __future__ import annotations
 
 from typing import Dict, List, Optional, Union, TYPE_CHECKING
-from uuid import uuid4
 
+from rewrite.utils import random_id
 from rewrite.java import J, Expression
 from rewrite.java import tree as j
 from rewrite.java.support_types import JContainer, JRightPadded
@@ -80,7 +80,7 @@ def _get_precedence(expr: J) -> Optional[int]:
 def _wrap_in_parens(expr: Expression) -> j.Parentheses:
     """Wrap an expression in parentheses, preserving its prefix on the outer node."""
     return j.Parentheses(
-        _id=uuid4(),
+        _id=random_id(),
         _prefix=expr.prefix,
         _markers=j.Markers.EMPTY,
         _tree=JRightPadded(

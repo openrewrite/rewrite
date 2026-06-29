@@ -12,112 +12,131 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Precondition helpers that delegate to Java search recipes.
+
+A recipe author wraps an editor with a precondition like so::
+
+    from rewrite import Preconditions
+    from rewrite.python.preconditions import uses_method
+
+    class ReplaceArrayTostring(Recipe):
+        def editor(self):
+            return Preconditions.check(uses_method("*..* tostring(..)"), Visitor())
+
+These helpers return :class:`rewrite.preconditions.RecipeRef` placeholders
+that record the Java recipe class name and options without firing an RPC.
+The framework introspects the wrapper at PrepareRecipe time and emits the
+recipe identity directly in ``editPreconditions``; the Java host's
+``PreparedRecipeCache.instantiateVisitor`` constructs the recipe and uses
+its visitor — no extra RPC round-trip needed. This keeps ``recipe.editor()``
+callable in unit tests without an active RPC connection.
 """
-Precondition helpers that delegate to Java search recipes via RPC.
 
-These functions provide preconditions for Python recipes that need to check
-if source files match certain criteria before applying transformations.
-When RPC is available, they delegate to the Java implementations for efficiency.
+from __future__ import annotations
 
-Example:
-    from rewrite.python.preconditions import uses_type, uses_method
-
-    class MyRecipe(Recipe):
-        def preconditions(self):
-            return uses_type("datetime.datetime")
-"""
-
-from typing import Any, Optional, Union
-
-from rewrite.rpc.java_recipe import prepare_java_recipe, PreparedJavaRecipe
+from rewrite.preconditions import RecipeRef
+from rewrite.python.search import IsSourceFile, UsesImport, UsesMethod, UsesType
 
 
-def has_source_path(file_pattern: str) -> PreparedJavaRecipe:
+def has_source_path(file_pattern: str) -> RecipeRef:
+    """Match source files by path glob (delegates to ``org.openrewrite.FindSourceFiles``).
+
+    Bundles a native :class:`IsSourceFile` visitor so unit tests without
+    an active RPC connection still see real filtering behavior.
     """
-    Create a precondition that matches source files by path pattern.
+    return RecipeRef(
+        "org.openrewrite.FindSourceFiles",
+        {"filePattern": file_pattern},
+        IsSourceFile(file_pattern),
+    )
 
-    Delegates to org.openrewrite.FindSourceFiles.
 
-    Args:
-        file_pattern: Glob pattern to match file paths (e.g., "**/*.py")
+def uses_method(method_pattern: str, match_overrides: bool = False) -> RecipeRef:
+    """Match files using a specific method (delegates to ``org.openrewrite.java.search.HasMethod``).
 
-    Returns:
-        A prepared recipe that can be used as a precondition
+    ``method_pattern`` follows the OpenRewrite method-pattern syntax::
+
+        <receiver-type> <method-name>(<args>)
+
+    Use ``*..*`` to match any class in any package, ``(..)`` to match any
+    arguments::
+
+        uses_method("*..* tostring(..)")
+        uses_method("java.util.Collections emptyList()")
+
+    Bundles a native :class:`UsesMethod` visitor so unit tests without
+    an active RPC connection still see real filtering behavior.
     """
-    return prepare_java_recipe("org.openrewrite.FindSourceFiles", {
-        "filePattern": file_pattern
-    })
+    return RecipeRef(
+        "org.openrewrite.java.search.HasMethod",
+        {"methodPattern": method_pattern, "matchOverrides": match_overrides},
+        UsesMethod(method_pattern),
+    )
 
 
-def uses_method(method_pattern: str, match_overrides: bool = False) -> PreparedJavaRecipe:
+def uses_type(
+    fully_qualified_type: str, check_assignability: bool = False
+) -> RecipeRef:
+    """Match files using a specific type (delegates to ``org.openrewrite.java.search.HasType``).
+
+    Bundles a native :class:`UsesType` visitor so unit tests without
+    an active RPC connection still see real filtering behavior.
     """
-    Create a precondition that matches files using a specific method.
+    return RecipeRef(
+        "org.openrewrite.java.search.HasType",
+        {
+            "fullyQualifiedTypeName": fully_qualified_type,
+            "checkAssignability": check_assignability,
+        },
+        UsesType(fully_qualified_type),
+    )
 
-    Delegates to org.openrewrite.java.search.HasMethod.
 
-    Args:
-        method_pattern: Method pattern to search for (e.g., "datetime.datetime utcnow()")
-        match_overrides: Whether to also match method overrides
+def uses_import(module: str) -> RecipeRef:
+    """Match files that import ``module`` (delegates to ``org.openrewrite.python.search.UsesImport``).
 
-    Returns:
-        A prepared recipe that can be used as a precondition
+    Gates on the as-written import syntax, not type attribution, so it works
+    for deprecated-import migrations where the type checker either
+    canonicalizes the alias (``from typing import List`` -> ``list``) or cannot
+    resolve a removed symbol (``from base64 import encodestring``). In both
+    cases :func:`uses_type` would miss the file; ``uses_import`` does not.
+
+    ``module`` is a dotted module path; a file matches if it imports that
+    module, a submodule, or a parent module of it.
+
+    Bundles a native :class:`UsesImport` visitor so unit tests without an
+    active RPC connection still see real filtering behavior.
     """
-    return prepare_java_recipe("org.openrewrite.java.search.HasMethod", {
-        "methodPattern": method_pattern,
-        "matchOverrides": match_overrides
-    })
+    return RecipeRef(
+        "org.openrewrite.python.search.UsesImport",
+        {"module": module},
+        UsesImport(module),
+    )
 
 
-def uses_type(fully_qualified_type: str, check_assignability: bool = False) -> PreparedJavaRecipe:
+def find_methods(
+    method_pattern: str, match_overrides: bool = False
+) -> RecipeRef:
+    """Find and mark methods matching a pattern (delegates to ``org.openrewrite.java.search.FindMethods``).
+
+    Bundles a native :class:`UsesMethod` visitor so unit tests without
+    an active RPC connection still see real filtering behavior.
     """
-    Create a precondition that matches files using a specific type.
+    return RecipeRef(
+        "org.openrewrite.java.search.FindMethods",
+        {"methodPattern": method_pattern, "matchOverrides": match_overrides},
+        UsesMethod(method_pattern),
+    )
 
-    Delegates to org.openrewrite.java.search.HasType.
 
-    Args:
-        fully_qualified_type: Fully qualified type name (e.g., "datetime.datetime")
-        check_assignability: Whether to check type assignability
+def find_types(fully_qualified_type: str) -> RecipeRef:
+    """Find and mark usages of a type (delegates to ``org.openrewrite.java.search.FindTypes``).
 
-    Returns:
-        A prepared recipe that can be used as a precondition
+    Bundles a native :class:`UsesType` visitor so unit tests without
+    an active RPC connection still see real filtering behavior.
     """
-    return prepare_java_recipe("org.openrewrite.java.search.HasType", {
-        "fullyQualifiedTypeName": fully_qualified_type,
-        "checkAssignability": check_assignability
-    })
-
-
-def find_methods(method_pattern: str, match_overrides: bool = False) -> PreparedJavaRecipe:
-    """
-    Create a recipe that finds and marks methods matching a pattern.
-
-    Delegates to org.openrewrite.java.search.FindMethods.
-
-    Args:
-        method_pattern: Method pattern to search for
-        match_overrides: Whether to also match method overrides
-
-    Returns:
-        A prepared recipe that marks matching methods
-    """
-    return prepare_java_recipe("org.openrewrite.java.search.FindMethods", {
-        "methodPattern": method_pattern,
-        "matchOverrides": match_overrides
-    })
-
-
-def find_types(fully_qualified_type: str) -> PreparedJavaRecipe:
-    """
-    Create a recipe that finds and marks usages of a type.
-
-    Delegates to org.openrewrite.java.search.FindTypes.
-
-    Args:
-        fully_qualified_type: Fully qualified type name to find
-
-    Returns:
-        A prepared recipe that marks matching type usages
-    """
-    return prepare_java_recipe("org.openrewrite.java.search.FindTypes", {
-        "fullyQualifiedTypeName": fully_qualified_type
-    })
+    return RecipeRef(
+        "org.openrewrite.java.search.FindTypes",
+        {"fullyQualifiedTypeName": fully_qualified_type},
+        UsesType(fully_qualified_type),
+    )

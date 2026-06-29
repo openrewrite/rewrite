@@ -23,9 +23,9 @@ dependencies {
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-test"))
     testImplementation("org.assertj:assertj-core:latest.release")
-    testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:latest.release")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
+    testImplementation("org.junit.jupiter:junit-jupiter-api")
+    testImplementation("org.junit.jupiter:junit-jupiter-params")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
 }
@@ -46,6 +46,13 @@ tasks.named<ScalaCompile>("compileScala") {
     source(sourceSets.main.get().java)
     // Scala compiler will compile both Java and Scala files together
     classpath = sourceSets.main.get().compileClasspath
+    // Scala 3.8+ requires Java 17 as the minimum bytecode target
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    })
+    // Forwarded to javac during Zinc joint compilation so .java files keep
+    // method parameter names in bytecode (MethodParameters attribute).
+    options.compilerArgs.add("-parameters")
 }
 
 // Ensure Java compilation uses output from Scala compilation

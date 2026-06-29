@@ -127,7 +127,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator accumulator) {
-        return new MavenIsoVisitor<ExecutionContext>() {
+        MavenIsoVisitor<ExecutionContext> mavenScanner = new MavenIsoVisitor<ExecutionContext>() {
             private final VersionComparator versionComparator =
                     requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
 
@@ -190,11 +190,23 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 storeParentPomProperty(currentMavenResolutionResult.getParent(), propertyName, newerVersion);
             }
         };
+
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return mavenScanner.isAcceptable(sourceFile, ctx);
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                return mavenScanner.visit(tree, ctx);
+            }
+        };
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator accumulator) {
-        return new MavenIsoVisitor<ExecutionContext>() {
+        MavenIsoVisitor<ExecutionContext> mavenVisitor = new MavenIsoVisitor<ExecutionContext>() {
             private final VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
 
             @Override
@@ -570,6 +582,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return null;
             }
         };
+
+        return mavenVisitor;
     }
 
     @Value

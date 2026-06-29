@@ -23,14 +23,24 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
+import org.openrewrite.config.Environment;
+import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
+import org.openrewrite.javascript.UpgradeDependencyVersion;
 import org.openrewrite.javascript.style.Autodetect;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeBundleReader;
+import org.openrewrite.marketplace.RecipeBundleResolver;
+import org.openrewrite.marketplace.RecipeListing;
+import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.rpc.RpcRecipe;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -75,6 +85,10 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         if (Files.exists(tempDir.resolve("rpc.log"))) {
             System.out.println(Files.readString(tempDir.resolve("rpc.log")));
         }
+        // Restore the default factory so this test's per-test @TempDir-backed
+        // factory does not leak into later test classes that lazily (re)start
+        // the RPC process on the same thread.
+        JavaScriptRewriteRpc.resetFactory();
     }
 
     @Override
@@ -106,6 +120,30 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             spec -> spec.path("package.json")
           )
         );
+    }
+
+    @Test
+    void startsWhenLogParentDirectoryIsMissing() {
+        // given a log path whose parent directory does not exist yet (mimics a
+        // torn-down @TempDir that a stale factory still references)
+        Path missingParent = tempDir.resolve("does-not-exist-yet");
+        Path log = missingParent.resolve("rpc.log");
+        assertThat(Files.exists(missingParent)).isFalse();
+
+        // when starting the RPC process configured to log there
+        JavaScriptRewriteRpc rpc = JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .log(log)
+          .get();
+
+        // then the process starts and the log (with its parent) is created
+        // rather than failing with NoSuchFileException
+        try {
+            assertThat(rpc).isNotNull();
+            assertThat(Files.exists(log)).isTrue();
+        } finally {
+            rpc.shutdown();
+        }
     }
 
     @Test
@@ -372,7 +410,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void parseProject(@TempDir Path projectDir) throws IOException {
+    void parseProject(@TempDir Path projectDir) throws Exception {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}
           """);
@@ -411,7 +449,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void parseProjectWithExclusions(@TempDir Path projectDir) throws IOException {
+    void parseProjectWithExclusions(@TempDir Path projectDir) throws Exception {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}
           """);
@@ -434,7 +472,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void parseProjectWithVariousYamlStructures(@TempDir Path projectDir) throws IOException {
+    void parseProjectWithVariousYamlStructures(@TempDir Path projectDir) throws Exception {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}
           """);
@@ -511,7 +549,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void parseProjectWithYamlContainingNestedFlowMappings(@TempDir Path projectDir) throws IOException {
+    void parseProjectWithYamlContainingNestedFlowMappings(@TempDir Path projectDir) throws Exception {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}
           """);
@@ -544,7 +582,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
-    void parseProjectWithYamlFlowCollectionKeys(@TempDir Path projectDir) throws IOException {
+    void parseProjectWithYamlFlowCollectionKeys(@TempDir Path projectDir) throws Exception {
         Files.writeString(projectDir.resolve("package.json"), """
           {"name": "test-project", "version": "1.0.0"}
           """);
@@ -615,6 +653,113 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
                 }
                 """
             )
+          )
+        );
+    }
+
+    /**
+     * A JS composite whose {@code recipeList()} contains a recipe that delegates to a Java recipe
+     * (the shape of Angular's {@code UpgradeToAngular19}). The host re-prepares each child by id while
+     * building {@code RpcRecipe.getRecipeList()}; the Java-delegate child misses in the JS marketplace,
+     * so the JS server must answer {@code delegatesTo} (rather than throwing "Could not find recipe
+     * with id ...") and the host resolves it from its own marketplace as a LOCAL Java recipe.
+     * <p>
+     * The host (this JVM) is configured with a runtime-classpath marketplace + resolver that owns its
+     * bundled {@code org.openrewrite.javascript.*} recipes — mirroring the moderne-cli concession.
+     */
+    @Test
+    void jsCompositeWithJavaDelegateChild() {
+        Environment env = Environment.builder().scanRuntimeClasspath("org.openrewrite.javascript").build();
+        RecipeMarketplace marketplace = env.toMarketplace(RecipeBundle.runtimeClasspath());
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .marketplace(marketplace)
+          .resolvers(List.of(new RuntimeClasspathResolver(marketplace)))
+          .log(tempDir.resolve("rpc.log")));
+
+        assertThat(client().installRecipes(new File("rewrite/dist-fixtures/composite-with-java-delegate.js"))
+          .getRecipesInstalled()).isGreaterThan(0);
+
+        Recipe composite = client().prepareRecipe("org.openrewrite.example.npm.composite-with-java-delegate");
+
+        Recipe delegate = composite.getRecipeList().stream()
+          .filter(r -> "org.openrewrite.javascript.UpgradeDependencyVersion".equals(r.getName()))
+          .findFirst()
+          .orElseThrow(() -> new AssertionError("expected an org.openrewrite.javascript.UpgradeDependencyVersion child"));
+        assertThat(delegate)
+          .isInstanceOf(UpgradeDependencyVersion.class)
+          .isNotInstanceOf(RpcRecipe.class);
+    }
+
+    /**
+     * A runtime-classpath {@link RecipeBundleResolver} that materializes a bundled recipe by id straight
+     * off the JVM classpath, mirroring the moderne-cli {@code RuntimeClasspathRecipeBundleResolver}.
+     */
+    private static class RuntimeClasspathResolver implements RecipeBundleResolver {
+        private final RecipeMarketplace marketplace;
+
+        RuntimeClasspathResolver(RecipeMarketplace marketplace) {
+            this.marketplace = marketplace;
+        }
+
+        @Override
+        public String getEcosystem() {
+            return "runtime";
+        }
+
+        @Override
+        public RecipeBundleReader resolve(RecipeBundle bundle) {
+            return new RecipeBundleReader() {
+                @Override
+                public RecipeBundle getBundle() {
+                    return bundle;
+                }
+
+                @Override
+                public RecipeMarketplace read() {
+                    return marketplace;
+                }
+
+                @Override
+                public RecipeDescriptor describe(RecipeListing listing) {
+                    return new RecipeLoader(null).load(listing.getName(), Map.of()).getDescriptor();
+                }
+
+                @Override
+                public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
+                    return new RecipeLoader(null).load(listing.getName(), options);
+                }
+            };
+        }
+    }
+
+    /**
+     * Regression test for <a href="https://github.com/moderneinc/customer-requests/issues/2234">#2234</a>:
+     * a string enum declaration would send a {@link JavaType.Primitive} (resolved from the union of
+     * enum literals) for {@code J.ClassDeclaration.type}, which the Java-side RPC receiver rejects
+     * with "A class can only be type attributed with a fully qualified type name".
+     */
+    @Test
+    void parseStringEnumDeclaration() {
+        rewriteRun(
+          typescript(
+            """
+              export enum ContentType {
+                APPLICATION_JSON = 'application/json',
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaScriptIsoVisitor<Integer>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+                    assertThat(classDecl.getType())
+                      .as("enum declaration must have a FullyQualified type")
+                      .isInstanceOf(JavaType.Class.class);
+                    JavaType.Class type = (JavaType.Class) classDecl.getType();
+                    assertThat(type.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Enum);
+                    assertThat(type.getFullyQualifiedName()).contains("ContentType");
+                    return classDecl;
+                }
+            }.visit(cu, 0))
           )
         );
     }

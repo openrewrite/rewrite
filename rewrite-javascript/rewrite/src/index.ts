@@ -37,19 +37,13 @@ export * from "./marketplace";
 // Install all recipes in this package
 export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     const {
-        AddDependency,
         AsyncCallbackInSyncArrayMethod,
         AutoFormat,
-        UpgradeDependencyVersion,
-        UpgradeTransitiveDependencyVersion,
         OrderImports,
         ChangeImport
     } = await import("./javascript/recipes/index.js");
-    await marketplace.install(AddDependency, JavaScript);
     await marketplace.install(AsyncCallbackInSyncArrayMethod, JavaScript);
     await marketplace.install(AutoFormat, JavaScript);
-    await marketplace.install(UpgradeDependencyVersion, JavaScript);
-    await marketplace.install(UpgradeTransitiveDependencyVersion, JavaScript);
     await marketplace.install(OrderImports, JavaScript);
     await marketplace.install(ChangeImport, JavaScript);
 

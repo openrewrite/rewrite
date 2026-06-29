@@ -37,3 +37,10 @@ dist/
 CLAUDE.local.md
 
 /.claude/settings.local.json
+
+# Moderne CLI
+.moderne/*
+!.moderne/context/
+
+# Kotlin compiler daemon session files
+.kotlin/

@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.config.RecipeExample;
+import org.openrewrite.rpc.request.PrepareRecipeResponse;
 
 import java.time.Duration;
 import java.util.Collection;
@@ -47,10 +48,27 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     private final RecipeDescriptor descriptor;
     @Getter
     private final String editVisitor;
+    /**
+     * Composite of all editPreconditions resolved during PrepareRecipe. Exposed so that the
+     * BatchVisit batching path in {@link org.openrewrite.scheduling.RecipeRunCycle} can
+     * evaluate preconditions locally before adding a visitor to the batch — otherwise the
+     * batch would dispatch the visit RPC for files that the precondition would have rejected.
+     * The non-batch path uses {@link #getVisitor()}, which already wraps with
+     * {@link org.openrewrite.Preconditions#check}.
+     */
+    @Getter
     private final @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor;
     @Getter
     private final @Nullable String scanVisitor;
+    @Getter
     private final @Nullable TreeVisitor<?, ExecutionContext> scanPreconditionVisitor;
+
+    /**
+     * The prepared child recipe responses returned by the server as part of the whole-tree
+     * prepare response. When non-null and non-empty, {@link #getRecipeList()} builds children
+     * locally from these nodes instead of making individual PrepareRecipe RPC calls.
+     */
+    private final @Nullable List<PrepareRecipeResponse> childResponses;
 
     @Override
     public String getName() {
@@ -116,11 +134,22 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     @Override
     public synchronized List<Recipe> getRecipeList() {
         if (recipeList == null) {
-            recipeList = descriptor.getRecipeList().stream()
-                    .map(r -> rpc.prepareRecipe(r.getName(), r.getOptions().stream()
-                            .filter(opt -> opt.getValue() != null)
-                            .collect(toMap(OptionDescriptor::getName, OptionDescriptor::getValue))))
-                    .collect(toList());
+            if (childResponses != null) {
+                // Whole-tree: children were prepared in the parent's response; build locally, no RPC.
+                recipeList = childResponses.stream()
+                        .map(rpc::recipeFromPrepareResponse)
+                        .collect(toList());
+            } else {
+                // Fallback: peers whose servers don't yet return a prepared child tree
+                // (Python/JS/Go until updated). This is the pre-existing by-name path, unchanged.
+                // TODO(remove-fallback): delete this branch once every RPC server populates
+                // `recipeList`. The C# server (this change) always takes the branch above.
+                recipeList = descriptor.getRecipeList().stream()
+                        .map(r -> rpc.prepareRecipe(r.getName(), r.getOptions().stream()
+                                .filter(opt -> opt.getValue() != null)
+                                .collect(toMap(OptionDescriptor::getName, OptionDescriptor::getValue))))
+                        .collect(toList());
+            }
         }
         return recipeList;
     }

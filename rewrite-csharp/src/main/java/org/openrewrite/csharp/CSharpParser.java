@@ -96,7 +96,8 @@ public class CSharpParser implements Parser {
                 }
             }
 
-            return CSharpRewriteRpc.getOrStart().parseSolution(csproj, tempDir, ctx).sourceFiles();
+            return CSharpRewriteRpc.getOrStart().parseSolution(csproj, tempDir, ctx)
+                    .filter(sf -> sf.getSourcePath().toString().endsWith(".cs") || sf instanceof org.openrewrite.tree.ParseError);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -123,7 +124,7 @@ public class CSharpParser implements Parser {
      * @return Stream of parsed source files
      */
     public static Stream<SourceFile> parseSolution(Path path, Path rootDir, ExecutionContext ctx) {
-        return CSharpRewriteRpc.getOrStart().parseSolution(path, rootDir, ctx).sourceFiles();
+        return CSharpRewriteRpc.getOrStart().parseSolution(path, rootDir, ctx);
     }
 
     private static void writeString(Path path, String content) throws IOException {

@@ -145,4 +145,15 @@ class EmptyNewlineAtEndOfFileTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void emptyFileStaysEmpty() {
+        rewriteRun(
+          generalFormat(false),
+          java(
+            "",
+            SourceSpec::noTrim
+          )
+        );
+    }
 }

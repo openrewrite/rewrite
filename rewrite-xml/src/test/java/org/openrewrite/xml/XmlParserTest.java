@@ -15,7 +15,6 @@
  */
 package org.openrewrite.xml;
 
-import java.util.stream.Stream;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
@@ -36,6 +35,7 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -59,6 +59,40 @@ class XmlParserTest implements RewriteTest {
               }
           }
         ));
+    }
+
+    @Test
+    void internalDTDWithExternalPublicIdentifierEntity() {
+        rewriteRun(
+          //language=xml
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <!DOCTYPE book [
+                <!ENTITY % extDTD PUBLIC "-//Example//DTD Extra//EN" "extra.dtd">
+              ]>
+              <book></book>
+              """
+          )
+        );
+    }
+
+    @Test
+    void internalDTDWithMultipleEntities() {
+        rewriteRun(
+          //language=xml
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <!DOCTYPE book [
+                <!ENTITY % extDTD PUBLIC "-//Example//DTD Extra//EN" "extra.dtd">
+                <!ENTITY % other PUBLIC "-//Example//DTD Other//EN" "other.dtd">
+                <!ELEMENT p ANY>
+              ]>
+              <book></book>
+              """
+          )
+        );
     }
 
     @Test
@@ -259,6 +293,106 @@ class XmlParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void htmlVoidElementInJsp() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <html lang="en">
+              <body>
+              	<br>
+              	Message
+              	<br>
+              </body>
+              </html>
+              """,
+            spec -> spec.path("voids.jsp")
+          )
+        );
+    }
+
+    @Test
+    void htmlVoidElementsWithAttributesInJsp() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <html>
+              <head>
+                <meta charset="utf-8">
+                <link rel="stylesheet" href="app.css">
+              </head>
+              <body>
+                <img src="logo.png" alt="logo">
+                <input type="text" name="q">
+                <hr>
+              </body>
+              </html>
+              """,
+            spec -> spec.path("attrs.jsp")
+          )
+        );
+    }
+
+    @Test
+    void springBootWelcomeJsp() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!DOCTYPE html>
+
+              <%@ taglib prefix="spring" uri="http://www.springframework.org/tags"%>
+              <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+
+              <html lang="en">
+
+              <body>
+              	<c:url value="/resources/text.txt" var="url"/>
+              	<spring:url value="/resources/text.txt" htmlEscape="true" var="springUrl" />
+              	Spring URL: ${springUrl} at ${time}
+              	<br>
+              	JSTL URL: ${url}
+              	<br>
+              	Message: ${message}
+              </body>
+
+              </html>
+              """,
+            spec -> spec.path("welcome.jsp")
+          )
+        );
+    }
+
+    @Test
+    void voidElementNameAsContainerStillParsesInXml() {
+        // In real XML (htmlMode off), an element that happens to share a name with an HTML
+        // void element but has content and a matching close tag must still parse normally.
+        rewriteRun(
+          xml(
+            """
+              <root>
+                <link>https://example.com</link>
+                <source>generated</source>
+              </root>
+              """
+          )
+        );
+    }
+
+    @Test
+    void voidElementLeniencyIsHtmlOnly() {
+        // In a plain .xml file (htmlMode off) an unclosed <br> remains malformed XML and is
+        // preserved verbatim as a ParseError, rather than being treated as an HTML void element.
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), "<root>\n<br>\n</root>")
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo("<root>\n<br>\n</root>");
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2189")
@@ -514,6 +648,30 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2567")
+    @Test
+    void dtdEntityWithAngleBracketsInQuotedValue() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <!DOCTYPE rules [
+              <!ENTITY ambiguous_date '
+                      <token regexp="yes">0?[1-9]|1[0-2]</token>
+                      <token>/</token>
+                      <token regexp="yes">0?[1-9]|1[0-2]</token>
+                      <token>/</token>
+                      <token regexp="yes">\\d\\d\\d\\d</token>
+                  '>
+              ]>
+              <rules>
+                  <rule>&ambiguous_date;</rule>
+              </rules>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1243")
     @Test
     void processingInstructions() {
@@ -542,7 +700,7 @@ class XmlParserTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1382")
     @MethodSource
     @ParameterizedTest
-    void testUtf8WithAndWithoutBom(@Language("xml") String xml, boolean hasBom) {
+    void utf8WithAndWithoutBom(@Language("xml") String xml, boolean hasBom) {
         XmlParser parser = XmlParser.builder().build();
         SourceFile parsed = parser.parse(xml).findFirst().orElseThrow();
 
@@ -560,7 +718,7 @@ class XmlParserTest implements RewriteTest {
         rewriteRun(xml(xml));
     }
 
-    static Stream<Arguments> testUtf8WithAndWithoutBom() {
+    static Stream<Arguments> utf8WithAndWithoutBom() {
         return Stream.of(
             Arguments.of("""
               <?xml version="1.0" encoding="UTF-8"?><a />
@@ -628,9 +786,25 @@ class XmlParserTest implements RewriteTest {
     @ParameterizedTest
     @ValueSource(strings = {
       "foo.xml",
+      "foo.XML",
       "proj.csproj",
+      "proj.Csproj",
       "/foo/bar/baz.jsp",
-      "packages.config"
+      "packages.config",
+      "Packages.config",
+      "nuget.config",
+      "NuGet.config",
+      "NuGet.Config",
+      "Directory.Build.targets",
+      "Some.TARGETS",
+      "MySolution.slnx",
+      "rules.ruleset",
+      "Project.DotSettings",
+      "App.config",
+      "app.config",
+      "Web.config",
+      "Web.Debug.config",
+      "App.Release.config"
     })
     void acceptWithValidPaths(String path) {
         assertThat(new XmlParser().accept(Path.of(path))).isTrue();
@@ -642,7 +816,10 @@ class XmlParserTest implements RewriteTest {
       ".xml",
       "foo.xml.",
       "file.cpp",
-      "/foo/bar/baz.xml.txt"
+      "/foo/bar/baz.xml.txt",
+      "log4net.config",
+      "appsettings.config",
+      "webhook.config"
     })
     void acceptWithInvalidPaths(String path) {
         assertThat(new XmlParser().accept(Path.of(path))).isFalse();
@@ -687,5 +864,43 @@ class XmlParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7554")
+    @Test
+    void malformedMissingRootCloseDoesNotThrow() {
+        // Inner element is never closed before EOF. Previously threw IndexOutOfBoundsException
+        // from advanceCursor when ANTLR error recovery synthesized closing-tag tokens past EOF.
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), "<root>\n<inner>\n    wrong format\n</root>")
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo("<root>\n<inner>\n    wrong format\n</root>");
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7554")
+    @Test
+    void malformedUnterminatedEndTagDoesNotThrow() {
+        // End-tag missing its '>' before EOF.
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), "<a></a")
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo("<a></a");
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7554")
+    @Test
+    void malformedBareAmpersandDoesNotThrow() {
+        // A bare '&' (not part of an entity reference) is invalid XML; the original
+        // text is preserved by falling back to a ParseError rather than silently dropping it.
+        SourceFile parsed = XmlParser.builder().build()
+          .parse(new InMemoryExecutionContext(t -> {
+          }), "<a>McFarland & Company</a>")
+          .findFirst().orElseThrow();
+        assertThat(parsed).isInstanceOf(ParseError.class);
+        assertThat(parsed.printAll()).isEqualTo("<a>McFarland & Company</a>");
     }
 }

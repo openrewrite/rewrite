@@ -41,6 +41,12 @@ public class CsDocCommentParser {
      */
     public static CsDocComment.DocComment parse(CsDocCommentRawComment rawComment) {
         String text = rawComment.getText();
+        // The raw text starts with the third '/' of the opening "///" (the C# parser strips the
+        // first "//"). The structured printer re-emits the full "///" prefix, so the leading '/'
+        // must not be carried into the body or it prints as "////".
+        if (text.startsWith("/")) {
+            text = text.substring(1);
+        }
         List<CsDocComment> body = parseContent(text);
         return new CsDocComment.DocComment(
                 Tree.randomId(),
@@ -225,10 +231,12 @@ public class CsDocCommentParser {
             if (pos == nameStart) break;
             String attrName = tagContent.substring(nameStart, pos);
 
-            // Skip whitespace before =
+            // Capture whitespace before = (normally empty for standard XML attributes)
+            int wsBeforeEqStart = pos;
             while (pos < len && Character.isWhitespace(tagContent.charAt(pos))) {
                 pos++;
             }
+            String wsBeforeEquals = tagContent.substring(wsBeforeEqStart, pos);
 
             if (pos >= len || tagContent.charAt(pos) != '=') {
                 // Attribute without value
@@ -242,10 +250,12 @@ public class CsDocCommentParser {
             }
             pos++; // skip '='
 
-            // Skip whitespace after =
+            // Capture whitespace after = (normally empty); folded into the value so it round-trips
+            int wsAfterEqStart = pos;
             while (pos < len && Character.isWhitespace(tagContent.charAt(pos))) {
                 pos++;
             }
+            String wsAfterEquals = tagContent.substring(wsAfterEqStart, pos);
 
             // Parse quoted value
             String value = "";
@@ -262,25 +272,27 @@ public class CsDocCommentParser {
 
             // Create the appropriate attribute type
             CsDocComment.XmlText spaceText = xmlText(leadingSpace);
-            List<CsDocComment> valueList = Collections.singletonList(xmlText(value));
+            List<CsDocComment> valueList = Collections.singletonList(xmlText(wsAfterEquals + value));
+            List<CsDocComment> spaceBeforeEquals =
+                    wsBeforeEquals.isEmpty() ? null : Collections.singletonList(xmlText(wsBeforeEquals));
 
             if ("cref".equals(attrName)) {
                 attrs.add(spaceText);
                 attrs.add(new CsDocComment.XmlCrefAttribute(
                         Tree.randomId(), Markers.EMPTY,
-                        null, valueList, null // reference resolved later
+                        spaceBeforeEquals, valueList, null // reference resolved later
                 ));
             } else if ("name".equals(attrName)) {
                 attrs.add(spaceText);
                 attrs.add(new CsDocComment.XmlNameAttribute(
                         Tree.randomId(), Markers.EMPTY,
-                        null, valueList, null // paramName resolved later
+                        spaceBeforeEquals, valueList, null // paramName resolved later
                 ));
             } else {
                 attrs.add(spaceText);
                 attrs.add(new CsDocComment.XmlAttribute(
                         Tree.randomId(), Markers.EMPTY,
-                        attrName, null, valueList
+                        attrName, spaceBeforeEquals, valueList
                 ));
             }
         }

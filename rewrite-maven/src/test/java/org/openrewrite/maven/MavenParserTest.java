@@ -984,7 +984,6 @@ class MavenParserTest implements RewriteTest {
     @Test
     void mirrorsAndAuth() throws Exception {
         // Set up a web server that returns 401 to any request without an Authorization header corresponding to specific credentials
-        // Exceptions in the console output are due to MavenPomDownloader attempting to access via https first before falling back to http
         var username = "admin";
         var password = "password";
         try (var mockRepo = new MockWebServer()) {
@@ -3372,6 +3371,71 @@ class MavenParserTest implements RewriteTest {
                   pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
                     .getPom().getVersion())
                   .isEqualTo("1.0.1"))
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void selfReferencingPropertyDoesNotStackOverflow() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>pom-with-property-self-reference</artifactId>
+                  <version>${revision}</version>
+
+                  <properties>
+                      <revision>${revision}</revision>
+                  </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void cyclicPropertyReferenceDoesNotStackOverflow() {
+        rewriteRun(
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>org.example</groupId>
+                    <artifactId>pom-with-property-cycle-parent</artifactId>
+                    <version>${revision}</version>
+                    <packaging>pom</packaging>
+
+                    <modules>
+                        <module>child</module>
+                    </modules>
+
+                    <properties>
+                        <revision>${project.build.version}</revision>
+                    </properties>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>org.example</groupId>
+                          <artifactId>pom-with-property-cycle-parent</artifactId>
+                          <version>${revision}</version>
+                          <relativePath>../pom.xml</relativePath>
+                      </parent>
+
+                      <artifactId>pom-with-property-cycle-child</artifactId>
+
+                      <properties>
+                          <project.build.version>${revision}</project.build.version>
+                      </properties>
+                  </project>
+                  """
               )
             )
           )

@@ -18,7 +18,7 @@ package org.openrewrite.yaml.trait;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Reference;
@@ -39,7 +39,7 @@ class YamlReferenceTest implements RewriteTest {
       """;
 
 
-    @CsvSource({
+    @ValueSource(strings = {
       "application.yaml",
       "application.yml",
       "application-test.yaml",
@@ -73,7 +73,7 @@ class YamlReferenceTest implements RewriteTest {
         );
     }
 
-    @CsvSource({
+    @ValueSource(strings = {
       "application-.yaml",
       "application-.yml",
       "application.test.yaml",

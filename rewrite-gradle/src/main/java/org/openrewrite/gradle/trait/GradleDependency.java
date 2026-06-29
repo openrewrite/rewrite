@@ -1240,12 +1240,28 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
                             arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, DependencyNotation.toStringNotation(updatedDep))));
                 } else if (dep == null && isMultiComponentDefinition(m.getArguments())) {
-                    // Multi-component form: update literal version; variable versions are handled by UpdateProperties/UpdateVariable
-                    if (m.getArguments().size() >= 3 && m.getArguments().get(2) instanceof J.Literal) {
-                        String currentVersion = (String) ((J.Literal) m.getArguments().get(2)).getValue();
-                        if (!newVersion.equals(currentVersion)) {
+                    // Multi-component form: update literal version, or detach a variable reference to a literal.
+                    if (m.getArguments().size() >= 3) {
+                        Expression versionArg = m.getArguments().get(2);
+                        if (versionArg instanceof J.Literal) {
+                            String currentVersion = (String) ((J.Literal) versionArg).getValue();
+                            if (!newVersion.equals(currentVersion)) {
+                                updated = m.withArguments(ListUtils.map(m.getArguments(), (i, arg) ->
+                                        i == 2 ? ChangeStringLiteral.withStringValue((J.Literal) arg, newVersion) : arg));
+                            }
+                        } else if (versionArg instanceof J.Identifier) {
+                            String delimiter = "\"";
+                            if (m.getArguments().get(1) instanceof J.Literal) {
+                                String src = ((J.Literal) m.getArguments().get(1)).getValueSource();
+                                if (src != null && !src.isEmpty()) {
+                                    delimiter = src.substring(0, 1);
+                                }
+                            }
+                            J.Literal replacement = new J.Literal(
+                                    Tree.randomId(), versionArg.getPrefix(), versionArg.getMarkers(),
+                                    newVersion, delimiter + newVersion + delimiter, null, JavaType.Primitive.String);
                             updated = m.withArguments(ListUtils.map(m.getArguments(), (i, arg) ->
-                                    i == 2 ? ChangeStringLiteral.withStringValue((J.Literal) arg, newVersion) : arg));
+                                    i == 2 ? replacement : arg));
                         }
                     }
                 }
@@ -1357,6 +1373,28 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     updated = m.withArguments(singletonList(newLiteral));
                 }
             }
+        }
+
+        // Sync rich version constraints inside any trailing `version { ... }` closure
+        // so that calls like `strictly(...)`, `require(...)`, `prefer(...)` reference the new version.
+        J.MethodInvocation withSyncedConstraints = (J.MethodInvocation) new JavaVisitor<Integer>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, Integer i) {
+                J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, i);
+                String name = mi.getSimpleName();
+                if (("strictly".equals(name) || "require".equals(name) || "prefer".equals(name)) &&
+                        withinBlock(getCursor(), "version")) {
+                    return mi.withArguments(ListUtils.map(mi.getArguments(), arg ->
+                            arg instanceof J.Literal ?
+                                    ChangeStringLiteral.withStringValue((J.Literal) arg, newVersion) :
+                                    arg));
+                }
+                return mi;
+            }
+        }.visitNonNull(updated, 0);
+
+        if (withSyncedConstraints != updated) {
+            updated = withSyncedConstraints;
         }
 
         return updated == m ? this : new GradleDependency(new Cursor(cursor.getParent(), updated), resolvedDependency);
@@ -1495,7 +1533,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
             if (gdc != null) {
                 if (gdc.isCanBeResolved()) {
-                    for (ResolvedDependency resolvedDependency : gdc.getDirectResolved()) {
+                    for (ResolvedDependency resolvedDependency : gdc.getDirectResolvedShallow()) {
                         if (matcher == null || matcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId())) {
                             Dependency req = resolvedDependency.getRequested();
                             if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
@@ -1507,7 +1545,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 } else {
                     for (GradleDependencyConfiguration transitiveConfiguration : gradleProject.configurationsExtendingFrom(gdc, true)) {
                         if (transitiveConfiguration.isCanBeResolved()) {
-                            for (ResolvedDependency resolvedDependency : transitiveConfiguration.getDirectResolved()) {
+                            for (ResolvedDependency resolvedDependency : transitiveConfiguration.getDirectResolvedShallow()) {
                                 if (matcher == null || matcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId())) {
                                     Dependency req = resolvedDependency.getRequested();
                                     if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&

@@ -70,6 +70,10 @@ public class XmlParser implements Parser {
             "vbproj",
             "fsproj",
             "props",
+            "targets",
+            "slnx",
+            "ruleset",
+            "dotsettings",
             // JasperReports files
             "jrxml"
             ));
@@ -88,6 +92,7 @@ public class XmlParser implements Parser {
                 lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
                 XMLParser parser = new XMLParser(new CommonTokenStream(lexer));
+                parser.htmlMode = isHtmlLike(path);
                 parser.removeErrorListeners();
                 parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
@@ -112,17 +117,33 @@ public class XmlParser implements Parser {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
+    /**
+     * Whether unclosed HTML void elements (e.g. {@code <br>}) should be tolerated for the given path.
+     * Enabled for HTML-like sources where void elements are idiomatically written without a slash.
+     */
+    private static boolean isHtmlLike(@Nullable Path path) {
+        if (path == null) {
+            return false;
+        }
+        String p = path.toString().toLowerCase();
+        return p.endsWith(".jsp") || p.endsWith(".jspx") || p.endsWith(".html") || p.endsWith(".htm");
+    }
+
     @Override
     public boolean accept(Path path) {
         String p = path.toString();
         int dot = p.lastIndexOf('.');
         if (0 < dot && dot < (p.length() - 1)) {
-            if (ACCEPTED_FILE_EXTENSIONS.contains(p.substring(dot + 1))) {
+            if (ACCEPTED_FILE_EXTENSIONS.contains(p.substring(dot + 1).toLowerCase())) {
                 return true;
             }
         }
-        return path.endsWith("nuget.config") ||
-                path.endsWith("packages.config");
+        String fileName = path.getFileName().toString().toLowerCase();
+        return fileName.equals("nuget.config") ||
+                fileName.equals("packages.config") ||
+                // .NET Framework app/web config and their XDT transform variants
+                // (e.g. Web.Release.config, App.Debug.config)
+                ((fileName.startsWith("app.") || fileName.startsWith("web.")) && fileName.endsWith(".config"));
     }
 
     @Override

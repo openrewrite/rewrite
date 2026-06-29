@@ -20,6 +20,12 @@ from .type_mapping import PythonTypeMapping, compute_source_line_data
 T = TypeVar('T')
 J2 = TypeVar('J2', bound=J)
 
+# Shared empty list for immutable LST list-fields (annotations, modifiers,
+# empty comment lists, ...). The LST is immutable and these fields are never
+# mutated in place, so every empty list can safely alias one singleton instead
+# of allocating a fresh 56-byte list per node. MUST NOT be mutated.
+_EMPTY_LIST: list = []
+
 # Custom token type for whitespace gaps between tokens
 WHITESPACE_TOKEN = -1
 
@@ -267,18 +273,18 @@ class ParserVisitor(ast.NodeVisitor):
                     random_id(),
                     self.__whitespace(),
                     Markers.EMPTY,
-                    [],
-                    [],
+                    _EMPTY_LIST,
+                    _EMPTY_LIST,
                     None,
                     None,
-                    [],
+                    _EMPTY_LIST,
                     [self.__pad_right(
                         j.VariableDeclarations.NamedVariable(
                             random_id(),
                             Space.EMPTY,
                             Markers.EMPTY,
                             cast(j.Identifier, self.__convert_name('/', None)),
-                            [],
+                            _EMPTY_LIST,
                             None,
                             None
                         ),
@@ -304,7 +310,7 @@ class ParserVisitor(ast.NodeVisitor):
         if node.kwonlyargs:
             if not node.vararg:
                 empty_name = j.VariableDeclarations.NamedVariable(random_id(), Space.EMPTY, Markers.EMPTY,
-                                                                  cast(j.Identifier, self.__convert_name('', None)), [],
+                                                                  cast(j.Identifier, self.__convert_name('', None)), _EMPTY_LIST,
                                                                   None, None)
                 kwonly_prefix = self.__source_before('*')
                 mapped.append(
@@ -313,7 +319,7 @@ class ParserVisitor(ast.NodeVisitor):
                             random_id(),
                             kwonly_prefix,
                             Markers(random_id(), [KeywordOnlyArguments(random_id())]),
-                            [], [], None, None, [],
+                            _EMPTY_LIST, _EMPTY_LIST, None, None, _EMPTY_LIST,
                             [self.__pad_right(empty_name, self.__source_before(','))]
                         ),
                         Space.EMPTY,
@@ -348,17 +354,17 @@ class ParserVisitor(ast.NodeVisitor):
             random_id(),
             prefix,
             Markers(random_id(), [KeywordArguments(random_id())]) if kwarg else Markers.EMPTY,
-            [],
-            [],
+            _EMPTY_LIST,
+            _EMPTY_LIST,
             type_expression,
             vararg_prefix if vararg else None,
-            [],
+            _EMPTY_LIST,
             [self.__pad_right(j.VariableDeclarations.NamedVariable(
                 random_id(),
                 Space.EMPTY,
                 Markers.EMPTY,
                 cast(j.Identifier, name),
-                [],
+                _EMPTY_LIST,
                 initializer,
                 field_type
             ), after_name)],
@@ -469,12 +475,12 @@ class ParserVisitor(ast.NodeVisitor):
             prefix,
             Markers.EMPTY,
             decorators,
-            [],  # TODO modifiers
+            _EMPTY_LIST,  # TODO modifiers
             j.ClassDeclaration.Kind(
                 random_id(),
                 kind_prefix,
                 Markers.EMPTY,
-                [],
+                _EMPTY_LIST,
                 j.ClassDeclaration.Kind.Type.Class
             ),
             name,
@@ -688,7 +694,7 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             resources_container,
             self.__convert_block(node.body),
-            [],
+            _EMPTY_LIST,
             None
         )
 
@@ -1093,14 +1099,14 @@ class ParserVisitor(ast.NodeVisitor):
             except_type_name = self.__convert_name(node.name)
         else:
             before_as = Space.EMPTY
-            except_type_name = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], '', None, None)
+            except_type_name = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, _EMPTY_LIST, '', None, None)
         except_type_name = self.__pad_right(
             j.VariableDeclarations.NamedVariable(
                 random_id(),
                 Space.EMPTY,
                 Markers.EMPTY,
                 except_type_name,
-                [], None, None
+                _EMPTY_LIST, None, None
             ),
             before_as
         )
@@ -1117,9 +1123,9 @@ class ParserVisitor(ast.NodeVisitor):
                     random_id(),
                     type_prefix,
                     Markers.EMPTY,
-                    [], [],
+                    _EMPTY_LIST, _EMPTY_LIST,
                     except_type,
-                    None, [],
+                    None, _EMPTY_LIST,
                     [except_type_name]
                 ), Space.EMPTY)
             ),
@@ -1281,7 +1287,7 @@ class ParserVisitor(ast.NodeVisitor):
             name = 'False'
         else:
             raise ValueError(f"Unexpected MatchSingleton value: {node.value}")
-        return j.Identifier(random_id(), prefix, Markers.EMPTY, [], name, None, None)
+        return j.Identifier(random_id(), prefix, Markers.EMPTY, _EMPTY_LIST, name, None, None)
 
     def visit_MatchStar(self, node):
         prefix = self.__source_before('*')
@@ -1295,7 +1301,7 @@ class ParserVisitor(ast.NodeVisitor):
                 self._tokens[self._token_idx].string == '_'):
                 space = self.__whitespace()
                 self._token_idx += 1  # consume '_'
-                expression = j.Identifier(random_id(), space, Markers.EMPTY, [], '_', None, None)
+                expression = j.Identifier(random_id(), space, Markers.EMPTY, _EMPTY_LIST, '_', None, None)
             else:
                 expression = None
         return py.Star(
@@ -1389,14 +1395,14 @@ class ParserVisitor(ast.NodeVisitor):
                     random_id(),
                     self.__whitespace(),
                     Markers.EMPTY,
-                    [], [], None, None, [],
+                    _EMPTY_LIST, _EMPTY_LIST, None, None, _EMPTY_LIST,
                     [
                         self.__pad_right(j.VariableDeclarations.NamedVariable(
                             random_id(),
                             Space.EMPTY,
                             Markers.EMPTY,
                             cast(j.Identifier, self.__convert_name(kwd)),
-                            [],
+                            _EMPTY_LIST,
                             self.__pad_left(self.__source_before('='), self.__convert(node.kwd_patterns[i])),
                             None
                         ), Space.EMPTY)
@@ -1480,7 +1486,7 @@ class ParserVisitor(ast.NodeVisitor):
                     Space.EMPTY,
                     # Use '|' as delimiter for OR patterns, not ','
                     [self.__pad_list_element(self.__convert_match_pattern(e), last=i == len(node.patterns) - 1, delim='|') for i, e in
-                     enumerate(node.patterns)] if node.patterns else [],
+                     enumerate(node.patterns)] if node.patterns else _EMPTY_LIST,
                     Markers.EMPTY
                 ),
                 None
@@ -1548,8 +1554,8 @@ class ParserVisitor(ast.NodeVisitor):
             random_id(),
             prefix,
             Markers.EMPTY,
-            [],  # annotations
-            [],  # modifiers
+            _EMPTY_LIST,  # annotations
+            _EMPTY_LIST,  # modifiers
             name,
             bounds
         )
@@ -1563,7 +1569,7 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             '**',
             j.Modifier.Type.LanguageExtension,
-            []
+            _EMPTY_LIST
         )
         name = self.__convert_name(node.name)
         default = getattr(node, 'default_value', None)
@@ -1582,7 +1588,7 @@ class ParserVisitor(ast.NodeVisitor):
             random_id(),
             prefix,
             Markers.EMPTY,
-            [],  # annotations
+            _EMPTY_LIST,  # annotations
             [modifier],
             name,
             bounds
@@ -1597,7 +1603,7 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             '*',
             j.Modifier.Type.LanguageExtension,
-            []
+            _EMPTY_LIST
         )
         name = self.__convert_name(node.name)
         default = getattr(node, 'default_value', None)
@@ -1616,7 +1622,7 @@ class ParserVisitor(ast.NodeVisitor):
             random_id(),
             prefix,
             Markers.EMPTY,
-            [],  # annotations
+            _EMPTY_LIST,  # annotations
             [modifier],
             name,
             bounds
@@ -1735,7 +1741,7 @@ class ParserVisitor(ast.NodeVisitor):
                 random_id(),
                 self.__source_before(node.func.attr),
                 Markers.EMPTY,
-                [],
+                _EMPTY_LIST,
                 node.func.attr,
                 self._type_mapping.type(node),
                 None
@@ -1782,7 +1788,7 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             select if isinstance(name, j.Identifier) else self.__pad_right(name, Space.EMPTY),
             None,
-            name if isinstance(name, j.Identifier) else j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "",
+            name if isinstance(name, j.Identifier) else j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, _EMPTY_LIST, "",
                                                                      None, None),
             args,
             method_type,
@@ -2153,7 +2159,7 @@ class ParserVisitor(ast.NodeVisitor):
                 Markers.EMPTY,
                 'async',
                 j.Modifier.Type.Async,
-                []
+                _EMPTY_LIST
             ))
 
         def_prefix = self.__source_before('def')
@@ -2163,13 +2169,13 @@ class ParserVisitor(ast.NodeVisitor):
             Markers.EMPTY,
             'def',
             j.Modifier.Type.Default,
-            []
+            _EMPTY_LIST
         ))
         name_identifier = j.Identifier(
             random_id(),
             self.__source_before(node.name),
             Markers.EMPTY,
-            [],
+            _EMPTY_LIST,
             node.name,
             None,
             None
@@ -2182,7 +2188,7 @@ class ParserVisitor(ast.NodeVisitor):
                 random_id(),
                 self.__source_before('['),
                 Markers.EMPTY,
-                [],  # annotations
+                _EMPTY_LIST,  # annotations
                 [self.__pad_list_element(self.__convert(tp), i == len(type_params) - 1, end_delim=']')
                  for i, tp in enumerate(type_params)]
             )
@@ -2210,9 +2216,10 @@ class ParserVisitor(ast.NodeVisitor):
             modifiers,
             type_parameters,
             return_type,
-            [],  # name_annotations
+            _EMPTY_LIST,  # name_annotations
             name_identifier,
             params,
+            _EMPTY_LIST,  # dimensions_after_name
             None,
             body,
             None,
@@ -2276,7 +2283,7 @@ class ParserVisitor(ast.NodeVisitor):
             name = name.replace(prefix=extra_parens[-1][1])  # ty: ignore[unresolved-attribute]  # recursive call returns unknown
 
             # Wrap in extra parentheses (innermost to outermost)
-            wrapped: Expression = name  # ty: ignore[invalid-assignment]
+            wrapped: Expression = name
             for i in range(len(extra_parens) - 1, -1, -1):
                 paren_prefix, _ = extra_parens[i]
                 suffix = self.__whitespace()
@@ -2542,7 +2549,7 @@ class ParserVisitor(ast.NodeVisitor):
             async_,
             self.__convert(node.target),
             self.__pad_left(self.__source_before('in'), self.__convert(node.iter)),
-            [self._map_comprehension_condition(i) for i in node.ifs] if node.ifs else []
+            [self._map_comprehension_condition(i) for i in node.ifs] if node.ifs else _EMPTY_LIST
         )
 
     def _map_comprehension_condition(self, i):
@@ -2563,7 +2570,7 @@ class ParserVisitor(ast.NodeVisitor):
             None,
             self._bom_marked,
             None,
-            [],
+            _EMPTY_LIST,
             [self.__pad_statement(stmt) for stmt in node.body] if node.body else [
                 self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY)],
             self.__whitespace()
@@ -2578,7 +2585,7 @@ class ParserVisitor(ast.NodeVisitor):
             random_id(),
             space,
             Markers.EMPTY,
-            [],
+            _EMPTY_LIST,
             actual_name,
             expr_type,
             field_type
@@ -2890,7 +2897,7 @@ class ParserVisitor(ast.NodeVisitor):
                     random_id(),
                     literal.prefix,
                     Markers.build(random_id(), [Quoted(random_id(), quote_style)]) if quote_style else Markers.EMPTY,
-                    [],
+                    _EMPTY_LIST,
                     name,
                     self._type_mapping.type(node),
                     None
@@ -3097,7 +3104,7 @@ class ParserVisitor(ast.NodeVisitor):
         def ident_or_field(parts: List[str]) -> NameTree:
             if len(parts) == 1:
                 space, actual_name = self.__consume_identifier(parts[-1])
-                return j.Identifier(random_id(), space, Markers.EMPTY, [], actual_name,
+                return j.Identifier(random_id(), space, Markers.EMPTY, _EMPTY_LIST, actual_name,
                                     name_type, field_type)
             else:
                 return j.FieldAccess(
@@ -3107,7 +3114,7 @@ class ParserVisitor(ast.NodeVisitor):
                     ident_or_field(parts[:-1]),
                     self.__pad_left(
                         self.__source_before('.'),
-                        (lambda s, n: j.Identifier(random_id(), s, Markers.EMPTY, [], n,
+                        (lambda s, n: j.Identifier(random_id(), s, Markers.EMPTY, _EMPTY_LIST, n,
                                      name_type,
                                      field_type))(*self.__consume_identifier(parts[-1])),
                     ),
@@ -3302,7 +3309,7 @@ class ParserVisitor(ast.NodeVisitor):
         elif whitespace:
             comments[-1] = comments[-1].replace(suffix=''.join(whitespace))
 
-        return Space(comments, prefix if prefix is not None else '')
+        return Space(comments or _EMPTY_LIST, prefix if prefix is not None else '')
 
     def _map_unary_operator(self, op) -> Tuple[j.Unary.Type, str]:
         operation_map: Dict[type, Tuple[j.Unary.Type, str]] = {

@@ -24,9 +24,9 @@ class MinimumViableSpacingVisitor(PythonVisitor):
             if not previous_statement or not previous_statement.markers.find_first(Semicolon):
                 new_prefix = tree.prefix.replace(whitespace='\n' + tree.prefix.whitespace)
                 if isinstance(tree, ExpressionStatement):
-                    tree = tree.replace(expression=tree.expression.replace(prefix=new_prefix))  # ty: ignore[invalid-assignment]
+                    tree = tree.replace(expression=tree.expression.replace(prefix=new_prefix))
                 else:
-                    tree = tree.replace(prefix=new_prefix)  # ty: ignore[invalid-assignment]
+                    tree = tree.replace(prefix=new_prefix)
 
         return tree
 

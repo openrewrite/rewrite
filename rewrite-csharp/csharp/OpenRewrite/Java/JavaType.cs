@@ -356,6 +356,7 @@ public abstract class JavaType
     public class Annotation : FullyQualified
     {
         public FullyQualified? AnnotationType { get; set; }
+        public IList<ElementValue>? Values { get; set; }
 
         public Annotation() { }
 
@@ -364,10 +365,61 @@ public abstract class JavaType
             AnnotationType = type;
         }
 
-        public Annotation UnsafeSet(FullyQualified? type)
+        public Annotation(FullyQualified? type, IList<ElementValue>? values)
         {
             AnnotationType = type;
+            Values = values;
+        }
+
+        public Annotation UnsafeSet(FullyQualified? type, IList<ElementValue>? values)
+        {
+            AnnotationType = type;
+            Values = values;
             return this;
+        }
+
+        /// <summary>
+        /// An annotation element value (one of <see cref="SingleElementValue"/> or
+        /// <see cref="ArrayElementValue"/>).
+        /// </summary>
+        public abstract class ElementValue
+        {
+            public JavaType? Element { get; set; }
+        }
+
+        public class SingleElementValue : ElementValue
+        {
+            /// <summary>
+            /// String, bool, sbyte, short, int, long, float, double, or char value.
+            /// Class literals and enum constants flow through <see cref="ReferenceValue"/>.
+            /// </summary>
+            public object? ConstantValue { get; set; }
+
+            public JavaType? ReferenceValue { get; set; }
+
+            public SingleElementValue() { }
+
+            public SingleElementValue(JavaType? element, object? constantValue, JavaType? referenceValue)
+            {
+                Element = element;
+                ConstantValue = constantValue;
+                ReferenceValue = referenceValue;
+            }
+        }
+
+        public class ArrayElementValue : ElementValue
+        {
+            public IList<object?>? ConstantValues { get; set; }
+            public IList<JavaType>? ReferenceValues { get; set; }
+
+            public ArrayElementValue() { }
+
+            public ArrayElementValue(JavaType? element, IList<object?>? constantValues, IList<JavaType>? referenceValues)
+            {
+                Element = element;
+                ConstantValues = constantValues;
+                ReferenceValues = referenceValues;
+            }
         }
     }
 

@@ -115,6 +115,57 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doNotRemoveImportUsedOnlyInNestedGeneric() {
+        rewriteRun(
+          java(
+            """
+              import com.google.common.hash.BloomFilter;
+              import java.util.concurrent.atomic.AtomicReference;
+
+              @SuppressWarnings("UnstableApiUsage")
+              public class BloomFilterRef<T> extends AtomicReference<BloomFilter<T>> {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7773")
+    @Test
+    void doNotRemoveImportUsedOnlyInNestedGenericWhenInnerTypeIsUnknown() {
+        // Simulates a multi-module Maven build where the parser classpath does not include
+        // the generic-parameter type, so its type attribution is partial/missing.
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion()),
+          java(
+            """
+              import com.google.common.hash.BloomFilter;
+              import java.util.concurrent.atomic.AtomicReference;
+
+              @SuppressWarnings("UnstableApiUsage")
+              public class BloomFilterRef<T> extends AtomicReference<BloomFilter<T>> {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRemoveLombokVal() {
+        rewriteRun(
+          java(
+            """
+              import lombok.val;
+
+              public class Foo {
+                  val myField = 10.0;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1798")
     @Test
     void doNotRemoveInnerClassInSamePackage() {
@@ -1132,6 +1183,54 @@ class RemoveUnusedImportsTest implements RewriteTest {
                     var uniqueCount = B1;
                     var uniqueCountNested = C1;
                     helloWorld();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7333")
+    @Test
+    void removesImportUsedOnlyAsStaticImportParameterType() {
+        rewriteRun(
+          java(
+            """
+              package org.example.a;
+
+              public class Something {
+                  public static Something DEFAULT_SOMETHING = new Something();
+
+                  public static void doSomething(Something something) {
+                      System.out.println("Doing something... " + something);
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package org.example.b;
+
+              import org.example.a.Something;
+
+              import static org.example.a.Something.DEFAULT_SOMETHING;
+              import static org.example.a.Something.doSomething;
+
+              public class Test {
+                  public static void main(String[] args) {
+                      doSomething(DEFAULT_SOMETHING);
+                  }
+              }
+              """,
+            """
+              package org.example.b;
+
+              import static org.example.a.Something.DEFAULT_SOMETHING;
+              import static org.example.a.Something.doSomething;
+
+              public class Test {
+                  public static void main(String[] args) {
+                      doSomething(DEFAULT_SOMETHING);
                   }
               }
               """
@@ -2350,6 +2449,34 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/7380")
+    @Test
+    void keepImportWhenUsedOnlyAsStaticFieldQualifier() {
+        rewriteRun(
+          java(
+            """
+            package foo;
+            public class A {
+                public static final int VALUE = 1;
+            }
+            """
+          ),
+          java(
+            """
+            package bar;
+
+            import foo.A;
+
+            public class Test {
+                public int getValue() {
+                    return A.VALUE;
+                }
+            }
+            """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/6544")
     @Test
     void starImportWithExplicitImportsFromSamePackage() {
@@ -2407,6 +2534,44 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   public void init() {
                       StringUtil.execute();
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainTypeUseAnnotationOnQualifiedArrayType() {
+        rewriteRun(
+          java(
+            """
+              package ann;
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.TYPE_USE)
+              public @interface Nullable {
+              }
+              """
+          ),
+          java(
+            """
+              package foo;
+              public class Outer {
+                  public static class Inner {}
+              }
+              """
+          ),
+          java(
+            """
+              import ann.Nullable;
+              import foo.Outer;
+
+              class Test {
+                  Outer.@Nullable Inner[] items;
               }
               """
           )

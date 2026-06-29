@@ -15,7 +15,7 @@
 """Tests for coordinates module."""
 
 import dataclasses
-from uuid import uuid4
+from rewrite import random_id
 
 from rewrite.java import tree as j
 from rewrite.java.support_types import Space
@@ -24,7 +24,7 @@ from rewrite.python.template.coordinates import PythonCoordinates, CoordinateMod
 
 
 def _make_tree():
-    return j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+    return j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
 
 
 class TestCoordinateMode:

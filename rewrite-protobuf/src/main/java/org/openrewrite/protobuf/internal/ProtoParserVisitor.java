@@ -144,6 +144,18 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
     }
 
     @Override
+    public Proto.Group visitGroup(Protobuf2Parser.GroupContext ctx) {
+        String label = ctx.getChild(0).getText();
+        Space prefix = sourceBefore(label);
+        return new Proto.Group(randomId(), prefix, Markers.EMPTY,
+                new Proto.Keyword(randomId(), Space.EMPTY, Markers.EMPTY, label),
+                new Proto.Keyword(randomId(), sourceBefore("group"), Markers.EMPTY, "group"),
+                ProtoRightPadded.build(visitIdent(ctx.ident())).withAfter(sourceBefore("=")),
+                mapConstant(ctx.IntegerLiteral()),
+                visitBlock(ctx.messageBody().children));
+    }
+
+    @Override
     public Proto visitFullyQualifiedType(Protobuf2Parser.FullyQualifiedTypeContext ctx) {
         return visitFullIdent(ctx.fullIdent());
     }

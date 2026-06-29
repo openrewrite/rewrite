@@ -15,60 +15,120 @@
  */
 package org.openrewrite.semver;
 
+import lombok.EqualsAndHashCode;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
 
+import java.util.Map;
 import java.util.Scanner;
 import java.util.regex.Pattern;
 
 @UtilityClass
 public class Semver {
 
+    /**
+     * Memoizes {@link #validate(String, String)} keyed on its {@code (toVersion, metadataPattern)}
+     * arguments. A version selector is a recipe parameter, so it is constant for the duration of a
+     * run yet {@code validate} is otherwise re-invoked for every dependency and every visit. Each
+     * invocation runs the full chain of selector-detection regexes (one {@code Pattern.matcher} per
+     * comparator type), which dominates {@code java.util.regex} CPU time during large recipe runs.
+     * Caching collapses the thousands of repeated calls to one computation per distinct selector.
+     * <p>
+     * Both valid <em>and</em> invalid results are cached: an {@link Validated} carries its validation
+     * errors, and re-deriving them is just as costly. The cached {@link VersionComparator}
+     * implementations store only final parsed fields and are immutable, so sharing them across the
+     * {@link java.util.concurrent.ForkJoinPool} that runs recipes is safe.
+     */
+    private static final Map<CacheKey, Validated<VersionComparator>> VALIDATE_CACHE = LruCache.bounded(1_024);
+
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean isVersion(@Nullable String version) {
         if (StringUtils.isBlank(version)) {
             return false;
         }
-        return LatestRelease.RELEASE_PATTERN.matcher(version).matches();
+        return ParsedVersion.parse(version).matches();
     }
 
     /**
-     * Validates the given version against an optional pattern
+     * Validates the given version against an optional pattern.
+     * <p>
+     * The {@code metadataPattern} is interpreted first as a regular expression. If that fails to
+     * compile, it is treated as a glob (where {@code *} matches any run of characters and {@code ?}
+     * matches any single character) and converted to an equivalent regex via
+     * {@link StringUtils#globToRegex(String)}. This lets simple patterns like {@code "+backpatch*"}
+     * work without needing to be regex-escaped.
      *
      * @param toVersion       the version to validate. Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used.
      * @param metadataPattern optional metadata appended to the version. Allows version selection to be extended beyond the original Node Semver semantics. So for example,
-     *                        Setting 'version' to "25-29" can be paired with a metadata pattern of "-jre" to select Guava 29.0-jre
+     *                        setting 'version' to "25-29" can be paired with a metadata pattern of "-jre" to select Guava 29.0-jre. Accepts either a regex or a glob.
      * @return the validation result
      */
     public static Validated<VersionComparator> validate(String toVersion, @Nullable String metadataPattern) {
+        CacheKey key = new CacheKey(toVersion, metadataPattern);
+        Validated<VersionComparator> cached = VALIDATE_CACHE.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        Validated<VersionComparator> result = doValidate(toVersion, metadataPattern);
+        VALIDATE_CACHE.put(key, result);
+        return result;
+    }
+
+    private static Validated<VersionComparator> doValidate(String toVersion, @Nullable String metadataPattern) {
+        String canonicalPattern = canonicalizeMetadataPattern(metadataPattern);
         return Validated.<VersionComparator, String>testNone(
                 "metadataPattern",
-                "must be a valid regular expression",
-                metadataPattern, metadata -> {
-                    try {
-                        if (metadata != null) {
-                            Pattern.compile(metadata);
-                        }
-                        return true;
-                    } catch (Throwable e) {
-                        return false;
-                    }
-                }
+                "must be a valid regular expression or glob",
+                metadataPattern, metadata -> metadata == null || canonicalPattern != null
         ).and(Validated.<VersionComparator>none()
-                .or(LatestRelease.buildLatestRelease(toVersion, metadataPattern))
-                .or(LatestIntegration.build(toVersion, metadataPattern))
-                .or(LatestMinor.build(toVersion, metadataPattern))
-                .or(LatestPatch.build(toVersion, metadataPattern))
-                .or(HyphenRange.build(toVersion, metadataPattern))
-                .or(XRange.build(toVersion, metadataPattern))
-                .or(TildeRange.build(toVersion, metadataPattern))
-                .or(CaretRange.build(toVersion, metadataPattern))
-                .or(SetRange.build(toVersion, metadataPattern))
-                .or(ExactVersionWithPattern.build(toVersion, metadataPattern))
+                .or(LatestRelease.buildLatestRelease(toVersion, canonicalPattern))
+                .or(LatestIntegration.build(toVersion, canonicalPattern))
+                .or(LatestMinor.build(toVersion, canonicalPattern))
+                .or(LatestPatch.build(toVersion, canonicalPattern))
+                .or(HyphenRange.build(toVersion, canonicalPattern))
+                .or(XRange.build(toVersion, canonicalPattern))
+                .or(TildeRange.build(toVersion, canonicalPattern))
+                .or(CaretRange.build(toVersion, canonicalPattern))
+                .or(SetRange.build(toVersion, canonicalPattern))
+                .or(ExactVersionWithPattern.build(toVersion, canonicalPattern))
                 .or(ExactVersion.build(toVersion))
         );
+    }
+
+    @EqualsAndHashCode
+    private static final class CacheKey {
+        private final String toVersion;
+
+        @Nullable
+        private final String metadataPattern;
+
+        private CacheKey(String toVersion, @Nullable String metadataPattern) {
+            this.toVersion = toVersion;
+            this.metadataPattern = metadataPattern;
+        }
+    }
+
+    private static @Nullable String canonicalizeMetadataPattern(@Nullable String metadataPattern) {
+        if (metadataPattern == null) {
+            return null;
+        }
+        try {
+            Pattern.compile(metadataPattern);
+            return metadataPattern;
+        } catch (Throwable regexFailure) {
+            String asRegex = StringUtils.globToRegex(metadataPattern);
+            try {
+                if (asRegex != null) {
+                    Pattern.compile(asRegex);
+                    return asRegex;
+                }
+            } catch (Throwable ignored) {
+                // fall through
+            }
+            return null;
+        }
     }
 
     public static String majorVersion(String version) {

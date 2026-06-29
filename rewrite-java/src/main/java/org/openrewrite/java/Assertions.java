@@ -28,6 +28,7 @@ import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
@@ -232,6 +233,21 @@ public class Assertions {
         return sourceSpec;
     }
 
+    /**
+     * Attach a {@link JavaVersion} where the compiling JDK ({@code createdBy}) may differ from the
+     * {@code -source}/{@code --release} bytecode level, e.g. JDK 23 producing Java 8 bytecode.
+     */
+    public static SourceSpec<?> version(SourceSpec<?> sourceSpec, int createdByMajor, int sourceCompatibility, int targetCompatibility) {
+        return sourceSpec.markers(javaVersion(createdByMajor, sourceCompatibility, targetCompatibility));
+    }
+
+    public static SourceSpecs version(SourceSpecs sourceSpec, int createdByMajor, int sourceCompatibility, int targetCompatibility) {
+        for (SourceSpec<?> spec : sourceSpec) {
+            spec.markers(javaVersion(createdByMajor, sourceCompatibility, targetCompatibility));
+        }
+        return sourceSpec;
+    }
+
     public static SourceSpec<?> project(SourceSpec<?> sourceSpec, String projectName) {
         return sourceSpec.markers(javaProject(projectName));
     }
@@ -265,10 +281,68 @@ public class Assertions {
         return addTypesToSourceSet(sourceSetName, emptyList(), emptyList());
     }
 
+    /**
+     * Register a project in {@code ctx} as dirty, simulating the state after a
+     * dependency-mutating recipe modified that project's dependencies earlier in the recipe run.
+     * Tests must subsequently pass {@code ctx} to {@link org.openrewrite.test.RecipeSpec#executionContext(ExecutionContext)}
+     * so that consumer recipes (e.g. {@code OrderImports}, {@code ChangePackage}, {@code ChangeType})
+     * read the registry from the same context. The {@code projectName} should match the
+     * {@link #project(SourceSpec, String)} marker attached to the source files under test.
+     */
+    public static void markSourceSetDirty(ExecutionContext ctx, String projectName) {
+        JavaSourceSet.markDirty(ctx, projectName);
+    }
+
+    /**
+     * Enrich each source file's JavaSourceSet marker with types declared in other source files,
+     * so that classpath-based ambiguity detection works in tests where types come from source
+     * files rather than JARs.
+     */
+    public static UncheckedConsumer<List<SourceFile>> withSourceTypesOnClasspath() {
+        return sourceFiles -> {
+            List<JavaType.FullyQualified> sourceTypes = new ArrayList<>();
+            for (SourceFile sf : sourceFiles) {
+                if (sf instanceof JavaSourceFile) {
+                    for (J.ClassDeclaration classDecl : ((JavaSourceFile) sf).getClasses()) {
+                        JavaType.FullyQualified type = classDecl.getType();
+                        if (type != null) {
+                            sourceTypes.add(type);
+                        }
+                    }
+                }
+            }
+            for (int i = 0; i < sourceFiles.size(); i++) {
+                SourceFile sf = sourceFiles.get(i);
+                Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
+                JavaSourceSet ss;
+                if (maybeSourceSet.isPresent()) {
+                    ss = maybeSourceSet.get();
+                    List<JavaType.FullyQualified> enriched = new ArrayList<>(ss.getClasspath());
+                    enriched.addAll(sourceTypes);
+                    ss = ss.withClasspath(enriched);
+                } else {
+                    ss = new JavaSourceSet(Tree.randomId(), "main", sourceTypes, emptyMap());
+                }
+                sourceFiles.set(i, sf.withMarkers(
+                  sf.getMarkers().computeByType(ss, (orig, upd) -> upd)));
+            }
+        };
+    }
+
     public static JavaVersion javaVersion(int version) {
         return javaVersions.computeIfAbsent(version, v ->
-                new JavaVersion(Tree.randomId(), "openjdk", "adoptopenjdk",
+                new JavaVersion(Tree.randomId(), v + ".0.1", "adoptopenjdk",
                         Integer.toString(v), Integer.toString(v)));
+    }
+
+    /**
+     * @param createdByMajor       the major version of the compiling JDK ({@code createdBy})
+     * @param sourceCompatibility  the {@code -source} level
+     * @param targetCompatibility  the {@code --release}/target bytecode level
+     */
+    public static JavaVersion javaVersion(int createdByMajor, int sourceCompatibility, int targetCompatibility) {
+        return new JavaVersion(Tree.randomId(), createdByMajor + ".0.1", "adoptopenjdk",
+                Integer.toString(sourceCompatibility), Integer.toString(targetCompatibility));
     }
 
     private static JavaProject javaProject(String projectName) {

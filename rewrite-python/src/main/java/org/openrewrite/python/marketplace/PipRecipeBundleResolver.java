@@ -47,6 +47,6 @@ public class PipRecipeBundleResolver implements RecipeBundleResolver {
         if (response.getVersion() != null) {
             bundle.setVersion(response.getVersion());
         }
-        return new PipRecipeBundleReader(bundle, rpc);
+        return new PipRecipeBundleReader(bundle, rpc, response);
     }
 }

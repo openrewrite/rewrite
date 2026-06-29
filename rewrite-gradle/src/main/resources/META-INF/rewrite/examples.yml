@@ -545,7 +545,10 @@ examples:
       plugins {
           id 'java'
           id 'jacoco'
+          id 'application'
       }
+
+      mainClassName = "com.example.AppMain"
 
       repositories {
           mavenCentral()
@@ -553,11 +556,29 @@ examples:
 
       dependencies {
           implementation group: 'com.google.guava', name: 'guava', version: '31.1-jre'
+          implementation("org.apache.httpcomponents:httpclient") {
+              version = {
+                  strictly("4.5.13")
+              }
+          }
+      }
+
+      task doSomething(type: JavaExec) {
+          main = "com.example.AppMain"
+      }
+
+      tasks.register("runEverything", JavaExec) {
+          main = "com.example.AppMain"
       }
     after: |
       plugins {
           id 'java'
           id 'jacoco'
+          id 'application'
+      }
+
+      application {
+          mainClass = "com.example.AppMain"
       }
 
       repositories {
@@ -566,6 +587,19 @@ examples:
 
       dependencies {
           implementation "com.google.guava:guava:31.1-jre"
+          implementation("org.apache.httpcomponents:httpclient") {
+              version {
+                  strictly("4.5.13")
+              }
+          }
+      }
+
+      task doSomething(type: JavaExec) {
+          mainClass = "com.example.AppMain"
+      }
+
+      tasks.register("runEverything", JavaExec) {
+          mainClass = "com.example.AppMain"
       }
     path: build.gradle
     language: groovy
@@ -754,6 +788,61 @@ examples:
     language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.SortDependencies
+examples:
+- description: '`SortDependenciesTest#sortsByConfigurationThenGroupThenArtifact`'
+  sources:
+  - before: |
+      plugins {
+          id 'java-library'
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          testImplementation "org.junit.jupiter:junit-jupiter-api:5.9.1"
+          implementation "org.springframework:spring-web:5.3.23"
+          api "com.google.guava:guava:31.1-jre"
+          implementation "com.fasterxml.jackson.core:jackson-databind:2.13.4"
+      }
+    after: |
+      plugins {
+          id 'java-library'
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          api "com.google.guava:guava:31.1-jre"
+          implementation "com.fasterxml.jackson.core:jackson-databind:2.13.4"
+          implementation "org.springframework:spring-web:5.3.23"
+          testImplementation "org.junit.jupiter:junit-jupiter-api:5.9.1"
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.SyncGradleExtPropertiesWithBom
+examples:
+- description: '`SyncGradleExtPropertiesWithBomTest#updatesExtSubscriptPropertyWhenBomVersionIsHigher`'
+  parameters:
+  - org.springframework.boot
+  - spring-boot-dependencies
+  - 3.4.0
+  - 'false'
+  sources:
+  - before: |
+      ext['jackson-bom.version'] = '2.14.0'
+    after: |
+      ext['jackson-bom.version'] = '2.18.1'
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.UpdateGradleWrapper
 examples:
 - description: Update existing Gradle wrapper
@@ -925,6 +1014,28 @@ examples:
     language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.UsePropertyAssignmentSyntax
+examples:
+- description: '`UsePropertyAssignmentSyntaxTest#spaceSyntaxConvertedToAssignment`'
+  parameters:
+  - description
+  sources:
+  - before: |
+      tasks.register('runLogic', JavaExec) {
+          description 'My precious logic'
+          classpath sourceSets.main.runtimeClasspath
+          mainClass = 'my.org.logic.Logic'
+      }
+    after: |
+      tasks.register('runLogic', JavaExec) {
+          description = 'My precious logic'
+          classpath sourceSets.main.runtimeClasspath
+          mainClass = 'my.org.logic.Logic'
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.gradle8.JacocoReportDeprecations
 examples:
 - description: '`JacocoReportDeprecationsTest#deprecationsInNormalSyntax`'
@@ -961,6 +1072,94 @@ examples:
               xml.outputLocation = layout.buildDirectory.dir('jacocoXml')
               csv.outputLocation = layout.buildDirectory.dir('jacocoCsv')
               html.outputLocation = layout.buildDirectory.dir('jacocoHtml')
+          }
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.gradle9.RewriteSpreadAllInConfigurationsBlock
+examples:
+- description: '`RewriteSpreadAllInConfigurationsBlockTest#rewriteSpreadAllAtTopLevel`'
+  sources:
+  - before: |
+      configurations {
+          all*.exclude group: "log4j", module: "log4j"
+      }
+    after: |
+      configurations.all {
+          exclude group: "log4j", module: "log4j"
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.gradle9.UseJavaExtensionBlock
+examples:
+- description: '`UseJavaExtensionBlockTest#wrapsAndNormalizesBothCompatibilityAssignments`'
+  sources:
+  - before: |
+      plugins {
+          id 'java'
+      }
+
+      sourceCompatibility = '17'
+      targetCompatibility = '17'
+    after: |
+      plugins {
+          id 'java'
+      }
+
+      java {
+          sourceCompatibility = JavaVersion.VERSION_17
+          targetCompatibility = JavaVersion.VERSION_17
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.gradle9.UseMainClassPropertyForApplication
+examples:
+- description: '`UseMainClassPropertyForApplicationTest#mainClassNameInApplicationBlock`'
+  sources:
+  - before: |
+      plugins {
+          id 'application'
+      }
+
+      application {
+          mainClassName = "com.example.AppMain"
+      }
+    after: |
+      plugins {
+          id 'application'
+      }
+
+      application {
+          mainClass = "com.example.AppMain"
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.gradle9.UseVersionClosure
+examples:
+- description: '`UseVersionClosureTest#convertsVersionAssignmentToClosure`'
+  sources:
+  - before: |
+      dependencies {
+          implementation('org.example:lib') {
+              version = {
+                  strictly '1.0'
+              }
+          }
+      }
+    after: |
+      dependencies {
+          implementation('org.example:lib') {
+              version {
+                  strictly '1.0'
+              }
           }
       }
     path: build.gradle
@@ -1217,16 +1416,10 @@ examples:
       plugins {
           id 'java'
       }
-    after: |
-      /*~~(https://plugins.gradle.org/m2)~~>*/plugins {
-          id 'java'
-      }
     path: build.gradle
     language: groovy
   - before: |
       rootProject.name = 'my-project'
-    after: |
-      /*~~(https://plugins.gradle.org/m2)~~>*/rootProject.name = 'my-project'
     language: settingsGradle
 ---
 type: specs.openrewrite.org/v1beta/example
@@ -1238,14 +1431,6 @@ examples:
   sources:
   - before: |
       plugins {
-          id 'java'
-      }
-
-      repositories {
-          maven { url 'https://repo.spring.io/milestone' }
-      }
-    after: |
-      /*~~(https://repo.spring.io/milestone)~~>*/plugins {
           id 'java'
       }
 
@@ -1436,14 +1621,6 @@ examples:
   sources:
   - before: |
       plugins {
-          id 'java'
-      }
-
-      repositories {
-          maven { url 'https://repo.spring.io/milestone' }
-      }
-    after: |
-      /*~~(https://repo.spring.io/milestone)~~>*/plugins {
           id 'java'
       }
 

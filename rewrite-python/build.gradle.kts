@@ -14,10 +14,17 @@ plugins {
     id("publishing")
 }
 
+normalization {
+    runtimeClasspath {
+        ignore("META-INF/rewrite-python-version.txt")
+    }
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
     api(project(":rewrite-toml"))
+    implementation(project(":rewrite-json"))
 
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
@@ -120,6 +127,7 @@ testing {
             dependencies {
                 implementation(project())
                 implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-test"))
                 implementation("org.assertj:assertj-core:latest.release")
                 implementation("org.junit.platform:junit-platform-suite-api")
@@ -355,6 +363,7 @@ val pythonPublish by tasks.registering(Exec::class) {
     commandLine(
         pythonExe.absolutePath, "-m", "twine", "upload",
         "--config-file", ".pypirc",
+        "--skip-existing",
         "dist/*"
     )
 
@@ -380,6 +389,13 @@ val generateTestClasspath by tasks.registering {
     val outputFile = pythonDir.resolve("test-classpath.txt")
     outputs.file(outputFile)
 
+    inputs.files(configurations["runtimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(configurations["testRuntimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(tasks.named("compileJava").map { it.outputs.files })
+    inputs.files(tasks.named("processResources").map { it.outputs.files })
+
     // Depend on jar tasks to ensure jars exist
     dependsOn(tasks.named("testClasses"))
     dependsOn(tasks.named("jar"))
@@ -395,8 +411,6 @@ val generateTestClasspath by tasks.registering {
          .joinToString(File.pathSeparator) { it.absolutePath }
         outputFile.writeText(classpath)
         logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
-
-
     }
 }
 
@@ -422,4 +436,3 @@ val printTestClasspath by tasks.registering {
 extensions.configure<LicenseExtension> {
     exclude("**/rewrite-python-version.txt")
 }
-

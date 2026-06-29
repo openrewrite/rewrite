@@ -47,9 +47,9 @@ public class ImportBlock implements Marker, RpcCodec<ImportBlock> {
     public ImportBlock rpcReceive(ImportBlock before, RpcReceiveQueue q) {
         return before
                 .withId(q.receiveAndGet(before.getId(), UUID::fromString))
-                .withClosePrevious(q.receiveAndGet(before.isClosePrevious(), Boolean::parseBoolean))
+                .withClosePrevious(q.receive(before.isClosePrevious()))
                 .withBefore(Space.format(q.receive(before.getBefore() == null ? "" : before.getBefore().getWhitespace())))
-                .withGrouped(q.receiveAndGet(before.isGrouped(), Boolean::parseBoolean))
+                .withGrouped(q.receive(before.isGrouped()))
                 .withGroupedBefore(Space.format(q.receive(before.getGroupedBefore() == null ? "" : before.getGroupedBefore().getWhitespace())));
     }
 }

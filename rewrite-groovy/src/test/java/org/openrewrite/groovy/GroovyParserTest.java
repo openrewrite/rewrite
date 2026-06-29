@@ -337,4 +337,160 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multilineString() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""
+                  foo
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringInterpolation() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""
+                  ${foo}
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringInterpolationFollowedByTripleQuote() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""${foo}\"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringDollarVariable() {
+        rewriteRun(
+          groovy(
+            """
+              def foo = "x"
+              String name = \"""
+                  $foo bar
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringWithEmbeddedQuotes() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""
+                  "quoted" and ${foo}
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineStringWithEscapedDollar() {
+        rewriteRun(
+          groovy(
+            """
+              String name = \"""
+                  \\$literal then ${foo}
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
+    void doWhileLoop() {
+        rewriteRun(
+          groovy(
+            """
+                    def a() {
+                    do {
+                    } while (c)
+                    }
+              """
+          )
+        );
+    }
+
+    @Test
+    void defaultMethodWithThis() {
+        rewriteRun(
+          groovy(
+            """
+            interface A {
+
+                default void a() {
+                    this.a(false)
+                }
+
+                void a(boolean b)
+
+            }
+              """
+          )
+        );
+    }
+
+    @Test
+    void compileDynamicAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.CompileDynamic
+              @CompileDynamic
+              void a() {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void notInstanceOfOperator() {
+        rewriteRun(
+          groovy(
+            """
+              if (a !instanceof B) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unboundedWildcardInMethod() {
+        rewriteRun(
+          groovy(
+            """
+                    class C {
+                       // these two method together fails
+                        String a(def a1) {
+                            Map<String, ?> r = b(a1)
+                            return r.key
+                        }
+                        Map<String, ?> b(def b) {
+                        }
+                    }
+
+              """
+          )
+        );
+    }
+
 }

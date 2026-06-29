@@ -23,10 +23,12 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
@@ -35,6 +37,7 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -80,6 +83,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
     public static void setFactory(Builder builder) {
         MANAGER.setFactory(builder);
+    }
+
+    public static void resetFactory() {
+        MANAGER.resetFactory();
     }
 
     @Override
@@ -177,27 +184,46 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 ParseProjectResponse.Item item = response.get(index);
                 index++;
 
-                SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
-                // for status update messages
-                Parser.Input input = Parser.Input.fromFile(sourceFile.getSourcePath());
-                parsingListener.startedParsing(input);
+                SourceFile sourceFile;
                 try {
+                    sourceFile = getObject(item.getId(), item.getSourceFileType());
+                    parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
                     if (sourceFile instanceof JS.CompilationUnit) {
                         validator.visit(sourceFile, 0);
                     }
                 } catch (Exception e) {
-                    sourceFile = new ParseError(
-                            sourceFile.getId(),
-                            new Markers(Tree.randomId(), singletonList(
-                                    ParseExceptionResult.build(JavaScriptParser.class, e, e.getMessage()))),
-                            sourceFile.getSourcePath(),
-                            null,
-                            null,
-                            false,
-                            null,
-                            input.getSource(ctx).readFully(),
-                            null
-                    );
+                    // A single file's RPC deserialization or validation failed. Convert it to a
+                    // ParseError pointing at the offending file and keep the stream going.
+                    //
+                    // `item.sourcePath` may be null when talking to an older TypeScript peer that
+                    // doesn't populate it yet — fall back to the RPC object id so we still produce
+                    // a usable ParseError rather than crashing the whole stream with an NPE.
+                    String relativePath = item.getSourcePath() != null ? item.getSourcePath() : item.getId();
+                    Path sourcePath = Paths.get(relativePath);
+                    Path absoluteSourcePath = projectPath.resolve(sourcePath);
+                    try {
+                        sourceFile = ParseError.build(
+                                JavaScriptParser.builder().build(),
+                                Parser.Input.fromFile(absoluteSourcePath),
+                                projectPath,
+                                ctx,
+                                e);
+                    } catch (Exception readFailure) {
+                        // If the file can't be read (e.g. fallback path from id doesn't exist on
+                        // disk), still emit a ParseError so the stream can continue. Without the
+                        // source text the error is less useful but at least it doesn't abort.
+                        sourceFile = new ParseError(
+                                Tree.randomId(),
+                                new Markers(Tree.randomId(), singletonList(
+                                        ParseExceptionResult.build(JavaScriptParser.class, e, null))),
+                                sourcePath,
+                                null,
+                                null,
+                                false,
+                                null,
+                                "",
+                                null);
+                    }
                 }
                 action.accept(sourceFile);
                 return true;
@@ -231,7 +257,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private List<RecipeBundleResolver> resolvers = Collections.emptyList();
         private final Map<String, String> environment = new HashMap<>();
-        private Path npxPath = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");
+        private final Set<String> unsetEnvNames = new LinkedHashSet<>();
+        private static final Path DEFAULT_NPX_PATH = System.getProperty("os.name").toLowerCase().contains("windows") ? Paths.get("npx.cmd") : Paths.get("npx");
+        private Supplier<@Nullable Path> npxPathSupplier = () -> DEFAULT_NPX_PATH;
         private @Nullable Path log;
         private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;
@@ -242,6 +270,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private @Nullable Path inspectBrkRewriteSourcePath;
 
         private @Nullable Path workingDirectory;
+
+        private @Nullable DataTableStore dataTableStore;
 
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
@@ -268,7 +298,20 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             if (Files.notExists(npxPath) || Files.isDirectory(npxPath)) {
                 throw new IllegalArgumentException("Invalid npx executable " + npxPath.toAbsolutePath().normalize());
             }
-            this.npxPath = npxPath;
+            return npxPath(() -> npxPath);
+        }
+
+        /**
+         * Supplies the path to the `npx` executable. The supplier is invoked at most
+         * once, when the RPC is first started. Returning {@code null} uses the built-in
+         * default (same as not configuring the path at all). Exceptions thrown by the
+         * supplier propagate out of the RPC-start call.
+         *
+         * @param npxPathSupplier Supplier for the path to the `npx` executable
+         * @return This builder
+         */
+        public Builder npxPath(Supplier<@Nullable Path> npxPathSupplier) {
+            this.npxPathSupplier = npxPathSupplier;
             return this;
         }
 
@@ -289,6 +332,22 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         public Builder environment(Map<String, String> environment) {
             this.environment.putAll(environment);
+            return this;
+        }
+
+        /**
+         * Strip these env vars from the spawned Node process's environment
+         * before {@link #environment(Map)} is applied. The cli bundles its
+         * own Node runtime; inheriting {@code NODE_OPTIONS},
+         * {@code NODE_PATH}, {@code NODE_TLS_REJECT_UNAUTHORIZED}, etc.
+         * from a parent process (e.g. a harness setting
+         * {@code NODE_OPTIONS=--require <instrumentation>.cjs} for its own
+         * bookkeeping) corrupts the bundled runtime's startup. The caller
+         * can still re-set any of these names via {@link #environment(Map)};
+         * the explicit value wins.
+         */
+        public Builder unsetEnv(Collection<String> names) {
+            this.unsetEnvNames.addAll(names);
             return this;
         }
 
@@ -342,8 +401,24 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        /**
+         * Where recipes in the JavaScript runtime write data table rows, conveyed via the
+         * {@link org.openrewrite.rpc.request.SetDataTableStore} handshake.
+         */
+        public Builder dataTableStore(@Nullable DataTableStore dataTableStore) {
+            this.dataTableStore = dataTableStore;
+            return this;
+        }
+
         @Override
         public JavaScriptRewriteRpc get() {
+            Path npxPath = npxPathSupplier.get();
+            if (npxPath == null) {
+                npxPath = DEFAULT_NPX_PATH;
+            }
+
+            DynamicDispatchRpcCodec.requireCodecFor(Json.Document.class.getName());
+
             Stream<@Nullable String> cmd;
 
             if (inspectBrk != null) {
@@ -366,8 +441,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/rewrite-javascript-version.txt"));
                 cmd = Stream.of(
                         npxPath.toString(),
-                        // For SNAPSHOT versions, assume npm link has been run and don't use --package
-                        version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
+                        // For unpublished local builds, assume npm link has been run and don't use --package
+                        isLocallyLinkedVersion(version) ? null : "--package=@openrewrite/rewrite@" + version,
                         "rewrite-rpc",
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
@@ -385,6 +460,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             }
             process.setStderrRedirect(log);
 
+            process.unsetEnv(unsetEnvNames);
             process.environment().putAll(environment);
             // caller-provided options, if any, are taking precedence over the options baked above
             process.environment().merge("NODE_OPTIONS", " --enable-source-maps", (callerProvided, local) -> local + " " + callerProvided);
@@ -400,10 +476,35 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
-                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
+                        .dataTableStore(dataTableStore)
+                        .log(log == null ? null : new PrintStream(openLog(log)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+        }
+
+        private static OutputStream openLog(Path log) throws IOException {
+            // The parent directory may not exist yet (e.g. a previously configured
+            // temp directory that has since been deleted), so create it defensively
+            // rather than failing the (re)start of the RPC process.
+            Path parent = log.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            return Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE);
+        }
+
+        /**
+         * Whether {@code version} refers to a locally-built, unpublished package that must be
+         * resolved through {@code npm link} rather than fetched from the npm registry via
+         * {@code npx --package}. This covers plain {@code -SNAPSHOT} versions (local builds) as
+         * well as the dated-snapshot form produced on CI, where the {@code SNAPSHOT} token is
+         * replaced by a {@code yyyyMMdd-HHmmss} commit timestamp (e.g. {@code 0.1.0-20260624-090742}).
+         * Passing such a version to {@code npx --package} fails with npm {@code ETARGET} because no
+         * matching version exists in the registry.
+         */
+        static boolean isLocallyLinkedVersion(String version) {
+            return version.endsWith("-SNAPSHOT") || version.matches(".*-\\d{8}-\\d{6}");
         }
     }
 }

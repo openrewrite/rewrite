@@ -15,9 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeSpec} from "../../../src/test";
+import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {JavaScriptVisitor, JS, npm, packageJson, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
+import {ExecutionContext} from "../../../src";
 import {withDir} from "tmp-promise";
 
 describe('method mapping', () => {
@@ -293,5 +294,26 @@ describe('method mapping', () => {
                 )
             );
         }, {unsafeCleanup: true});
+    });
+
+    test('tolerates a MethodDeclaration with undefined dimensionsAfterName (pre-#6992 LST)', () => {
+        // given a visitor that strips dimensionsAfterName, simulating a legacy LST deserialized
+        // without the field (Java backfills it via @JsonCreator, the JS side previously did not)
+        const legacyVisitor = class extends JavaScriptVisitor<ExecutionContext> {
+            protected async visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): Promise<J | undefined> {
+                const legacy = {...method, dimensionsAfterName: undefined as unknown as J.MethodDeclaration["dimensionsAfterName"]};
+                return super.visitMethodDeclaration(legacy, p);
+            }
+        };
+        const legacySpec = new RecipeSpec();
+        legacySpec.recipe = fromVisitor(new legacyVisitor());
+        legacySpec.allowEmptyDiff = true;
+
+        // when the method (inside an object literal) is visited, then it must not throw
+        // "Cannot read properties of undefined (reading 'length')"
+        return legacySpec.rewriteRun(
+            //language=typescript
+            typescript('const o = { foo() {} };')
+        );
     });
 });

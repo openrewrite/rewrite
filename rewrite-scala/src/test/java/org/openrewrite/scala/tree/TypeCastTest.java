@@ -135,4 +135,27 @@ class TypeCastTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void chainedAsInstanceOfOnNewLine() {
+        rewriteRun(
+          scala(
+            """
+            val hudiSchemaAsStruct = something.dataType
+              .asInstanceOf[StructType]
+            """
+          )
+        );
+    }
+
+    @Test
+    void castToFunctionType() {
+        rewriteRun(
+          scala(
+            """
+            val f = x.asInstanceOf[A => B]
+            """
+          )
+        );
+    }
 }

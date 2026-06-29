@@ -19,6 +19,8 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.DataTableDescriptor;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RecipeMarketplaceReaderTest {
@@ -289,6 +291,23 @@ class RecipeMarketplaceReaderTest {
     }
 
     @Test
+    void writerSortsRecipeRowsAlphabetically() {
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,category2,ecosystem,packageName
+          org.example.Zeta,Search,Java,maven,org.example:rewrite-java
+          org.example.Alpha,Search,Maven,maven,org.example:rewrite-maven
+          org.example.Beta,Cleanup,Java,maven,org.example:rewrite-java
+          """);
+        String writtenCsv = new RecipeMarketplaceWriter().toCsv(marketplace);
+
+        List<String> recipeRows = writtenCsv.lines()
+          .skip(1)
+          .toList();
+
+        assertThat(recipeRows).isSorted();
+    }
+
+    @Test
     void recipeInMultipleCategoriesHasSeparateBundleInstances() {
         // This tests the scenario where a recipe appears in multiple categories
         // (e.g., Java recipes that also work for JavaScript). Each listing should
@@ -434,6 +453,89 @@ class RecipeMarketplaceReaderTest {
         RecipeListing mergedOther = target.findRecipe("org.example.OtherRecipe");
         assertThat(mergedOther).isNotNull();
         assertThat(mergedOther.getMetadata().get("embedding")).isEqualTo("xyz789");
+    }
+
+    @Test
+    void mergeCategoriesCaseInsensitive() {
+        // Simulates the real-world scenario where rewrite-java defines category "AI"
+        // and rewrite-ai defines category "ai" -- these should merge into one category
+        RecipeMarketplace marketplace1 = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,ecosystem,packageName
+          org.openrewrite.java.ai.ClassDefinitionLength,AI,maven,org.openrewrite:rewrite-java
+          org.openrewrite.java.ai.MethodDefinitionLength,AI,maven,org.openrewrite:rewrite-java
+          """);
+
+        RecipeMarketplace marketplace2 = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,ecosystem,packageName
+          io.moderne.ai.FindAgentsInUse,ai,maven,io.moderne.recipe:rewrite-ai
+          io.moderne.ai.FindLibrariesInUse,ai,maven,io.moderne.recipe:rewrite-ai
+          """);
+
+        marketplace1.getRoot().merge(marketplace2.getRoot());
+
+        assertThat(marketplace1.getRoot().getCategories())
+          .as("AI and ai should merge into a single category")
+          .hasSize(1);
+        assertThat(marketplace1.getRoot().getCategories().getFirst().getRecipes()).hasSize(4);
+        // The first-seen casing wins
+        assertThat(marketplace1.getRoot().getCategories().getFirst().getDisplayName()).isEqualTo("AI");
+    }
+
+    @Test
+    void mergeDoesNotAliasCategoryBranches() {
+        // Regression: when the target lacks a category that the source has, merge
+        // must deep-copy the branch rather than aliasing the source's Category
+        // instance. Otherwise later mutations to the target's tree mutate the
+        // source as well, and when the source is a cached marketplace shared
+        // across requests, concurrent readers iterate while a writer mutates,
+        // producing ConcurrentModificationException.
+        RecipeMarketplace source = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,category2,ecosystem,packageName
+          org.example.SourceRecipe,Inner,Outer,maven,org.example:source
+          """);
+        RecipeMarketplace target = new RecipeMarketplace();
+
+        target.getRoot().merge(source.getRoot());
+
+        RecipeMarketplace.Category sourceOuter = findCategory(source.getRoot(), "Outer");
+        RecipeMarketplace.Category targetOuter = findCategory(target.getRoot(), "Outer");
+        assertThat(targetOuter).isNotSameAs(sourceOuter);
+        assertThat(findCategory(targetOuter, "Inner")).isNotSameAs(findCategory(sourceOuter, "Inner"));
+
+        // Mutate the target by merging an overlay that overlaps the same path.
+        // If the target's branches were aliased to source, this would also mutate source.
+        RecipeMarketplace overlay = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,category2,ecosystem,packageName
+          org.example.OverlayRecipe,Inner,Outer,maven,org.example:overlay
+          """);
+        target.getRoot().merge(overlay.getRoot());
+
+        assertThat(findCategory(sourceOuter, "Inner").getRecipes())
+          .as("Source category must not be mutated by changes to merge target")
+          .extracting(RecipeListing::getName)
+          .containsExactly("org.example.SourceRecipe");
+
+        assertThat(findCategory(targetOuter, "Inner").getRecipes())
+          .extracting(RecipeListing::getName)
+          .containsExactlyInAnyOrder("org.example.SourceRecipe", "org.example.OverlayRecipe");
+    }
+
+    @Test
+    void installCategoriesCaseInsensitive() {
+        // When installing recipes via CSV where one uses "AI" and another uses "ai"
+        // in the same category position, they should land in the same category
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,ecosystem,packageName
+          org.example.Recipe1,AI,maven,org.example:test1
+          org.example.Recipe2,ai,maven,org.example:test2
+          """);
+
+        assertThat(marketplace.getRoot().getCategories())
+          .as("AI and ai should be treated as the same category during install")
+          .hasSize(1);
+        assertThat(marketplace.getRoot().getCategories().getFirst().getRecipes()).hasSize(2);
+        // The first-seen casing wins
+        assertThat(marketplace.getRoot().getCategories().getFirst().getDisplayName()).isEqualTo("AI");
     }
 
     private static RecipeMarketplace.Category findCategory(RecipeMarketplace.Category category, String name) {

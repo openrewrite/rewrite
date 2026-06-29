@@ -25,7 +25,9 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Trait;
 
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
@@ -49,6 +51,45 @@ class GradleDependenciesTest implements RewriteTest {
                   return mi;
               }
           }));
+    }
+
+    @Test
+    void noNewTraitInstanceWhenNothingIsRemoved() {
+        AtomicReference<GradleDependencies> input = new AtomicReference<>();
+        AtomicReference<GradleDependencies> output = new AtomicReference<>();
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  var mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                  new GradleDependencies.Matcher().get(mi, getCursor().getParent()).ifPresent(deps -> {
+                      input.set(deps);
+                      // Try to remove a dependency that is not present, so nothing should change.
+                      output.set(deps.removeDependency("com.example", "does-not-exist"));
+                  });
+                  return mi;
+              }
+          })),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation 'org.apache.commons:commons-lang3:3.17.0'
+              }
+              """
+          )
+        );
+
+        assertThat(input.get()).isNotNull();
+        // When no statement is removed, no new trait (or underlying tree) should be allocated.
+        assertThat(output.get())
+          .as("removeDependency should return the same instance when nothing changes")
+          .isSameAs(input.get());
     }
 
     @DocumentExample

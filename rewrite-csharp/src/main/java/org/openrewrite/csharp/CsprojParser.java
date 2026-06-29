@@ -20,88 +20,155 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.marker.MSBuildProject;
-import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
-import org.openrewrite.csharp.rpc.ParseSolutionResult;
 import org.openrewrite.xml.XmlParser;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.stream.Stream;
 
+import static org.openrewrite.Tree.randomId;
+
 /**
- * A parser for .csproj files that wraps XmlParser and attaches MSBuildProject markers.
- * <p>
- * If a {@link ParseSolutionResult} is provided via the builder, uses pre-resolved
- * project metadata from a prior {@code parseSolution()} call. Otherwise, if a
- * CSharpRewriteRpc server is available (configured via {@link CSharpRewriteRpc#setFactory}),
- * uses real MSBuild evaluation to populate the marker with resolved metadata.
- * Falls back to extracting declared metadata directly from the XML structure.
- * <p>
- * This is analogous to how MavenParser automatically attaches MavenResolutionResult
- * markers to pom.xml files during parsing.
+ * A parser for .csproj files that parses them as XML and attaches
+ * an MSBuildProject marker with metadata extracted from the XML structure.
  */
 public class CsprojParser implements Parser {
     private final XmlParser xmlParser;
-    private final @Nullable ParseSolutionResult solutionResult;
 
-    CsprojParser(XmlParser xmlParser, @Nullable ParseSolutionResult solutionResult) {
+    CsprojParser(XmlParser xmlParser) {
         this.xmlParser = xmlParser;
-        this.solutionResult = solutionResult;
     }
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         return xmlParser.parseInputs(sources, relativeTo, ctx)
-                .map(sourceFile -> {
-                    if (sourceFile instanceof Xml.Document) {
-                        Xml.Document doc = (Xml.Document) sourceFile;
-                        MSBuildProject marker = resolveFromSolution(doc, relativeTo);
-                        if (marker == null) {
-                            marker = resolveViaRpc(doc, relativeTo, ctx);
-                        }
-                        if (marker == null) {
-                            marker = Assertions.extractMSBuildProjectFromXml(doc);
-                        }
+                .map(sf -> {
+                    if (sf instanceof Xml.Document) {
+                        Xml.Document doc = (Xml.Document) sf;
+                        MSBuildProject marker = createMarkerFromXml(doc);
                         if (marker != null) {
-                            doc = doc.withMarkers(doc.getMarkers().add(marker));
+                            return (SourceFile) doc.withMarkers(doc.getMarkers().add(marker));
                         }
-                        return doc;
                     }
-                    return sourceFile;
+                    return sf;
                 });
     }
 
-    private @Nullable MSBuildProject resolveFromSolution(Xml.Document doc, @Nullable Path relativeTo) {
-        if (solutionResult == null || relativeTo == null) {
+    /**
+     * Creates an MSBuildProject marker by extracting metadata from the XML structure.
+     * Extracts the Sdk attribute, target frameworks, and package references.
+     */
+    static @Nullable MSBuildProject createMarkerFromXml(Xml.Document doc) {
+        Xml.Tag root = doc.getRoot();
+        if (root == null) {
             return null;
         }
-        Path absolutePath = relativeTo.resolve(doc.getSourcePath());
-        MSBuildProject marker = solutionResult.getProject(absolutePath.toString());
-        if (marker == null) {
-            marker = solutionResult.getProject(doc.getSourcePath().toString());
-        }
-        return marker;
+
+        // Extract Sdk attribute from <Project Sdk="...">
+        String sdk = getAttributeValue(root, "Sdk");
+
+        // Extract target frameworks and package references
+        List<MSBuildProject.TargetFramework> targetFrameworks = extractTargetFrameworks(root);
+
+        return MSBuildProject.builder()
+                .id(randomId())
+                .sdk(sdk)
+                .targetFrameworks(targetFrameworks)
+                .build();
     }
 
-    private @Nullable MSBuildProject resolveViaRpc(Xml.Document doc, @Nullable Path relativeTo, ExecutionContext ctx) {
-        if (relativeTo == null) {
-            return null;
+    private static List<MSBuildProject.TargetFramework> extractTargetFrameworks(Xml.Tag root) {
+        // Find TargetFramework or TargetFrameworks in PropertyGroup
+        String tfmValue = null;
+        String tfmsValue = null;
+
+        for (Xml.Tag propertyGroup : findChildTags(root, "PropertyGroup")) {
+            for (Xml.Tag child : findChildTags(propertyGroup, "TargetFramework")) {
+                tfmValue = getTagTextValue(child);
+            }
+            for (Xml.Tag child : findChildTags(propertyGroup, "TargetFrameworks")) {
+                tfmsValue = getTagTextValue(child);
+            }
         }
-        try {
-            Path csprojPath = relativeTo.resolve(doc.getSourcePath());
-            if (!Files.exists(csprojPath)) {
-                return null;
+
+        List<String> tfmNames = new ArrayList<>();
+        if (tfmsValue != null) {
+            for (String tfm : tfmsValue.split(";")) {
+                String trimmed = tfm.trim();
+                if (!trimmed.isEmpty()) {
+                    tfmNames.add(trimmed);
+                }
             }
-            CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
-            ParseSolutionResult result = rpc.parseSolution(csprojPath, relativeTo, ctx);
-            if (!result.projects().isEmpty()) {
-                return result.projects().get(0);
+        } else if (tfmValue != null) {
+            tfmNames.add(tfmValue.trim());
+        }
+
+        if (tfmNames.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Extract package references from ItemGroup
+        List<MSBuildProject.PackageReference> packageReferences = new ArrayList<>();
+        for (Xml.Tag itemGroup : findChildTags(root, "ItemGroup")) {
+            for (Xml.Tag pkgRef : findChildTags(itemGroup, "PackageReference")) {
+                String include = getAttributeValue(pkgRef, "Include");
+                if (include != null) {
+                    String version = getAttributeValue(pkgRef, "Version");
+                    packageReferences.add(MSBuildProject.PackageReference.builder()
+                            .include(include)
+                            .requestedVersion(version)
+                            .build());
+                }
             }
-        } catch (Exception e) {
-            // Fall back to XML extraction
+        }
+
+        // Create a TargetFramework entry for each TFM with the same package references
+        List<MSBuildProject.TargetFramework> result = new ArrayList<>();
+        for (String tfm : tfmNames) {
+            result.add(MSBuildProject.TargetFramework.builder()
+                    .targetFramework(tfm)
+                    .packageReferences(packageReferences)
+                    .build());
+        }
+        return result;
+    }
+
+    private static List<Xml.Tag> findChildTags(Xml.Tag parent, String name) {
+        List<Xml.Tag> result = new ArrayList<>();
+        if (parent.getContent() != null) {
+            for (Content content : parent.getContent()) {
+                if (content instanceof Xml.Tag && name.equals(((Xml.Tag) content).getName())) {
+                    result.add((Xml.Tag) content);
+                }
+            }
+        }
+        return result;
+    }
+
+    private static @Nullable String getAttributeValue(Xml.Tag tag, String name) {
+        if (tag.getAttributes() != null) {
+            for (Xml.Attribute attr : tag.getAttributes()) {
+                if (name.equals(attr.getKeyAsString())) {
+                    return attr.getValueAsString();
+                }
+            }
         }
         return null;
+    }
+
+    private static @Nullable String getTagTextValue(Xml.Tag tag) {
+        if (tag.getContent() != null) {
+            for (Content content : tag.getContent()) {
+                if (content instanceof Xml.CharData) {
+                    return ((Xml.CharData) content).getText().trim();
+                }
+            }
+        }
+        return tag.getValue().orElse(null);
     }
 
     @Override
@@ -120,20 +187,13 @@ public class CsprojParser implements Parser {
     }
 
     public static class Builder extends Parser.Builder {
-        private @Nullable ParseSolutionResult solutionResult;
-
         Builder() {
             super(Xml.Document.class);
         }
 
-        public Builder solutionResult(ParseSolutionResult result) {
-            this.solutionResult = result;
-            return this;
-        }
-
         @Override
         public CsprojParser build() {
-            return new CsprojParser(XmlParser.builder().build(), solutionResult);
+            return new CsprojParser(XmlParser.builder().build());
         }
 
         @Override

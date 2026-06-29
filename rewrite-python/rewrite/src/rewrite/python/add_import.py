@@ -208,21 +208,13 @@ class AddImport(PythonVisitor):
             if from_name != self.module:
                 continue
 
-            # Found an existing import from the same module - add our name
+            # Found an existing import from the same module - add our name in
+            # case-insensitive alphabetical position (mirrors rewrite-javascript's
+            # AddImport). Existing members are not reordered; only the new member
+            # is positioned.
             new_import = self._create_import_element(self.name, self.alias)
-            # Give the new import a space prefix (space after comma)
-            new_import = new_import.replace(prefix=Space.SINGLE_SPACE)
-
-            # Preserve existing padded elements; append new one with proper padding
-            existing_padded = list(stmt.padding.names.padding.elements)
-            # Move last element's .after (typically '\n') to the new element
-            if existing_padded:
-                last = existing_padded[-1]
-                existing_padded[-1] = last.replace(_after=Space.EMPTY)
-                new_padded_import = JRightPadded(new_import, last.after, Markers.EMPTY)
-            else:
-                new_padded_import = JRightPadded(new_import, Space.EMPTY, Markers.EMPTY)
-            existing_padded.append(new_padded_import)
+            existing_padded = self._insert_member(
+                list(stmt.padding.names.padding.elements), new_import)
 
             # Recreate the MultiImport with the new names
             new_multi = MultiImport(
@@ -246,6 +238,63 @@ class AddImport(PythonVisitor):
 
         return cu
 
+    def _insert_member(self, elements: list, new_import: Import) -> list:
+        """Insert ``new_import`` into a list of ``JRightPadded[Import]`` at its
+        case-insensitive alphabetical position.
+
+        The space after the ``import`` keyword lives in the surrounding
+        ``JContainer.before``, so the element at index 0 carries an empty prefix
+        while every later element carries a single-space prefix (the space after
+        the separating comma). Trailing whitespace (e.g. before a ``)`` in a
+        parenthesized import) lives in the last element's ``.after`` and must
+        travel with whichever element ends up last.
+        """
+        insert_idx = self._sorted_insert_index(elements, new_import)
+        end = len(elements)
+
+        if insert_idx == 0:
+            prefix = Space.EMPTY
+            if elements:
+                # The displaced first element now follows a comma.
+                first = elements[0]
+                elements[0] = first.replace(
+                    _element=first.element.replace(prefix=Space.SINGLE_SPACE))
+        else:
+            prefix = Space.SINGLE_SPACE
+        new_import = new_import.replace(prefix=prefix)
+
+        if insert_idx == end and elements:
+            # Appending at the end: the new element becomes the last, so any
+            # trailing whitespace moves from the old last element onto it.
+            last = elements[-1]
+            elements[-1] = last.replace(_after=Space.EMPTY)
+            after = last.after
+        else:
+            after = Space.EMPTY
+
+        elements.insert(insert_idx, JRightPadded(new_import, after, Markers.EMPTY))
+        return elements
+
+    def _sorted_insert_index(self, elements: list, new_import: Import) -> int:
+        """Return the index at which the new member keeps the list in
+        case-insensitive alphabetical order: the first existing member whose
+        bound name sorts after the new member's, or the end if none does.
+
+        Members are sorted by their bound name (alias if present, else the
+        imported name), matching rewrite-javascript's comparator.
+        """
+        new_key = self._sort_key(new_import)
+        for i, padded in enumerate(elements):
+            if new_key < self._sort_key(padded.element):
+                return i
+        return len(elements)
+
+    @staticmethod
+    def _sort_key(imp: Import) -> str:
+        """Case-insensitive sort key for an imported member: its alias if it has
+        one, otherwise the imported name."""
+        return (get_alias_name(imp) or get_qualid_name(imp.qualid)).lower()
+
     def _add_import(self, cu: CompilationUnit) -> CompilationUnit:
         """Add a new import statement to the compilation unit."""
         new_import = self._create_multi_import()
@@ -260,7 +309,13 @@ class AddImport(PythonVisitor):
                 break  # Stop after we've passed the import section
 
         # Insert the new import at the padding level
-        if insert_idx == 0 and padded_stmts:
+        if not padded_stmts:
+            # Empty file (e.g., a prior remove-import emptied the statement
+            # list). The new import becomes the sole statement with empty
+            # prefix; any trailing newline lives in cu.eof.
+            new_padded = JRightPadded(new_import.replace(prefix=Space.EMPTY), Space.EMPTY, Markers.EMPTY)
+            padded_stmts.append(new_padded)
+        elif insert_idx == 0:
             first = padded_stmts[0]
             first_prefix = first.element.prefix
             if first_prefix.whitespace and first_prefix.whitespace.startswith('\n'):

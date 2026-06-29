@@ -146,9 +146,13 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                             }
                         }
                         Dependency req = resolvedDependency.getRequested();
-                        String reqGroup = req.getGroupId();
-                        if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                                req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                        ResolvedPom pom = getResolutionResult().getPom();
+                        String reqGroup = pom.getValue(req.getGroupId());
+                        String reqArtifact = pom.getValue(req.getArtifactId());
+                        String tagGroupId = pom.getValue(tag.getChildValue("groupId").orElse(null));
+                        String tagArtifactId = pom.getValue(tag.getChildValue("artifactId").orElse(null));
+                        if ((reqGroup == null || reqGroup.equals(tagGroupId)) &&
+                                reqArtifact.equals(tagArtifactId) &&
                                 scope == tagScope) {
                             return true;
                         }
@@ -194,8 +198,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
             if (matchesGlob(dm.getGroupId(), groupId) && matchesGlob(dm.getArtifactId(), artifactId)) {
                 ManagedDependency req = dm.getRequested();
-                String reqGroup = req.getGroupId();
-                if (reqGroup.equals(tag.getChildValue("groupId").orElse(null)) &&
+                if (req != null &&
+                        req.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
                         req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
                         dm.getScope() == tag.getChildValue("scope").map(Scope::fromName).orElse(null)) {
                     return true;
@@ -204,8 +208,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (dm.getBomGav() != null) {
                 if (matchesGlob(dm.getBomGav().getGroupId(), groupId) && matchesGlob(dm.getBomGav().getArtifactId(), artifactId)) {
                     ManagedDependency requestedBom = dm.getRequestedBom();
-                    //noinspection ConstantConditions
-                    if (requestedBom.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
+                    if (requestedBom != null &&
+                            requestedBom.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
                             requestedBom.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null))) {
                         return true;
                     }
@@ -413,11 +417,14 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         if (inClasspathOf != null && tagScope != inClasspathOf && !tagScope.isInClasspathOf(inClasspathOf)) {
             return null;
         }
+        ResolvedPom resolvedPom = getResolutionResult().getPom();
         for (Map.Entry<Scope, List<ResolvedDependency>> scope : getResolutionResult().getDependencies().entrySet()) {
             if (inClasspathOf == null || scope.getKey() == inClasspathOf || scope.getKey().isInClasspathOf(inClasspathOf)) {
                 for (ResolvedDependency d : scope.getValue()) {
-                    if (tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()).equals(d.getGroupId()) &&
-                            tag.getChildValue("artifactId").orElse(getResolutionResult().getPom().getArtifactId()).equals(d.getArtifactId())) {
+                    String tagGroupId = resolvedPom.getValue(tag.getChildValue("groupId").orElse(null));
+                    String tagArtifactId = resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null));
+                    if ((tagGroupId != null ? tagGroupId : resolvedPom.getGroupId()).equals(d.getGroupId()) &&
+                            (tagArtifactId != null ? tagArtifactId : resolvedPom.getArtifactId()).equals(d.getArtifactId())) {
                         return d;
                     }
                 }

@@ -44,13 +44,30 @@ public class RecipeRun {
         return null;
     }
 
+    /**
+     * @deprecated Use {@link #getDataTableRows(Class)} for type-safe deserialization.
+     */
+    @Deprecated
     public <E> List<E> getDataTableRows(String name) {
         return getDataTableRows(name, null);
     }
 
+    /**
+     * @deprecated Use {@link #getDataTableRows(Class, String)} for type-safe deserialization.
+     */
     @SuppressWarnings("unchecked")
+    @Deprecated
     public <E> List<E> getDataTableRows(String name, @Nullable String group) {
         return (List<E>) dataTableStore.getRows(name, group)
+                .collect(Collectors.toList());
+    }
+
+    public <E> List<E> getDataTableRows(Class<? extends DataTable<E>> dataTableClass) {
+        return getDataTableRows(dataTableClass, null);
+    }
+
+    public <E> List<E> getDataTableRows(Class<? extends DataTable<E>> dataTableClass, @Nullable String group) {
+        return dataTableStore.getRows(dataTableClass, group)
                 .collect(Collectors.toList());
     }
 }

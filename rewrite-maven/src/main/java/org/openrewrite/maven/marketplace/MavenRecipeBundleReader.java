@@ -103,19 +103,14 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
         RecipeMarketplace marketplace = new RecipeMarketplace();
         List<Path> classpath = classpath();
         try (RecipeClassLoader classLoader = new RecipeClassLoader(requireNonNull(recipeJar), classpath)) {
-            // First pass: Scan only the recipe jar for recipes and don't list recipes from dependencies
+            // Scan the recipe jar for recipes, with dependency loaders providing
+            // category descriptors and cross-dependency YAML recipe resolution.
             Environment env = Environment.builder().scanJar(
                     requireNonNull(recipeJar).toAbsolutePath(),
                     classpath.stream().map(Path::toAbsolutePath).collect(toList()),
                     classLoader
             ).build();
 
-            // Second pass: Scan all jars in classpath for recipes and categories
-            // This gives us proper root categories from category YAMLs.
-            Environment envWithCategories = environment();
-
-            // Bundle version may be set in the environment() call above (as the JARs making up
-            // the classpath are resolved)
             GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
 
             for (RecipeDescriptor descriptor : env.listRecipeDescriptors()) {
@@ -124,7 +119,7 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
                                 "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
                                 bundle.getRequestedVersion() == null ? gav.getVersion() : bundle.getRequestedVersion(),
                                 gav.getVersion(), null)),
-                        descriptor.inferCategoriesFromName(envWithCategories)
+                        descriptor.inferCategoriesFromName(env)
                 );
             }
             return marketplace;

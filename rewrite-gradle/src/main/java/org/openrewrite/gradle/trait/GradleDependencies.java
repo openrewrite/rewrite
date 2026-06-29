@@ -82,7 +82,11 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
         if (arguments.isEmpty()) {
             return null;
         }
-        Cursor newCursor = new Cursor(this.cursor.getParent(), getTree().withArguments(arguments));
+        J.MethodInvocation newTree = getTree().withArguments(arguments);
+        if (getTree() == newTree) {
+            return this;
+        }
+        Cursor newCursor = new Cursor(this.cursor.getParent(), newTree);
 
         return new GradleDependencies(newCursor);
     }

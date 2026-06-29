@@ -1,0 +1,134 @@
+---
+name: npm-publish
+
+# Publishes after `ci` succeeds for any non-PR event on main (push, manual
+# dispatch, or the daily schedule), or `publish` succeeds for a version tag.
+# This mirrors the Maven snapshot publish in gh-automation's ci-gradle.yml,
+# which publishes for `event_name != 'pull_request'` on main — so npm gets a
+# counterpart for every Maven snapshot. `ci` also runs for PRs; those must not
+# publish to npm.
+on:
+  workflow_run:
+    workflows:
+      - ci
+      - publish
+    types:
+      - completed
+
+concurrency:
+  group: npm-publish-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      (
+        (
+          github.event.workflow_run.name == 'ci' &&
+          github.event.workflow_run.event != 'pull_request' &&
+          github.event.workflow_run.head_branch == 'main'
+        ) ||
+        (
+          github.event.workflow_run.name == 'publish' &&
+          github.event.workflow_run.event == 'push'
+        )
+      ) &&
+      (github.repository_owner == 'openrewrite' || github.repository_owner == 'moderneinc')
+    permissions:
+      contents: read
+      id-token: write
+      actions: read  # download the published-snapshot-version artifact from the triggering `ci` run
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          show-progress: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            25
+            21
+
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          develocity-access-key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+
+      # Trusted Publisher auto-detection in `npm publish` requires npm >= 11.5.1.
+      # GitHub-hosted ubuntu runners currently ship Node 22 / npm 10.x, and the
+      # global install needs sudo to write under /usr/local.
+      - shell: bash
+        run: sudo npm install -g npm@latest
+
+      # The `ci` run records the exact Maven snapshot version it deployed for
+      # rewrite-javascript and uploads it as the `published-snapshot-version` artifact.
+      # Download it so the npm package can mirror that version 1:1. Best-effort: absent
+      # on the `publish` tag path (and on older `ci` runs), in which case the step below
+      # falls back to Gradle's own snapshot-version derivation.
+      - if: github.event.workflow_run.name == 'ci'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: published-snapshot-version
+          path: .published-version
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      # For a tag-triggered upstream `publish` run, `head_branch` is the tag name
+      # (e.g. `v8.83.0`). Strip the leading `v` and publish to dist-tag `latest`.
+      # Otherwise this is the `ci`-triggered snapshot path: mirror the exact Maven
+      # snapshot version handed off above (so every Maven snapshot gets a 1:1 npm
+      # counterpart), and publish to dist-tag `next`.
+      - id: ver
+        shell: bash
+        env:
+          TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [[ '${{ github.event.workflow_run.name }}' == 'publish' ]]; then
+            echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+            echo "dist_tag=latest"  >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          V=''
+          F=$(find .published-version -name publishedVersion.txt 2>/dev/null | head -1)
+          if [[ -n "$F" ]]; then
+            V=$(tr -d '[:space:]' < "$F")
+            echo "Mirroring Maven snapshot version handed off from the ci run: $V"
+          else
+            echo "No handed-off version found; falling back to Gradle-derived snapshot version"
+          fi
+          echo "version=$V"     >> "$GITHUB_OUTPUT"
+          echo "dist_tag=next"  >> "$GITHUB_OUTPUT"
+
+      - shell: bash
+        run: |
+          ARGS=()
+          if [[ -n '${{ steps.ver.outputs.version }}' ]]; then
+            ARGS+=("-PnpmPublishVersion=${{ steps.ver.outputs.version }}")
+          fi
+          ./gradlew --no-daemon --console=plain --info --stacktrace \
+            :rewrite-javascript:npmPack "${ARGS[@]}"
+
+      # npm has no `--skip-duplicate`. Guards against a re-run of the same upstream
+      # event (which resolves to the identical version) 403-ing. A genuine new Maven
+      # snapshot always carries a fresh build number, so this never suppresses a
+      # legitimate publish — including the daily schedule, even with no new commit.
+      - shell: bash
+        env:
+          CI: 'true'
+          DIST_TAG: ${{ steps.ver.outputs.dist_tag }}
+        run: |
+          TGZ=$(ls rewrite-javascript/build/distributions/openrewrite-rewrite-*.tgz)
+          V=$(tar -xzOf "$TGZ" package/package.json | python3 -c 'import json,sys;print(json.load(sys.stdin)["version"])')
+          echo "Tarball: $TGZ"
+          echo "Version: $V"
+          echo "Dist-tag: $DIST_TAG"
+          if npm view "@openrewrite/rewrite@$V" version >/dev/null 2>&1; then
+            echo "Skipping npm publish: @openrewrite/rewrite@$V already published"
+            exit 0
+          fi
+          npm publish "$TGZ" --tag "$DIST_TAG"

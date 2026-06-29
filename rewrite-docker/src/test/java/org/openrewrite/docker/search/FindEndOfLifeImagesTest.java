@@ -102,7 +102,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: ubuntu:16.04 (ended 2021-04-02, suggest noble (24.04)))~~>FROM ubuntu:16.04
+              ~~(EOL: ubuntu:16.04 (ended 2021-04-02, suggest plucky (26.04)))~~>FROM ubuntu:16.04
               RUN apt-get update
               """
           )
@@ -118,7 +118,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apt-get update
               """,
             """
-              ~~(EOL: ubuntu:bionic (ended 2023-05-31, suggest noble (24.04)))~~>FROM ubuntu:bionic
+              ~~(EOL: ubuntu:bionic (ended 2023-05-31, suggest plucky (26.04)))~~>FROM ubuntu:bionic
               RUN apt-get update
               """
           )
@@ -134,7 +134,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN apk update
               """,
             """
-              ~~(EOL: alpine:3.14 (ended 2023-05-01, suggest 3.23 or 3.22))~~>FROM alpine:3.14
+              ~~(EOL: alpine:3.14 (ended 2023-05-01, suggest 3.24 or 3.23))~~>FROM alpine:3.14
               RUN apk update
               """
           )
@@ -182,7 +182,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN npm install
               """,
             """
-              ~~(EOL: node:14-slim (ended 2023-04-30, suggest 24 or 22))~~>FROM node:14-slim
+              ~~(EOL: node:14-slim (ended 2023-04-30, suggest 26 or 24))~~>FROM node:14-slim
               RUN npm install
               """
           )
@@ -198,7 +198,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               RUN npm install
               """,
             """
-              ~~(EOL: node:16 (ended 2023-09-11, suggest 24 or 22))~~>FROM node:16
+              ~~(EOL: node:16 (ended 2023-09-11, suggest 26 or 24))~~>FROM node:16
               RUN npm install
               """
           )
@@ -296,7 +296,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
             //language=csv
             """
               sourceFile,stageName,imageName,tag,eolDate,suggestedReplacement
-              Dockerfile,builder,node,14,2023-04-30,"24 or 22"
+              Dockerfile,builder,node,14,2023-04-30,"26 or 24"
               Dockerfile,,debian,buster,2022-09-10,"trixie (13)"
               """
           ),
@@ -309,7 +309,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               COPY --from=builder /app /app
               """,
             """
-              ~~(EOL: node:14 (ended 2023-04-30, suggest 24 or 22))~~>FROM node:14 AS builder
+              ~~(EOL: node:14 (ended 2023-04-30, suggest 26 or 24))~~>FROM node:14 AS builder
               RUN npm run build
 
               ~~(EOL: debian:buster (ended 2022-09-10, suggest trixie (13)))~~>FROM debian:buster

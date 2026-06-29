@@ -1497,4 +1497,244 @@ class JavaTemplateTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7443")
+    @Test
+    void replaceExpressionInSwitchExpressionRuleArm() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final MethodMatcher emptyListMatcher = new MethodMatcher("java.util.Collections emptyList()");
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (emptyListMatcher.matches(m)) {
+                      return JavaTemplate.builder("List.of()")
+                        .contextSensitive()
+                        .imports("java.util.List")
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().replace());
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0 -> Collections.emptyList();
+                          default -> null;
+                      };
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0 -> List.of();
+                          default -> null;
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7443")
+    @Test
+    void replaceExpressionInSwitchExpressionColonArm() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final MethodMatcher emptyListMatcher = new MethodMatcher("java.util.Collections emptyList()");
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (emptyListMatcher.matches(m)) {
+                      return JavaTemplate.builder("List.of()")
+                        .contextSensitive()
+                        .imports("java.util.List")
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().replace());
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0: yield Collections.emptyList();
+                          default: yield null;
+                      };
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0: yield List.of();
+                          default: yield null;
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7443")
+    @Test
+    void replaceExpressionInSwitchExpressionPreservesUnrelatedArms() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final MethodMatcher emptyListMatcher = new MethodMatcher("java.util.Collections emptyList()");
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                  if (emptyListMatcher.matches(m)) {
+                      return JavaTemplate.builder("List.of()")
+                        .contextSensitive()
+                        .imports("java.util.List")
+                        .build()
+                        .apply(getCursor(), m.getCoordinates().replace());
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              import java.util.Arrays;
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0 -> Arrays.asList("a");
+                          case 1 -> Collections.emptyList();
+                          case 2 -> Arrays.asList("b");
+                          default -> null;
+                      };
+                  }
+              }
+              """,
+            """
+              import java.util.Arrays;
+              import java.util.Collections;
+              import java.util.List;
+
+              class T {
+                  List<Object> m(int i) {
+                      return switch (i) {
+                          case 0 -> Arrays.asList("a");
+                          case 1 -> List.of();
+                          case 2 -> Arrays.asList("b");
+                          default -> null;
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceExpressionLambdaBody() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                  if (!(lambda.getBody() instanceof J.Literal) ||
+                      !Boolean.TRUE.equals(((J.Literal) lambda.getBody()).getValue())) {
+                      return super.visitLambda(lambda, ctx);
+                  }
+                  J.Literal body = (J.Literal) lambda.getBody();
+                  return JavaTemplate.builder("Boolean.FALSE")
+                    .contextSensitive()
+                    .build()
+                    .apply(getCursor(), body.getCoordinates().replace());
+              }
+          })),
+          java(
+            """
+              import java.util.function.BooleanSupplier;
+
+              class Test {
+                  BooleanSupplier always = () -> true;
+              }
+              """,
+            """
+              import java.util.function.BooleanSupplier;
+
+              class Test {
+                  BooleanSupplier always = () -> Boolean.FALSE;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceStatementInsideLambdaBlockBody() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                  if (!(lambda.getBody() instanceof J.Block)) {
+                      return super.visitLambda(lambda, ctx);
+                  }
+                  J.Block block = (J.Block) lambda.getBody();
+                  if (block.getStatements().size() != 1 ||
+                      !(block.getStatements().get(0) instanceof J.Return) ||
+                      !(((J.Return) block.getStatements().get(0)).getExpression() instanceof J.Literal) ||
+                      !Boolean.TRUE.equals(((J.Literal) ((J.Return) block.getStatements().get(0)).getExpression()).getValue())) {
+                      return super.visitLambda(lambda, ctx);
+                  }
+                  return JavaTemplate.builder("return Boolean.FALSE;")
+                    .contextSensitive()
+                    .build()
+                    .apply(getCursor(), block.getStatements().get(0).getCoordinates().replace());
+              }
+          })),
+          java(
+            """
+              import java.util.function.BooleanSupplier;
+
+              class Test {
+                  BooleanSupplier always = () -> {
+                      return true;
+                  };
+              }
+              """,
+            """
+              import java.util.function.BooleanSupplier;
+
+              class Test {
+                  BooleanSupplier always = () -> {
+                      return Boolean.FALSE;
+                  };
+              }
+              """
+          )
+        );
+    }
 }

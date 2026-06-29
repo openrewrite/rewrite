@@ -84,4 +84,21 @@ class BlockTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void multipleStatementsSeparatedBySemicolon() {
+        rewriteRun(
+            scala(
+                """
+                class C {
+                  var a = 0
+                  var b = 0
+                  def f(): Unit = {
+                    a = 1; b = 2
+                  }
+                }
+                """
+            )
+        );
+    }
 }

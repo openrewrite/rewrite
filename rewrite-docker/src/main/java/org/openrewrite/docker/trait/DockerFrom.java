@@ -159,6 +159,17 @@ public class DockerFrom implements Trait<Docker.From> {
     }
 
     /**
+     * Returns true if this image is pinned by digest (carries an {@code @sha256:...} reference),
+     * regardless of tag. This is distinct from {@link #isUnpinned()}, which is tag-based: an image
+     * with a specific tag but no digest is not "unpinned", yet it is not digest-pinned either.
+     *
+     * @return true if a digest is present
+     */
+    public boolean isDigestPinned() {
+        return getTree().getDigest() != null;
+    }
+
+    /**
      * Returns the quote style used for the image name, if any.
      *
      * @return The quote style, or null if unquoted

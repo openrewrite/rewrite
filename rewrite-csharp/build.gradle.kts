@@ -17,6 +17,12 @@ plugins {
     id("publishing")
 }
 
+normalization {
+    runtimeClasspath {
+        ignore("META-INF/rewrite-csharp-version.txt")
+    }
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
@@ -67,16 +73,19 @@ val csharpBuild by tasks.registering(Exec::class) {
     description = "Build C# projects"
 
     workingDir = csharpDir
-    commandLine(findDotnet(), "build")
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tests")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(csharpDir.resolve("OpenRewrite/bin"))
+    outputs.dir(csharpDir.resolve("OpenRewrite.Tests/bin"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin"))
 
     doFirst {
+        commandLine(findDotnet(), "build")
         logger.lifecycle("Building C# projects in ${csharpDir}")
     }
 }
@@ -88,13 +97,22 @@ val rpcTestClasspath by tasks.registering {
     description = "Write the Java RPC test server classpath for C# integration tests"
     dependsOn(tasks.named("testClasses"))
 
+    inputs.files(configurations["testRuntimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(tasks.named<JavaCompile>("compileJava").flatMap { it.destinationDirectory })
+    inputs.files(tasks.named<JavaCompile>("compileTestJava").flatMap { it.destinationDirectory })
+    inputs.files(tasks.named("processResources"))
+    inputs.files(tasks.named("processTestResources"))
+
     val classpathFile = layout.buildDirectory.file("rpc-test-server-classpath.txt")
     outputs.file(classpathFile)
 
     doLast {
         val cp = configurations["testRuntimeClasspath"].resolve().joinToString(File.pathSeparator) +
                 File.pathSeparator + tasks.named<JavaCompile>("compileJava").get().destinationDirectory.get().asFile +
-                File.pathSeparator + tasks.named<JavaCompile>("compileTestJava").get().destinationDirectory.get().asFile
+                File.pathSeparator + tasks.named<JavaCompile>("compileTestJava").get().destinationDirectory.get().asFile +
+                File.pathSeparator + tasks.named("processResources").get().outputs.files.singleFile +
+                File.pathSeparator + tasks.named("processTestResources").get().outputs.files.singleFile
         classpathFile.get().asFile.writeText(cp)
     }
 }
@@ -107,17 +125,13 @@ val csharpTest by tasks.registering(Exec::class) {
     dependsOn(csharpBuild, rpcTestClasspath)
 
     workingDir = csharpDir
-    // Use relative path for JUnit XML to avoid absolute paths in cache key
-    val relativeJunitPath = junitXmlFile.relativeTo(csharpDir).path
-    commandLine(
-        findDotnet(), "test", "--no-build", "--verbosity", "normal",
-        "--logger", "junit;LogFilePath=${relativeJunitPath}"
-    )
 
     environment("RPC_TEST_SERVER_CLASSPATH",
         rpcTestClasspath.get().outputs.files.singleFile.absolutePath)
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tests")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -125,6 +139,18 @@ val csharpTest by tasks.registering(Exec::class) {
     outputs.cacheIf { true }
 
     doFirst {
+        // Target the OpenRewrite.Tests project explicitly. Running 'dotnet test' at solution
+        // level would also probe OpenRewrite and OpenRewrite.Tool (neither carries the junit
+        // logger after the test split), which fails the run even though all tests pass.
+        // JunitXml.TestLogger resolves a relative LogFilePath against the test project's
+        // TargetDir, so pin the absolute path and pass --results-directory to match.
+        junitXmlFile.parentFile.mkdirs()
+        commandLine(
+            findDotnet(), "test", "OpenRewrite.Tests/OpenRewrite.Tests.csproj",
+            "--no-build", "--verbosity", "normal",
+            "--results-directory", junitXmlFile.parentFile.absolutePath,
+            "--logger", "junit;LogFilePath=${junitXmlFile.absolutePath}"
+        )
         logger.lifecycle("Running C# tests in ${csharpDir}")
     }
 }
@@ -137,6 +163,9 @@ tasks.named("check") {
 
 testing {
     suites {
+        // Cross-process RPC bridge tests: Java drives the C# tool over the JSON-RPC bridge.
+        // Kept out of the main `test` source set (matching rewrite-javascript/python/go) so the
+        // unit suite stays fast and hermetic.
         register<JvmTestSuite>("integTest") {
             useJUnitJupiter()
 
@@ -144,12 +173,40 @@ testing {
                 implementation(project())
                 implementation(project(":rewrite-java-21"))
                 implementation(project(":rewrite-test"))
+                implementation(project(":rewrite-xml"))
                 implementation("org.assertj:assertj-core:latest.release")
                 implementation("org.junit.platform:junit-platform-suite-api")
                 runtimeOnly("org.junit.platform:junit-platform-suite-engine")
             }
+
+            targets {
+                all {
+                    testTask.configure {
+                        // These tests spawn the freshly built C# tool. dependsOn(csharpBuild) is
+                        // also applied by the tasks.withType<Test> block below, but a plain
+                        // dependsOn only orders the build — it does NOT make a C# source change
+                        // invalidate this task's up-to-date/cache state. Declaring the C# sources
+                        // as inputs does: without it a C# regression can slip through a cached test
+                        // run (e.g. the System.Text.Json `IConvertible` break that reached main).
+                        dependsOn(csharpBuild)
+                        inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
+                        inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
+                            .withPathSensitivity(PathSensitivity.RELATIVE)
+                        // Avoid two tasks driving C# RPC processes at the same time.
+                        shouldRunAfter(tasks.named("test"))
+                    }
+                }
+            }
         }
     }
+}
+
+// Run the cross-process bridge tests as part of `check` (and therefore `build`). The other RPC
+// modules leave integTest opt-in, but here it is the only end-to-end coverage of the Java↔C#
+// bridge, and the input wiring above makes it re-run when the C# tool changes.
+tasks.named("check") {
+    dependsOn(testing.suites.named("integTest"))
 }
 
 // Run tests serially to avoid issues with concurrent C# RPC processes
@@ -242,7 +299,6 @@ val csharpBuildRelease by tasks.registering(Exec::class) {
     description = "Build C# projects in Release configuration"
 
     workingDir = csharpDir
-    commandLine(findDotnet(), "build", "--configuration", "Release")
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -250,6 +306,10 @@ val csharpBuildRelease by tasks.registering(Exec::class) {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(csharpDir.resolve("OpenRewrite/bin/Release"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin/Release"))
+
+    doFirst {
+        commandLine(findDotnet(), "build", "--configuration", "Release")
+    }
 }
 
 val csharpPack by tasks.registering(Exec::class) {
@@ -259,13 +319,6 @@ val csharpPack by tasks.registering(Exec::class) {
     dependsOn(csharpBuildRelease)
 
     workingDir = csharpDir
-    commandLine(
-        findDotnet(), "pack",
-        "--no-build",
-        "--configuration", "Release",
-        "--output", "dist",
-        "/p:Version=$nugetVersion"
-    )
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
@@ -274,6 +327,13 @@ val csharpPack by tasks.registering(Exec::class) {
 
     doFirst {
         csharpDir.resolve("dist").deleteRecursively()
+        commandLine(
+            findDotnet(), "pack",
+            "--no-build",
+            "--configuration", "Release",
+            "--output", "dist",
+            "/p:Version=$nugetVersion"
+        )
         logger.lifecycle("Packing C# NuGet packages (version: $nugetVersion)")
     }
 }
@@ -286,17 +346,18 @@ val csharpPublish by tasks.registering(Exec::class) {
     dependsOn(csharpPack)
 
     workingDir = csharpDir
-    commandLine(
-        findDotnet(), "nuget", "push",
-        "dist/*.nupkg",
-        "--source", "https://api.nuget.org/v3/index.json",
-        "--api-key", project.findProperty("nugetApiKey")?.toString() ?: ""
-    )
 
     doFirst {
         if (!project.hasProperty("nugetApiKey")) {
             throw GradleException("nugetApiKey property is required for NuGet publishing")
         }
+        commandLine(
+            findDotnet(), "nuget", "push",
+            "dist/*.nupkg",
+            "--source", "https://api.nuget.org/v3/index.json",
+            "--api-key", project.findProperty("nugetApiKey")?.toString() ?: "",
+            "--skip-duplicate"
+        )
         logger.lifecycle("Publishing C# NuGet package (version: $nugetVersion)")
     }
 }
@@ -345,6 +406,17 @@ val csharpPublishLocal by tasks.registering {
                 if (packageCacheDir.exists()) {
                     logger.lifecycle("Clearing cached: ${packageCacheDir.absolutePath}")
                     packageCacheDir.deleteRecursively()
+                }
+
+                // Clear the persistent tool-path install for the C# Tool so that
+                // CSharpRewriteRpc reinstalls from the freshly published nupkg on the
+                // next run instead of reusing a stale binary.
+                if (packageId.equals("OpenRewrite.CSharp.Tool", ignoreCase = true)) {
+                    val toolPathDir = file("${System.getProperty("user.home")}/.dotnet/rewrite-tools/$nugetVersion")
+                    if (toolPathDir.exists()) {
+                        logger.lifecycle("Clearing installed tool: ${toolPathDir.absolutePath}")
+                        toolPathDir.deleteRecursively()
+                    }
                 }
 
                 nupkg.copyTo(localFeed.resolve(nupkg.name), overwrite = true)

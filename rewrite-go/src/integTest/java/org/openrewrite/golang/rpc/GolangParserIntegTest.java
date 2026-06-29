@@ -21,6 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.golang.tree.Go;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import org.openrewrite.test.TypeValidation;
@@ -28,7 +30,10 @@ import org.openrewrite.test.TypeValidation;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static org.openrewrite.golang.Assertions.expectMethodType;
+import static org.openrewrite.golang.Assertions.expectType;
 import static org.openrewrite.golang.Assertions.go;
 
 /**
@@ -106,11 +111,70 @@ class GolangParserIntegTest implements RewriteTest {
                                 \tfmt.Println("Hello")
                                 }
                                 """,
+                        spec -> spec.afterRecipe(cu -> expectMethodType(cu, "Println", "fmt"))
+                )
+        );
+    }
+
+    @Test
+    void verifyStructTypeAttribution() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Point struct {
+                                \tX int
+                                \tY int
+                                }
+
+                                func main() {
+                                \tp := Point{X: 1, Y: 2}
+                                \t_ = p
+                                }
+                                """,
+                        spec -> spec.afterRecipe(cu -> expectType(cu, "p", "main.Point"))
+                )
+        );
+    }
+
+    /**
+     * Regression test for the {@code dimensionsAfterName} field added to
+     * {@code J.MethodDeclaration} in #6992. The Go RPC sender/receiver originally
+     * omitted this left-padded list (positioned between {@code parameters} and
+     * {@code throws}), desyncing the RPC stream by one field for every method
+     * declaration. The symptom was a {@code ClassCastException: J$Block cannot be
+     * cast to JContainer} in {@code JavaReceiver.visitMethodDeclaration}, which
+     * broke parsing of <em>any</em> Go source containing a function — not just
+     * C-style arrays (which don't exist in Go). This asserts a plain method
+     * declaration round-trips with its parameters and body intact.
+     */
+    @Test
+    void methodDeclarationRoundTrips() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                func add(a int, b int) int {
+                                \treturn a + b
+                                }
+                                """,
                         spec -> spec.afterRecipe(cu -> {
-                            var methods = org.openrewrite.java.search.FindMethods.find(cu, "fmt Println(..)");
-                            org.assertj.core.api.Assertions.assertThat(methods)
-                                    .as("FindMethods should find fmt.Println invocation via type attribution")
-                                    .isNotEmpty();
+                            J.MethodDeclaration method = new JavaIsoVisitor<AtomicReference<J.MethodDeclaration>>() {
+                                @Override
+                                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration m, AtomicReference<J.MethodDeclaration> found) {
+                                    if ("add".equals(m.getSimpleName())) {
+                                        found.set(m);
+                                    }
+                                    return super.visitMethodDeclaration(m, found);
+                                }
+                            }.reduce(cu, new AtomicReference<J.MethodDeclaration>()).get();
+
+                            assertThat(method).as("method declaration 'add' should be present").isNotNull();
+                            assertThat(method.getParameters()).as("parameters should survive the round-trip").hasSize(2);
+                            assertThat(method.getBody()).as("body should be a J.Block, not a desynced field").isNotNull();
+                            assertThat(method.getReturnTypeExpression()).as("return type should survive the round-trip").isNotNull();
                         })
                 )
         );
@@ -264,6 +328,113 @@ class GolangParserIntegTest implements RewriteTest {
     }
 
     @Test
+    void typeSetUnionConstraintWithApproximation() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Signed interface {
+                                \t~int | ~int8 | ~int16 | ~int32 | ~int64
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void standaloneApproximationConstraint() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type MyInt interface {
+                                \t~int
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void unionOfNamedConstraints() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Signed interface {
+                                \t~int | ~int64
+                                }
+
+                                type Unsigned interface {
+                                \t~uint | ~uint64
+                                }
+
+                                type Integer interface {
+                                \tSigned | Unsigned
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void plainUnionWithoutApproximation() {
+        // Mirrors klauspost/compress .../le.go — a plain union of
+        // primitive type names with no `~`.
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Indexer interface {
+                                \tint | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void unionOfQualifiedNameAndSlice() {
+        // Mirrors golang-jwt/jwt .../token.go — `crypto.PublicKey | []uint8`.
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                import "crypto"
+
+                                type VerificationKey interface {
+                                \tcrypto.PublicKey | []uint8
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void typeSetUnionWithCompositeOperands() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type ByteSeq interface {
+                                \t~[]byte | ~string
+                                }
+
+                                type IntPtr interface {
+                                \t*int | *int64
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
     void mapType() {
         rewriteRun(
                 go(
@@ -363,6 +534,52 @@ class GolangParserIntegTest implements RewriteTest {
     }
 
     @Test
+    void lineComment() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                // hello is a function
+                                func hello() {
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void pointerTypeVar() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                func f() {
+                                \tvar x *int
+                                \t_ = x
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void structTag() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Finding struct {
+                                \tLine string `json:"-"`
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
     void compositeAndKeyValue() {
         rewriteRun(
                 go(
@@ -379,6 +596,57 @@ class GolangParserIntegTest implements RewriteTest {
                                 \t\tName:    "default",
                                 \t\tTimeout: 30,
                                 \t}
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void literalWithNonPrimitiveType() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                import (
+                                \t"time"
+
+                                \t"github.com/example/pkg"
+                                )
+
+                                var c = pkg.Config{
+                                \tTTL: 10 * time.Minute,
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void variadicParameter() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                func foo(args ...string) {
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void genericTypeInStructField() {
+        rewriteRun(
+                go(
+                        """
+                                package core
+
+                                type baseCollection struct {
+                                \tIndexes JSONArray[string]
+                                \tData    Store[string, any]
                                 }
                                 """
                 )

@@ -135,6 +135,26 @@ class PropertyPlaceholderHelperTest {
     }
 
     @Test
+    void selfReferencingPropertyDoesNotStackOverflow() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var props = new java.util.HashMap<String, String>();
+        props.put("revision", "${revision}");
+        var s = helper.replacePlaceholders("${revision}", props::get);
+        assertThat(s).isEqualTo("${revision}");
+    }
+
+    @Test
+    void cyclicPropertyReferenceDoesNotStackOverflow() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var props = new java.util.HashMap<String, String>();
+        props.put("revision", "${project.build.version}");
+        props.put("project.build.version", "${revision}");
+        var s = helper.replacePlaceholders("${revision}", props::get);
+        // The cycle should be detected and the placeholder left unresolved
+        assertThat(s).contains("${");
+    }
+
+    @Test
     void withValueSeparatorAndNullReplacement() {
         var helper = new PropertyPlaceholderHelper("%%{", "}", ",");
         var s = helper.replacePlaceholders("%%{k1,oh}%%{k2}", k -> switch (k) {

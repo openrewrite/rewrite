@@ -17,7 +17,7 @@ package org.openrewrite.python;
 
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.python.internal.UvExecutor;
+import org.openrewrite.python.internal.PackageManagerExecutor;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -27,11 +27,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Stream;
 
 import static java.util.Collections.synchronizedMap;
 
@@ -93,8 +90,11 @@ public class DependencyWorkspace {
 
         // Check in-memory cache
         Path cached = cache.get(hash);
-        if (cached != null && isWorkspaceValid(cached)) {
-            return cached;
+        if (cached != null) {
+            if (isWorkspaceValid(cached)) {
+                return cached;
+            }
+            cache.remove(hash);
         }
 
         // Check disk cache
@@ -103,6 +103,10 @@ public class DependencyWorkspace {
             cache.put(hash, workspaceDir);
             return workspaceDir;
         }
+        // An invalid leftover at the target path (e.g. gutted by macOS periodic tmp
+        // cleanup, which deletes old files but keeps the directory skeleton) would
+        // block the final Files.move into place; remove it before rebuilding.
+        cleanupDirectory(workspaceDir);
 
         // Create new workspace
         try {
@@ -180,7 +184,7 @@ public class DependencyWorkspace {
     static @Nullable Path getOrCreateRequirementsWorkspace(String requirementsContent,
                                                             @Nullable Path originalFilePath,
                                                             Map<String, String> environment) {
-        String uvPath = UvExecutor.findUvExecutable();
+        String uvPath = PackageManagerExecutor.UV.find();
         if (uvPath == null) {
             return null;
         }
@@ -189,8 +193,11 @@ public class DependencyWorkspace {
 
         // Check in-memory cache
         Path cached = cache.get(hash);
-        if (cached != null && isRequirementsWorkspaceValid(cached)) {
-            return cached;
+        if (cached != null) {
+            if (isRequirementsWorkspaceValid(cached)) {
+                return cached;
+            }
+            cache.remove(hash);
         }
 
         // Check disk cache
@@ -199,6 +206,10 @@ public class DependencyWorkspace {
             cache.put(hash, workspaceDir);
             return workspaceDir;
         }
+        // An invalid leftover at the target path (e.g. gutted by macOS periodic tmp
+        // cleanup, which deletes old files but keeps the directory skeleton) would
+        // block the final Files.move into place; remove it before rebuilding.
+        cleanupDirectory(workspaceDir);
 
         // Create new workspace
         try {
@@ -221,7 +232,7 @@ public class DependencyWorkspace {
                 runCommandWithPath(tempDir, uvPath, environment, "pip", "install", "-r", reqFile.toString());
 
                 // Capture freeze output BEFORE installing ty
-                UvExecutor.RunResult freezeResult = UvExecutor.run(tempDir, uvPath, environment, "pip", "freeze");
+                PackageManagerExecutor.RunResult freezeResult = PackageManagerExecutor.UV.run(tempDir, uvPath, environment, "pip", "freeze");
                 if (freezeResult.isSuccess()) {
                     Files.write(
                             tempDir.resolve("freeze.txt"),
@@ -287,7 +298,7 @@ public class DependencyWorkspace {
     public static @Nullable Path getOrCreateSetuptoolsWorkspace(String manifestContent,
                                                                 @Nullable Path projectDir,
                                                                 Map<String, String> environment) {
-        String uvPath = UvExecutor.findUvExecutable();
+        String uvPath = PackageManagerExecutor.UV.find();
         if (uvPath == null) {
             return null;
         }
@@ -296,8 +307,11 @@ public class DependencyWorkspace {
 
         // Check in-memory cache
         Path cached = cache.get(hash);
-        if (cached != null && isRequirementsWorkspaceValid(cached)) {
-            return cached;
+        if (cached != null) {
+            if (isRequirementsWorkspaceValid(cached)) {
+                return cached;
+            }
+            cache.remove(hash);
         }
 
         // Check disk cache
@@ -306,6 +320,10 @@ public class DependencyWorkspace {
             cache.put(hash, workspaceDir);
             return workspaceDir;
         }
+        // An invalid leftover at the target path (e.g. gutted by macOS periodic tmp
+        // cleanup, which deletes old files but keeps the directory skeleton) would
+        // block the final Files.move into place; remove it before rebuilding.
+        cleanupDirectory(workspaceDir);
 
         if (projectDir == null || !Files.isDirectory(projectDir)) {
             return null;
@@ -325,7 +343,7 @@ public class DependencyWorkspace {
                 runCommandWithPath(tempDir, uvPath, environment, "pip", "install", projectDir.toString());
 
                 // Capture freeze output BEFORE installing ty
-                UvExecutor.RunResult freezeResult = UvExecutor.run(tempDir, uvPath, environment, "pip", "freeze");
+                PackageManagerExecutor.RunResult freezeResult = PackageManagerExecutor.UV.run(tempDir, uvPath, environment, "pip", "freeze");
                 if (freezeResult.isSuccess()) {
                     Files.write(
                             tempDir.resolve("freeze.txt"),
@@ -380,14 +398,14 @@ public class DependencyWorkspace {
     }
 
     private static void runCommandWithPath(Path dir, String uvPath, Map<String, String> environment, String... args) throws IOException, InterruptedException {
-        UvExecutor.RunResult result = UvExecutor.run(dir, uvPath, environment, args);
+        PackageManagerExecutor.RunResult result = PackageManagerExecutor.UV.run(dir, uvPath, environment, args);
         if (!result.isSuccess()) {
             throw new RuntimeException("uv " + String.join(" ", args) + " failed with exit code: " + result.getExitCode());
         }
     }
 
     private static void runCommand(Path dir, Map<String, String> environment, String... command) throws IOException, InterruptedException {
-        String uvPath = UvExecutor.findUvExecutable();
+        String uvPath = PackageManagerExecutor.UV.find();
         if (uvPath == null) {
             throw new RuntimeException("uv is not installed. Install it with: pip install uv");
         }
@@ -396,7 +414,7 @@ public class DependencyWorkspace {
         String[] args = new String[command.length - 1];
         System.arraycopy(command, 1, args, 0, args.length);
 
-        UvExecutor.RunResult result = UvExecutor.run(dir, uvPath, environment, args);
+        PackageManagerExecutor.RunResult result = PackageManagerExecutor.UV.run(dir, uvPath, environment, args);
         if (!result.isSuccess()) {
             throw new RuntimeException(String.join(" ", command) + " failed with exit code: " + result.getExitCode());
         }
@@ -438,18 +456,18 @@ public class DependencyWorkspace {
     }
 
     private static void cleanupDirectory(Path dir) {
-        try {
-            if (Files.exists(dir)) {
-                Files.walk(dir)
-                        .sorted(Comparator.reverseOrder())
-                        .forEach(path -> {
-                            try {
-                                Files.delete(path);
-                            } catch (IOException e) {
-                                // Ignore
-                            }
-                        });
-            }
+        if (!Files.exists(dir)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(dir)) {
+            walk.sorted(Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            // Ignore
+                        }
+                    });
         } catch (IOException e) {
             // Ignore cleanup errors
         }
@@ -460,13 +478,11 @@ public class DependencyWorkspace {
     }
 
     private static void initializeCacheFromDisk() {
-        try {
-            if (!Files.exists(WORKSPACE_BASE)) {
-                return;
-            }
-
-            Files.list(WORKSPACE_BASE)
-                    .filter(Files::isDirectory)
+        if (!Files.exists(WORKSPACE_BASE)) {
+            return;
+        }
+        try (Stream<Path> entries = Files.list(WORKSPACE_BASE)) {
+            entries.filter(Files::isDirectory)
                     .filter(dir -> !dir.getFileName().toString().contains(".tmp-"))
                     .filter(dir -> {
                         String name = dir.getFileName().toString();

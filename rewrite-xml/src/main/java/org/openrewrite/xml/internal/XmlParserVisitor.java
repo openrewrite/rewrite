@@ -24,6 +24,7 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.internal.grammar.XMLParserBaseVisitor;
+import org.openrewrite.xml.marker.HtmlVoidElement;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
@@ -331,33 +332,52 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     List<Content> content = null;
                     String beforeTagDelimiterPrefix;
                     Xml.Tag.Closing closeTag = null;
+                    Markers markers = Markers.EMPTY;
 
                     if (ctx.SLASH_CLOSE() != null) {
                         beforeTagDelimiterPrefix = prefix(ctx.SLASH_CLOSE());
                         advanceCursor(ctx.SLASH_CLOSE().getSymbol().getStopIndex() + 1);
+                    } else if (ctx.voidClose() != null) {
+                        // HTML void element written without a self-closing slash, e.g. <br>.
+                        // It has no content and no closing tag, but prints with a bare '>'.
+                        beforeTagDelimiterPrefix = ctx.CLOSE(0) == null ? "" : prefix(ctx.CLOSE(0));
+                        if (ctx.CLOSE(0) != null) {
+                            advanceCursor(ctx.CLOSE(0).getSymbol().getStopIndex() + 1);
+                        }
+                        markers = markers.add(new HtmlVoidElement(randomId()));
                     } else {
-                        beforeTagDelimiterPrefix = prefix(ctx.CLOSE(0));
-                        advanceCursor(ctx.CLOSE(0).getSymbol().getStopIndex() + 1);
+                        beforeTagDelimiterPrefix = ctx.CLOSE(0) == null ? "" : prefix(ctx.CLOSE(0));
+                        if (ctx.CLOSE(0) != null) {
+                            advanceCursor(ctx.CLOSE(0).getSymbol().getStopIndex() + 1);
+                        }
 
                         content = ctx.content().stream()
                                 .map(this::visit)
                                 .map(Content.class::cast)
                                 .collect(toList());
 
-                        String closeTagPrefix = prefix(ctx.OPEN(1));
-                        advanceCursor(codePointCursor + 2);
+                        // ANTLR may synthesize missing closing-tag tokens during error recovery
+                        // on malformed input; tolerate any combination of null OPEN/Name/CLOSE.
+                        if (ctx.OPEN(1) != null || ctx.Name(1) != null || ctx.CLOSE(1) != null) {
+                            String closeTagPrefix = ctx.OPEN(1) == null ? "" : prefix(ctx.OPEN(1));
+                            advanceCursor(codePointCursor + 2);
 
-                        closeTag = new Xml.Tag.Closing(
-                                randomId(),
-                                closeTagPrefix,
-                                Markers.EMPTY,
-                                convert(ctx.Name(1), (n, p) -> n.getText()),
-                                prefix(ctx.CLOSE(1))
-                        );
-                        advanceCursor(codePointCursor + 1);
+                            String closeName = ctx.Name(1) == null ? "" :
+                                    convert(ctx.Name(1), (n, p) -> n.getText());
+                            String afterCloseName = ctx.CLOSE(1) == null ? "" : prefix(ctx.CLOSE(1));
+
+                            closeTag = new Xml.Tag.Closing(
+                                    randomId(),
+                                    closeTagPrefix,
+                                    Markers.EMPTY,
+                                    closeName,
+                                    afterCloseName
+                            );
+                            advanceCursor(codePointCursor + 1);
+                        }
                     }
 
-                    return new Xml.Tag(randomId(), prefix, Markers.EMPTY, name, attributes,
+                    return new Xml.Tag(randomId(), prefix, markers, name, attributes,
                             content, closeTag, beforeTagDelimiterPrefix);
                 }
         );
@@ -410,8 +430,13 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 for (int i = 0; i < children.size(); i++) {
                     ParserRuleContext element = (ParserRuleContext) children.get(i);
                     // Markup declarations are not fully implemented.
-                    // n.getText() includes element subsets.
-                    Xml.Ident ident = convert(element, (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.getText()));
+                    // Use the original source text to preserve whitespace between tokens.
+                    Xml.Ident ident = convert(element, (n, p) -> {
+                        int startIdx = n.getStart().getStartIndex();
+                        int stopIdx = n.getStop().getStopIndex();
+                        String text = source.substring(startIdx, stopIdx + 1);
+                        return new Xml.Ident(randomId(), p, Markers.EMPTY, text);
+                    });
 
                     String beforeElementTag = "";
                     if (i == children.size() - 1) {
@@ -463,15 +488,23 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
 
     /**
-     *  Advance both the cursor and the code point cursor
+     *  Advance both the cursor and the code point cursor.
+     *  Clamps to the end of source if a synthesized token (from ANTLR error recovery
+     *  on malformed input) would advance past the end of the source string.
      */
     @SuppressWarnings("UnusedReturnValue")
     private int advanceCursor(int newCodePointIndex) {
         if (newCodePointIndex <= codePointCursor) {
             return cursor;
         }
-        cursor = source.offsetByCodePoints(cursor, newCodePointIndex - codePointCursor);
-        codePointCursor = newCodePointIndex;
+        try {
+            cursor = source.offsetByCodePoints(cursor, newCodePointIndex - codePointCursor);
+            codePointCursor = newCodePointIndex;
+        } catch (IndexOutOfBoundsException e) {
+            int reachableCodePoints = source.codePointCount(cursor, source.length());
+            cursor = source.length();
+            codePointCursor += reachableCodePoints;
+        }
         return cursor;
     }
 

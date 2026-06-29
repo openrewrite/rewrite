@@ -996,12 +996,33 @@ public class ResolvedPom {
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        return resolveDependencies(scope, new HashMap<>(), downloader, ctx);
+        return doResolveDependencies(scope, new HashMap<>(), true, downloader, ctx);
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
                                                         MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+        return doResolveDependencies(scope, requirements, true, downloader, ctx);
+    }
+
+    /**
+     * Resolves the requested dependencies in the given scope without downloading their transitive closure.
+     * Each returned {@link ResolvedDependency} has an empty {@code dependencies} list. This allows callers who only
+     * need the direct coordinates (for example to re-resolve after a version mutation) to avoid the cost of
+     * transitive POM downloads.
+     */
+    public List<ResolvedDependency> resolveDirectDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+        return doResolveDependencies(scope, new HashMap<>(), false, downloader, ctx);
+    }
+
+    private List<ResolvedDependency> doResolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
+                                                           boolean resolveTransitives,
+                                                           MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
         List<ResolvedDependency> dependencies = new ArrayList<>();
+
+        // Tracks the dependency that included each resolved dependency, so that an effective exclusion can be
+        // attributed to the dependency that declared it rather than to the deepest dependency whose direct child
+        // happened to match the exclusion glob (exclusions are propagated down the transitive chain).
+        Map<ResolvedDependency, ResolvedDependency> includedByMap = new IdentityHashMap<>();
 
         Map<GroupArtifact, DependencyAndDependent> rootDependencies = new LinkedHashMap<>();
         for (Dependency requestedDependency : getRequestedDependencies()) {
@@ -1066,7 +1087,7 @@ public class ResolvedPom {
                             MavenExecutionContextView.view(ctx)
                                     .getResolutionListener()
                                     .clear();
-                            return resolveDependencies(scope, requirements, downloader, ctx);
+                            return doResolveDependencies(scope, requirements, resolveTransitives, downloader, ctx);
                         } else if (contains(dependencies, ga, d.getClassifier())) {
                             // we've already resolved this previously and the requirement didn't change,
                             // so just skip and continue on
@@ -1126,11 +1147,16 @@ public class ResolvedPom {
                             includedBy.unsafeSetDependencies(new ArrayList<>());
                         }
                         includedBy.getDependencies().add(resolved);
+                        includedByMap.put(resolved, includedBy);
                     }
 
                     if (dd.getScope().transitiveOf(scope) == scope) {
                         dependencies.add(resolved);
                     } else {
+                        continue;
+                    }
+
+                    if (!resolveTransitives) {
                         continue;
                     }
 
@@ -1155,10 +1181,21 @@ public class ResolvedPom {
                             for (GroupArtifact exclusion : d.getExclusions()) {
                                 if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
                                         matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
-                                    if (resolved.getEffectiveExclusions().isEmpty()) {
-                                        resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
+                                    // Exclusions are propagated down the transitive chain, so the dependency whose
+                                    // direct child matched the exclusion may be deeper than the dependency that
+                                    // actually declared it. Attribute the effective exclusion to the declaring
+                                    // dependency so callers can find it on the dependency that owns the exclusion.
+                                    ResolvedDependency declaredOn = resolved;
+                                    for (ResolvedDependency ancestor = includedByMap.get(resolved);
+                                         ancestor != null && ancestor.getRequested().getExclusions() != null &&
+                                                 ancestor.getRequested().getExclusions().contains(exclusion);
+                                         ancestor = includedByMap.get(ancestor)) {
+                                        declaredOn = ancestor;
                                     }
-                                    resolved.getEffectiveExclusions().add(d2.getGav().asGroupArtifact());
+                                    if (declaredOn.getEffectiveExclusions().isEmpty()) {
+                                        declaredOn.unsafeSetEffectiveExclusions(new ArrayList<>());
+                                    }
+                                    declaredOn.getEffectiveExclusions().add(d2.getGav().asGroupArtifact());
                                     continue nextDependency;
                                 }
                             }

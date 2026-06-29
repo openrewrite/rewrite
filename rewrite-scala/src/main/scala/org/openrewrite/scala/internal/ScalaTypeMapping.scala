@@ -24,7 +24,7 @@ import dotty.tools.dotc.core.Symbols.Symbol
 import dotty.tools.dotc.core.Types.*
 import dotty.tools.dotc.util.Spans
 
-import org.openrewrite.java.internal.JavaTypeCache
+import org.openrewrite.java.internal.{JavaReflectionTypeMapping, JavaTypeFactory}
 import org.openrewrite.java.tree.{Flag, JavaType, TypeUtils}
 
 import java.util
@@ -41,10 +41,15 @@ import scala.collection.mutable
  *
  * Both maps are built from the typed tree using Dotty's TreeTraverser.
  */
-class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx: Context) {
+class ScalaTypeMapping(typeFactory: JavaTypeFactory, typedTree: tpd.Tree)(using ctx: Context) {
 
   private val signatureBuilder = new ScalaTypeSignatureBuilder
   private val unknown: JavaType = JavaType.Unknown.getInstance()
+
+  // For mapping Scala constant tags and other real Java classes (like
+  // java.lang.String) through proper reflection-driven type attribution
+  // rather than a synthetic stub.
+  private val reflectionTypeMapping = new JavaReflectionTypeMapping(typeFactory)
 
   // Span-based lookup: start position → typed tree nodes (multiple nodes may share a start position)
   // Uses start position only — end positions may differ between untpd and tpd trees
@@ -118,13 +123,31 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
       case Some(sym) =>
         try {
           val tpe = sym.info
-          if (tpe == null || tpe == NoType) null
-          else mapType(tpe)
+          val mapped = if (tpe == null || tpe == NoType) null else mapType(tpe)
+          if (mapped == null || mapped.isInstanceOf[JavaType.Unknown]) typeForPredefAlias(name)
+          else mapped
         } catch {
-          case _: Throwable => null
+          case _: Throwable => typeForPredefAlias(name)
         }
-      case None => null
+      case None => typeForPredefAlias(name)
     }
+  }
+
+  private def typeForPredefAlias(name: String): JavaType = name match {
+    case "String" => JavaType.ShallowClass.build("java.lang.String")
+    case "Int" => JavaType.Primitive.Int
+    case "Long" => JavaType.Primitive.Long
+    case "Short" => JavaType.Primitive.Short
+    case "Byte" => JavaType.Primitive.Byte
+    case "Char" => JavaType.Primitive.Char
+    case "Float" => JavaType.Primitive.Float
+    case "Double" => JavaType.Primitive.Double
+    case "Boolean" => JavaType.Primitive.Boolean
+    case "Unit" => JavaType.Primitive.Void
+    case "Any" | "AnyRef" => JavaType.ShallowClass.build("java.lang.Object")
+    case "Null" => JavaType.Primitive.Null
+    case "Nothing" => JavaType.ShallowClass.build("scala.Nothing")
+    case _ => null
   }
 
   /** Look up JavaType.Method by span start position. */
@@ -222,8 +245,6 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
     if (tpe == null || tpe == NoType) return null
 
     val sig = signatureBuilder.signature(tpe)
-    val existing: JavaType = typeCache.get(sig)
-    if (existing != null) return existing
 
     try {
       tpe.dealias match {
@@ -244,12 +265,7 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
             case "scala.Any" | "scala.AnyRef" => "java.lang.Object"
             case other => other
           }
-          val normalizedSig = normalizedFqn
-          val existingNorm: JavaType = typeCache.get(normalizedSig)
-          if (existingNorm != null && existingNorm.isInstanceOf[JavaType.FullyQualified])
-            existingNorm.asInstanceOf[JavaType.FullyQualified]
-          else
-            mapClassType(ci.cls, normalizedFqn, normalizedSig)
+          mapClassType(ci.cls, normalizedFqn, normalizedFqn)
         case mt: MethodType => mapMethodResultType(mt)
         case pt: PolyType => mapMethodResultType(pt.resultType)
         case _ => unknown
@@ -277,7 +293,7 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
       case Constants.LongTag => JavaType.Primitive.Long
       case Constants.FloatTag => JavaType.Primitive.Float
       case Constants.DoubleTag => JavaType.Primitive.Double
-      case Constants.StringTag => JavaType.ShallowClass.build("java.lang.String")
+      case Constants.StringTag => reflectionTypeMapping.`type`(classOf[String])
       case Constants.NullTag => JavaType.Primitive.Null
       case Constants.UnitTag => JavaType.Primitive.Void
       case _ => mapType(ct.underlying)
@@ -322,76 +338,69 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
   }
 
   private def mapAppliedType(at: AppliedType, sig: String): JavaType = {
-    val pt = new JavaType.Parameterized(null, null, null)
-    typeCache.put(sig, pt)
-
     val baseType = mapType(at.tycon) match {
       case fq: JavaType.FullyQualified => fq
       case p: JavaType.Parameterized => p.getType
       case _ => return unknown
     }
 
-    val typeArgs = new ArrayList[JavaType]()
-    at.args.foreach { arg =>
-      val mapped = mapType(arg)
-      typeArgs.add(if (mapped != null) mapped else unknown)
-    }
-
-    pt.unsafeSet(baseType, typeArgs)
+    typeFactory.computeParameterized(sig, (pt: JavaType.Parameterized) => {
+      val typeArgs = new ArrayList[JavaType]()
+      at.args.foreach { arg =>
+        val mapped = mapType(arg)
+        typeArgs.add(if (mapped != null) mapped else unknown)
+      }
+      pt.unsafeSet(baseType, typeArgs)
+    })
   }
 
   private def mapGenericTypeVariable(tp: TypeParamRef, sig: String): JavaType = {
     val name = tp.paramName.toString
-    val variance = JavaType.GenericTypeVariable.Variance.INVARIANT
-    val gtv = new JavaType.GenericTypeVariable(null, name, variance, null)
-    typeCache.put(sig, gtv)
+    typeFactory.computeGenericTypeVariable(sig, name, JavaType.GenericTypeVariable.Variance.INVARIANT,
+      (gtv: JavaType.GenericTypeVariable) => {
+        var bounds: ArrayList[JavaType] = null
+        var resolvedVariance = JavaType.GenericTypeVariable.Variance.INVARIANT
 
-    var bounds: ArrayList[JavaType] = null
-    var resolvedVariance = variance
-
-    tp.underlying match {
-      case tb: TypeBounds =>
-        if (!(tb.hi =:= ctx.definitions.AnyType)) {
-          bounds = new ArrayList[JavaType]()
-          val mapped = mapType(tb.hi)
-          if (mapped != null) bounds.add(mapped)
-          resolvedVariance = JavaType.GenericTypeVariable.Variance.COVARIANT
+        tp.underlying match {
+          case tb: TypeBounds =>
+            if (!(tb.hi =:= ctx.definitions.AnyType)) {
+              bounds = new ArrayList[JavaType]()
+              val mapped = mapType(tb.hi)
+              if (mapped != null) bounds.add(mapped)
+              resolvedVariance = JavaType.GenericTypeVariable.Variance.COVARIANT
+            }
+          case _ =>
         }
-      case _ =>
-    }
 
-    gtv.unsafeSet(name, resolvedVariance, bounds)
+        gtv.unsafeSet(name, resolvedVariance, bounds)
+      })
   }
 
   private def mapTypeBounds(tb: TypeBounds, sig: String): JavaType = {
-    val gtv = new JavaType.GenericTypeVariable(null, "?",
-      JavaType.GenericTypeVariable.Variance.INVARIANT, null)
-    typeCache.put(sig, gtv)
+    typeFactory.computeGenericTypeVariable(sig, "?", JavaType.GenericTypeVariable.Variance.INVARIANT,
+      (gtv: JavaType.GenericTypeVariable) => {
+        var bounds: ArrayList[JavaType] = null
+        var variance = JavaType.GenericTypeVariable.Variance.INVARIANT
 
-    var bounds: ArrayList[JavaType] = null
-    var variance = JavaType.GenericTypeVariable.Variance.INVARIANT
+        if (!(tb.hi =:= ctx.definitions.AnyType)) {
+          bounds = new ArrayList[JavaType]()
+          bounds.add(mapType(tb.hi))
+          variance = JavaType.GenericTypeVariable.Variance.COVARIANT
+        } else if (!(tb.lo =:= ctx.definitions.NothingType)) {
+          bounds = new ArrayList[JavaType]()
+          bounds.add(mapType(tb.lo))
+          variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
+        }
 
-    if (!(tb.hi =:= ctx.definitions.AnyType)) {
-      bounds = new ArrayList[JavaType]()
-      bounds.add(mapType(tb.hi))
-      variance = JavaType.GenericTypeVariable.Variance.COVARIANT
-    } else if (!(tb.lo =:= ctx.definitions.NothingType)) {
-      bounds = new ArrayList[JavaType]()
-      bounds.add(mapType(tb.lo))
-      variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
-    }
-
-    gtv.unsafeSet("?", variance, bounds)
+        gtv.unsafeSet("?", variance, bounds)
+      })
   }
 
   def mapClassType(sym: Symbol, fqn: String, sig: String): JavaType.FullyQualified = {
-    val existing: JavaType = typeCache.get(sig)
-    if (existing != null && existing.isInstanceOf[JavaType.FullyQualified])
-      return existing.asInstanceOf[JavaType.FullyQualified]
-
-    // Use ShallowClass for library types to avoid deep recursive type hierarchies
-    // that cause StackOverflowError in recipes like ChangeType.
-    // Source-defined classes (those with a sourceFile) get full population.
+    // Synthesize a canonical-but-empty Class for library types to avoid deep
+    // recursive type hierarchies that cause StackOverflowError in recipes like
+    // ChangeType. Source-defined classes (those with a sourceFile) get full
+    // population below.
     val isSourceDefined = try {
       val src = sym.source
       src != null && src.exists && !sym.is(Flags.JavaDefined) && src.name.endsWith(".scala")
@@ -400,9 +409,9 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
     }
 
     if (!isSourceDefined) {
-      val shallow = JavaType.ShallowClass.build(fqn)
-      typeCache.put(sig, shallow)
-      return shallow
+      return typeFactory.computeClass(fqn, Flag.Public.getBitMask, JavaType.FullyQualified.Kind.Class, _ => {
+        // Library type — body intentionally not populated.
+      })
     }
 
     val kind = if (sym.is(Flags.Trait)) JavaType.FullyQualified.Kind.Interface
@@ -411,77 +420,75 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
 
     val flagsBits = mapFlags(sym)
 
-    val clazz = new JavaType.Class(null, flagsBits, fqn, kind,
-      null, null, null, null, null, null, null)
-    typeCache.put(sig, clazz)
-
-    // For source-defined classes, populate members and methods (but use ShallowClass for supertypes)
-    val supertype: JavaType.FullyQualified = try {
-      val parentTypes = sym.info match {
-        case ci: ClassInfo => ci.parents
-        case _ => Nil
-      }
-      parentTypes.headOption.flatMap { pt =>
-        Option(TypeUtils.asFullyQualified(mapType(pt)))
-      }.orNull
-    } catch {
-      case _: Throwable => null
-    }
-
-    val interfaces: util.List[JavaType.FullyQualified] = try {
-      val parentTypes = sym.info match {
-        case ci: ClassInfo => ci.parents.drop(1)
-        case _ => Nil
-      }
-      if (parentTypes.nonEmpty) {
-        val ifaces = new ArrayList[JavaType.FullyQualified]()
-        parentTypes.foreach { pt =>
-          val mapped = TypeUtils.asFullyQualified(mapType(pt))
-          if (mapped != null) ifaces.add(mapped)
+    typeFactory.computeClass(fqn, flagsBits, kind, (clazz: JavaType.Class) => {
+      // For source-defined classes, populate members and methods (but use ShallowClass for supertypes)
+      val supertype: JavaType.FullyQualified = try {
+        val parentTypes = sym.info match {
+          case ci: ClassInfo => ci.parents
+          case _ => Nil
         }
-        ifaces
-      } else null
-    } catch {
-      case _: Throwable => null
-    }
-
-    // Populate methods
-    val methods: util.List[JavaType.Method] = try {
-      val decls = sym.info match {
-        case ci: ClassInfo => ci.decls.toList
-        case _ => Nil
+        parentTypes.headOption.flatMap { pt =>
+          Option(TypeUtils.asFullyQualified(mapType(pt)))
+        }.orNull
+      } catch {
+        case _: Throwable => null
       }
-      val methodSyms = decls.filter(s => s.is(Flags.Method) && !s.isConstructor && !s.name.toString.startsWith("$"))
-      if (methodSyms.nonEmpty) {
-        val ms = new ArrayList[JavaType.Method]()
-        methodSyms.foreach { m =>
-          try { ms.add(mapMethodType(m)) } catch { case _: Throwable => }
-        }
-        ms
-      } else null
-    } catch {
-      case _: Throwable => null
-    }
 
-    // Populate fields
-    val members: util.List[JavaType.Variable] = try {
-      val decls = sym.info match {
-        case ci: ClassInfo => ci.decls.toList
-        case _ => Nil
+      val interfaces: util.List[JavaType.FullyQualified] = try {
+        val parentTypes = sym.info match {
+          case ci: ClassInfo => ci.parents.drop(1)
+          case _ => Nil
+        }
+        if (parentTypes.nonEmpty) {
+          val ifaces = new ArrayList[JavaType.FullyQualified]()
+          parentTypes.foreach { pt =>
+            val mapped = TypeUtils.asFullyQualified(mapType(pt))
+            if (mapped != null) ifaces.add(mapped)
+          }
+          ifaces
+        } else null
+      } catch {
+        case _: Throwable => null
       }
-      val fieldSyms = decls.filter(s => !s.is(Flags.Method) && !s.isClass && !s.name.toString.startsWith("$"))
-      if (fieldSyms.nonEmpty) {
-        val fs = new ArrayList[JavaType.Variable]()
-        fieldSyms.foreach { f =>
-          try { fs.add(mapVariableType(f)) } catch { case _: Throwable => }
-        }
-        fs
-      } else null
-    } catch {
-      case _: Throwable => null
-    }
 
-    clazz.unsafeSet(null, supertype, null, null, interfaces, members, methods)
+      // Populate methods
+      val methods: util.List[JavaType.Method] = try {
+        val decls = sym.info match {
+          case ci: ClassInfo => ci.decls.toList
+          case _ => Nil
+        }
+        val methodSyms = decls.filter(s => s.is(Flags.Method) && !s.isConstructor && !s.name.toString.startsWith("$"))
+        if (methodSyms.nonEmpty) {
+          val ms = new ArrayList[JavaType.Method]()
+          methodSyms.foreach { m =>
+            try { ms.add(mapMethodType(m)) } catch { case _: Throwable => }
+          }
+          ms
+        } else null
+      } catch {
+        case _: Throwable => null
+      }
+
+      // Populate fields
+      val members: util.List[JavaType.Variable] = try {
+        val decls = sym.info match {
+          case ci: ClassInfo => ci.decls.toList
+          case _ => Nil
+        }
+        val fieldSyms = decls.filter(s => !s.is(Flags.Method) && !s.isClass && !s.name.toString.startsWith("$"))
+        if (fieldSyms.nonEmpty) {
+          val fs = new ArrayList[JavaType.Variable]()
+          fieldSyms.foreach { f =>
+            try { fs.add(mapVariableType(f)) } catch { case _: Throwable => }
+          }
+          fs
+        } else null
+      } catch {
+        case _: Throwable => null
+      }
+
+      clazz.unsafeSet(null, supertype, null, null, interfaces, members, methods)
+    })
   }
 
   // --- Method and Variable type mapping ---
@@ -490,79 +497,71 @@ class ScalaTypeMapping(typeCache: JavaTypeCache, typedTree: tpd.Tree)(using ctx:
     if (sym == null || !sym.exists) return null
 
     val sig = signatureBuilder.methodSignature(sym)
-    val existing: JavaType.Method = typeCache.get(sig)
-    if (existing != null) return existing
-
     val name = if (sym.isConstructor) "<constructor>" else sym.name.toString
     val flagsBits = mapFlags(sym)
 
-    var paramNames: util.List[String] = null
-    var paramTypes: util.List[JavaType] = null
+    val paramNamesArr: Array[String] = sym.info match {
+      case mt: MethodType => mt.paramNames.iterator.map(_.toString).toArray
+      case pt: PolyType => pt.resultType match {
+        case mt: MethodType => mt.paramNames.iterator.map(_.toString).toArray
+        case _ => null
+      }
+      case _ => null
+    }
 
-    sym.info match {
-      case mt: MethodType =>
-        paramNames = new ArrayList[String]()
-        paramTypes = new ArrayList[JavaType]()
-        mt.paramNames.foreach(n => paramNames.add(n.toString))
-        mt.paramInfos.foreach(pt => paramTypes.add(mapType(pt)))
-      case pt: PolyType =>
-        pt.resultType match {
+    val finalParamNames = paramNamesArr
+    typeFactory.methodFor(sig,
+      () => new JavaType.Method(null, flagsBits, null, name, null, finalParamNames, null, null, null, null, null),
+      (method: JavaType.Method) => {
+        val paramTypes: util.List[JavaType] = sym.info match {
           case mt: MethodType =>
-            paramNames = new ArrayList[String]()
-            paramTypes = new ArrayList[JavaType]()
-            mt.paramNames.foreach(n => paramNames.add(n.toString))
-            mt.paramInfos.foreach(pt2 => paramTypes.add(mapType(pt2)))
-          case _ =>
+            val pts = new ArrayList[JavaType]()
+            mt.paramInfos.foreach(pt => pts.add(mapType(pt)))
+            pts
+          case pt: PolyType => pt.resultType match {
+            case mt: MethodType =>
+              val pts = new ArrayList[JavaType]()
+              mt.paramInfos.foreach(pt2 => pts.add(mapType(pt2)))
+              pts
+            case _ => null
+          }
+          case _ => null
         }
-      case _ =>
-    }
 
-    val method = new JavaType.Method(
-      null, flagsBits, null, name, null, paramNames, null, null, null, null, null
-    )
-    typeCache.put(sig, method)
+        val declaringType = try {
+          TypeUtils.asFullyQualified(mapType(sym.owner.info))
+        } catch {
+          case _: Throwable => null
+        }
+        val returnType = mapType(sym.info.finalResultType)
 
-    val declaringType = try {
-      TypeUtils.asFullyQualified(mapType(sym.owner.info))
-    } catch {
-      case _: Throwable => null
-    }
-    val returnType = mapType(sym.info.finalResultType)
-
-    method.unsafeSet(declaringType, returnType, paramTypes, null, null)
+        method.unsafeSet(declaringType, returnType, paramTypes, null, null)
+      })
   }
 
   def mapVariableType(sym: Symbol): JavaType.Variable = {
     if (sym == null || !sym.exists) return null
 
     val sig = signatureBuilder.variableSignature(sym)
-    val existing: JavaType.Variable = typeCache.get(sig)
-    if (existing != null) return existing
-
     val flagsBits = mapFlags(sym)
-    val variable = new JavaType.Variable(null, flagsBits, sym.name.toString, null, null, null)
-    typeCache.put(sig, variable)
-
-    val ownerType = try { mapType(sym.owner.info) } catch { case _: Throwable => unknown }
-    val varType = try { mapType(sym.info) } catch { case _: Throwable => unknown }
-    val emptyAnnotations: Array[JavaType.FullyQualified] = Array.empty
-    variable.unsafeSet(ownerType, varType, emptyAnnotations)
+    typeFactory.variableFor(sig, () => {
+      val variable = new JavaType.Variable(null, flagsBits, sym.name.toString, null, null, null)
+      val ownerType = try { mapType(sym.owner.info) } catch { case _: Throwable => unknown }
+      val varType = try { mapType(sym.info) } catch { case _: Throwable => unknown }
+      variable.unsafeSet(ownerType, varType, null.asInstanceOf[java.util.List[JavaType.FullyQualified]])
+      variable
+    })
   }
 
   /** Create a constructor method type for a given class type. */
   def mapConstructorType(fq: JavaType.FullyQualified): JavaType.Method = {
     val sig = fq.getFullyQualifiedName + "{name=<constructor>,return=" + fq.getFullyQualifiedName + ",parameters=[]}"
-    val existing: JavaType.Method = typeCache.get(sig)
-    if (existing != null) return existing
-
-    val paramNames: java.util.List[String] = java.util.Collections.emptyList()
-    val paramTypes: java.util.List[JavaType] = java.util.Collections.emptyList()
-    val method = new JavaType.Method(
-      null, Flag.Public.getBitMask, null, "<constructor>", null,
-      paramNames, null, null, null, null, null
-    )
-    typeCache.put(sig, method)
-    method.unsafeSet(fq, fq, paramTypes, null, null)
+    typeFactory.methodFor(sig,
+      () => new JavaType.Method(null, Flag.Public.getBitMask, null, "<constructor>",
+        null, null.asInstanceOf[Array[String]], null, null, null, null, null),
+      (method: JavaType.Method) => {
+        method.unsafeSet(fq, fq, java.util.Collections.emptyList[JavaType](), null, null)
+      })
   }
 
   // --- Helpers ---

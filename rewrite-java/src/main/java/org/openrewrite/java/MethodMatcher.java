@@ -82,6 +82,7 @@ public class MethodMatcher {
     private MethodNameMatcher methodNameMatcher;
     private List<ArgumentMatcher> argumentMatchers;
     private int varArgsPosition = -1;
+    private @Nullable String declaringTypeMatchPrefix;
 
     /**
      * Whether to match overridden forms of the method on subclasses of {@link #typeMatcher}.
@@ -137,6 +138,50 @@ public class MethodMatcher {
         this.methodNameMatcher = parser.methodNameMatcher;
         this.argumentMatchers = parser.argumentMatchers;
         this.varArgsPosition = parser.varArgsPosition;
+        this.declaringTypeMatchPrefix = parser.declaringTypeMatchPrefix;
+    }
+
+    /**
+     * The literal prefix that the declaring-type pattern requires of any matching type's fully qualified name:
+     * everything in the type pattern up to the first wildcard metacharacter ({@code *} or {@code ..}), with
+     * {@code $} canonicalized to {@code .}. A {@code ..} subpackage wildcard keeps the package separator that
+     * precedes it, since every type it matches has that separator in its FQN ({@code java.util..*} yields
+     * {@code java.util.}). Returns {@code null} when the pattern starts with a wildcard, i.e. no prefix can be
+     * required.
+     * <p>
+     * Because the type portion of a method pattern is matched verbatim against the declaring type's name (ignoring
+     * {@code matchOverrides}), this prefix is a <em>necessary</em> prefix of any non-override match. Callers holding
+     * a collection of methods sorted by canonical declaring-type FQN can therefore binary-search to this prefix and
+     * scan only the {@code startsWith(prefix)} window, confirming each candidate with {@link #matches(JavaType.Method)}.
+     */
+    public @Nullable String getDeclaringTypeMatchPrefix() {
+        return declaringTypeMatchPrefix;
+    }
+
+    /**
+     * The literal prefix of a declaring-type pattern: characters preceding the first {@code *} or {@code ..}, with
+     * {@code $} canonicalized to {@code .}. The package separator before a {@code ..} wildcard is retained
+     * ({@code java.util..*} -> {@code java.util.}) because every match has it; a separator before {@code *} is
+     * naturally retained too ({@code com.*.Bar} -> {@code com.}). {@code null} when empty.
+     */
+    private static @Nullable String literalTypePrefix(String typePattern) {
+        int end = typePattern.length();
+        for (int i = 0; i < typePattern.length(); i++) {
+            char c = typePattern.charAt(i);
+            if (c == '.' && i + 1 < typePattern.length() && typePattern.charAt(i + 1) == '.') {
+                end = i == 0 ? 0 : i + 1;
+                break;
+            }
+            if (c == '*') {
+                end = i;
+                break;
+            }
+        }
+        if (end == 0) {
+            return null;
+        }
+        String prefix = typePattern.substring(0, end);
+        return prefix.indexOf('$') < 0 ? prefix : prefix.replace('$', '.');
     }
 
     public static Validated<String> validate(@Nullable String signature) {
@@ -300,6 +345,7 @@ public class MethodMatcher {
             return false;
         }
 
+        //noinspection NullableProblems
         List<JavaType> parameterTypes =
                 method
                         .getParameters()
@@ -363,7 +409,14 @@ public class MethodMatcher {
             return matchUnknownTypes && matchesAllowingUnknownTypes(method);
         }
 
-        return matches(method.getMethodType());
+        if (matches(method.getMethodType())) {
+            return true;
+        }
+
+        // When matchUnknownTypes is true, fall back to structural matching even when
+        // type information is present but incomplete (e.g. after lossy LST deserialization
+        // where interface hierarchies may be stripped from declaring types)
+        return matchUnknownTypes && matchesAllowingUnknownTypes(method);
     }
 
     private boolean matchesAllowingUnknownTypes(J.MethodInvocation method) {
@@ -668,7 +721,7 @@ public class MethodMatcher {
 
         @Override
         public boolean matches(String name) {
-            return "<constructor>".equals(name);
+            return "<constructor>".equals(name) || "<init>".equals(name);
         }
 
         @Override
@@ -859,6 +912,7 @@ public class MethodMatcher {
         private MethodMatcher.MethodNameMatcher methodNameMatcher;
         private List<MethodMatcher.ArgumentMatcher> argumentMatchers;
         private int varArgsPosition = -1;
+        private @Nullable String declaringTypeMatchPrefix;
         private boolean hasWildcardVarArgs = false;  // Track if we've seen .. wildcard
 
         void parse() {
@@ -887,6 +941,7 @@ public class MethodMatcher {
                 throw new IllegalArgumentException("Invalid method pattern - empty type pattern: " + pattern);
             }
             typeMatcher = parseTypeMatcher(typePattern);
+            declaringTypeMatchPrefix = literalTypePrefix(typePattern);
 
             // Parse method name pattern
             String methodName = pattern.substring(separator + 1, openParen).trim();

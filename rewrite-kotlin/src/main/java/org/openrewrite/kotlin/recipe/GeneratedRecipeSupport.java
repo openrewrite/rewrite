@@ -1,0 +1,899 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ */
+package org.openrewrite.kotlin.recipe;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.search.UsesField;
+import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.kotlin.KotlinTemplate;
+import org.openrewrite.kotlin.KotlinVisitor;
+import org.openrewrite.kotlin.marker.TrailingLambdaArgument;
+import org.openrewrite.kotlin.tree.K;
+
+/**
+ * Runtime support for the recipe authoring DSL's K2 compiler plugin
+ * (see {@link org.openrewrite.kotlin.recipe.internal.RecipeIrGenerationExtension}).
+ * The plugin generates {@link org.openrewrite.Recipe} subclasses whose
+ * {@code getVisitor()} body is a single call into one of these factories,
+ * keeping the IR codegen small and the matching/replacing logic
+ * Java-readable.
+ *
+ * <p>{@code methodInvocationRewrite} (Kotlin) and {@code methodInvocationRewriteJava}
+ * are parallel paths selected by the LST-structural classifier in the IR
+ * extension: the default is {@code methodInvocationRewriteJava} (a
+ * {@link JavaVisitor} walks both Java AND Kotlin sources via
+ * {@link org.openrewrite.kotlin.TreeVisitorAdapter}); the Kotlin variant kicks
+ * in only when the before/after templates structurally reference a {@code K.*}
+ * LST node — see {@code RecipeIrLanguageDescriptors.isKotlinSpecificTreeNode}.
+ */
+public final class GeneratedRecipeSupport {
+
+    private GeneratedRecipeSupport() {}
+
+    /**
+     * Visitor for a {@code rewrite { ... } to { ... }} recipe whose before
+     * lambda body is a method invocation rooted at the receiver param. Matching
+     * is delegated to {@link MethodMatcher}; the after template is a
+     * {@link KotlinTemplate} string with one {@code #{any()}} placeholder per
+     * substitution slot.
+     *
+     * {@code matcherSpecsLines} is a {@code \n}-delimited list of
+     * MethodMatcher specs — multi-before recipes
+     * ({@code rewrite(b1, b2, ...) to a}) yield one spec per before lambda
+     * and we accept a method invocation when any spec matches.
+     *
+     * The {@code substitutionSourcesCsv} encodes, in template-left-to-right
+     * order, how to fill each placeholder from the matched method invocation:
+     * {@code -1} for {@code method.getSelect()} (the receiver), {@code N >= 0}
+     * for {@code method.getArguments().get(N)}. The CSV is shared across all
+     * matchers because the IR pass requires every before lambda to agree on
+     * the captured argument shape (same param-index references and same
+     * literal {@code (kind, value)} at each position).
+     */
+    public static TreeVisitor<?, ExecutionContext> methodInvocationRewrite(
+            String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv, int strictArgCount) {
+        // Chain mode: a single matcher spec line containing a tab encodes a
+        // two-segment chain <outerSpec>\t<innerSpec>. Substitution-source CSV
+        // is segment-tagged ("o:N" / "i:N"). v1 supports single-before chains
+        // only; multi-before chains are rejected at IR-pass time. Chains never
+        // carry a variadic run, so strictArgCount is irrelevant there.
+        if (matcherSpecsLines.indexOf('\t') >= 0) {
+            return chainMethodInvocationRewrite(matcherSpecsLines, afterTemplate, substitutionSourcesCsv);
+        }
+        String[] specs = matcherSpecsLines.isEmpty() ? new String[0] : matcherSpecsLines.split("\n");
+        MethodMatcher[] matchers = new MethodMatcher[specs.length];
+        for (int i = 0; i < specs.length; i++) {
+            matchers[i] = new MethodMatcher(specs[i]);
+        }
+        SubSource[][] substitutionSourcesByMatcher = parseSourcesPerMatcher(substitutionSourcesCsv, specs.length);
+        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                int matchedIdx = -1;
+                for (int i = 0; i < matchers.length; i++) {
+                    if (matchers[i].matches(method)) {
+                        matchedIdx = i;
+                        break;
+                    }
+                }
+                if (matchedIdx >= 0) {
+                    Applied applied = prepareSubstitutions(
+                            method, substitutionSourcesByMatcher[matchedIdx], afterTemplate, strictArgCount);
+                    if (applied == null) {
+                        return super.visitMethodInvocation(method, ctx);
+                    }
+                    Object[] substitutions = applied.substitutions;
+                    J result = KotlinTemplate.builder(applied.template).build()
+                            .apply(getCursor(), method.getCoordinates().replace(), substitutions);
+                    // Preserve the matched call's reified type arguments. The
+                    // after-template's type args (if any) are placeholders the
+                    // author wrote because Kotlin won't let `enumValues<T>()` /
+                    // `enumEntries<T>()` etc. parse without a concrete type
+                    // there. The matched call carries the real type — copy it
+                    // over so the rewrite is type-arg-faithful for reified
+                    // callees. No-op when the result isn't a method invocation
+                    // or the matched call had no type args.
+                    if (result instanceof J.MethodInvocation) {
+                        JContainer<Expression> matchedTypeArgs = method.getPadding().getTypeParameters();
+                        if (matchedTypeArgs != null) {
+                            result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
+                        }
+                        result = preserveSelectAfter((J.MethodInvocation) result, method);
+                        result = preserveTrailingLambdaShape((J.MethodInvocation) result);
+                        result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
+                    }
+                    return result.withPrefix(method.getPrefix());
+                }
+                return super.visitMethodInvocation(method, ctx);
+            }
+        };
+        return wrapWithPrecondition(matcherSpecsLines, walker);
+    }
+
+    /**
+     * Chain-mode body for {@link #methodInvocationRewrite}. The before lambda
+     * was a two-segment chained call (e.g. {@code xs.filter(p).first()}); the
+     * matcher spec is {@code <outerSpec>\t<innerSpec>} and the substitution-
+     * source CSV uses segment-tagged entries ({@code o:N} for outer-call args
+     * with {@code o:-1} for the outer receiver, {@code i:N} / {@code i:-1} for
+     * the inner segment).
+     *
+     * <p>Walks {@link J.MethodInvocation}; matches the outer spec, then
+     * checks that {@code method.getSelect()} is itself a {@link J.MethodInvocation}
+     * matching the inner spec. If both match, extracts substitutions per the
+     * tagged CSV and applies the after template.
+     */
+    private static TreeVisitor<?, ExecutionContext> chainMethodInvocationRewrite(
+            String matcherSpecsLine, String afterTemplate, String substitutionSourcesCsv) {
+        int tabIdx = matcherSpecsLine.indexOf('\t');
+        MethodMatcher outerMatcher = new MethodMatcher(matcherSpecsLine.substring(0, tabIdx));
+        MethodMatcher innerMatcher = new MethodMatcher(matcherSpecsLine.substring(tabIdx + 1));
+        ChainSourceRef[] sources = parseChainCsv(substitutionSourcesCsv);
+        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                if (!outerMatcher.matches(method)) {
+                    return super.visitMethodInvocation(method, ctx);
+                }
+                if (!(method.getSelect() instanceof J.MethodInvocation)) {
+                    return super.visitMethodInvocation(method, ctx);
+                }
+                J.MethodInvocation inner = (J.MethodInvocation) method.getSelect();
+                if (!innerMatcher.matches(inner)) {
+                    return super.visitMethodInvocation(method, ctx);
+                }
+                Object[] substitutions = new Object[sources.length];
+                for (int i = 0; i < sources.length; i++) {
+                    ChainSourceRef ref = sources[i];
+                    J.MethodInvocation target = ref.outer ? method : inner;
+                    if (ref.pos < 0) {
+                        if (target.getSelect() == null) {
+                            return super.visitMethodInvocation(method, ctx);
+                        }
+                        substitutions[i] = target.getSelect();
+                    } else {
+                        if (ref.pos >= target.getArguments().size()) {
+                            return super.visitMethodInvocation(method, ctx);
+                        }
+                        substitutions[i] = target.getArguments().get(ref.pos);
+                    }
+                }
+                J result = KotlinTemplate.builder(afterTemplate).build()
+                        .apply(getCursor(), method.getCoordinates().replace(), substitutions);
+                if (result instanceof J.MethodInvocation) {
+                    JContainer<Expression> matchedTypeArgs = method.getPadding().getTypeParameters();
+                    if (matchedTypeArgs != null) {
+                        result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
+                    }
+                    result = preserveSelectAfter((J.MethodInvocation) result, method);
+                    result = preserveTrailingLambdaShape((J.MethodInvocation) result);
+                    result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
+                }
+                return result.withPrefix(method.getPrefix());
+            }
+        };
+        return wrapWithPrecondition(matcherSpecsLine, walker);
+    }
+
+    /**
+     * Restore the interior whitespace of every substituted argument.
+     * {@link JavaTemplate#apply} runs {@code AutoFormat} over the parsed-then-
+     * substituted tree, which re-indents interior lines (lambda bodies,
+     * dot-on-newline chain layouts) relative to the new call's cursor position
+     * — typically shifting interior lines several columns to the left and
+     * losing the author's original formatting. The captured arguments (passed
+     * in {@code substitutions}) still carry their original absolute interior
+     * whitespace, since substitution only clears each captured node's outer
+     * prefix (see {@code Substitutions#substituteTypedPattern}).
+     *
+     * <p>Match captures to result-tree nodes by {@link Tree#getId()} — both
+     * {@code withPrefix} and AutoFormat's whitespace edits preserve UUIDs, so
+     * this is a precise alignment. For each matched node, swap the entire
+     * captured node back into place but keep the result node's outer prefix
+     * (so the captured arg lands at the call site's chosen position) — the
+     * captured node's interior (the body lines, the chain {@code .x} dots, the
+     * statement prefixes, the closing {@code }} indent) is preserved verbatim.
+     */
+    private static J.MethodInvocation restoreSubstitutedInteriors(
+            J.MethodInvocation result, Object[] substitutions) {
+        Map<UUID, J> capturedById = null;
+        for (Object s : substitutions) {
+            if (s instanceof J) {
+                if (capturedById == null) {
+                    capturedById = new HashMap<>();
+                }
+                capturedById.put(((J) s).getId(), (J) s);
+            }
+        }
+        if (capturedById == null) {
+            return result;
+        }
+        Map<UUID, J> finalCapturedById = capturedById;
+        //noinspection DataFlowIssue
+        return (J.MethodInvocation) new JavaVisitor<Integer>() {
+            @Override
+            public J visit(@Nullable Tree tree, Integer p) {
+                if (tree instanceof J) {
+                    J captured = finalCapturedById.get(((J) tree).getId());
+                    if (captured != null) {
+                        // Keep the result-tree node's outer prefix (set by
+                        // preserveTrailingLambdaShape or the template-substituted
+                        // default); swap the captured contents (interior
+                        // whitespace and all) back in.
+                        return captured.withPrefix(((J) tree).getPrefix());
+                    }
+                }
+                return super.visit(tree, p);
+            }
+        }.visit(result, 0);
+    }
+
+    /**
+     * When a chain-collapse rewrite replaces a multi-line chain like
+     * <pre>{@code xs
+     *     .filter(p)
+     *     .firstOrNull()}</pre>
+     * with a single fused call ({@code xs.firstOrNull(p)}), the synthesized result's
+     * outer call has an empty {@link J.MethodInvocation.Padding#getSelect() select.after}
+     * — the whitespace that used to sit between the inner's text end and the outer's
+     * {@code .}. The author's intent (and Kotlin convention for long chains) was to
+     * keep the trailing call on its own indented line. We carry the original outer's
+     * select.after onto the result so the dot-on-its-own-line layout survives the
+     * rewrite.
+     *
+     * <p>No-op when the original outer had no select.after (already single-line)
+     * or when the result has no select (e.g. the template produced a non-method
+     * shape).
+     */
+    private static J.MethodInvocation preserveSelectAfter(J.MethodInvocation result, J.MethodInvocation matched) {
+        JRightPadded<Expression> resultSelect = result.getPadding().getSelect();
+        JRightPadded<Expression> matchedSelect = matched.getPadding().getSelect();
+        if (resultSelect == null || matchedSelect == null) {
+            return result;
+        }
+        if (matchedSelect.getAfter().getWhitespace().isEmpty()) {
+            return result;
+        }
+        return result.getPadding().withSelect(resultSelect.withAfter(matchedSelect.getAfter()));
+    }
+
+    private static class ChainSourceRef {
+        final boolean outer;
+        final int pos;
+        ChainSourceRef(boolean outer, int pos) { this.outer = outer; this.pos = pos; }
+    }
+
+    private static ChainSourceRef[] parseChainCsv(String csv) {
+        if (csv.isEmpty()) {
+            return new ChainSourceRef[0];
+        }
+        String[] parts = csv.split(",");
+        ChainSourceRef[] result = new ChainSourceRef[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            String p = parts[i];
+            int colonIdx = p.indexOf(':');
+            if (colonIdx < 0) {
+                throw new IllegalStateException("Chain CSV entry missing segment tag: " + p);
+            }
+            char tag = p.charAt(0);
+            int pos = Integer.parseInt(p.substring(colonIdx + 1));
+            result[i] = new ChainSourceRef(tag == 'o', pos);
+        }
+        return result;
+    }
+
+    /**
+     * Variant of {@link #methodInvocationRewrite} for recipes whose before
+     * lambda body is {@code someCall()!!} (a method invocation immediately
+     * not-null-asserted). In the rewrite-kotlin LST that pattern parses as
+     * {@code K.Unary(NotNull, J.MethodInvocation)} — visiting only
+     * {@code J.MethodInvocation} would replace just the call and leave a
+     * stranded {@code !!} on the rewritten template, so this visitor walks
+     * {@link K.Unary} instead and swaps the whole not-null expression for the
+     * after template.
+     *
+     * <p>Matcher specs, substitution-source CSV, and trailing-lambda fix-up
+     * semantics are identical to the bare variant — only the entry point and
+     * the replacement coordinate (the K.Unary, not its inner J.MethodInvocation)
+     * change.
+     */
+    public static TreeVisitor<?, ExecutionContext> methodInvocationRewriteKotlinNotNull(
+            String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv) {
+        String[] specs = matcherSpecsLines.isEmpty() ? new String[0] : matcherSpecsLines.split("\n");
+        MethodMatcher[] matchers = new MethodMatcher[specs.length];
+        for (int i = 0; i < specs.length; i++) {
+            matchers[i] = new MethodMatcher(specs[i]);
+        }
+        int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
+        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
+            @Override
+            public J visitUnary(K.Unary unary, ExecutionContext ctx) {
+                if (unary.getOperator() != K.Unary.Type.NotNull) {
+                    return super.visitUnary(unary, ctx);
+                }
+                if (!(unary.getExpression() instanceof J.MethodInvocation)) {
+                    return super.visitUnary(unary, ctx);
+                }
+                J.MethodInvocation method = (J.MethodInvocation) unary.getExpression();
+                int matchedIdx = -1;
+                for (int i = 0; i < matchers.length; i++) {
+                    if (matchers[i].matches(method)) {
+                        matchedIdx = i;
+                        break;
+                    }
+                }
+                if (matchedIdx < 0) {
+                    return super.visitUnary(unary, ctx);
+                }
+                int[] substitutionSources = substitutionSourcesByMatcher[matchedIdx];
+                Object[] substitutions = new Object[substitutionSources.length];
+                for (int i = 0; i < substitutionSources.length; i++) {
+                    int src = substitutionSources[i];
+                    if (src < 0) {
+                        if (method.getSelect() == null) {
+                            return super.visitUnary(unary, ctx);
+                        }
+                        substitutions[i] = method.getSelect();
+                    } else {
+                        if (src >= method.getArguments().size()) {
+                            return super.visitUnary(unary, ctx);
+                        }
+                        substitutions[i] = method.getArguments().get(src);
+                    }
+                }
+                J result = KotlinTemplate.builder(afterTemplate).build()
+                        .apply(getCursor(), unary.getCoordinates().replace(), substitutions);
+                if (result instanceof J.MethodInvocation) {
+                    JContainer<Expression> matchedTypeArgs = method.getPadding().getTypeParameters();
+                    if (matchedTypeArgs != null) {
+                        result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
+                    }
+                    result = preserveSelectAfter((J.MethodInvocation) result, method);
+                    result = preserveTrailingLambdaShape((J.MethodInvocation) result);
+                    result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
+                }
+                return result.withPrefix(unary.getPrefix());
+            }
+        };
+        return wrapWithPrecondition(matcherSpecsLines, walker);
+    }
+
+    /**
+     * Visitor for a {@code rewrite { d: Duration -> d.inHours } to { d -> d.inWholeHours }}
+     * recipe whose before lambda body is a property access (rather than a
+     * method invocation). The Kotlin parser models {@code obj.prop} as a
+     * {@link J.FieldAccess} — so this visitor walks {@link J.FieldAccess}
+     * instead of {@link J.MethodInvocation}.
+     *
+     * <p>Matcher specs use the {@code <owner-fqn>#<property-name>} format
+     * (rather than the {@link MethodMatcher} spelling), since property access
+     * has no parenthesised parameter list. Each line of
+     * {@code matcherSpecsLines} is one such spec; the visitor accepts a
+     * field access iff its target type FQN and selector name match any spec.
+     *
+     * <p>Property accessors have no value arguments, so the substitution
+     * source CSV always references the receiver via {@code -1} — the IR pass
+     * still emits the receiver placeholder uniformly with the method-invocation
+     * path, which keeps the after-template synthesis logic shared.
+     */
+    public static TreeVisitor<?, ExecutionContext> propertyAccessRewrite(
+            String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv) {
+        String[] specs = matcherSpecsLines.isEmpty() ? new String[0] : matcherSpecsLines.split("\n");
+        String[] specOwners = new String[specs.length];
+        String[] specNames = new String[specs.length];
+        for (int i = 0; i < specs.length; i++) {
+            int hash = specs[i].indexOf('#');
+            if (hash < 0) {
+                specOwners[i] = "*";
+                specNames[i] = specs[i];
+            } else {
+                specOwners[i] = specs[i].substring(0, hash);
+                specNames[i] = specs[i].substring(hash + 1);
+            }
+        }
+        int[][] substitutionSourcesByMatcher = parseCsvPerMatcher(substitutionSourcesCsv, specs.length);
+        TreeVisitor<?, ExecutionContext> walker = new KotlinVisitor<ExecutionContext>() {
+            @Override
+            public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                String name = fieldAccess.getName().getSimpleName();
+                String targetTypeFqn = fullyQualifiedNameOf(fieldAccess.getTarget().getType());
+                int matchedIdx = -1;
+                for (int i = 0; i < specs.length; i++) {
+                    if (!specNames[i].equals(name)) {
+                        continue;
+                    }
+                    if (!"*".equals(specOwners[i]) && !specOwners[i].equals(targetTypeFqn)) {
+                        continue;
+                    }
+                    matchedIdx = i;
+                    break;
+                }
+                if (matchedIdx < 0) {
+                    return super.visitFieldAccess(fieldAccess, ctx);
+                }
+                int[] substitutionSources = substitutionSourcesByMatcher[matchedIdx];
+                Object[] substitutions = new Object[substitutionSources.length];
+                for (int i = 0; i < substitutionSources.length; i++) {
+                    int src = substitutionSources[i];
+                    if (src < 0) {
+                        substitutions[i] = fieldAccess.getTarget();
+                    } else {
+                        // Property accessors have no positional args — the IR
+                        // pass should never have emitted a non-negative source
+                        // for this path. Bail out rather than substituting a
+                        // placeholder we can't satisfy.
+                        return super.visitFieldAccess(fieldAccess, ctx);
+                    }
+                }
+                J result = KotlinTemplate.builder(afterTemplate).build()
+                        .apply(getCursor(), fieldAccess.getCoordinates().replace(), substitutions);
+                return result.withPrefix(fieldAccess.getPrefix());
+            }
+        };
+        return wrapWithPrecondition(matcherSpecsLines, walker);
+    }
+
+    private static @Nullable String fullyQualifiedNameOf(org.openrewrite.java.tree.@Nullable JavaType type) {
+        if (type instanceof org.openrewrite.java.tree.JavaType.FullyQualified) {
+            return ((org.openrewrite.java.tree.JavaType.FullyQualified) type).getFullyQualifiedName();
+        }
+        return null;
+    }
+
+    /**
+     * Java-rooted parallel of {@link #methodInvocationRewrite}. Used when the
+     * LST-structural classifier defaults a {@code rewrite { } to { }} clause
+     * to a {@link JavaVisitor}: the visitor walks both Java and Kotlin sources
+     * via {@link org.openrewrite.kotlin.TreeVisitorAdapter}, but the template
+     * is parsed via {@link JavaTemplate}.
+     *
+     * <p>Matching, substitution-source semantics, and the multi-spec {@code \n}
+     * delimiter are identical to the Kotlin variant — only the visitor type
+     * and the template engine differ. There is no trailing-lambda fix-up:
+     * Java has no trailing-lambda syntax, so the {@link OmitParentheses}
+     * dance is Kotlin-specific.
+     */
+    public static TreeVisitor<?, ExecutionContext> methodInvocationRewriteJava(
+            String matcherSpecsLines, String afterTemplate, String substitutionSourcesCsv, int strictArgCount) {
+        String[] specs = matcherSpecsLines.isEmpty() ? new String[0] : matcherSpecsLines.split("\n");
+        MethodMatcher[] matchers = new MethodMatcher[specs.length];
+        for (int i = 0; i < specs.length; i++) {
+            matchers[i] = new MethodMatcher(specs[i]);
+        }
+        SubSource[][] substitutionSourcesByMatcher = parseSourcesPerMatcher(substitutionSourcesCsv, specs.length);
+        TreeVisitor<?, ExecutionContext> walker = new JavaVisitor<ExecutionContext>() {
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                int matchedIdx = -1;
+                for (int i = 0; i < matchers.length; i++) {
+                    if (matchers[i].matches(method)) {
+                        matchedIdx = i;
+                        break;
+                    }
+                }
+                if (matchedIdx >= 0) {
+                    Applied applied = prepareSubstitutions(
+                            method, substitutionSourcesByMatcher[matchedIdx], afterTemplate, strictArgCount);
+                    if (applied == null) {
+                        return super.visitMethodInvocation(method, ctx);
+                    }
+                    Object[] substitutions = applied.substitutions;
+                    J result = JavaTemplate.builder(applied.template).build()
+                            .apply(getCursor(), method.getCoordinates().replace(), substitutions);
+                    if (result instanceof J.MethodInvocation) {
+                        JContainer<Expression> matchedTypeArgs = method.getPadding().getTypeParameters();
+                        if (matchedTypeArgs != null) {
+                            result = ((J.MethodInvocation) result).withTypeParameters(matchedTypeArgs);
+                        }
+                        result = preserveSelectAfter((J.MethodInvocation) result, method);
+                        result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
+                    }
+                    return result.withPrefix(method.getPrefix());
+                }
+                return super.visitMethodInvocation(method, ctx);
+            }
+        };
+        return wrapWithPrecondition(matcherSpecsLines, walker);
+    }
+
+    /**
+     * Compose visitors sequentially: each runs in declaration order on the
+     * result of the previous one. Backs multi-statement {@code edit/scan/generate}
+     * bodies in {@code org.openrewrite.RecipeDsl}.
+     *
+     * <p>Semantics (per plan §7):
+     * <ul>
+     *   <li>{@code isAcceptable(SourceFile, ctx)} returns true iff ANY inner
+     *       visitor accepts the source. Non-accepting inner visitors are skipped
+     *       for that source.</li>
+     *   <li>{@code visit(tree, ctx)} threads {@code tree} through each visitor in
+     *       declaration order, restarting cursor state between visitors. Cursor
+     *       messages set by one inner visitor are NOT visible to the next.
+     *       Returning the same instance does NOT short-circuit — the next visitor
+     *       still runs.</li>
+     *   <li>Exceptions propagate; there's no partial-state recovery.</li>
+     * </ul>
+     */
+    public static TreeVisitor<?, ExecutionContext> composeSequential(TreeVisitor<?, ExecutionContext>[] visitors) {
+        if (visitors.length == 0) {
+            return TreeVisitor.noop();
+        }
+        if (visitors.length == 1) {
+            return visitors[0];
+        }
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                for (TreeVisitor<?, ExecutionContext> v : visitors) {
+                    if (v.isAcceptable(sourceFile, ctx)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                Tree current = tree;
+                for (TreeVisitor<?, ExecutionContext> v : visitors) {
+                    if (current instanceof SourceFile && !v.isAcceptable((SourceFile) current, ctx)) {
+                        continue;
+                    }
+                    Tree next = v.visit(current, ctx, new Cursor(null, Cursor.ROOT_VALUE));
+                    if (next != null) {
+                        current = next;
+                    }
+                }
+                return current;
+            }
+        };
+    }
+
+    /**
+     * Wrap a generated walker in {@link Preconditions#check(TreeVisitor, TreeVisitor)}
+     * using {@link UsesMethod} / {@link UsesField} derived from the recipe's
+     * matcher spec(s). Same idea as the {@code Preconditions.check(Preconditions.and(
+     * new UsesType<>(...), new UsesMethod<>(...)), visitor)} pattern that Refaster
+     * emits for its generated Java recipes — the walker only runs against a source
+     * file that actually uses the relevant member, letting the framework
+     * short-circuit unrelated files before they're walked.
+     *
+     * <p>We deliberately skip the {@link UsesType} prefilter that Refaster pairs
+     * with {@link UsesMethod}: for Kotlin extension functions and properties
+     * the matcher's owner is the synthetic JVM facade class (e.g.
+     * {@code kotlin.text.StringsKt} for {@code String.lowercase()}), which the
+     * source never references directly and which {@link UsesType} therefore
+     * always reports as absent. {@link UsesMethod} and {@link UsesField} each
+     * already constrain on the owner via the methods-/fields-in-use cache, so
+     * dropping {@link UsesType} loses no real filtering power.
+     *
+     * <p>Spec shapes (set by
+     * {@link org.openrewrite.kotlin.recipe.internal.RecipeIrGenerationExtension}):
+     * <ul>
+     *   <li>{@code "<owner-fqn> <name>(<args>)"} — method invocation. Yields
+     *       {@code UsesMethod(spec)}.</li>
+     *   <li>{@code "<owner-fqn>#<name>"} — property/field access (also the
+     *       inlined-constant fallback for {@code Math.PI} etc.). Yields
+     *       {@code UsesField(owner, name)}.</li>
+     *   <li>{@code "<outer>\t<inner>"} — two-segment chain. Yields the
+     *       AND of both segments' per-spec preconditions.</li>
+     * </ul>
+     * Multiple specs ({@code \n}-delimited, from {@code rewrite(b1, b2) to a})
+     * compose as {@link Preconditions#or}: the walker runs when ANY before
+     * pattern's member appears in the source.
+     *
+     * <p>Empty {@code specsLines} falls through to the bare walker without
+     * a precondition.
+     */
+    @SuppressWarnings("unchecked")
+    private static TreeVisitor<?, ExecutionContext> wrapWithPrecondition(
+            String specsLines, TreeVisitor<?, ExecutionContext> walker) {
+        if (specsLines == null || specsLines.isEmpty()) {
+            return walker;
+        }
+        String[] specs = specsLines.split("\n");
+        TreeVisitor<?, ExecutionContext>[] perSpec = new TreeVisitor[specs.length];
+        for (int i = 0; i < specs.length; i++) {
+            perSpec[i] = preconditionForSpec(specs[i]);
+        }
+        TreeVisitor<?, ExecutionContext> combined = perSpec.length == 1
+                ? perSpec[0]
+                : Preconditions.or(perSpec);
+        return Preconditions.check(combined, walker);
+    }
+
+    private static TreeVisitor<?, ExecutionContext> preconditionForSpec(String spec) {
+        int tabIdx = spec.indexOf('\t');
+        if (tabIdx >= 0) {
+            // Chain: BOTH segments must be present in the source file for the
+            // chained pattern to ever match.
+            return Preconditions.and(
+                    preconditionForSpec(spec.substring(0, tabIdx)),
+                    preconditionForSpec(spec.substring(tabIdx + 1)));
+        }
+        int hashIdx = spec.indexOf('#');
+        if (hashIdx >= 0) {
+            String owner = spec.substring(0, hashIdx);
+            String field = spec.substring(hashIdx + 1);
+            return new UsesField<>(owner, field);
+        }
+        return new UsesMethod<>(spec);
+    }
+
+    private static int[] parseCsv(String csv) {
+        if (csv.isEmpty()) {
+            return new int[0];
+        }
+        String[] parts = csv.split(",");
+        int[] result = new int[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            result[i] = Integer.parseInt(parts[i]);
+        }
+        return result;
+    }
+
+    /**
+     * Parse a substitution-source CSV that may be a single shared list (no
+     * {@code \n}) or one CSV per matcher ({@code \n}-delimited, one entry per
+     * matcher spec). Returns an {@code int[][]} of length {@code matcherCount}
+     * — the same array repeated for the shared case, or a per-matcher array
+     * for the mixed-shape multi-before case.
+     *
+     * <p>Mixed-shape multi-before: a recipe like
+     * {@code rewrite({ s: String -> s.foo() }, { s: String -> bar(s) }) to { s -> s.qux() }}
+     * binds {@code s} to the receiver in the first matcher and to arg 0 in
+     * the second. The after template's placeholder ORDER is shared (since
+     * the template is derived from the same after lambda), but the substitution
+     * sources differ per-matcher.
+     */
+    private static int[][] parseCsvPerMatcher(String csv, int matcherCount) {
+        if (matcherCount == 0) {
+            return new int[0][];
+        }
+        if (csv.indexOf('\n') < 0) {
+            int[] shared = parseCsv(csv);
+            int[][] result = new int[matcherCount][];
+            for (int i = 0; i < matcherCount; i++) {
+                result[i] = shared;
+            }
+            return result;
+        }
+        String[] lines = csv.split("\n", -1);
+        if (lines.length != matcherCount) {
+            throw new IllegalStateException(
+                    "expected " + matcherCount + " per-matcher CSVs but got " + lines.length);
+        }
+        int[][] result = new int[matcherCount][];
+        for (int i = 0; i < matcherCount; i++) {
+            result[i] = parseCsv(lines[i]);
+        }
+        return result;
+    }
+
+    /**
+     * Marks the variadic-run position in an after template. Must stay
+     * byte-identical to {@code RecipeIrGenerationExtension.VARARGS_SENTINEL}.
+     * Control-char-fenced so it can never collide with real source text.
+     */
+    private static final String VARARGS_SENTINEL = "VARARGS";
+
+    /**
+     * A single substitution source parsed from the CSV. {@link #SELECT} pulls
+     * the matched call's receiver; {@link #ARG} pulls one positional argument;
+     * {@link #VARARG} expands to {@code getArguments()[pos..end]} — the
+     * variadic-by-default run.
+     */
+    private static final class SubSource {
+        static final int SELECT = 0;
+        static final int ARG = 1;
+        static final int VARARG = 2;
+        final int kind;
+        final int pos;
+        SubSource(int kind, int pos) { this.kind = kind; this.pos = pos; }
+    }
+
+    private static SubSource parseSource(String token) {
+        if (!token.isEmpty() && token.charAt(0) == 'V') {
+            return new SubSource(SubSource.VARARG, Integer.parseInt(token.substring(1)));
+        }
+        int n = Integer.parseInt(token);
+        return n < 0 ? new SubSource(SubSource.SELECT, -1) : new SubSource(SubSource.ARG, n);
+    }
+
+    /**
+     * Parse a per-matcher substitution-source CSV (same shared / {@code \n}-
+     * delimited shape as {@link #parseCsvPerMatcher}) into {@link SubSource}
+     * rows, supporting the {@code V<k>} variadic token.
+     */
+    private static SubSource[][] parseSourcesPerMatcher(String csv, int matcherCount) {
+        if (matcherCount == 0) {
+            return new SubSource[0][];
+        }
+        if (csv.indexOf('\n') < 0) {
+            SubSource[] shared = parseSourceRow(csv);
+            SubSource[][] result = new SubSource[matcherCount][];
+            for (int i = 0; i < matcherCount; i++) {
+                result[i] = shared;
+            }
+            return result;
+        }
+        String[] lines = csv.split("\n", -1);
+        if (lines.length != matcherCount) {
+            throw new IllegalStateException(
+                    "expected " + matcherCount + " per-matcher CSVs but got " + lines.length);
+        }
+        SubSource[][] result = new SubSource[matcherCount][];
+        for (int i = 0; i < matcherCount; i++) {
+            result[i] = parseSourceRow(lines[i]);
+        }
+        return result;
+    }
+
+    private static SubSource[] parseSourceRow(String row) {
+        if (row.isEmpty()) {
+            return new SubSource[0];
+        }
+        String[] parts = row.split(",");
+        SubSource[] out = new SubSource[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            out[i] = parseSource(parts[i]);
+        }
+        return out;
+    }
+
+    /** Expanded after template + the substitution array it aligns with. */
+    private static final class Applied {
+        final String template;
+        final Object[] substitutions;
+        Applied(String template, Object[] substitutions) {
+            this.template = template;
+            this.substitutions = substitutions;
+        }
+    }
+
+    /**
+     * Build the substitution array for a matched invocation and, when the
+     * recipe is variadic, expand the {@link #VARARGS_SENTINEL} in the after
+     * template to one {@code #{any()}} placeholder per matched run argument.
+     * Returns {@code null} (caller should skip) when the arity guard fails or a
+     * source can't be satisfied (missing receiver / out-of-range arg).
+     *
+     * <p>Placeholders bind positionally, so expanding the sentinel in place and
+     * splicing the run args at the same ordinal keeps template and array
+     * aligned.
+     */
+    private static @Nullable Applied prepareSubstitutions(
+            J.MethodInvocation method, SubSource[] sources, String afterTemplate, int strictArgCount) {
+        List<Expression> args = method.getArguments();
+        // The canonical zero-arg call is a single J.Empty — treat as 0 args so a
+        // variadic run collapses to `()` rather than splicing the placeholder.
+        boolean noArgs = args.size() == 1 && args.get(0) instanceof J.Empty;
+        int argCount = noArgs ? 0 : args.size();
+        if (strictArgCount >= 0 && argCount != strictArgCount) {
+            return null;
+        }
+        List<Object> substitutions = new ArrayList<>(sources.length);
+        int varargCount = -1;
+        for (SubSource s : sources) {
+            switch (s.kind) {
+                case SubSource.SELECT:
+                    if (method.getSelect() == null) {
+                        return null;
+                    }
+                    substitutions.add(method.getSelect());
+                    break;
+                case SubSource.ARG:
+                    if (s.pos >= argCount) {
+                        return null;
+                    }
+                    substitutions.add(args.get(s.pos));
+                    break;
+                case SubSource.VARARG:
+                    varargCount = Math.max(0, argCount - s.pos);
+                    for (int i = s.pos; i < s.pos + varargCount; i++) {
+                        substitutions.add(args.get(i));
+                    }
+                    break;
+            }
+        }
+        String template = afterTemplate;
+        if (varargCount >= 0) {
+            StringBuilder placeholders = new StringBuilder();
+            for (int i = 0; i < varargCount; i++) {
+                if (i > 0) {
+                    placeholders.append(", ");
+                }
+                placeholders.append("#{any()}");
+            }
+            template = afterTemplate.replace(VARARGS_SENTINEL, placeholders.toString());
+        }
+        return new Applied(template, substitutions.toArray());
+    }
+
+/**
+     * Restore Kotlin trailing-lambda call shape on a template-substituted result.
+     *
+     * <p>The substitution sources come straight off the matched invocation's
+     * argument list. When the matched call site used trailing-lambda syntax
+     * ({@code xs.foo { ... }}), the captured {@link J.Lambda} carries a
+     * {@link TrailingLambdaArgument} marker — that marker tells
+     * {@code KotlinPrinter#visitArgumentsContainer} to emit {@code )} <em>before</em>
+     * the lambda. After the substitution lands inside a parenthesised template
+     * call ({@code xs.bar(#{any()})}), the marker still fires but the template's
+     * container has no {@link OmitParentheses} marker, so the printer emits
+     * {@code xs.bar(){ ... }} (an empty pair of parens followed by the lambda).
+     *
+     * <p>Re-attach {@link OmitParentheses} to the args container when the last
+     * arg is a {@code TrailingLambdaArgument}-marked lambda. The output is the
+     * idiomatic {@code xs.bar { ... }}.
+     */
+    private static J.MethodInvocation preserveTrailingLambdaShape(J.MethodInvocation method) {
+        JContainer<Expression> args = method.getPadding().getArguments();
+        List<JRightPadded<Expression>> padded = args.getPadding().getElements();
+        if (padded.isEmpty()) {
+            return method;
+        }
+        JRightPadded<Expression> lastPadded = padded.get(padded.size() - 1);
+        Expression last = lastPadded.getElement();
+        if (!(last instanceof J.Lambda) ||
+            !last.getMarkers().findFirst(TrailingLambdaArgument.class).isPresent()) {
+            return method;
+        }
+        // Two cases:
+        //   (1) single lambda arg → `obj.foo { ... }` (no parens anywhere). Add
+        //       OmitParentheses to the args container so the printer drops the
+        //       call's parens entirely.
+        //   (2) multi-arg with trailing lambda → `obj.foo(a, b) { ... }`. The
+        //       printer already handles this when OmitParentheses is absent and
+        //       the trailing lambda carries TrailingLambdaArgument: it emits
+        //       `(` ... `)` around the non-lambda args, then the lambda. We
+        //       must NOT add OmitParentheses here — doing so would drop the
+        //       call's parens and produce `obj.fooab { ... }`.
+        boolean singleArg = padded.size() == 1;
+        if (singleArg && args.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+            return method;
+        }
+        // The template parsed without trailing-lambda syntax, so the lambda's
+        // own prefix is "" (it sat flush against the placeholder). Once the
+        // lambda moves outside the call's args, Kotlin convention is one space
+        // between the closing position and `{`.
+        Expression spaced = last.getPrefix().getWhitespace().isEmpty()
+                ? last.withPrefix(Space.SINGLE_SPACE)
+                : last;
+        List<JRightPadded<Expression>> rebuilt = new ArrayList<>(padded);
+        rebuilt.set(rebuilt.size() - 1, lastPadded.withElement(spaced));
+        JContainer<Expression> withElements = args.getPadding().withElements(rebuilt);
+        JContainer<Expression> reshaped = singleArg
+                ? withElements.withMarkers(args.getMarkers().addIfAbsent(new OmitParentheses(Tree.randomId())))
+                : withElements;
+        return method.getPadding().withArguments(reshaped);
+    }
+}

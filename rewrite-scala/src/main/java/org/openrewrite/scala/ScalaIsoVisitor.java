@@ -38,8 +38,13 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     }
 
     @Override
-    public S.BlockExpression visitBlockExpression(S.BlockExpression blockExpression, P p) {
-        return (S.BlockExpression) super.visitBlockExpression(blockExpression, p);
+    public J visitStatementExpression(S.StatementExpression statementExpression, P p) {
+        return super.visitStatementExpression(statementExpression, p);
+    }
+
+    @Override
+    public J visitExpressionStatement(S.ExpressionStatement expressionStatement, P p) {
+        return super.visitExpressionStatement(expressionStatement, p);
     }
 
     @Override
@@ -204,6 +209,26 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     }
 
     @Override
+    public S.Export visitExport(S.Export export, P p) {
+        return (S.Export) super.visitExport(export, p);
+    }
+
+    @Override
+    public S.InterpolatedString visitInterpolatedString(S.InterpolatedString interpolatedString, P p) {
+        return (S.InterpolatedString) super.visitInterpolatedString(interpolatedString, p);
+    }
+
+    @Override
+    public S.Interpolation visitInterpolation(S.Interpolation interpolation, P p) {
+        return (S.Interpolation) super.visitInterpolation(interpolation, p);
+    }
+
+    @Override
+    public S.Try visitSTry(S.Try tryable, P p) {
+        return (S.Try) super.visitSTry(tryable, p);
+    }
+
+    @Override
     public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, P p) {
         return (J.InstanceOf) super.visitInstanceOf(instanceOf, p);
     }
@@ -352,5 +377,10 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     @Override
     public J.Yield visitYield(J.Yield yield, P p) {
         return (J.Yield) super.visitYield(yield, p);
+    }
+
+    @Override
+    public S.ConstructorInvocation visitConstructorInvocation(S.ConstructorInvocation constructorInvocation, P p) {
+        return (S.ConstructorInvocation) super.visitConstructorInvocation(constructorInvocation, p);
     }
 }

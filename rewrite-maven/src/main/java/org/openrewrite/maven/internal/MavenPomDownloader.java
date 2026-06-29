@@ -27,7 +27,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
@@ -558,6 +557,12 @@ public class MavenPomDownloader {
         gav = resolveNamedVersion(gav, containingPom, repositories, ctx);
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         gav = handleSnapshotTimestampVersion(gav);
+
+        if (gav.getVersion().contains("${")) {
+            throw new MavenDownloadingException("Unable to download POM " + gav +
+                    ". Version contains unresolved property placeholder.", null, originalGav);
+        }
+
         Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
 
         Timer.Sample sample = Timer.start();
@@ -678,7 +683,9 @@ public class MavenPomDownloader {
                                     }
                                 }
                             } catch (HttpSenderResponseException e) {
-                                if (e.getResponseCode() != 404) {
+                                // Some repositories return 401 when no `.module` url is found (eg. virtual repo that is accessed unauthenticated)
+                                // As the retrieval of module is not critical for the pom, we're swallowing if we can reach the other server / it is a timeout.
+                                if (!e.isServerReached() && !e.isClientSideException()) {
                                     throw e;
                                 }
                             }
@@ -946,7 +953,8 @@ public class MavenPomDownloader {
                 return null;
             }
 
-            if ("file".equals(URI.create(repository.getUri()).getScheme())) {
+            URI uri = URI.create(repository.getUri());
+            if ("file".equals(uri.getScheme())) {
                 return repository;
             }
             result = mavenCache.getNormalizedRepository(repository);
@@ -956,10 +964,27 @@ public class MavenPomDownloader {
                     ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), new IllegalArgumentException("Repository " + repository.getUri() + " is not HTTP(S)."));
                     return null;
                 }
+                // An endpoint that has already failed to connect during this run is skipped rather
+                // than re-probed. The same dead repository is frequently declared (often under
+                // different ids) by many transitive POMs; the per-repository normalization cache
+                // does not dedupe those, so without this each one costs a full connection timeout.
+                // The key is the host:port the connection targets (not the full URI): a connection
+                // failure happens before any path is sent, so it is independent of the path, and so
+                // the same dead host declared under different paths or ids is deduped too.
+                String endpoint = endpointOrNull(uri);
+                if (endpoint != null && ctx.getUnreachableEndpoints().contains(endpoint)) {
+                    ctx.getResolutionListener().repositoryAccessFailedPreviously(repository.getUri());
+                    return null;
+                }
                 MavenRepository normalized = null;
                 try {
                     normalized = normalizeRepository(repository);
                 } catch (Throwable e) {
+                    // normalizeRepository(repository) only throws once the endpoint is unreachable on
+                    // every probed URL, so remember it and skip the endpoint for the rest of the run.
+                    if (endpoint != null) {
+                        ctx.getUnreachableEndpoints().add(endpoint);
+                    }
                     ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), e);
                 }
 
@@ -1151,6 +1176,11 @@ public class MavenPomDownloader {
 
     private static boolean hasCredentials(MavenRepository repository) {
         return repository.getUsername() != null && repository.getPassword() != null;
+    }
+
+    private static @Nullable String endpointOrNull(URI uri) {
+        String host = uri.getHost();
+        return host == null ? null : host + ':' + uri.getPort();
     }
 
     private MavenRepository applyMirrors(MavenRepository repository) {

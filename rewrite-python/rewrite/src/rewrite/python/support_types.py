@@ -12,25 +12,38 @@ if TYPE_CHECKING:
 
 P = TypeVar('P')
 
+# Cached on first use to avoid the import-machinery cost of repeating
+# `from .visitor import PythonVisitor` inside is_acceptable / accept on every
+# visited Python node. Lazy-then-cached preserves the circular-import workaround.
+_PythonVisitor: Any = None
+
 
 class Py(J):
+    __slots__ = ()
+
     def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]:
-        from .visitor import PythonVisitor
-        return self.accept_python(v.adapt(Py, PythonVisitor), p)
+        global _PythonVisitor
+        if _PythonVisitor is None:
+            from .visitor import PythonVisitor
+            _PythonVisitor = PythonVisitor
+        return self.accept_python(v.adapt(Py, _PythonVisitor), p)
 
     def accept_python(self, v: 'PythonVisitor[P]', p: P) -> Optional['J']:
         ...
 
     def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool:
-        from .visitor import PythonVisitor
-        return v.is_adaptable_to(PythonVisitor)
+        global _PythonVisitor
+        if _PythonVisitor is None:
+            from .visitor import PythonVisitor
+            _PythonVisitor = PythonVisitor
+        return v.is_adaptable_to(_PythonVisitor)
 
 
 T = TypeVar('T')
 J2 = TypeVar('J2', bound=J)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PyComment(Comment):
     _aligned_to_indent: bool
 

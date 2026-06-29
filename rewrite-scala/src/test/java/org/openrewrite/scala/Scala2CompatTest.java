@@ -68,6 +68,41 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
+    void procedureSyntaxWithDefaultParam() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def greet(name: String = "world") {
+                    println(name)
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void statementAfterProcedureSyntaxMethod() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def outer(): Unit = {
+                    def inner() {
+                      println(1)
+                    }
+
+                    // call it
+                    inner()
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void uninitializedVar() {
         rewriteRun(
             scala(
@@ -126,12 +161,13 @@ class Scala2CompatTest implements RewriteTest {
 
     @Test
     void blockArgumentWithTypedParam() {
+        // In Scala 3, typed lambda params in block args need parentheses: (x: Int) =>
         rewriteRun(
             scala(
                 """
                 object Test {
                   val list = List(1, 2, 3)
-                  list.foreach { x: Int =>
+                  list.foreach { (x: Int) =>
                     println(x)
                   }
                 }
@@ -446,7 +482,6 @@ class Scala2CompatTest implements RewriteTest {
         );
     }
 
-    @org.junit.jupiter.api.Disabled("Context bounds should desugar to implicit params — not yet implemented")
     @Test
     void contextBound() {
         rewriteRun(
@@ -810,7 +845,6 @@ class Scala2CompatTest implements RewriteTest {
         );
     }
 
-    @org.junit.jupiter.api.Disabled("Space before : in type annotation not yet preserved")
     @Test
     void namedGivenSpaceBeforeColon() {
         rewriteRun(
@@ -881,6 +915,181 @@ class Scala2CompatTest implements RewriteTest {
                 object Test {
                   given Foo = new Foo {
                     def bar(): Int = 42
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void parameterizedAnonymousGiven() {
+        rewriteRun(
+            scala(
+                """
+                trait Ord[T]
+                object Test {
+                  given [T](using Ord[T]): Ord[List[T]] = new Ord[List[T]] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void classConstructorWithUsingClause() {
+        rewriteRun(
+            scala(
+                """
+                trait Executor
+                class C(val coll: String, helper: Int)(using Executor):
+                  def foo = 1
+                """
+            )
+        );
+    }
+
+    @Test
+    void anonymousGivenWithModifier() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  private given BSONHandler[Int] = new BSONHandler[Int] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void namedGivenWithBodyAndScopedModifier() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  private[Test] given intHandler: BSONHandler[Int] with {
+                    def write(i: Int) = ???
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void namedGivenWithBody() {
+        rewriteRun(
+            scala(
+                """
+                trait Ord[T] {
+                  def compare(a: T, b: T): Int
+                }
+                object Test {
+                  given intOrd: Ord[Int] with {
+                    def compare(a: Int, b: Int): Int = a - b
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void anonymousGivenWithBody() {
+        rewriteRun(
+            scala(
+                """
+                trait Ord[T] {
+                  def compare(a: T, b: T): Int
+                }
+                object Test {
+                  given Ord[Int] with {
+                    def compare(a: Int, b: Int): Int = a - b
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenImportBare() {
+        rewriteRun(
+            scala(
+                """
+                trait Foo
+                object Givens {
+                  given Foo = new Foo {}
+                }
+                object Use {
+                  import Givens.given
+                  val x: Foo = summon[Foo]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenImportSelector() {
+        rewriteRun(
+            scala(
+                """
+                trait Foo
+                object Givens {
+                  given Foo = new Foo {}
+                }
+                object Use {
+                  import Givens.{given Foo}
+                  val x: Foo = summon[Foo]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenMethodShapeNoValueParams() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  given mapHandler[V: BSONHandler]: BSONHandler[V] = new BSONHandler[V] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenAnonymousTypeParamsOnly() {
+        rewriteRun(
+            scala(
+                """
+                trait BSONHandler[T]
+                object Test {
+                  given [T: BSONHandler]: BSONHandler[List[T]] = new BSONHandler[List[T]] {}
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenAliasMethodShape() {
+        rewriteRun(
+            scala(
+                """
+                trait Ord[T] {
+                  def compare(a: T, b: T): Int
+                }
+                object Test {
+                  given listOrd[T](using ord: Ord[T]): Ord[List[T]] = new Ord[List[T]] {
+                    def compare(a: List[T], b: List[T]): Int = 0
                   }
                 }
                 """
@@ -1136,5 +1345,149 @@ class Scala2CompatTest implements RewriteTest {
                 System.out.println("FILE: " + name + " OK");
             }
         }
+    }
+
+    @Test
+    void minimalLambdaTupleTypeAscription() {
+        rewriteRun(
+            scala(
+                """
+                val f = (t: (Int, String)) => t
+                """
+            )
+        );
+    }
+
+    @Test
+    void valTupleAndFunctionTypeAscription() {
+        rewriteRun(
+            scala(
+                """
+                val x: (Int, String) = (1, "a")
+                val f: Int => String = _.toString
+                """
+            )
+        );
+    }
+
+    @Test
+    void expressionTupleTypeAscription() {
+        rewriteRun(
+            scala(
+                """
+                val y = (1, "a"): (Int, String)
+                """
+            )
+        );
+    }
+
+    @Test
+    void contextFunctionTypeAscription() {
+        rewriteRun(
+            scala(
+                """
+                val f: Int ?=> String = _.toString
+                """
+            )
+        );
+    }
+
+    @Test
+    void preservesWhitespaceBeforeFirstElementInDelimitedList() {
+        rewriteRun(
+            scala(
+                """
+                class Foo[
+                  A,
+                  B
+                ](
+                  a: A,
+                  b: B
+                )
+
+                object Test {
+                  val x: Map[
+                    String,
+                    Int
+                  ] = ???
+
+                  val xs = List.empty[
+                    String
+                  ]
+
+                  def f[A, B](a: A, b: B) = (a, b)
+
+                  val y = f[
+                    Int,
+                    String
+                  ](
+                    1,
+                    "x"
+                  )
+
+                  val t = (
+                    1,
+                    2,
+                    3
+                  )
+
+                  val g = (
+                    a: Int,
+                    b: Int
+                  ) => a + b
+
+                  def make() =
+                    new Foo(
+                      a,
+                      b
+                    ) {
+                      override def x() = 1
+                    }
+
+                  def matchIt(z: Any) = z match {
+                    case Foo(
+                      a,
+                      b
+                    ) => a
+                  }
+
+                  def cast(w: Any) = w.isInstanceOf[
+                    String]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void trailingPostfixAfterInfixChain() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def foo(xs: List[Int]) =
+                    xs filter (_ > 0) sortBy (_.toString) list
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void forComprehensionWithBlockBody() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  for {
+                    _ <- Some(1)
+                    field <- Some(2)
+                  } {
+                    println(field)
+                  }
+                }
+                """
+            )
+        );
     }
 }

@@ -229,6 +229,9 @@ public sealed class AccessorDeclaration(
     public IList<Modifier> Modifiers { get; } = modifiers;
     public JLeftPadded<AccessorKind> Kind { get; } = kind;
     public Block? Body { get; } = body;
+    // For auto-implemented accessors (e.g. "get ;"), Element is a J.Empty whose Prefix
+    // carries any whitespace between the keyword and the trailing ';'. For "get => x;" the
+    // Element is the body expression and Before is the space before '=>'.
     public JLeftPadded<Expression>? ExpressionBody { get; } = expressionBody;
 
     public AccessorDeclaration WithId(Guid id) =>
@@ -853,14 +856,15 @@ public sealed class IsPattern(
     Space prefix,
     Markers markers,
     Expression expression,
-    JLeftPadded<Pattern> pattern
+    JLeftPadded<Expression> pattern
 ) : Cs, Expression, IEquatable<IsPattern>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public Expression Expression { get; } = expression;
-    public JLeftPadded<Pattern> Pattern { get; } = pattern;
+    // Widened from Pattern to Expression so parenthesized patterns (J.Parentheses<Expression>) fit too.
+    public JLeftPadded<Expression> Pattern { get; } = pattern;
 
     public IsPattern WithId(Guid id) =>
         id == Id ? this : new(id, Prefix, Markers, Expression, Pattern);
@@ -870,7 +874,7 @@ public sealed class IsPattern(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Pattern);
     public IsPattern WithExpression(Expression expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Pattern);
-    public IsPattern WithPattern(JLeftPadded<Pattern> pattern) =>
+    public IsPattern WithPattern(JLeftPadded<Expression> pattern) =>
         ReferenceEquals(pattern, Pattern) ? this : new(Id, Prefix, Markers, Expression, pattern);
 
     public JavaType? Type => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean);
@@ -1304,7 +1308,9 @@ public sealed class PragmaWarningDirective(
     Space prefix,
     Markers markers,
     PragmaWarningAction action,
-    IList<JRightPadded<Expression>> warningCodes
+    IList<JRightPadded<Expression>> warningCodes,
+    Space keywordSpacing,
+    Space actionSpacing
 ) : Cs, Statement, IEquatable<PragmaWarningDirective>
 {
     public Guid Id { get; } = id;
@@ -1313,16 +1319,26 @@ public sealed class PragmaWarningDirective(
     public PragmaWarningAction Action { get; } = action;
     public IList<JRightPadded<Expression>> WarningCodes { get; } = warningCodes;
 
+    /// <summary>Whitespace between <c>#pragma</c> and <c>warning</c> (usually a single space).</summary>
+    public Space KeywordSpacing { get; } = keywordSpacing;
+
+    /// <summary>Whitespace between <c>warning</c> and the action keyword (<c>disable</c>/<c>restore</c>).</summary>
+    public Space ActionSpacing { get; } = actionSpacing;
+
     public PragmaWarningDirective WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Action, WarningCodes);
+        id == Id ? this : new(id, Prefix, Markers, Action, WarningCodes, KeywordSpacing, ActionSpacing);
     public PragmaWarningDirective WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Action, WarningCodes);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Action, WarningCodes, KeywordSpacing, ActionSpacing);
     public PragmaWarningDirective WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Action, WarningCodes);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Action, WarningCodes, KeywordSpacing, ActionSpacing);
     public PragmaWarningDirective WithAction(PragmaWarningAction action) =>
-        action == Action ? this : new(Id, Prefix, Markers, action, WarningCodes);
+        action == Action ? this : new(Id, Prefix, Markers, action, WarningCodes, KeywordSpacing, ActionSpacing);
     public PragmaWarningDirective WithWarningCodes(IList<JRightPadded<Expression>> warningCodes) =>
-        ReferenceEquals(warningCodes, WarningCodes) ? this : new(Id, Prefix, Markers, Action, warningCodes);
+        ReferenceEquals(warningCodes, WarningCodes) ? this : new(Id, Prefix, Markers, Action, warningCodes, KeywordSpacing, ActionSpacing);
+    public PragmaWarningDirective WithKeywordSpacing(Space keywordSpacing) =>
+        ReferenceEquals(keywordSpacing, KeywordSpacing) ? this : new(Id, Prefix, Markers, Action, WarningCodes, keywordSpacing, ActionSpacing);
+    public PragmaWarningDirective WithActionSpacing(Space actionSpacing) =>
+        ReferenceEquals(actionSpacing, ActionSpacing) ? this : new(Id, Prefix, Markers, Action, WarningCodes, KeywordSpacing, actionSpacing);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1338,22 +1354,30 @@ public sealed class PragmaChecksumDirective(
     Guid id,
     Space prefix,
     Markers markers,
+    Space keywordSpacing,
     string arguments
 ) : Cs, Statement, IEquatable<PragmaChecksumDirective>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
+
+    /// <summary>Whitespace between <c>#pragma</c> and <c>checksum</c> (usually a single space).</summary>
+    public Space KeywordSpacing { get; } = keywordSpacing;
+
+    /// <summary>The raw text following <c>checksum</c> (file/guid/hash), whitespace preserved verbatim.</summary>
     public string Arguments { get; } = arguments;
 
     public PragmaChecksumDirective WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Arguments);
+        id == Id ? this : new(id, Prefix, Markers, KeywordSpacing, Arguments);
     public PragmaChecksumDirective WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Arguments);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, KeywordSpacing, Arguments);
     public PragmaChecksumDirective WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Arguments);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, KeywordSpacing, Arguments);
+    public PragmaChecksumDirective WithKeywordSpacing(Space keywordSpacing) =>
+        ReferenceEquals(keywordSpacing, KeywordSpacing) ? this : new(Id, Prefix, Markers, keywordSpacing, Arguments);
     public PragmaChecksumDirective WithArguments(string arguments) =>
-        arguments == Arguments ? this : new(Id, Prefix, Markers, arguments);
+        arguments == Arguments ? this : new(Id, Prefix, Markers, KeywordSpacing, arguments);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1372,7 +1396,8 @@ public sealed class NullableDirective(
     NullableSetting setting,
     NullableTarget? target,
     string hashSpacing = "",
-    string trailingComment = ""
+    string trailingComment = "",
+    string keywordSpacing = " "
 ) : Cs, Statement, IEquatable<NullableDirective>
 {
     public Guid Id { get; } = id;
@@ -1382,21 +1407,25 @@ public sealed class NullableDirective(
     public NullableTarget? Target { get; } = target;
     public string HashSpacing { get; } = hashSpacing;
     public string TrailingComment { get; } = trailingComment;
+    // Whitespace between the "nullable" keyword and the setting keyword (e.g. "  " in "#nullable  enable").
+    public string KeywordSpacing { get; } = keywordSpacing;
 
     public NullableDirective WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Setting, Target, HashSpacing, TrailingComment);
+        id == Id ? this : new(id, Prefix, Markers, Setting, Target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Setting, Target, HashSpacing, TrailingComment);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Setting, Target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Setting, Target, HashSpacing, TrailingComment);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Setting, Target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithSetting(NullableSetting setting) =>
-        setting == Setting ? this : new(Id, Prefix, Markers, setting, Target, HashSpacing, TrailingComment);
+        setting == Setting ? this : new(Id, Prefix, Markers, setting, Target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithTarget(NullableTarget? target) =>
-        target == Target ? this : new(Id, Prefix, Markers, Setting, target, HashSpacing, TrailingComment);
+        target == Target ? this : new(Id, Prefix, Markers, Setting, target, HashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithHashSpacing(string hashSpacing) =>
-        string.Equals(hashSpacing, HashSpacing, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, hashSpacing, TrailingComment);
+        string.Equals(hashSpacing, HashSpacing, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, hashSpacing, TrailingComment, KeywordSpacing);
     public NullableDirective WithTrailingComment(string trailingComment) =>
-        string.Equals(trailingComment, TrailingComment, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, HashSpacing, trailingComment);
+        string.Equals(trailingComment, TrailingComment, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, HashSpacing, trailingComment, KeywordSpacing);
+    public NullableDirective WithKeywordSpacing(string keywordSpacing) =>
+        string.Equals(keywordSpacing, KeywordSpacing, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, HashSpacing, TrailingComment, keywordSpacing);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 

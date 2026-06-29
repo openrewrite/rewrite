@@ -15,13 +15,13 @@
  */
 package org.openrewrite.java;
 
-import io.github.classgraph.ClassGraph;
 import lombok.experimental.UtilityClass;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
 import org.openrewrite.java.internal.parser.TypeTable;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -32,6 +32,7 @@ import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -231,6 +232,9 @@ public interface JavaParser extends Parser {
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
 
         @Nullable
+        protected JavaTypeFactory javaTypeFactory;
+
+        @Nullable
         protected Collection<Input> dependsOn;
 
         protected Charset charset = Charset.defaultCharset();
@@ -246,8 +250,21 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        /**
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} instead.
+         * The cache becomes an implementation detail of the default
+         * {@link org.openrewrite.java.internal.DefaultJavaTypeFactory}. For now, calls
+         * are still honored and the cache is wrapped into the default factory when no
+         * explicit factory is configured.
+         */
+        @Deprecated
         public B typeCache(JavaTypeCache javaTypeCache) {
             this.javaTypeCache = javaTypeCache;
+            return (B) this;
+        }
+
+        public B typeFactory(JavaTypeFactory javaTypeFactory) {
+            this.javaTypeFactory = javaTypeFactory;
             return (B) this;
         }
 
@@ -345,6 +362,15 @@ public interface JavaParser extends Parser {
             return classpath;
         }
 
+        /**
+         * Resolve the {@link JavaTypeFactory} to use for this parser. Returns the explicit
+         * factory set via {@link #typeFactory}, or {@code null} when none is configured —
+         * the caller falls back to a default factory.
+         */
+        protected @Nullable JavaTypeFactory resolvedTypeFactory() {
+            return javaTypeFactory;
+        }
+
         @Override
         public abstract P build();
 
@@ -401,12 +427,12 @@ class RuntimeClasspathCache {
             synchronized (RuntimeClasspathCache.class) {
                 paths = runtimeClasspath;
                 if (paths == null) {
-                    runtimeClasspath = paths = new ClassGraph()
-                            .disableNestedJarScanning()
-                            .getClasspathURIs().stream()
-                            .filter(uri -> "file".equals(uri.getScheme()))
-                            .map(Paths::get)
-                            .collect(toList());
+                    String cp = System.getProperty("java.class.path");
+                    runtimeClasspath = paths = cp == null ? Collections.emptyList() :
+                            Arrays.stream(cp.split(System.getProperty("path.separator")))
+                                    .map(Paths::get)
+                                    .filter(Files::exists)
+                                    .collect(toList());
                 }
             }
         }

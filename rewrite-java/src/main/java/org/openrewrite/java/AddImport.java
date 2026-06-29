@@ -19,9 +19,11 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
@@ -113,7 +115,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             }
             // Nor if the classes are within the same package
             if (!"Record".equals(typeName) && cu.getPackageDeclaration() != null &&
-                    packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
+                    packageName.equals(PackageNameUtils.getPackageName(cu.getPackageDeclaration()))) {
                 // For static imports, only skip if the target type is declared in this compilation unit
                 if (member == null) {
                     return cu;
@@ -175,11 +177,11 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, ((SourceFile) cu)))
                     .orElse(IntelliJ.importLayout());
 
-            List<JavaType.FullyQualified> classpath = cu.getMarkers().findFirst(JavaSourceSet.class)
-                    .map(JavaSourceSet::getClasspath)
-                    .orElse(emptyList());
+            Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
+            List<JavaType.FullyQualified> classpath = sourceSet.map(JavaSourceSet::getClasspath).orElse(emptyList());
+            boolean classpathDirty = p instanceof ExecutionContext && JavaSourceSet.isDirty((ExecutionContext) p, cu);
 
-            List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath);
+            List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath, classpathDirty);
 
             if (member != null && typeReference.isPresent()) {
                 cu = (JavaSourceFile) new ShortenFullyQualifiedMemberReferences(typeReference.get()).visit(cu, p);

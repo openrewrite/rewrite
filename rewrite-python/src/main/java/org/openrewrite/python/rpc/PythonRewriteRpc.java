@@ -20,30 +20,24 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.json.JsonParser;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.python.*;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.python.tree.Py;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.toml.TomlParser;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import org.openrewrite.Parser;
-import org.openrewrite.python.PyProjectTomlParser;
-import org.openrewrite.toml.TomlParser;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintStream;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -150,7 +144,7 @@ public class PythonRewriteRpc extends RewriteRpc {
      * @return Stream of parsed source files
      */
     public Stream<SourceFile> parseProject(Path projectPath, ExecutionContext ctx) {
-        return parseProject(projectPath, null, null, ctx);
+        return parseProject(projectPath, ParseProjectOptions.builder().build(), ctx);
     }
 
     /**
@@ -161,9 +155,13 @@ public class PythonRewriteRpc extends RewriteRpc {
      * @param exclusions  Optional glob patterns to exclude from parsing
      * @param ctx         Execution context for parsing
      * @return Stream of parsed source files
+     * @deprecated Use {@link #parseProject(Path, ParseProjectOptions, ExecutionContext)} instead.
      */
+    @Deprecated
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, ExecutionContext ctx) {
-        return parseProject(projectPath, exclusions, null, ctx);
+        return parseProject(projectPath, ParseProjectOptions.builder()
+                .exclusions(exclusions)
+                .build(), ctx);
     }
 
     /**
@@ -175,8 +173,31 @@ public class PythonRewriteRpc extends RewriteRpc {
      * @param relativeTo  Optional path to make source file paths relative to
      * @param ctx         Execution context for parsing
      * @return Stream of parsed source files
+     * @deprecated Use {@link #parseProject(Path, ParseProjectOptions, ExecutionContext)} instead.
      */
+    @Deprecated
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
+        return parseProject(projectPath, ParseProjectOptions.builder()
+                .exclusions(exclusions)
+                .relativeTo(relativeTo)
+                .build(), ctx);
+    }
+
+    /**
+     * Parses an entire Python project directory.
+     * Discovers and parses all relevant source files.
+     *
+     * @param projectPath Path to the project directory to parse
+     * @param options     Optional parsing inputs — exclusions, relativeTo, and the caller-provisioned
+     *                    dependency environment; see {@link ParseProjectOptions}. This is the only
+     *                    overload that accepts a {@code dependencyPath}.
+     * @param ctx         Execution context for parsing
+     * @return Stream of parsed source files
+     */
+    public Stream<SourceFile> parseProject(Path projectPath, ParseProjectOptions options, ExecutionContext ctx) {
+        @Nullable List<String> exclusions = options.getExclusions();
+        @Nullable Path relativeTo = options.getRelativeTo();
+        @Nullable Path dependencyPath = options.getDependencyPath();
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         Stream<SourceFile> rpcStream = StreamSupport.stream(new Spliterator<SourceFile>() {
@@ -187,7 +208,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, dependencyPath), ParseProjectResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -248,7 +269,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                 final PythonResolutionResult finalMarker = marker;
                 rpcStream = rpcStream.map(sf -> {
                     if (sf instanceof Py.CompilationUnit &&
-                            sf.getSourcePath().getFileName().toString().equals("setup.py")) {
+                            sf.getSourcePath().endsWith("setup.py")) {
                         return sf.withMarkers(sf.getMarkers().addIfAbsent(finalMarker));
                     }
                     return sf;
@@ -312,7 +333,7 @@ public class PythonRewriteRpc extends RewriteRpc {
     private Stream<SourceFile> parseManifest(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {
         Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
 
-        // Priority: pyproject.toml > setup.cfg > requirements.txt
+        // Priority: pyproject.toml > Pipfile > setup.cfg > requirements.txt
         // Note: setup.py is NOT handled here — it's already in the RPC stream as Py.CompilationUnit
 
         Path pyprojectPath = projectPath.resolve("pyproject.toml");
@@ -331,6 +352,22 @@ public class PythonRewriteRpc extends RewriteRpc {
             return result;
         }
 
+        Path pipfilePath = projectPath.resolve("Pipfile");
+        if (Files.exists(pipfilePath)) {
+            Parser.Input pipfileInput = Parser.Input.fromFile(pipfilePath);
+            Stream<SourceFile> result = new PipfileParser().parseInputs(
+                    Collections.singletonList(pipfileInput), effectiveRelativeTo, ctx);
+
+            Path pipfileLockPath = projectPath.resolve("Pipfile.lock");
+            if (Files.exists(pipfileLockPath)) {
+                Parser.Input pipfileLockInput = Parser.Input.fromFile(pipfileLockPath);
+                Stream<SourceFile> pipfileLockStream = new JsonParser().parseInputs(
+                        Collections.singletonList(pipfileLockInput), effectiveRelativeTo, ctx);
+                result = Stream.concat(result, pipfileLockStream);
+            }
+            return result;
+        }
+
         Path setupCfgPath = projectPath.resolve("setup.cfg");
         if (Files.exists(setupCfgPath)) {
             Parser.Input input = Parser.Input.fromFile(setupCfgPath);
@@ -340,14 +377,13 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         RequirementsTxtParser reqsParser = new RequirementsTxtParser(commandEnv);
         try (Stream<Path> entries = Files.list(projectPath)) {
-            Path reqsPath = entries
-                    .filter(p -> reqsParser.accept(p.getFileName()))
-                    .findFirst()
-                    .orElse(null);
-            if (reqsPath != null) {
-                Parser.Input input = Parser.Input.fromFile(reqsPath);
-                return reqsParser.parseInputs(
-                        Collections.singletonList(input), effectiveRelativeTo, ctx);
+            List<Parser.Input> reqInputs = new ArrayList<>();
+            entries.filter(p -> reqsParser.accept(p.getFileName()))
+                    .sorted()
+                    .map(Parser.Input::fromFile)
+                    .forEach(reqInputs::add);
+            if (!reqInputs.isEmpty()) {
+                return reqsParser.parseInputs(reqInputs, effectiveRelativeTo, ctx);
             }
         } catch (IOException e) {
             // Silently skip manifest parsing if we can't list the directory
@@ -366,10 +402,13 @@ public class PythonRewriteRpc extends RewriteRpc {
         private List<RecipeBundleResolver> resolvers = Collections.emptyList();
         private final Map<String, String> environment = new HashMap<>();
         // Default to looking for a venv python, falling back to system python
-        private Path pythonPath = findDefaultPythonPath();
+        private Supplier<@Nullable Path> pythonPathSupplier = Builder::findDefaultPythonPath;
         private @Nullable Path log;
         private @Nullable Path pipPackagesPath;
         private @Nullable Path recipeInstallDir;
+        // Resolved lazily at start; when it yields a directory, the engine is taken from there and
+        // all bootstrap/detection is skipped. Default: no pre-provisioned engine.
+        private Supplier<@Nullable Path> engineInstallDirSupplier = () -> null;
 
         private static Path findDefaultPythonPath() {
             // Try to find a venv in the project structure
@@ -405,6 +444,8 @@ public class PythonRewriteRpc extends RewriteRpc {
          */
         private String pythonVersion = "3";
 
+        private @Nullable DataTableStore dataTableStore;
+
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
             return this;
@@ -422,7 +463,20 @@ public class PythonRewriteRpc extends RewriteRpc {
          * @return This builder
          */
         public Builder pythonPath(Path pythonPath) {
-            this.pythonPath = pythonPath;
+            return pythonPath(() -> pythonPath);
+        }
+
+        /**
+         * Supplies the path to the Python executable. The supplier is invoked at most
+         * once, when the RPC is first started. Returning {@code null} uses the built-in
+         * default (same as not configuring the path at all). Exceptions thrown by the
+         * supplier propagate out of the RPC-start call.
+         *
+         * @param pythonPathSupplier Supplier for the path to the Python executable
+         * @return This builder
+         */
+        public Builder pythonPath(Supplier<@Nullable Path> pythonPathSupplier) {
+            this.pythonPathSupplier = pythonPathSupplier;
             return this;
         }
 
@@ -509,6 +563,35 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
+         * Point at a directory where the {@code openrewrite} engine is already installed (an
+         * importable {@code rewrite} package and its dependencies). When set, that directory is put
+         * on {@code PYTHONPATH} and <em>all</em> engine bootstrap/detection is skipped — no pip
+         * install, no interpreter probes, no network. This is the seam an embedding host uses to
+         * provide an engine it has provisioned out-of-band; it leaves the normal install-from-index
+         * path as the fallback for everyone else.
+         *
+         * @param engineInstallDir The directory containing the installed engine, or {@code null}
+         * @return This builder
+         */
+        public Builder engineInstallDir(@Nullable Path engineInstallDir) {
+            return engineInstallDir(() -> engineInstallDir);
+        }
+
+        /**
+         * Supplies the engine install directory, resolved at most once when the RPC first starts.
+         * Returning {@code null} means "no pre-provisioned engine" (fall back to normal detection).
+         * Because it runs at start, the supplier is the right place to do lazy, on-demand work such
+         * as installing the engine before returning its directory.
+         *
+         * @param engineInstallDirSupplier Supplier for the installed-engine directory
+         * @return This builder
+         */
+        public Builder engineInstallDir(Supplier<@Nullable Path> engineInstallDirSupplier) {
+            this.engineInstallDirSupplier = engineInstallDirSupplier;
+            return this;
+        }
+
+        /**
          * Set the Python language version to parse.
          * <p>
          * Supported values:
@@ -525,14 +608,35 @@ public class PythonRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        /**
+         * Configures where recipes in the Python runtime write data table rows, conveyed via
+         * the {@link org.openrewrite.rpc.request.SetDataTableStore} handshake.
+         */
+        public Builder dataTableStore(@Nullable DataTableStore dataTableStore) {
+            this.dataTableStore = dataTableStore;
+            return this;
+        }
+
         @Override
         public PythonRewriteRpc get() {
+            Path pythonPath = pythonPathSupplier.get();
+            if (pythonPath == null) {
+                pythonPath = findDefaultPythonPath();
+            }
+
             String version = StringUtils.readFully(
                     PythonRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-python-version.txt")).trim();
             boolean isDevBuild = version.isEmpty() || version.endsWith(".dev0") || "unspecified".equals(version);
 
             Path resolvedPipPackagesPath = null;
-            if (!isDevBuild) {
+            // Explicit seam: the engineInstallDir supplier hands us an engine that the caller has
+            // already provisioned out-of-band. Resolved lazily here so any such work only happens
+            // when the RPC actually starts; when present, use it directly and skip all
+            // bootstrap/detection — no network, no interpreter probes. Null → normal path.
+            Path engineInstallDir = engineInstallDirSupplier.get();
+            if (engineInstallDir != null) {
+                resolvedPipPackagesPath = engineInstallDir;
+            } else if (!isDevBuild) {
                 // Known version (release or published pre-release) — try to find or
                 // install the pinned version, falling back to any available install.
                 if (pipPackagesPath != null && isVersionInstalled(pipPackagesPath.resolve(version), version)) {
@@ -541,7 +645,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                     // Interpreter already has the right version; nothing to do
                 } else if (pipPackagesPath != null) {
                     resolvedPipPackagesPath = pipPackagesPath.resolve(version);
-                    bootstrapOpenrewrite(resolvedPipPackagesPath, version);
+                    bootstrapOpenrewrite(pythonPath, resolvedPipPackagesPath, version);
                 } else if (canImportRewrite(pythonPath)) {
                     // Interpreter has a different version, but no pipPackagesPath to
                     // install the right one — proceed with what's available (e.g., CI
@@ -572,7 +676,8 @@ public class PythonRewriteRpc extends RewriteRpc {
                     "-m", "rewrite.rpc.server",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                     metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
-                    traceRpcMessages ? "--trace-rpc-messages" : null
+                    traceRpcMessages ? "--trace-rpc-messages" : null,
+                    recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );
 
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
@@ -641,6 +746,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
+                        .dataTableStore(dataTableStore)
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
@@ -706,18 +812,42 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
+         * Whether Pyroscope profiling has been requested for the RPC subprocess, via
+         * either the configured builder environment or the inherited process environment.
+         * Drives whether the heavier, registry-only {@code [profiling]} extra is installed
+         * alongside the base engine.
+         */
+        private boolean isProfilingRequested() {
+            String fromBuilder = environment.get("PYROSCOPE_SERVER_ADDRESS");
+            if (fromBuilder != null && !fromBuilder.trim().isEmpty()) {
+                return true;
+            }
+            String fromProcess = System.getenv("PYROSCOPE_SERVER_ADDRESS");
+            return fromProcess != null && !fromProcess.trim().isEmpty();
+        }
+
+        /**
          * Installs the pinned openrewrite package into the given pip packages directory.
          */
-        private void bootstrapOpenrewrite(Path pipPackagesPath, String version) {
+        private void bootstrapOpenrewrite(Path pythonPath, Path pipPackagesPath, String version) {
             try {
                 Files.createDirectories(pipPackagesPath);
 
+                // Install the lean engine by default. The [profiling] extra pulls in
+                // pyroscope-io and its transitive (often native) dependencies, which most
+                // deployments never use; request it only when PYROSCOPE_SERVER_ADDRESS is
+                // set — the same signal the SDK init in rewrite.rpc.server gates on. The env
+                // var may arrive through either the configured builder environment or the
+                // inherited process environment, so check both. Keeping the default install
+                // free of the profiling deps makes it resolvable from a restricted or offline
+                // package source and keeps those extra packages off the parse path.
+                String packageSpec = (isProfilingRequested() ? "openrewrite[profiling]==" : "openrewrite==") + version;
                 ProcessBuilder pb = new ProcessBuilder(
                         pythonPath.toString(),
                         "-m", "pip", "install",
                         "--upgrade",
                         "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
-                        "openrewrite==" + version
+                        packageSpec
                 );
                 pb.environment().putAll(environment);
                 pb.redirectErrorStream(true);
@@ -737,12 +867,12 @@ public class PythonRewriteRpc extends RewriteRpc {
 
                 if (!completed) {
                     process.destroyForcibly();
-                    throw new RuntimeException("Timed out bootstrapping openrewrite==" + version);
+                    throw new RuntimeException("Timed out bootstrapping " + packageSpec);
                 }
 
                 int exitCode = process.exitValue();
                 if (exitCode != 0) {
-                    String message = "Failed to install openrewrite==" + version +
+                    String message = "Failed to install " + packageSpec +
                             " (pip exited with code " + exitCode + ")";
                     if (!pipOutput.isEmpty()) {
                         message += ":\n" + pipOutput.trim();

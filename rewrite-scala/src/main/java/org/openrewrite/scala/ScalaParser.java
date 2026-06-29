@@ -21,7 +21,9 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.DefaultJavaTypeFactory;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 import org.openrewrite.scala.internal.ScalaCompilerContext;
 import org.openrewrite.scala.tree.S;
 import org.openrewrite.style.NamedStyles;
@@ -32,7 +34,6 @@ import org.openrewrite.internal.EncodingDetectingInputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -45,27 +46,30 @@ public class ScalaParser implements Parser {
 
     private final boolean logCompilationWarningsAndErrors;
     private final JavaTypeCache typeCache;
+    private final JavaTypeFactory typeFactory;
+
+    private static final Pattern PACKAGE_PATTERN = Pattern.compile("\\bpackage\\s+([.\\w]+)");
+    private static final Pattern CLASS_PATTERN = Pattern.compile("(class|object|trait|case\\s+class)\\s*(<[^>]*>)?\\s+(\\w+)");
+
+    private static String derivedRelativePath(String sourceCode) {
+        Matcher packageMatcher = PACKAGE_PATTERN.matcher(sourceCode);
+        boolean hasPackage = packageMatcher.find();
+        String pkg = hasPackage ? packageMatcher.group(1).replace('.', '/') + "/" : "";
+
+        Matcher classMatcher = CLASS_PATTERN.matcher(sourceCode);
+        boolean hasClass = classMatcher.find();
+        String simpleName = hasClass ? classMatcher.group(3) : Long.toString(System.nanoTime());
+
+        String extension = (!hasPackage && !hasClass) ? ".sbt" : ".scala";
+        return pkg + simpleName + extension;
+    }
 
     @Override
     public Stream<SourceFile> parse(@Language("scala") String... sources) {
-        Pattern packagePattern = Pattern.compile("\\bpackage\\s+([.\\w]+)");
-        Pattern classPattern = Pattern.compile("(class|object|trait|case\\s+class)\\s*(<[^>]*>)?\\s+(\\w+)");
-
-        Function<String, String> simpleName = sourceStr -> {
-            Matcher classMatcher = classPattern.matcher(sourceStr);
-            return classMatcher.find() ? classMatcher.group(3) : null;
-        };
-
         return parseInputs(
                 Arrays.stream(sources)
                         .map(sourceFile -> {
-                            Matcher packageMatcher = packagePattern.matcher(sourceFile);
-                            String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
-
-                            String className = Optional.ofNullable(simpleName.apply(sourceFile))
-                                                       .orElse(Long.toString(System.nanoTime())) + ".scala";
-
-                            Path path = Paths.get(pkg + className);
+                            Path path = Paths.get(derivedRelativePath(sourceFile));
                             return Input.fromString(path, sourceFile);
                         })
                         .collect(Collectors.toList()),
@@ -91,8 +95,18 @@ public class ScalaParser implements Parser {
             inputList.add(input);
         }
 
-        // Batch compile all sources with type checking
-        Map<String, ScalaCompilerContext.ParseResult> compiledResults = compilerContext.compileAll(inputList);
+        // Batch compile all sources with type checking. If the batch fails as a
+        // whole, degrade to per-file parsing below so a single bad input (or a
+        // transient failure) yields a ParseError for that input only instead of
+        // failing the entire parse stream.
+        Map<String, ScalaCompilerContext.ParseResult> compiledResults;
+        try {
+            compiledResults = compilerContext.compileAll(inputList);
+        } catch (Throwable t) {
+            ctx.getOnError().accept(t);
+            compiledResults = Collections.emptyMap();
+        }
+        Map<String, ScalaCompilerContext.ParseResult> finalCompiledResults = compiledResults;
 
         // Map results back to SourceFiles
         return inputList.stream()
@@ -101,7 +115,7 @@ public class ScalaParser implements Parser {
                     pctx.getParsingListener().startedParsing(input);
 
                     try {
-                        ScalaCompilerContext.ParseResult parseResult = compiledResults.get(input.getPath().toString());
+                        ScalaCompilerContext.ParseResult parseResult = finalCompiledResults.get(input.getPath().toString());
 
                         // Fall back to single-file parse if batch didn't include this file
                         if (parseResult == null) {
@@ -118,6 +132,7 @@ public class ScalaParser implements Parser {
                             source.getCharset(),
                             source.isCharsetBomMarked(),
                             typeCache,
+                            typeFactory,
                             ctx,
                             parseResult.getParseResult()
                         );
@@ -143,7 +158,8 @@ public class ScalaParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".scala") || path.toString().endsWith(".sc");
+        String s = path.toString();
+        return s.endsWith(".scala") || s.endsWith(".sc") || s.endsWith(".sbt");
     }
 
     @Override
@@ -154,7 +170,7 @@ public class ScalaParser implements Parser {
 
     @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
-        return prefix.resolve("file.scala");
+        return prefix.resolve(derivedRelativePath(sourceCode));
     }
 
     public static ScalaParser.Builder builder() {
@@ -172,6 +188,10 @@ public class ScalaParser implements Parser {
         protected @Nullable Collection<String> artifactNames = Collections.emptyList();
 
         private JavaTypeCache typeCache = new JavaTypeCache();
+
+        @Nullable
+        private JavaTypeFactory typeFactory;
+
         private boolean logCompilationWarningsAndErrors = false;
         private final List<NamedStyles> styles = new ArrayList<>();
 
@@ -184,6 +204,7 @@ public class ScalaParser implements Parser {
             this.classpath = base.classpath;
             this.artifactNames = base.artifactNames;
             this.typeCache = base.typeCache;
+            this.typeFactory = base.typeFactory;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
         }
@@ -224,9 +245,21 @@ public class ScalaParser implements Parser {
             return this;
         }
 
+        /**
+         * @deprecated Configure a {@link JavaTypeFactory} via {@link #typeFactory} instead.
+         * The cache becomes an implementation
+         * detail of the default {@link DefaultJavaTypeFactory}.
+         */
+        @Deprecated
         @SuppressWarnings("unused")
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;
+            return this;
+        }
+
+        @SuppressWarnings("unused")
+        public Builder typeFactory(JavaTypeFactory typeFactory) {
+            this.typeFactory = typeFactory;
             return this;
         }
 
@@ -247,7 +280,12 @@ public class ScalaParser implements Parser {
 
         @Override
         public ScalaParser build() {
-            return new ScalaParser(resolvedClasspath(), logCompilationWarningsAndErrors, typeCache);
+            Collection<Path> cp = resolvedClasspath();
+            JavaTypeFactory factory = typeFactory;
+            if (factory == null) {
+                factory = new DefaultJavaTypeFactory(typeCache);
+            }
+            return new ScalaParser(cp, logCompilationWarningsAndErrors, typeCache, factory);
         }
 
         @Override

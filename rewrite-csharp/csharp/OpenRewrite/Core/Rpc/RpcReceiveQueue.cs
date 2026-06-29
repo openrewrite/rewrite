@@ -16,7 +16,6 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using Newtonsoft.Json.Linq;
 using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
@@ -151,10 +150,12 @@ public class RpcReceiveQueue
                     // Simple value types (enums, primitives) sent with both valueType and value
                     after = ExtractValue<T>(message.Value);
                 }
-                else if (message.ValueType != null)
+                else if (message.State == ADD && message.ValueType != null)
                 {
-                    // ValueType set but no value and no codec - keep before
-                    after = before;
+                    throw new InvalidOperationException(
+                        $"No RPC codec registered on the C# side for '{message.ValueType}'. " +
+                        "The remote side has a codec and sent property messages that will not be consumed, " +
+                        "causing RPC queue desynchronization.");
                 }
                 else
                 {
@@ -390,9 +391,9 @@ public class RpcReceiveQueue
 
     /// <summary>
     /// Deserializes a non-codec object that was sent inline in the ADD message.
-    /// The value is typically a JObject from Newtonsoft.Json deserialization.
+    /// The value is typically a JsonElement from System.Text.Json deserialization.
     /// </summary>
-    private static T DeserializeInline<T>(string javaTypeName, object value)
+    internal static T DeserializeInline<T>(string javaTypeName, object value)
     {
         var type = FromJavaTypeName(javaTypeName) ?? typeof(T);
 
@@ -408,17 +409,18 @@ public class RpcReceiveQueue
         // LstProvenance, BuildTool, etc. added by the mod CLI).
         if ((type.IsInterface || type.IsAbstract) && typeof(Marker).IsAssignableFrom(type))
         {
-            if (value is JObject jobj)
+            if (value is JsonElement je && je.ValueKind == JsonValueKind.Object)
             {
-                var idToken = jobj["id"];
-                var id = idToken != null ? Guid.Parse(idToken.ToString()) : Guid.NewGuid();
+                var id = je.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String
+                    ? Guid.Parse(idProp.GetString()!)
+                    : Guid.NewGuid();
                 return (T)(object)new UnknownMarker(id);
             }
             return (T)(object)new UnknownMarker(Guid.NewGuid());
         }
 
-        if (value is JObject jobjNormal)
-            return (T)jobjNormal.ToObject(type)!;
+        if (value is JsonElement jeNormal)
+            return (T)jeNormal.Deserialize(type, RpcJson.Options)!;
 
         if (value is T t)
             return t;
@@ -459,6 +461,26 @@ public class RpcReceiveQueue
                 typeof(ForEachVariableLoopControl),
             "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable" =>
                 typeof(NamedVariable),
+
+            // Structured XML doc-comment tree (Java-only model). The C# side has no
+            // equivalent, so these map to sentinel shells that CsDocCommentReceiver drains
+            // and re-flattens into a raw XmlDocComment.
+            "org.openrewrite.csharp.tree.CsDocComment$DocComment" =>
+                typeof(OpenRewrite.CSharp.Rpc.StructuredDocComment),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlElement" =>
+                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlElement),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlEmptyElement" =>
+                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlEmptyElement),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlText" =>
+                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlText),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlAttribute" =>
+                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlAttribute),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlCrefAttribute" =>
+                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlCrefAttribute),
+            "org.openrewrite.csharp.tree.CsDocComment$XmlNameAttribute" =>
+                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocXmlNameAttribute),
+            "org.openrewrite.csharp.tree.CsDocComment$LineBreak" =>
+                typeof(OpenRewrite.CSharp.Rpc.CsDocCommentReceiver.DocLineBreak),
 
             // Marker type overrides
             "org.openrewrite.java.marker.Semicolon" =>

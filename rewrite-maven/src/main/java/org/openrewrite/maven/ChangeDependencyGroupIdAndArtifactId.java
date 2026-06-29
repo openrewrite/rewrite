@@ -114,6 +114,11 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
         this.changeManagedDependency = changeManagedDependency;
     }
 
+    private boolean isGlobPattern() {
+        return oldGroupId.contains("*") || oldGroupId.contains("?") ||
+               oldArtifactId.contains("*") || oldArtifactId.contains("?");
+    }
+
     String displayName = "Change Maven dependency";
 
     @Override
@@ -391,6 +396,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                                 deferUpdate = true;
                             }
                         } catch (MavenDownloadingException e) {
+                            if (isGlobPattern()) {
+                                return tag;
+                            }
                             return e.warn(tag);
                         }
                     }

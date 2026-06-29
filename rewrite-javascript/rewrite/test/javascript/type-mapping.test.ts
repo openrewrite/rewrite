@@ -1895,6 +1895,44 @@ describe('JavaScript type mapping', () => {
         );
     });
 
+    test('standalone function declaration has module-derived declaringType', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new class extends Recipe {
+            name = 'Check function declaringType';
+            displayName = 'Check function declaringType';
+            description = 'Checks that standalone function declarations get a module-derived declaringType';
+
+            async editor(): Promise<JavaScriptVisitor<ExecutionContext>> {
+                return new class extends JavaScriptVisitor<ExecutionContext> {
+                    async visitMethodDeclaration(methodDecl: J.MethodDeclaration, p: ExecutionContext): Promise<J.MethodDeclaration> {
+                        const visited = await super.visitMethodDeclaration(methodDecl, p) as J.MethodDeclaration;
+                        if (visited.methodType?.declaringType) {
+                            const dt = visited.methodType.declaringType as Type.FullyQualified;
+                            if (Type.isClass(dt)) {
+                                const fqn = dt.fullyQualifiedName;
+                                return foundSearchResult(visited, fqn);
+                            }
+                        }
+                        return visited;
+                    }
+                };
+            }
+        };
+
+        const src = typescript(
+            `
+                    function helper(): void {}
+                `,
+            //@formatter:off
+            `
+                    /*~~(main)~~>*/function helper(): void {}
+                `
+            //@formatter:on
+        );
+        src.path = 'main.ts';
+        await spec.rewriteRun(src);
+    });
+
     test('FindMissingTypes produces no results on a complex class', async () => {
         const findings: string[] = [];
 

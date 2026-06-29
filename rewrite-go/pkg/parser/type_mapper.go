@@ -1,0 +1,460 @@
+/*
+ * Copyright 2025 the original author or authors.
+ *
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package parser
+
+import (
+	"go/types"
+	"strings"
+	"unicode"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+)
+
+// typeMapper converts go/types.Type to OpenRewrite JavaType equivalents.
+// It caches results to avoid creating duplicate type objects.
+type typeMapper struct {
+	cache map[types.Type]java.JavaType
+	// namedCache deduplicates by *types.Named pointer, preventing infinite recursion
+	// when types reference each other.
+	namedCache map[*types.Named]*java.JavaTypeClass
+}
+
+func newTypeMapper() *typeMapper {
+	return &typeMapper{
+		cache:      make(map[types.Type]java.JavaType),
+		namedCache: make(map[*types.Named]*java.JavaTypeClass),
+	}
+}
+
+// mapType converts a go/types.Type to a java.JavaType.
+func (m *typeMapper) mapType(t types.Type) java.JavaType {
+	if t == nil {
+		return nil
+	}
+	if cached, ok := m.cache[t]; ok {
+		return cached
+	}
+
+	result := m.doMapType(t)
+	if result != nil {
+		m.cache[t] = result
+	}
+	return result
+}
+
+func (m *typeMapper) doMapType(t types.Type) java.JavaType {
+	switch v := t.(type) {
+	case *types.Basic:
+		return m.mapBasic(v)
+	case *types.Named:
+		return m.mapNamed(v)
+	case *types.Pointer:
+		// Go pointers are transparent for refactoring — unwrap to pointee type
+		return m.mapType(v.Elem())
+	case *types.Slice:
+		return &java.JavaTypeArray{ElemType: m.mapType(v.Elem())}
+	case *types.Array:
+		return &java.JavaTypeArray{ElemType: m.mapType(v.Elem())}
+	case *types.Map:
+		return m.mapMapType(v)
+	case *types.Chan:
+		return m.mapChanType(v)
+	case *types.Signature:
+		return m.mapSignature(v, "", nil)
+	case *types.Interface:
+		return m.mapInterface(v, "")
+	case *types.Struct:
+		return m.mapStruct(v, "")
+	case *types.TypeParam:
+		return &java.JavaTypeGenericTypeVariable{
+			Name:     v.Obj().Name(),
+			Variance: "INVARIANT",
+		}
+	case *types.Tuple:
+		// Tuples are decomposed by callers; should not appear here directly
+		return java.UnknownType
+	case *types.Union:
+		// Union types from type constraints
+		var bounds []java.JavaType
+		for i := 0; i < v.Len(); i++ {
+			bounds = append(bounds, m.mapType(v.Term(i).Type()))
+		}
+		return &java.JavaTypeIntersection{Bounds: bounds}
+	default:
+		return java.UnknownType
+	}
+}
+
+// mapBasic maps Go basic types to JavaTypePrimitive.
+func (m *typeMapper) mapBasic(b *types.Basic) java.JavaType {
+	// Handle aliases by name first (Byte=Uint8, Rune=Int32 share constant values)
+	switch b.Name() {
+	case "byte":
+		return &java.JavaTypePrimitive{Keyword: "byte"}
+	case "rune":
+		return &java.JavaTypePrimitive{Keyword: "char"}
+	}
+
+	switch b.Kind() {
+	case types.Bool, types.UntypedBool:
+		return &java.JavaTypePrimitive{Keyword: "boolean"}
+	case types.Int, types.Int8, types.Int16, types.Int32, types.Int64,
+		types.Uint, types.Uint8, types.Uint16, types.Uint32, types.Uint64,
+		types.Uintptr, types.UntypedInt:
+		return &java.JavaTypePrimitive{Keyword: "int"}
+	case types.Float32, types.Float64, types.UntypedFloat:
+		return &java.JavaTypePrimitive{Keyword: "double"}
+	case types.Complex64, types.Complex128, types.UntypedComplex:
+		return &java.JavaTypePrimitive{Keyword: "double"}
+	case types.String, types.UntypedString:
+		return &java.JavaTypePrimitive{Keyword: "String"}
+	case types.UntypedRune:
+		return &java.JavaTypePrimitive{Keyword: "char"}
+	case types.UntypedNil:
+		return &java.JavaTypePrimitive{Keyword: "void"}
+	default:
+		return java.UnknownType
+	}
+}
+
+// mapNamed maps a named type (struct, interface, etc.) to JavaTypeClass.
+func (m *typeMapper) mapNamed(named *types.Named) *java.JavaTypeClass {
+	// Check for already-created class (handles circular references)
+	if cached, ok := m.namedCache[named]; ok {
+		return cached
+	}
+
+	obj := named.Obj()
+	fqn := fullyQualifiedName(obj)
+
+	cls := &java.JavaTypeClass{
+		FullyQualifiedName: fqn,
+		FlagsBitMap:        flagsForObject(obj),
+	}
+	// Cache early to break cycles
+	m.namedCache[named] = cls
+	m.cache[named] = cls
+
+	// Map the underlying type to determine kind and populate members/methods
+	underlying := named.Underlying()
+	switch u := underlying.(type) {
+	case *types.Struct:
+		cls.Kind = "Class"
+		cls.Members = m.structMembers(u)
+	case *types.Interface:
+		cls.Kind = "Interface"
+		cls.Methods = m.interfaceMethods(u)
+	default:
+		// Named type wrapping a basic type (e.g., type MyInt int)
+		cls.Kind = "Class"
+	}
+
+	// Map type parameters (generics)
+	tparams := named.TypeParams()
+	if tparams != nil && tparams.Len() > 0 {
+		for i := 0; i < tparams.Len(); i++ {
+			cls.TypeParameters = append(cls.TypeParameters, m.mapType(tparams.At(i)))
+		}
+	}
+
+	// Map methods
+	for i := 0; i < named.NumMethods(); i++ {
+		method := named.Method(i)
+		sig := method.Type().(*types.Signature)
+		mt := m.mapSignature(sig, method.Name(), cls)
+		cls.Methods = append(cls.Methods, mt)
+	}
+
+	// Map implemented interfaces
+	for i := 0; i < named.NumMethods(); i++ {
+		// Go uses structural interface satisfaction — we don't enumerate interfaces here.
+		// Interface relationships would require global analysis.
+		break
+	}
+
+	return cls
+}
+
+// mapSignature maps a function signature to JavaTypeMethod.
+func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringType *java.JavaTypeClass) *java.JavaTypeMethod {
+	mt := &java.JavaTypeMethod{
+		Name:        name,
+		FlagsBitMap: flagsForExported(name),
+	}
+	if declaringType != nil {
+		mt.DeclaringType = declaringType
+	}
+
+	// Return type
+	results := sig.Results()
+	if results.Len() == 0 {
+		mt.ReturnType = &java.JavaTypePrimitive{Keyword: "void"}
+	} else if results.Len() == 1 {
+		mt.ReturnType = m.mapType(results.At(0).Type())
+	} else {
+		tupleParams := make([]java.JavaType, 0, results.Len())
+		for i := 0; i < results.Len(); i++ {
+			tupleParams = append(tupleParams, m.mapType(results.At(i).Type()))
+		}
+		mt.ReturnType = &java.JavaTypeParameterized{
+			Type: &java.JavaTypeClass{
+				FullyQualifiedName: "go.tuple",
+				Kind:               "Class",
+			},
+			TypeParameters: tupleParams,
+		}
+	}
+
+	// Parameters
+	params := sig.Params()
+	for i := 0; i < params.Len(); i++ {
+		p := params.At(i)
+		mt.ParameterNames = append(mt.ParameterNames, p.Name())
+		mt.ParameterTypes = append(mt.ParameterTypes, m.mapType(p.Type()))
+	}
+
+	return mt
+}
+
+// mapInterface maps an anonymous interface type.
+func (m *typeMapper) mapInterface(iface *types.Interface, fqn string) *java.JavaTypeClass {
+	cls := &java.JavaTypeClass{
+		FullyQualifiedName: fqn,
+		Kind:               "Interface",
+	}
+	cls.Methods = m.interfaceMethods(iface)
+	return cls
+}
+
+// mapStruct maps an anonymous struct type.
+func (m *typeMapper) mapStruct(s *types.Struct, fqn string) *java.JavaTypeClass {
+	cls := &java.JavaTypeClass{
+		FullyQualifiedName: fqn,
+		Kind:               "Class",
+	}
+	cls.Members = m.structMembers(s)
+	return cls
+}
+
+// mapMapType maps a Go map type to a parameterized class.
+func (m *typeMapper) mapMapType(mt *types.Map) java.JavaType {
+	return &java.JavaTypeParameterized{
+		Type: &java.JavaTypeClass{
+			FullyQualifiedName: "map",
+			Kind:               "Class",
+		},
+		TypeParameters: []java.JavaType{
+			m.mapType(mt.Key()),
+			m.mapType(mt.Elem()),
+		},
+	}
+}
+
+// mapChanType maps a Go channel type to a parameterized class.
+func (m *typeMapper) mapChanType(ch *types.Chan) java.JavaType {
+	var fqn string
+	switch ch.Dir() {
+	case types.SendRecv:
+		fqn = "chan"
+	case types.SendOnly:
+		fqn = "chan<-"
+	case types.RecvOnly:
+		fqn = "<-chan"
+	}
+	return &java.JavaTypeParameterized{
+		Type: &java.JavaTypeClass{
+			FullyQualifiedName: fqn,
+			Kind:               "Class",
+		},
+		TypeParameters: []java.JavaType{m.mapType(ch.Elem())},
+	}
+}
+
+// structMembers extracts fields from a struct as JavaTypeVariable.
+func (m *typeMapper) structMembers(s *types.Struct) []*java.JavaTypeVariable {
+	var members []*java.JavaTypeVariable
+	for i := 0; i < s.NumFields(); i++ {
+		f := s.Field(i)
+		members = append(members, &java.JavaTypeVariable{
+			Name:        f.Name(),
+			Type:        m.mapType(f.Type()),
+			Annotations: nil,
+		})
+	}
+	return members
+}
+
+// interfaceMethods extracts methods from an interface as JavaTypeMethod.
+func (m *typeMapper) interfaceMethods(iface *types.Interface) []*java.JavaTypeMethod {
+	var methods []*java.JavaTypeMethod
+	for i := 0; i < iface.NumMethods(); i++ {
+		method := iface.Method(i)
+		sig := method.Type().(*types.Signature)
+		mt := m.mapSignature(sig, method.Name(), nil)
+		methods = append(methods, mt)
+	}
+	return methods
+}
+
+// fullyQualifiedName returns the fully qualified name for a Go type object.
+// Format: "pkgpath.TypeName" (e.g., "fmt.Stringer", "main.MyStruct")
+func fullyQualifiedName(obj *types.TypeName) string {
+	pkg := obj.Pkg()
+	if pkg == nil {
+		// Built-in types (error, etc.)
+		return obj.Name()
+	}
+	return pkg.Path() + "." + obj.Name()
+}
+
+// flagsForObject returns the Java-compatible flags bitmask for a Go type object.
+// Bit 0 (value 1) = Public (exported in Go)
+func flagsForObject(obj *types.TypeName) int64 {
+	return flagsForExported(obj.Name())
+}
+
+// flagsForExported returns Public (1) if the name starts with an uppercase letter.
+func flagsForExported(name string) int64 {
+	if len(name) > 0 && unicode.IsUpper(rune(name[0])) {
+		return 1 // Java Flag.Public
+	}
+	return 2 // Java Flag.Private
+}
+
+// mapObject maps a types.Object (from Defs/Uses) to a JavaType for identifiers.
+func (m *typeMapper) mapObject(obj types.Object) java.JavaType {
+	if obj == nil {
+		return nil
+	}
+	if fn, ok := obj.(*types.Func); ok {
+		return m.mapMethodObject(fn)
+	}
+	// Package-alias identifiers (the `y` in `y.Hello()` after
+	// `import "github.com/x/y"`) come back as *types.PkgName, whose .Type()
+	// is the Invalid sentinel. Map them to a JavaTypeClass tagged with the
+	// imported package's path so recipes can recognize the reference even
+	// when the package's symbols aren't loaded.
+	if pn, ok := obj.(*types.PkgName); ok {
+		imported := pn.Imported()
+		if imported == nil {
+			return nil
+		}
+		// JavaType.FullyQualified.Kind is a fixed enum (Class, Enum,
+		// Interface, Annotation, Record, Value) without a Package value.
+		// Map package aliases to "Class" with the import path as the FQN;
+		// recipes can recognize package references by the FQN containing
+		// path separators (e.g. "github.com/x/y").
+		return &java.JavaTypeClass{
+			Kind:               "Class",
+			FullyQualifiedName: imported.Path(),
+		}
+	}
+	return m.mapType(obj.Type())
+}
+
+// mapObjectToVariable maps a types.Object to a JavaTypeVariable (for field-like identifiers).
+func (m *typeMapper) mapObjectToVariable(obj types.Object) *java.JavaTypeVariable {
+	if obj == nil {
+		return nil
+	}
+	switch o := obj.(type) {
+	case *types.Var:
+		ownerType := m.ownerType(o)
+		return &java.JavaTypeVariable{
+			Name:  o.Name(),
+			Owner: ownerType,
+			Type:  m.mapType(o.Type()),
+		}
+	default:
+		return nil
+	}
+}
+
+// ownerType returns the JavaType of the object's owner (declaring type).
+func (m *typeMapper) ownerType(v *types.Var) java.JavaType {
+	if !v.IsField() {
+		return nil
+	}
+	// For struct fields, the owner is the parent type.
+	// go/types doesn't directly expose the parent; we return nil.
+	// The owner will be inferred from context during tree construction.
+	return nil
+}
+
+// mapMethodObject maps a types.Func to a JavaTypeMethod.
+func (m *typeMapper) mapMethodObject(fn *types.Func) *java.JavaTypeMethod {
+	if fn == nil {
+		return nil
+	}
+	sig := fn.Type().(*types.Signature)
+
+	var declaringType *java.JavaTypeClass
+	recv := sig.Recv()
+	if recv != nil {
+		// Method receiver — the declaring type is the receiver's type
+		recvType := recv.Type()
+		// Unwrap pointer
+		if ptr, ok := recvType.(*types.Pointer); ok {
+			recvType = ptr.Elem()
+		}
+		if named, ok := recvType.(*types.Named); ok {
+			declaringType = m.mapNamed(named)
+		}
+	} else {
+		// Package-level function
+		pkg := fn.Pkg()
+		if pkg != nil {
+			declaringType = &java.JavaTypeClass{
+				FullyQualifiedName: pkg.Path(),
+				Kind:               "Class",
+			}
+		}
+	}
+
+	return m.mapSignature(sig, fn.Name(), declaringType)
+}
+
+// mapSelection maps a types.Selection (field or method selection via ".") to a JavaType.
+func (m *typeMapper) mapSelection(sel *types.Selection) java.JavaType {
+	if sel == nil {
+		return nil
+	}
+	return m.mapType(sel.Type())
+}
+
+// mapSelectionToMethod maps a method selection to a JavaTypeMethod.
+func (m *typeMapper) mapSelectionToMethod(sel *types.Selection) *java.JavaTypeMethod {
+	if sel == nil || sel.Kind() != types.MethodVal {
+		return nil
+	}
+	fn, ok := sel.Obj().(*types.Func)
+	if !ok {
+		return nil
+	}
+	return m.mapMethodObject(fn)
+}
+
+// isUnresolved returns true if we should not expect to map the given object
+// because type-checking did not resolve it (e.g., missing imports).
+func isUnresolved(obj types.Object) bool {
+	return obj == nil
+}
+
+// isBlankIdent returns true if the identifier is "_".
+func isBlankIdent(name string) bool {
+	return strings.TrimSpace(name) == "_"
+}

@@ -17,11 +17,9 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Xml.Linq;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json.Serialization;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
@@ -50,11 +48,21 @@ public class RewriteRpcServer
     public static void SetCurrent(RewriteRpcServer? server) => _current = server;
 
     private readonly RecipeMarketplace _marketplace;
+
+    // Recipe name -> the package that contributed it, recorded at install time and persisted for the
+    // process lifetime so GetMarketplace can attribute each row even when a later install is a no-op.
+    private readonly ConcurrentDictionary<string, string> _recipeOrigin = new();
+
     private readonly ConcurrentDictionary<string, Recipe> _preparedRecipes = new();
     private readonly ConcurrentDictionary<string, object?> _recipeAccumulators = new();
     private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
+
+    private volatile IDataTableStore? _configuredDataTableStore;
+
     private string? _recipesProjectDir;
+    private readonly string? _recipeInstallDir;
     private JsonRpc? _jsonRpc;
+    private DotNetBuildContext? _buildContext;
 
     /// <summary>
     /// Objects that have been parsed locally and are available for remote access.
@@ -88,9 +96,10 @@ public class RewriteRpcServer
         jsonRpc.StartListening();
     }
 
-    public RewriteRpcServer(RecipeMarketplace marketplace)
+    public RewriteRpcServer(RecipeMarketplace marketplace, string? recipeInstallDir = null)
     {
         _marketplace = marketplace;
+        _recipeInstallDir = recipeInstallDir;
 
         // Register type name overrides for nagoya types that don't match Java names
         RpcSendQueue.RegisterJavaTypeName(typeof(CsLambda),
@@ -211,14 +220,25 @@ public class RewriteRpcServer
         var path = ResolvePath(request.Path);
         var rootDir = ResolvePath(request.RootDir);
 
+        // Remove any global.json SDK pin before running dotnet restore / loading the workspace,
+        // so the latest installed SDK is used regardless of the version the repo pins. The
+        // file(s) are restored verbatim when the guard is disposed at the end of this method
+        // (after all projects are parsed), and any global.json a prior crashed run left deleted
+        // is recovered from git at that point too.
+        using var globalJsonGuard = GlobalJsonGuard.Neutralize(rootDir);
+
         var requirePrintEqualsInput = true;
         if (request.Options?.TryGetValue("org.openrewrite.requirePrintEqualsInput", out var val) == true)
         {
-            // StreamJsonRpc with Newtonsoft.Json may deliver values as JToken wrappers
-            if (val is JToken jt)
-                requirePrintEqualsInput = jt.Value<bool>();
-            else
-                requirePrintEqualsInput = Convert.ToBoolean(val);
+            // SystemTextJsonFormatter delivers object-typed option values as JsonElement.
+            requirePrintEqualsInput = val switch
+            {
+                JsonElement { ValueKind: JsonValueKind.True } => true,
+                JsonElement { ValueKind: JsonValueKind.False } => false,
+                JsonElement { ValueKind: JsonValueKind.String } je => bool.Parse(je.GetString()!),
+                JsonElement je => Convert.ToBoolean(je.ToString()),
+                _ => Convert.ToBoolean(val),
+            };
         }
 
         var solution = await solutionParser.LoadAsync(path, CancellationToken.None);
@@ -262,296 +282,57 @@ public class RewriteRpcServer
                 response.Items.Add(new ParseSolutionResponseItem
                 {
                     Id = id,
-                    SourceFileType = sourceFileType,
-                    ProjectPath = project.FilePath!
+                    SourceFileType = sourceFileType
                 });
             }
 
-            // Extract MSBuild project metadata from .csproj
+            // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker
+            // Files are already on disk and restore happened during solution loading,
+            // so we parse XML directly and create the marker from project.assets.json.
             try
             {
-                var metadata = ExtractProjectMetadata(project.FilePath!, rootDir);
-                response.Projects.Add(metadata);
+                var content = ReadFilePreservingBom(project.FilePath!);
+                var relativePath = Path.GetRelativePath(rootDir, project.FilePath!);
+                var xmlParser = new OpenRewrite.Xml.XmlParser();
+                var csprojDoc = xmlParser.Parse(content, relativePath);
+                var marker = MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
+                if (marker != null)
+                    csprojDoc = csprojDoc.WithMarkers(csprojDoc.Markers.Add(marker));
+                _localObjects[csprojDoc.Id.ToString()] = csprojDoc;
+                response.Items.Add(new ParseSolutionResponseItem
+                {
+                    Id = csprojDoc.Id.ToString(),
+                    SourceFileType = "org.openrewrite.xml.tree.Xml$Document"
+                });
             }
             catch (Exception ex)
             {
-                Log.Debug("RPC ParseSolution: failed to extract metadata for {ProjectPath}: {ExType}: {ExMessage}",
+                Log.Debug("RPC ParseSolution: failed to parse csproj for {ProjectPath}: {ExType}: {ExMessage}",
                     project.FilePath, ex.GetType().Name, ex.Message);
             }
         }
 
-        Log.Debug("RPC ParseSolution: completed, {ItemCount} source files, {ProjectCount} project metadata",
-            response.Items.Count, response.Projects.Count);
+        // Capture build context files from disk for reattestation
+        _buildContext = new DotNetBuildContext();
+        _buildContext.CaptureFromDisk(rootDir);
+
+        Log.Debug("RPC ParseSolution: completed, {ItemCount} source files", response.Items.Count);
         return response;
     }
 
     /// <summary>
-    /// Extracts MSBuild project metadata from a .csproj file by parsing its XML
-    /// and reading the resolved dependency tree from project.assets.json.
+    /// Reads a text file while preserving a leading UTF-8 BOM as a `\uFEFF` character in
+    /// the returned string. File.ReadAllText silently strips BOMs, which defeats the
+    /// XmlParser's BOM detection and causes csproj files to round-trip without their BOM.
     /// </summary>
-    private static ProjectMetadata ExtractProjectMetadata(string projectPath, string rootDir)
+    private static string ReadFilePreservingBom(string filePath)
     {
-        var doc = XDocument.Load(projectPath);
-        var root = doc.Root!;
-        var ns = root.Name.Namespace;
-
-        var relativePath = Path.GetRelativePath(rootDir, projectPath);
-
-        var metadata = new ProjectMetadata
+        var bytes = File.ReadAllBytes(filePath);
+        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
         {
-            ProjectPath = relativePath,
-            Sdk = root.Attribute("Sdk")?.Value
-        };
-
-        // Extract TargetFramework(s)
-        var tfmElement = root.Descendants(ns + "TargetFramework").FirstOrDefault();
-        var tfmsElement = root.Descendants(ns + "TargetFrameworks").FirstOrDefault();
-
-        var frameworks = new List<string>();
-        if (tfmsElement != null)
-        {
-            foreach (var tfm in tfmsElement.Value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                frameworks.Add(tfm);
+            return "\uFEFF" + System.Text.Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
         }
-        else if (tfmElement != null)
-        {
-            frameworks.Add(tfmElement.Value.Trim());
-        }
-
-        // Extract PackageReferences
-        var packageRefs = root.Descendants(ns + "PackageReference")
-            .Select(e => new PackageReferenceEntry
-            {
-                Include = e.Attribute("Include")?.Value ?? "",
-                RequestedVersion = e.Attribute("Version")?.Value,
-                ResolvedVersion = e.Attribute("Version")?.Value // raw = resolved in XML context
-            })
-            .Where(r => !string.IsNullOrEmpty(r.Include))
-            .ToList();
-
-        // Extract ProjectReferences
-        var projectRefs = root.Descendants(ns + "ProjectReference")
-            .Select(e => new ProjectReferenceEntry
-            {
-                Include = e.Attribute("Include")?.Value ?? ""
-            })
-            .Where(r => !string.IsNullOrEmpty(r.Include))
-            .ToList();
-
-        // Read resolved packages from project.assets.json
-        var assetsPath = Path.Combine(Path.GetDirectoryName(projectPath)!, "obj", "project.assets.json");
-        var resolvedByTfm = new Dictionary<string, List<ResolvedPackageEntry>>();
-        if (File.Exists(assetsPath))
-        {
-            try
-            {
-                resolvedByTfm = ReadResolvedPackages(assetsPath);
-            }
-            catch (Exception ex)
-            {
-                Log.Debug("Failed to read project.assets.json at {Path}: {Ex}", assetsPath, ex.Message);
-            }
-        }
-
-        // Extract properties with provenance
-        foreach (var propGroup in root.Descendants(ns + "PropertyGroup"))
-        {
-            foreach (var prop in propGroup.Elements())
-            {
-                var propName = prop.Name.LocalName;
-                if (!metadata.Properties.ContainsKey(propName))
-                {
-                    metadata.Properties[propName] = new PropertyEntry
-                    {
-                        Value = prop.Value,
-                        DefinedIn = relativePath
-                    };
-                }
-            }
-        }
-
-        // Discover NuGet package sources from nuget.config files
-        metadata.PackageSources = FindNuGetPackageSources(projectPath, rootDir);
-
-        // Build per-TFM metadata
-        foreach (var tfm in frameworks)
-        {
-            resolvedByTfm.TryGetValue(tfm, out var resolved);
-            metadata.TargetFrameworks.Add(new TargetFrameworkEntry
-            {
-                TargetFramework = tfm,
-                PackageReferences = packageRefs,
-                ResolvedPackages = resolved ?? new List<ResolvedPackageEntry>(),
-                ProjectReferences = projectRefs
-            });
-        }
-
-        // If no frameworks found, still include a default entry
-        if (frameworks.Count == 0)
-        {
-            metadata.TargetFrameworks.Add(new TargetFrameworkEntry
-            {
-                PackageReferences = packageRefs,
-                ProjectReferences = projectRefs
-            });
-        }
-
-        return metadata;
-    }
-
-    /// <summary>
-    /// Discovers NuGet package sources by walking up from the project directory
-    /// to the repository root looking for nuget.config files.
-    /// NuGet resolves sources hierarchically — closest config wins.
-    /// </summary>
-    private static List<PackageSourceEntry> FindNuGetPackageSources(string projectPath, string rootDir)
-    {
-        var sources = new List<PackageSourceEntry>();
-        var dir = Path.GetDirectoryName(projectPath);
-
-        while (dir != null && dir.StartsWith(rootDir, StringComparison.OrdinalIgnoreCase))
-        {
-            var configPath = Path.Combine(dir, "nuget.config");
-            // Case-insensitive check (NuGet.Config, nuget.config, NuGet.config all valid)
-            if (!File.Exists(configPath))
-            {
-                configPath = Path.Combine(dir, "NuGet.Config");
-                if (!File.Exists(configPath))
-                {
-                    configPath = Path.Combine(dir, "NuGet.config");
-                }
-            }
-
-            if (File.Exists(configPath))
-            {
-                try
-                {
-                    var configDoc = XDocument.Load(configPath);
-                    var packageSources = configDoc.Root?
-                        .Element("packageSources")?
-                        .Elements("add");
-
-                    if (packageSources != null)
-                    {
-                        foreach (var source in packageSources)
-                        {
-                            var key = source.Attribute("key")?.Value;
-                            var url = source.Attribute("value")?.Value;
-                            if (key != null && url != null &&
-                                !sources.Any(s => s.Key == key))
-                            {
-                                sources.Add(new PackageSourceEntry
-                                {
-                                    Key = key,
-                                    Url = url
-                                });
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log.Debug("Failed to parse nuget.config at {Path}: {Ex}", configPath, ex.Message);
-                }
-                // NuGet uses the closest config — stop walking up once we find one
-                break;
-            }
-
-            if (dir == rootDir) break;
-            dir = Path.GetDirectoryName(dir);
-        }
-
-        // Default to nuget.org if no sources found
-        if (sources.Count == 0)
-        {
-            sources.Add(new PackageSourceEntry
-            {
-                Key = "nuget.org",
-                Url = "https://api.nuget.org/v3/index.json"
-            });
-        }
-
-        return sources;
-    }
-
-    /// <summary>
-    /// Reads the resolved dependency tree from project.assets.json.
-    /// Returns a dictionary keyed by target framework moniker.
-    /// </summary>
-    private static Dictionary<string, List<ResolvedPackageEntry>> ReadResolvedPackages(string assetsPath)
-    {
-        var result = new Dictionary<string, List<ResolvedPackageEntry>>();
-        var json = JObject.Parse(File.ReadAllText(assetsPath));
-        var targets = json["targets"] as JObject;
-        if (targets == null) return result;
-
-        foreach (var (tfmKey, tfmValue) in targets)
-        {
-            // tfmKey is like "net8.0" or ".NETCoreApp,Version=v8.0"
-            var tfm = tfmKey.Contains(',')
-                ? NormalizeTfm(tfmKey)
-                : tfmKey;
-
-            var packages = new List<ResolvedPackageEntry>();
-            if (tfmValue is JObject tfmObj)
-            {
-                foreach (var (pkgKey, pkgValue) in tfmObj)
-                {
-                    // pkgKey is "PackageName/Version"
-                    var parts = pkgKey.Split('/', 2);
-                    if (parts.Length != 2) continue;
-
-                    var type = pkgValue?["type"]?.Value<string>();
-                    if (type != "package") continue;
-
-                    var deps = new List<ResolvedPackageEntry>();
-                    var dependencies = pkgValue?["dependencies"] as JObject;
-                    if (dependencies != null)
-                    {
-                        foreach (var (depName, depVersion) in dependencies)
-                        {
-                            deps.Add(new ResolvedPackageEntry
-                            {
-                                Name = depName,
-                                ResolvedVersion = depVersion?.Value<string>() ?? "",
-                                Depth = 1
-                            });
-                        }
-                    }
-
-                    packages.Add(new ResolvedPackageEntry
-                    {
-                        Name = parts[0],
-                        ResolvedVersion = parts[1],
-                        Dependencies = deps,
-                        Depth = 0
-                    });
-                }
-            }
-
-            result[tfm] = packages;
-        }
-
-        return result;
-    }
-
-    /// <summary>
-    /// Normalizes a full framework identifier like ".NETCoreApp,Version=v8.0" to "net8.0".
-    /// </summary>
-    private static string NormalizeTfm(string fullTfm)
-    {
-        // Simple heuristic: extract the version part
-        if (fullTfm.StartsWith(".NETCoreApp,Version=v") || fullTfm.StartsWith(".NETCoreApp,Version=V"))
-        {
-            var version = fullTfm.Substring(".NETCoreApp,Version=v".Length);
-            return "net" + version;
-        }
-        if (fullTfm.StartsWith(".NETStandard,Version=v") || fullTfm.StartsWith(".NETStandard,Version=V"))
-        {
-            var version = fullTfm.Substring(".NETStandard,Version=v".Length);
-            return "netstandard" + version;
-        }
-        return fullTfm;
+        return System.Text.Encoding.UTF8.GetString(bytes);
     }
 
     /// <summary>
@@ -744,7 +525,7 @@ public class RewriteRpcServer
         return Task.FromResult(rowByRecipeId.Values.ToList());
     }
 
-    private static void CollectRecipes(
+    private void CollectRecipes(
         Dictionary<string, GetMarketplaceResponseRow> rowByRecipeId,
         RecipeMarketplace.Category category,
         List<CategoryDescriptorDto> parentPath)
@@ -761,7 +542,8 @@ public class RewriteRpcServer
                 row = new GetMarketplaceResponseRow
                 {
                     Descriptor = RecipeDescriptorDto.FromDescriptor(descriptor),
-                    CategoryPaths = []
+                    CategoryPaths = [],
+                    PackageName = _recipeOrigin.GetValueOrDefault(descriptor.Name)
                 };
                 rowByRecipeId[descriptor.Name] = row;
             }
@@ -778,22 +560,35 @@ public class RewriteRpcServer
     public Task<InstallRecipesResponse> InstallRecipes(InstallRecipesRequest request)
     {
         var beforeCount = _marketplace.AllRecipes().Count;
-        string? version = null;
+        string? version = null;          // requested version, as supplied by the caller (never mutated)
+        string? resolvedVersion = null;  // concrete version NuGet resolved it to (null off the NuGet path)
 
-        if (request.Recipes is string path)
+        // SystemTextJsonFormatter deserializes the object-typed Recipes payload to a JsonElement:
+        // a JSON string is a local assembly path; a JSON object describes a NuGet package.
+        var recipesString = request.Recipes switch
+        {
+            string s => s,
+            JsonElement { ValueKind: JsonValueKind.String } je => je.GetString(),
+            _ => null,
+        };
+        var recipesObject = request.Recipes is JsonElement { ValueKind: JsonValueKind.Object } obj
+            ? (JsonElement?)obj
+            : null;
+
+        if (recipesString != null)
         {
             // Local assembly path
-            var absolutePath = Path.GetFullPath(path);
+            var absolutePath = Path.GetFullPath(recipesString);
             var context = new PluginLoadContext(absolutePath);
             var assembly = context.LoadFromAssemblyPath(absolutePath);
             CheckVersionCompatibility(assembly);
-            ActivateAssembly(assembly);
+            ActivateAssembly(assembly, recipesString);
         }
-        else if (request.Recipes is JObject packageObj)
+        else if (recipesObject is { } packageObj)
         {
-            var packageName = packageObj["packageName"]?.ToString()
+            var packageName = (packageObj.TryGetProperty("packageName", out var pn) ? pn.GetString() : null)
                               ?? throw new ArgumentException("Missing packageName in recipes object");
-            version = packageObj["version"]?.ToString();
+            version = packageObj.TryGetProperty("version", out var v) ? v.GetString() : null;
 
             if (File.Exists(packageName))
             {
@@ -801,24 +596,30 @@ public class RewriteRpcServer
                 var context = new PluginLoadContext(absolutePath);
                 var assembly = context.LoadFromAssemblyPath(absolutePath);
                 CheckVersionCompatibility(assembly);
-                ActivateAssembly(assembly);
+                ActivateAssembly(assembly, packageName);
             }
             else
             {
-                // NuGet package download via dotnet CLI
-                var csprojPath = EnsureRecipesProject();
-                var args = $"add \"{csprojPath}\" package {packageName}";
-                if (version != null)
-                    args += $" --version {version}";
-                RunDotnet(args);
-
-                version = ResolveVersionFromCsproj(csprojPath, packageName);
-
-                var assemblies = PublishAndLoadPlugin(csprojPath, packageName);
+                // NuGet install reads as a three-stage pipeline: restore the bundle (which also
+                // resolves the concrete version), publish it into the resolved-version dir, then
+                // load the plugin assemblies. The requested version may be a concrete pin or a
+                // floating/unspecified spec — restore resolves either uniformly.
+                var (stagingCsproj, resolved) = RestoreBundle(packageName, version);
+                resolvedVersion = resolved;
+                var publishDir = PublishBundle(stagingCsproj, resolved);
+                var assemblies = LoadPlugin(publishDir);
+                var ownAssemblyNames = OwnAssemblyNames(packageName, resolved);
+                if (ownAssemblyNames.Count == 0)
+                {
+                    Log.Warning("No own assemblies found for {Package} {Version} (lib folder missing/empty); no recipes activated", packageName, resolved);
+                }
                 foreach (var assembly in assemblies)
                 {
                     CheckVersionCompatibility(assembly);
-                    ActivateAssembly(assembly);
+                    if (ownAssemblyNames.Contains(assembly.GetName().Name))
+                    {
+                        ActivateAssembly(assembly, packageName);
+                    }
                 }
             }
         }
@@ -827,16 +628,18 @@ public class RewriteRpcServer
             throw new ArgumentException($"Unexpected recipes type: {request.Recipes?.GetType().Name ?? "null"}");
         }
 
-        var afterCount = _marketplace.AllRecipes().Count;
         return Task.FromResult(new InstallRecipesResponse
         {
-            RecipesInstalled = afterCount - beforeCount,
-            Version = version
+            RecipesInstalled = _marketplace.AllRecipes().Count - beforeCount,
+            Version = resolvedVersion ?? version
         });
     }
 
-    private void ActivateAssembly(Assembly assembly)
+    private void ActivateAssembly(Assembly assembly, string? packageName = null)
     {
+        var before = packageName == null ? null
+            : new HashSet<string>(_marketplace.AllRecipes().Select(r => r.Name));
+
         Type[] exportedTypes;
         try
         {
@@ -860,21 +663,45 @@ public class RewriteRpcServer
                 activator.Activate(_marketplace);
             }
         }
+
+        if (packageName != null)
+        {
+            foreach (var name in _marketplace.AllRecipes().Select(r => r.Name))
+            {
+                if (!before!.Contains(name))
+                {
+                    _recipeOrigin[name] = packageName;
+                }
+            }
+        }
     }
 
-    private string EnsureRecipesProject()
+    // Sanitize a path segment (package id or version) for use as a directory name.
+    private static string Sanitize(string s) => string.Join("_", s.Split(Path.GetInvalidFileNameChars()));
+
+    private string EnsureRecipesProject(string packageName, string? version)
     {
-        if (_recipesProjectDir != null)
+        // Use the caller-supplied recipe install directory when provided (so a co-located
+        // NuGet.config is found by dotnet's project-directory config walk); otherwise fall
+        // back to a temp directory.
+        var root = _recipeInstallDir
+            ?? Path.Combine(Path.GetTempPath(), "rewrite-recipes");
+        // Mirror NuGet's global-packages layout: <root>/<id>/<version>/, versions as
+        // immutable siblings. Never deleted — old versions accumulate (no cleanup),
+        // matching ~/.nuget and existing Moderne/OpenRewrite practice.
+        var bundleDir = Path.Combine(root, Sanitize(packageName), Sanitize(version ?? "unversioned"));
+        var csprojPath = Path.Combine(bundleDir, "Recipes.csproj");
+        _recipesProjectDir = bundleDir;
+
+        // Reuse an already-published version dir (idempotent, like NuGet reusing an
+        // already-extracted package). Snapshots carry timestamps in their version string,
+        // so each publish lands in a fresh dir.
+        if (File.Exists(csprojPath))
         {
-            var existing = Path.Combine(_recipesProjectDir, "Recipes.csproj");
-            if (File.Exists(existing))
-                return existing;
+            return csprojPath;
         }
+        Directory.CreateDirectory(bundleDir);
 
-        _recipesProjectDir = Path.Combine(Path.GetTempPath(), "rewrite-recipes", Guid.NewGuid().ToString("N")[..8]);
-        Directory.CreateDirectory(_recipesProjectDir);
-
-        var csprojPath = Path.Combine(_recipesProjectDir, "Recipes.csproj");
         File.WriteAllText(csprojPath, """
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
@@ -884,26 +711,101 @@ public class RewriteRpcServer
             </Project>
             """);
 
-        // Add local NuGet feed as a package source if it exists, so that
-        // locally-published SDK snapshots are discovered alongside nuget.org
+        // For local cross-repo development, make the local NuGet feed additive to
+        // whatever config already lives in the project dir. A caller (e.g. the Moderne
+        // CLI) may have written its own nuget.config there — possibly an exclusive
+        // configured feed — so we must not clobber it: append only the local feed when
+        // a config is present, and create a standalone dev config that adds only the
+        // local feed (never nuget.org, so it merges with the user/machine config's
+        // default source) when none exists. No-ops in production, where local-feed is absent.
         var localFeed = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".nuget", "local-feed");
         if (Directory.Exists(localFeed))
         {
-            var nugetConfig = Path.Combine(_recipesProjectDir, "nuget.config");
-            File.WriteAllText(nugetConfig, $"""
-                <?xml version="1.0" encoding="utf-8"?>
-                <configuration>
-                  <packageSources>
-                    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-                    <add key="local-feed" value="{localFeed}" />
-                  </packageSources>
-                </configuration>
-                """);
+            var nugetConfig = Path.Combine(bundleDir, "nuget.config");
+            var existing = File.Exists(nugetConfig) ? File.ReadAllText(nugetConfig) : null;
+            File.WriteAllText(nugetConfig, BuildRecipesNuGetConfig(existing, localFeed));
         }
 
         return csprojPath;
+    }
+
+    private static HashSet<string> OwnAssemblyNames(string packageName, string? version, string? packagesRoot = null)
+    {
+        // The package's own runtime assemblies are those shipped in its lib/<tfm> folder
+        // in the global packages cache (the directly-contributed boundary). All other
+        // published DLLs are transitive dependencies and must not be activated.
+        packagesRoot ??= Environment.GetEnvironmentVariable("NUGET_PACKAGES")
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
+        // NuGet's v3 global-packages layout lowercases both the package id and the (normalized)
+        // version in the folder path, so match that or the lib dir won't be found on a
+        // case-sensitive filesystem (Linux).
+        var libDir = Path.Combine(packagesRoot, packageName.ToLowerInvariant(), (version ?? "").ToLowerInvariant(), "lib");
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (Directory.Exists(libDir))
+        {
+            foreach (var dll in Directory.GetFiles(libDir, "*.dll", SearchOption.AllDirectories))
+            {
+                names.Add(Path.GetFileNameWithoutExtension(dll));
+            }
+        }
+        return names;
+    }
+
+    /// <summary>
+    /// Test seam for <see cref="OwnAssemblyNames"/>: exposes the private helper
+    /// with an explicit packages root so unit tests can use a synthetic temp directory
+    /// without a real NuGet install.
+    /// </summary>
+    internal static HashSet<string> OwnAssemblyNamesForTest(string packageName, string? version, string packagesRoot)
+        => OwnAssemblyNames(packageName, version, packagesRoot);
+
+    /// <summary>
+    /// Produces the recipe project's <c>nuget.config</c> with the local development
+    /// feed present. When <paramref name="existingConfigXml"/> is null/empty, creates a
+    /// standalone config that adds only the local feed — never nuget.org — so it merges
+    /// with (rather than overrides) the user/machine NuGet configuration that supplies the
+    /// environment's default source. Otherwise the caller already wrote a config (possibly
+    /// an exclusive configured feed): only the local feed is appended to
+    /// <c>&lt;packageSources&gt;</c>, preserving the caller's sources and any
+    /// <c>&lt;clear/&gt;</c>, and idempotently (no duplicate if already present).
+    /// </summary>
+    internal static string BuildRecipesNuGetConfig(string? existingConfigXml, string localFeedPath)
+    {
+        if (string.IsNullOrWhiteSpace(existingConfigXml))
+        {
+            return $"""
+                <?xml version="1.0" encoding="utf-8"?>
+                <configuration>
+                  <packageSources>
+                    <add key="local-feed" value="{localFeedPath}" />
+                  </packageSources>
+                </configuration>
+                """;
+        }
+
+        var doc = XDocument.Parse(existingConfigXml);
+        var configuration = doc.Element("configuration")
+                            ?? throw new InvalidOperationException("nuget.config is missing its <configuration> root");
+        var packageSources = configuration.Element("packageSources");
+        if (packageSources == null)
+        {
+            packageSources = new XElement("packageSources");
+            configuration.Add(packageSources);
+        }
+
+        bool alreadyPresent = packageSources.Elements("add").Any(e =>
+            string.Equals((string?)e.Attribute("value"), localFeedPath, StringComparison.OrdinalIgnoreCase));
+        if (!alreadyPresent)
+        {
+            packageSources.Add(new XElement("add",
+                new XAttribute("key", "local-feed"),
+                new XAttribute("value", localFeedPath)));
+        }
+
+        var declaration = doc.Declaration ?? new XDeclaration("1.0", "utf-8", null);
+        return declaration + Environment.NewLine + doc.Root!.ToString();
     }
 
     private static void RunDotnet(string arguments)
@@ -930,42 +832,60 @@ public class RewriteRpcServer
         }
     }
 
-    private static string ResolveVersionFromCsproj(string csprojPath, string packageName)
+    /// <summary>
+    /// Restore stage: restore a NuGet recipe bundle in a staging project under the install root
+    /// (so the caller's nuget.config is found by dotnet's upward project-directory config walk),
+    /// and return the staging project plus the resolved concrete version.
+    /// </summary>
+    private (string Csproj, string ResolvedVersion) RestoreBundle(string packageName, string? requestedVersion)
     {
-        var doc = XDocument.Load(csprojPath);
-        var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
+        var stagingCsproj = EnsureRecipesProject(packageName, ".staging");
+        var addArgs = $"add \"{stagingCsproj}\" package {packageName}";
+        if (requestedVersion != null)
+            addArgs += $" --version {requestedVersion}";
+        RunDotnet(addArgs);
 
-        var packageRef = doc.Descendants(ns + "PackageReference")
-            .FirstOrDefault(e => string.Equals(
-                e.Attribute("Include")?.Value, packageName, StringComparison.OrdinalIgnoreCase));
-
-        return packageRef?.Attribute("Version")?.Value
-               ?? throw new InvalidOperationException(
-                   $"Could not find resolved version for {packageName} in {csprojPath}");
+        // dotnet add package preserves the requested constraint verbatim in the csproj;
+        // the resolved concrete version lives in obj/project.assets.json.
+        var resolvedVersion = MSBuildProjectHelper.GetResolvedPackageVersion(
+            Path.GetDirectoryName(stagingCsproj)!, packageName);
+        return (stagingCsproj, resolvedVersion);
     }
 
     /// <summary>
-    /// Publish the temp recipes project to produce a flat output directory with all transitive
-    /// dependencies and a .deps.json, then load plugin assemblies in an isolated
-    /// <see cref="PluginLoadContext"/>. Because the NuGet package name may not match the assembly
-    /// name, we scan all non-host DLLs in the publish output for <see cref="IRecipeActivator"/>
-    /// implementations.
+    /// Publish stage: publish a restored staging project into its permanent, resolved-version-keyed
+    /// sibling dir (<c>&lt;root&gt;/&lt;id&gt;/&lt;resolvedVersion&gt;</c>), reusing it if already
+    /// present. Returns the publish output directory.
     /// </summary>
-    private List<Assembly> PublishAndLoadPlugin(string csprojPath, string packageName)
+    private static string PublishBundle(string stagingCsproj, string resolvedVersion)
     {
-        var projectDir = Path.GetDirectoryName(csprojPath)!;
-        var publishDir = Path.Combine(projectDir, "publish");
+        var bundleRoot = Directory.GetParent(Path.GetDirectoryName(stagingCsproj)!)!.FullName; // <root>/<id>
+        var publishDir = Path.Combine(bundleRoot, Sanitize(resolvedVersion));
+        // The publish output is an immutable sibling: publish only when this resolved version
+        // isn't there yet. --no-restore reuses the staging project's restore.
+        if (!File.Exists(Path.Combine(publishDir, "Recipes.dll")))
+        {
+            RunDotnet($"publish \"{stagingCsproj}\" --no-restore -c Release -o \"{publishDir}\"");
+        }
+        return publishDir;
+    }
 
-        RunDotnet($"publish \"{csprojPath}\" -c Release -o \"{publishDir}\"");
-
-        // Use the Recipes.deps.json (from the temp project) for the dependency resolver
+    /// <summary>
+    /// Load stage: load the recipe-bearing assemblies from a publish output directory into an
+    /// isolated <see cref="PluginLoadContext"/>. Because the NuGet package name may not match the
+    /// assembly name, we scan all non-host DLLs in the publish output for
+    /// <see cref="IRecipeActivator"/> implementations.
+    /// </summary>
+    private List<Assembly> LoadPlugin(string publishDir)
+    {
+        // Use the Recipes.deps.json (from the staging project) for the dependency resolver
         var depsJson = Path.Combine(publishDir, "Recipes.deps.json");
         if (!File.Exists(depsJson))
         {
             Log.Warning("No .deps.json found in publish output at {PublishDir}", publishDir);
         }
 
-        // The temp project's main DLL is the anchor for AssemblyDependencyResolver
+        // The staging project's main DLL is the anchor for AssemblyDependencyResolver
         var anchorDll = Path.Combine(publishDir, "Recipes.dll");
         if (!File.Exists(anchorDll))
         {
@@ -1073,16 +993,12 @@ public class RewriteRpcServer
 
         var response = new GenerateResponse();
 
-        var scanningBase = GetScanningRecipeBase(recipe.GetType());
-        if (scanningBase != null)
+        if (recipe is IScanningRecipe scanning)
         {
             var ctx = GetOrCreateExecutionContext(request.P);
-            var acc = GetOrCreateAccumulator(request.Id, recipe, scanningBase, ctx);
+            var acc = GetOrCreateAccumulator(request.Id, scanning, ctx);
 
-            var generateMethod = scanningBase.GetMethod("Generate")
-                ?? throw new InvalidOperationException(
-                    $"Could not find Generate method on {scanningBase.Name}");
-            var generated = (IEnumerable<SourceFile>)generateMethod.Invoke(recipe, [acc, ctx])!;
+            var generated = scanning.Generate(acc, ctx);
 
             foreach (var g in generated)
             {
@@ -1110,7 +1026,28 @@ public class RewriteRpcServer
         var found = _marketplace.FindRecipe(request.Id);
         if (found == null)
         {
-            throw new InvalidOperationException($"Recipe not found: {request.Id}");
+            // The host re-prepares every sub-recipe of a composite by id while building
+            // RpcRecipe.getRecipeList(). A sub-recipe that delegates to a Java recipe is not in
+            // this marketplace, so a miss means the host owns this recipe: answer with delegatesTo
+            // so the host resolves the id locally (the Java recipe is on its classpath) rather than
+            // failing with "Recipe not found".
+            var delegateId = Guid.NewGuid().ToString();
+            return Task.FromResult(new PrepareRecipeResponse
+            {
+                Id = delegateId,
+                Descriptor = new RecipeDescriptorDto
+                {
+                    Name = request.Id,
+                    DisplayName = request.Id,
+                    InstanceName = request.Id
+                },
+                EditVisitor = $"edit:{delegateId}",
+                DelegatesTo = new DelegatesTo
+                {
+                    RecipeName = request.Id,
+                    Options = request.Options ?? new()
+                }
+            });
         }
 
         var (descriptor, recipe) = found.Value;
@@ -1119,10 +1056,40 @@ public class RewriteRpcServer
             throw new InvalidOperationException($"Recipe {request.Id} has no live instance (installed without constructor)");
         }
 
-        // If options are provided, create a new instance with options applied
-        if (request.Options is { Count: > 0 })
+        return Task.FromResult(PrepareInstance(recipe, request.Options));
+    }
+
+    /// <summary>
+    /// Prepares a single recipe instance (optionally applying options) and recursively
+    /// prepares the full child tree, storing every node in <see cref="_preparedRecipes"/>.
+    /// A child that is <see cref="IDelegatesTo"/> carries only <c>DelegatesTo</c> and
+    /// no children; all other children have their own <c>RecipeList</c> populated.
+    /// </summary>
+    private PrepareRecipeResponse PrepareInstance(Recipe recipe, Dictionary<string, object?>? options)
+    {
+        // If options are provided, create a new instance with options applied.
+        if (options is { Count: > 0 })
         {
-            recipe = InstantiateWithOptions(recipe.GetType(), request.Options);
+            recipe = InstantiateWithOptions(recipe.GetType(), options);
+        }
+
+        // Validate required options on the instantiated recipe — the root against the caller's
+        // options, and every child against the values its parent set in GetRecipeList(). Because
+        // PrepareInstance recurses, this covers the whole tree, and it's the only place the C# tree
+        // gets validated: declarative recipes bundled in an artifact often ship without a test that
+        // runs validateAll, so this is the safety net against executing a broken recipe. Delegating
+        // recipes forward to a Java recipe that validates its own options, so they are skipped here.
+        if (recipe is not IDelegatesTo)
+        {
+            var descriptor = recipe.GetDescriptor();
+            foreach (var option in descriptor.Options)
+            {
+                if (option.Required && option.Value is null)
+                {
+                    throw new ArgumentException(
+                        $"Missing required option `{option.Name}` for recipe `{descriptor.Name}`.");
+                }
+            }
         }
 
         var id = Guid.NewGuid().ToString();
@@ -1133,11 +1100,12 @@ public class RewriteRpcServer
             Id = id,
             Descriptor = RecipeDescriptorDto.FromDescriptor(recipe.GetDescriptor()),
             EditVisitor = $"edit:{id}",
-            ScanVisitor = GetScanningRecipeBase(recipe.GetType()) != null ? $"scan:{id}" : null
+            ScanVisitor = recipe is IScanningRecipe ? $"scan:{id}" : null
         };
 
         if (recipe is IDelegatesTo del)
         {
+            // Cross-ecosystem child: host resolves locally; no C# child tree.
             response.DelegatesTo = new DelegatesTo
             {
                 RecipeName = del.JavaRecipeName,
@@ -1147,9 +1115,13 @@ public class RewriteRpcServer
         else
         {
             OptimizePreconditions(recipe, response);
+            // Whole-tree preparation: children are real instances in this recipe's own ALC.
+            response.RecipeList = recipe.GetRecipeList()
+                .Select(child => PrepareInstance(child, null))
+                .ToList();
         }
 
-        return Task.FromResult(response);
+        return response;
     }
 
     /// <summary>
@@ -1166,6 +1138,28 @@ public class RewriteRpcServer
             var innerVisitor = visitor;
             if (visitor is Check check)
             {
+                // Try to emit the precondition's wire identity so the Java
+                // host can evaluate it locally and skip the visit RPC for
+                // non-matching files. RecipeCheck is the only shape we can
+                // serialize today (recipe identity); Check wrapping a bare
+                // visitor or a composite has no recipe-name to point Java
+                // at, so we fall through and let the gate run C#-side.
+                if (check is RecipeCheck recipeCheck && _preparedRecipes.Values.Contains(recipeCheck.Recipe))
+                {
+                    var entry = ConditionWireEntry(recipeCheck.Precondition);
+                    if (entry != null)
+                    {
+                        response.EditPreconditions.Add(entry);
+                    }
+                }
+                else
+                {
+                    var entry = ConditionWireEntry(check.Precondition);
+                    if (entry != null)
+                    {
+                        response.EditPreconditions.Add(entry);
+                    }
+                }
                 innerVisitor = check.Visitor;
             }
 
@@ -1185,6 +1179,47 @@ public class RewriteRpcServer
         }
     }
 
+    /// <summary>
+    /// Translate a precondition condition (operand) to a wire entry.
+    /// Composites recurse into <c>op</c> + <c>operands</c>; leaves carry
+    /// <c>visitorName</c>. Returns <c>null</c> when the condition can't be
+    /// serialized (e.g. an opaque local visitor with no recipe identity);
+    /// the caller leaves the wrapper intact so the gate runs C#-side.
+    /// </summary>
+    private Precondition? ConditionWireEntry(ITreeVisitor<ExecutionContext> condition)
+    {
+        if (condition is IComposite composite)
+        {
+            var operands = new List<Precondition>(composite.Operands.Count);
+            foreach (var operand in composite.Operands)
+            {
+                var nested = ConditionWireEntry(operand);
+                if (nested == null)
+                {
+                    return null;
+                }
+                operands.Add(nested);
+            }
+            return new Precondition { Op = composite.Op, Operands = operands };
+        }
+        // Common case: helpers like UsesMethod / UsesType return a
+        // lightweight RecipeRef so the recipe author can declare a
+        // precondition without firing an RPC at GetVisitor() time.
+        // Java's PreparedRecipeCache.instantiateVisitor constructs the
+        // named recipe via Jackson and uses its visitor.
+        if (condition is RecipeRef recipeRef)
+        {
+            return new Precondition
+            {
+                VisitorName = recipeRef.RecipeName,
+                VisitorOptions = recipeRef.Options.ToDictionary(kvp => kvp.Key, kvp => kvp.Value!)
+            };
+        }
+        // Leaf with no wire identity — the Java host can't evaluate it
+        // remotely. Leave the wrapper intact so the gate runs C#-side.
+        return null;
+    }
+
     private static Recipe InstantiateWithOptions(Type recipeType, Dictionary<string, object?> options)
     {
         var recipe = (Recipe)Activator.CreateInstance(recipeType)!;
@@ -1193,11 +1228,32 @@ public class RewriteRpcServer
             var prop = recipeType.GetProperty(key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
             if (prop != null && prop.CanWrite)
             {
-                var convertedValue = Convert.ChangeType(value, prop.PropertyType);
-                prop.SetValue(recipe, convertedValue);
+                prop.SetValue(recipe, ConvertOptionValue(value, prop.PropertyType));
             }
         }
         return recipe;
+    }
+
+    /// <summary>
+    /// Coerce a recipe option value received over the wire to its target property type.
+    /// The streaming <c>SystemTextJsonFormatter</c> deserializes <c>object</c>-typed values
+    /// to <see cref="JsonElement"/>, which is not <see cref="IConvertible"/> — so a plain
+    /// <see cref="Convert.ChangeType(object?, Type)"/> throws. Deserialize the fragment
+    /// straight to the property type instead. A non-<see cref="JsonElement"/> value (an
+    /// in-process call or a test passing a direct CLR value) keeps the prior conversion.
+    /// </summary>
+    private static object? ConvertOptionValue(object? value, Type targetType)
+    {
+        if (value is JsonElement element)
+        {
+            return element.Deserialize(targetType, RpcJson.Options);
+        }
+        if (value is null || targetType.IsInstanceOfType(value))
+        {
+            return value;
+        }
+        var conversionType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        return Convert.ChangeType(value, conversionType);
     }
 
     [JsonRpcMethod("Visit", UseSingleObjectParameterDeserialization = true)]
@@ -1237,25 +1293,10 @@ public class RewriteRpcServer
         var ctx = GetOrCreateExecutionContext(request.PId);
         ITreeVisitor<ExecutionContext> visitor;
 
-        var scanningBase = GetScanningRecipeBase(recipe.GetType());
-        if (scanningBase != null)
+        if (recipe is IScanningRecipe scanning)
         {
-            var acc = GetOrCreateAccumulator(recipeId, recipe, scanningBase, ctx);
-            if (phase == "scan")
-            {
-                var getScannerMethod = scanningBase.GetMethod("GetScanner")
-                    ?? throw new InvalidOperationException(
-                        $"Could not find GetScanner method on {scanningBase.Name}");
-                visitor = (ITreeVisitor<ExecutionContext>)getScannerMethod.Invoke(recipe, [acc])!;
-            }
-            else
-            {
-                var getVisitorMethod = scanningBase.GetMethod("GetVisitor",
-                    [scanningBase.GetGenericArguments()[0]])
-                    ?? throw new InvalidOperationException(
-                        $"Could not find GetVisitor(T) method on {scanningBase.Name}");
-                visitor = (ITreeVisitor<ExecutionContext>)getVisitorMethod.Invoke(recipe, [acc])!;
-            }
+            var acc = GetOrCreateAccumulator(recipeId, scanning, ctx);
+            visitor = phase == "scan" ? scanning.Scanner(acc) : scanning.Editor(acc);
         }
         else
         {
@@ -1321,23 +1362,10 @@ public class RewriteRpcServer
                 throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
 
             ITreeVisitor<ExecutionContext> visitor;
-            var scanningBase = GetScanningRecipeBase(recipe.GetType());
-            if (scanningBase != null)
+            if (recipe is IScanningRecipe scanning)
             {
-                var acc = GetOrCreateAccumulator(recipeId, recipe, scanningBase, ctx);
-                if (phase == "scan")
-                {
-                    var getScannerMethod = scanningBase.GetMethod("GetScanner")
-                        ?? throw new InvalidOperationException($"Could not find GetScanner on {scanningBase.Name}");
-                    visitor = (ITreeVisitor<ExecutionContext>)getScannerMethod.Invoke(recipe, [acc])!;
-                }
-                else
-                {
-                    var getVisitorMethod = scanningBase.GetMethod("GetVisitor",
-                        [scanningBase.GetGenericArguments()[0]])
-                        ?? throw new InvalidOperationException($"Could not find GetVisitor on {scanningBase.Name}");
-                    visitor = (ITreeVisitor<ExecutionContext>)getVisitorMethod.Invoke(recipe, [acc])!;
-                }
+                var acc = GetOrCreateAccumulator(recipeId, scanning, ctx);
+                visitor = phase == "scan" ? scanning.Scanner(acc) : scanning.Editor(acc);
             }
             else
             {
@@ -1436,6 +1464,7 @@ public class RewriteRpcServer
     }
 
     public static async Task RunAsync(RecipeMarketplace? marketplace = null,
+        string? recipeInstallDir = null,
         CancellationToken cancellationToken = default)
     {
         marketplace ??= new RecipeMarketplace();
@@ -1453,18 +1482,20 @@ public class RewriteRpcServer
         using var inputStream = Console.OpenStandardInput();
         using var outputStream = Console.OpenStandardOutput();
 
-        // Configure JSON serialization to match Java expectations:
-        // - camelCase property names
-        // - string enum values (not integers)
-        var formatter = new JsonMessageFormatter();
-        formatter.JsonSerializer.ContractResolver = new CamelCasePropertyNamesContractResolver();
-        formatter.JsonSerializer.Converters.Add(new StringEnumConverter());
-        formatter.JsonSerializer.NullValueHandling = NullValueHandling.Ignore;
+        // Stream the JSON-RPC envelope with System.Text.Json (Utf8JsonWriter/Utf8JsonReader)
+        // instead of Newtonsoft's JToken-DOM formatter. The wire format stays JSON and matches
+        // Java's expectations (camelCase property names, string enum values, omitted nulls) via
+        // the shared RpcJson.Options. See RpcJson for why this is far cheaper on the .NET side
+        // (no per-message DOM, no per-value converter scan under lock, far less GC pressure).
+        var formatter = new SystemTextJsonFormatter
+        {
+            JsonSerializerOptions = RpcJson.Options,
+        };
 
         var handler = new HeaderDelimitedMessageHandler(outputStream, inputStream, formatter);
         using var jsonRpc = new StringErrorDataJsonRpc(handler);
 
-        var server = new RewriteRpcServer(marketplace);
+        var server = new RewriteRpcServer(marketplace, recipeInstallDir);
         server._jsonRpc = jsonRpc;
         _current = server;
         // Allow concurrent request dispatch so reentrant callbacks don't deadlock.
@@ -1485,11 +1516,20 @@ public class RewriteRpcServer
     }
 
     /// <summary>
-    /// Asks the Java peer to parse source content and returns the parsed tree.
-    /// The Java side selects the appropriate parser based on the file extension.
+    /// Parses source content, handling .csproj files locally and delegating others to Java.
     /// </summary>
     public SourceFile ParseOnRemote(string sourcePath, string content, string? sourceFileType = null)
     {
+        // Parse .csproj files locally using C# XmlParser + MSBuildProject marker
+        var csprojParser = new Xml.CsprojParser();
+        if (csprojParser.Accept(sourcePath))
+        {
+            var doc = csprojParser.Parse(content, sourcePath);
+            var id = doc.Id.ToString();
+            _localObjects[id] = doc;
+            return doc;
+        }
+
         var response = _jsonRpc!.InvokeWithParameterObjectAsync<List<string>>(
             "Parse",
             new ParseRequest
@@ -1501,8 +1541,8 @@ public class RewriteRpcServer
         if (response.Count == 0)
             throw new InvalidOperationException($"Parse returned no results for {sourcePath}");
 
-        var id = response[0];
-        return (SourceFile)GetObjectFromRemoteAsync(id, sourceFileType).GetAwaiter().GetResult();
+        var id2 = response[0];
+        return (SourceFile)GetObjectFromRemoteAsync(id2, sourceFileType).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -1539,6 +1579,13 @@ public class RewriteRpcServer
         }
 
         return (Tree)_localObjects[treeId]!;
+    }
+
+    [JsonRpcMethod("SetDataTableStore", UseSingleObjectParameterDeserialization = true)]
+    public Task<bool> SetDataTableStore(SetDataTableStoreRequest request)
+    {
+        _configuredDataTableStore = request.ToDataTableStore();
+        return Task.FromResult(true);
     }
 
     /// <summary>
@@ -1586,29 +1633,22 @@ public class RewriteRpcServer
     internal void StoreLocalObject(string id, object obj) => _localObjects[id] = obj;
 
     /// <summary>
-    /// Finds the closed generic ScanningRecipe&lt;T&gt; base type, or null if the recipe is not a scanning recipe.
-    /// </summary>
-    private static Type? GetScanningRecipeBase(Type recipeType)
-    {
-        var type = recipeType;
-        while (type != null)
-        {
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ScanningRecipe<>))
-                return type;
-            type = type.BaseType;
-        }
-        return null;
-    }
-
-    /// <summary>
     /// Gets or creates an ExecutionContext by ID, caching it for reuse across phases.
     /// </summary>
     private ExecutionContext GetOrCreateExecutionContext(string? pId)
     {
         if (pId != null && _executionContexts.TryGetValue(pId, out var existing))
+        {
+            InstallDataTableStore(existing);
             return existing;
+        }
 
         var ctx = new ExecutionContext();
+        // Inject the build context captured during ParseSolution so that
+        // reattestation (MSBuildProjectHelper) can materialize build files
+        _buildContext?.StoreIn(ctx);
+        InstallDataTableStore(ctx);
+
         if (pId != null)
         {
             _executionContexts[pId] = ctx;
@@ -1617,18 +1657,24 @@ public class RewriteRpcServer
         return ctx;
     }
 
+    private void InstallDataTableStore(ExecutionContext ctx)
+    {
+        var store = _configuredDataTableStore;
+        if (store != null)
+        {
+            ctx.PutMessage(DataTable<object>.DataTableStoreKey, store);
+        }
+    }
+
     /// <summary>
     /// Gets or creates the accumulator for a scanning recipe, storing it for reuse across scan/generate/edit phases.
     /// </summary>
-    private object? GetOrCreateAccumulator(string recipeId, Recipe recipe, Type scanningBase, ExecutionContext ctx)
+    private object? GetOrCreateAccumulator(string recipeId, IScanningRecipe recipe, ExecutionContext ctx)
     {
         if (_recipeAccumulators.TryGetValue(recipeId, out var acc))
             return acc;
-
-        var getInitialValue = scanningBase.GetMethod("GetInitialValue")
-            ?? throw new InvalidOperationException(
-                $"Could not find GetInitialValue method on {scanningBase.Name}");
-        acc = getInitialValue.Invoke(recipe, [ctx]);
+        
+        acc = recipe.InitialValue(ctx);
         _recipeAccumulators[recipeId] = acc;
         return acc;
     }
@@ -1692,69 +1738,46 @@ public class ParseSolutionRequest
 public class ParseSolutionResponse
 {
     public List<ParseSolutionResponseItem> Items { get; set; } = new();
-    public List<ProjectMetadata> Projects { get; set; } = new();
 }
 
 public class ParseSolutionResponseItem
 {
     public string Id { get; set; } = "";
     public string SourceFileType { get; set; } = "";
-    public string ProjectPath { get; set; } = "";
-}
-
-public class ProjectMetadata
-{
-    public string ProjectPath { get; set; } = "";
-    public string? Sdk { get; set; }
-    public Dictionary<string, PropertyEntry> Properties { get; set; } = new();
-    public List<TargetFrameworkEntry> TargetFrameworks { get; set; } = new();
-    public List<PackageSourceEntry> PackageSources { get; set; } = new();
-}
-
-public class PackageSourceEntry
-{
-    public string Key { get; set; } = "";
-    public string Url { get; set; } = "";
-}
-
-public class PropertyEntry
-{
-    public string Value { get; set; } = "";
-    public string? DefinedIn { get; set; }
-}
-
-public class TargetFrameworkEntry
-{
-    public string TargetFramework { get; set; } = "";
-    public List<PackageReferenceEntry> PackageReferences { get; set; } = new();
-    public List<ResolvedPackageEntry> ResolvedPackages { get; set; } = new();
-    public List<ProjectReferenceEntry> ProjectReferences { get; set; } = new();
-}
-
-public class PackageReferenceEntry
-{
-    public string Include { get; set; } = "";
-    public string? RequestedVersion { get; set; }
-    public string? ResolvedVersion { get; set; }
-}
-
-public class ResolvedPackageEntry
-{
-    public string Name { get; set; } = "";
-    public string ResolvedVersion { get; set; } = "";
-    public List<ResolvedPackageEntry> Dependencies { get; set; } = new();
-    public int Depth { get; set; }
-}
-
-public class ProjectReferenceEntry
-{
-    public string Include { get; set; } = "";
 }
 
 public class GetObjectRequest
 {
     public string Id { get; set; } = "";
     public string? SourceFileType { get; set; }
+}
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
+[JsonDerivedType(typeof(Csv), "CSV")]
+[JsonDerivedType(typeof(NoOp), "NOOP")]
+public abstract class SetDataTableStoreRequest
+{
+    public abstract IDataTableStore ToDataTableStore();
+
+    public sealed class Csv : SetDataTableStoreRequest
+    {
+        public string? OutputDir { get; set; }
+        public Dictionary<string, string>? PrefixColumns { get; set; }
+        public Dictionary<string, string>? SuffixColumns { get; set; }
+
+        public override IDataTableStore ToDataTableStore() =>
+            string.IsNullOrEmpty(OutputDir)
+                ? new InMemoryDataTableStore()
+                : new CsvDataTableStore(
+                    OutputDir,
+                    PrefixColumns ?? new Dictionary<string, string>(),
+                    SuffixColumns ?? new Dictionary<string, string>());
+    }
+
+    public sealed class NoOp : SetDataTableStoreRequest
+    {
+        public override IDataTableStore ToDataTableStore() => new InMemoryDataTableStore();
+    }
 }
 
 public class ParseRequest
@@ -1781,12 +1804,46 @@ public class GetMarketplaceResponseRow
 {
     public RecipeDescriptorDto Descriptor { get; set; } = null!;
     public List<List<CategoryDescriptorDto>> CategoryPaths { get; set; } = [];
+    public string? PackageName { get; set; }
 }
 
 public class CategoryDescriptorDto
 {
     public string DisplayName { get; set; } = "";
     public string? Description { get; set; }
+}
+
+/// <summary>
+/// Reads <c>estimatedEffortPerOccurrence</c> from either the Java wire shape (a
+/// JSON number of seconds) or the C# wire shape (an ISO-8601 duration string),
+/// normalizing both to an ISO-8601 string. Writes the ISO-8601 string, which
+/// the Java peer's Jackson Duration deserializer accepts.
+/// </summary>
+public sealed class DurationWireConverter : JsonConverter<string?>
+{
+    public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.Null:
+                return null;
+            case JsonTokenType.String:
+                return reader.GetString();
+            case JsonTokenType.Number:
+                return System.Xml.XmlConvert.ToString(TimeSpan.FromSeconds(reader.GetDouble()));
+            default:
+                reader.Skip();
+                return null;
+        }
+    }
+
+    public override void Write(Utf8JsonWriter writer, string? value, JsonSerializerOptions options)
+    {
+        if (value is null)
+            writer.WriteNullValue();
+        else
+            writer.WriteStringValue(value);
+    }
 }
 
 public class RecipeDescriptorDto
@@ -1796,6 +1853,12 @@ public class RecipeDescriptorDto
     public string InstanceName { get; set; } = "";
     public string Description { get; set; } = "";
     public HashSet<string> Tags { get; set; } = [];
+
+    // The Java peer serializes the recipe's estimatedEffortPerOccurrence
+    // (a Duration) as a JSON number of seconds, while the C# side emits it as
+    // an ISO-8601 duration string. Accept either on read so System.Text.Json's
+    // strict number/string handling doesn't fail descriptor deserialization.
+    [JsonConverter(typeof(DurationWireConverter))]
     public string? EstimatedEffortPerOccurrence { get; set; }
     public List<OptionDescriptorDto> Options { get; set; } = [];
     public List<RecipeDescriptorDto> Preconditions { get; set; } = [];
@@ -1876,6 +1939,7 @@ public class PrepareRecipeResponse
     public string? ScanVisitor { get; set; }
     public List<Precondition> ScanPreconditions { get; set; } = [];
     public DelegatesTo? DelegatesTo { get; set; }
+    public List<PrepareRecipeResponse> RecipeList { get; set; } = [];
 }
 
 public class DelegatesTo
@@ -1884,16 +1948,27 @@ public class DelegatesTo
     public Dictionary<string, object?> Options { get; set; } = new();
 }
 
+/// <summary>
+/// Either a leaf (a single visitor identified by <see cref="VisitorName"/> +
+/// optional <see cref="VisitorOptions"/>) or a composite of nested
+/// preconditions joined by <see cref="Op"/> ("or" / "and" / "not"). When
+/// <see cref="Op"/> is null the entry is a leaf and the visitor fields
+/// carry the gate identity; when <see cref="Op"/> is set, <see cref="Operands"/>
+/// carries the children and the visitor fields are ignored. Mirrors the
+/// Java DTO <c>org.openrewrite.rpc.request.PrepareRecipeResponse.Precondition</c>.
+/// </summary>
 public class Precondition
 {
-    public string VisitorName { get; set; } = "";
-    public Dictionary<string, object> VisitorOptions { get; set; } = [];
+    public string? VisitorName { get; set; }
+    public Dictionary<string, object>? VisitorOptions { get; set; }
+    public string? Op { get; set; }
+    public List<Precondition>? Operands { get; set; }
 }
 
 public class GenerateRequest
 {
     public string Id { get; set; } = "";
-    [JsonProperty("p")]
+    [JsonPropertyName("p")]
     public string? P { get; set; }
 }
 
@@ -1905,13 +1980,13 @@ public class GenerateResponse
 
 public class VisitRequest
 {
-    [JsonProperty("visitor")]
+    [JsonPropertyName("visitor")]
     public string VisitorName { get; set; } = "";
     public string? SourceFileType { get; set; }
     public string TreeId { get; set; } = "";
-    [JsonProperty("p")]
+    [JsonPropertyName("p")]
     public string? PId { get; set; }
-    [JsonProperty("cursor")]
+    [JsonPropertyName("cursor")]
     public List<string>? CursorIds { get; set; }
 }
 
@@ -1924,9 +1999,9 @@ public class BatchVisitRequest
 {
     public string SourceFileType { get; set; } = "";
     public string TreeId { get; set; } = "";
-    [JsonProperty("p")]
+    [JsonPropertyName("p")]
     public string? PId { get; set; }
-    [JsonProperty("cursor")]
+    [JsonPropertyName("cursor")]
     public List<string>? CursorIds { get; set; }
     public List<BatchVisitItem> Visitors { get; set; } = new();
 }

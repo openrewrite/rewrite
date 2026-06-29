@@ -4569,13 +4569,13 @@ public interface Cs extends J {
         @Getter
         Expression expression;
 
-        JLeftPadded<Pattern> pattern;
+        JLeftPadded<Expression> pattern;
 
-        public Pattern getPattern() {
+        public Expression getPattern() {
             return pattern.getElement();
         }
 
-        public IsPattern withPattern(Pattern pattern) {
+        public IsPattern withPattern(Expression pattern) {
             return getPadding().withPattern(this.pattern.withElement(pattern));
         }
 
@@ -4619,11 +4619,11 @@ public interface Cs extends J {
         public static class Padding {
             private final IsPattern t;
 
-            public JLeftPadded<Pattern> getPattern() {
+            public JLeftPadded<Expression> getPattern() {
                 return t.pattern;
             }
 
-            public IsPattern withPattern(JLeftPadded<Pattern> pattern) {
+            public IsPattern withPattern(JLeftPadded<Expression> pattern) {
                 return t.pattern == pattern ? t : new IsPattern(t.id, t.prefix, t.markers, t.expression, pattern);
             }
         }
@@ -7212,26 +7212,14 @@ public interface Cs extends J {
         @Getter
         Expression expression;
 
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
             return v.visitPointerDereference(this, p);
-        }
-
-        @Override
-        public JavaType getType() {
-            return expression == null ? null : expression.getType();
-        }
-
-        @Override
-        public PointerDereference withType(@Nullable JavaType type) {
-            if (expression == null) {
-                return this;
-            }
-            if (expression instanceof J.MethodInvocation) {
-                return withExpression(((J.MethodInvocation) expression)
-                        .withMethodType(type instanceof JavaType.Method ? (JavaType.Method) type : null));
-            }
-            return withExpression(expression.withType(type));
         }
 
         @Override
@@ -7483,6 +7471,20 @@ public interface Cs extends J {
 
         List<JRightPadded<Expression>> warningCodes;
 
+        /**
+         * Whitespace between {@code #pragma} and {@code warning} (usually a single space).
+         */
+        @With
+        @Getter
+        Space keywordSpacing;
+
+        /**
+         * Whitespace between {@code warning} and the action keyword ({@code disable}/{@code restore}).
+         */
+        @With
+        @Getter
+        Space actionSpacing;
+
         public List<Expression> getWarningCodes() {
             return JRightPadded.getElements(warningCodes);
         }
@@ -7531,7 +7533,7 @@ public interface Cs extends J {
             }
 
             public PragmaWarningDirective withWarningCodes(List<JRightPadded<Expression>> warningCodes) {
-                return t.warningCodes == warningCodes ? t : new PragmaWarningDirective(t.id, t.prefix, t.markers, t.action, warningCodes);
+                return t.warningCodes == warningCodes ? t : new PragmaWarningDirective(t.id, t.prefix, t.markers, t.action, warningCodes, t.keywordSpacing, t.actionSpacing);
             }
         }
     }
@@ -7561,6 +7563,13 @@ public interface Cs extends J {
         @With
         @Getter
         Markers markers;
+
+        /**
+         * Whitespace between {@code #pragma} and {@code checksum} (usually a single space).
+         */
+        @With
+        @Getter
+        Space keywordSpacing;
 
         @With
         @Getter
@@ -7622,6 +7631,14 @@ public interface Cs extends J {
         @With
         @Getter
         String trailingComment;
+
+        /**
+         * Whitespace between the {@code nullable} keyword and the setting keyword
+         * (e.g. {@code "  "} in {@code "#nullable  enable"}).
+         */
+        @With
+        @Getter
+        String keywordSpacing;
 
         public enum NullableSetting {
             Enable,

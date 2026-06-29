@@ -106,6 +106,22 @@ public class RecipeSpec {
     @Nullable
     RecipePrinter recipePrinter;
 
+    @Nullable
+    RewriteRunner runner;
+
+    /**
+     * Selects how the recipe is executed for this run. The default is
+     * {@link RewriteRunner#IN_PROCESS}; pass an alternative (e.g. a moderne-cli
+     * runner) to exercise the same test through an out-of-process backend.
+     * <p>
+     * Resolution order: per-call spec runner &gt; per-class
+     * {@link RewriteTest#runner()} &gt; {@link RewriteRunner#IN_PROCESS}.
+     */
+    public RecipeSpec runner(RewriteRunner runner) {
+        this.runner = runner;
+        return this;
+    }
+
     /**
      * Configuration that applies to all source file inputs.
      */
@@ -250,8 +266,7 @@ public class RecipeSpec {
                 }
             }
             assertThat(dataTable).isNotNull();
-            @SuppressWarnings("unchecked")
-            List<E> rows = (List<E>) store.getRows(dataTable.getName(), dataTable.getGroup())
+            List<?> rows = store.getRows(dataTable.getName(), dataTable.getGroup())
                     .collect(java.util.stream.Collectors.toList());
             StringWriter writer = new StringWriter();
             CsvMapper mapper = CsvMapper.builder()

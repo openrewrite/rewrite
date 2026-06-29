@@ -17,8 +17,11 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -51,8 +54,8 @@ public class ChangeMethodInvocationReturnType extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            private final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, false);
+        MethodMatcher methodMatcher = new MethodMatcher(methodPattern, false);
+        return Preconditions.check(new UsesMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
 
             private boolean methodUpdated;
 
@@ -77,7 +80,13 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                 JavaType.FullyQualified originalType = multiVariable.getTypeAsFullyQualified();
                 J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, ctx);
 
-                if (methodUpdated) {
+                // Only change the declared type when a variable's initializer is itself the matched
+                // method invocation. A match nested deeper (e.g. as an argument to another call, such
+                // as `Cell c = row.createCell(i, other.getCellType())`) must not change the variable type.
+                boolean initializedByMatch = mv.getVariables().stream()
+                        .anyMatch(v -> isInitializedByMatch(v.getInitializer()));
+
+                if (methodUpdated && initializedByMatch) {
                     JavaType newType = JavaType.buildType(newReturnType);
                     JavaType.FullyQualified newFieldType = TypeUtils.asFullyQualified(newType);
 
@@ -107,6 +116,27 @@ public class ChangeMethodInvocationReturnType extends Recipe {
 
                 return mv;
             }
-        };
+
+            /**
+             * Returns true when the matched invocation is the direct initializer, is inside
+             * wrapping parentheses (stripped before checking), or is a branch of a ternary —
+             * in all of those positions the invocation determines the variable's type.
+             */
+            private boolean isInitializedByMatch(@Nullable Expression expression) {
+                if (expression == null) {
+                    return false;
+                }
+                Expression unwrapped = expression.unwrap();
+                if (unwrapped instanceof J.MethodInvocation) {
+                    return methodMatcher.matches((J.MethodInvocation) unwrapped);
+                }
+                if (unwrapped instanceof J.Ternary) {
+                    J.Ternary ternary = (J.Ternary) unwrapped;
+                    return isInitializedByMatch(ternary.getTruePart()) ||
+                            isInitializedByMatch(ternary.getFalsePart());
+                }
+                return false;
+            }
+        });
     }
 }

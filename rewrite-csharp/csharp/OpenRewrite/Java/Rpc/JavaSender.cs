@@ -234,6 +234,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         q.GetAndSend(classDecl, c => c.Implements, impl => VisitContainer(impl, q));
         q.GetAndSend(classDecl, c => c.Permits, perm => VisitContainer(perm, q));
         q.GetAndSend(classDecl, c => (J)c.Body, j => Visit(j, q));
+        q.GetAndSend(classDecl, c => AsRef(c.Type), type => VisitType(GetValueNonNull<JavaType>(type), q));
         return classDecl;
     }
 
@@ -409,6 +410,8 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         q.GetAndSendList(method, m => m.Name.Annotations, a => a.Id, a => Visit(a, q));
         q.GetAndSend(method, m => (J)m.Name, name => Visit(name, q));
         q.GetAndSend(method, m => m.Parameters, @params => VisitContainer(@params, q));
+        q.GetAndSendList(method, m => m.DimensionsAfterName,
+            lp => lp.Element.ToString()!, lp => VisitLeftPadded(lp, q));
         q.GetAndSend(method, m => m.Throws, thr => VisitContainer(thr, q));
         q.GetAndSend(method, m => m.Body, body => Visit(body, q));
         q.GetAndSend(method, m => m.DefaultValue, def => VisitLeftPadded(def, q));
@@ -670,25 +673,11 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     public virtual void VisitSpace(Space space, RpcSendQueue q)
     {
         q.GetAndSendList(space, s => s.Comments,
+            c => c.Text + c.Suffix,
             c =>
             {
-                if (c is TextComment tc)
-                {
-                    return tc.Text + c.Suffix;
-                }
-                throw new ArgumentException($"Unexpected comment type {c.GetType().Name}");
-            },
-            c =>
-            {
-                if (c is TextComment tc)
-                {
-                    q.GetAndSend(tc, t => t.Multiline);
-                    q.GetAndSend(tc, t => t.Text);
-                }
-                else
-                {
-                    throw new ArgumentException($"Unexpected comment type {c.GetType().Name}");
-                }
+                q.GetAndSend(c, cm => cm.Multiline);
+                q.GetAndSend(c, cm => cm.Text);
                 q.GetAndSend(c, cm => cm.Suffix);
                 // C# Comment does not have Markers; send empty Markers for protocol compatibility
                 q.GetAndSend(c, _ => Markers.Empty);
@@ -705,6 +694,11 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             case JavaType.Annotation annotation:
                 q.GetAndSend(annotation, a => AsRef(a.AnnotationType),
                     t => VisitType(GetValueNonNull<JavaType>(t), q));
+                q.GetAndSendListAsRef(
+                    annotation,
+                    a => a.Values,
+                    v => v.Element != null ? TypeSignature(v.Element) : "null",
+                    v => VisitAnnotationElementValue(v, q));
                 break;
 
             case JavaType.MultiCatch multiCatch:
@@ -795,6 +789,34 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         }
 
         return javaType;
+    }
+
+    private void VisitAnnotationElementValue(JavaType.Annotation.ElementValue v, RpcSendQueue q)
+    {
+        q.GetAndSend(v, e => AsRef(e.Element),
+            t => VisitType(GetValueNonNull<JavaType>(t), q));
+        switch (v)
+        {
+            case JavaType.Annotation.ArrayElementValue array:
+                // Constant values are sent as raw JSON-native values; numeric subtype
+                // (int/long/float/double) and char/string distinctions are not preserved.
+                q.GetAndSendList(
+                    array,
+                    a => a.ConstantValues,
+                    x => x?.ToString() ?? "null",
+                    null);
+                q.GetAndSendListAsRef(
+                    array,
+                    a => a.ReferenceValues,
+                    t => TypeSignature(t),
+                    t => VisitType(t, q));
+                break;
+            case JavaType.Annotation.SingleElementValue single:
+                q.GetAndSend(single, s => s.ConstantValue);
+                q.GetAndSend(single, s => AsRef(s.ReferenceValue),
+                    t => VisitType(GetValueNonNull<JavaType>(t), q));
+                break;
+        }
     }
 
     /// <summary>

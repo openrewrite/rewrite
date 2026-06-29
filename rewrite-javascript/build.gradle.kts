@@ -17,10 +17,18 @@ plugins {
     id("publishing")
 }
 
+normalization {
+    runtimeClasspath {
+        ignore("META-INF/rewrite-javascript-version.txt")
+    }
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
     api(project(":rewrite-json"))
+    implementation(project(":rewrite-yaml"))
+    implementation("org.yaml:snakeyaml:latest.release")
 
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
@@ -30,9 +38,11 @@ dependencies {
     compileOnly(project(":rewrite-test"))
 
     testImplementation(project(":rewrite-test"))
-    testImplementation(project(":rewrite-yaml"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
     testRuntimeOnly(project(":rewrite-java-21"))
+    // For `:rewrite-javascript:generateTestClasspath` — bundles org.openrewrite.maven.rpc.JavaRewriteRpc,
+    // the main class spawned by JavaRpcTestServer in test/rpc/.
+    testRuntimeOnly(project(":rewrite-maven"))
 }
 
 tasks.withType<Javadoc>().configureEach {
@@ -70,13 +80,13 @@ fun gitCommitTimestamp(): String {
         .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
 }
 
-val datedSnapshotVersion = if (System.getenv("CI") != null) {
-    project.version.toString().replace(
-        "SNAPSHOT",
-        gitCommitTimestamp()
-    )
-} else {
-    project.version.toString()
+// `-PnpmPublishVersion=<v>` (set by the npm-publish workflow on the tag-triggered path)
+// pins the version verbatim, so e.g. tag `v8.83.0` publishes `8.83.0`. Otherwise CI builds
+// substitute `SNAPSHOT` for the git commit timestamp, and local builds use the raw version.
+val datedSnapshotVersion = when {
+    project.hasProperty("npmPublishVersion") -> project.property("npmPublishVersion").toString()
+    System.getenv("CI") != null -> project.version.toString().replace("SNAPSHOT", gitCommitTimestamp())
+    else -> project.version.toString()
 }
 
 // Helper function to extract version from the JAR if it exists
@@ -113,6 +123,10 @@ val npmInstall = tasks.named("npmInstall")
 
 val npmTest = tasks.register<NpmTask>("npmTest") {
     dependsOn(npmInstall)
+    // RPC integration tests under test/rpc/ need the classpath of org.openrewrite.maven.rpc.JavaRewriteRpc.
+    // Generating it before npmTest means devs running `./gradlew :rewrite-javascript:test` get the RPC
+    // tests for free — devs running `npx vitest` directly still need to run :generateTestClasspath once.
+    dependsOn(tasks.named("generateTestClasspath"))
     inputs.files(fileTree("rewrite/node_modules") { exclude(".vite-temp/**", ".vite/**", ".cache/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite") {
@@ -123,6 +137,8 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/test"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(tasks.named("generateTestClasspath").map { it.outputs.files })
+        .withNormalizer(ClasspathNormalizer::class)
     outputs.files("rewrite/build/test-results/vitest/junit.xml")
     outputs.cacheIf { true }
 
@@ -224,33 +240,83 @@ testing {
     }
 }
 
-// This task creates a `.npmrc` file with the given token, so that the `npm publish` succeeds
-// For local development the user would typically have a `~/.npmrc` file with the token in it
-val setupNpmrc = tasks.register("setupNpmrc") {
+// npm publishing is performed directly by `.github/workflows/npm-publish.yml` (which runs
+// `npm publish <tgz>` against the artifact produced by the `npmPack` task above). The workflow
+// owns version selection (via `-PnpmPublishVersion=<v>`), dist-tag selection (`latest` vs
+// `next`), and the duplicate-publish guard. The dedicated workflow filename is also what the
+// package's npm Trusted Publisher (OIDC) record matches against. CI/release workflows still
+// publish to Sonatype, PyPI, NuGet as before.
+//
+// npm publishing is decoupled from the Maven snapshot publish (it runs in a separate
+// `workflow_run` triggered by `ci`, because npm Trusted Publisher binds to a single workflow
+// filename). To still give every Maven snapshot a 1:1 npm counterpart carrying the identical
+// version reference, this task records the exact unique snapshot version that Gradle assigned to
+// `org.openrewrite:rewrite-javascript` (e.g. `8.86.0-20260625.164513-55`). Gradle's maven-publish
+// computes that version client-side and stages the very `maven-metadata.xml` it uploads under
+// `build/tmp/publish<Pub>PublicationTo<Repo>Repository/snapshot-maven-metadata.xml`; we read the
+// `<value>` straight from that local file — no network read-back. The `ci` run uploads the
+// recorded version as an artifact and `npm-publish.yml` pins the npm version to it.
+val recordPublishedSnapshotVersion = tasks.register("recordPublishedSnapshotVersion") {
+    description = "Records the unique Sonatype snapshot version of rewrite-javascript for npm-publish to mirror."
+    val baseVersion = project.version.toString()
+    val buildDirectory = layout.buildDirectory
+    val versionFile = buildDirectory.file("npm/publishedVersion.txt")
+    onlyIf { baseVersion.endsWith("-SNAPSHOT") }
     doLast {
-        if (project.hasProperty("nodeAuthToken")) {
-            val npmrcFile = file("rewrite/.npmrc")
-            npmrcFile.writeText("//registry.npmjs.org/:_authToken=${project.property("nodeAuthToken")}\n")
+        val staged = buildDirectory.dir("tmp").get().asFile.walkTopDown()
+            .firstOrNull { it.name == "snapshot-maven-metadata.xml" }
+        val resolved = staged?.readText()
+            ?.let { Regex("<value>([^<]+)</value>").find(it)?.groupValues?.get(1) }
+        if (resolved == null) {
+            logger.warn("Could not find the staged snapshot metadata under build/tmp; " +
+                    "npm-publish will fall back to its default version derivation.")
+            return@doLast
         }
+        val out = versionFile.get().asFile
+        out.parentFile.mkdirs()
+        out.writeText(resolved)
+        logger.lifecycle("Recorded published snapshot version for npm: $resolved")
     }
-}
-
-// Implicitly `--tag latest` if not specified
-val npmPublish = tasks.register<NpmTask>("npmPublish") {
-    inputs.files(npmPack)
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    dependsOn(setupNpmrc)
-
-    args = provider { listOf("publish", npmPack.get().archiveFile.get().asFile.absolutePath) }
-    if (!project.hasProperty("releasing")) {
-        args.addAll("--tag", "next")
-    }
-
-    workingDir.set(file("rewrite"))
 }
 
 tasks.named("publish") {
-    dependsOn(npmPublish)
+    finalizedBy(recordPublishedSnapshotVersion)
+}
+
+// ============================================
+// JavaScript Test Support Tasks
+// ============================================
+
+// Task to generate classpath file for Java RPC server testing (consumed by TS tests
+// in rewrite-javascript/rewrite/test/rpc/ that spawn org.openrewrite.maven.rpc.JavaRewriteRpc).
+val generateTestClasspath by tasks.registering {
+    group = "javascript"
+    description = "Generate classpath file for Java RPC server (used by TypeScript tests)"
+
+    val outputFile = projectDir.resolve("rewrite/test-classpath.txt")
+    outputs.file(outputFile)
+
+    inputs.files(configurations["runtimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(configurations["testRuntimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(tasks.named("compileJava").map { it.outputs.files })
+    inputs.files(tasks.named("processResources").map { it.outputs.files })
+
+    dependsOn(tasks.named("testClasses"))
+    dependsOn(tasks.named("jar"))
+
+    doLast {
+        val classpath = (
+            configurations.getByName("runtimeClasspath").files +
+            configurations.getByName("testRuntimeClasspath").files +
+            tasks.named("compileJava").get().outputs.files +
+            tasks.named("processResources").get().outputs.files
+        ).distinctBy { it.absolutePath }
+         .joinToString(File.pathSeparator) { it.absolutePath }
+        outputFile.writeText(classpath)
+        logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
+    }
 }
 
 extensions.configure<LicenseExtension> {

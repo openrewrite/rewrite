@@ -16,8 +16,15 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class ParameterizedTypeTest implements RewriteTest {
@@ -31,6 +38,52 @@ class ParameterizedTypeTest implements RewriteTest {
               val list: List[String] = List("a", "b", "c")
             }
             """
+          )
+        );
+    }
+
+    @Test
+    void arrayTypeAnnotationIsParameterizedType() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val args: Array[String] = Array.empty[String]
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicReference<TypeTree> typeExpression = new AtomicReference<>();
+
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer p) {
+                        J.VariableDeclarations.NamedVariable variable = multiVariable.getVariables().get(0);
+                        if ("args".equals(variable.getSimpleName())) {
+                            typeExpression.set(multiVariable.getTypeExpression());
+                        }
+                        return super.visitVariableDeclarations(multiVariable, p);
+                    }
+                }.visit(cu, 0);
+
+                assertThat(typeExpression.get())
+                  .as("Array[String] should parse as a parameterized type annotation")
+                  .isInstanceOf(J.ParameterizedType.class);
+
+                J.ParameterizedType arrayType = (J.ParameterizedType) typeExpression.get();
+                assertThat(arrayType.getClazz()).isInstanceOf(J.Identifier.class);
+                assertThat(((J.Identifier) arrayType.getClazz()).getSimpleName()).isEqualTo("Array");
+                assertThat(arrayType.getTypeParameters()).hasSize(1);
+                assertThat(arrayType.getTypeParameters().get(0)).isInstanceOf(J.Identifier.class);
+                assertThat(((J.Identifier) arrayType.getTypeParameters().get(0)).getSimpleName()).isEqualTo("String");
+                assertThat(arrayType.getType()).isInstanceOf(JavaType.Parameterized.class);
+                JavaType.Parameterized attributedType = (JavaType.Parameterized) arrayType.getType();
+                assertThat(attributedType.getType().getFullyQualifiedName()).isEqualTo("scala.Array");
+                assertThat(attributedType.getTypeParameters()).hasSize(1);
+                assertThat(attributedType.getTypeParameters().get(0))
+                  .isInstanceOf(JavaType.FullyQualified.class);
+                assertThat(((JavaType.FullyQualified) attributedType.getTypeParameters().get(0)).getFullyQualifiedName())
+                  .isEqualTo("java.lang.String");
+            })
           )
         );
     }
@@ -123,6 +176,26 @@ class ParameterizedTypeTest implements RewriteTest {
     }
 
     @Test
+    void boundedTypeParameterWithContextBound() {
+        rewriteRun(
+          scala(
+            """
+            trait Actor
+            trait ClassTag[T]
+            trait Lower
+            trait Upper
+
+            class ActorRefProvider[T <: Actor: ClassTag]
+            class UpperBound[T <: Upper: ClassTag]
+            class LowerBound[T >: Lower: ClassTag]
+            class LowerAndUpperBound[T >: Lower <: Upper: ClassTag]
+            class MultipleContextBounds[T <: Upper: ClassTag: Ordering]
+            """
+          )
+        );
+    }
+
+    @Test
     void varianceAnnotations() {
         rewriteRun(
           scala(
@@ -164,6 +237,62 @@ class ParameterizedTypeTest implements RewriteTest {
               def transform[F[_], A, B](fa: F[A])(f: A => B): F[B] = ???
             }
             """
+          )
+        );
+    }
+
+    @Test
+    void higherKindedTypeParamNotCrammedIntoIdentifier() {
+        // visitTypeParameter — `F[_]` must be modeled as J.ParameterizedType, not crammed into the name
+        assertNoTypeArgInIdentifier(
+          """
+          trait Functor[F[_]] {
+            val x: Int = 1
+          }
+          """
+        );
+    }
+
+    @Test
+    void multipleHigherKindedParamsNotCrammedIntoIdentifier() {
+        assertNoTypeArgInIdentifier(
+          """
+          trait Iso[F[_], G[_]] {
+            val x: Int = 1
+          }
+          """
+        );
+    }
+
+    private void assertNoTypeArgInIdentifier(String source) {
+        rewriteRun(
+          scala(
+            source,
+            spec -> spec.afterRecipe(cu -> {
+                java.util.List<String> identifierNames = new java.util.ArrayList<>();
+                new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                        identifierNames.add(identifier.getSimpleName());
+                        return super.visitIdentifier(identifier, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(identifierNames)
+                  .as("higher-kinded type-param brackets should not be crammed into an identifier name")
+                  .allSatisfy(name -> assertThat(name).doesNotContain("[", "]", "_"));
+            })
+          )
+        );
+    }
+
+    @Test
+    void significantCharactersInComments() {
+        // visitAppliedTypeTree — `[` in block comment between type constructor and type args
+        rewriteRun(
+          scala(
+            """
+              val xs: List /* [ */ [Int] = List(1)
+              """
           )
         );
     }

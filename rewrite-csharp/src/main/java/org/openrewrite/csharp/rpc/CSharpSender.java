@@ -19,12 +19,12 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.csharp.tree.CsDocComment;
+import org.openrewrite.csharp.tree.CsDocCommentRawComment;
 import org.openrewrite.csharp.tree.Linq;
 import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcSendQueue;
-
-import java.util.List;
 
 import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.Reference.getValueNonNull;
@@ -142,6 +142,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitPragmaChecksumDirective(Cs.PragmaChecksumDirective pragmaChecksumDirective, RpcSendQueue q) {
+        q.getAndSend(pragmaChecksumDirective, Cs.PragmaChecksumDirective::getKeywordSpacing, space -> visitSpace(space, q));
         q.getAndSend(pragmaChecksumDirective, Cs.PragmaChecksumDirective::getArguments);
         return pragmaChecksumDirective;
     }
@@ -152,6 +153,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(nullableDirective, Cs.NullableDirective::getTarget);
         q.getAndSend(nullableDirective, Cs.NullableDirective::getHashSpacing);
         q.getAndSend(nullableDirective, Cs.NullableDirective::getTrailingComment);
+        q.getAndSend(nullableDirective, Cs.NullableDirective::getKeywordSpacing);
         return nullableDirective;
     }
 
@@ -186,6 +188,8 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J visitPragmaWarningDirective(Cs.PragmaWarningDirective pragmaWarningDirective, RpcSendQueue q) {
         q.getAndSend(pragmaWarningDirective, Cs.PragmaWarningDirective::getAction);
+        q.getAndSend(pragmaWarningDirective, Cs.PragmaWarningDirective::getKeywordSpacing, space -> visitSpace(space, q));
+        q.getAndSend(pragmaWarningDirective, Cs.PragmaWarningDirective::getActionSpacing, space -> visitSpace(space, q));
         q.getAndSendList(pragmaWarningDirective, p -> p.getPadding().getWarningCodes(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         return pragmaWarningDirective;
     }
@@ -867,6 +871,43 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
+        }
+
+        @Override
+        public void visitSpace(Space space, RpcSendQueue q) {
+            q.getAndSendList(space, Space::getComments,
+                    c -> {
+                        if (c instanceof TextComment) {
+                            return ((TextComment) c).getText() + c.getSuffix();
+                        } else if (c instanceof CsDocCommentRawComment) {
+                            return ((CsDocCommentRawComment) c).getText() + c.getSuffix();
+                        } else if (c instanceof CsDocComment.DocComment) {
+                            // A structured doc comment is a proper tree, so it is keyed by its id
+                            // (like Javadoc.DocComment on the Java side) and decomposed over RPC.
+                            return ((CsDocComment.DocComment) c).getId();
+                        }
+                        throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
+                    },
+                    c -> {
+                        if (c instanceof CsDocComment.DocComment) {
+                            new CsDocCommentSender(delegate).visit((CsDocComment.DocComment) c, q);
+                        } else {
+                            if (c instanceof TextComment) {
+                                TextComment tc = (TextComment) c;
+                                q.getAndSend(tc, TextComment::isMultiline);
+                                q.getAndSend(tc, TextComment::getText);
+                            } else if (c instanceof CsDocCommentRawComment) {
+                                CsDocCommentRawComment dc = (CsDocCommentRawComment) c;
+                                q.getAndSend(dc, CsDocCommentRawComment::isMultiline);
+                                q.getAndSend(dc, CsDocCommentRawComment::getText);
+                            } else {
+                                throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
+                            }
+                            q.getAndSend(c, Comment::getSuffix);
+                            q.getAndSend(c, Comment::getMarkers);
+                        }
+                    });
+            q.getAndSend(space, Space::getWhitespace);
         }
     }
 }

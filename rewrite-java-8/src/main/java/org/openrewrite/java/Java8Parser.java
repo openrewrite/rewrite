@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeFactory;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
@@ -130,16 +131,17 @@ public class Java8Parser implements JavaParser {
 
                 Constructor<?> delegateParserConstructor = reloadableParser
                         .getDeclaredConstructor(Collection.class, Collection.class, Collection.class, Charset.class,
-                                Boolean.TYPE, Collection.class, JavaTypeCache.class);
+                                Boolean.TYPE, Collection.class, JavaTypeCache.class, JavaTypeFactory.class);
 
                 delegateParserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) delegateParserConstructor
-                        .newInstance(resolvedClasspath(), classBytesClasspath, dependsOn, charset, logCompilationWarningsAndErrors, styles, javaTypeCache);
+                        .newInstance(resolvedClasspath(), classBytesClasspath, dependsOn, charset, logCompilationWarningsAndErrors, styles, javaTypeCache, resolvedTypeFactory());
 
                 return new Java8Parser(delegate);
             } catch (Exception e) {
-                throw new IllegalStateException("Unable to construct Java8Parser.", e);
+                throw new IllegalStateException("Unable to construct Java8Parser. java.version: " + System.getProperty("java.version") + ", classpath: " + resolvedClasspath() +
+                                                "\nhttps://docs.openrewrite.org/reference/faq#im-getting-unable-to-construct-java21parser-or-similar-when-running-my-recipe-what-does-this-mean", e);
             }
         }
     }

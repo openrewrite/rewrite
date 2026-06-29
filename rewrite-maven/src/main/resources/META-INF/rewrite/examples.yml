@@ -16,7 +16,7 @@ type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.AddAnnotationProcessor
 examples:
 - description: '`AddAnnotationProcessorTest#addAnnotationProcessor`'
-  parameters:
+  parameters: &id001
   - org.projectlombok
   - lombok-mapstruct-binding
   - 0.2.0
@@ -69,6 +69,114 @@ examples:
                                   <groupId>org.projectlombok</groupId>
                                   <artifactId>lombok</artifactId>
                               </path>
+                              <path>
+                                  <groupId>org.projectlombok</groupId>
+                                  <artifactId>lombok-mapstruct-binding</artifactId>
+                                  <version>0.2.0</version>
+                              </path>
+                          </annotationProcessorPaths>
+                      </configuration>
+                  </plugin>
+              </plugins>
+          </build>
+      </project>
+    path: pom.xml
+    language: xml
+- description: '`SeparatedAggregatorAndParent#orphanModuleSharedLstWithExternalParent`'
+  parameters: *id001
+  sources:
+  - before: corp-parent
+    language: mavenProject
+  - before: service-module
+    language: mavenProject
+  - before: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.mycompany.platform</groupId>
+          <artifactId>corp-parent</artifactId>
+          <version>1.0.0</version>
+          <packaging>pom</packaging>
+          <dependencyManagement>
+              <dependencies>
+                  <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-dependencies</artifactId>
+                      <version>3.2.0</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                  </dependency>
+              </dependencies>
+          </dependencyManagement>
+          <build>
+              <pluginManagement>
+                  <plugins>
+                      <plugin>
+                          <groupId>org.apache.maven.plugins</groupId>
+                          <artifactId>maven-compiler-plugin</artifactId>
+                          <version>3.13.0</version>
+                      </plugin>
+                  </plugins>
+              </pluginManagement>
+          </build>
+      </project>
+    path: pom.xml
+    language: xml
+  - before: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <parent>
+              <groupId>com.mycompany.platform</groupId>
+              <artifactId>corp-parent</artifactId>
+              <version>1.0.0</version>
+          </parent>
+          <artifactId>service-module</artifactId>
+          <version>0.0.1-SNAPSHOT</version>
+          <dependencies>
+              <dependency>
+                  <groupId>org.projectlombok</groupId>
+                  <artifactId>lombok</artifactId>
+                  <version>1.18.44</version>
+                  <scope>provided</scope>
+              </dependency>
+              <dependency>
+                  <groupId>org.projectlombok</groupId>
+                  <artifactId>lombok-mapstruct-binding</artifactId>
+                  <version>0.2.0</version>
+                  <scope>provided</scope>
+              </dependency>
+          </dependencies>
+      </project>
+    after: |
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <parent>
+              <groupId>com.mycompany.platform</groupId>
+              <artifactId>corp-parent</artifactId>
+              <version>1.0.0</version>
+          </parent>
+          <artifactId>service-module</artifactId>
+          <version>0.0.1-SNAPSHOT</version>
+          <dependencies>
+              <dependency>
+                  <groupId>org.projectlombok</groupId>
+                  <artifactId>lombok</artifactId>
+                  <version>1.18.44</version>
+                  <scope>provided</scope>
+              </dependency>
+              <dependency>
+                  <groupId>org.projectlombok</groupId>
+                  <artifactId>lombok-mapstruct-binding</artifactId>
+                  <version>0.2.0</version>
+                  <scope>provided</scope>
+              </dependency>
+          </dependencies>
+          <build>
+              <plugins>
+                  <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <configuration>
+                          <annotationProcessorPaths>
                               <path>
                                   <groupId>org.projectlombok</groupId>
                                   <artifactId>lombok-mapstruct-binding</artifactId>
@@ -2462,6 +2570,87 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.ReproducibleBuilds
+examples:
+- description: '`ReproducibleBuildsTest#appliesEncodingAndOutputTimestamp`'
+  sources:
+  - before: |
+      <project>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+      </project>
+    after: |
+      <project>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+        <properties>
+          <project.build.outputTimestamp>1980-01-01T00:00:00Z</project.build.outputTimestamp>
+          <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+          <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        </properties>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.SortDependencies
+examples:
+- description: '`SortDependenciesTest#sortsByGroupIdThenArtifactId`'
+  sources:
+  - before: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.1</version>
+          </dependency>
+          <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>29.0-jre</version>
+          </dependency>
+          <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.13.0</version>
+          </dependency>
+        </dependencies>
+      </project>
+    after: |
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+        <dependencies>
+          <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.13.0</version>
+          </dependency>
+          <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>29.0-jre</version>
+          </dependency>
+          <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.1</version>
+          </dependency>
+        </dependencies>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.UpdateMavenProjectPropertyJavaVersion
 examples:
 - description: '`UpdateMavenProjectPropertyJavaVersionTest#basic`'
@@ -2945,6 +3134,31 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.maven.cleanup.AddProjectBuildOutputTimestamp
+examples:
+- description: '`AddProjectBuildOutputTimestampTest#addsDefaultTimestamp`'
+  parameters:
+  - 'null'
+  sources:
+  - before: |
+      <project>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+      </project>
+    after: |
+      <project>
+        <groupId>com.mycompany.app</groupId>
+        <artifactId>my-app</artifactId>
+        <version>1</version>
+        <properties>
+          <project.build.outputTimestamp>1980-01-01T00:00:00Z</project.build.outputTimestamp>
+        </properties>
+      </project>
+    path: pom.xml
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.maven.cleanup.ExplicitDependencyVersion
 examples:
 - description: '`ExplicitDependencyVersionTest#shouldReplaceLatestWithExplicitVersion`'
@@ -3210,12 +3424,6 @@ examples:
   sources:
   - before: |
       <project>
-        <groupId>org.openrewrite.example</groupId>
-        <artifactId>my-app</artifactId>
-        <version>1</version>
-      </project>
-    after: |
-      <!--~~(https://repo.maven.apache.org/maven2)~~>--><project>
         <groupId>org.openrewrite.example</groupId>
         <artifactId>my-app</artifactId>
         <version>1</version>

@@ -185,6 +185,154 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/877")
+    @Test
+    void isOfTypeIgnoringGenericsMatchesRawCollectionInvocation() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Collection;
+              import java.util.Map;
+              import java.util.Set;
+
+              class Main {
+                  Main(Map templates) {
+                      compileTemplates(templates.keySet(), templates.values());
+                  }
+
+                  private Set<String> compileTemplates(Set<String> compiledParam, Collection<String> toCheck) {
+                      return compiledParam;
+                  }
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                // `templates` is raw, so the call is an unchecked invocation: javac erases the
+                // result type of `compileTemplates` to raw `Set`, so the recorded usage is neither
+                // `==` nor `.equals` to the declaration, but it is the same method ignoring generics.
+                JavaType.Method declaration = methodType(cu, "compileTemplates");
+                JavaType.Method use = usedMethod(cu, "compileTemplates");
+                assertThat(declaration).isNotEqualTo(use);
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(declaration, use)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/877")
+    @Test
+    void isOfTypeIgnoringGenericsMatchesParameterizedMapInvocation() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Collection;
+              import java.util.Map;
+              import java.util.Set;
+
+              class Main {
+                  Main(Map<String, String> templates) {
+                      compileTemplates(templates.keySet(), templates.values());
+                  }
+
+                  private Set<String> compileTemplates(Set<String> compiledParam, Collection<String> toCheck) {
+                      return compiledParam;
+                  }
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                JavaType.Method declaration = methodType(cu, "compileTemplates");
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(declaration, usedMethod(cu, "compileTemplates"))).isTrue();
+            })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1536")
+    @Test
+    void isOfTypeIgnoringGenericsMatchesGenericOverloads() {
+        rewriteRun(
+          java(
+            """
+              public class TestClass {
+                  void method() {
+                      checkMethodInUse("String", "String");
+                  }
+
+                  private static void checkMethodInUse(String arg0, String arg1) {
+                  }
+
+                  private static <T> void checkMethodInUse(String arg0, T arg1) {
+                  }
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                var statements = cu.getClasses().get(0).getBody().getStatements();
+                JavaType.Method nonGenericOverload = ((J.MethodDeclaration) statements.get(1)).getMethodType();
+                JavaType.Method genericOverload = ((J.MethodDeclaration) statements.get(2)).getMethodType();
+                JavaType.Method use = usedMethod(cu, "checkMethodInUse");
+
+                // The call binds to the non-generic overload, but a use ignoring generics matches
+                // both overloads: the generic parameter `T` is treated as a wildcard. This keeps a
+                // generic method that is actually invoked from looking unused.
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(nonGenericOverload, use)).isTrue();
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(genericOverload, use)).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void isOfTypeIgnoringGenericsDistinguishesDifferentMethods() {
+        rewriteRun(
+          java(
+            """
+              class Main {
+                  void method() {
+                      a("x");
+                  }
+
+                  private void a(String s) {
+                  }
+
+                  private void a(Integer i) {
+                  }
+
+                  private void b(String s) {
+                  }
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                var statements = cu.getClasses().get(0).getBody().getStatements();
+                JavaType.Method aString = ((J.MethodDeclaration) statements.get(1)).getMethodType();
+                JavaType.Method aInteger = ((J.MethodDeclaration) statements.get(2)).getMethodType();
+                JavaType.Method b = ((J.MethodDeclaration) statements.get(3)).getMethodType();
+                JavaType.Method use = usedMethod(cu, "a");
+
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(aString, use)).isTrue();
+                // Differing parameter type and differing name are not matched.
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(aInteger, use)).isFalse();
+                assertThat(TypeUtils.isOfTypeIgnoringGenerics(b, use)).isFalse();
+            })
+          )
+        );
+    }
+
+    private static JavaType.Method methodType(J.CompilationUnit cu, String name) {
+        return cu.getClasses().get(0).getBody().getStatements().stream()
+          .filter(J.MethodDeclaration.class::isInstance)
+          .map(J.MethodDeclaration.class::cast)
+          .map(J.MethodDeclaration::getMethodType)
+          .filter(m -> m != null && name.equals(m.getName()))
+          .findFirst()
+          .orElseThrow(() -> new AssertionError("No method declaration named " + name));
+    }
+
+    private static JavaType.Method usedMethod(J.CompilationUnit cu, String name) {
+        return cu.getTypesInUse().getUsedMethods().stream()
+          .filter(m -> name.equals(m.getName()))
+          .findFirst()
+          .orElseThrow(() -> new AssertionError("No used method named " + name));
+    }
+
     @Test
     void arrayIsFullyQualifiedOfType() {
         rewriteRun(

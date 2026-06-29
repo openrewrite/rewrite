@@ -35,6 +35,9 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 public class RecipeMarketplaceWriter {
+    private static final Comparator<List<String>> CSV_ROW_COMPARATOR = Comparator
+            .comparing(RecipeMarketplaceWriter::toCsvRow);
+
     private static final Set<String> EXCLUDED_DATA_TABLES = new HashSet<>(Arrays.asList(
             "org.openrewrite.table.SearchResults",
             "org.openrewrite.table.SourcesFileResults",
@@ -60,10 +63,7 @@ public class RecipeMarketplaceWriter {
     }
 
     public void toCsv(RecipeMarketplace marketplace, Writer writer) {
-        CsvWriterSettings settings = new CsvWriterSettings();
-        settings.getFormat().setLineSeparator("\n");
-
-        CsvWriter csv = new CsvWriter(writer, settings);
+        CsvWriter csv = new CsvWriter(writer, csvWriterSettings());
 
         try {
             int maxCategoryDepth = calculateMaxCategoryDepth(marketplace.getRoot(), -1) + 1;
@@ -115,18 +115,23 @@ public class RecipeMarketplaceWriter {
             }
 
             csv.writeHeaders(headers);
-            writeCsvRecursive(csv, marketplace.getRoot(), emptyList(), emptyList(),
+            List<List<String>> rows = new ArrayList<>();
+            collectRowsRecursive(rows, marketplace.getRoot(), emptyList(), emptyList(),
                     maxCategoryDepth, hasOptions, hasDataTables, hasTeam, hasVersion, hasCategoryDescription, metadataKeys);
+            rows.sort(CSV_ROW_COMPARATOR);
+            for (List<String> row : rows) {
+                csv.writeRow(row.toArray(new String[0]));
+            }
         } finally {
             csv.close();
         }
     }
 
-    private void writeCsvRecursive(CsvWriter csv, RecipeMarketplace.Category category,
-                                   List<String> categoryPath, List<String> categoryDescriptionPath,
-                                   int maxCategoryDepth, boolean hasOptions, boolean hasDataTables, boolean hasTeam,
-                                   boolean hasVersion, boolean hasCategoryDescription,
-                                   List<String> metadataKeys) {
+    private void collectRowsRecursive(List<List<String>> rows, RecipeMarketplace.Category category,
+                                      List<String> categoryPath, List<String> categoryDescriptionPath,
+                                      int maxCategoryDepth, boolean hasOptions, boolean hasDataTables, boolean hasTeam,
+                                      boolean hasVersion, boolean hasCategoryDescription,
+                                      List<String> metadataKeys) {
         for (RecipeListing recipe : category.getRecipes()) {
             List<String> row = new ArrayList<>();
             RecipeBundle bundle = recipe.getBundle();
@@ -183,7 +188,7 @@ public class RecipeMarketplaceWriter {
                 row.add(dataTablesToJson(recipe.getDataTables()));
             }
 
-            csv.writeRow(row.toArray(new String[0]));
+            rows.add(row);
         }
 
         for (RecipeMarketplace.Category child : category.getCategories()) {
@@ -191,9 +196,23 @@ public class RecipeMarketplaceWriter {
             childPath.add(0, child.getDisplayName());
             List<String> childDescriptionPath = new ArrayList<>(categoryDescriptionPath);
             childDescriptionPath.add(0, child.getDescription());
-            writeCsvRecursive(csv, child, childPath, childDescriptionPath, maxCategoryDepth, hasOptions, hasDataTables,
+            collectRowsRecursive(rows, child, childPath, childDescriptionPath, maxCategoryDepth, hasOptions, hasDataTables,
                     hasTeam, hasVersion, hasCategoryDescription, metadataKeys);
         }
+    }
+
+    private static CsvWriterSettings csvWriterSettings() {
+        CsvWriterSettings settings = new CsvWriterSettings();
+        settings.getFormat().setLineSeparator("\n");
+        return settings;
+    }
+
+    private static String toCsvRow(List<String> row) {
+        StringWriter writer = new StringWriter();
+        CsvWriter csv = new CsvWriter(writer, csvWriterSettings());
+        csv.writeRow(row.toArray(new String[0]));
+        csv.close();
+        return writer.toString();
     }
 
     private String optionsToJson(List<OptionDescriptor> options) {
@@ -309,4 +328,5 @@ public class RecipeMarketplaceWriter {
         }
         return new ArrayList<>(keys);
     }
+
 }

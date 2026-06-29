@@ -1545,3 +1545,39 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
     private RoslynFormatter.DeferredFormatVisitor<P>? _deferredFormat;
 }
+
+/// <summary>
+/// Adapts a generic <see cref="TreeVisitor{J,P}"/> as a <see cref="CSharpVisitor{P}"/>.
+/// Returned by <see cref="TreeVisitor{T,P}.Adapt"/> when a Cs node is visited by a non-CSharp
+/// visitor (including a bare <see cref="TreeVisitor{J,P}"/> or a plain <see cref="JavaVisitor{P}"/>
+/// whose switch would throw on Cs types). The wrapper IS-A CSharpVisitor so the C#-specific
+/// Accept switch runs and child traversal uses the right defaults; <see cref="Visit"/> and
+/// <see cref="TreeVisitor{T,P}.Cursor"/> are forwarded to the wrapped visitor so user-defined
+/// PreVisit / PostVisit / DefaultValue / cursor state still drive the traversal.
+/// </summary>
+internal sealed class TreeVisitorAsCSharpVisitor<P> : CSharpVisitor<P>
+{
+    private readonly TreeVisitor<J, P> _wrapped;
+
+    public TreeVisitorAsCSharpVisitor(TreeVisitor<J, P> wrapped) => _wrapped = wrapped;
+
+    public override Cursor Cursor
+    {
+        get => _wrapped.Cursor;
+        set => _wrapped.Cursor = value;
+    }
+
+    public override J? Visit(Tree? tree, P p) => _wrapped.Visit(tree, p);
+}
+
+internal static class CSharpVisitorAdapterInit
+{
+    [System.Runtime.CompilerServices.ModuleInitializer]
+    internal static void Init()
+    {
+        TreeVisitorAdapterRegistry.Register(
+            treeType: typeof(Cs),
+            openLangVisitorType: typeof(CSharpVisitor<>),
+            openAdapterType: typeof(TreeVisitorAsCSharpVisitor<>));
+    }
+}

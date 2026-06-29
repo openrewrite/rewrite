@@ -19,6 +19,8 @@ import {Cursor, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
 import {MarkersKind, SearchResult} from "../../markers";
 import {Visit} from "./visit";
+import {ExecutionContext} from "../../execution";
+import {DATA_TABLE_STORE, DataTableStore} from "../../data-table";
 import {withMetrics} from "./metrics";
 
 export interface BatchVisitItem {
@@ -67,6 +69,7 @@ export class BatchVisit {
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string, sourceFileType?: string) => any,
                   getCursor: (cursorIds: string[] | undefined, sourceFileType?: string) => Promise<Cursor>,
+                  dataTableStore: () => DataTableStore | undefined,
                   metricsCsv?: string): void {
         connection.onRequest(
             new rpc.RequestType<BatchVisitRequest, BatchVisitResponse, Error>("BatchVisit"),
@@ -75,6 +78,10 @@ export class BatchVisit {
                 metricsCsv,
                 (_context) => async (request) => {
                     const p = await getObject(request.p, undefined);
+                    const store = dataTableStore();
+                    if (store && p instanceof ExecutionContext) {
+                        p.messages[DATA_TABLE_STORE] = store;
+                    }
                     let tree: Tree = await getObject(request.treeId, request.sourceFileType);
                     const cursor = await getCursor(request.cursor, request.sourceFileType);
 
@@ -86,10 +93,23 @@ export class BatchVisit {
                         const visitor = await Visit.instantiateVisitor(
                             {visitor: item.visitor, visitorOptions: item.visitorOptions},
                             preparedRecipes, recipeCursors, p);
+                        // Snapshot ctx message keys so we can flag whether
+                        // the visitor put anything new into the context.
+                        const preKeys = new Set<string | symbol>(
+                            Reflect.ownKeys(p.messages) as (string | symbol)[]
+                        );
                         const after = await visitor.visit(tree, p, cursor);
 
                         const modified = after !== tree;
                         const deleted = after == null;
+
+                        let hasNewMessages = false;
+                        for (const k of Reflect.ownKeys(p.messages)) {
+                            if (!preKeys.has(k)) {
+                                hasNewMessages = true;
+                                break;
+                            }
+                        }
 
                         // Diff SearchResult IDs against the running set
                         let searchResultIds: string[];
@@ -101,7 +121,7 @@ export class BatchVisit {
                             for (const id of searchResultIds) knownIds.add(id);
                         }
 
-                        results.push({modified, deleted, hasNewMessages: false, searchResultIds});
+                        results.push({modified, deleted, hasNewMessages, searchResultIds});
 
                         if (deleted) {
                             localObjects.delete(request.treeId);

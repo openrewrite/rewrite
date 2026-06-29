@@ -21,11 +21,10 @@ import org.openrewrite.internal.StringUtils;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Optional;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public interface VersionComparator extends Comparator<String> {
-    Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?<qualifier>[-.+].*?$)?");
+    Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.\\d+)*(?<qualifier>[-.+].*?$)?");
     String[] RELEASE_SUFFIXES = new String[]{".final", ".ga", ".release"};
     Pattern PRE_RELEASE_ENDING = Pattern.compile("[.-](alpha|a|beta|b|milestone|m|rc|cr|snapshot)[.-]?\\d*$", Pattern.CASE_INSENSITIVE);
 
@@ -57,16 +56,16 @@ public interface VersionComparator extends Comparator<String> {
     }
 
     static boolean checkVersion(String version, @Nullable String metadataPattern, boolean requireRelease) {
-        Matcher matcher = VersionComparator.RELEASE_PATTERN.matcher(version);
-        if (!matcher.matches()) {
+        ParsedVersion parsed = ParsedVersion.parse(version);
+        if (!parsed.matches()) {
             return false;
         }
-        if (requireRelease && PRE_RELEASE_ENDING.matcher(version).find()) {
+        if (requireRelease && parsed.isPreReleaseEnding()) {
             return false;
         }
 
         boolean requireMeta = !StringUtils.isNullOrEmpty(metadataPattern);
-        String versionMeta = matcher.group("qualifier");
+        String versionMeta = parsed.qualifier();
         if (requireMeta) {
             return versionMeta != null && versionMeta.matches(metadataPattern);
         } else if (versionMeta == null) {

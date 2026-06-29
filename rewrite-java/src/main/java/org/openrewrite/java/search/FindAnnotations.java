@@ -58,20 +58,27 @@ public class FindAnnotations extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern, matchMetaAnnotations);
-        return Preconditions.check(
-                new JavaIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public J preVisit(J tree, ExecutionContext ctx) {
-                        stopAfterPreVisit();
-                        JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                        for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
-                            if (annotationMatcher.matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(type))) {
-                                return SearchResult.found(cu);
-                            }
-                        }
-                        return tree;
+        TreeVisitor<?, ExecutionContext> precondition = new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J preVisit(J tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                    if (annotationMatcher.matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(type))) {
+                        return SearchResult.found(cu);
                     }
-                },
+                }
+                return tree;
+            }
+        };
+
+        // In meta-annotation mode the matched type need not literally appear in a file (it can be
+        // reached transitively), so only require the annotation type's use when matching directly.
+        if (!Boolean.TRUE.equals(matchMetaAnnotations)) {
+            precondition = Preconditions.and(new UsesType<>(annotationMatcher.getAnnotationName(), true), precondition);
+        }
+
+        return Preconditions.check(precondition,
                 new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {

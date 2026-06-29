@@ -100,6 +100,123 @@ class ControlFlowTest implements RewriteTest {
     }
     
     @Test
+    void ifElseExpressionLiteralOperands() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val flag = true
+                  val result = if (flag) "yes" else "no"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void ifElseExpressionIdentifierOperands() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val a = 1
+                  val b = 2
+                  val flag = true
+                  val picked = if (flag) a else b
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void returnWithIfExpression() {
+        rewriteRun(
+            scala(
+                """
+                class Calc {
+                  def pick(flag: Boolean): Int = {
+                    return if (flag) 1 else 2
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void assignmentWithIfExpression() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  var x = 0
+                  val flag = true
+                  x = if (flag) 1 else 2
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void binaryOpWithIfExpressionOperand() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val flag = true
+                  val sum = 10 + (if (flag) 1 else 2)
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void tupleWithIfExpressionElements() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val flag = true
+                  val pair = (if (flag) 1 else 2, if (flag) "a" else "b")
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void throwWithIfExpression() {
+        rewriteRun(
+            scala(
+                """
+                class Check {
+                  def verify(flag: Boolean): Unit = {
+                    throw (if (flag) new RuntimeException("a") else new IllegalArgumentException("b"))
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void whileWithUnitBody() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  var i = 0
+                  while (i < 10) { i += 1 }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void ifElseIfElse() {
         rewriteRun(
             scala(

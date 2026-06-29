@@ -79,7 +79,7 @@ public class RecipeMarketplace {
             for (Category subCategory : category.categories) {
                 Category existingSubCategory = null;
                 for (Category c : categories) {
-                    if (c.getDisplayName().equals(subCategory.getDisplayName())) {
+                    if (c.getDisplayName().equalsIgnoreCase(subCategory.getDisplayName())) {
                         existingSubCategory = c;
                         break;
                     }
@@ -87,7 +87,9 @@ public class RecipeMarketplace {
                 if (existingSubCategory != null) {
                     existingSubCategory.merge(subCategory);
                 } else {
-                    categories.add(subCategory);
+                    Category copy = new Category(subCategory.displayName, subCategory.description);
+                    copy.merge(subCategory);
+                    categories.add(copy);
                 }
             }
         }
@@ -154,7 +156,7 @@ public class RecipeMarketplace {
 
         private Category findOrCreateCategory(CategoryDescriptor categoryDescriptor) {
             for (Category category : categories) {
-                if (category.getDisplayName().equals(categoryDescriptor.getDisplayName())) {
+                if (category.getDisplayName().equalsIgnoreCase(categoryDescriptor.getDisplayName())) {
                     return category;
                 }
             }

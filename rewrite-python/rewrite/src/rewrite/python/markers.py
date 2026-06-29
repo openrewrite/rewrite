@@ -6,42 +6,31 @@ from typing import Optional, List, Dict
 from uuid import UUID
 
 from rewrite import Marker
+from rewrite.utils import replace_if_changed
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class KeywordArguments(Marker):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> 'KeywordArguments':
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class KeywordOnlyArguments(Marker):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> 'KeywordOnlyArguments':
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class Quoted(Marker):
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> Quoted:
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
     _style: Style
 
@@ -75,20 +64,56 @@ class Quoted(Marker):
             return ""
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class SuppressNewline(Marker):
     """Marker to suppress trailing newline in compilation units."""
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> 'SuppressNewline':
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
+class LegacyNotEqual(Marker):
+    """Marker for the Python 2 ``<>`` not-equal operator on a :class:`j.Binary`.
+
+    The default printer renders ``Binary.Type.NotEqual`` as ``!=``; when
+    this marker is present it emits the legacy ``<>`` spelling instead.
+    """
+    _id: UUID
+
+    def with_id(self, id_: UUID) -> 'LegacyNotEqual':
+        return replace_if_changed(self, _id=id_)
+
+
+@dataclass(frozen=True, eq=False, slots=True)
+class RaiseTuple(Marker):
+    """Marker for the Python 2 three-argument ``raise E, v, tb`` form on a :class:`j.Throw`.
+
+    The exception slot of the Throw is a tuple literal of the three operands;
+    when this marker is present the printer drops the parentheses and renders
+    the legacy comma-separated form instead.
+    """
+    _id: UUID
+
+    def with_id(self, id_: UUID) -> 'RaiseTuple':
+        return replace_if_changed(self, _id=id_)
+
+
+@dataclass(frozen=True, eq=False, slots=True)
+class TupleExceptClause(Marker):
+    """Marker for the Python 2 ``except E, e:`` (comma) form on a J.Try.Catch.
+
+    The default printer renders the catch as ``except E as e:``; when this
+    marker is present it should emit the Py2 comma-based syntax instead.
+    """
+    _id: UUID
+
+    def with_id(self, id_: UUID) -> 'TupleExceptClause':
+        return replace_if_changed(self, _id=id_)
+
+
+@dataclass(frozen=True, eq=False, slots=True)
 class PrintSyntax(Marker):
     """Marker indicating a J.MethodInvocation represents a Python 2 print statement.
 
@@ -101,12 +126,8 @@ class PrintSyntax(Marker):
     _has_destination: bool
     _trailing_comma: bool
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> 'PrintSyntax':
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
     @property
     def has_destination(self) -> bool:
@@ -123,7 +144,7 @@ class PrintSyntax(Marker):
         return self if trailing_comma is self._trailing_comma else replace(self, _trailing_comma=trailing_comma)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class ExecSyntax(Marker):
     """Marker indicating a J.MethodInvocation represents a Python 2 exec statement.
 
@@ -134,15 +155,11 @@ class ExecSyntax(Marker):
     """
     _id: UUID
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> 'ExecSyntax':
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
 
-@dataclass(frozen=True, eq=False)
+@dataclass(frozen=True, eq=False, slots=True)
 class PythonResolutionResult(Marker):
     """Contains metadata about a Python project, parsed from pyproject.toml and uv.lock."""
 
@@ -153,7 +170,7 @@ class PythonResolutionResult(Marker):
         Poetry = auto()
         Pdm = auto()
 
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class SourceIndex:
         _name: str
         _url: str
@@ -180,7 +197,7 @@ class PythonResolutionResult(Marker):
         def with_default_index(self, default_index: bool) -> PythonResolutionResult.SourceIndex:
             return self if default_index is self._default_index else replace(self, _default_index=default_index)
 
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class ResolvedDependency:
         _name: str
         _version: str
@@ -215,7 +232,7 @@ class PythonResolutionResult(Marker):
         def with_dependencies(self, dependencies: Optional[List[PythonResolutionResult.ResolvedDependency]]) -> PythonResolutionResult.ResolvedDependency:
             return self if dependencies is self._dependencies else replace(self, _dependencies=dependencies)
 
-    @dataclass(frozen=True, eq=False)
+    @dataclass(frozen=True, eq=False, slots=True)
     class Dependency:
         _name: str
         _version_constraint: Optional[str]
@@ -276,12 +293,8 @@ class PythonResolutionResult(Marker):
     _package_manager: Optional[PackageManager]
     _source_indexes: Optional[List[SourceIndex]]
 
-    @property
-    def id(self) -> UUID:
-        return self._id
-
     def with_id(self, id_: UUID) -> PythonResolutionResult:
-        return self if id_ is self._id else replace(self, _id=id_)
+        return replace_if_changed(self, _id=id_)
 
     @property
     def name(self) -> Optional[str]:

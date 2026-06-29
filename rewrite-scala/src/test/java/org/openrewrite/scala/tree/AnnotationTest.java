@@ -16,11 +16,17 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
-public class AnnotationTest implements RewriteTest {
+class AnnotationTest implements RewriteTest {
     
     @Test
     void simpleAnnotation() {
@@ -111,11 +117,250 @@ public class AnnotationTest implements RewriteTest {
     }
     
     @Test
+    void annotationWithArrayArgumentMultiline() {
+        rewriteRun(
+            scala(
+                """
+                @SuppressWarnings(
+                  Array(
+                    "a", "b"
+                  )
+                )
+                val x = 1
+                """
+            )
+        );
+    }
+
+    @Test
     void annotationOnParameter() {
         rewriteRun(
             scala(
                 """
                 def process(@unchecked value: Any): Unit = {}
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeLazyVal() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @JsonIgnore
+                  lazy val schema: String = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeFinalClass() {
+        rewriteRun(
+            scala(
+                """
+                @SerialVersionUID(1L)
+                final class Box(val x: Int)
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeOverrideDef() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @Override
+                  override def toString: String = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforePrivateVal() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @JsonIgnore
+                  private val secret: String = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeSealedTrait() {
+        rewriteRun(
+            scala(
+                """
+                @SerialVersionUID(1L)
+                sealed trait Status
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeObject() {
+        rewriteRun(
+            scala(
+                """
+                @deprecated
+                object Marker
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnSameLineBeforeObject() {
+        rewriteRun(
+            scala(
+                """
+                @deprecated object Marker
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeCaseObject() {
+        rewriteRun(
+            scala(
+                """
+                @SerialVersionUID(1L)
+                case object Marker
+                """
+            )
+        );
+    }
+
+    @Test
+    void multipleAnnotationsBeforeLazyVal() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @JsonIgnore
+                  @transient
+                  lazy val schema: String = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnTypeArgument() {
+        rewriteRun(
+            scala(
+                """
+                class Box[A]
+                trait Test {
+                  def f: Box[Int @deprecated]
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnReturnType() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f: String @deprecated = "x"
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void annotationOnMethodParameterType() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def f(x: Int @deprecated): Unit = ()
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void qualifiedAnnotationName() {
+        rewriteRun(
+            scala(
+                """
+                @scala.annotation.implicitNotFound("msg")
+                trait Foo[T]
+                """
+            )
+        );
+    }
+
+    @Test
+    void throwsAnnotationTypeArgNotInIdentifier() {
+        assertNoTypeArgInIdentifier(
+            """
+            @throws[Exception]
+            def riskyMethod(): Unit = {}
+            """
+        );
+    }
+
+    @Test
+    void throwsAnnotationWithTypeArgAndValueArgNotInIdentifier() {
+        assertNoTypeArgInIdentifier(
+            """
+            @throws[IllegalArgumentException]("Invalid argument")
+            def validate(x: Int): Unit = {}
+            """
+        );
+    }
+
+    private void assertNoTypeArgInIdentifier(String source) {
+        rewriteRun(
+            scala(
+                source,
+                spec -> spec.afterRecipe(cu -> {
+                    List<String> identifierNames = new ArrayList<>();
+                    new JavaIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                            identifierNames.add(identifier.getSimpleName());
+                            return super.visitIdentifier(identifier, p);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(identifierNames)
+                      .as("type-arg source text should not be crammed into an identifier name")
+                      .allSatisfy(name -> assertThat(name).doesNotContain("[", "@"));
+                })
+            )
+        );
+    }
+
+    @Test
+    void annotationOnOwnLineBeforeImplicitVal() {
+        rewriteRun(
+            scala(
+                """
+                class Test {
+                  @JsonIgnore
+                  implicit val schema: String = "x"
+                }
                 """
             )
         );

@@ -30,6 +30,19 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void numericLiteralsWithUnderscoreSeparator() {
+        rewriteRun(
+          scala(
+            """
+            val i = 60_000
+            val l = 1_000_000L
+            val d = 3.141_592
+            """
+          )
+        );
+    }
+
+    @Test
     void hexLiteral() {
         rewriteRun(
           scala("0xFF")
@@ -82,6 +95,21 @@ class LiteralTest implements RewriteTest {
     void stringLiteral() {
         rewriteRun(
           scala("\"hello\"")
+        );
+    }
+
+    @Test
+    void stringLiteralContainingTripleQuestionMark() {
+        // The `???` content must not be mistaken for the compiler-synthetic Predef.???
+        // placeholder and dropped from the block's trailing expression.
+        rewriteRun(
+          scala(
+            """
+            val code = {
+              "???"
+            }
+            """
+          )
         );
     }
 

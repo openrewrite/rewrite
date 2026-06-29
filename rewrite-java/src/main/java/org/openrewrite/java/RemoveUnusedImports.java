@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.java.internal.PackageNameUtils;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
@@ -66,12 +67,16 @@ public class RemoveUnusedImports extends Recipe {
             ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, cu))
                     .orElse(IntelliJ.importLayout());
             String sourcePackage = cu.getPackageDeclaration() == null ? "" :
-                    cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
+                    PackageNameUtils.getPackageName(cu.getPackageDeclaration());
             Map<String, TreeSet<String>> methodsAndFieldsByTypeName = new HashMap<>();
             Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
 
             // Collect all unqualified type references upfront for efficiency
             Set<String> unqualifiedTypeNames = collectUnqualifiedTypeNames(cu);
+
+            // Collect all identifier simple names from source (excluding imports) to detect
+            // types that only appear in type attribution but not in actual source references
+            Set<String> sourceIdentifierNames = collectSourceIdentifierNames(cu);
 
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
                 if (method.hasFlags(Flag.Static)) {
@@ -220,7 +225,12 @@ public class RemoveUnusedImports extends Recipe {
                             .filter(fq -> fq.getOwningClass() == null || !topLevelTypeNames.contains(fq.getOwningClass().getFullyQualifiedName()))
                             .collect(toSet());
                     JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
-                    if (combinedTypes.isEmpty() || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
+                    boolean noEvidenceOfUse = combinedTypes.isEmpty() &&
+                            !unqualifiedTypeNames.contains(elem.getTypeName()) &&
+                            !sourceIdentifierNames.contains(qualid.getSimpleName());
+                    boolean shadowedBySourcePackage = sourcePackage.equals(elem.getPackageName()) &&
+                            qualidType != null && !qualidType.getFullyQualifiedName().contains("$");
+                    if (noEvidenceOfUse || shadowedBySourcePackage) {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(elem.getQualid().getSimpleName())) {
@@ -257,12 +267,16 @@ public class RemoveUnusedImports extends Recipe {
                         } else {
                             usedWildcardImports.add(target);
                         }
-                    } else if (combinedTypes.stream().noneMatch(c -> {
-                        if ("*".equals(elem.getQualid().getSimpleName())) {
-                            return elem.getPackageName().equals(c.getPackageName());
-                        }
-                        return fullyQualifiedNamesAreEqual(c.getFullyQualifiedName(), elem.getTypeName());
-                    })) {
+                    } else if (!sourceIdentifierNames.contains(qualid.getSimpleName())) {
+                        // The imported type's simple name doesn't appear anywhere in the source code;
+                        // it only appears in type attribution (e.g., as a parameter type of a statically imported method)
+                        anImport.used = false;
+                        changed = true;
+                    } else if (!combinedTypes.isEmpty() &&
+                            combinedTypes.stream().noneMatch(c -> fullyQualifiedNamesAreEqual(c.getFullyQualifiedName(), elem.getTypeName())) &&
+                            !unqualifiedTypeNames.contains(elem.getTypeName())) {
+                        // Empty combinedTypes means type attribution is partial; the simple-name check
+                        // above is the only reliable signal, so keep the import.
                         anImport.used = false;
                         changed = true;
                     }
@@ -506,6 +520,25 @@ public class RemoveUnusedImports extends Recipe {
                         cursor = cursor.getParent();
                     }
                     return false;
+                }
+            }.reduce(cu, new HashSet<>());
+        }
+
+        /**
+         * Collect all identifier simple names appearing in source code, excluding import statements.
+         * Used to detect imports whose type name doesn't actually appear in the source.
+         */
+        private Set<String> collectSourceIdentifierNames(J.CompilationUnit cu) {
+            return new JavaIsoVisitor<Set<String>>() {
+                @Override
+                public J.Import visitImport(J.Import import_, Set<String> names) {
+                    return import_;
+                }
+
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
+                    names.add(identifier.getSimpleName());
+                    return super.visitIdentifier(identifier, names);
                 }
             }.reduce(cu, new HashSet<>());
         }

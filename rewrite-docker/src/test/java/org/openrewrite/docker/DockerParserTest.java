@@ -87,6 +87,22 @@ class DockerParserTest implements RewriteTest {
     }
 
     @Test
+    void caseInsensitiveInstructions() {
+        rewriteRun(
+          docker(
+            """
+              from ubuntu:20.04
+              run apt-get update
+              copy app.jar /app/
+              Env MY_VAR=value
+              expose 8080
+              Cmd ["./app"]
+              """
+          )
+        );
+    }
+
+    @Test
     void multipleJsonArrayWhitespaceStyles() {
         // Test different whitespace styles in JSON arrays are preserved
         rewriteRun(

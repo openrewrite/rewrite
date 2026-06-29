@@ -733,7 +733,7 @@ export class JavaScriptParserVisitor {
                 )),
                 end: this.prefix(node.getLastToken()!)
             },
-            type: this.mapType(node)
+            type: this.mapDeclarationType(node)
         };
     }
 
@@ -1073,6 +1073,10 @@ export class JavaScriptParserVisitor {
         let annotationType: NameTree | TypeTree;
         let _arguments: J.Container<Expression> | undefined = undefined;
 
+        // The identifier/qualified name that names the decorator — the call target for
+        // `@Entity()` / `@Entity<T>()`, or the bare reference for `@Entity`.
+        const nameNode = ts.isCallExpression(node.expression) ? node.expression.expression : node.expression;
+
         if (ts.isCallExpression(node.expression) && node.expression.typeArguments) {
             annotationType = {
                 kind: JS.Kind.ExpressionWithTypeArguments,
@@ -1094,6 +1098,16 @@ export class JavaScriptParserVisitor {
             annotationType = this.mapTypeTree(node.expression);
         } else {
             return this.visitUnknown(node);
+        }
+
+        // Attribute the decorator's fully qualified type (e.g. `typeorm.Entity`) so it is matchable
+        // by name, like Java annotations — rather than the generic function type of the decorator
+        // factory that the callee identifier otherwise resolves to.
+        const type = this.mapAnnotationType(nameNode);
+        if (type) {
+            // Identifier, FieldAccess and ExpressionWithTypeArguments (the decorator name forms)
+            // all declare an optional `type`; cast through `unknown` since the union itself does not.
+            annotationType = {...annotationType, type} as unknown as NameTree | TypeTree;
         }
 
         return {
@@ -1208,6 +1222,7 @@ export class JavaScriptParserVisitor {
             nameAnnotations: [],
             name: name,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             methodType: methodType
         };
     }
@@ -1259,6 +1274,7 @@ export class JavaScriptParserVisitor {
             nameAnnotations: [],
             name: name as J.Identifier,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             body: node.body && this.convert<J.Block>(node.body),
             methodType: methodType
         };
@@ -1331,6 +1347,7 @@ export class JavaScriptParserVisitor {
             nameAnnotations: [],
             name: {...this.mapIdentifier(constructorKeyword, constructorKeyword.getText(), false), type: methodType},
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             body: node.body && this.convert<J.Block>(node.body),
             methodType: methodType
         };
@@ -1366,6 +1383,7 @@ export class JavaScriptParserVisitor {
             nameAnnotations: [],
             name: name as J.Identifier,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             body: node.body && this.convert<J.Block>(node.body),
             methodType: methodType
         };
@@ -1399,6 +1417,7 @@ export class JavaScriptParserVisitor {
             nameAnnotations: [],
             name: name as J.Identifier,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             body: node.body && this.convert<J.Block>(node.body),
             methodType: methodType
         };
@@ -1426,6 +1445,7 @@ export class JavaScriptParserVisitor {
                 type: methodType
             },
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             methodType: methodType
         };
     }
@@ -1452,6 +1472,7 @@ export class JavaScriptParserVisitor {
                 type: methodType
             },
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             methodType: methodType
         };
     }
@@ -2723,7 +2744,7 @@ export class JavaScriptParserVisitor {
                     })),
                     end: this.prefix(node.getLastToken()!)
                 },
-                type: this.mapType(node)
+                type: this.mapDeclarationType(node)
             } satisfies J.ClassDeclaration as J.ClassDeclaration,
         }
     }
@@ -3366,6 +3387,7 @@ export class JavaScriptParserVisitor {
             typeParameters: this.mapTypeParametersAsObject(node),
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             returnTypeExpression: this.mapTypeInfo(node),
+            dimensionsAfterName: [],
             body: node.body && this.convert<J.Block>(node.body),
             methodType: methodType
         };
@@ -3414,7 +3436,7 @@ export class JavaScriptParserVisitor {
                 })),
                 end: this.prefix(node.getLastToken()!)
             },
-            type: this.mapType(node)
+            type: this.mapDeclarationType(node)
         };
     }
 
@@ -3475,7 +3497,7 @@ export class JavaScriptParserVisitor {
                     emptySpace)],
                 end: this.prefix(node.getLastToken()!)
             },
-            type: this.mapType(node) as Type.Class
+            type: this.mapDeclarationType(node) as Type.Class
         };
     }
 
@@ -4427,6 +4449,10 @@ export class JavaScriptParserVisitor {
         return this.typeMapping?.type(node);
     }
 
+    private mapDeclarationType(node: ts.ClassDeclaration | ts.ClassExpression | ts.InterfaceDeclaration | ts.EnumDeclaration): Type.FullyQualified | undefined {
+        return this.typeMapping?.declarationType(node);
+    }
+
     private mapPrimitiveType(node: ts.Node): Type.Primitive {
         return this.typeMapping?.primitiveType(node) ?? Type.Primitive.None;
     }
@@ -4437,6 +4463,10 @@ export class JavaScriptParserVisitor {
 
     private mapMethodType(node: ts.Node): Type.Method | undefined {
         return this.typeMapping?.methodType(node);
+    }
+
+    private mapAnnotationType(node: ts.Node): Type.FullyQualified | undefined {
+        return this.typeMapping?.annotationType(node);
     }
 
     private mapCommaSeparatedList<T extends J>(nodes: readonly ts.Node[]): J.Container<T> {

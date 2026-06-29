@@ -79,6 +79,15 @@ public class AnnotationMatcher {
         this(signature, false);
     }
 
+    /**
+     * @return The annotation type pattern this matcher was constructed with, without the leading
+     * {@code @} or any parameter constraints (e.g. {@code java.lang.SuppressWarnings}). Suitable for
+     * use as a {@link org.openrewrite.java.search.UsesType} pattern.
+     */
+    public String getAnnotationName() {
+        return match.annotationName().getText();
+    }
+
     public boolean matches(J.Annotation annotation) {
         return matchesAnnotationName(annotation) &&
                matchesSingleParameter(annotation) &&
