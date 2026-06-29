@@ -135,6 +135,11 @@ type server struct {
 	registry  *recipe.Registry
 	installer *installer.Installer
 
+	// recipeOrigin maps a recipe name to the package that contributed it,
+	// recorded at install time and read by GetMarketplace so each row is
+	// attributed to its own bundle on the host.
+	recipeOrigin map[string]string
+
 	// recipeWorkspaceCleanup removes the temp recipe install dir created
 	// when --recipe-install-dir was not supplied. Nil when the caller
 	// provided the path (in which case lifetime is the caller's concern).
@@ -223,6 +228,7 @@ func newServer(cfg serverConfig) *server {
 		logger:                  logger,
 		registry:                reg,
 		installer:               inst,
+		recipeOrigin:            make(map[string]string),
 		recipeWorkspaceCleanup:  recipeWorkspaceCleanup,
 	}
 
@@ -998,6 +1004,13 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 		return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Install package failed: %v", err)}
 	}
 
+	// Attribute the recipes this package contributed to it, so GetMarketplace can tag each row
+	// with its origin and the host can bind it to the right bundle. A local-path install has no
+	// package identity, so its recipes stay unattributed and fall back to the requested bundle.
+	for _, r := range info.Recipes {
+		s.recipeOrigin[r.Name] = pkg.PackageName
+	}
+
 	afterCount := len(s.registry.AllRecipes())
 	var version *string
 	if info.Version != "" {
@@ -1201,6 +1214,9 @@ func parseOrderedColumns(raw json.RawMessage) ([]recipe.ColumnValue, error) {
 type marketplaceRow struct {
 	Descriptor    marketplaceDescriptor   `json:"descriptor"`
 	CategoryPaths [][]marketplaceCategory `json:"categoryPaths"`
+	// PackageName is the package that contributed this recipe (nil when unattributed, e.g. a
+	// local-path install), so the host attributes each row to its own bundle.
+	PackageName *string `json:"packageName"`
 }
 
 // marketplaceDescriptor matches Java's RecipeDescriptor (minimal fields).
@@ -1261,9 +1277,14 @@ func (s *server) handleGetMarketplace(params json.RawMessage) (any, *rpcError) {
 			})
 		}
 
+		var packageName *string
+		if origin, ok := s.recipeOrigin[desc.Name]; ok {
+			packageName = &origin
+		}
 		rows = append(rows, marketplaceRow{
 			Descriptor:    marketplaceDescriptorFromRecipe(desc),
 			CategoryPaths: [][]marketplaceCategory{categoryPath},
+			PackageName:   packageName,
 		})
 	}
 	if rows == nil {
