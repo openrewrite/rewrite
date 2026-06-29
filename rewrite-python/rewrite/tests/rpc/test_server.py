@@ -241,3 +241,56 @@ def test_recipe_descriptor_to_dict_emits_all_collection_keys():
                 "dataTables", "maintainers", "contributors", "examples"):
         assert key in result, f"missing key: {key}"
         assert result[key] == [], f"{key} should be empty list, got {result[key]!r}"
+
+
+def test_get_marketplace_row_carries_package_name(monkeypatch):
+    """A GetMarketplace row is tagged with the package that contributed the recipe,
+    so the host attributes it to its own bundle instead of the requested one."""
+    import rewrite.rpc.server as server
+    from rewrite.discovery import RecipeAttribution
+    from rewrite import CategoryDescriptor, RecipeMarketplace, Recipe
+
+    class _MyRecipe(Recipe):
+        @property
+        def name(self): return "org.example.MyRecipe"
+        @property
+        def display_name(self): return "My Recipe"
+        @property
+        def description(self): return "A recipe."
+
+    marketplace = RecipeMarketplace()
+    marketplace.install(_MyRecipe, [CategoryDescriptor(display_name="Test")])
+
+    attribution = RecipeAttribution()
+    attribution.record("my-recipes-package", {"org.example.MyRecipe"})
+    monkeypatch.setattr(server, "_attribution", attribution)
+
+    rows = server._collect_marketplace_rows(marketplace)
+
+    row = next(r for r in rows if r["descriptor"]["name"] == "org.example.MyRecipe")
+    assert row["packageName"] == "my-recipes-package"
+
+
+def test_get_marketplace_row_unattributed_has_none_package_name(monkeypatch):
+    """An unattributed recipe (e.g. a local-path install with no package identity)
+    leaves packageName None so the host falls back to the requested bundle."""
+    import rewrite.rpc.server as server
+    from rewrite.discovery import RecipeAttribution
+    from rewrite import CategoryDescriptor, RecipeMarketplace, Recipe
+
+    class _Unattributed(Recipe):
+        @property
+        def name(self): return "org.example.Unattributed"
+        @property
+        def display_name(self): return "Unattributed"
+        @property
+        def description(self): return "A recipe."
+
+    marketplace = RecipeMarketplace()
+    marketplace.install(_Unattributed, [CategoryDescriptor(display_name="Test")])
+    monkeypatch.setattr(server, "_attribution", RecipeAttribution())
+
+    rows = server._collect_marketplace_rows(marketplace)
+
+    row = next(r for r in rows if r["descriptor"]["name"] == "org.example.Unattributed")
+    assert row["packageName"] is None

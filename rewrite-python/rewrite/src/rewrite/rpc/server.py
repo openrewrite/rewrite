@@ -874,23 +874,10 @@ def handle_install_recipes(params: dict) -> dict:
     else:
         raise ValueError(f"Invalid recipes parameter: {recipes}")
 
-    package_rows: List[dict] = []
-    if package_name:
-        # recipes_for returns an empty set (not None) when the package activated
-        # nothing, so the filter scopes the result to "this package's recipes"
-        # (zero of them) instead of falling back to "no filter" and returning
-        # everything.
-        package_rows = _collect_marketplace_rows(
-            marketplace, recipe_filter=_attribution.recipes_for(package_name)
-        )
-
-    logger.info(
-        f"InstallRecipes: {recipes_added} new, {len(package_rows)} cumulative for {package_name}"
-    )
+    logger.info(f"InstallRecipes: {recipes_added} new for {package_name}")
     return {
         'recipesInstalled': recipes_added,
         'version': installed_version,
-        'recipes': package_rows,
     }
 
 
@@ -1101,7 +1088,8 @@ def _collect_marketplace_rows(
             else:
                 rows.append({
                     'descriptor': _recipe_descriptor_to_dict(recipe_desc),
-                    'categoryPaths': [current_path]
+                    'categoryPaths': [current_path],
+                    'packageName': _attribution.package_for(recipe_desc.name),
                 })
 
         for subcategory in category.categories:
