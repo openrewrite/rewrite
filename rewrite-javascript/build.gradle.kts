@@ -249,40 +249,37 @@ testing {
 //
 // npm publishing is decoupled from the Maven snapshot publish (it runs in a separate
 // `workflow_run` triggered by `ci`, because npm Trusted Publisher binds to a single workflow
-// filename). To still tie every npm snapshot to the exact Maven snapshot deploy, this task reads
-// the unique snapshot version that Gradle assigned to `org.openrewrite:rewrite-javascript`
-// (e.g. `8.86.0-20260625.164513-55`). Gradle's maven-publish computes that version client-side and
-// stages the very `maven-metadata.xml` it uploads under
-// `build/tmp/publish<Pub>PublicationTo<Repo>Repository/snapshot-maven-metadata.xml`; we read the
-// `<value>` straight from that local file — no network read-back.
+// filename), so the `ci` run must hand off the exact version string to publish. That string is NOT
+// the Maven snapshot coordinate (`8.86.0-<yyyyMMdd>.<HHmmss>-<buildNumber>`, a deploy-time
+// timestamp): it MUST be the value baked into the jar's
+// `META-INF/rewrite-javascript-version.txt` (= `datedSnapshotVersion`, a git-commit-time
+// timestamp). A downstream consumer reads that embedded value and feeds it verbatim to
+// `npx --package=@openrewrite/rewrite@<version>` when spawning the JS RPC server (see
+// JavaScriptRewriteRpc). If npm carries the deploy timestamp instead, it diverges from the
+// embedded value by however long elapses between commit and deploy, so the consumer asks npm for a
+// version that was never published and the RPC process dies on startup.
 //
-// The raw Maven `<value>` carries the repository-layout suffix `<yyyyMMdd>.<HHmmss>-<buildNumber>`,
-// whose `.` separator and trailing build number are Maven artifacts that don't belong in an npm
-// version. We normalize it to the npm dated-snapshot convention `<base>-<yyyyMMdd>-<HHmmss>` (same
-// as `gitCommitTimestamp()`), dropping the build number — the second-resolution timestamp already
-// makes it unique (a same-second double-deploy is not realistic). The `ci` run uploads the recorded
-// version as an artifact and `npm-publish.yml` pins the npm version to it.
+// So we record `datedSnapshotVersion` itself, and assert it matches the jar that was just built.
+// The `ci` run uploads the recorded version as an artifact and `npm-publish.yml` pins npm to it.
 val recordPublishedSnapshotVersion = tasks.register("recordPublishedSnapshotVersion") {
-    description = "Records the unique Sonatype snapshot version of rewrite-javascript for npm-publish to mirror."
+    description = "Records the npm snapshot version (identical to the jar's embedded version.txt) for npm-publish to mirror."
     val baseVersion = project.version.toString()
-    val buildDirectory = layout.buildDirectory
-    val versionFile = buildDirectory.file("npm/publishedVersion.txt")
+    val recordedVersion = datedSnapshotVersion
+    val versionFile = layout.buildDirectory.file("npm/publishedVersion.txt")
     onlyIf { baseVersion.endsWith("-SNAPSHOT") }
     doLast {
-        val staged = buildDirectory.dir("tmp").get().asFile.walkTopDown()
-            .firstOrNull { it.name == "snapshot-maven-metadata.xml" }
-        val resolved = staged?.readText()
-            ?.let { Regex("<value>([^<]+)</value>").find(it)?.groupValues?.get(1) }
-        if (resolved == null) {
-            logger.warn("Could not find the staged snapshot metadata under build/tmp; " +
-                    "npm-publish will fall back to its default version derivation.")
-            return@doLast
+        // `extractVersionFromJar()` returns null only if the jar is absent; this task is
+        // `finalizedBy` the `publish` that builds it, so in practice it is always present here.
+        val embedded = extractVersionFromJar()
+        check(embedded == null || embedded == recordedVersion) {
+            "npm publish version ($recordedVersion) must equal the jar's embedded " +
+                    "META-INF/rewrite-javascript-version.txt ($embedded); a downstream consumer derives the " +
+                    "`npx --package=@openrewrite/rewrite@<version>` coordinate from the embedded value."
         }
-        val normalized = resolved.replace(Regex("(\\d{8})\\.(\\d{6})-\\d+$"), "$1-$2")
         val out = versionFile.get().asFile
         out.parentFile.mkdirs()
-        out.writeText(normalized)
-        logger.lifecycle("Recorded published snapshot version for npm: $normalized (from Maven $resolved)")
+        out.writeText(recordedVersion)
+        logger.lifecycle("Recorded published snapshot version for npm: $recordedVersion")
     }
 }
 
