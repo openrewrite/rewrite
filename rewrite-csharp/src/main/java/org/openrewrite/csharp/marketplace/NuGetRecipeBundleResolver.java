@@ -40,7 +40,13 @@ public class NuGetRecipeBundleResolver implements RecipeBundleResolver {
         Path pkgPath = Paths.get(bundle.getPackageName());
         InstallRecipesResponse response;
         if (Files.exists(pkgPath)) {
-            response = rpc.installRecipes(pkgPath.toFile());
+            // Local file: send (and record on the bundle) the absolute path. The server's working
+            // directory may differ from ours, so it needs the absolute form to load the assembly —
+            // and aligning the bundle's packageName with it keeps the install origin the server
+            // records and the marketplace filter key (the bundle's packageName) the same value.
+            String absolutePath = pkgPath.toAbsolutePath().toString();
+            bundle.setPackageName(absolutePath);
+            response = rpc.installRecipes(absolutePath, bundle.getVersion());
         } else {
             response = rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
         }

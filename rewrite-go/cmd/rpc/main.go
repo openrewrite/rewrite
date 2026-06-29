@@ -20,6 +20,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"flag"
@@ -117,8 +118,9 @@ type server struct {
 	traceSend    bool
 
 	// Server configuration from CLI flags (see serverConfig)
-	metricsCsv       string
-	dataTablesCsvDir string
+	metricsCsv string
+
+	configuredDataTableStore recipe.DataTableStore
 
 	// Per-RPC metrics writer. Lazily opened in newServer when metricsCsv
 	// is set. Writes are guarded by metricsMu so concurrent dispatch
@@ -145,7 +147,6 @@ type serverConfig struct {
 	traceRpcMessages bool
 	metricsCsv       string
 	recipeInstallDir string
-	dataTablesCsvDir string
 }
 
 func newServer(cfg serverConfig) *server {
@@ -217,7 +218,6 @@ func newServer(cfg serverConfig) *server {
 		traceReceive:            cfg.traceRpcMessages,
 		traceSend:               cfg.traceRpcMessages,
 		metricsCsv:              cfg.metricsCsv,
-		dataTablesCsvDir:        cfg.dataTablesCsvDir,
 		reader:                  bufio.NewReader(os.Stdin),
 		writer:                  os.Stdout,
 		logger:                  logger,
@@ -292,7 +292,6 @@ func parseFlags() serverConfig {
 	flag.BoolVar(&cfg.traceRpcMessages, "trace-rpc-messages", false, "log every GetObject batch send/receive")
 	flag.StringVar(&cfg.metricsCsv, "metrics-csv", "", "path to write per-RPC metrics as CSV")
 	flag.StringVar(&cfg.recipeInstallDir, "recipe-install-dir", "", "directory used as the recipe installer workspace; if empty, a temporary directory is created and cleaned up on shutdown")
-	flag.StringVar(&cfg.dataTablesCsvDir, "data-tables-csv-dir", "", "directory where DataTable rows are written as CSV; empty = in-memory only")
 	flag.Parse()
 	return cfg
 }
@@ -450,6 +449,8 @@ func (s *server) handleRequest(req *jsonRPCRequest) *jsonRPCResponse {
 		result, rpcErr = s.handleBatchVisit(req.Params)
 	case "Generate":
 		result, rpcErr = s.handleGenerate(req.Params)
+	case "SetDataTableStore":
+		result, rpcErr = s.handleSetDataTableStore(req.Params)
 	case "TraceGetObject":
 		result, rpcErr = s.handleTraceGetObject(req.Params)
 	case "ParseProject":
@@ -1030,10 +1031,7 @@ func (s *server) handleReset() bool {
 // returned. Otherwise the ctx is fetched from Java once (via the empty-body
 // codec) and cached under the pid for subsequent calls in the same recipe run.
 //
-// When --data-tables-csv-dir is set, a CsvDataTableStore is installed into
-// the ctx so any recipe that emits data-table rows writes them to that
-// directory. Otherwise an InMemoryDataTableStore is created lazily on first
-// InsertRow.
+// It then installs the host-configured DataTableStore (see installDataTableStore).
 func (s *server) resolveExecutionContext(pid *string) *recipe.ExecutionContext {
 	var ctx *recipe.ExecutionContext
 	if pid == nil || *pid == "" {
@@ -1091,22 +1089,112 @@ func (s *server) seedCursor(v recipe.TreeVisitor, ids []string) {
 	}
 }
 
-// installDataTableStore puts a DataTableStore into the ctx if one isn't
-// already present. Choice driven by --data-tables-csv-dir.
+// installDataTableStore installs the host-configured store onto the ctx. When
+// none was configured, the ctx is left untouched so an InMemoryDataTableStore
+// is created lazily on the first InsertRow.
 func (s *server) installDataTableStore(ctx *recipe.ExecutionContext) {
-	if _, ok := ctx.GetMessage(recipe.DataTableStoreKey); ok {
-		return
+	if s.configuredDataTableStore != nil {
+		ctx.PutMessage(recipe.DataTableStoreKey, s.configuredDataTableStore)
 	}
-	if s.dataTablesCsvDir != "" {
-		store, err := recipe.NewCsvDataTableStore(s.dataTablesCsvDir)
-		if err != nil {
-			s.logger.Printf("CsvDataTableStore unavailable, falling back to in-memory: %v", err)
-		} else {
-			ctx.PutMessage(recipe.DataTableStoreKey, store)
-			return
+}
+
+// setDataTableStore is the wire form of the data table store configuration,
+// mirroring org.openrewrite.rpc.request.SetDataTableStore.
+type setDataTableStore interface {
+	toDataTableStore() (recipe.DataTableStore, error)
+}
+
+type csvDataTableStore struct {
+	OutputDir string `json:"outputDir"`
+	// Raw JSON to preserve the host's key order; Go maps are unordered.
+	PrefixColumns json.RawMessage `json:"prefixColumns"`
+	SuffixColumns json.RawMessage `json:"suffixColumns"`
+}
+
+func (c *csvDataTableStore) toDataTableStore() (recipe.DataTableStore, error) {
+	if c.OutputDir == "" {
+		return recipe.NewInMemoryDataTableStore(), nil
+	}
+	prefix, err := parseOrderedColumns(c.PrefixColumns)
+	if err != nil {
+		return nil, fmt.Errorf("prefixColumns: %w", err)
+	}
+	suffix, err := parseOrderedColumns(c.SuffixColumns)
+	if err != nil {
+		return nil, fmt.Errorf("suffixColumns: %w", err)
+	}
+	return recipe.NewCsvDataTableStoreWithColumns(c.OutputDir, prefix, suffix)
+}
+
+type noOpDataTableStore struct{}
+
+func (noOpDataTableStore) toDataTableStore() (recipe.DataTableStore, error) {
+	return recipe.NewInMemoryDataTableStore(), nil
+}
+
+func parseSetDataTableStore(params json.RawMessage) (setDataTableStore, error) {
+	var tag struct {
+		Kind string `json:"kind"`
+	}
+	if err := json.Unmarshal(params, &tag); err != nil {
+		return nil, err
+	}
+	if tag.Kind == "CSV" {
+		var c csvDataTableStore
+		if err := json.Unmarshal(params, &c); err != nil {
+			return nil, err
 		}
+		return &c, nil
 	}
-	ctx.PutMessage(recipe.DataTableStoreKey, recipe.NewInMemoryDataTableStore())
+	return noOpDataTableStore{}, nil
+}
+
+// handleSetDataTableStore remembers the reconstructed store as the configured
+// store. Mirrors the JS SetDataTableStore.handle.
+func (s *server) handleSetDataTableStore(params json.RawMessage) (any, *rpcError) {
+	cfg, err := parseSetDataTableStore(params)
+	if err != nil {
+		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("Invalid params: %v", err)}
+	}
+	store, err := cfg.toDataTableStore()
+	if err != nil {
+		return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Cannot reconstruct data table store: %v", err)}
+	}
+	s.configuredDataTableStore = store
+	return true, nil
+}
+
+// parseOrderedColumns decodes a JSON object into ordered (name, value) pairs;
+// key order must be preserved, so a plain (unordered) map won't do.
+func parseOrderedColumns(raw json.RawMessage) ([]recipe.ColumnValue, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	tok, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	if d, ok := tok.(json.Delim); !ok || d != '{' {
+		return nil, fmt.Errorf("expected JSON object, got %v", tok)
+	}
+	var cols []recipe.ColumnValue
+	for dec.More() {
+		keyTok, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		key, ok := keyTok.(string)
+		if !ok {
+			return nil, fmt.Errorf("expected string key, got %v", keyTok)
+		}
+		var val string
+		if err := dec.Decode(&val); err != nil {
+			return nil, err
+		}
+		cols = append(cols, recipe.ColumnValue{Name: key, Value: val})
+	}
+	return cols, nil
 }
 
 // marketplaceRow matches Java's GetMarketplaceResponse.Row.

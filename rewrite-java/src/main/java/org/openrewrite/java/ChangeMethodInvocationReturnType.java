@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -53,8 +54,8 @@ public class ChangeMethodInvocationReturnType extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            private final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, false);
+        MethodMatcher methodMatcher = new MethodMatcher(methodPattern, false);
+        return Preconditions.check(new UsesMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
 
             private boolean methodUpdated;
 
@@ -136,6 +137,6 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                 }
                 return false;
             }
-        };
+        });
     }
 }

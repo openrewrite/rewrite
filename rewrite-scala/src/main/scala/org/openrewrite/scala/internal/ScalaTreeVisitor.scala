@@ -5184,7 +5184,8 @@ class ScalaTreeVisitor(
               val afterCursor = source.substring(cursor, classEnd)
               val braceIndex = positionOfNextIn(afterCursor, "{", 0)
               // For Scala 3 braceless: look for `:` at end of line (not `: Type` annotation).
-              // A braceless body colon is followed by a newline, not by a type name.
+              // A braceless body colon is followed by a newline (or a trailing comment),
+              // not by a type name.
               val colonIndex = {
                 var result = -1
                 var idx = positionOfNextIn(afterCursor, ":", 0)
@@ -5194,8 +5195,12 @@ class ScalaTreeVisitor(
                   } else {
                     val afterColon = afterCursor.substring(idx + 1)
                     val nextNonSpace = afterColon.indexWhere(c => c != ' ' && c != '\t')
-                    if (nextNonSpace < 0 || afterColon.charAt(nextNonSpace) == '\n' || afterColon.charAt(nextNonSpace) == '\r') {
-                      result = idx // `:` followed by newline = braceless body
+                    val startsComment = nextNonSpace >= 0 && nextNonSpace + 1 < afterColon.length &&
+                      afterColon.charAt(nextNonSpace) == '/' &&
+                      (afterColon.charAt(nextNonSpace + 1) == '/' || afterColon.charAt(nextNonSpace + 1) == '*')
+                    if (nextNonSpace < 0 || afterColon.charAt(nextNonSpace) == '\n' ||
+                        afterColon.charAt(nextNonSpace) == '\r' || startsComment) {
+                      result = idx // `:` followed by newline or trailing comment = braceless body
                     }
                   }
                   if (result < 0) idx = positionOfNextIn(afterCursor, ":", idx + 1)
@@ -7627,11 +7632,21 @@ class ScalaTreeVisitor(
 
   private def visitExtMethods(ext: untpd.ExtMethods): S.ExtensionMethods = {
     // Scala 3 extension method block: `extension (x: T) { def ... }`
+    // The dotty span of an ExtMethods begins at the parameter/method region, not at
+    // the `extension` keyword, so we search backwards for the keyword. Floor that
+    // search at the previous statement's end (the cursor before the prefix) — otherwise
+    // a `(` in a preceding extension's method body (e.g. `def a = foo()`) is mistaken
+    // for this extension's parameter clause, rewinding the cursor into the previous
+    // block and duplicating it on print.
+    val keywordFloor = cursor
     val prefix = extractPrefix(ext.span)
     val adjustedStart = Math.max(0, ext.span.start - offsetAdjustment)
-    val searchStart = Math.max(0, Math.min(cursor, adjustedStart) - "extension".length)
+    val searchStart = Math.max(keywordFloor, Math.min(cursor, adjustedStart) - "extension".length)
     val firstParenIdx = positionOfNext("(", searchStart)
-    val extKwIdx = if (firstParenIdx >= 0) source.lastIndexOf("extension", firstParenIdx) else positionOfNext("extension", cursor)
+    val extKwIdx = if (firstParenIdx >= 0) {
+      val idx = source.lastIndexOf("extension", firstParenIdx)
+      if (idx >= keywordFloor) idx else -1
+    } else positionOfNext("extension", cursor)
     val keywordEnd = if (extKwIdx >= 0) extKwIdx + "extension".length else cursor
     cursor = keywordEnd
 
