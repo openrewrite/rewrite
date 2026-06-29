@@ -63,11 +63,6 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 JavaType.Method type = m.getMethodType();
                 if (methodMatcher.matches(method) && type != null && !newReturnType.equals(type.getReturnType().toString())) {
-                    type = type.withReturnType(TypeUtils.buildTypeTree(newReturnType).getType());
-                    m = m.withMethodType(type);
-                    if (m.getName().getType() != null) {
-                        m = m.withName(m.getName().withType(type));
-                    }
                     methodUpdated = true;
                 }
                 return m;
@@ -85,32 +80,73 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                 boolean initializedByMatch = mv.getVariables().stream()
                         .anyMatch(v -> isInitializedByMatch(v.getInitializer()));
 
-                if (methodUpdated && initializedByMatch) {
-                    TypeTree newTypeTree = TypeUtils.buildTypeTree(newReturnType);
-                    JavaType newType = newTypeTree.getType();
-
+                if (methodUpdated && initializedByMatch && mv.getTypeExpression() != null) {
+                    TypeTree originalTypeExpression = mv.getTypeExpression();
                     maybeRemoveImports(originalType);
 
-                    if (mv.getTypeExpression() != null) {
-                        TypeTree newTypeExpression = newTypeTree.withPrefix(mv.getTypeExpression().getPrefix());
-                        mv = mv.withTypeExpression(newTypeExpression);
-                        // The tree is built with fully-qualified names; shorten them and add imports for the
-                        // new type and all of its type parameters (recursively for nested generics).
-                        if (!(newTypeExpression instanceof J.Identifier) && !(newTypeExpression instanceof J.Primitive)) {
-                            doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(newTypeExpression));
+                    // Parse the new return type in type position via JavaTemplate so that it is resolved against
+                    // the classpath (properly attributed) and its imports are added, rather than synthesizing a
+                    // shallow type tree by hand. The resolved type expression is then spliced into the existing
+                    // declaration, preserving its modifiers, variable names and initializer.
+                    // `ShortenFullyQualifiedTypeReferences` intentionally leaves `java.lang` references qualified,
+                    // so render direct `java.lang` members with their simple (implicitly imported) name up front.
+                    String templateType = newReturnType.replaceAll("\\bjava\\.lang\\.([A-Z][A-Za-z0-9_]*)(?![.A-Za-z0-9_])", "$1");
+                    J.VariableDeclarations resolved = JavaTemplate.builder(templateType + " __cmirt__")
+                            .contextSensitive()
+                            .build()
+                            .apply(updateCursor(mv), mv.getCoordinates().replace());
+                    TypeTree newTypeExpression = resolved.getTypeExpression();
+                    // Only rewrite when the new type actually resolved against the classpath; if it could not be
+                    // resolved (e.g. it is not on the classpath) leave the declaration untouched rather than
+                    // introducing an unattributed type that would never stabilize.
+                    if (newTypeExpression != null && !(newTypeExpression.getType() instanceof JavaType.Unknown)) {
+                        JavaType newType = newTypeExpression.getType();
+                        TypeTree splicedTypeExpression = newTypeExpression.withPrefix(originalTypeExpression.getPrefix());
+                        mv = mv.withTypeExpression(splicedTypeExpression);
+                        // The template renders fully-qualified names; shorten them and add the corresponding
+                        // imports (for the raw type and every type parameter).
+                        if (!(splicedTypeExpression instanceof J.Primitive)) {
+                            doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(splicedTypeExpression));
                         }
+                        mv = mv.withVariables(ListUtils.map(mv.getVariables(), var -> {
+                            if (isInitializedByMatch(var.getInitializer())) {
+                                var = var.withInitializer(updateMatchedReturnType(var.getInitializer(), newType));
+                            }
+                            JavaType.FullyQualified varType = TypeUtils.asFullyQualified(var.getType());
+                            if (varType != null && !varType.equals(newType)) {
+                                var = var.withType(newType).withName(var.getName().withType(newType));
+                            }
+                            return var;
+                        }));
                     }
-
-                    mv = mv.withVariables(ListUtils.map(mv.getVariables(), var -> {
-                        JavaType.FullyQualified varType = TypeUtils.asFullyQualified(var.getType());
-                        if (varType != null && !varType.equals(newType)) {
-                            return var.withType(newType).withName(var.getName().withType(newType));
-                        }
-                        return var;
-                    }));
                 }
 
                 return mv;
+            }
+
+            /**
+             * Re-attribute the return type of every matched invocation within the initializer to the resolved
+             * type, preserving wrapping parentheses and ternaries. This keeps the variable's declared type and
+             * its initializer consistent and lets the recipe stabilize in a single cycle.
+             */
+            private @Nullable Expression updateMatchedReturnType(@Nullable Expression initializer, @Nullable JavaType newType) {
+                if (initializer == null) {
+                    return null;
+                }
+                return (Expression) new JavaIsoVisitor<Integer>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                        J.MethodInvocation m = super.visitMethodInvocation(method, p);
+                        if (methodMatcher.matches(m) && m.getMethodType() != null) {
+                            JavaType.Method type = m.getMethodType().withReturnType(newType);
+                            m = m.withMethodType(type);
+                            if (m.getName().getType() != null) {
+                                m = m.withName(m.getName().withType(type));
+                            }
+                        }
+                        return m;
+                    }
+                }.visit(initializer, 0);
             }
 
             /**

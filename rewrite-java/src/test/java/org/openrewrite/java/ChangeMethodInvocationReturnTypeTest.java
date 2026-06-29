@@ -17,9 +17,12 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
@@ -412,6 +415,65 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void newReturnTypeIsResolvedAgainstTheClasspath() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.ArrayList<java.lang.String>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  import java.util.List;
+                  public class Bar {
+                      public static List<String> bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              import java.util.List;
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+
+              import java.util.ArrayList;
+
+              class Foo {
+                  void foo() {
+                      ArrayList<String> one = Bar.bar();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("one".equals(variable.getSimpleName())) {
+                        // The replacement type is resolved against the classpath: a fully attributed type with a
+                        // real supertype, rather than a shallow JavaType.ShallowClass stub. This is what the
+                        // JavaTemplate-based approach buys over assembling the type tree via constructors.
+                        JavaType.Parameterized type = (JavaType.Parameterized) variable.getType();
+                        assertThat(type.getType()).isNotInstanceOf(JavaType.ShallowClass.class);
+                        assertThat(type.getType().getSupertype()).isNotNull();
+                        assertThat(type.getType().getSupertype().getFullyQualifiedName()).isEqualTo("java.util.AbstractList");
+                    }
+                    return super.visitVariable(variable, p);
+                }
+            }.visit(cu, 0))
           )
         );
     }
