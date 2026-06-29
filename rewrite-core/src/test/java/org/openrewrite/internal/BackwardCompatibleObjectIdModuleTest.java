@@ -64,15 +64,13 @@ class BackwardCompatibleObjectIdModuleTest {
     }
 
     /**
-     * The "new" wire format writes the {@code @ref} id as the first property of a shared {@code @Value} type, so a
-     * bounded reader can decide the encoding from the prefix alone and stream the (potentially large) remainder. The
-     * old reader instead copies the entire nested subtree into a {@code TokenBuffer} before constructing anything,
-     * which is the allocation churn this change removes.
+     * The {@code @ref} id is written as the first property of a shared {@code @Value} type, so a bounded reader can
+     * decide the encoding from the prefix alone and construct the object while streaming the (potentially large)
+     * remainder, rather than copying the entire nested subtree into a {@code TokenBuffer} before constructing anything.
      * <p>
      * Total tokens read from the source parser are identical either way — the difference is <em>when</em> they are
      * read relative to object construction. We assert that the first {@link Node} is constructed while the source
-     * parser is still near the start of the stream. Against the current implementation the whole subtree is drained
-     * first, so the source-token count at first construction equals the full token total and this fails.
+     * parser is still near the start of the stream.
      */
     @Test
     void newFormatObjectIsBuiltBeforeSubtreeIsBuffered() throws IOException {
@@ -88,8 +86,8 @@ class BackwardCompatibleObjectIdModuleTest {
         }
 
         assertThat(parsed).isEqualTo(root);
-        // After the fix the root is built from the @ref prefix only; before it, the whole subtree is buffered first
-        // so the count at first construction is on the order of the full token total (> childCount).
+        // The root is built from the @ref prefix only, so few source tokens are consumed before first construction
+        // (otherwise the whole subtree would be buffered first, putting the count on the order of childCount).
         assertThat(Probe.minSourceTokensAtBuild).isLessThan(200L);
     }
 
