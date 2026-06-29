@@ -1478,6 +1478,10 @@ type prepareRecipeResponse struct {
 	ScanVisitor       *string               `json:"scanVisitor,omitempty"`
 	ScanPreconditions []any                 `json:"scanPreconditions"`
 	DelegatesTo       *delegatesToResponse  `json:"delegatesTo,omitempty"`
+	// RecipeList carries the prepared child recipes of a composite so the host builds the tree
+	// locally instead of re-preparing each child by name. Always emitted (an empty list for a
+	// leaf; null only for a delegating recipe, whose children the host resolves itself).
+	RecipeList []prepareRecipeResponse `json:"recipeList"`
 }
 
 type delegatesToResponse struct {
@@ -1517,22 +1521,62 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 		}, nil
 	}
 
-	// Create recipe instance with options
+	// Create recipe instance with options. A nil instance means an installer-loaded recipe with no
+	// constructor (the bootstrap binary's descriptor-only registration) — it can't run here, only
+	// be described, so return the stored descriptor with no prepared child tree. Execution happens
+	// in the CLI-built binary, where the recipe module is linked and its constructor exists, so
+	// prepareInstance below runs and returns the whole tree.
 	instance := reg.Constructor(req.Options)
-
-	var desc recipe.RecipeDescriptor
-	if instance != nil {
-		desc = recipe.Describe(instance)
-	} else {
-		// Installer-loaded recipes have no constructor; use stored descriptor
-		desc = reg.Descriptor
+	if instance == nil {
+		recipeID := uuid.New().String()
+		// Store the nil instance keyed by id so a later Visit can fail loudly by recipe name
+		// (stale/missing CLI-built binary) instead of "Unknown recipe: <uuid>".
+		s.preparedRecipes[recipeID] = instance
+		s.preparedRecipeNames[recipeID] = req.ID
+		return prepareRecipeResponse{
+			ID:                recipeID,
+			Descriptor:        marketplaceDescriptorFromRecipe(reg.Descriptor),
+			EditVisitor:       "edit:" + recipeID,
+			EditPreconditions: []any{},
+			ScanPreconditions: []any{},
+			RecipeList:        []prepareRecipeResponse{},
+		}, nil
 	}
 
-	// response.ID must be the per-instance UUID, not the recipe name —
-	// callers echo it back to identify the prepared instance.
+	resp, rerr := s.prepareInstance(instance, req.ID)
+	if rerr != nil {
+		return nil, rerr
+	}
+	return resp, nil
+}
+
+// prepareInstance prepares a recipe instance and, recursively, its whole child tree — storing every
+// node in preparedRecipes and returning the response with recipeList populated, so the host builds
+// the tree locally instead of a PrepareRecipe round trip per child.
+//
+// Mirrors the C#, JS, and Python servers. Required options are validated as each node is prepared,
+// which covers the whole tree (the root against the caller's options and each child against the
+// values its parent set). A child that delegates to a Java recipe is emitted as delegatesTo for the
+// host to resolve; the rest are prepared and validated recursively. Delegating recipes forward
+// validation to the recipe they delegate to, so they are not validated here.
+func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRecipeResponse, *rpcError) {
+	desc := recipe.Describe(instance)
+
+	_, isDelegating := instance.(recipe.DelegatesTo)
+	if !isDelegating {
+		for _, opt := range instance.Options() {
+			if opt.Required && opt.Value == nil {
+				return prepareRecipeResponse{}, &rpcError{
+					Code:    -32602,
+					Message: fmt.Sprintf("Missing required option `%s` for recipe `%s`.", opt.Name, desc.Name),
+				}
+			}
+		}
+	}
+
 	recipeID := uuid.New().String()
 	s.preparedRecipes[recipeID] = instance
-	s.preparedRecipeNames[recipeID] = req.ID
+	s.preparedRecipeNames[recipeID] = name
 
 	resp := prepareRecipeResponse{
 		ID:                recipeID,
@@ -1542,43 +1586,61 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 		ScanPreconditions: []any{},
 	}
 
-	// Introspect Editor() once at prepare time. If the recipe wrapped its
-	// editor in preconditions.Check(...), extract the precondition's wire
-	// identity (so the Java host can evaluate it locally and skip the
-	// visit RPC for non-matching files) and cache the bare editor (so a
-	// subsequent dispatch via instantiateVisitor returns the unwrapped
-	// editor — otherwise the precondition would also run Go-side and
-	// double the cost).
-	if instance != nil {
-		if _, isScan := instance.(recipe.ScanningRecipe); !isScan {
-			if editor := instance.Editor(); editor != nil {
-				if checkV, ok := editor.(*preconditions.CheckVisitor); ok {
-					if entry, ok := preconditionWireEntry(checkV.Check); ok {
-						resp.EditPreconditions = append(resp.EditPreconditions, entry)
-						s.preparedEditorOverrides[recipeID] = checkV.V
-					}
+	// Introspect Editor() once: if it's wrapped in preconditions.Check(...), extract the
+	// precondition's wire identity (so the Java host can evaluate it locally and skip the visit
+	// RPC for non-matching files) and cache the bare editor (so a subsequent dispatch via
+	// instantiateVisitor returns the unwrapped editor — otherwise the precondition runs Go-side
+	// too and doubles the cost).
+	_, isScan := instance.(recipe.ScanningRecipe)
+	if !isScan {
+		if editor := instance.Editor(); editor != nil {
+			if checkV, ok := editor.(*preconditions.CheckVisitor); ok {
+				if entry, ok := preconditionWireEntry(checkV.Check); ok {
+					resp.EditPreconditions = append(resp.EditPreconditions, entry)
+					s.preparedEditorOverrides[recipeID] = checkV.V
 				}
 			}
 		}
 	}
-
-	// Check if this is a scanning recipe
-	if instance != nil {
-		if _, isScan := instance.(recipe.ScanningRecipe); isScan {
-			scanVis := "scan:" + recipeID
-			resp.ScanVisitor = &scanVis
-		}
+	if isScan {
+		scanVis := "scan:" + recipeID
+		resp.ScanVisitor = &scanVis
 	}
 
-	// Check for delegation
-	if instance != nil {
-		if del, ok := instance.(recipe.DelegatesTo); ok {
-			resp.DelegatesTo = &delegatesToResponse{
-				RecipeName: del.JavaRecipeName(),
-				Options:    del.JavaOptions(),
+	if del, ok := instance.(recipe.DelegatesTo); ok {
+		resp.DelegatesTo = &delegatesToResponse{
+			RecipeName: del.JavaRecipeName(),
+			Options:    del.JavaOptions(),
+		}
+		return resp, nil
+	}
+
+	// Whole-tree: prepare each child. A child that delegates to a Java recipe is emitted as
+	// delegatesTo for the host to resolve; the rest are prepared and validated recursively.
+	childResponses := []prepareRecipeResponse{}
+	for _, child := range instance.RecipeList() {
+		if del, ok := child.(recipe.DelegatesTo); ok {
+			childID := uuid.New().String()
+			childResponses = append(childResponses, prepareRecipeResponse{
+				ID:                childID,
+				Descriptor:        delegateDescriptor(del.JavaRecipeName()),
+				EditVisitor:       "edit:" + childID,
+				EditPreconditions: []any{},
+				ScanPreconditions: []any{},
+				DelegatesTo: &delegatesToResponse{
+					RecipeName: del.JavaRecipeName(),
+					Options:    del.JavaOptions(),
+				},
+			})
+		} else {
+			childResp, rerr := s.prepareInstance(child, recipe.Describe(child).Name)
+			if rerr != nil {
+				return prepareRecipeResponse{}, rerr
 			}
+			childResponses = append(childResponses, childResp)
 		}
 	}
+	resp.RecipeList = childResponses
 
 	return resp, nil
 }
