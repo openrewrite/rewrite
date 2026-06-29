@@ -34,9 +34,6 @@ public class PipRecipeBundleReader implements RecipeBundleReader {
 
     @Override
     public RecipeMarketplace read() {
-        // GetMarketplace rows now carry each recipe's origin packageName, so toMarketplace keeps
-        // only this bundle's recipes — the round trip that used to over-attribute the whole
-        // singleton marketplace to this bundle is now safe.
         return rpc.getMarketplace(bundle);
     }
 
