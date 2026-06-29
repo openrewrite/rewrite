@@ -249,13 +249,19 @@ testing {
 //
 // npm publishing is decoupled from the Maven snapshot publish (it runs in a separate
 // `workflow_run` triggered by `ci`, because npm Trusted Publisher binds to a single workflow
-// filename). To still give every Maven snapshot a 1:1 npm counterpart carrying the identical
-// version reference, this task records the exact unique snapshot version that Gradle assigned to
-// `org.openrewrite:rewrite-javascript` (e.g. `8.86.0-20260625.164513-55`). Gradle's maven-publish
-// computes that version client-side and stages the very `maven-metadata.xml` it uploads under
+// filename). To still tie every npm snapshot to the exact Maven snapshot deploy, this task reads
+// the unique snapshot version that Gradle assigned to `org.openrewrite:rewrite-javascript`
+// (e.g. `8.86.0-20260625.164513-55`). Gradle's maven-publish computes that version client-side and
+// stages the very `maven-metadata.xml` it uploads under
 // `build/tmp/publish<Pub>PublicationTo<Repo>Repository/snapshot-maven-metadata.xml`; we read the
-// `<value>` straight from that local file — no network read-back. The `ci` run uploads the
-// recorded version as an artifact and `npm-publish.yml` pins the npm version to it.
+// `<value>` straight from that local file — no network read-back.
+//
+// The raw Maven `<value>` carries the repository-layout suffix `<yyyyMMdd>.<HHmmss>-<buildNumber>`,
+// whose `.` separator and trailing build number are Maven artifacts that don't belong in an npm
+// version. We normalize it to the npm dated-snapshot convention `<base>-<yyyyMMdd>-<HHmmss>` (same
+// as `gitCommitTimestamp()`), dropping the build number — the second-resolution timestamp already
+// makes it unique (a same-second double-deploy is not realistic). The `ci` run uploads the recorded
+// version as an artifact and `npm-publish.yml` pins the npm version to it.
 val recordPublishedSnapshotVersion = tasks.register("recordPublishedSnapshotVersion") {
     description = "Records the unique Sonatype snapshot version of rewrite-javascript for npm-publish to mirror."
     val baseVersion = project.version.toString()
@@ -272,10 +278,11 @@ val recordPublishedSnapshotVersion = tasks.register("recordPublishedSnapshotVers
                     "npm-publish will fall back to its default version derivation.")
             return@doLast
         }
+        val normalized = resolved.replace(Regex("(\\d{8})\\.(\\d{6})-\\d+$"), "$1-$2")
         val out = versionFile.get().asFile
         out.parentFile.mkdirs()
-        out.writeText(resolved)
-        logger.lifecycle("Recorded published snapshot version for npm: $resolved")
+        out.writeText(normalized)
+        logger.lifecycle("Recorded published snapshot version for npm: $normalized (from Maven $resolved)")
     }
 }
 
