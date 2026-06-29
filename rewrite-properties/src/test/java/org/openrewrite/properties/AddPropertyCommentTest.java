@@ -171,6 +171,34 @@ class AddPropertyCommentTest implements RewriteTest {
     }
 
     @Test
+    void shouldAddIdenticalCommentToConsecutiveCommentedOutProperties() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new AddPropertyComment("zookeeper.connection.timeout.ms", "Removed", true),
+            new AddPropertyComment("zookeeper.session.timeout.ms", "Removed", true),
+            new AddPropertyComment("zookeeper.sync.time.ms", "Removed", true)
+          ),
+          properties(
+            """
+              broker.id=0
+              zookeeper.connection.timeout.ms=18000
+              zookeeper.session.timeout.ms=6000
+              zookeeper.sync.time.ms=2000
+              """,
+            """
+              broker.id=0
+              # Removed
+              # zookeeper.connection.timeout.ms=18000
+              # Removed
+              # zookeeper.session.timeout.ms=6000
+              # Removed
+              # zookeeper.sync.time.ms=2000
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldASkipCommentOutProperty() {
         rewriteRun(
           spec -> spec.recipe(new AddPropertyComment(

@@ -68,12 +68,18 @@ public class PropertiesCommentService extends CommentService {
         if (file == null) {
             return (Tree) cursor.getValue();
         }
-        if (hasEquivalentComment(cursor, text)) {
-            return file;
-        }
         List<Properties.Content> content = file.getContent();
         int idx = indexOf(content, cursor.getValue());
         if (idx < 0) {
+            return file;
+        }
+        // Idempotency is scoped to the insertion point (Placement.BEFORE): skip only when the comment
+        // immediately preceding the element is already equivalent. Scanning the whole preceding run
+        // (as getComments does) would misfire here, because a neighbouring property that has been
+        // commented out is itself a Properties.Comment and so merges into the run, letting an
+        // equivalent comment belonging to an earlier property suppress this one.
+        if (idx > 0 && content.get(idx - 1) instanceof Properties.Comment &&
+                equivalent(((Properties.Comment) content.get(idx - 1)).getMessage(), text)) {
             return file;
         }
         Properties.Content element = content.get(idx);
