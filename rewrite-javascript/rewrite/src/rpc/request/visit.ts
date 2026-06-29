@@ -20,10 +20,21 @@ import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {DATA_TABLE_STORE, DataTableStore} from "../../data-table";
 import {withMetrics, extractSourcePath} from "./metrics";
+import {AutoformatVisitor} from "../../javascript/format";
 
 export interface VisitResponse {
     modified: boolean
 }
+
+/**
+ * Visitors that may be invoked directly by their fully-qualified (Java-style) name
+ * over RPC, rather than as part of a prepared recipe. This lets a language service on
+ * the Java side (e.g. {@code JavaScriptAutoFormatService}) delegate to a TypeScript
+ * visitor by name, mirroring how the Python side registers its formatter.
+ */
+const VISITOR_REGISTRY: Record<string, new (...args: any[]) => TreeVisitor<any, any>> = {
+    "org.openrewrite.javascript.format.AutoformatVisitor": AutoformatVisitor,
+};
 
 // Tracks the last phase (scan or edit) for each recipe to detect cycle transitions
 type RecipePhase = 'scan' | 'edit';
@@ -135,9 +146,12 @@ export class Visit {
             }
             return await recipe.editor();
         } else {
+            const ctor = VISITOR_REGISTRY[visitorName] ?? (globalThis as any)[visitorName];
+            if (!ctor) {
+                throw new Error(`Unknown visitor: ${visitorName}`);
+            }
             return Reflect.construct(
-                // "as any" bypasses strict type checking
-                (globalThis as any)[visitorName],
+                ctor,
                 request.visitorOptions ? Array.from(request.visitorOptions.values()) : [])
         }
     }
