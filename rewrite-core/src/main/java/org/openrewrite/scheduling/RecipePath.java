@@ -24,9 +24,7 @@ import java.util.AbstractList;
  * A persistent, immutable path from the root recipe down to a descendant recipe.
  * <p>
  * Each node references its {@code parent}, so deriving a child path via {@link #child(Recipe)}
- * is O(1) and shares the entire ancestor chain instead of copying it. This replaces the
- * previous approach of copying a {@link java.util.Stack} for every node visited during a
- * recipe-tree traversal, which is rebuilt identically for every source file and every cycle.
+ * is O(1) and shares the entire ancestor chain instead of copying it.
  * <p>
  * Because it implements {@link java.util.List List&lt;Recipe&gt;} (ordered root-first, leaf-last),
  * it drops directly into consumers expecting the recipe path as a list, with no copying.
