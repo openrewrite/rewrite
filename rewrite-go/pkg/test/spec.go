@@ -284,18 +284,29 @@ func parsePackageGroups(t *testing.T, p *parser.GoParser, flat []SourceSpec) map
 //   - intra-project imports type-check against real sources;
 //   - imports of declared third-party modules resolve to stub packages.
 //
+// SourceSpec paths may be absolute when tests model ParseProject's
+// filesystem-discovery shape; ProjectImporter still needs module-relative
+// paths so its import-path index matches the module path.
+//
 // Returns nil when there's no module context — the caller should fall
 // back to importer.Default().
 func buildProjectImporter(flat []SourceSpec) *parser.ProjectImporter {
 	var mrr *golang.GoResolutionResult
+	moduleRoot := ""
 	for _, s := range flat {
 		if found := FindGoResolutionResult(s); found != nil && found.ModulePath != "" {
 			mrr = found
+			if path.IsAbs(s.Path) {
+				moduleRoot = path.Dir(path.Clean(s.Path))
+			}
 			break
 		}
 	}
 	if mrr == nil {
 		return nil
+	}
+	if moduleRoot == "" {
+		moduleRoot = commonAbsoluteSourceRoot(flat)
 	}
 	pi := parser.NewProjectImporter(mrr.ModulePath, nil)
 	for _, req := range mrr.Requires {
@@ -305,9 +316,56 @@ func buildProjectImporter(flat []SourceSpec) *parser.ProjectImporter {
 		if !strings.HasSuffix(s.Path, ".go") {
 			continue
 		}
-		pi.AddSource(s.Path, s.Before)
+		pi.AddSource(moduleRelativeSourcePath(s.Path, moduleRoot), s.Before)
 	}
 	return pi
+}
+
+func commonAbsoluteSourceRoot(flat []SourceSpec) string {
+	root := ""
+	for _, s := range flat {
+		if !strings.HasSuffix(s.Path, ".go") || !path.IsAbs(s.Path) {
+			continue
+		}
+		dir := path.Dir(path.Clean(s.Path))
+		if root == "" {
+			root = dir
+		} else {
+			root = commonPathPrefix(root, dir)
+		}
+	}
+	return root
+}
+
+func commonPathPrefix(a, b string) string {
+	if a == b {
+		return a
+	}
+	aParts := strings.Split(strings.Trim(a, "/"), "/")
+	bParts := strings.Split(strings.Trim(b, "/"), "/")
+	n := 0
+	for n < len(aParts) && n < len(bParts) && aParts[n] == bParts[n] {
+		n++
+	}
+	if n == 0 {
+		return "/"
+	}
+	return "/" + strings.Join(aParts[:n], "/")
+}
+
+func moduleRelativeSourcePath(sourcePath, moduleRoot string) string {
+	if moduleRoot == "" {
+		return sourcePath
+	}
+	cleaned := path.Clean(sourcePath)
+	if !path.IsAbs(cleaned) {
+		return sourcePath
+	}
+	root := path.Clean(moduleRoot)
+	if strings.HasPrefix(cleaned, root+"/") {
+		return strings.TrimPrefix(cleaned, root+"/")
+	}
+	return sourcePath
 }
 
 // Golang creates a SourceSpec for Go source code.

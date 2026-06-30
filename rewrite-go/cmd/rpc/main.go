@@ -2209,7 +2209,12 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if m == nil {
 			continue
 		}
-		piByModule[m.dir].AddSource(goFile, src)
+		rel, err := filepath.Rel(m.dir, goFile)
+		if err != nil {
+			s.logger.Printf("ParseProject: cannot relativize %s to module %s: %v", goFile, m.dir, err)
+			continue
+		}
+		piByModule[m.dir].AddSource(filepath.ToSlash(rel), src)
 	}
 
 	// Group files by (owning module, package directory). Each group
