@@ -25,6 +25,8 @@ import org.openrewrite.scheduling.WorkingDirectoryExecutionContextView;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -100,43 +102,62 @@ public class ScalaCompilerContext {
         java.util.List<SourceEntry> sourceList = new ArrayList<>(entries);
         java.util.List<String> cpList = new ArrayList<>(classpathStrings);
 
-        // Get a working directory for compiler output (.class files)
+        // Get a working directory for compiler output (.class/.tasty files).
         String outputDir;
+        Path ownedTempDir = null;
         try {
             Path root = executionContext.getMessage(WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT);
             if (root == null) {
-                root = java.nio.file.Files.createTempDirectory("rewrite-scala");
+                root = ownedTempDir = Files.createTempDirectory("rewrite-scala");
             }
-            outputDir = java.nio.file.Files.createDirectories(root.resolve("scala-compiler")).toString();
-        } catch (java.io.IOException e) {
+            outputDir = Files.createDirectories(root.resolve("scala-compiler")).toString();
+        } catch (IOException e) {
             outputDir = System.getProperty("java.io.tmpdir");
         }
 
-        // Batch compile
-        Map<String, ScalaParseResult> compiled = bridge.compileAll(sourceList, cpList, outputDir);
+        try {
+            // Batch compile
+            Map<String, ScalaParseResult> compiled = bridge.compileAll(sourceList, cpList, outputDir);
 
-        // Convert to ParseResult map
-        Map<String, ParseResult> results = new LinkedHashMap<>();
-        for (Map.Entry<String, ScalaParseResult> entry : compiled.entrySet()) {
-            String path = entry.getKey();
-            ScalaParseResult result = entry.getValue();
+            // Convert to ParseResult map
+            Map<String, ParseResult> results = new LinkedHashMap<>();
+            for (Map.Entry<String, ScalaParseResult> entry : compiled.entrySet()) {
+                String path = entry.getKey();
+                ScalaParseResult result = entry.getValue();
 
-            List<ParseWarning> warnings = new ArrayList<>();
-            for (int i = 0; i < result.warnings().size(); i++) {
-                ScalaWarning w = result.warnings().get(i);
-                Parser.Input input = inputsByPath.get(path);
-                String location = (input != null ? input.getPath().toString() : path);
-                String formatted = location + " at line " + w.line() + ":" + w.column() + " " + w.message();
-                warnings.add(new ParseWarning(Tree.randomId(), formatted));
-                if (logCompilationWarningsAndErrors) {
-                    logger.warn(formatted);
+                List<ParseWarning> warnings = new ArrayList<>();
+                for (int i = 0; i < result.warnings().size(); i++) {
+                    ScalaWarning w = result.warnings().get(i);
+                    Parser.Input input = inputsByPath.get(path);
+                    String location = (input != null ? input.getPath().toString() : path);
+                    String formatted = location + " at line " + w.line() + ":" + w.column() + " " + w.message();
+                    warnings.add(new ParseWarning(Tree.randomId(), formatted));
+                    if (logCompilationWarningsAndErrors) {
+                        logger.warn(formatted);
+                    }
                 }
+
+                results.put(path, new ParseResult(result, warnings));
             }
 
-            results.put(path, new ParseResult(result, warnings));
+            return results;
+        } finally {
+            if (ownedTempDir != null) {
+                deleteRecursively(ownedTempDir);
+            }
         }
+    }
 
-        return results;
+    private static void deleteRecursively(Path path) {
+        try {
+            if (Files.isDirectory(path)) {
+                try (java.util.stream.Stream<Path> children = Files.list(path)) {
+                    children.forEach(ScalaCompilerContext::deleteRecursively);
+                }
+            }
+            Files.delete(path);
+        } catch (IOException ignore) {
+        }
     }
 
     /**

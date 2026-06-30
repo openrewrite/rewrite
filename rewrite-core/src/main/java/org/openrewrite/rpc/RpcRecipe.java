@@ -140,10 +140,9 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
                         .map(rpc::recipeFromPrepareResponse)
                         .collect(toList());
             } else {
-                // Fallback: peers whose servers don't yet return a prepared child tree
-                // (Python/JS/Go until updated). This is the pre-existing by-name path, unchanged.
-                // TODO(remove-fallback): delete this branch once every RPC server populates
-                // `recipeList`. The C# server (this change) always takes the branch above.
+                // Fallback by-name path: peers whose servers don't yet return a prepared child tree
+                // (Python/JS/Go until updated). The C# server always takes the branch above.
+                // TODO(remove-fallback): delete this branch once every RPC server populates `recipeList`.
                 recipeList = descriptor.getRecipeList().stream()
                         .map(r -> rpc.prepareRecipe(r.getName(), r.getOptions().stream()
                                 .filter(opt -> opt.getValue() != null)

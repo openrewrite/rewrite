@@ -31,8 +31,8 @@ class KotlinVisitorReturnTest implements RewriteTest {
     /**
      * A {@link org.openrewrite.kotlin.tree.K.Return} wraps a {@link J.Return}. A Java recipe (such as
      * {@code TestMethodsShouldBeVoid}) may rewrite that inner {@code J.Return} into a different statement,
-     * e.g. unwrapping {@code return foo()} to {@code foo()}. {@code KotlinVisitor.visitReturn} previously
-     * cast the visited expression straight back to {@code J.Return}, throwing a {@link ClassCastException}.
+     * e.g. unwrapping {@code return foo()} to {@code foo()}. {@code KotlinVisitor.visitReturn} must handle
+     * the visited expression no longer being a {@code J.Return} without throwing a {@link ClassCastException}.
      */
     @Test
     void unwrapReturnIntoItsExpression() {

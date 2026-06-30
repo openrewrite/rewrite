@@ -19,6 +19,16 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import {execSync} from 'child_process';
 
+function isProcessAlive(pid: number): boolean {
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (error: any) {
+        // ESRCH: no such process. EPERM: process exists but is owned by another user.
+        return error.code === 'EPERM';
+    }
+}
+
 interface BaseWorkspaceOptions {
     /**
      * Optional target directory. If provided, creates workspace in this directory
@@ -465,8 +475,25 @@ export class DependencyWorkspace {
 
             const workspaceDir = path.join(this.WORKSPACE_BASE, entry.name);
 
-            // Always clean up temporary directories (incomplete operations)
-            if (entry.name.includes('.tmp-')) {
+            // Temporary directories are named `<key>.tmp-<pid>-...`. Only reap one
+            // whose owning process is gone — otherwise a shutdown here would delete
+            // another live process's install cwd mid-run (npm then exits 7). Names
+            // without a parseable pid fall back to age-based reaping.
+            const tmpIdx = entry.name.indexOf('.tmp-');
+            if (tmpIdx >= 0) {
+                const ownerPid = parseInt(entry.name.substring(tmpIdx + 5).split('-')[0], 10);
+                if (!isNaN(ownerPid) && isProcessAlive(ownerPid)) {
+                    continue;
+                }
+                if (isNaN(ownerPid)) {
+                    try {
+                        if (now - fs.statSync(workspaceDir).mtimeMs <= maxAgeMs) {
+                            continue;
+                        }
+                    } catch (error) {
+                        // fall through to deletion
+                    }
+                }
                 try {
                     fs.rmSync(workspaceDir, {recursive: true, force: true});
                 } catch (error) {

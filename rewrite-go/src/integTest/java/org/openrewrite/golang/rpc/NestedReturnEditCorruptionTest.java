@@ -34,19 +34,15 @@ import static org.openrewrite.golang.Assertions.go;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 /**
- * Regression test for the {@code receiveBlockBody} baseline fix in
- * {@code rewrite-go/pkg/rpc/java_receiver.go}.
+ * Editing a statement inside an {@code if} (or {@code for}) must round-trip cleanly over RPC. The
+ * {@code receiveBlockBody} path in {@code rewrite-go/pkg/rpc/java_receiver.go} has to pass the correct
+ * baseline when reconstructing {@code J.If.thenPart} and {@code ForLoop/ForEachLoop.body}; otherwise on
+ * a CHANGE every NO_CHANGE sibling field resolves to its zero value — the then-block's whitespace
+ * collapses (printing {@code if ...; a != 0{returnb}}) and, when wrapped in a {@code for}, the inner
+ * {@code if}'s {@code Condition} is dropped entirely.
  * <p>
- * Editing a statement inside an {@code if} (or {@code for}) used to corrupt the
- * enclosing block on RPC round-trip: the receiver passed a {@code nil} baseline
- * when reconstructing {@code J.If.thenPart} and {@code ForLoop/ForEachLoop.body},
- * so on a CHANGE every NO_CHANGE sibling field resolved to its zero value — the
- * then-block's whitespace collapsed (printing {@code if ...; a != 0{returnb}})
- * and, when wrapped in a {@code for}, the inner {@code if}'s {@code Condition}
- * was dropped entirely.
- * <p>
- * A one-line {@code toRecipe} visitor that renames {@code a} to {@code b} is
- * enough — the bug is structural, not recipe-specific.
+ * A one-line {@code toRecipe} visitor that renames {@code a} to {@code b} is enough to exercise this —
+ * the corruption is structural, not recipe-specific.
  */
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 class NestedReturnEditCorruptionTest implements RewriteTest {
