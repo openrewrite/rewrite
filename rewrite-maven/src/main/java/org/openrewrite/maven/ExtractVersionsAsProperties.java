@@ -20,12 +20,17 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.*;
 
 @Value
@@ -46,9 +51,37 @@ public class ExtractVersionsAsProperties extends Recipe {
                 Map<String, String> existingProps = loadExistingProperties(document.getRoot());
                 Map<String, String> groupSharedVersion = GroupVersionAnalyzer.analyze(document.getRoot(), existingProps);
                 propertyResolver = new PropertyResolver(groupSharedVersion, existingProps);
-                PropertyRenamer.findRenames(document.getRoot(), groupSharedVersion, existingProps)
+                Set<String> inheritedProps = inheritedPropertyKeys(ctx);
+                PropertyRenamer.findRenames(document.getRoot(), groupSharedVersion, existingProps, inheritedProps)
                     .forEach((oldKey, newKey) -> applyRename(oldKey, newKey, existingProps));
                 return super.visitDocument(document, ctx);
+            }
+
+            // Property names declared by an ancestor POM (e.g. Spring Boot's `spring-boot-dependencies`).
+            // These must not be renamed: the parent's dependency management still references them by name,
+            // so a local rename would silently break that wiring outside the scope of this pom.xml.
+            private Set<String> inheritedPropertyKeys(ExecutionContext ctx) {
+                MavenResolutionResult mrr = getResolutionResult();
+                if (mrr.getParent() != null) {
+                    return mrr.getParent().getPom().getProperties().keySet();
+                }
+                if (mrr.getPom().getRequested().getParent() == null) {
+                    return emptySet();
+                }
+                MavenPomDownloader downloader = new MavenPomDownloader(
+                    mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+                try {
+                    return mrr.getPom().getRequested()
+                        .withProperties(emptyMap())
+                        .withDependencies(emptyList())
+                        .withDependencyManagement(emptyList())
+                        .withPlugins(emptyList())
+                        .withPluginManagement(emptyList())
+                        .resolve(mrr.getActiveProfiles(), downloader, ctx)
+                        .getProperties().keySet();
+                } catch (MavenDownloadingException e) {
+                    return emptySet();
+                }
             }
 
             private Map<String, String> loadExistingProperties(Xml.Tag root) {
@@ -171,10 +204,10 @@ public class ExtractVersionsAsProperties extends Recipe {
         // For deps in a shared-version group that already reference a non-standard ${propName},
         // returns oldKey→newKey pairs so the visitor can schedule RenamePropertyKey for each.
         static Map<String, String> findRenames(Xml.Tag root, Map<String, String> groupSharedVersion,
-                                               Map<String, String> existingProps) {
+                                               Map<String, String> existingProps, Set<String> inheritedProps) {
             return allDescendants(root)
                 .filter(tag -> "dependency".equals(tag.getName()) || "plugin".equals(tag.getName()))
-                .flatMap(tag -> toNonStandardRenameEntry(tag, existingProps, groupSharedVersion))
+                .flatMap(tag -> toNonStandardRenameEntry(tag, existingProps, groupSharedVersion, inheritedProps))
                 .collect(toMap(
                     Map.Entry::getKey,
                     Map.Entry::getValue,
@@ -183,7 +216,8 @@ public class ExtractVersionsAsProperties extends Recipe {
         }
 
         private static Stream<Map.Entry<String, String>> toNonStandardRenameEntry(
-            Xml.Tag tag, Map<String, String> existingProps, Map<String, String> groupSharedVersion) {
+            Xml.Tag tag, Map<String, String> existingProps, Map<String, String> groupSharedVersion,
+            Set<String> inheritedProps) {
             String groupId = tag.getChildValue("groupId").orElse(null);
             if (groupId == null || !groupSharedVersion.containsKey(groupId)) {
                 return Stream.empty();
@@ -195,7 +229,7 @@ public class ExtractVersionsAsProperties extends Recipe {
             }
             String trimmedVersion = version.trim();
             String propRef = trimmedVersion.substring(2, trimmedVersion.length() - 1);
-            if (propRef.equals(standardKey) || !existingProps.containsKey(propRef)) {
+            if (propRef.equals(standardKey) || !existingProps.containsKey(propRef) || inheritedProps.contains(propRef)) {
                 return Stream.empty();
             }
             return Stream.of(new AbstractMap.SimpleEntry<>(propRef, standardKey));

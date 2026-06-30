@@ -670,6 +670,166 @@ class ExtractVersionsAsPropertiesTest implements RewriteTest {
     }
 
     @Test
+    void extractsInlinedVersionUnderSpringBootStarterParentReusingInheritedPropertyName() {
+        // spring-boot-starter-parent's own parent (spring-boot-dependencies) declares a `h2.version`
+        // property and manages com.h2database:h2 via `${h2.version}`. Those inherited properties live in
+        // the parent hierarchy, not in this document, so the recipe never sees them. It derives a local
+        // property name purely from the artifactId ("h2" -> "h2.version"), which here happens to match
+        // the inherited property name. Because Spring Boot's override convention is to redeclare that same
+        // property locally, the extracted `<h2.version>` not only de-inlines the version but also becomes
+        // the idiomatic override of the managed version.
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.h2database</groupId>
+                    <artifactId>h2</artifactId>
+                    <version>2.1.214</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1.0.0</version>
+                <properties>
+                  <h2.version>2.1.214</h2.version>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.h2database</groupId>
+                    <artifactId>h2</artifactId>
+                    <version>${h2.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void extractsInlinedVersionUnderSpringBootStarterParentWithoutReusingInheritedPropertyName() {
+        // Counterpart to the h2 case: spring-boot-dependencies manages org.mockito:mockito-core via a
+        // `mockito.version` property, but the recipe names its local property after the artifactId
+        // ("mockito-core" -> "mockito-core.version") rather than after the inherited `mockito.version`.
+        // The dependency still resolves to the intended version through the explicit `${mockito-core.version}`
+        // reference, but the extracted property does not line up with Spring Boot's override convention.
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.mockito</groupId>
+                    <artifactId>mockito-core</artifactId>
+                    <version>4.5.1</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1.0.0</version>
+                <properties>
+                  <mockito-core.version>4.5.1</mockito-core.version>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.mockito</groupId>
+                    <artifactId>mockito-core</artifactId>
+                    <version>${mockito-core.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotRenameInheritedSpringBootPropertyToGroupStandardName() {
+        // `mockito.version` is declared by spring-boot-dependencies and the parent's dependency management
+        // references it by that exact name; redeclaring it locally is Spring Boot's override mechanism.
+        // Both mockito dependencies share that property, so the group-standardizing rename would normally
+        // rewrite it to `org.mockito.version` - but that would break the parent's `${mockito.version}`
+        // wiring, which lives outside this pom.xml. The recipe must leave the inherited property untouched.
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1.0.0</version>
+                <properties>
+                  <mockito.version>4.5.1</mockito.version>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.mockito</groupId>
+                    <artifactId>mockito-core</artifactId>
+                    <version>${mockito.version}</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>org.mockito</groupId>
+                    <artifactId>mockito-junit-jupiter</artifactId>
+                    <version>${mockito.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void isNoOpWhenAllVersionsAlreadyExtracted() {
         rewriteRun(
           pomXml(
