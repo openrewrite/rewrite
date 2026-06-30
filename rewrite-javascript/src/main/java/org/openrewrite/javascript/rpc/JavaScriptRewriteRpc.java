@@ -467,8 +467,12 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/rewrite-javascript-version.txt"));
                 cmd = Stream.of(
                         npxPath.toString(),
-                        // For SNAPSHOT versions, assume npm link has been run and don't use --package
-                        version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
+                        // DO NOT COMMIT — branch-local diagnostic only.
+                        // Always resolve `rewrite-rpc` from the locally-linked build instead of
+                        // fetching `@openrewrite/rewrite@<version>` from npm. On CI the version is a
+                        // dated, unpublished snapshot, so the registry fetch fails with ETARGET and
+                        // kills the RPC server. Forcing the local link makes CI behave like local.
+                        null,
                         "rewrite-rpc",
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
