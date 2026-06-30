@@ -734,4 +734,22 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deleteEntryAfterCrlfBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("doomed", null, null, null)),
+          yaml(
+            "keep: >-\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "doomed: value\r\n" +
+            "after: tail\r\n",
+            "keep: >-\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "after: tail\r\n"
+          )
+        );
+    }
 }

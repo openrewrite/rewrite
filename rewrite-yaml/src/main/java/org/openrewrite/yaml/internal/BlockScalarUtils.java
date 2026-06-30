@@ -54,6 +54,12 @@ public final class BlockScalarUtils {
      * For FOLDED and LITERAL scalars this is the body dedented to column zero, joined with
      * single {@code \n}s, with the chomp indicator, header newline, indent, and trailing
      * whitespace stripped.
+     *
+     * <p>The returned body is line-ending neutral: regardless of whether the source file uses
+     * {@code \n} or {@code \r\n}, interior line breaks are normalized to {@code \n} so that
+     * callers can compare and regex-match against it without worrying about the platform the
+     * file was authored on. Use {@link #withBody(Yaml.Scalar, String)} to write a body back in
+     * the document's own line-ending convention.
      */
     public static String getBody(Yaml.Scalar scalar) {
         if (!isBlockStyle(scalar)) {
@@ -76,15 +82,14 @@ public final class BlockScalarUtils {
         while (indent < bodyRegion.length() && bodyRegion.charAt(indent) == ' ') {
             indent++;
         }
-        if (indent == 0) {
-            return bodyRegion;
-        }
         String indentStr = bodyRegion.substring(0, indent);
-        String[] lines = bodyRegion.split("\n", -1);
+        // Split on any line-ending form so a CRLF-authored file does not leave stray '\r's in
+        // the body, then rejoin with '\n' for a platform-neutral result.
+        String[] lines = bodyRegion.split("\r\n|\r|\n", -1);
         StringBuilder out = new StringBuilder(bodyRegion.length());
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
-            if (line.startsWith(indentStr)) {
+            if (indent > 0 && line.startsWith(indentStr)) {
                 line = line.substring(indent);
             }
             if (i > 0) {
@@ -110,6 +115,9 @@ public final class BlockScalarUtils {
      * For FOLDED and LITERAL scalars the block envelope is preserved: the chomp indicator,
      * header newline, and trailing whitespace that bounds the block from the next sibling are
      * kept intact, and each line of {@code newBody} is re-indented to the block body's column.
+     * Interior line breaks in {@code newBody} are emitted in the existing value's line-ending
+     * convention ({@code \r\n} if the block header uses CRLF, otherwise {@code \n}), so that
+     * editing a body on a Windows-authored file does not introduce mixed line endings.
      *
      * <p>If the original block scalar had an empty body and the body indent cannot be
      * recovered from the existing value, {@code defaultIndentSpaces} is used as the indent
@@ -123,6 +131,9 @@ public final class BlockScalarUtils {
         String value = scalar.getValue();
         int headerEnd = value.indexOf('\n');
         String header = headerEnd < 0 ? value : value.substring(0, headerEnd + 1);
+        // Match the document's line-ending convention for interior breaks: if the block header
+        // terminates with CRLF, keep emitting CRLF rather than gluing in bare '\n's.
+        String newLine = (headerEnd > 0 && value.charAt(headerEnd - 1) == '\r') ? "\r\n" : "\n";
         int bodyEnd = value.length();
         while (bodyEnd > 0 && Character.isWhitespace(value.charAt(bodyEnd - 1))) {
             bodyEnd--;
@@ -142,13 +153,13 @@ public final class BlockScalarUtils {
         }
         String trailing = value.substring(bodyEnd);
         if (trailing.isEmpty()) {
-            trailing = "\n";
+            trailing = newLine;
         }
-        String[] lines = newBody.split("\n", -1);
+        String[] lines = newBody.split("\r\n|\r|\n", -1);
         StringBuilder body = new StringBuilder();
         for (int i = 0; i < lines.length; i++) {
             if (i > 0) {
-                body.append('\n');
+                body.append(newLine);
             }
             if (!lines[i].isEmpty()) {
                 body.append(indent).append(lines[i]);

@@ -242,6 +242,22 @@ class ChangeValueTest implements RewriteTest {
     }
 
     @Test
+    void preservesCrlfLiteralBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.key", "replaced", null)),
+          yaml(
+            "key: |\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "after: tail\r\n",
+            "key: |\r\n" +
+            "  replaced\r\n" +
+            "after: tail\r\n"
+          )
+        );
+    }
+
+    @Test
     void changeSequenceKeyByExactMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(

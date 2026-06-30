@@ -399,6 +399,42 @@ class ChangePropertyValueTest implements RewriteTest {
     }
 
     @Test
+    void preservesCrlfLiteralBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
+          yaml(
+            "key: |\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "after: tail\r\n",
+            "key: |\r\n" +
+            "  replaced\r\n" +
+            "after: tail\r\n"
+          )
+        );
+    }
+
+    @Test
+    void multilineReplacementOnCrlfBlockScalarKeepsCrlf() {
+        // The new value introduces its own interior line break (a bare '\n' from the recipe
+        // argument). On a CRLF file that break must be emitted as CRLF, not glued in as a lone
+        // LF that would leave the block with mixed line endings.
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("key", "new one\nnew two", null, null, null, null)),
+          yaml(
+            "key: |\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "after: tail\r\n",
+            "key: |\r\n" +
+            "  new one\r\n" +
+            "  new two\r\n" +
+            "after: tail\r\n"
+          )
+        );
+    }
+
+    @Test
     void validatesThatOldValueIsRequiredIfRegexEnabled() {
         assertTrue(new ChangePropertyValue("my.prop", "bar", null, true, null, null).validate().isInvalid());
     }
