@@ -40,7 +40,6 @@ func newTypeMapper() *typeMapper {
 	}
 }
 
-// mapType converts a go/types.Type to a java.JavaType.
 func (m *typeMapper) mapType(t types.Type) java.JavaType {
 	if t == nil {
 		return nil
@@ -218,8 +217,6 @@ func (m *typeMapper) mapSignature(sig *types.Signature, name string, declaringTy
 			TypeParameters: tupleParams,
 		}
 	}
-
-	// Parameters
 	params := sig.Params()
 	for i := 0; i < params.Len(); i++ {
 		p := params.At(i)
@@ -327,7 +324,6 @@ func flagsForObject(obj *types.TypeName) int64 {
 	return flagsForExported(obj.Name())
 }
 
-// flagsForExported returns Public (1) if the name starts with an uppercase letter.
 func flagsForExported(name string) int64 {
 	if len(name) > 0 && unicode.IsUpper(rune(name[0])) {
 		return 1 // Java Flag.Public
@@ -384,7 +380,6 @@ func (m *typeMapper) mapObjectToVariable(obj types.Object) *java.JavaTypeVariabl
 	}
 }
 
-// ownerType returns the JavaType of the object's owner (declaring type).
 func (m *typeMapper) ownerType(v *types.Var) java.JavaType {
 	if !v.IsField() {
 		return nil
@@ -454,7 +449,6 @@ func isUnresolved(obj types.Object) bool {
 	return obj == nil
 }
 
-// isBlankIdent returns true if the identifier is "_".
 func isBlankIdent(name string) bool {
 	return strings.TrimSpace(name) == "_"
 }

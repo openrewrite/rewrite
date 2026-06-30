@@ -116,7 +116,6 @@ func TestParseMultiAssignFromFunc(t *testing.T) {
 		`))
 }
 
-// ident builds a bare identifier expression for the visitor fixtures.
 func ident(name string) java.Expression {
 	return &java.Identifier{ID: uuid.New(), Name: name}
 }

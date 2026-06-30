@@ -32,8 +32,6 @@ import (
 // DataTableStore is installed. Mirrors JS DATA_TABLE_STORE.
 const DataTableStoreKey = "org.openrewrite.dataTables.store"
 
-// DataTableLike is the type-erased view of a DataTable that DataTableStore
-// implementations work against. Generic DataTable[Row] satisfies this.
 type DataTableLike interface {
 	Descriptor() DataTableDescriptor
 	InstanceName() string
@@ -96,16 +94,11 @@ func (dt *DataTable[Row]) InsertRow(ctx *ExecutionContext, row Row) {
 	}
 }
 
-// --- InMemoryDataTableStore ---
-
 type bucket struct {
 	dt   DataTableLike
 	rows []any
 }
 
-// InMemoryDataTableStore holds rows in memory keyed by (dataTableName, group).
-// Rows can be read back via GetRows. Default for tests and recipes that
-// don't need disk-backed output.
 type InMemoryDataTableStore struct {
 	mu      sync.Mutex
 	buckets map[string]*bucket
@@ -162,8 +155,6 @@ func (s *InMemoryDataTableStore) GetDataTables() []DataTableLike {
 	return out
 }
 
-// --- CsvDataTableStore ---
-
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]`)
 var dashRun = regexp.MustCompile(`-+`)
 var leadingTrailingDash = regexp.MustCompile(`^-|-$`)
@@ -192,7 +183,6 @@ type ColumnValue struct {
 	Value string
 }
 
-// CsvDataTableStore writes rows directly to raw .csv files, one per (recipe, dataTable, group).
 type CsvDataTableStore struct {
 	outputDir     string
 	prefixColumns []ColumnValue
@@ -217,7 +207,6 @@ func NewCsvDataTableStoreWithColumns(outputDir string, prefix, suffix []ColumnVa
 	}, nil
 }
 
-// Close is a no-op: each row is written with its own short-lived append handle.
 func (s *CsvDataTableStore) Close() {}
 
 // fileKey mirrors Java's CsvDataTableStore.fileKey exactly so a table shared by

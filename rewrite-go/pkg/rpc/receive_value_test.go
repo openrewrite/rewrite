@@ -22,7 +22,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// queueOf returns a ReceiveQueue that yields the given messages once.
 func queueOf(msgs ...RpcObjectData) *ReceiveQueue {
 	delivered := false
 	return NewReceiveQueue(make(map[int]any), func() []RpcObjectData {

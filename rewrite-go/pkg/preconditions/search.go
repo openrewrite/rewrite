@@ -35,8 +35,6 @@ func isSourceFile(t java.Tree) bool {
 	return ok
 }
 
-// IsSourceFileVisitor matches SourceFile trees by path glob.
-//
 // Mirrors org.openrewrite.FindSourceFiles. Used as the LocalVisitor
 // bundled with the *RecipeRef returned by HasSourcePath so unit tests
 // without an active RPC connection still see real filtering.

@@ -38,7 +38,6 @@ type GoResolutionResult struct {
 
 func (m GoResolutionResult) ID() uuid.UUID { return m.Ident }
 
-// FindRequire returns the require entry for a module, or nil.
 func (m GoResolutionResult) FindRequire(modulePath string) *GoRequire {
 	for i := range m.Requires {
 		if m.Requires[i].ModulePath == modulePath {
@@ -48,7 +47,6 @@ func (m GoResolutionResult) FindRequire(modulePath string) *GoRequire {
 	return nil
 }
 
-// FindResolved returns the resolved dependency for a module, or nil.
 func (m GoResolutionResult) FindResolved(modulePath string) *GoResolvedDependency {
 	for i := range m.ResolvedDependencies {
 		if m.ResolvedDependencies[i].ModulePath == modulePath {
@@ -58,7 +56,6 @@ func (m GoResolutionResult) FindResolved(modulePath string) *GoResolvedDependenc
 	return nil
 }
 
-// GoRequire is one entry in the go.mod `require` list.
 type GoRequire struct {
 	ModulePath string
 	Version    string
@@ -75,7 +72,6 @@ type GoReplace struct {
 	NewVersion string
 }
 
-// GoExclude is one entry in the go.mod `exclude` list.
 type GoExclude struct {
 	ModulePath string
 	Version    string
@@ -88,7 +84,6 @@ type GoRetract struct {
 	Rationale    string // empty if no `// ...` comment
 }
 
-// GoResolvedDependency is one entry from go.sum.
 type GoResolvedDependency struct {
 	ModulePath string
 	Version    string
@@ -96,8 +91,6 @@ type GoResolvedDependency struct {
 	GoModHash  string
 }
 
-// NewGoResolutionResult creates a GoResolutionResult marker with a fresh UUID.
-//
 // The directive slices are initialized to empty (non-nil) values. Go has no
 // way to declare a slice non-nullable at the type level, so this constructor is
 // the single chokepoint that guarantees it: a nil slice would be serialized by

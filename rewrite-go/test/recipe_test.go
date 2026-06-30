@@ -28,8 +28,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// --- Sample search recipe that marks identifiers named "foo" ---
-
 type findFoo struct {
 	recipe.Base
 }
@@ -56,8 +54,6 @@ func (v *findFooVisitor) VisitIdentifier(ident *java.Identifier, p any) java.J {
 	return ident
 }
 
-// --- Sample refactoring recipe that renames "foo" to "bar" ---
-
 type renameFooToBar struct {
 	recipe.Base
 }
@@ -81,8 +77,6 @@ func (v *renameFooToBarVisitor) VisitIdentifier(ident *java.Identifier, p any) j
 	}
 	return ident
 }
-
-// --- Tests ---
 
 func TestRecipeRename(t *testing.T) {
 	spec := test.NewRecipeSpec().WithRecipe(&renameFooToBar{})
@@ -206,7 +200,6 @@ func TestRegistryActivate(t *testing.T) {
 
 	reg.Activate(activateSearch, activateRefactoring)
 
-	// Find by name
 	found, ok := reg.FindRecipe("org.openrewrite.golang.test.FindFoo")
 	if !ok {
 		t.Fatal("expected to find FindFoo recipe")

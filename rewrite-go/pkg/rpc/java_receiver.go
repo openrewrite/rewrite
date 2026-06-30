@@ -116,8 +116,6 @@ func (r *JavaReceiver) receiveType(before java.JavaType, q *ReceiveQueue) java.J
 	return result.(java.JavaType)
 }
 
-// --- J nodes ---
-
 func (r *JavaReceiver) VisitIdentifier(id *java.Identifier, p any) java.J {
 	q := p.(*ReceiveQueue)
 	c := *id // shallow copy to avoid mutating remoteObjects baseline

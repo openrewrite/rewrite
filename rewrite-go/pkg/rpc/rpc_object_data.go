@@ -18,7 +18,6 @@ package rpc
 
 import "encoding/json"
 
-// State represents the state of an RPC object data message.
 type State int
 
 const (
@@ -57,7 +56,6 @@ type RpcObjectData struct {
 	Ref       *int    `json:"ref,omitempty"`
 }
 
-// MarshalJSON implements custom JSON marshaling for RpcObjectData.
 func (d RpcObjectData) MarshalJSON() ([]byte, error) {
 	type Alias struct {
 		State     string  `json:"state"`
@@ -73,7 +71,6 @@ func (d RpcObjectData) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// ParseObjectData converts a JSON-decoded map to an RpcObjectData.
 func ParseObjectData(m map[string]any) RpcObjectData {
 	d := RpcObjectData{}
 	if s, ok := m["state"].(string); ok {

@@ -22,6 +22,9 @@ dependencies {
 
     api("org.jspecify:jspecify:latest.release")
 
+    // @MustBeClosed on DataTableStore.getRows; CLASS-retention, not needed at runtime.
+    compileOnly("com.google.errorprone:error_prone_annotations:latest.release")
+
     // Recipe marketplace
     implementation("com.univocity:univocity-parsers:latest.release")
 

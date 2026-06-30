@@ -18,7 +18,6 @@ package java
 
 import "github.com/google/uuid"
 
-// Identifier represents a name reference in source code.
 type Identifier struct {
 	ID          uuid.UUID
 	Prefix      Space
@@ -66,7 +65,6 @@ func (n *Identifier) WithFieldType(ft *JavaTypeVariable) *Identifier {
 	return &c
 }
 
-// Literal represents a literal value (string, number, boolean, etc.).
 type Literal struct {
 	ID             uuid.UUID
 	Prefix         Space
@@ -117,7 +115,6 @@ func (n *Literal) WithSource(source string) *Literal {
 	return &c
 }
 
-// BinaryOperator represents the operator in a binary expression.
 type BinaryOperator int
 
 const (
@@ -144,7 +141,6 @@ const (
 	AndNot // Go-specific: &^
 )
 
-// String returns the Java enum name for this BinaryOperator.
 func (op BinaryOperator) String() string {
 	switch op {
 	case Add:
@@ -190,7 +186,6 @@ func (op BinaryOperator) String() string {
 	}
 }
 
-// ParseBinaryOperator converts a Java enum name to a BinaryOperator.
 func ParseBinaryOperator(s string) BinaryOperator {
 	switch s {
 	case "Addition":
@@ -234,7 +229,6 @@ func ParseBinaryOperator(s string) BinaryOperator {
 	}
 }
 
-// Binary represents a binary expression like `a + b`.
 type Binary struct {
 	ID       uuid.UUID
 	Prefix   Space
@@ -273,7 +267,6 @@ func (n *Binary) WithRight(right Expression) *Binary {
 	return &c
 }
 
-// Block represents a brace-delimited block of statements.
 type Block struct {
 	ID         uuid.UUID
 	Prefix     Space
@@ -379,8 +372,6 @@ func (n *If) WithThen(then *Block) *If {
 	return &c
 }
 
-// Else represents an else clause of an if statement.
-// This matches Java's J.If.Else for RPC wire format compatibility.
 type Else struct {
 	ID      uuid.UUID
 	Prefix  Space
@@ -403,7 +394,6 @@ func (n *Else) WithMarkers(markers Markers) *Else {
 	return &c
 }
 
-// Assignment represents an assignment statement like `x = expr`.
 type Assignment struct {
 	ID       uuid.UUID
 	Prefix   Space
@@ -436,7 +426,6 @@ func (n *Assignment) WithVariable(variable Expression) *Assignment {
 	return &c
 }
 
-// AssignmentOperation represents a compound assignment like `x += expr`.
 type AssignmentOperation struct {
 	ID         uuid.UUID
 	Prefix     Space
@@ -463,7 +452,6 @@ const (
 	AndNotAssign                               // &^= (Go-specific)
 )
 
-// String returns the Java enum name for this AssignmentOperator.
 func (op AssignmentOperator) String() string {
 	switch op {
 	case AddAssign:
@@ -493,7 +481,6 @@ func (op AssignmentOperator) String() string {
 	}
 }
 
-// ParseAssignmentOperator converts a Java enum name to an AssignmentOperator.
 func ParseAssignmentOperator(s string) AssignmentOperator {
 	switch s {
 	case "Addition":
@@ -544,7 +531,6 @@ func (n *AssignmentOperation) WithVariable(variable Expression) *AssignmentOpera
 	return &c
 }
 
-// MethodDeclaration represents a function or method declaration.
 type MethodDeclaration struct {
 	ID                 uuid.UUID
 	Prefix             Space
@@ -689,7 +675,6 @@ func (n *ForLoop) WithBody(body *Block) *ForLoop {
 	return &c
 }
 
-// ForControl holds the init, condition, and update of a for loop.
 // When Init is non-nil, this is a 3-clause loop with semicolons;
 // Init.After and Condition.After capture whitespace around semicolons.
 // When Init is nil and Condition is non-nil, it's a condition-only loop (no semicolons).
@@ -718,7 +703,6 @@ func (n *ForControl) WithMarkers(markers Markers) *ForControl {
 	return &c
 }
 
-// ForEachLoop represents a for-range loop: `for k, v := range expr { body }`
 type ForEachLoop struct {
 	ID      uuid.UUID
 	Prefix  Space
@@ -815,7 +799,6 @@ func (n *Switch) WithBody(body *Block) *Switch {
 	return &c
 }
 
-// Case represents a case or default clause in a switch statement.
 type Case struct {
 	ID          uuid.UUID
 	Prefix      Space
@@ -840,7 +823,6 @@ func (n *Case) WithMarkers(markers Markers) *Case {
 	return &c
 }
 
-// Break represents a break statement with optional label.
 type Break struct {
 	ID      uuid.UUID
 	Prefix  Space
@@ -864,7 +846,6 @@ func (n *Break) WithMarkers(markers Markers) *Break {
 	return &c
 }
 
-// Continue represents a continue statement with optional label.
 type Continue struct {
 	ID      uuid.UUID
 	Prefix  Space
@@ -888,7 +869,6 @@ func (n *Continue) WithMarkers(markers Markers) *Continue {
 	return &c
 }
 
-// Label represents a labeled statement: `label: stmt`.
 type Label struct {
 	ID        uuid.UUID
 	Prefix    Space
@@ -913,7 +893,6 @@ func (n *Label) WithMarkers(markers Markers) *Label {
 	return &c
 }
 
-// Annotation represents annotation metadata attached to a declaration.
 // Mirrors org.openrewrite.java.tree.J.Annotation.
 //
 // Java has first-class `@Annotation(args)` syntax. Go has no `@`, but
@@ -975,7 +954,6 @@ func (n *Annotation) WithArguments(arguments *Container[Expression]) *Annotation
 	return &c
 }
 
-// Empty represents an empty statement or expression placeholder.
 type Empty struct {
 	ID      uuid.UUID
 	Prefix  Space
@@ -993,7 +971,6 @@ func (n *Empty) WithPrefix(prefix Space) *Empty {
 	return &c
 }
 
-// Unary represents a unary expression like `-x` or `!y`.
 type Unary struct {
 	ID       uuid.UUID
 	Prefix   Space
@@ -1020,7 +997,6 @@ const (
 	Tilde                                  // ~ (approximate type constraint, Go-specific)
 )
 
-// String returns the Java enum name for this UnaryOperator.
 func (op UnaryOperator) String() string {
 	switch op {
 	case Negate:
@@ -1052,7 +1028,6 @@ func (op UnaryOperator) String() string {
 	}
 }
 
-// ParseUnaryOperator converts a Java enum name to a UnaryOperator.
 func ParseUnaryOperator(s string) UnaryOperator {
 	switch s {
 	case "PreIncrement":
@@ -1111,7 +1086,6 @@ func (n *Unary) WithOperand(operand Expression) *Unary {
 	return &c
 }
 
-// FieldAccess represents a field or method access like `obj.Field`.
 type FieldAccess struct {
 	ID      uuid.UUID
 	Prefix  Space
@@ -1143,7 +1117,6 @@ func (n *FieldAccess) WithTarget(target Expression) *FieldAccess {
 	return &c
 }
 
-// MethodInvocation represents a function or method call like `f(args)`.
 type MethodInvocation struct {
 	ID             uuid.UUID
 	Prefix         Space
@@ -1184,7 +1157,6 @@ func (n *MethodInvocation) WithTypeParameters(typeParameters *Container[Expressi
 	return &c
 }
 
-// VariableDeclarations represents one or more variable declarations.
 // Grouped declarations `var ( ... )` / `const ( ... )` are modeled by
 // golang.DeclarationBlock, whose elements are single VariableDeclarations.
 type VariableDeclarations struct {
@@ -1219,7 +1191,6 @@ func (n *VariableDeclarations) WithLeadingAnnotations(anns []*Annotation) *Varia
 	return &c
 }
 
-// VariableDeclarator represents a single variable with optional initializer.
 type VariableDeclarator struct {
 	ID          uuid.UUID
 	Prefix      Space
@@ -1249,7 +1220,6 @@ func (n *VariableDeclarator) WithName(name *Identifier) *VariableDeclarator {
 	return &c
 }
 
-// ArrayType represents a variable-length array (slice) type like `[]T`.
 // Mirrors Java's J.ArrayType, which has no length slot. Go's fixed-size arrays
 // `[N]T` carry an inline length expression and map to golang.ArrayType instead.
 type ArrayType struct {
@@ -1277,7 +1247,6 @@ func (n *ArrayType) WithMarkers(markers Markers) *ArrayType {
 	return &c
 }
 
-// Parentheses wraps an expression in parentheses: `(expr)`.
 type Parentheses struct {
 	ID      uuid.UUID
 	Prefix  Space
@@ -1301,7 +1270,6 @@ func (n *Parentheses) WithMarkers(markers Markers) *Parentheses {
 	return &c
 }
 
-// TypeCast represents a type assertion or type cast: `x.(T)` in Go.
 type TypeCast struct {
 	ID      uuid.UUID
 	Prefix  Space
@@ -1326,7 +1294,6 @@ func (n *TypeCast) WithMarkers(markers Markers) *TypeCast {
 	return &c
 }
 
-// ControlParentheses wraps an expression in parentheses for control flow.
 type ControlParentheses struct {
 	ID      uuid.UUID
 	Prefix  Space
@@ -1350,7 +1317,6 @@ func (n *ControlParentheses) WithMarkers(markers Markers) *ControlParentheses {
 	return &c
 }
 
-// ArrayAccess represents an index expression like `a[i]` or `m[key]`.
 type ArrayAccess struct {
 	ID        uuid.UUID
 	Prefix    Space
@@ -1360,7 +1326,6 @@ type ArrayAccess struct {
 	Type      JavaType // the result type (nullable)
 }
 
-// ArrayDimension represents the `[index]` part of an array access.
 type ArrayDimension struct {
 	ID      uuid.UUID
 	Prefix  Space
@@ -1399,7 +1364,6 @@ func (n *ArrayDimension) WithMarkers(markers Markers) *ArrayDimension {
 	return &c
 }
 
-// ParameterizedType represents a generic type instantiation like `List[string]`.
 type ParameterizedType struct {
 	ID             uuid.UUID
 	Prefix         Space
@@ -1425,7 +1389,6 @@ func (n *ParameterizedType) WithMarkers(markers Markers) *ParameterizedType {
 	return &c
 }
 
-// Import represents a single import declaration.
 type Import struct {
 	ID      uuid.UUID
 	Prefix  Space

@@ -18,7 +18,6 @@ package java
 
 import "strings"
 
-// Comment represents a comment in source code.
 type Comment struct {
 	Kind      CommentKind
 	Text      string
@@ -34,20 +33,16 @@ const (
 	BlockComment
 )
 
-// Space represents whitespace and comments that appear before a syntax element.
 // This is the fundamental unit of formatting preservation in OpenRewrite.
 type Space struct {
 	Comments   []Comment
 	Whitespace string
 }
 
-// EmptySpace is the zero-value Space with no whitespace or comments.
 var EmptySpace = Space{}
 
-// SingleSpace is a Space containing exactly one space character.
 var SingleSpace = Space{Whitespace: " "}
 
-// IsEmpty returns true if this Space has no whitespace and no comments.
 func (s Space) IsEmpty() bool {
 	return s.Whitespace == "" && len(s.Comments) == 0
 }
@@ -74,10 +69,8 @@ func ParseSpace(raw string) Space {
 		return EmptySpace
 	}
 
-	// Find where the first comment starts
 	firstComment := findCommentStart(raw, 0)
 	if firstComment == len(raw) {
-		// No comments, just whitespace
 		return Space{Whitespace: raw}
 	}
 
@@ -87,7 +80,6 @@ func ParseSpace(raw string) Space {
 
 	for i < len(raw) {
 		if i+1 < len(raw) && raw[i] == '/' && raw[i+1] == '/' {
-			// Line comment: from // to end of line (not including \n)
 			end := strings.IndexByte(raw[i:], '\n')
 			var text string
 			if end < 0 {
@@ -97,13 +89,11 @@ func ParseSpace(raw string) Space {
 				text = raw[i : i+end]
 				i = i + end // i now points at \n
 			}
-			// Suffix: consume until next comment or end
 			suffixEnd := findCommentStart(raw, i)
 			suffix := raw[i:suffixEnd]
 			i = suffixEnd
 			comments = append(comments, Comment{Kind: LineComment, Text: text, Suffix: suffix})
 		} else if i+1 < len(raw) && raw[i] == '/' && raw[i+1] == '*' {
-			// Block comment: from /* to */
 			end := strings.Index(raw[i+2:], "*/")
 			var text string
 			if end < 0 {
@@ -114,7 +104,6 @@ func ParseSpace(raw string) Space {
 				i = i + 2 + end + 2
 			}
 			multiline := strings.Contains(text, "\n")
-			// Suffix: consume until next comment or end
 			suffixEnd := findCommentStart(raw, i)
 			suffix := raw[i:suffixEnd]
 			i = suffixEnd
