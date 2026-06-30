@@ -167,8 +167,6 @@ func runVisitor(v recipe.TreeVisitor, t java.Tree, p any) bool {
 	return result != t
 }
 
-// Check wraps an editor with a precondition gate.
-//
 // Argument shapes accepted as the gate (CheckArg):
 //   - recipe.TreeVisitor — runs in-process as the gate
 //   - recipe.Recipe — its Editor() is used as the gate

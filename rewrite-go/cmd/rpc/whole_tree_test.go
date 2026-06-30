@@ -51,7 +51,9 @@ type goCompositeInvalidChild struct{ recipe.Base }
 
 func (*goCompositeInvalidChild) Name() string        { return "org.openrewrite.go.test.CompositeInvalid" }
 func (*goCompositeInvalidChild) DisplayName() string { return "Composite invalid" }
-func (*goCompositeInvalidChild) Description() string { return "A composite whose child lacks a required option." }
+func (*goCompositeInvalidChild) Description() string {
+	return "A composite whose child lacks a required option."
+}
 func (*goCompositeInvalidChild) RecipeList() []recipe.Recipe {
 	return []recipe.Recipe{&goReqOptRecipe{}}
 }
@@ -95,7 +97,6 @@ func TestPrepareRecipeValidatesChildRequiredOptions(t *testing.T) {
 	}
 }
 
-// PrepareRecipe returns the whole prepared tree (recipeList) so the host builds it locally.
 func TestPrepareRecipeReturnsWholeChildTree(t *testing.T) {
 	s, _ := newTestServer(t)
 	s.registry.Register(&goCompositeRecipe{})

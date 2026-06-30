@@ -34,7 +34,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// GoParser parses Go source code into OpenRewrite LST nodes.
 type GoParser struct {
 	// Importer resolves imported packages for type checking.
 	// Defaults to importer.Default() which resolves stdlib packages.
@@ -72,7 +71,6 @@ type FileInput struct {
 	Content string
 }
 
-// Parse parses a single Go source file and returns its CompilationUnit.
 // Convenience wrapper around ParsePackage for the common one-file case;
 // type attribution that depends on sibling files in the same package
 // won't resolve here. Use ParsePackage when sibling files matter.
@@ -179,7 +177,6 @@ func PackageNameOf(path, content string) string {
 	return f.Name.Name
 }
 
-// parseContext holds the state needed during AST-to-LST mapping.
 type parseContext struct {
 	src      []byte
 	fset     *token.FileSet
@@ -235,8 +232,6 @@ func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *golang.Comp
 	// Package name identifier
 	pkgName := ctx.mapIdent(file.Name)
 	paddedPkgName := java.RightPadded[*java.Identifier]{Element: pkgName}
-
-	// Imports
 	var imports *java.Container[*java.Import]
 	imports = ctx.mapImports(file)
 
@@ -251,8 +246,6 @@ func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *golang.Comp
 			stmts = append(stmts, java.RightPadded[java.Statement]{Element: stmt})
 		}
 	}
-
-	// EOF
 	eof := java.EmptySpace
 	if ctx.cursor < len(ctx.src) {
 		eof = java.ParseSpace(string(ctx.src[ctx.cursor:]))
@@ -1932,7 +1925,6 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *java.Literal {
 // hoistLeftPrefix detaches the leading whitespace from a node's first child
 // so it can be attached to the enclosing (outermost) element instead, per the
 // OpenRewrite convention that whitespace belongs to the outermost element.
-// It returns the removed prefix and the child with an empty prefix.
 func hoistLeftPrefix[T java.J](node T) (java.Space, T) {
 	prefix := node.GetPrefix()
 	if prefix.Whitespace == "" && len(prefix.Comments) == 0 {
@@ -3246,7 +3238,6 @@ func (ctx *parseContext) mapEllipsis(expr *ast.Ellipsis) java.Expression {
 	}
 }
 
-// findNextFrom finds the next occurrence of ch starting from a given offset.
 func (ctx *parseContext) findNextFrom(ch byte, from int) int {
 	for i := from; i < len(ctx.src); i++ {
 		if ctx.src[i] == ch {
@@ -3301,7 +3292,6 @@ func mapBinaryOp(op token.Token) java.BinaryOperator {
 	}
 }
 
-// findNext returns the byte offset of the next occurrence of ch from the current cursor.
 func (ctx *parseContext) findNext(ch byte) int {
 	for i := ctx.cursor; i < len(ctx.src); i++ {
 		if ctx.src[i] == ch {
@@ -3381,7 +3371,6 @@ func (ctx *parseContext) findNextPositionOf(ch byte, before int) int {
 	return -1
 }
 
-// findNextString finds the next occurrence of s from the current cursor.
 func (ctx *parseContext) findNextString(s string) int {
 	idx := strings.Index(string(ctx.src[ctx.cursor:]), s)
 	if idx < 0 {
@@ -3390,7 +3379,6 @@ func (ctx *parseContext) findNextString(s string) int {
 	return ctx.cursor + idx
 }
 
-// prefixString returns the raw source between cursor and pos, for debugging.
 func (ctx *parseContext) prefixString(pos token.Pos) string {
 	if !pos.IsValid() {
 		return ""

@@ -81,8 +81,6 @@ func (s *JavaSender) visitType(t java.JavaType, q *SendQueue) {
 	s.typeSender.Visit(t, q)
 }
 
-// --- J nodes ---
-
 func (s *JavaSender) VisitIdentifier(id *java.Identifier, p any) java.J {
 	q := p.(*SendQueue)
 	// annotations (list)

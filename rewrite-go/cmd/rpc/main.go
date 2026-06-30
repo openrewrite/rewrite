@@ -51,7 +51,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// jsonRPCRequest represents an incoming JSON-RPC 2.0 message (request or response).
 type jsonRPCRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id"`
@@ -60,7 +59,6 @@ type jsonRPCRequest struct {
 	Result  json.RawMessage `json:"result"` // present in responses
 }
 
-// jsonRPCResponse represents an outgoing JSON-RPC 2.0 response.
 type jsonRPCResponse struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id"`
@@ -68,14 +66,12 @@ type jsonRPCResponse struct {
 	Error   *rpcError       `json:"error,omitempty"`
 }
 
-// rpcError is the error object in a JSON-RPC response.
 type rpcError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Data    string `json:"data,omitempty"`
 }
 
-// server holds the RPC state.
 type server struct {
 	localObjects  map[string]any
 	remoteObjects map[string]any // forward direction: tracks what Java has from Go
@@ -113,11 +109,9 @@ type server struct {
 	// remote object id (the `p` value in Visit/Generate/BatchVisit).
 	preparedContexts map[string]*recipe.ExecutionContext
 
-	// Tracing toggles for GetObject
 	traceReceive bool
 	traceSend    bool
 
-	// Server configuration from CLI flags (see serverConfig)
 	metricsCsv string
 
 	configuredDataTableStore recipe.DataTableStore
@@ -146,7 +140,6 @@ type server struct {
 	recipeWorkspaceCleanup func()
 }
 
-// serverConfig holds CLI-driven configuration applied to the server at startup.
 type serverConfig struct {
 	logFile          string
 	traceRpcMessages bool
@@ -249,7 +242,6 @@ func newServer(cfg serverConfig) *server {
 	return s
 }
 
-// closeMetrics flushes and closes the metrics CSV writer if open. Idempotent.
 func (s *server) closeMetrics() {
 	s.metricsMu.Lock()
 	defer s.metricsMu.Unlock()
@@ -358,9 +350,7 @@ func main() {
 	}
 }
 
-// readMessage reads a Content-Length framed JSON-RPC message from stdin.
 func (s *server) readMessage() (*jsonRPCRequest, error) {
-	// Read Content-Length header
 	headerLine, err := s.reader.ReadString('\n')
 	if err != nil {
 		return nil, err
@@ -375,12 +365,10 @@ func (s *server) readMessage() (*jsonRPCRequest, error) {
 		return nil, fmt.Errorf("invalid content length: %s", lengthStr)
 	}
 
-	// Read empty separator line
 	if _, err := s.reader.ReadString('\n'); err != nil {
 		return nil, err
 	}
 
-	// Read content body
 	body := make([]byte, contentLength)
 	if _, err := io.ReadFull(s.reader, body); err != nil {
 		return nil, err
@@ -393,7 +381,6 @@ func (s *server) readMessage() (*jsonRPCRequest, error) {
 	return &req, nil
 }
 
-// writeMessage writes a Content-Length framed JSON-RPC message to stdout.
 func (s *server) writeMessage(resp *jsonRPCResponse) error {
 	body, err := json.Marshal(resp)
 	if err != nil {
@@ -476,7 +463,6 @@ func (s *server) handleRequest(req *jsonRPCRequest) *jsonRPCResponse {
 	}
 }
 
-// handleGetLanguages returns the supported language types.
 func (s *server) handleGetLanguages() []string {
 	return []string{
 		"org.openrewrite.golang.tree.Go$CompilationUnit",
@@ -511,13 +497,11 @@ type parseInput struct {
 }
 
 func (p *parseInput) UnmarshalJSON(data []byte) error {
-	// Try bare string first (Java PathInput serializes as @JsonValue string)
 	var s string
 	if err := json.Unmarshal(data, &s); err == nil {
 		p.Path = s
 		return nil
 	}
-	// Otherwise unmarshal as a structured object
 	type alias parseInput
 	var a alias
 	if err := json.Unmarshal(data, &a); err != nil {
@@ -527,8 +511,6 @@ func (p *parseInput) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// handleParse parses Go source files and returns their IDs.
-//
 // When req.Module + req.GoModContent are set, the handler builds a
 // ProjectImporter from the parsed go.mod (requires) plus every .go input
 // in the batch (siblings) and uses it for type attribution. Inputs in the
@@ -692,7 +674,6 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		goModByIdx[r.idx] = gm
 	}
 
-	// Emit results in input order.
 	ids := make([]string, 0, len(req.Inputs))
 	for _, r := range resolvedInputs {
 		if cu, ok := cuByIdx[r.idx]; ok && cu != nil {
@@ -721,13 +702,11 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 	return ids, nil
 }
 
-// getObjectRequest is the parameter type for GetObject.
 type getObjectRequest struct {
 	ID             string `json:"id"`
 	SourceFileType string `json:"sourceFileType"`
 }
 
-// handleGetObject serializes a local object for transfer to Java.
 func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	var req getObjectRequest
 	if err := json.Unmarshal(params, &req); err != nil {
@@ -747,7 +726,6 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	// between the reverse direction (Java→Go) and forward direction (Go→Java).
 	localRefs := make(map[uintptr]int)
 
-	// Collect all batches into a single result
 	var result []rpc.RpcObjectData
 	q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
 		result = append(result, batch...)
@@ -762,13 +740,11 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	q.Put(rpc.RpcObjectData{State: rpc.EndOfObject})
 	q.Flush()
 
-	// Update remote tracking
 	s.remoteObjects[req.ID] = obj
 
 	return result, nil
 }
 
-// printRequest is the parameter type for Print.
 type printRequest struct {
 	TreeID         string  `json:"treeId"`
 	SourcePath     string  `json:"sourcePath"`
@@ -776,20 +752,17 @@ type printRequest struct {
 	MarkerPrinter  *string `json:"markerPrinter"`
 }
 
-// handlePrint retrieves a tree from Java and prints it to source.
 func (s *server) handlePrint(params json.RawMessage) (any, *rpcError) {
 	var req printRequest
 	if err := json.Unmarshal(params, &req); err != nil {
 		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("Invalid params: %v", err)}
 	}
 
-	// Get the object from Java via bidirectional RPC
 	obj := s.getObjectFromJava(req.TreeID, req.SourceFileType)
 	if obj == nil {
 		return "", nil
 	}
 
-	// Map markerPrinter from the request to the Go MarkerPrinter
 	mp := mapMarkerPrinter(req.MarkerPrinter)
 
 	if cu, ok := obj.(*golang.CompilationUnit); ok {
@@ -811,7 +784,6 @@ func (s *server) handlePrint(params json.RawMessage) (any, *rpcError) {
 	return "", &rpcError{Code: -32603, Message: "Object is not a Tree"}
 }
 
-// mapMarkerPrinter maps the RPC marker printer string to the Go MarkerPrinter.
 func mapMarkerPrinter(mp *string) printer.MarkerPrinter {
 	if mp == nil {
 		return nil
@@ -843,7 +815,6 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 		before = s.localObjects[id]
 	}
 
-	// fetchBatch sends a GetObject request to Java and reads one batch of RpcObjectData.
 	fetchBatch := func() []rpc.RpcObjectData {
 		reqParams := getObjectRequest{ID: id, SourceFileType: sourceFileType}
 		paramsJSON, _ := json.Marshal(reqParams)
@@ -1023,7 +994,6 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 	}, nil
 }
 
-// handleReset clears all cached state.
 func (s *server) handleReset() bool {
 	s.localObjects = make(map[string]any)
 	s.remoteObjects = make(map[string]any)
@@ -1210,7 +1180,6 @@ func parseOrderedColumns(raw json.RawMessage) ([]recipe.ColumnValue, error) {
 	return cols, nil
 }
 
-// marketplaceRow matches Java's GetMarketplaceResponse.Row.
 type marketplaceRow struct {
 	Descriptor    marketplaceDescriptor   `json:"descriptor"`
 	CategoryPaths [][]marketplaceCategory `json:"categoryPaths"`
@@ -1219,7 +1188,6 @@ type marketplaceRow struct {
 	PackageName *string `json:"packageName"`
 }
 
-// marketplaceDescriptor matches Java's RecipeDescriptor (minimal fields).
 type marketplaceDescriptor struct {
 	Name                         string                  `json:"name"`
 	DisplayName                  string                  `json:"displayName"`
@@ -1248,7 +1216,6 @@ type marketplaceOption struct {
 	Valid       []any   `json:"valid"`
 }
 
-// marketplaceCategory matches Java's CategoryDescriptor.
 type marketplaceCategory struct {
 	DisplayName string   `json:"displayName"`
 	PackageName string   `json:"packageName"`
@@ -1463,7 +1430,6 @@ func nonNil(s []string) []string {
 	return s
 }
 
-// prepareRecipeRequest is the parameter type for PrepareRecipe.
 type prepareRecipeRequest struct {
 	ID      string         `json:"id"`
 	Options map[string]any `json:"options"`
@@ -1652,7 +1618,6 @@ func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRe
 // operands (a list of nested wire entries). Returns ok=false when the
 // condition can't be serialized (e.g. an opaque local TreeVisitor with
 // no recipe identity) — the caller leaves the wrapper intact so the
-// gate runs Go-side as a fallback.
 func preconditionWireEntry(condition preconditions.CheckArg) (map[string]any, bool) {
 	switch c := condition.(type) {
 	case *preconditions.RecipeRef:
@@ -1676,7 +1641,6 @@ func preconditionWireEntry(condition preconditions.CheckArg) (map[string]any, bo
 	}
 }
 
-// visitRequest is the parameter type for Visit.
 type visitRequest struct {
 	Visitor        string   `json:"visitor"`
 	TreeID         string   `json:"treeId"`
@@ -1685,12 +1649,10 @@ type visitRequest struct {
 	Cursor         []string `json:"cursor"`
 }
 
-// visitResponse is the response type for Visit.
 type visitResponse struct {
 	Modified bool `json:"modified"`
 }
 
-// handleVisit applies a prepared recipe's visitor to a tree.
 func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	var req visitRequest
 	if err := json.Unmarshal(params, &req); err != nil {
@@ -1797,13 +1759,11 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	return &visitResponse{Modified: modified}, nil
 }
 
-// generateRequest is the parameter type for Generate.
 type generateRequest struct {
 	ID  string  `json:"id"`
 	PID *string `json:"p"`
 }
 
-// generateResponse is the response type for Generate.
 type generateResponse struct {
 	IDs             []string `json:"ids"`
 	SourceFileTypes []string `json:"sourceFileTypes"`
@@ -2032,13 +1992,11 @@ func sourceFileTypeFor(t java.Tree) string {
 	return ""
 }
 
-// traceGetObjectRequest is the parameter type for TraceGetObject.
 type traceGetObjectRequest struct {
 	Receive bool `json:"receive"`
 	Send    bool `json:"send"`
 }
 
-// handleTraceGetObject toggles tracing for GetObject calls.
 func (s *server) handleTraceGetObject(params json.RawMessage) (any, *rpcError) {
 	var req traceGetObjectRequest
 	if err := json.Unmarshal(params, &req); err != nil {
@@ -2052,14 +2010,12 @@ func (s *server) handleTraceGetObject(params json.RawMessage) (any, *rpcError) {
 	return true, nil
 }
 
-// parseProjectRequest is the parameter type for ParseProject.
 type parseProjectRequest struct {
 	ProjectPath string   `json:"projectPath"`
 	Exclusions  []string `json:"exclusions"`
 	RelativeTo  *string  `json:"relativeTo"`
 }
 
-// parseProjectResponseItem describes a parsed source file.
 type parseProjectResponseItem struct {
 	ID             string `json:"id"`
 	SourceFileType string `json:"sourceFileType"`

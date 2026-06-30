@@ -24,8 +24,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// AddImport adds an `import` statement to a Go compilation unit.
-//
 // Mirrors the Java AddImport recipe with full surface parity (per the
 // C1 directive in the eng review):
 //

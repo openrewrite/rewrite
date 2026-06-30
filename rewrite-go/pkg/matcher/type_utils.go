@@ -41,7 +41,6 @@ func GetFullyQualifiedName(t java.JavaType) string {
 	return ""
 }
 
-// IsOfClassType checks if the type has the exact fully qualified name.
 func IsOfClassType(t java.JavaType, fqn string) bool {
 	return GetFullyQualifiedName(t) == fqn
 }
@@ -101,12 +100,10 @@ func Implements(t java.JavaType, interfaceFQN string) bool {
 	return IsAssignableTo(t, interfaceFQN)
 }
 
-// IsError checks if the type is the Go built-in `error` interface.
 func IsError(t java.JavaType) bool {
 	return IsOfClassType(t, "error")
 }
 
-// IsString checks if the type is the Go `string` type.
 func IsString(t java.JavaType) bool {
 	if t == nil {
 		return false
@@ -117,7 +114,6 @@ func IsString(t java.JavaType) bool {
 	return IsOfClassType(t, "string")
 }
 
-// IsNumeric checks if the type is a numeric type (int, float, etc.).
 func IsNumeric(t java.JavaType) bool {
 	if t == nil {
 		return false
@@ -138,7 +134,6 @@ func IsNumeric(t java.JavaType) bool {
 	return false
 }
 
-// IsInt checks if the type is a Go integer type (int, int8…int64, uint…uintptr, byte, rune).
 func IsInt(t java.JavaType) bool {
 	if p, ok := t.(*java.JavaTypePrimitive); ok {
 		switch p.Keyword {
@@ -157,7 +152,6 @@ func IsInt(t java.JavaType) bool {
 	return false
 }
 
-// IsBool checks if the type is the Go `bool` type.
 func IsBool(t java.JavaType) bool {
 	if p, ok := t.(*java.JavaTypePrimitive); ok {
 		return p.Keyword == "boolean" || p.Keyword == "bool"

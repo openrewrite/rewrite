@@ -37,7 +37,6 @@ func sendRightPadded(s Sender, rp any, q *SendQueue) {
 	// After space
 	q.GetAndSend(rp, func(v any) any { return rightPaddedAfter(v) },
 		func(v any) { sendSpace(v.(java.Space), q) })
-	// Markers
 	q.GetAndSend(rp, func(v any) any { return rightPaddedMarkers(v) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 }
@@ -51,7 +50,6 @@ func sendRightPaddedBool(elem bool, after java.Space, markers java.Markers, q *S
 	q.Put(RpcObjectData{State: Add, Value: elem})
 	// After: Space
 	q.Send(after, nil, func(v any) { sendSpace(v.(java.Space), q) })
-	// Markers
 	q.Send(markers, nil, func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 }
 
@@ -74,7 +72,6 @@ func sendLeftPadded(s Sender, lp any, q *SendQueue) {
 		// Primitives (strings, enums, bools) are sent as raw values with nil onChange
 		q.GetAndSend(lp, func(v any) any { return leftPaddedElement(v) }, nil)
 	}
-	// Markers
 	q.GetAndSend(lp, func(v any) any { return leftPaddedMarkers(v) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 }
@@ -90,14 +87,11 @@ func sendContainer(s Sender, c any, q *SendQueue) {
 		func(v any) []any { return containerElements(v) },
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
-	// Markers
 	q.GetAndSend(c, func(v any) any { return containerMarkers(v) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 }
 
-// receiveRightPadded deserializes a RightPadded element.
 func receiveRightPadded(r Receiver, q *ReceiveQueue, before any) any {
-	// Element
 	elem := q.Receive(rightPaddedElement(before), func(v any) any {
 		if _, ok := v.(java.J); ok {
 			return r.Visit(v.(java.Tree), q)
@@ -108,7 +102,6 @@ func receiveRightPadded(r Receiver, q *ReceiveQueue, before any) any {
 	afterSpace := q.Receive(rightPaddedAfter(before), func(v any) any {
 		return receiveSpace(v.(java.Space), q)
 	})
-	// Markers
 	markers := q.Receive(rightPaddedMarkers(before), func(v any) any {
 		return receiveMarkersCodec(q, v.(java.Markers))
 	})

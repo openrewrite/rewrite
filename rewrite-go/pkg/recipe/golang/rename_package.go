@@ -27,8 +27,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// RenamePackage renames a Go package across a project.
-//
 // On every visited compilation unit:
 //   - If the file's `package` declaration matches the last segment of
 //     OldPackagePath AND the file is in the renamed package, the

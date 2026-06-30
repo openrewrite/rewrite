@@ -67,9 +67,6 @@ func (t *GoTemplate) getTree() (java.J, error) {
 	return t.cached, t.parseErr
 }
 
-// --- Template builder ---
-
-// TemplateBuilder constructs a GoTemplate with fluent configuration.
 type TemplateBuilder struct {
 	code     string
 	captures []*Capture
@@ -77,35 +74,29 @@ type TemplateBuilder struct {
 	kind     ScaffoldKind
 }
 
-// ExpressionTemplate creates a TemplateBuilder for producing an expression.
 func ExpressionTemplate(code string) *TemplateBuilder {
 	return &TemplateBuilder{code: code, kind: ScaffoldExpression}
 }
 
-// StatementTemplate creates a TemplateBuilder for producing a statement.
 func StatementTemplate(code string) *TemplateBuilder {
 	return &TemplateBuilder{code: code, kind: ScaffoldStatement}
 }
 
-// TopLevelTemplate creates a TemplateBuilder for producing a top-level declaration.
 func TopLevelTemplate(code string) *TemplateBuilder {
 	return &TemplateBuilder{code: code, kind: ScaffoldTopLevel}
 }
 
-// Captures adds captures to the builder.
 func (b *TemplateBuilder) Captures(caps ...*Capture) *TemplateBuilder {
 	b.captures = append(b.captures, caps...)
 	return b
 }
 
-// Imports adds imports to the synthetic source used to parse the template.
 // It does not edit imports in the source file being rewritten.
 func (b *TemplateBuilder) Imports(pkgs ...string) *TemplateBuilder {
 	b.imports = append(b.imports, pkgs...)
 	return b
 }
 
-// Build creates the GoTemplate.
 func (b *TemplateBuilder) Build() *GoTemplate {
 	return &GoTemplate{
 		code:     b.code,
@@ -123,7 +114,6 @@ func Rewrite(before *GoPattern, after *GoTemplate) *RewriteVisitor {
 	return v
 }
 
-// RewriteVisitor applies a pattern match + template replacement on every node.
 type RewriteVisitor struct {
 	visitor.GoVisitor
 	before *GoPattern

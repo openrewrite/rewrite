@@ -26,14 +26,12 @@ import (
 
 var defaultReceiver = NewGoReceiver()
 
-// ReceiveQueue deserializes RpcObjectData messages from the RPC channel.
 type ReceiveQueue struct {
 	batch []RpcObjectData
 	refs  map[int]any
 	pull  func() []RpcObjectData
 }
 
-// NewReceiveQueue creates a new ReceiveQueue.
 func NewReceiveQueue(refs map[int]any, pull func() []RpcObjectData) *ReceiveQueue {
 	return &ReceiveQueue{
 		refs: refs,
@@ -47,7 +45,6 @@ func (q *ReceiveQueue) PeekBatch() []RpcObjectData {
 	return q.batch
 }
 
-// Take returns the next message from the queue, pulling a new batch if needed.
 func (q *ReceiveQueue) Take() RpcObjectData {
 	if len(q.batch) == 0 {
 		q.batch = q.pull()
@@ -140,7 +137,6 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 	}
 }
 
-// ReceiveAndGet reads a value and applies a mapping function for ADD/CHANGE.
 func (q *ReceiveQueue) ReceiveAndGet(before any, mapping func(any) any) any {
 	after := q.Receive(before, nil)
 	if after != nil && after != before {
@@ -189,7 +185,6 @@ func receiveScalar[T any](q *ReceiveQueue, before T) T {
 	return convertTo[T](result)
 }
 
-// convertTo converts a value to the desired type, handling JSON number conversions.
 func convertTo[T any](v any) T {
 	if t, ok := v.(T); ok {
 		return t
@@ -212,7 +207,6 @@ func convertTo[T any](v any) T {
 	return v.(T)
 }
 
-// ReceiveList reads a list from the queue with position-based tracking.
 func (q *ReceiveQueue) ReceiveList(before []any, onChange func(any) any) []any {
 	msg := q.Take()
 
@@ -253,7 +247,6 @@ func (q *ReceiveQueue) ReceiveList(before []any, onChange func(any) any) []any {
 	}
 }
 
-// toInt converts a value to int, handling both int and float64 (from JSON).
 func toInt(v any) int {
 	switch n := v.(type) {
 	case int:
@@ -270,7 +263,6 @@ func toInt(v any) int {
 // Factory registry for creating empty instances by Java class name.
 var factories = map[string]func() any{}
 
-// RegisterFactory registers a factory for creating instances of a Java class.
 func RegisterFactory(javaClassName string, factory func() any) {
 	factories[javaClassName] = factory
 }

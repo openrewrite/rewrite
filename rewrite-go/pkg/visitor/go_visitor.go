@@ -362,8 +362,6 @@ type VisitorI interface {
 // Ensure GoVisitor satisfies VisitorI.
 var _ VisitorI = (*GoVisitor)(nil)
 
-// --- Default visit implementations ---
-
 // PreVisit is the per-node hook called by Visit() before dispatching
 // to the type-specific Visit* method. The default implementation is
 // the identity function. RPC senders/receivers override it to
@@ -1168,8 +1166,6 @@ func (v *GoVisitor) VisitType(javaType java.JavaType, p any) java.JavaType {
 func (v *GoVisitor) visitMarkers(markers java.Markers, p any) java.Markers {
 	return markers
 }
-
-// --- Helper functions ---
 
 func visitAndCast[T java.Tree](v *GoVisitor, t java.Tree, p any) T {
 	result := v.self().Visit(t, p)

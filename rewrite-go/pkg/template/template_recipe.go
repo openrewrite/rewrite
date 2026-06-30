@@ -26,12 +26,8 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// --- Functional builder API ---
-
-// RecipeOption configures a template recipe via NewRecipe.
 type RecipeOption func(*templateRecipeConfig)
 
-// BeforeOption configures a single before-pattern.
 type BeforeOption func(*beforeSpec)
 
 type beforeSpec struct {
@@ -62,22 +58,18 @@ type templateRecipeConfig struct {
 	kind          *ScaffoldKind // global override
 }
 
-// RecipeName sets the fully qualified recipe name.
 func RecipeName(name string) RecipeOption {
 	return func(c *templateRecipeConfig) { c.name = name }
 }
 
-// WithDisplayName sets the human-readable display name.
 func WithDisplayName(name string) RecipeOption {
 	return func(c *templateRecipeConfig) { c.displayName = name }
 }
 
-// WithDescription sets the recipe description.
 func WithDescription(desc string) RecipeOption {
 	return func(c *templateRecipeConfig) { c.description = desc }
 }
 
-// WithTags sets categorization tags.
 func WithTags(tags ...string) RecipeOption {
 	return func(c *templateRecipeConfig) { c.tags = tags }
 }
@@ -94,7 +86,6 @@ func WithBefore(code string, opts ...BeforeOption) RecipeOption {
 	}
 }
 
-// WithAfter sets the after-template code.
 func WithAfter(code string, opts ...BeforeOption) RecipeOption {
 	return func(c *templateRecipeConfig) {
 		c.afterCode = code
@@ -154,8 +145,6 @@ func SourceImport(path string, alias *string) BeforeOption {
 	}
 }
 
-// NewRecipe creates a recipe.Recipe from declarative before/after templates.
-//
 // Example:
 //
 //	s := template.Expr("s")
@@ -177,14 +166,12 @@ func NewRecipe(opts ...RecipeOption) recipe.Recipe {
 func buildRecipe(cfg *templateRecipeConfig) recipe.Recipe {
 	caps := cfg.captures
 
-	// Build before patterns
 	var befores []*GoPattern
 	for _, bs := range cfg.befores {
 		kind := resolveKind(bs.kind, cfg.kind, bs.code)
 		befores = append(befores, buildPattern(bs.code, caps, bs.imports, kind))
 	}
 
-	// Build after template
 	afterKind := resolveKind(cfg.afterKind, cfg.kind, cfg.afterCode)
 	after := buildTemplate(cfg.afterCode, caps, cfg.afterImports, afterKind)
 
@@ -250,8 +237,6 @@ func detectScaffoldKind(code string) ScaffoldKind {
 	return ScaffoldExpression
 }
 
-// --- Multi-before visitor ---
-
 // templateRecipeVisitor tries each before pattern in order; first match wins.
 type templateRecipeVisitor struct {
 	visitor.GoVisitor
@@ -296,8 +281,6 @@ func (v *templateRecipeVisitor) Visit(t java.Tree, p any) java.Tree {
 	return result
 }
 
-// --- Built recipe (returned by NewRecipe) ---
-
 type builtTemplateRecipe struct {
 	name        string
 	displayName string
@@ -318,8 +301,6 @@ func (r *builtTemplateRecipe) DataTables() []recipe.DataTableDescriptor    { ret
 func (r *builtTemplateRecipe) Maintainers() []recipe.Maintainer            { return nil }
 func (r *builtTemplateRecipe) Contributors() []recipe.Contributor          { return nil }
 func (r *builtTemplateRecipe) Examples() []recipe.Example                  { return nil }
-
-// --- Embeddable TemplateRecipe struct ---
 
 // TemplateRecipe is an embeddable base type for struct-based template recipes.
 // Embed it and call Init() to wire up the before/after patterns.
@@ -366,7 +347,6 @@ func (tr *TemplateRecipe) InitTemplate(opts ...RecipeOption) {
 	tr.editor = newTemplateRecipeVisitor(befores, after, cfg.sourceImports)
 }
 
-// Editor returns the auto-generated visitor.
 func (tr *TemplateRecipe) Editor() recipe.TreeVisitor {
 	return tr.editor
 }

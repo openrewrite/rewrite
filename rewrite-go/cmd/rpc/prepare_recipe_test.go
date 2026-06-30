@@ -24,7 +24,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 )
 
-// prepareRecipe runs the PrepareRecipe handler and returns the per-instance id.
 func prepareRecipe(t *testing.T, s *server, id string) string {
 	t.Helper()
 	params, err := json.Marshal(prepareRecipeRequest{ID: id})
@@ -38,7 +37,6 @@ func prepareRecipe(t *testing.T, s *server, id string) string {
 	return resp.(prepareRecipeResponse).ID
 }
 
-// visit runs the Visit handler for the given "phase:recipeId" visitor.
 func visit(t *testing.T, s *server, visitor string) (any, *rpcError) {
 	t.Helper()
 	params, err := json.Marshal(visitRequest{Visitor: visitor, TreeID: "tree-1", SourceFileType: "Go"})
