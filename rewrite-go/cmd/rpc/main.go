@@ -20,6 +20,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"flag"
@@ -90,6 +91,12 @@ type server struct {
 	// Prepared recipe instances keyed by unique ID
 	preparedRecipes map[string]recipe.Recipe
 
+	// Recipe name (fully qualified id) keyed by the same prepared recipe ID.
+	// Used to produce a meaningful error when an edit/scan run is attempted
+	// on a recipe that was registered descriptor-only (nil instance) — i.e.
+	// the workspace binary is stale or missing its implementation.
+	preparedRecipeNames map[string]string
+
 	// Bare editor cached at PrepareRecipe time when an editor was wrapped in
 	// preconditions.Check(...). Subsequent dispatch via instantiateVisitor
 	// returns the unwrapped editor — otherwise the precondition would also
@@ -111,8 +118,9 @@ type server struct {
 	traceSend    bool
 
 	// Server configuration from CLI flags (see serverConfig)
-	metricsCsv       string
-	dataTablesCsvDir string
+	metricsCsv string
+
+	configuredDataTableStore recipe.DataTableStore
 
 	// Per-RPC metrics writer. Lazily opened in newServer when metricsCsv
 	// is set. Writes are guarded by metricsMu so concurrent dispatch
@@ -127,6 +135,11 @@ type server struct {
 	registry  *recipe.Registry
 	installer *installer.Installer
 
+	// recipeOrigin maps a recipe name to the package that contributed it,
+	// recorded at install time and read by GetMarketplace so each row is
+	// attributed to its own bundle on the host.
+	recipeOrigin map[string]string
+
 	// recipeWorkspaceCleanup removes the temp recipe install dir created
 	// when --recipe-install-dir was not supplied. Nil when the caller
 	// provided the path (in which case lifetime is the caller's concern).
@@ -139,7 +152,6 @@ type serverConfig struct {
 	traceRpcMessages bool
 	metricsCsv       string
 	recipeInstallDir string
-	dataTablesCsvDir string
 }
 
 func newServer(cfg serverConfig) *server {
@@ -203,6 +215,7 @@ func newServer(cfg serverConfig) *server {
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
 		preparedRecipes:         make(map[string]recipe.Recipe),
+		preparedRecipeNames:     make(map[string]string),
 		preparedEditorOverrides: make(map[string]recipe.TreeVisitor),
 		preparedAccumulators:    make(map[string]any),
 		preparedContexts:        make(map[string]*recipe.ExecutionContext),
@@ -210,12 +223,12 @@ func newServer(cfg serverConfig) *server {
 		traceReceive:            cfg.traceRpcMessages,
 		traceSend:               cfg.traceRpcMessages,
 		metricsCsv:              cfg.metricsCsv,
-		dataTablesCsvDir:        cfg.dataTablesCsvDir,
 		reader:                  bufio.NewReader(os.Stdin),
 		writer:                  os.Stdout,
 		logger:                  logger,
 		registry:                reg,
 		installer:               inst,
+		recipeOrigin:            make(map[string]string),
 		recipeWorkspaceCleanup:  recipeWorkspaceCleanup,
 	}
 
@@ -285,7 +298,6 @@ func parseFlags() serverConfig {
 	flag.BoolVar(&cfg.traceRpcMessages, "trace-rpc-messages", false, "log every GetObject batch send/receive")
 	flag.StringVar(&cfg.metricsCsv, "metrics-csv", "", "path to write per-RPC metrics as CSV")
 	flag.StringVar(&cfg.recipeInstallDir, "recipe-install-dir", "", "directory used as the recipe installer workspace; if empty, a temporary directory is created and cleaned up on shutdown")
-	flag.StringVar(&cfg.dataTablesCsvDir, "data-tables-csv-dir", "", "directory where DataTable rows are written as CSV; empty = in-memory only")
 	flag.Parse()
 	return cfg
 }
@@ -443,6 +455,8 @@ func (s *server) handleRequest(req *jsonRPCRequest) *jsonRPCResponse {
 		result, rpcErr = s.handleBatchVisit(req.Params)
 	case "Generate":
 		result, rpcErr = s.handleGenerate(req.Params)
+	case "SetDataTableStore":
+		result, rpcErr = s.handleSetDataTableStore(req.Params)
 	case "TraceGetObject":
 		result, rpcErr = s.handleTraceGetObject(req.Params)
 	case "ParseProject":
@@ -990,6 +1004,13 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 		return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Install package failed: %v", err)}
 	}
 
+	// Attribute the recipes this package contributed to it, so GetMarketplace can tag each row
+	// with its origin and the host can bind it to the right bundle. A local-path install has no
+	// package identity, so its recipes stay unattributed and fall back to the requested bundle.
+	for _, r := range info.Recipes {
+		s.recipeOrigin[r.Name] = pkg.PackageName
+	}
+
 	afterCount := len(s.registry.AllRecipes())
 	var version *string
 	if info.Version != "" {
@@ -1011,6 +1032,7 @@ func (s *server) handleReset() bool {
 	s.reverseRemoteObjects = make(map[string]any)
 	s.reverseRemoteRefs = make(map[int]any)
 	s.preparedRecipes = make(map[string]recipe.Recipe)
+	s.preparedRecipeNames = make(map[string]string)
 	s.preparedEditorOverrides = make(map[string]recipe.TreeVisitor)
 	s.preparedAccumulators = make(map[string]any)
 	s.preparedContexts = make(map[string]*recipe.ExecutionContext)
@@ -1022,10 +1044,7 @@ func (s *server) handleReset() bool {
 // returned. Otherwise the ctx is fetched from Java once (via the empty-body
 // codec) and cached under the pid for subsequent calls in the same recipe run.
 //
-// When --data-tables-csv-dir is set, a CsvDataTableStore is installed into
-// the ctx so any recipe that emits data-table rows writes them to that
-// directory. Otherwise an InMemoryDataTableStore is created lazily on first
-// InsertRow.
+// It then installs the host-configured DataTableStore (see installDataTableStore).
 func (s *server) resolveExecutionContext(pid *string) *recipe.ExecutionContext {
 	var ctx *recipe.ExecutionContext
 	if pid == nil || *pid == "" {
@@ -1083,28 +1102,121 @@ func (s *server) seedCursor(v recipe.TreeVisitor, ids []string) {
 	}
 }
 
-// installDataTableStore puts a DataTableStore into the ctx if one isn't
-// already present. Choice driven by --data-tables-csv-dir.
+// installDataTableStore installs the host-configured store onto the ctx. When
+// none was configured, the ctx is left untouched so an InMemoryDataTableStore
+// is created lazily on the first InsertRow.
 func (s *server) installDataTableStore(ctx *recipe.ExecutionContext) {
-	if _, ok := ctx.GetMessage(recipe.DataTableStoreKey); ok {
-		return
+	if s.configuredDataTableStore != nil {
+		ctx.PutMessage(recipe.DataTableStoreKey, s.configuredDataTableStore)
 	}
-	if s.dataTablesCsvDir != "" {
-		store, err := recipe.NewCsvDataTableStore(s.dataTablesCsvDir)
-		if err != nil {
-			s.logger.Printf("CsvDataTableStore unavailable, falling back to in-memory: %v", err)
-		} else {
-			ctx.PutMessage(recipe.DataTableStoreKey, store)
-			return
+}
+
+// setDataTableStore is the wire form of the data table store configuration,
+// mirroring org.openrewrite.rpc.request.SetDataTableStore.
+type setDataTableStore interface {
+	toDataTableStore() (recipe.DataTableStore, error)
+}
+
+type csvDataTableStore struct {
+	OutputDir string `json:"outputDir"`
+	// Raw JSON to preserve the host's key order; Go maps are unordered.
+	PrefixColumns json.RawMessage `json:"prefixColumns"`
+	SuffixColumns json.RawMessage `json:"suffixColumns"`
+}
+
+func (c *csvDataTableStore) toDataTableStore() (recipe.DataTableStore, error) {
+	if c.OutputDir == "" {
+		return recipe.NewInMemoryDataTableStore(), nil
+	}
+	prefix, err := parseOrderedColumns(c.PrefixColumns)
+	if err != nil {
+		return nil, fmt.Errorf("prefixColumns: %w", err)
+	}
+	suffix, err := parseOrderedColumns(c.SuffixColumns)
+	if err != nil {
+		return nil, fmt.Errorf("suffixColumns: %w", err)
+	}
+	return recipe.NewCsvDataTableStoreWithColumns(c.OutputDir, prefix, suffix)
+}
+
+type noOpDataTableStore struct{}
+
+func (noOpDataTableStore) toDataTableStore() (recipe.DataTableStore, error) {
+	return recipe.NewInMemoryDataTableStore(), nil
+}
+
+func parseSetDataTableStore(params json.RawMessage) (setDataTableStore, error) {
+	var tag struct {
+		Kind string `json:"kind"`
+	}
+	if err := json.Unmarshal(params, &tag); err != nil {
+		return nil, err
+	}
+	if tag.Kind == "CSV" {
+		var c csvDataTableStore
+		if err := json.Unmarshal(params, &c); err != nil {
+			return nil, err
 		}
+		return &c, nil
 	}
-	ctx.PutMessage(recipe.DataTableStoreKey, recipe.NewInMemoryDataTableStore())
+	return noOpDataTableStore{}, nil
+}
+
+// handleSetDataTableStore remembers the reconstructed store as the configured
+// store. Mirrors the JS SetDataTableStore.handle.
+func (s *server) handleSetDataTableStore(params json.RawMessage) (any, *rpcError) {
+	cfg, err := parseSetDataTableStore(params)
+	if err != nil {
+		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("Invalid params: %v", err)}
+	}
+	store, err := cfg.toDataTableStore()
+	if err != nil {
+		return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Cannot reconstruct data table store: %v", err)}
+	}
+	s.configuredDataTableStore = store
+	return true, nil
+}
+
+// parseOrderedColumns decodes a JSON object into ordered (name, value) pairs;
+// key order must be preserved, so a plain (unordered) map won't do.
+func parseOrderedColumns(raw json.RawMessage) ([]recipe.ColumnValue, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	tok, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	if d, ok := tok.(json.Delim); !ok || d != '{' {
+		return nil, fmt.Errorf("expected JSON object, got %v", tok)
+	}
+	var cols []recipe.ColumnValue
+	for dec.More() {
+		keyTok, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		key, ok := keyTok.(string)
+		if !ok {
+			return nil, fmt.Errorf("expected string key, got %v", keyTok)
+		}
+		var val string
+		if err := dec.Decode(&val); err != nil {
+			return nil, err
+		}
+		cols = append(cols, recipe.ColumnValue{Name: key, Value: val})
+	}
+	return cols, nil
 }
 
 // marketplaceRow matches Java's GetMarketplaceResponse.Row.
 type marketplaceRow struct {
 	Descriptor    marketplaceDescriptor   `json:"descriptor"`
 	CategoryPaths [][]marketplaceCategory `json:"categoryPaths"`
+	// PackageName is the package that contributed this recipe (nil when unattributed, e.g. a
+	// local-path install), so the host attributes each row to its own bundle.
+	PackageName *string `json:"packageName"`
 }
 
 // marketplaceDescriptor matches Java's RecipeDescriptor (minimal fields).
@@ -1165,9 +1277,14 @@ func (s *server) handleGetMarketplace(params json.RawMessage) (any, *rpcError) {
 			})
 		}
 
+		var packageName *string
+		if origin, ok := s.recipeOrigin[desc.Name]; ok {
+			packageName = &origin
+		}
 		rows = append(rows, marketplaceRow{
 			Descriptor:    marketplaceDescriptorFromRecipe(desc),
 			CategoryPaths: [][]marketplaceCategory{categoryPath},
+			PackageName:   packageName,
 		})
 	}
 	if rows == nil {
@@ -1180,6 +1297,26 @@ func (s *server) handleGetMarketplace(params json.RawMessage) (any, *rpcError) {
 // wire-format marketplaceDescriptor expected by Java. Recursive fields
 // (recipeList, preconditions) are populated. Cycle protection is handled
 // upstream by recipe.Describe.
+// delegateDescriptor builds a minimal stand-in descriptor for a recipe the host will resolve
+// locally via the delegatesTo response. The host reads only delegatesTo for delegated recipes
+// and ignores this descriptor, but the response type requires one.
+func delegateDescriptor(name string) marketplaceDescriptor {
+	return marketplaceDescriptor{
+		Name:          name,
+		DisplayName:   name,
+		InstanceName:  name,
+		Description:   "",
+		Tags:          []string{},
+		Options:       []marketplaceOption{},
+		Preconditions: []marketplaceDescriptor{},
+		RecipeList:    []marketplaceDescriptor{},
+		DataTables:    []any{},
+		Maintainers:   []any{},
+		Contributors:  []any{},
+		Examples:      []any{},
+	}
+}
+
 func marketplaceDescriptorFromRecipe(desc recipe.RecipeDescriptor) marketplaceDescriptor {
 	options := make([]marketplaceOption, 0, len(desc.Options))
 	for _, opt := range desc.Options {
@@ -1341,6 +1478,10 @@ type prepareRecipeResponse struct {
 	ScanVisitor       *string               `json:"scanVisitor,omitempty"`
 	ScanPreconditions []any                 `json:"scanPreconditions"`
 	DelegatesTo       *delegatesToResponse  `json:"delegatesTo,omitempty"`
+	// RecipeList carries the prepared child recipes of a composite so the host builds the tree
+	// locally instead of re-preparing each child by name. Always emitted (an empty list for a
+	// leaf; null only for a delegating recipe, whose children the host resolves itself).
+	RecipeList []prepareRecipeResponse `json:"recipeList"`
 }
 
 type delegatesToResponse struct {
@@ -1357,24 +1498,85 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 
 	reg, ok := s.registry.FindRecipe(req.ID)
 	if !ok {
-		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("Unknown recipe: %s", req.ID)}
+		// The host re-prepares every sub-recipe of a composite by id while building
+		// RpcRecipe.getRecipeList(). A sub-recipe that delegates to a Java recipe is not
+		// registered here, so a miss means the host owns this recipe: answer with delegatesTo
+		// so the host resolves the id locally (the Java recipe is on its classpath) rather than
+		// failing with "Unknown recipe".
+		options := req.Options
+		if options == nil {
+			options = map[string]any{}
+		}
+		recipeID := uuid.New().String()
+		return prepareRecipeResponse{
+			ID:                recipeID,
+			Descriptor:        delegateDescriptor(req.ID),
+			EditVisitor:       "edit:" + recipeID,
+			EditPreconditions: []any{},
+			ScanPreconditions: []any{},
+			DelegatesTo: &delegatesToResponse{
+				RecipeName: req.ID,
+				Options:    options,
+			},
+		}, nil
 	}
 
-	// Create recipe instance with options
+	// Create recipe instance with options. A nil instance means an installer-loaded recipe with no
+	// constructor (the bootstrap binary's descriptor-only registration) — it can't run here, only
+	// be described, so return the stored descriptor with no prepared child tree. Execution happens
+	// in the CLI-built binary, where the recipe module is linked and its constructor exists, so
+	// prepareInstance below runs and returns the whole tree.
 	instance := reg.Constructor(req.Options)
-
-	var desc recipe.RecipeDescriptor
-	if instance != nil {
-		desc = recipe.Describe(instance)
-	} else {
-		// Installer-loaded recipes have no constructor; use stored descriptor
-		desc = reg.Descriptor
+	if instance == nil {
+		recipeID := uuid.New().String()
+		// Store the nil instance keyed by id so a later Visit can fail loudly by recipe name
+		// (stale/missing CLI-built binary) instead of "Unknown recipe: <uuid>".
+		s.preparedRecipes[recipeID] = instance
+		s.preparedRecipeNames[recipeID] = req.ID
+		return prepareRecipeResponse{
+			ID:                recipeID,
+			Descriptor:        marketplaceDescriptorFromRecipe(reg.Descriptor),
+			EditVisitor:       "edit:" + recipeID,
+			EditPreconditions: []any{},
+			ScanPreconditions: []any{},
+			RecipeList:        []prepareRecipeResponse{},
+		}, nil
 	}
 
-	// response.ID must be the per-instance UUID, not the recipe name —
-	// callers echo it back to identify the prepared instance.
+	resp, rerr := s.prepareInstance(instance, req.ID)
+	if rerr != nil {
+		return nil, rerr
+	}
+	return resp, nil
+}
+
+// prepareInstance prepares a recipe instance and, recursively, its whole child tree — storing every
+// node in preparedRecipes and returning the response with recipeList populated, so the host builds
+// the tree locally instead of a PrepareRecipe round trip per child.
+//
+// Mirrors the C#, JS, and Python servers. Required options are validated as each node is prepared,
+// which covers the whole tree (the root against the caller's options and each child against the
+// values its parent set). A child that delegates to a Java recipe is emitted as delegatesTo for the
+// host to resolve; the rest are prepared and validated recursively. Delegating recipes forward
+// validation to the recipe they delegate to, so they are not validated here.
+func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRecipeResponse, *rpcError) {
+	desc := recipe.Describe(instance)
+
+	_, isDelegating := instance.(recipe.DelegatesTo)
+	if !isDelegating {
+		for _, opt := range instance.Options() {
+			if opt.Required && opt.Value == nil {
+				return prepareRecipeResponse{}, &rpcError{
+					Code:    -32602,
+					Message: fmt.Sprintf("Missing required option `%s` for recipe `%s`.", opt.Name, desc.Name),
+				}
+			}
+		}
+	}
+
 	recipeID := uuid.New().String()
 	s.preparedRecipes[recipeID] = instance
+	s.preparedRecipeNames[recipeID] = name
 
 	resp := prepareRecipeResponse{
 		ID:                recipeID,
@@ -1384,43 +1586,61 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 		ScanPreconditions: []any{},
 	}
 
-	// Introspect Editor() once at prepare time. If the recipe wrapped its
-	// editor in preconditions.Check(...), extract the precondition's wire
-	// identity (so the Java host can evaluate it locally and skip the
-	// visit RPC for non-matching files) and cache the bare editor (so a
-	// subsequent dispatch via instantiateVisitor returns the unwrapped
-	// editor — otherwise the precondition would also run Go-side and
-	// double the cost).
-	if instance != nil {
-		if _, isScan := instance.(recipe.ScanningRecipe); !isScan {
-			if editor := instance.Editor(); editor != nil {
-				if checkV, ok := editor.(*preconditions.CheckVisitor); ok {
-					if entry, ok := preconditionWireEntry(checkV.Check); ok {
-						resp.EditPreconditions = append(resp.EditPreconditions, entry)
-						s.preparedEditorOverrides[recipeID] = checkV.V
-					}
+	// Introspect Editor() once: if it's wrapped in preconditions.Check(...), extract the
+	// precondition's wire identity (so the Java host can evaluate it locally and skip the visit
+	// RPC for non-matching files) and cache the bare editor (so a subsequent dispatch via
+	// instantiateVisitor returns the unwrapped editor — otherwise the precondition runs Go-side
+	// too and doubles the cost).
+	_, isScan := instance.(recipe.ScanningRecipe)
+	if !isScan {
+		if editor := instance.Editor(); editor != nil {
+			if checkV, ok := editor.(*preconditions.CheckVisitor); ok {
+				if entry, ok := preconditionWireEntry(checkV.Check); ok {
+					resp.EditPreconditions = append(resp.EditPreconditions, entry)
+					s.preparedEditorOverrides[recipeID] = checkV.V
 				}
 			}
 		}
 	}
-
-	// Check if this is a scanning recipe
-	if instance != nil {
-		if _, isScan := instance.(recipe.ScanningRecipe); isScan {
-			scanVis := "scan:" + recipeID
-			resp.ScanVisitor = &scanVis
-		}
+	if isScan {
+		scanVis := "scan:" + recipeID
+		resp.ScanVisitor = &scanVis
 	}
 
-	// Check for delegation
-	if instance != nil {
-		if del, ok := instance.(recipe.DelegatesTo); ok {
-			resp.DelegatesTo = &delegatesToResponse{
-				RecipeName: del.JavaRecipeName(),
-				Options:    del.JavaOptions(),
+	if del, ok := instance.(recipe.DelegatesTo); ok {
+		resp.DelegatesTo = &delegatesToResponse{
+			RecipeName: del.JavaRecipeName(),
+			Options:    del.JavaOptions(),
+		}
+		return resp, nil
+	}
+
+	// Whole-tree: prepare each child. A child that delegates to a Java recipe is emitted as
+	// delegatesTo for the host to resolve; the rest are prepared and validated recursively.
+	childResponses := []prepareRecipeResponse{}
+	for _, child := range instance.RecipeList() {
+		if del, ok := child.(recipe.DelegatesTo); ok {
+			childID := uuid.New().String()
+			childResponses = append(childResponses, prepareRecipeResponse{
+				ID:                childID,
+				Descriptor:        delegateDescriptor(del.JavaRecipeName()),
+				EditVisitor:       "edit:" + childID,
+				EditPreconditions: []any{},
+				ScanPreconditions: []any{},
+				DelegatesTo: &delegatesToResponse{
+					RecipeName: del.JavaRecipeName(),
+					Options:    del.JavaOptions(),
+				},
+			})
+		} else {
+			childResp, rerr := s.prepareInstance(child, recipe.Describe(child).Name)
+			if rerr != nil {
+				return prepareRecipeResponse{}, rerr
 			}
+			childResponses = append(childResponses, childResp)
 		}
 	}
+	resp.RecipeList = childResponses
 
 	return resp, nil
 }
@@ -1491,8 +1711,21 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 		return nil, &rpcError{Code: -32602, Message: "Unknown recipe: " + recipeID}
 	}
 	if r == nil {
-		// Installer-loaded recipes have no implementation in Go
-		return &visitResponse{Modified: false}, nil
+		// The recipe was registered descriptor-only (nil instance) yet an
+		// edit/scan run is being dispatched against it. A descriptor-only
+		// registration exists purely so the recipe can be listed in the
+		// marketplace; the real implementation is supposed to overwrite it
+		// when the recipe binary is activated (see Registry.RegisterWithCategories).
+		// Reaching here means it never was — fail loudly rather than silently
+		// reporting "no changes", which masks a stale or missing workspace binary.
+		name := s.preparedRecipeNames[recipeID]
+		if name == "" {
+			name = recipeID
+		}
+		return nil, &rpcError{
+			Code:    -32603,
+			Message: fmt.Sprintf("recipe %q is registered as metadata only and has no executable implementation in this server build; the workspace binary is stale or missing", name),
+		}
 	}
 
 	// Get the tree from Java via bidirectional RPC

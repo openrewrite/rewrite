@@ -606,7 +606,17 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                 whitespace = evaluate(() -> spacesStyle.getBeforeParentheses().getMethodCall(), false) ? " " : "";
                 break;
             case NEW_ARRAY_INITIALIZER:
-                whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getArrayInitializerLeftBrace(), false) ? " " : "";
+                if (getCursor().firstEnclosing(J.Annotation.class) != null) {
+                    if (getCursor().getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.Assignment) {
+                        // For a named annotation value pair (e.g. `value = {...}`) the space before the
+                        // brace is governed by the `=` spacing, so don't add another one here.
+                        whitespace = "";
+                    } else {
+                        whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getAnnotationArrayInitializerLeftBrace(), false) ? " " : "";
+                    }
+                } else {
+                    whitespace = evaluate(() -> spacesStyle.getBeforeLeftBrace().getArrayInitializerLeftBrace(), false) ? " " : "";
+                }
                 break;
             case UNARY_OPERATOR: //intelliJ does not format the i++ to i ++ when spacesStyle.getAroundOperators().getUnary() is true;
             case METHOD_SELECT_SUFFIX:

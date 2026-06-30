@@ -29,7 +29,7 @@ public sealed class PointerMemberAccess(Guid id) : Marker, IRpcCodec<PointerMemb
     public PointerMemberAccess WithId(Guid id) =>
         id == Id ? this : new(id);
 
-    public static PointerMemberAccess Instance { get; } = new(Guid.Empty);
+    public static PointerMemberAccess Instance { get; } = new(new Guid("1e5a0009-0000-4000-8000-000000000009"));
 
     public void RpcSend(PointerMemberAccess after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
     public PointerMemberAccess RpcReceive(PointerMemberAccess before, RpcReceiveQueue q) =>

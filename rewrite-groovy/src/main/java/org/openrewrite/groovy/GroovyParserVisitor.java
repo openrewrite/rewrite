@@ -1690,6 +1690,9 @@ public class GroovyParserVisitor {
                     case "!in":
                         gBinaryOp = G.Binary.Type.NotIn;
                         break;
+                    case "!instanceof":
+                        gBinaryOp = G.Binary.Type.NotInstanceOf;
+                        break;
                     case "<=>":
                         gBinaryOp = G.Binary.Type.Spaceship;
                         break;
@@ -1744,6 +1747,15 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitBlockStatement(BlockStatement block) {
+            if (isUnwrappedDesugaredResourceBlock(block)) {
+                // A try-with-resources without a catch or finally clause is desugared by Groovy 4 into a
+                // bare block (rather than being wrapped in a TryCatchStatement like the cases that have a
+                // catch/finally). Re-wrap it so the try-with-resources handling in visitTryCatchFinally applies.
+                BlockStatement wrapper = new BlockStatement();
+                wrapper.addStatement(block);
+                visitTryCatchFinally(new TryCatchStatement(wrapper, EmptyStatement.INSTANCE));
+                return;
+            }
             Space fmt = EMPTY;
             Space staticInitPadding = EMPTY;
             boolean isStaticInit = sourceStartsWith("static");
@@ -3160,6 +3172,9 @@ public class GroovyParserVisitor {
             // Groovy 4 desugars try-with-resources at parse time (getResourceStatements() is always empty).
             // Detect from source: if "(" follows "try", parse resources from source text.
             JContainer<J.Try.Resource> resources = null;
+            // The body lives at the bottom of the nested resource structure; it defaults to the try
+            // statement itself when there are no resources, and is reassigned as resources are consumed.
+            org.codehaus.groovy.ast.stmt.Statement bodyStatement = node.getTryStatement();
             boolean hasTryWithResources = source.charAt(indexOfNextNonWhitespace(cursor, source)) == '(';
             if (hasTryWithResources) {
                 Space beforeParen = sourceBefore("(");
@@ -3177,7 +3192,6 @@ public class GroovyParserVisitor {
                     resourceVar = resourceVar.withPrefix(EMPTY);
 
                     TryCatchStatement innerTry = (TryCatchStatement) innerBlock.getStatements().get(innerBlock.getStatements().size() - 1);
-                    boolean hasMoreResources = isDesugaredResourceBlock(innerTry.getTryStatement());
 
                     int nextNonWs = indexOfNextNonWhitespace(cursor, source);
                     boolean semicolonPresent = nextNonWs < source.length() && source.charAt(nextNonWs) == ';';
@@ -3191,36 +3205,23 @@ public class GroovyParserVisitor {
                             resourceVar.withPrefix(EMPTY), semicolonPresent);
                     skip(";");
 
+                    // Whether another resource follows must be decided from the source, not the AST:
+                    // a nested try-with-resources in the body desugars to the same shape as an additional
+                    // resource, so only the closing ')' of the resource list can disambiguate them.
+                    boolean hasMoreResources = source.charAt(indexOfNextNonWhitespace(cursor, source)) != ')';
                     if (hasMoreResources) {
                         resourceList.add(padRight(tryResource, EMPTY));
                         current = innerTry.getTryStatement();
                     } else {
                         resourceList.add(padRight(tryResource, sourceBefore(")")));
+                        bodyStatement = innerTry.getTryStatement();
                         break;
                     }
                 }
                 resources = JContainer.build(beforeParen, resourceList, Markers.EMPTY);
             }
 
-            // When try-with-resources, find the actual body by walking down the nested structure
-            // to the innermost TryCatchStatement's tryStmt.
-            J.Block body;
-            if (hasTryWithResources) {
-                org.codehaus.groovy.ast.stmt.Statement current = node.getTryStatement();
-                TryCatchStatement innerTry = null;
-                while (isDesugaredResourceBlock(current)) {
-                    BlockStatement innerBlock = (BlockStatement) ((BlockStatement) current).getStatements().get(0);
-                    innerTry = (TryCatchStatement) innerBlock.getStatements().get(innerBlock.getStatements().size() - 1);
-                    if (isDesugaredResourceBlock(innerTry.getTryStatement())) {
-                        current = innerTry.getTryStatement();
-                    } else {
-                        break;
-                    }
-                }
-                body = doVisit(innerTry != null ? innerTry.getTryStatement() : node.getTryStatement());
-            } else {
-                body = doVisit(node.getTryStatement());
-            }
+            J.Block body = doVisit(bodyStatement);
 
             // Handle catches, merging multi-catch statements.
             // Groovy 4 splits catch(A | B e) into separate CatchStatements at the same source position.
@@ -3631,6 +3632,27 @@ public class GroovyParserVisitor {
 
     private <T> JRightPadded<T> padRight(T tree, Space right, Markers markers) {
         return new JRightPadded<>(tree, right, markers);
+    }
+
+    /**
+     * Detects the "unwrapped" desugared form of a try-with-resources that has no catch or finally clause.
+     * Groovy 4 desugars such a statement into a bare block of the shape
+     * {@code [resourceDecl, __$$primaryExc decl, TryCatchStatement]} rather than wrapping it in an
+     * enclosing {@link TryCatchStatement}. The synthetic {@code __$$primaryExc} primary-exception holder is
+     * what distinguishes it from an ordinary user-authored block.
+     */
+    private static boolean isUnwrappedDesugaredResourceBlock(BlockStatement block) {
+        List<org.codehaus.groovy.ast.stmt.Statement> stmts = block.getStatements();
+        if (stmts.size() < 3 || !(stmts.get(stmts.size() - 1) instanceof TryCatchStatement)) {
+            return false;
+        }
+        org.codehaus.groovy.ast.stmt.Statement primaryExc = stmts.get(stmts.size() - 2);
+        if (primaryExc instanceof ExpressionStatement &&
+                ((ExpressionStatement) primaryExc).getExpression() instanceof DeclarationExpression) {
+            org.codehaus.groovy.ast.expr.Expression left = ((DeclarationExpression) ((ExpressionStatement) primaryExc).getExpression()).getLeftExpression();
+            return left instanceof VariableExpression && ((VariableExpression) left).getName().startsWith("__$$primaryExc");
+        }
+        return false;
     }
 
     /**
@@ -4359,7 +4381,7 @@ public class GroovyParserVisitor {
             skip("?");
             JLeftPadded<J.Wildcard.Bound> bound = null;
             NameTree boundedType = null;
-            if (genericsType.getUpperBounds() != null) {
+            if (genericsType.getUpperBounds() != null && sourceStartsWith("extends")) {
                 bound = padLeft(sourceBefore("extends"), J.Wildcard.Bound.Extends);
                 boundedType = visitTypeTree(genericsType.getUpperBounds()[0]);
             } else if (genericsType.getLowerBound() != null) {

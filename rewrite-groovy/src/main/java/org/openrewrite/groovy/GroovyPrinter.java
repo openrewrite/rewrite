@@ -166,6 +166,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             case NotIn:
                 keyword = "!in";
                 break;
+            case NotInstanceOf:
+                keyword = "!instanceof";
+                break;
             case Spaceship:
                 keyword = "<=>";
                 break;

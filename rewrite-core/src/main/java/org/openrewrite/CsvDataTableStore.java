@@ -108,6 +108,16 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
     }
 
     /**
+     * Raw CSV has no cross-record state, so several writers can safely append to one shared file.
+     */
+    public CsvDataTableStore(Path outputDir,
+                             Map<String, String> prefixColumns,
+                             Map<String, String> suffixColumns) {
+        this(outputDir, CsvDataTableStore::defaultOutputStream, CsvDataTableStore::defaultInputStream,
+                ".csv", prefixColumns, suffixColumns);
+    }
+
+    /**
      * Create a store with control over output stream creation, file extension,
      * and additional static columns prepended/appended to each row.
      * <p>
@@ -164,6 +174,22 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    public Path getOutputDir() {
+        return outputDir;
+    }
+
+    public String getFileExtension() {
+        return fileExtension;
+    }
+
+    public Map<String, String> getPrefixColumns() {
+        return prefixColumns;
+    }
+
+    public Map<String, String> getSuffixColumns() {
+        return suffixColumns;
     }
 
     private static OutputStream defaultOutputStream(Path path) {
@@ -318,6 +344,11 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
         }
         headers.addAll(suffixColumns.keySet());
 
+        // Writers sharing one file must agree on column order; fail loud rather than misalign rows.
+        if (append) {
+            validateExistingHeader(path, headers);
+        }
+
         OutputStream os = outputStreamFactory.apply(path);
         try {
             CsvWriterSettings settings = new CsvWriterSettings();
@@ -340,6 +371,26 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
             } catch (IOException ignored) {
             }
             throw e;
+        }
+    }
+
+    private void validateExistingHeader(Path path, List<String> expectedHeaders) {
+        try (InputStream is = inputStreamFactory.apply(path)) {
+            CsvParserSettings settings = new CsvParserSettings();
+            settings.setMaxCharsPerColumn(-1);
+            settings.getFormat().setComment('#');
+            CsvParser parser = new CsvParser(settings);
+            parser.beginParsing(new InputStreamReader(is, StandardCharsets.UTF_8));
+            String[] existing = parser.parseNext();
+            parser.stopParsing();
+            if (existing != null && !Arrays.asList(existing).equals(expectedHeaders)) {
+                throw new IllegalStateException(
+                        "Data table file " + path.getFileName() + " has header " + Arrays.toString(existing) +
+                        " but a writer expected " + expectedHeaders + ". Writers sharing a data table file " +
+                        "must agree on column order.");
+            }
+        } catch (IOException e) {
+            // Existing file is unreadable here (e.g. not yet flushed); skip the guard and proceed.
         }
     }
 
@@ -388,6 +439,8 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
             }
 
             csvWriter.writeRow((Object[]) values);
+            // Flush per row so a shared file always ends at a complete line.
+            csvWriter.flush();
         }
 
         void close() {

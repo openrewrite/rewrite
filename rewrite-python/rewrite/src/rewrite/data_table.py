@@ -155,15 +155,19 @@ class _Bucket:
 
 class CsvDataTableStore(DataTableStore):
     """
-    Writes data table rows directly to CSV files (RFC 4180 format).
-
-    Each data table bucket is written to a separate CSV file named using
-    the data table's file-safe key.
+    Writes data table rows to raw CSV files (RFC 4180), one per file-safe key.
+    Prefix/suffix columns are static columns the host conveys so writers sharing a file agree on them.
     """
 
-    def __init__(self, output_dir: str):
+    def __init__(
+        self,
+        output_dir: str,
+        prefix_columns: Optional[Dict[str, str]] = None,
+        suffix_columns: Optional[Dict[str, str]] = None,
+    ):
         self._output_dir = output_dir
-        self._initialized_tables: set[str] = set()
+        self._prefix_columns: Dict[str, str] = dict(prefix_columns or {})
+        self._suffix_columns: Dict[str, str] = dict(suffix_columns or {})
         self._row_counts: Dict[str, int] = {}
         self._data_tables: Dict[str, DataTable] = {}
         os.makedirs(output_dir, exist_ok=True)
@@ -173,27 +177,33 @@ class CsvDataTableStore(DataTableStore):
     ) -> None:
         file_key = self._file_key(data_table)
         csv_path = os.path.join(self._output_dir, f"{file_key}.csv")
+        self._data_tables[file_key] = data_table
 
-        # Write metadata comments and header on first row
-        if file_key not in self._initialized_tables:
-            self._initialized_tables.add(file_key)
-            self._row_counts[file_key] = 0
-            self._data_tables[file_key] = data_table
-            descriptor = data_table.descriptor()
-            headers = [
-                self._escape_csv(col["displayName"]) for col in descriptor["columns"]
+        descriptor = data_table.descriptor()
+        columns = descriptor["columns"]
+
+        # Key the header on file existence (not in-memory state) so writers sharing a
+        # file emit it once; use column NAMES, not display names, to match the Java writer.
+        if not os.path.exists(csv_path):
+            header = [
+                self._escape_csv(name) for name in self._prefix_columns.keys()
+            ] + [
+                self._escape_csv(col["name"]) for col in columns
+            ] + [
+                self._escape_csv(name) for name in self._suffix_columns.keys()
             ]
             with open(csv_path, "w") as f:
                 f.write(f"# @name {data_table.name}\n")
                 f.write(f"# @instanceName {data_table.instance_name}\n")
                 f.write(f"# @group {data_table.group or ''}\n")
-                f.write(",".join(headers) + "\n")
+                f.write(",".join(header) + "\n")
 
-        # Write data row
-        descriptor = data_table.descriptor()
-        columns = descriptor["columns"]
         values = [
+            self._escape_csv(value) for value in self._prefix_columns.values()
+        ] + [
             self._escape_csv(getattr(row, col["name"], "")) for col in columns
+        ] + [
+            self._escape_csv(value) for value in self._suffix_columns.values()
         ]
         with open(csv_path, "a") as f:
             f.write(",".join(values) + "\n")
@@ -214,14 +224,21 @@ class CsvDataTableStore(DataTableStore):
     @property
     def table_names(self) -> List[str]:
         """Get the file-safe keys of all data tables that have been written to."""
-        return list(self._initialized_tables)
+        return list(self._data_tables.keys())
 
     @staticmethod
     def _file_key(data_table: DataTable) -> str:
-        suffix = data_table.group if data_table.group else data_table.instance_name
-        if suffix == data_table.name:
+        # Mirror org.openrewrite.CsvDataTableStore#fileKey exactly so a table shared
+        # by Java and Python recipes resolves to the same filename.
+        group = data_table.group
+        if group is not None:
+            if group == data_table.name:
+                return data_table.name
+            return f"{data_table.name}--{sanitize_scope(group)}"
+        instance_name = data_table.instance_name
+        if instance_name == data_table.display_name:
             return data_table.name
-        return f"{data_table.name}--{sanitize_scope(suffix)}"
+        return f"{data_table.name}--{sanitize_scope(instance_name)}"
 
     @staticmethod
     def _escape_csv(value: Any) -> str:

@@ -161,6 +161,64 @@ public class TypeUtils {
         return isOfTypeCore(type1, type2, context);
     }
 
+    /**
+     * Compares two method types for being the same method, ignoring differences that arise purely
+     * from generic parameterization at the use site. This is looser than
+     * {@link #isOfType(JavaType, JavaType)}: a raw type matches its parameterized form (e.g. raw
+     * {@code Set} matches {@code Set<String>}) and a generic type variable matches any type.
+     * <p>
+     * It is intended for matching the {@link JavaType.Method} recorded for an invocation (such as
+     * the entries of {@code JavaSourceFile.getTypesInUse().getUsedMethods()}) back to the
+     * declaration it resolves to. The recorded call-site type can diverge from the declaration when
+     * the invocation is an unchecked invocation (the result type is erased to its raw form) or when
+     * the call binds a generic parameter to a concrete type, so neither {@link Object#equals} nor
+     * {@link #isOfType(JavaType, JavaType)} reliably matches the two.
+     */
+    public static boolean isOfTypeIgnoringGenerics(JavaType.@Nullable Method declaration, JavaType.@Nullable Method use) {
+        if (declaration == use) {
+            return true;
+        }
+        if (declaration == null || use == null ||
+            !declaration.getName().equals(use.getName()) ||
+            declaration.getParameterTypes().size() != use.getParameterTypes().size() ||
+            !isOfTypeIgnoringGenerics(declaration.getDeclaringType(), use.getDeclaringType()) ||
+            !isOfTypeIgnoringGenerics(declaration.getReturnType(), use.getReturnType())) {
+            return false;
+        }
+        for (int i = 0; i < declaration.getParameterTypes().size(); i++) {
+            if (!isOfTypeIgnoringGenerics(declaration.getParameterTypes().get(i), use.getParameterTypes().get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isOfTypeIgnoringGenerics(@Nullable JavaType type1, @Nullable JavaType type2) {
+        if (type1 == type2) {
+            return true;
+        }
+        if (type1 == null || type2 == null) {
+            return false;
+        }
+        // A generic type variable can be bound to any type at a use site, so treat it as a wildcard.
+        if (type1 instanceof JavaType.GenericTypeVariable || type2 instanceof JavaType.GenericTypeVariable) {
+            return true;
+        }
+        if (isString(type1) && isString(type2)) {
+            return true;
+        }
+        if (type1 instanceof JavaType.Primitive || type2 instanceof JavaType.Primitive) {
+            return type1 == type2;
+        }
+        if (type1 instanceof JavaType.Array && type2 instanceof JavaType.Array) {
+            return isOfTypeIgnoringGenerics(((JavaType.Array) type1).getElemType(), ((JavaType.Array) type2).getElemType());
+        }
+        // Ignore any type parameters: compare only the raw fully qualified names.
+        JavaType.FullyQualified fq1 = asFullyQualified(type1);
+        JavaType.FullyQualified fq2 = asFullyQualified(type2);
+        return fq1 != null && fq2 != null && fullyQualifiedNamesAreEqual(fq1.getFullyQualifiedName(), fq2.getFullyQualifiedName());
+    }
+
     private static boolean isOfTypeMethod(JavaType.Method type1, JavaType.Method type2, ComparisonContext context) {
         if (!type1.getName().equals(type2.getName()) ||
             type1.getFlagsBitMap() != type2.getFlagsBitMap() ||

@@ -72,7 +72,7 @@ export class InstallRecipes {
     }
 
     static handle(connection: rpc.MessageConnection, installDir: string, marketplace: RecipeMarketplace,
-                  logger?: rpc.Logger, metricsCsv?: string): void {
+                  recipeOrigin: Map<string, string>, logger?: rpc.Logger, metricsCsv?: string): void {
         connection.onRequest(
             new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"),
             withMetrics<InstallRecipes, InstallRecipesResponse>(
@@ -80,7 +80,7 @@ export class InstallRecipes {
                 metricsCsv,
                 (context) => async (request) => {
                     context.target = typeof request.recipes === "object" ? request.recipes.packageName : request.recipes;
-                    const beforeInstall = marketplace.allRecipes().length;
+                    const beforeNames = new Set(marketplace.allRecipes().map(r => r.name));
                     let resolvedPath;
                     let recipesName = request.recipes;
 
@@ -150,8 +150,21 @@ export class InstallRecipes {
                         throw new Error(`${recipesName} does not export an 'activate' function`);
                     }
 
+                    // Attribute the recipes this install contributed to their package, so GetMarketplace
+                    // can tag each row with its origin and the host can bind it to the right bundle.
+                    // Local-path installs have no package identity, so they stay unattributed and fall
+                    // back to the requested bundle on the host.
+                    if (typeof request.recipes === "object") {
+                        const packageName = request.recipes.packageName;
+                        for (const recipe of marketplace.allRecipes()) {
+                            if (!beforeNames.has(recipe.name)) {
+                                recipeOrigin.set(recipe.name, packageName);
+                            }
+                        }
+                    }
+
                     return {
-                        recipesInstalled: marketplace.allRecipes().length - beforeInstall,
+                        recipesInstalled: marketplace.allRecipes().length - beforeNames.size,
                         version: installedVersion
                     };
                 }

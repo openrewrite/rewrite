@@ -20,7 +20,9 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.search.DeclaresMethod;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -66,7 +68,14 @@ public class RemoveMethodThrows extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides != null ? matchOverrides : true);
         TypeMatcher typeMatcher = new TypeMatcher(exceptionTypePattern, true);
-        return Preconditions.check(new DeclaresMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> precondition = new DeclaresMethod<>(methodMatcher);
+        // An exception can only be removed if it appears in a `throws` clause (or `@Throws`), so also
+        // require its type to be used — unless the pattern matches all exceptions, where no single
+        // type applies.
+        if (!StringUtils.isBlank(exceptionTypePattern) && !"*".equals(exceptionTypePattern)) {
+            precondition = Preconditions.and(new UsesType<>(exceptionTypePattern, true), precondition);
+        }
+        return Preconditions.check(precondition, new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                         J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);

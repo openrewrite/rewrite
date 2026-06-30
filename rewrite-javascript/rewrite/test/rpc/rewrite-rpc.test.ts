@@ -34,6 +34,7 @@ import {
 } from "../../src/javascript";
 import {J} from "../../src/java";
 import {withDir} from "tmp-promise";
+import {PrepareRecipe, PrepareRecipeResponse} from "../../src/rpc/request/prepare-recipe";
 
 describe("Rewrite RPC", () => {
     const spec = new RecipeSpec();
@@ -137,6 +138,20 @@ describe("Rewrite RPC", () => {
         const recipe = await client.prepareRecipe("org.openrewrite.example.text.change-text", {text: "hello"});
         expect(recipe.displayName).toEqual("Change text");
         expect(recipe.instanceName()).toEqual("Change text to 'hello'");
+    });
+
+    test("prepareRecipe rejects a missing required option", async () => {
+        // The server validates required options when preparing a recipe. `text` is required, so
+        // omitting it must fail rather than silently preparing a broken recipe.
+        await expect(client.prepareRecipe("org.openrewrite.example.text.change-text", {}))
+            .rejects.toThrow("Missing required option `text`");
+    });
+
+    test("prepareRecipe validates required options of child recipes", async () => {
+        // The composite's child ChangeText is missing its required `text`. Validation recurses through
+        // the whole prepared tree (like the C# server), so preparing the composite must fail.
+        await expect(client.prepareRecipe("org.openrewrite.example.text.composite-with-invalid-child"))
+            .rejects.toThrow("Missing required option `text`");
     });
 
     // TODO: Re-enable once @openrewrite/recipes-npm is updated to use RecipeMarketplace API
@@ -263,6 +278,24 @@ describe("Rewrite RPC", () => {
         expect(descriptor.recipeList.map(r => r.name)).toContain(
             "org.openrewrite.example.text.remote-change-text"
         );
+    });
+
+    test("preparing an unknown recipe id delegates to the host instead of failing", async () => {
+        // When the host builds RpcRecipe.getRecipeList() it re-prepares every child by
+        // id over RPC. A child that delegates to a Java recipe (e.g. Angular's
+        // upgradeDependencyVersion() -> org.openrewrite.javascript.UpgradeDependencyVersion)
+        // is an RpcRecipe that installSubRecipes intentionally does NOT register in this
+        // marketplace, so findRecipe misses. Rather than throwing "Could not find recipe
+        // with id ...", the server must tell the host to resolve it locally via delegatesTo
+        // (the Java recipe is on the host's classpath).
+        const response: PrepareRecipeResponse = await (client as any).connection.sendRequest(
+            new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
+            new PrepareRecipe("org.openrewrite.javascript.UpgradeDependencyVersion", {newVersion: "19.x"})
+        );
+        expect(response.delegatesTo).toEqual({
+            recipeName: "org.openrewrite.javascript.UpgradeDependencyVersion",
+            options: {newVersion: "19.x"}
+        });
     });
 
     test("runRecipeWithCrossModuleRecipeList", async () => {

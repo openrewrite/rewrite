@@ -633,6 +633,23 @@ class MethodDeclarationTest implements RewriteTest {
         }
 
         @Test
+        void consecutiveBracelessExtensionsWithMethodCallBody() {
+            // Two consecutive braceless extensions where the first's method body is a
+            // method invocation must each print once, not duplicate the first on print.
+            rewriteRun(
+                scala(
+                    """
+                    extension (pk: Int)
+                      def a: Int = foo()
+
+                    extension (v: Int)
+                      def c: Int = v
+                    """
+                )
+            );
+        }
+
+        @Test
         void bracelessExtensionWithBraceBlockMethodBody() {
             // A `{` inside a method body must not be mistaken for the extension's
             // opening brace, which would make the parser treat this braceless
@@ -905,6 +922,25 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void asInstanceOfInProcedureSyntaxBody() {
+        // Procedure-syntax bodies are reparsed with a nonzero offset; the cursor update
+        // after `asInstanceOf[...]` must apply that offset or it swallows the following
+        // statement's leading whitespace (`x.asInstanceOf[B]\ny` -> `x.asInstanceOf[B]y`).
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def m() {
+                x.asInstanceOf[B]
+                y
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void procedureSyntaxSetter() {
         rewriteRun(
           scala(
@@ -914,6 +950,20 @@ class MethodDeclarationTest implements RewriteTest {
                 println(x)
               }
             }
+            """
+          )
+        );
+    }
+
+    @Test
+    void parameterWithInfixType() {
+        rewriteRun(
+          scala(
+            """
+            class AsyncDb
+            class InsightDb
+            type @@[A, B] = A
+            def f(x: AsyncDb @@ InsightDb) = x
             """
           )
         );

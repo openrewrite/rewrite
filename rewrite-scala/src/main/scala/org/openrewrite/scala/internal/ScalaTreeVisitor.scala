@@ -29,6 +29,7 @@ import org.openrewrite.scala.marker.AmpersandIntersection
 import org.openrewrite.scala.marker.DottedMatch
 import org.openrewrite.scala.marker.ExtraConstructorParamLists
 import org.openrewrite.scala.marker.Implicit
+import org.openrewrite.scala.marker.InfixTypeNotation
 import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedSyntax
 import org.openrewrite.scala.marker.OmitBraces
@@ -652,11 +653,7 @@ class ScalaTreeVisitor(
       arguments
     )
     
-    // Update cursor to the end of the annotation
-    val adjustedEnd = Math.max(0, app.span.end - offsetAdjustment)
-    if (adjustedEnd > cursor) {
-      cursor = adjustedEnd
-    }
+    updateCursor(app.span.end)
     
     
     annotation
@@ -969,12 +966,8 @@ class ScalaTreeVisitor(
         } else Space.EMPTY
         if (dotPos >= 0) cursor = dotPos + 1
 
-        // Update cursor position to after the method name
         if (sel.nameSpan.exists) {
-          val nameEnd = Math.max(0, sel.nameSpan.end - offsetAdjustment)
-          if (nameEnd > cursor) {
-            cursor = nameEnd
-          }
+          updateCursor(sel.nameSpan.end)
         }
 
         select = target
@@ -1250,12 +1243,8 @@ class ScalaTreeVisitor(
       Markers.EMPTY
     )
 
-    // Update cursor to end of the apply expression
     if (app.span.exists) {
-      val adjustedEnd = Math.max(0, app.span.end - offsetAdjustment)
-      if (adjustedEnd > cursor && adjustedEnd <= source.length) {
-        cursor = adjustedEnd
-      }
+      updateCursor(app.span.end)
     }
 
     val markers = if (isBlockArg) {
@@ -1390,13 +1379,9 @@ class ScalaTreeVisitor(
     val operator = mapOperator(sel.name.toString)
     val rightExpr = visitTree(right).asInstanceOf[Expression]
     
-    // Extract any remaining source from the Apply span if provided
     appSpan.foreach { span =>
       if (span.exists) {
-        val adjustedEnd = Math.max(0, span.end - offsetAdjustment)
-        if (adjustedEnd > cursor && adjustedEnd <= source.length) {
-          cursor = adjustedEnd
-        }
+        updateCursor(span.end)
       }
     }
     
@@ -1506,12 +1491,8 @@ class ScalaTreeVisitor(
       }
       val name = ident(nameStr, dotSpace, typeOfTree(sel), variableTypeOfTree(sel))
       
-      // Consume up to the end of the selection
       if (sel.span.exists) {
-        val adjustedEnd = Math.max(0, sel.span.end - offsetAdjustment)
-        if (adjustedEnd > cursor && adjustedEnd <= source.length) {
-          cursor = adjustedEnd
-        }
+        updateCursor(sel.span.end)
       }
       
       val faMarkers = if (isTypeProjection) {
@@ -4378,14 +4359,17 @@ class ScalaTreeVisitor(
     // Detect Scala 3 paren-less form (`for x <- xs do body`): after `for`, the next
     // non-whitespace is neither `(` nor `{`. The single-generator J.ForEachLoop
     // shortcut assumes parens, so for paren-less route through buildSFor.
-    val isParenless = {
+    val openDelim: Char = {
       val forStart = Math.max(0, forTree.span.start - offsetAdjustment)
       var i = forStart + 3 // skip "for"
       while (i < source.length && source.charAt(i).isWhitespace) i += 1
-      i < source.length && source.charAt(i) != '(' && source.charAt(i) != '{'
+      if (i < source.length) source.charAt(i) else ' '
     }
+    // The single-generator J.ForEachLoop shortcut always prints with parens, so only
+    // take it for the paren form. The brace form `for { x <- xs } { body }` and the
+    // Scala 3 paren-less form must route through buildSFor, which preserves brackets.
     val enums = forTree.enums
-    if (!isParenless && enums.size == 1) {
+    if (openDelim == '(' && enums.size == 1) {
       enums.head match {
         case genFrom: untpd.GenFrom if genFrom.pat.isInstanceOf[Trees.Ident[?]] =>
           return visitSimpleForEach(forTree, genFrom)
@@ -5200,7 +5184,8 @@ class ScalaTreeVisitor(
               val afterCursor = source.substring(cursor, classEnd)
               val braceIndex = positionOfNextIn(afterCursor, "{", 0)
               // For Scala 3 braceless: look for `:` at end of line (not `: Type` annotation).
-              // A braceless body colon is followed by a newline, not by a type name.
+              // A braceless body colon is followed by a newline (or a trailing comment),
+              // not by a type name.
               val colonIndex = {
                 var result = -1
                 var idx = positionOfNextIn(afterCursor, ":", 0)
@@ -5210,8 +5195,12 @@ class ScalaTreeVisitor(
                   } else {
                     val afterColon = afterCursor.substring(idx + 1)
                     val nextNonSpace = afterColon.indexWhere(c => c != ' ' && c != '\t')
-                    if (nextNonSpace < 0 || afterColon.charAt(nextNonSpace) == '\n' || afterColon.charAt(nextNonSpace) == '\r') {
-                      result = idx // `:` followed by newline = braceless body
+                    val startsComment = nextNonSpace >= 0 && nextNonSpace + 1 < afterColon.length &&
+                      afterColon.charAt(nextNonSpace) == '/' &&
+                      (afterColon.charAt(nextNonSpace + 1) == '/' || afterColon.charAt(nextNonSpace + 1) == '*')
+                    if (nextNonSpace < 0 || afterColon.charAt(nextNonSpace) == '\n' ||
+                        afterColon.charAt(nextNonSpace) == '\r' || startsComment) {
+                      result = idx // `:` followed by newline or trailing comment = braceless body
                     }
                   }
                   if (result < 0) idx = positionOfNextIn(afterCursor, ":", idx + 1)
@@ -5330,12 +5319,8 @@ class ScalaTreeVisitor(
       null
     }
     
-    // Update cursor to end of the class
     if (td.span.exists) {
-      val adjustedEnd = Math.max(0, td.span.end - offsetAdjustment)
-      if (adjustedEnd > cursor && adjustedEnd <= source.length) {
-        cursor = adjustedEnd
-      }
+      updateCursor(td.span.end)
     }
     
     val classDeclMarkers = if (isEnumCaseClass) {
@@ -5449,10 +5434,7 @@ class ScalaTreeVisitor(
               Space.EMPTY
             }
 
-          // Update cursor past ".asInstanceOf"
-          if (asInstanceOfEnd > cursor) {
-            cursor = asInstanceOfEnd
-          }
+          updateCursor(sel.span.end)
           
           // Now handle the type argument in brackets
           // Extract any space before the opening bracket
@@ -5480,10 +5462,8 @@ class ScalaTreeVisitor(
           }
           
           // Update cursor past the closing bracket
-          if (ta.span.end > cursor) {
-            cursor = ta.span.end
-          }
-          
+          updateCursor(ta.span.end)
+
           val typeCastMarkers =
             if (asInstanceOfPrefix.getWhitespace.nonEmpty || !asInstanceOfPrefix.getComments.isEmpty) {
               Markers.EMPTY.addIfAbsent(AsInstanceOfPrefix.create(asInstanceOfPrefix))
@@ -7652,11 +7632,21 @@ class ScalaTreeVisitor(
 
   private def visitExtMethods(ext: untpd.ExtMethods): S.ExtensionMethods = {
     // Scala 3 extension method block: `extension (x: T) { def ... }`
+    // The dotty span of an ExtMethods begins at the parameter/method region, not at
+    // the `extension` keyword, so we search backwards for the keyword. Floor that
+    // search at the previous statement's end (the cursor before the prefix) — otherwise
+    // a `(` in a preceding extension's method body (e.g. `def a = foo()`) is mistaken
+    // for this extension's parameter clause, rewinding the cursor into the previous
+    // block and duplicating it on print.
+    val keywordFloor = cursor
     val prefix = extractPrefix(ext.span)
     val adjustedStart = Math.max(0, ext.span.start - offsetAdjustment)
-    val searchStart = Math.max(0, Math.min(cursor, adjustedStart) - "extension".length)
+    val searchStart = Math.max(keywordFloor, Math.min(cursor, adjustedStart) - "extension".length)
     val firstParenIdx = positionOfNext("(", searchStart)
-    val extKwIdx = if (firstParenIdx >= 0) source.lastIndexOf("extension", firstParenIdx) else positionOfNext("extension", cursor)
+    val extKwIdx = if (firstParenIdx >= 0) {
+      val idx = source.lastIndexOf("extension", firstParenIdx)
+      if (idx >= keywordFloor) idx else -1
+    } else positionOfNext("extension", cursor)
     val keywordEnd = if (extKwIdx >= 0) extKwIdx + "extension".length else cursor
     cursor = keywordEnd
 
@@ -8174,8 +8164,7 @@ class ScalaTreeVisitor(
       visitRepeatedType(po)
     case tuple: untpd.Tuple => visitTupleType(tuple)
     case parens: untpd.Parens => visitParenthesizedType(parens)
-    case infix: untpd.InfixOp if infix.op != null &&
-        (infix.op.name.toString == "|" || infix.op.name.toString == "&") =>
+    case infix: untpd.InfixOp if infix.op != null =>
       visitTypeOperatorInfix(infix)
     case _ =>
       visitTree(tpt) match {
@@ -8186,16 +8175,52 @@ class ScalaTreeVisitor(
   }
 
   /**
-   * Scala 3 operator-form intersection (`A & B`) and union (`A | B`) types are parsed as an
-   * `untpd.InfixOp`. They are modeled structurally — `&` as a `J.IntersectionType` (flagged
-   * with `AmpersandIntersection` so the printer emits `&` rather than `with`) and `|` as an
-   * `S.UnionType` — rather than crammed whole into a single `J.Identifier`. This fixes every
-   * type-annotation position at once (params, return types, ascriptions, bounds, tuple and
-   * function components, ...).
+   * Type-level infix operators are parsed as an `untpd.InfixOp`. They are modeled
+   * structurally rather than crammed whole into a single `J.Identifier`:
+   *   - `&` as a `J.IntersectionType` (flagged with `AmpersandIntersection` so the
+   *     printer emits `&` rather than `with`),
+   *   - `|` as an `S.UnionType`,
+   *   - any other operator (`A @@ B`, `A =:= B`, ...) as a `J.ParameterizedType`
+   *     (since Scala desugars `A op B` to `op[A, B]`) flagged with `InfixTypeNotation`
+   *     so the printer re-emits the infix form.
+   * This fixes every type-annotation position at once (params, return types,
+   * ascriptions, bounds, tuple and function components, ...).
    */
   private def visitTypeOperatorInfix(infix: untpd.InfixOp): TypeTree =
-    if (infix.op.name.toString == "&") visitIntersectionInfixType(infix)
-    else visitUnionInfixType(infix)
+    infix.op.name.toString match {
+      case "&" => visitIntersectionInfixType(infix)
+      case "|" => visitUnionInfixType(infix)
+      case _ => visitGeneralInfixType(infix)
+    }
+
+  /**
+   * Model a general type-level infix operator `A op B` as `op[A, B]` (a
+   * `J.ParameterizedType` whose `clazz` is the operator identifier and whose two type
+   * parameters are the left and right operands), flagged with `InfixTypeNotation` so the
+   * printer re-emits the source `A op B` form. The space before the operator is stored as
+   * the left operand's right-padding; the space before the right operand is its own prefix.
+   */
+  private def visitGeneralInfixType(infix: untpd.InfixOp): TypeTree = {
+    val opName = infix.op.name.toString
+    val prefix = extractPrefix(infix.span)
+    val left = asExpression(visitTypeTree(infix.left))
+    if (left == null) return ident(extractSource(infix.span), prefix)
+    val beforeOp = sourceBefore(opName)
+    val right = asExpression(visitTypeTree(infix.right))
+    if (right == null) return ident(extractSource(infix.span), prefix)
+    updateCursor(infix.span.end)
+    val elements = new util.ArrayList[JRightPadded[Expression]](2)
+    elements.add(new JRightPadded[Expression](left, beforeOp, Markers.EMPTY))
+    elements.add(new JRightPadded[Expression](right, Space.EMPTY, Markers.EMPTY))
+    new J.ParameterizedType(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY.add(InfixTypeNotation.create()),
+      ident(opName),
+      JContainer.build(Space.EMPTY, elements, Markers.EMPTY),
+      typeOfTree(infix)
+    )
+  }
 
   /**
    * Flatten a (possibly chained) type-level infix `A op B op C` into its leaf operands in
@@ -8786,6 +8811,13 @@ class ScalaTreeVisitor(
    */
   private def consumeTrailingSemicolon(statEnd: Int, nextStart: Int): (Space, Markers) = {
     val trailStart = Math.max(statEnd, cursor)
+    // When the statement's rhs sits on its own line, Dotty extends the statement
+    // span to include the trailing `;`, so the cursor already moved past it. The
+    // forward scan below would miss it, dropping the explicit separator on print.
+    // Recognize that already-absorbed `;` here so it is preserved via the marker.
+    if (trailStart > 0 && trailStart <= source.length && source.charAt(trailStart - 1) == ';') {
+      return (Space.EMPTY, Markers.EMPTY.add(new Semicolon(Tree.randomId())))
+    }
     if (trailStart >= nextStart || nextStart > source.length) {
       return (Space.EMPTY, Markers.EMPTY)
     }

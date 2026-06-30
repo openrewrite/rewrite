@@ -37,7 +37,7 @@ import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.DottedMatch;
 import org.openrewrite.scala.marker.Implicit;
 import org.openrewrite.scala.marker.IndentedSyntax;
-import org.openrewrite.scala.marker.PackageBraces;
+import org.openrewrite.scala.marker.InfixTypeNotation;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TypeProjection;
@@ -644,6 +644,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
         if (tree instanceof S.CompilationUnit) {
             return visitScalaCompilationUnit((S.CompilationUnit) tree, p);
+        } else if (tree instanceof S.PackageDeclaration) {
+            return visitScalaPackageDeclaration((S.PackageDeclaration) tree, p);
         } else if (tree instanceof S.Wildcard) {
             return visitWildcard((S.Wildcard) tree, p);
         } else if (tree instanceof S.TuplePattern) {
@@ -734,17 +736,17 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visit(statement, p);
         }
 
-        if (scu.getPackageDeclaration() != null) {
-            Optional<PackageBraces> braces = scu.getPackageDeclaration().getMarkers().findFirst(PackageBraces.class);
-            if (braces.isPresent()) {
-                p.append(braces.get().afterBody());
-                p.append('}');
-            }
-        }
-
         visitSpace(scu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
         afterSyntax(scu, p);
         return scu;
+    }
+
+    public J visitScalaPackageDeclaration(S.PackageDeclaration pkg, PrintOutputCapture<P> p) {
+        beforeSyntax(pkg, Space.Location.PACKAGE_PREFIX, p);
+        visit(pkg.getName(), p);
+        visit(pkg.getBody(), p);
+        afterSyntax(pkg, p);
+        return pkg;
     }
 
     @Override
@@ -754,11 +756,6 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visit(pkg.getExpression(), p);
         if (pkg.getMarkers().findFirst(IndentedSyntax.class).isPresent()) {
             p.append(':');
-        }
-        Optional<PackageBraces> braces = pkg.getMarkers().findFirst(PackageBraces.class);
-        if (braces.isPresent()) {
-            p.append(braces.get().beforeBrace());
-            p.append('{');
         }
         if (pkg.getMarkers().findFirst(PackageSemicolon.class).isPresent()) {
             p.append(';');
@@ -1363,11 +1360,28 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     @Override
     public J visitParameterizedType(J.ParameterizedType type, PrintOutputCapture<P> p) {
         beforeSyntax(type, Space.Location.PARAMETERIZED_TYPE_PREFIX, p);
+
+        // Type-level infix operators (`A op B`) are modeled as `op[A, B]` flagged with
+        // InfixTypeNotation; re-emit them in source order as `left op right` rather than
+        // as a bracketed type application.
+        if (type.getMarkers().findFirst(InfixTypeNotation.class).isPresent() &&
+                type.getPadding().getTypeParameters() != null &&
+                type.getPadding().getTypeParameters().getPadding().getElements().size() == 2) {
+            List<JRightPadded<Expression>> operands = type.getPadding().getTypeParameters().getPadding().getElements();
+            JRightPadded<Expression> left = operands.get(0);
+            visit(left.getElement(), p);
+            visitSpace(left.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            visit(type.getClazz(), p);
+            visit(operands.get(1).getElement(), p);
+            afterSyntax(type, p);
+            return type;
+        }
+
         visit(type.getClazz(), p);
-        
+
         // Use Scala-style square brackets for type parameters
         visitContainer("[", type.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", "]", p);
-        
+
         afterSyntax(type, p);
         return type;
     }

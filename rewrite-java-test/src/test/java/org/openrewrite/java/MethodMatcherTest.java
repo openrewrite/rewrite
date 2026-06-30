@@ -42,6 +42,19 @@ import static org.openrewrite.java.tree.JavaType.ShallowClass.build;
 class MethodMatcherTest implements RewriteTest {
 
     @Test
+    void declaringTypeMatchPrefix() {
+        // The literal prefix is everything in the declaring-type pattern up to the first wildcard.
+        assertThat(new MethodMatcher("java.util.List add(..)").getDeclaringTypeMatchPrefix()).isEqualTo("java.util.List");
+        assertThat(new MethodMatcher("java.util.List *(..)").getDeclaringTypeMatchPrefix()).isEqualTo("java.util.List");
+        // The package separator before the `..` wildcard is retained, since every match's FQN has it.
+        assertThat(new MethodMatcher("java.util..* *(..)").getDeclaringTypeMatchPrefix()).isEqualTo("java.util.");
+        assertThat(new MethodMatcher("com.*.Bar foo(..)").getDeclaringTypeMatchPrefix()).isEqualTo("com.");
+        // A leading wildcard yields no usable prefix.
+        assertThat(new MethodMatcher("* *(..)").getDeclaringTypeMatchPrefix()).isNull();
+        assertThat(new MethodMatcher("*..* *(..)").getDeclaringTypeMatchPrefix()).isNull();
+    }
+
+    @Test
     void invalidMethodMatcher() {
         Validated<String> validate = MethodMatcher.validate("com.google.common.collect.*");
         assertThat(validate.isValid()).isFalse();

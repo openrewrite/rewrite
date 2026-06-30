@@ -953,7 +953,8 @@ public class MavenPomDownloader {
                 return null;
             }
 
-            if ("file".equals(URI.create(repository.getUri()).getScheme())) {
+            URI uri = URI.create(repository.getUri());
+            if ("file".equals(uri.getScheme())) {
                 return repository;
             }
             result = mavenCache.getNormalizedRepository(repository);
@@ -963,10 +964,27 @@ public class MavenPomDownloader {
                     ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), new IllegalArgumentException("Repository " + repository.getUri() + " is not HTTP(S)."));
                     return null;
                 }
+                // An endpoint that has already failed to connect during this run is skipped rather
+                // than re-probed. The same dead repository is frequently declared (often under
+                // different ids) by many transitive POMs; the per-repository normalization cache
+                // does not dedupe those, so without this each one costs a full connection timeout.
+                // The key is the host:port the connection targets (not the full URI): a connection
+                // failure happens before any path is sent, so it is independent of the path, and so
+                // the same dead host declared under different paths or ids is deduped too.
+                String endpoint = endpointOrNull(uri);
+                if (endpoint != null && ctx.getUnreachableEndpoints().contains(endpoint)) {
+                    ctx.getResolutionListener().repositoryAccessFailedPreviously(repository.getUri());
+                    return null;
+                }
                 MavenRepository normalized = null;
                 try {
                     normalized = normalizeRepository(repository);
                 } catch (Throwable e) {
+                    // normalizeRepository(repository) only throws once the endpoint is unreachable on
+                    // every probed URL, so remember it and skip the endpoint for the rest of the run.
+                    if (endpoint != null) {
+                        ctx.getUnreachableEndpoints().add(endpoint);
+                    }
                     ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), e);
                 }
 
@@ -1158,6 +1176,11 @@ public class MavenPomDownloader {
 
     private static boolean hasCredentials(MavenRepository repository) {
         return repository.getUsername() != null && repository.getPassword() != null;
+    }
+
+    private static @Nullable String endpointOrNull(URI uri) {
+        String host = uri.getHost();
+        return host == null ? null : host + ':' + uri.getPort();
     }
 
     private MavenRepository applyMirrors(MavenRepository repository) {

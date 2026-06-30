@@ -95,8 +95,18 @@ public class ScalaParser implements Parser {
             inputList.add(input);
         }
 
-        // Batch compile all sources with type checking
-        Map<String, ScalaCompilerContext.ParseResult> compiledResults = compilerContext.compileAll(inputList);
+        // Batch compile all sources with type checking. If the batch fails as a
+        // whole, degrade to per-file parsing below so a single bad input (or a
+        // transient failure) yields a ParseError for that input only instead of
+        // failing the entire parse stream.
+        Map<String, ScalaCompilerContext.ParseResult> compiledResults;
+        try {
+            compiledResults = compilerContext.compileAll(inputList);
+        } catch (Throwable t) {
+            ctx.getOnError().accept(t);
+            compiledResults = Collections.emptyMap();
+        }
+        Map<String, ScalaCompilerContext.ParseResult> finalCompiledResults = compiledResults;
 
         // Map results back to SourceFiles
         return inputList.stream()
@@ -105,7 +115,7 @@ public class ScalaParser implements Parser {
                     pctx.getParsingListener().startedParsing(input);
 
                     try {
-                        ScalaCompilerContext.ParseResult parseResult = compiledResults.get(input.getPath().toString());
+                        ScalaCompilerContext.ParseResult parseResult = finalCompiledResults.get(input.getPath().toString());
 
                         // Fall back to single-file parse if batch didn't include this file
                         if (parseResult == null) {

@@ -51,6 +51,10 @@ class RecipeAttribution:
 
     def __init__(self) -> None:
         self._by_package: Dict[NormalizedDistName, Set[RecipeName]] = {}
+        # recipe name -> the distribution name as recorded (first attribution wins).
+        # Kept un-normalized so a GetMarketplace row carries the package spelling the
+        # host installed, which is what its bundle filter matches against.
+        self._by_recipe: Dict[RecipeName, str] = {}
 
     def record(self, distribution_name: str, recipe_names: Set[RecipeName]) -> None:
         """Attribute ``recipe_names`` to ``distribution_name``.
@@ -62,6 +66,8 @@ class RecipeAttribution:
             return
         key = _normalize_package_name(distribution_name)
         self._by_package.setdefault(key, set()).update(recipe_names)
+        for recipe_name in recipe_names:
+            self._by_recipe.setdefault(recipe_name, distribution_name)
 
     def recipes_for(self, distribution_name: str) -> Set[RecipeName]:
         """Return the (possibly empty) set of recipe names attributed to a
@@ -69,6 +75,13 @@ class RecipeAttribution:
         change the attribution.
         """
         return set(self._by_package.get(_normalize_package_name(distribution_name), ()))
+
+    def package_for(self, recipe_name: RecipeName) -> Optional[str]:
+        """Return the distribution that contributed ``recipe_name`` (the spelling
+        it was recorded with), or None if the recipe wasn't attributed. Used to tag
+        each GetMarketplace row with its origin so the host attributes it to the
+        right bundle instead of the single requested one."""
+        return self._by_recipe.get(recipe_name)
 
 
 def discover_recipes(

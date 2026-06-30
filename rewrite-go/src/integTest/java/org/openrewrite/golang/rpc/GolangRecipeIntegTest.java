@@ -285,6 +285,38 @@ class GolangRecipeIntegTest implements RewriteTest {
         assertThat(result).isNotNull().isInstanceOf(SourceFile.class);
     }
 
+    /**
+     * A Java recipe that iterates {@code J.MethodDeclaration#getModifiers()} —
+     * exactly what {@code ModifierOrder} does — must not NPE on a Go function.
+     * Go functions have no modifiers, but {@code J.MethodDeclaration#modifiers}
+     * is a non-null Java contract; before the fix the Go sender emitted the
+     * modifiers list as a nil slice, which deserialized to {@code null} on the
+     * Java side and threw {@code NullPointerException: Cannot invoke
+     * "java.util.List.iterator()" because "modifiers" is null}.
+     */
+    @Test
+    void iteratingModifiersDoesNotNpe() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, org.openrewrite.ExecutionContext ctx) {
+                  for (J.Modifier modifier : method.getModifiers()) {
+                      assertThat(modifier).isNotNull();
+                  }
+                  return super.visitMethodDeclaration(method, ctx);
+              }
+          })),
+          go(
+            """
+              package main
+
+              func hello() {
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void renameIdentifier() {
         rewriteRun(
@@ -372,8 +404,8 @@ class GolangRecipeIntegTest implements RewriteTest {
 
               import "fmt"
 
-              func main() {/*~~>*/
-              \tfmt.Println("hello")
+              func main() {
+              \t/*~~>*/fmt.Println("hello")
               }
               """
           )

@@ -30,6 +30,8 @@ import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
@@ -48,6 +50,22 @@ public class TypesInUse {
     private final Set<JavaType.Method> declaredMethods;
     private final Set<JavaType.Method> usedMethods;
     private final Set<JavaType.Variable> variables;
+
+    /**
+     * Packages of the fully qualified types referenced only from documentation comments — Javadoc
+     * {@code {@link com.foo.Bar}}, C# {@code <see cref="..."/>}, etc. — each contributing its package
+     * (e.g. {@code com.foo}). The types themselves are deliberately excluded from {@link #typesInUse}
+     * because a fully qualified doc reference needs no import, so it must not count toward import
+     * retention (see #5738). Their packages are recorded here so that package-renaming recipes can still
+     * discover them without re-walking the tree. Only the package is retained because that is all such
+     * recipes query.
+     * <p>
+     * This bucket is <em>transient</em>: it is populated only by {@link #build(JavaSourceFile)} and is left
+     * empty by {@link #of}, since a serialized type index carries no doc references. It is queried only via
+     * {@link #hasDocReferenceInPackage}; the raw set is intentionally not exposed.
+     */
+    @Getter(AccessLevel.NONE)
+    private final Set<String> docReferencePackages;
 
     /**
      * Lazily-built prefix tree over every fully qualified name reachable via
@@ -76,6 +94,16 @@ public class TypesInUse {
     @Nullable
     private volatile Map<String, Boolean> typeMatchingCache;
 
+    /**
+     * {@link #usedMethods} / {@link #declaredMethods} sorted by canonical declaring-type FQN, so a
+     * {@link MethodMatcher} carrying a literal declaring-type prefix can binary-search to its window instead of
+     * scanning the whole set. Lazily built on first matchable query and cached, mirroring {@link #trie}.
+     */
+    @Nullable
+    private volatile MethodEntry[] usedMethodIndex;
+    @Nullable
+    private volatile MethodEntry[] declaredMethodIndex;
+
     public static TypesInUse build(JavaSourceFile cu) {
         FindTypesInUse findTypesInUse = new FindTypesInUse();
         findTypesInUse.visit(cu, 0);
@@ -83,7 +111,8 @@ public class TypesInUse {
                 findTypesInUse.getTypes(),
                 findTypesInUse.getDeclaredMethods(),
                 findTypesInUse.getUsedMethods(),
-                findTypesInUse.getVariables());
+                findTypesInUse.getVariables(),
+                findTypesInUse.getDocReferencePackages());
     }
 
     /**
@@ -96,7 +125,23 @@ public class TypesInUse {
                                 Set<JavaType.Method> declaredMethods,
                                 Set<JavaType.Method> usedMethods,
                                 Set<JavaType.Variable> variables) {
-        return new TypesInUse(cu, typesInUse, declaredMethods, usedMethods, variables);
+        return new TypesInUse(cu, typesInUse, declaredMethods, usedMethods, variables, Collections.emptySet());
+    }
+
+    /**
+     * Whether any fully qualified documentation-comment reference in this compilation unit has a package
+     * equal to {@code packageName}, or (when {@code recursive}) starts with {@code packageName + '.'}.
+     * Mirrors the per-type package check that package-renaming recipes apply to {@link #typesInUse}, for
+     * the references that {@link #typesInUse} deliberately omits.
+     */
+    public boolean hasDocReferenceInPackage(String packageName, boolean recursive) {
+        String recursivePrefix = packageName + ".";
+        for (String pkg : docReferencePackages) {
+            if (pkg.equals(packageName) || recursive && pkg.startsWith(recursivePrefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -156,18 +201,43 @@ public class TypesInUse {
      * Whether this compilation unit invokes any method matching {@code matcher}.
      */
     public boolean hasMethodUse(MethodMatcher matcher) {
-        for (JavaType.Method m : usedMethods) {
-            if (matcher.matches(m)) {
-                return true;
-            }
-        }
-        return false;
+        return anyMethodMatches(matcher, true);
     }
 
     /** Whether this compilation unit declares any method matching {@code matcher}. */
     public boolean declaresMethod(MethodMatcher matcher) {
-        for (JavaType.Method m : declaredMethods) {
-            if (matcher.matches(m)) {
+        return anyMethodMatches(matcher, false);
+    }
+
+    /**
+     * When the matcher pins a literal declaring-type prefix and does not need override resolution, binary-search the
+     * sorted index to the prefix window and confirm candidates with {@link MethodMatcher#matches(JavaType.Method)};
+     * otherwise (leading-wildcard type, or {@code matchOverrides} where the match may live under a subtype key) fall
+     * back to a full scan.
+     */
+    private boolean anyMethodMatches(MethodMatcher matcher, boolean used) {
+        Set<JavaType.Method> methods = used ? usedMethods : declaredMethods;
+        String prefix = matcher.getDeclaringTypeMatchPrefix();
+        if (prefix == null || matcher.isMatchOverrides()) {
+            for (JavaType.Method m : methods) {
+                if (matcher.matches(m)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        MethodEntry[] index = used ? usedMethodIndex : declaredMethodIndex;
+        if (index == null) {
+            index = MethodEntry.index(methods);
+            if (used) {
+                usedMethodIndex = index;
+            } else {
+                declaredMethodIndex = index;
+            }
+        }
+        for (int i = MethodEntry.lowerBound(index, prefix); i < index.length && index[i].key.startsWith(prefix); i++) {
+            if (matcher.matches(index[i].method)) {
                 return true;
             }
         }
@@ -503,12 +573,56 @@ public class TypesInUse {
         }
     }
 
+    /**
+     * A method paired with its canonical declaring-type FQN ({@code $} replaced with {@code .}), used as the sort key
+     * so that {@link MethodMatcher#getDeclaringTypeMatchPrefix() declaring-type prefixes} — exact FQNs, package
+     * prefixes from {@code ..*} patterns, and the shorter prefixes of mid-string wildcards alike — all resolve to a
+     * contiguous {@code startsWith} window. Canonicalizing here lets inner-class FQNs match either {@code .} or
+     * {@code $} prefix form, consistent with {@link TypeUtils#fullyQualifiedNamesAreEqual}.
+     */
+    private static final class MethodEntry {
+        private final String key;
+        private final JavaType.Method method;
+
+        private MethodEntry(String key, JavaType.Method method) {
+            this.key = key;
+            this.method = method;
+        }
+
+        static MethodEntry[] index(Set<JavaType.Method> methods) {
+            MethodEntry[] entries = new MethodEntry[methods.size()];
+            int i = 0;
+            for (JavaType.Method m : methods) {
+                String fqn = m.getDeclaringType().getFullyQualifiedName();
+                entries[i++] = new MethodEntry(fqn.indexOf('$') < 0 ? fqn : fqn.replace('$', '.'), m);
+            }
+            Arrays.sort(entries, Comparator.comparing(e -> e.key));
+            return entries;
+        }
+
+        /** First index whose key is {@code >= prefix} — the start of the {@code startsWith(prefix)} run. */
+        static int lowerBound(MethodEntry[] index, String prefix) {
+            int lo = 0;
+            int hi = index.length;
+            while (lo < hi) {
+                int mid = (lo + hi) >>> 1;
+                if (index[mid].key.compareTo(prefix) < 0) {
+                    lo = mid + 1;
+                } else {
+                    hi = mid;
+                }
+            }
+            return lo;
+        }
+    }
+
     @Getter
     public static class FindTypesInUse extends JavaIsoVisitor<Integer> {
         private final Set<JavaType> types = newSetFromMap(new IdentityHashMap<>());
         private final Set<JavaType.Method> declaredMethods = newSetFromMap(new IdentityHashMap<>());
         private final Set<JavaType.Method> usedMethods = newSetFromMap(new IdentityHashMap<>());
         private final Set<JavaType.Variable> variables = newSetFromMap(new IdentityHashMap<>());
+        private final Set<String> docReferencePackages = new HashSet<>();
 
         @Override
         public J.Import visitImport(J.Import _import, Integer p) {
@@ -554,9 +668,14 @@ public class TypesInUse {
                         usedMethods.add((JavaType.Method) javaType);
                     }
                 } else if (!(cursor.getValue() instanceof J.ClassDeclaration) &&
-                        !(cursor.getValue() instanceof J.Lambda) &&
-                        !isFullyQualifiedJavaDocReference(cursor)) {
-                    types.add(javaType);
+                        !(cursor.getValue() instanceof J.Lambda)) {
+                    if (isFullyQualifiedJavaDocReference(cursor)) {
+                        if (javaType instanceof JavaType.FullyQualified) {
+                            docReferencePackages.add(((JavaType.FullyQualified) javaType).getPackageName());
+                        }
+                    } else {
+                        types.add(javaType);
+                    }
                 }
             }
             return javaType;

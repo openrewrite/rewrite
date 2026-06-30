@@ -395,6 +395,62 @@ public interface S extends J {
     }
 
     /**
+     * Represents a Scala braced package, e.g. {@code package a { ... }}.
+     * <p>
+     * Unlike Java, Scala allows multiple and nested braced packages within a single
+     * file, each introducing a scope with its own body. Such a package is therefore
+     * modeled as a statement that owns its body, rather than as the compilation unit's
+     * single {@link J.Package} header. The non-braced leading {@code package a.b.c}
+     * form continues to be represented as {@link CompilationUnit#getPackageDeclaration()}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class PackageDeclaration implements S, Statement {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        /**
+         * The {@code package <name>} header. The brace itself is owned by {@link #body}.
+         */
+        @With @Getter
+        J.Package name;
+
+        /**
+         * The braced body: its prefix carries the space before {@code &#123;}, its
+         * statements are the package members, and its end carries the space before
+         * {@code &#125;}.
+         */
+        @With @Getter
+        J.Block body;
+
+        // Explicit constructor: same-module Scala (the parser) cannot see Lombok-generated ones.
+        public PackageDeclaration(UUID id, Space prefix, Markers markers, J.Package name, J.Block body) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.name = name;
+            this.body = body;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitScalaPackageDeclaration(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
      * Represents a tuple pattern used in destructuring assignments and declarations.
      * For example: val (a, b) = (1, 2) or (x, y) = pair
      */

@@ -94,20 +94,6 @@ case class ValVarKeyword(id: UUID, beforeKeyword: String) extends Marker {
 }
 
 /**
- * Marks a `J.Package` that uses Scala's braced package syntax:
- * `package foo.bar { ... }`. The printer uses this to re-emit the
- * opening brace after the package name. The closing brace is preserved
- * in the compilation unit's EOF whitespace.
- *
- * @param beforeBrace whitespace between the package name and the opening brace
- * @param afterBody whitespace between the last statement and the closing brace
- */
-case class PackageBraces(id: UUID, beforeBrace: String, afterBody: String) extends Marker {
-  override def getId(): UUID = id
-  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
-}
-
-/**
  * Marks a package declaration followed by an explicit semicolon:
  * `package foo;class Bar`.
  */
