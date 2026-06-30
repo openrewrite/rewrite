@@ -184,6 +184,14 @@ public class DeleteProperty extends Recipe {
                             entry = entry.withPrefix(firstDeletedPrefix);
                         } else if (previousWasDeleted && !entries.isEmpty() && !containsNewline(entry.getPrefix())) {
                             entry = entry.withPrefix("\n" + entry.getPrefix());
+                        } else if (previousWasDeleted && !entries.isEmpty()
+                                && endsWithBlockScalar(entries.get(entries.size() - 1))
+                                && containsNewline(entry.getPrefix())) {
+                            // Block-scalar predecessor already ended in a trailing newline (it lives
+                            // inside its `value` slot). With the intervening entry gone, the next
+                            // entry's prefix newline becomes redundant — strip it to avoid a blank
+                            // line.
+                            entry = entry.withPrefix(stripLeadingLineBreak(entry.getPrefix()));
                         }
                         entries.add(entry);
                         previousWasDeleted = false;
@@ -255,6 +263,32 @@ public class DeleteProperty extends Recipe {
         }
 
         return true;
+    }
+
+    private static String stripLeadingLineBreak(String s) {
+        if (s.startsWith("\r\n")) {
+            return s.substring(2);
+        }
+        if (s.startsWith("\n") || s.startsWith("\r")) {
+            return s.substring(1);
+        }
+        // Line break not at the start — strip the first one found.
+        int idx = -1;
+        int idxN = s.indexOf('\n');
+        int idxR = s.indexOf('\r');
+        if (idxN >= 0 && (idxR < 0 || idxN < idxR)) {
+            idx = idxN;
+        } else if (idxR >= 0) {
+            idx = idxR;
+        }
+        if (idx < 0) {
+            return s;
+        }
+        int after = idx + 1;
+        if (s.charAt(idx) == '\r' && after < s.length() && s.charAt(after) == '\n') {
+            after++;
+        }
+        return s.substring(0, idx) + s.substring(after);
     }
 
     private static boolean containsNewline(@Nullable String str) {
