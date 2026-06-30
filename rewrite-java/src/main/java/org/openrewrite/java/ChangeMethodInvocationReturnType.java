@@ -76,7 +76,7 @@ public class ChangeMethodInvocationReturnType extends Recipe {
             @Override
             public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                 methodUpdated = false;
-                JavaType originalType = multiVariable.getType();
+                JavaType.FullyQualified originalType = multiVariable.getTypeAsFullyQualified();
                 J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, ctx);
 
                 boolean initializedByMatch = mv.getVariables().stream()
@@ -85,6 +85,7 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                     return mv;
                 }
 
+                // `ShortenFullyQualifiedTypeReferences` deliberately leaves `java.lang.*` fully qualified, so strip it here.
                 String templateType = newReturnType.replaceAll("\\bjava\\.lang\\.([A-Z][A-Za-z0-9_]*)(?![.A-Za-z0-9_])", "$1");
                 J.VariableDeclarations resolved = JavaTemplate.builder(templateType + " __cmirt__")
                         .contextSensitive()
@@ -96,7 +97,7 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                 }
 
                 JavaType newType = newTypeExpression.getType();
-                maybeRemoveImports(originalType);
+                maybeRemoveImport(originalType);
                 mv = mv.withTypeExpression(newTypeExpression.withPrefix(mv.getTypeExpression().getPrefix()));
                 if (!(newTypeExpression instanceof J.Primitive)) {
                     doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(mv.getTypeExpression()));
@@ -110,34 +111,6 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                 }));
             }
 
-            /**
-             * Remove the imports for a type that is being replaced, walking parameterized types, arrays and
-             * wildcard bounds so that imports introduced for type parameters are also cleaned up when no longer
-             * referenced.
-             */
-            private void maybeRemoveImports(@Nullable JavaType type) {
-                if (type instanceof JavaType.Parameterized) {
-                    JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
-                    maybeRemoveImport(parameterized.getType());
-                    for (JavaType typeParameter : parameterized.getTypeParameters()) {
-                        maybeRemoveImports(typeParameter);
-                    }
-                } else if (type instanceof JavaType.Array) {
-                    maybeRemoveImports(((JavaType.Array) type).getElemType());
-                } else if (type instanceof JavaType.GenericTypeVariable) {
-                    for (JavaType bound : ((JavaType.GenericTypeVariable) type).getBounds()) {
-                        maybeRemoveImports(bound);
-                    }
-                } else if (type instanceof JavaType.FullyQualified) {
-                    maybeRemoveImport((JavaType.FullyQualified) type);
-                }
-            }
-
-            /**
-             * Returns true when the matched invocation is the direct initializer, is inside
-             * wrapping parentheses (stripped before checking), or is a branch of a ternary —
-             * in all of those positions the invocation determines the variable's type.
-             */
             private boolean isInitializedByMatch(@Nullable Expression expression) {
                 if (expression == null) {
                     return false;
