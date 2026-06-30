@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import com.google.errorprone.annotations.MustBeClosed;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
@@ -34,6 +35,7 @@ final class NoOpDataTableStore implements DataTableStore {
     public <Row> void insertRow(DataTable<Row> dataTable, ExecutionContext ctx, Row row) {
     }
 
+    @MustBeClosed
     @Override
     public Stream<?> getRows(String dataTableName, @Nullable String group) {
         return Stream.empty();
