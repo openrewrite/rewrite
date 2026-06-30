@@ -187,10 +187,7 @@ public class DeleteProperty extends Recipe {
                         } else if (previousWasDeleted && !entries.isEmpty()
                                 && endsWithBlockScalar(entries.get(entries.size() - 1))
                                 && containsNewline(entry.getPrefix())) {
-                            // Block-scalar predecessor already ended in a trailing newline (it lives
-                            // inside its `value` slot). With the intervening entry gone, the next
-                            // entry's prefix newline becomes redundant — strip it to avoid a blank
-                            // line.
+                            // Block-scalar predecessor already owns the boundary newline; strip the duplicate.
                             entry = entry.withPrefix(stripLeadingLineBreak(entry.getPrefix()));
                         }
                         entries.add(entry);

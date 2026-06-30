@@ -238,17 +238,17 @@ class ChangePropertyValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
           yaml(
-                """
-            key: >
-              line one
-              line two
-            after: tail
-            """,
-                """
-            key: >
-              replaced
-            after: tail
             """
+              key: >
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: >
+                replaced
+              after: tail
+              """
           )
         );
     }
@@ -258,17 +258,17 @@ class ChangePropertyValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
           yaml(
-                """
-            key: >-
-              line one
-              line two
-            after: tail
-            """,
-                """
-            key: >-
-              replaced
-            after: tail
             """
+              key: >-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: >-
+                replaced
+              after: tail
+              """
           )
         );
     }
@@ -278,19 +278,19 @@ class ChangePropertyValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
           yaml(
-                """
-            key: >+
-              line one
-              line two
-
-            after: tail
-            """,
-                """
-            key: >+
-              replaced
-
-            after: tail
             """
+              key: >+
+                line one
+                line two
+
+              after: tail
+              """,
+            """
+              key: >+
+                replaced
+
+              after: tail
+              """
           )
         );
     }
@@ -300,17 +300,17 @@ class ChangePropertyValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
           yaml(
-                """
-            key: |
-              line one
-              line two
-            after: tail
-            """,
-                """
-            key: |
-              replaced
-            after: tail
             """
+              key: |
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: |
+                replaced
+              after: tail
+              """
           )
         );
     }
@@ -320,17 +320,17 @@ class ChangePropertyValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
           yaml(
-                """
-            key: |-
-              line one
-              line two
-            after: tail
-            """,
-                """
-            key: |-
-              replaced
-            after: tail
             """
+              key: |-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: |-
+                replaced
+              after: tail
+              """
           )
         );
     }
@@ -340,19 +340,19 @@ class ChangePropertyValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("key", "replaced", null, null, null, null)),
           yaml(
-                """
-            key: |+
-              line one
-              line two
-
-            after: tail
-            """,
-                """
-            key: |+
-              replaced
-
-            after: tail
             """
+              key: |+
+                line one
+                line two
+
+              after: tail
+              """,
+            """
+              key: |+
+                replaced
+
+              after: tail
+              """
           )
         );
     }
@@ -362,17 +362,17 @@ class ChangePropertyValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("key", "first\nsecond", null, null, null, null)),
           yaml(
-                """
-            key: |
-              old line
-            after: tail
-            """,
-                """
-            key: |
-              first
-              second
-            after: tail
             """
+              key: |
+                old line
+              after: tail
+              """,
+            """
+              key: |
+                first
+                second
+              after: tail
+              """
           )
         );
     }
@@ -382,18 +382,18 @@ class ChangePropertyValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("key", "B", "A", true, null, null)),
           yaml(
-                """
-            key: |-
-              line A one
-              line A two
-            after: tail
-            """,
-                """
-            key: |-
-              line B one
-              line B two
-            after: tail
             """
+              key: |-
+                line A one
+                line A two
+              after: tail
+              """,
+            """
+              key: |-
+                line B one
+                line B two
+              after: tail
+              """
           )
         );
     }

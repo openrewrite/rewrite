@@ -20,27 +20,15 @@ import org.openrewrite.yaml.tree.Yaml;
 
 /**
  * Internal helpers for safely mutating FOLDED ({@code >}, {@code >-}, {@code >+}) and
- * LITERAL ({@code |}, {@code |-}, {@code |+}) block scalars in the YAML LST.
+ * LITERAL ({@code |}, {@code |-}, {@code |+}) block scalars: the {@link Yaml.Scalar#value}
+ * field carries the block envelope (chomp indicator, indented body, trailing whitespace
+ * bounding the next sibling), so a naïve Lombok-generated {@code withValue} replacement
+ * corrupts the surrounding structure.
  *
- * <p>The trap this exists to avoid: for block scalars, {@link Yaml.Scalar#getValue()}
- * carries three concatenated things — the chomp/indent indicator(s), the indented body,
- * AND the trailing whitespace that bounds the block from the next sibling mapping entry.
- * Naïvely replacing {@code value} via {@link Yaml.Scalar#withValue(String)} clobbers the
- * block envelope, drops the chomp indicator, and lets the printer glue the next sibling
- * key onto the same line.
- *
- * <p>Use {@link #getBody(Yaml.Scalar)} and {@link #withBody(Yaml.Scalar, String)} when a
- * recipe needs to set or transform a property's value and the existing scalar might be a
- * block scalar.
- *
- * <p><b>TODO:</b> these helpers should eventually move onto {@link Yaml.Scalar} itself as
- * instance methods ({@code getBody()}, {@code withBody(String)}) so they're discoverable
- * to recipe authors. Promoting them is deliberately deferred to avoid a forwards-compatibility
- * trap: built-in and customer recipes compiled against new {@code Yaml.Scalar} methods would
- * {@code NoSuchMethodError} when loaded under Moderne CLI versions that bundle an older
- * {@code rewrite-yaml}. Once a long-enough adoption window has passed for those CLI bundles
- * to roll forward, inline this logic into {@code Yaml.Scalar} and have consumers call the
- * instance methods directly.
+ * <p><b>TODO:</b> promote these onto {@link Yaml.Scalar} as instance {@code getBody} /
+ * {@code withBody} methods once enough downstream CLI bundles ship a {@code rewrite-yaml}
+ * including them — promoting now would {@code NoSuchMethodError} customer recipes that
+ * adopted the new API but load against an older bundled {@code Yaml.Scalar}.
  */
 public final class BlockScalarUtils {
 
@@ -49,17 +37,10 @@ public final class BlockScalarUtils {
 
     /**
      * Returns the body content of {@code scalar}, stripped of any style-specific envelope.
-     *
-     * <p>For PLAIN and quoted scalars this is identical to {@link Yaml.Scalar#getValue()}.
-     * For FOLDED and LITERAL scalars this is the body dedented to column zero, joined with
-     * single {@code \n}s, with the chomp indicator, header newline, indent, and trailing
-     * whitespace stripped.
-     *
-     * <p>The returned body is line-ending neutral: regardless of whether the source file uses
-     * {@code \n} or {@code \r\n}, interior line breaks are normalized to {@code \n} so that
-     * callers can compare and regex-match against it without worrying about the platform the
-     * file was authored on. Use {@link #withBody(Yaml.Scalar, String)} to write a body back in
-     * the document's own line-ending convention.
+     * For PLAIN and quoted styles this returns {@link Yaml.Scalar#value} verbatim. For block
+     * styles the body is dedented to column zero with interior line breaks normalized to
+     * {@code \n} (so callers can compare or regex against it irrespective of the file's
+     * CRLF/LF convention).
      */
     public static String getBody(Yaml.Scalar scalar) {
         if (!isBlockStyle(scalar)) {
@@ -83,8 +64,6 @@ public final class BlockScalarUtils {
             indent++;
         }
         String indentStr = bodyRegion.substring(0, indent);
-        // Split on any line-ending form so a CRLF-authored file does not leave stray '\r's in
-        // the body, then rejoin with '\n' for a platform-neutral result.
         String[] lines = bodyRegion.split("\r\n|\r|\n", -1);
         StringBuilder out = new StringBuilder(bodyRegion.length());
         for (int i = 0; i < lines.length; i++) {
@@ -100,29 +79,19 @@ public final class BlockScalarUtils {
         return out.toString();
     }
 
-    /**
-     * Returns a copy of {@code scalar} with its body replaced by {@code newBody}, defaulting
-     * the empty-body indent fallback to 2 spaces.
-     */
+    /** {@link #withBody(Yaml.Scalar, String, int)} with a 2-space empty-body indent fallback. */
     public static Yaml.Scalar withBody(Yaml.Scalar scalar, String newBody) {
         return withBody(scalar, newBody, 2);
     }
 
     /**
-     * Returns a copy of {@code scalar} with its body replaced by {@code newBody}.
-     *
-     * <p>For PLAIN and quoted styles this is equivalent to {@link Yaml.Scalar#withValue(String)}.
-     * For FOLDED and LITERAL scalars the block envelope is preserved: the chomp indicator,
-     * header newline, and trailing whitespace that bounds the block from the next sibling are
-     * kept intact, and each line of {@code newBody} is re-indented to the block body's column.
-     * Interior line breaks in {@code newBody} are emitted in the existing value's line-ending
-     * convention ({@code \r\n} if the block header uses CRLF, otherwise {@code \n}), so that
-     * editing a body on a Windows-authored file does not introduce mixed line endings.
-     *
-     * <p>If the original block scalar had an empty body and the body indent cannot be
-     * recovered from the existing value, {@code defaultIndentSpaces} is used as the indent
-     * width. Recipes that honor the document's configured {@code IndentsStyle} should pass
-     * its {@code getIndentSize()}; {@code 2} matches the YAML convention default.
+     * Returns a copy of {@code scalar} with its body replaced by {@code newBody}. For PLAIN
+     * and quoted styles this just sets {@link Yaml.Scalar#value} (via the Lombok-generated
+     * {@code withValue}); for block styles the chomp indicator, header newline, body indent,
+     * and trailing whitespace are preserved, and each line of {@code newBody} is emitted in
+     * the existing value's line-ending convention. {@code defaultIndentSpaces} is used as the
+     * body indent width when the existing block scalar has an empty body — pass an
+     * {@code IndentsStyle#getIndentSize()} to honor the document's configured indent.
      */
     public static Yaml.Scalar withBody(Yaml.Scalar scalar, String newBody, int defaultIndentSpaces) {
         if (!isBlockStyle(scalar)) {
@@ -131,8 +100,6 @@ public final class BlockScalarUtils {
         String value = scalar.getValue();
         int headerEnd = value.indexOf('\n');
         String header = headerEnd < 0 ? value : value.substring(0, headerEnd + 1);
-        // Match the document's line-ending convention for interior breaks: if the block header
-        // terminates with CRLF, keep emitting CRLF rather than gluing in bare '\n's.
         String newLine = (headerEnd > 0 && value.charAt(headerEnd - 1) == '\r') ? "\r\n" : "\n";
         int bodyEnd = value.length();
         while (bodyEnd > 0 && Character.isWhitespace(value.charAt(bodyEnd - 1))) {

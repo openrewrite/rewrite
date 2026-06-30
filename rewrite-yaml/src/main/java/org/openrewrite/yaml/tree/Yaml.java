@@ -308,24 +308,13 @@ public interface Yaml extends Tree {
         Tag tag;
 
         /**
-         * The raw scalar content as it appears in source, prior to any spec-level
-         * resolution (escape sequences, folding, chomping). The semantics depend on
-         * {@link #style}:
-         *
-         * <ul>
-         *   <li>{@link Style#PLAIN}, {@link Style#SINGLE_QUOTED}, {@link Style#DOUBLE_QUOTED}:
-         *       the body content as written in source. For double-quoted scalars escape
-         *       sequences are stored verbatim (e.g. {@code "hello\\nworld"} ⇒ the literal
-         *       12 characters {@code hello\nworld}, not the 11-character resolved string).</li>
-         *   <li>{@link Style#FOLDED}, {@link Style#LITERAL}: <em>everything that follows the
-         *       {@code >} or {@code |} indicator</em> — the chomp indicator (if any), the
-         *       explicit indent indicator (if any), the newline that terminates the block
-         *       scalar header, the indented body, AND the trailing whitespace that bounds
-         *       the block from the next sibling. Naïvely replacing this whole string clobbers
-         *       the block envelope and corrupts the surrounding YAML structure. Recipes
-         *       mutating block-scalar values should use the helpers in
-         *       {@code org.openrewrite.yaml.internal.BlockScalarUtils}.</li>
-         * </ul>
+         * Raw source content; semantics depend on {@link #style}. For PLAIN, SINGLE_QUOTED,
+         * and DOUBLE_QUOTED scalars this is the body as written (double-quoted escape
+         * sequences are stored verbatim, not resolved). For FOLDED and LITERAL scalars this
+         * is everything after the {@code >} or {@code |} indicator — chomp/indent indicators,
+         * the header newline, the indented body, AND the trailing whitespace bounding the
+         * block from the next sibling — so the Lombok-generated {@code withValue} cannot be
+         * used safely to set a new scalar value; use {@code BlockScalarUtils} instead.
          */
         String value;
 

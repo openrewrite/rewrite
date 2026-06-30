@@ -111,9 +111,6 @@ public class ChangePropertyValue extends Recipe {
     private Yaml.@Nullable Block updateValue(Yaml.Block value) {
         if (value instanceof Yaml.Scalar) {
             Yaml.Scalar scalar = (Yaml.Scalar) value;
-            // Operate on the style-aware body rather than the raw `value` field, so that
-            // FOLDED/LITERAL block scalars preserve their envelope (chomp indicator, header
-            // newline, trailing whitespace that bounds the block from the next sibling).
             String body = BlockScalarUtils.getBody(scalar);
             String updatedBody = Boolean.TRUE.equals(regex) ?
                     body.replaceAll(Objects.requireNonNull(oldValue), newValue) :

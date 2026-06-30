@@ -23,10 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Direct unit tests for {@link BlockScalarUtils}, isolating {@code getBody}/{@code withBody}
- * from the recipe round-trip. The recipe path calls {@code getBody} then {@code withBody}, so a
- * stray {@code \r} leaked by {@code getBody} can be re-absorbed by {@code withBody} and mask a
- * line-ending bug end-to-end; testing each method in isolation prevents that masking.
+ * Tests {@code getBody}/{@code withBody} in isolation: a {@code \r} leaked by {@code getBody}
+ * can be re-absorbed by a subsequent {@code withBody} call and mask a line-ending bug in
+ * end-to-end recipe tests.
  */
 class BlockScalarUtilsTest {
 
@@ -36,14 +35,12 @@ class BlockScalarUtilsTest {
 
     @Test
     void getBodyStripsCrFromLfBody() {
-        // header "\n", two indented lines, trailing "\n"
         Yaml.Scalar s = literal("\n  line one\n  line two\n");
         assertThat(BlockScalarUtils.getBody(s)).isEqualTo("line one\nline two");
     }
 
     @Test
     void getBodyStripsCrFromCrlfBody() {
-        // A CRLF-authored block scalar must not leak '\r' into the returned body.
         Yaml.Scalar s = literal("\r\n  line one\r\n  line two\r\n");
         assertThat(BlockScalarUtils.getBody(s)).isEqualTo("line one\nline two");
     }
@@ -57,8 +54,6 @@ class BlockScalarUtilsTest {
 
     @Test
     void withBodyEmitsCrlfForCrlfScalar() {
-        // Interior breaks of the new body must follow the existing CRLF convention, and the
-        // preserved header/trailing must stay CRLF as well — no mixed endings.
         Yaml.Scalar s = literal("\r\n  line one\r\n  line two\r\n");
         Yaml.Scalar updated = BlockScalarUtils.withBody(s, "new one\nnew two");
         assertThat(updated.getValue()).isEqualTo("\r\n  new one\r\n  new two\r\n");

@@ -69,10 +69,6 @@ public class ChangeValue extends Recipe {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 if (matcher.matches(getCursor()) && (!(e.getValue() instanceof Yaml.Scalar) || !BlockScalarUtils.getBody((Yaml.Scalar) e.getValue()).equals(value))) {
                     if (e.getValue() instanceof Yaml.Scalar && isBlockStyle((Yaml.Scalar) e.getValue())) {
-                        // Preserve the user's chosen FOLDED/LITERAL style and its envelope
-                        // (chomp indicator, header newline, trailing whitespace bounding the
-                        // block from the next sibling) — replacing with a fresh PLAIN scalar
-                        // would orphan the boundary newline and glue siblings together.
                         e = e.withValue(BlockScalarUtils.withBody((Yaml.Scalar) e.getValue(), value));
                     } else {
                         Yaml.Anchor anchor = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getAnchor() : null;
