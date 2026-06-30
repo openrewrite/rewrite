@@ -62,7 +62,8 @@ public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
                 Yaml.Mapping valueMapping = (Yaml.Mapping) entry.getValue();
                 if (valueMapping.getEntries().size() == 1) {
                     Yaml.Mapping.Entry subEntry = valueMapping.getEntries().get(0);
-                    if (!subEntry.getPrefix().contains("#") && !isExcluded(entry, subEntry) && isApplied(entry)) {
+                    if (!subEntry.getPrefix().contains("#") && !isExcluded(entry, subEntry) && isApplied(entry)
+                            && !containsBlockScalar(subEntry.getValue())) {
                         int indentToUse = findIndent.getMostCommonIndent() > 0 ? findIndent.getMostCommonIndent() : 4;
                         doAfterVisit(new ShiftFormatLeftVisitor<>(subEntry.getValue(), indentToUse));
 
@@ -73,6 +74,28 @@ public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
             }
             return entry;
         }));
+    }
+
+    private static boolean containsBlockScalar(Yaml.Block block) {
+        if (block instanceof Yaml.Scalar) {
+            Yaml.Scalar.Style style = ((Yaml.Scalar) block).getStyle();
+            return style == Yaml.Scalar.Style.FOLDED || style == Yaml.Scalar.Style.LITERAL;
+        }
+        if (block instanceof Yaml.Mapping) {
+            for (Yaml.Mapping.Entry e : ((Yaml.Mapping) block).getEntries()) {
+                if (containsBlockScalar(e.getValue())) {
+                    return true;
+                }
+            }
+        }
+        if (block instanceof Yaml.Sequence) {
+            for (Yaml.Sequence.Entry e : ((Yaml.Sequence) block).getEntries()) {
+                if (containsBlockScalar(e.getBlock())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private boolean isExcluded(Yaml.Mapping.Entry entry, Yaml.Mapping.Entry subEntry) {
