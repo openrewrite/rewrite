@@ -90,11 +90,53 @@ public class RecipeTest : RewriteTest
         Assert.Equal("The class name to rename from.", descriptor.Options[0].Description);
         Assert.Equal("Foo", descriptor.Options[0].Example);
         Assert.True(descriptor.Options[0].Required);
+        Assert.False(descriptor.Options[0].Secret);
         Assert.Equal("Foo", descriptor.Options[0].Value);
         Assert.Equal("To", descriptor.Options[1].Name);
         Assert.Equal("Bar", descriptor.Options[1].Value);
     }
 
+    [Fact]
+    public void SecretOptionPropagatesAndCanBeRedacted()
+    {
+        var recipe = new RecipeWithSecret { ApiToken = "hunter2" };
+        var descriptor = recipe.GetDescriptor();
+
+        Assert.Single(descriptor.Options);
+        var opt = descriptor.Options[0];
+        Assert.Equal("ApiToken", opt.Name);
+        Assert.True(opt.Secret);
+        // Raw value is preserved on the source-level descriptor so RPC + recipe execution
+        // still see it. Persistence boundaries must call WithRedactedSecretValue().
+        Assert.Equal("hunter2", opt.Value);
+
+        var redacted = opt.WithRedactedSecretValue();
+        Assert.True(redacted.Secret);
+        Assert.Null(redacted.Value);
+        Assert.Equal("ApiToken", redacted.Name);
+        Assert.Equal("API token", redacted.DisplayName);
+    }
+
+    [Fact]
+    public void WithRedactedSecretValueIsNoOpForNonSecret()
+    {
+        var recipe = new RenameClassRecipe { From = "Foo", To = "Bar" };
+        var opt = recipe.GetDescriptor().Options[0];
+        Assert.Same(opt, opt.WithRedactedSecretValue());
+    }
+
+}
+
+class RecipeWithSecret : OpenRewrite.Core.Recipe
+{
+    [Option(DisplayName = "API token", Description = "API token used by the recipe.", Secret = true)]
+    public required string ApiToken { get; init; }
+
+    public override string DisplayName => "Recipe with secret";
+    public override string Description => "Recipe with secret.";
+
+    public override JavaVisitor<OpenRewrite.Core.ExecutionContext> GetVisitor() =>
+        new CSharpVisitor<OpenRewrite.Core.ExecutionContext>();
 }
 
 class RenameClassRecipe : OpenRewrite.Core.Recipe

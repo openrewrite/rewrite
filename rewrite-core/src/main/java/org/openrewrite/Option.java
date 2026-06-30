@@ -40,4 +40,19 @@ public @interface Option {
     String[] valid() default "";
 
     boolean required() default true;
+
+    /**
+     * Indicates the value is sensitive (an API token, password, etc.).
+     * <p>
+     * Consumers persisting or displaying option values are expected to redact secret values.
+     * The corresponding {@link org.openrewrite.config.OptionDescriptor#getValue()} is left raw
+     * at the source so the value can still be passed into recipe execution (including across
+     * RPC to non-JVM recipe peers); redaction happens at each persistence boundary.
+     * <p>
+     * Recipe authors overriding {@link Recipe#getInstanceName()} or
+     * {@link Recipe#getInstanceNameSuffix()} must not include the value of a secret option
+     * in the returned string. The default {@code getInstanceName()} skips secret options
+     * automatically, but custom overrides bypass that filter.
+     */
+    boolean secret() default false;
 }

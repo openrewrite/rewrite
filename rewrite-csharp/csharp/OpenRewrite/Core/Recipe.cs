@@ -88,6 +88,7 @@ public abstract class Recipe
                 attr.Valid is { Length: > 0 } v && !(v.Length == 1 && v[0] == "")
                     ? v.ToList() : null,
                 attr.Required,
+                attr.Secret,
                 value
             ));
         }

@@ -1895,6 +1895,7 @@ public class OptionDescriptorDto
     public string? Example { get; set; }
     public List<string>? Valid { get; set; }
     public bool Required { get; set; }
+    public bool Secret { get; set; }
     public object? Value { get; set; }
 
     public static OptionDescriptorDto FromDescriptor(OptionDescriptor d)
@@ -1908,6 +1909,7 @@ public class OptionDescriptorDto
             Example = d.Example,
             Valid = d.Valid?.ToList(),
             Required = d.Required,
+            Secret = d.Secret,
             Value = d.Value
         };
     }

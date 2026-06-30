@@ -1243,6 +1243,7 @@ type marketplaceOption struct {
 	Description string  `json:"description"`
 	Example     *string `json:"example"`
 	Required    bool    `json:"required"`
+	Secret      bool    `json:"secret"`
 	Type        string  `json:"type"`
 	Value       any     `json:"value"`
 	Valid       []any   `json:"valid"`
@@ -1334,6 +1335,7 @@ func marketplaceDescriptorFromRecipe(desc recipe.RecipeDescriptor) marketplaceDe
 			Description: opt.Description,
 			Example:     example,
 			Required:    opt.Required,
+			Secret:      opt.Secret,
 			Type:        opt.TypeName(),
 			Value:       opt.Value,
 			Valid:       valid,

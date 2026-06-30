@@ -1150,6 +1150,7 @@ def _recipe_descriptor_to_dict(descriptor) -> dict:
                 'description': opt.description,
                 'example': opt.example,
                 'required': opt.required,
+                'secret': opt.secret,
                 'valid': opt.valid,
             }
             for name, value, opt in descriptor.options

@@ -35,4 +35,15 @@ public sealed class OptionAttribute : Attribute
     public string[]? Valid { get; set; }
 
     public bool Required { get; set; } = true;
+
+    /// <summary>
+    /// Indicates the value is sensitive (an API token, password, etc.).
+    /// <para>
+    /// Consumers persisting or displaying option values are expected to redact secret values.
+    /// The corresponding <see cref="OptionDescriptor.Value"/> is left raw at the source so the
+    /// value can still be passed into recipe execution (including across RPC); redaction happens
+    /// at each persistence boundary.
+    /// </para>
+    /// </summary>
+    public bool Secret { get; set; } = false;
 }

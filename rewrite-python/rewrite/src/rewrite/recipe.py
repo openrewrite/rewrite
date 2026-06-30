@@ -40,6 +40,7 @@ def option(
     example: Optional[str] = None,
     required: bool = True,
     valid: Optional[List[str]] = None,
+    secret: bool = False,
 ) -> dict[str, Any]:
     """
     Create option metadata for a recipe field.
@@ -53,6 +54,10 @@ def option(
         example: Example value for the option
         required: Whether the option is required (default True)
         valid: List of valid values (for enum-like options)
+        secret: Whether the value is sensitive (API token, password, etc.).
+            Secret values must not be logged or persisted by the recipe. The
+            value still flows through normal recipe execution; consumers are
+            responsible for redacting it at any persistence boundary.
 
     Returns:
         Metadata dictionary to pass to dataclasses.field()
@@ -73,6 +78,7 @@ def option(
             example=example,
             required=required,
             valid=valid,
+            secret=secret,
         )
     }
 
@@ -86,6 +92,7 @@ class OptionDescriptor:
     example: Optional[str] = None
     required: bool = True
     valid: Optional[List[str]] = None
+    secret: bool = False
 
 
 @dataclass(frozen=True)

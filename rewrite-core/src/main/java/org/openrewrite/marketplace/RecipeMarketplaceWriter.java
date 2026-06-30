@@ -220,7 +220,10 @@ public class RecipeMarketplaceWriter {
             return "";
         }
         try {
-            return JSON_MAPPER.writeValueAsString(options);
+            List<OptionDescriptor> toSerialize = options.stream().anyMatch(OptionDescriptor::isSecret)
+                    ? options.stream().map(OptionDescriptor::withRedactedSecretValue).collect(toList())
+                    : options;
+            return JSON_MAPPER.writeValueAsString(toSerialize);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize options to JSON", e);
         }
