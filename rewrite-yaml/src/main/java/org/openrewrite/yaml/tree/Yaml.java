@@ -308,13 +308,9 @@ public interface Yaml extends Tree {
         Tag tag;
 
         /**
-         * Raw source content; semantics depend on {@link #style}. For PLAIN, SINGLE_QUOTED,
-         * and DOUBLE_QUOTED scalars this is the body as written (double-quoted escape
-         * sequences are stored verbatim, not resolved). For FOLDED and LITERAL scalars this
-         * is everything after the {@code >} or {@code |} indicator — chomp/indent indicators,
-         * the header newline, the indented body, AND the trailing whitespace bounding the
-         * block from the next sibling — so the Lombok-generated {@code withValue} cannot be
-         * used safely to set a new scalar value; use {@code BlockScalarUtils} instead.
+         * For FOLDED/LITERAL scalars this includes the chomp indicator, header newline,
+         * indented body, and trailing whitespace bounding the next sibling — so the
+         * Lombok-generated {@code withValue} cannot safely rewrite a block scalar's body.
          */
         String value;
 
