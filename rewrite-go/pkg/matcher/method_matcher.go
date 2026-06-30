@@ -23,8 +23,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// MethodMatcher matches method invocations against an AspectJ-style pattern.
-//
 // Pattern format: "DeclaringType MethodName(ArgType1, ArgType2, ..)"
 //
 // Examples:
@@ -45,12 +43,10 @@ type MethodMatcher struct {
 	matchesAnyArgs       bool // true when pattern is (..)
 }
 
-// argMatcher matches a single argument type.
 type argMatcher interface {
 	matches(t java.JavaType) bool
 }
 
-// typeArgMatcher matches a specific type by FQN pattern.
 type typeArgMatcher struct {
 	pattern *regexp.Regexp
 	raw     string
@@ -65,12 +61,10 @@ func (m *typeArgMatcher) matches(t java.JavaType) bool {
 	return m.pattern.MatchString(fqn)
 }
 
-// wildcardArgMatcher matches any type (the ".." wildcard).
 type wildcardArgMatcher struct{}
 
 func (m *wildcardArgMatcher) matches(t java.JavaType) bool { return true }
 
-// NewMethodMatcher creates a MethodMatcher from the given pattern string.
 // Pattern format: "DeclaringType MethodName(ArgTypes)"
 func NewMethodMatcher(pattern string) *MethodMatcher {
 	pattern = strings.TrimSpace(pattern)
@@ -126,7 +120,6 @@ func NewMethodMatcher(pattern string) *MethodMatcher {
 	return mm
 }
 
-// Matches checks if the given MethodInvocation matches this pattern.
 func (m *MethodMatcher) Matches(mi *java.MethodInvocation) bool {
 	// Match method name
 	if m.methodNamePattern != nil && !m.methodNamePattern.MatchString(mi.Name.Name) {
@@ -172,7 +165,6 @@ func (m *MethodMatcher) Matches(mi *java.MethodInvocation) bool {
 	return true
 }
 
-// MatchesMethod checks if a JavaTypeMethod matches this pattern.
 func (m *MethodMatcher) MatchesMethod(mt *java.JavaTypeMethod) bool {
 	if mt == nil {
 		return false

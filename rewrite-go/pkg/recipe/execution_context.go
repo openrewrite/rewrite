@@ -26,21 +26,18 @@ type ExecutionContext struct {
 	messages map[string]any
 }
 
-// NewExecutionContext creates a new ExecutionContext.
 func NewExecutionContext() *ExecutionContext {
 	return &ExecutionContext{
 		messages: make(map[string]any),
 	}
 }
 
-// PutMessage stores a value by key.
 func (ctx *ExecutionContext) PutMessage(key string, value any) {
 	ctx.mu.Lock()
 	defer ctx.mu.Unlock()
 	ctx.messages[key] = value
 }
 
-// GetMessage retrieves a value by key.
 func (ctx *ExecutionContext) GetMessage(key string) (any, bool) {
 	ctx.mu.RLock()
 	defer ctx.mu.RUnlock()
@@ -48,7 +45,6 @@ func (ctx *ExecutionContext) GetMessage(key string) (any, bool) {
 	return v, ok
 }
 
-// GetMessageOrDefault retrieves a value by key, or returns the default if not found.
 func (ctx *ExecutionContext) GetMessageOrDefault(key string, defaultValue any) any {
 	ctx.mu.RLock()
 	defer ctx.mu.RUnlock()

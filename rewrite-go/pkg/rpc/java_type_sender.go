@@ -23,21 +23,18 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// JavaTypeSender serializes JavaType objects into the send queue.
 // Field ordering MUST match JavaTypeSender.java exactly.
 // Embeds JavaTypeVisitor for dispatch; override methods serialize each type.
 type JavaTypeSender struct {
 	visitor.JavaTypeVisitor
 }
 
-// NewJavaTypeSender creates a JavaTypeSender with virtual dispatch wired.
 func NewJavaTypeSender() *JavaTypeSender {
 	s := &JavaTypeSender{}
 	s.Self = s // wire virtual dispatch
 	return s
 }
 
-// VisitAnnotation matches JavaTypeSender.visitAnnotation
 func (s *JavaTypeSender) VisitAnnotation(a *java.JavaTypeAnnotation, p any) java.JavaType {
 	q := p.(*SendQueue)
 	q.GetAndSend(a, func(v any) any { return AsRef(v.(*java.JavaTypeAnnotation).Type) },
@@ -97,7 +94,6 @@ func (s *JavaTypeSender) visitAnnotationElementValue(v java.JavaTypeAnnotationEl
 	}
 }
 
-// VisitMultiCatch matches JavaTypeSender.visitMultiCatch
 func (s *JavaTypeSender) VisitMultiCatch(mc *java.JavaTypeMultiCatch, p any) java.JavaType {
 	q := p.(*SendQueue)
 	q.GetAndSendListAsRef(mc,
@@ -107,7 +103,6 @@ func (s *JavaTypeSender) VisitMultiCatch(mc *java.JavaTypeMultiCatch, p any) jav
 	return mc
 }
 
-// VisitIntersection matches JavaTypeSender.visitIntersection
 func (s *JavaTypeSender) VisitIntersection(is *java.JavaTypeIntersection, p any) java.JavaType {
 	q := p.(*SendQueue)
 	q.GetAndSendListAsRef(is,
@@ -117,7 +112,6 @@ func (s *JavaTypeSender) VisitIntersection(is *java.JavaTypeIntersection, p any)
 	return is
 }
 
-// VisitClass matches JavaTypeSender.visitClass field order exactly:
 // flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype, owningClass,
 // annotations, interfaces, members, methods
 func (s *JavaTypeSender) VisitClass(c *java.JavaTypeClass, p any) java.JavaType {
@@ -181,7 +175,6 @@ func (s *JavaTypeSender) visitClassFields(parent any, q *SendQueue) {
 		func(v any) { s.Visit(v.(java.JavaType), q) })
 }
 
-// VisitParameterized matches JavaTypeSender.visitParameterized
 func (s *JavaTypeSender) VisitParameterized(pt *java.JavaTypeParameterized, p any) java.JavaType {
 	q := p.(*SendQueue)
 	q.GetAndSend(pt, func(v any) any { return AsRef(v.(*java.JavaTypeParameterized).Type) },
@@ -193,7 +186,6 @@ func (s *JavaTypeSender) VisitParameterized(pt *java.JavaTypeParameterized, p an
 	return pt
 }
 
-// VisitGenericTypeVariable matches JavaTypeSender.visitGenericTypeVariable
 func (s *JavaTypeSender) VisitGenericTypeVariable(g *java.JavaTypeGenericTypeVariable, p any) java.JavaType {
 	q := p.(*SendQueue)
 	q.GetAndSend(g, func(v any) any { return v.(*java.JavaTypeGenericTypeVariable).Name }, nil)
@@ -205,7 +197,6 @@ func (s *JavaTypeSender) VisitGenericTypeVariable(g *java.JavaTypeGenericTypeVar
 	return g
 }
 
-// VisitArray matches JavaTypeSender.visitArray
 func (s *JavaTypeSender) VisitArray(a *java.JavaTypeArray, p any) java.JavaType {
 	q := p.(*SendQueue)
 	q.GetAndSend(a, func(v any) any { return AsRef(v.(*java.JavaTypeArray).ElemType) },
@@ -217,14 +208,12 @@ func (s *JavaTypeSender) VisitArray(a *java.JavaTypeArray, p any) java.JavaType 
 	return a
 }
 
-// VisitPrimitive matches JavaTypeSender.visitPrimitive
 func (s *JavaTypeSender) VisitPrimitive(pr *java.JavaTypePrimitive, p any) java.JavaType {
 	q := p.(*SendQueue)
 	q.GetAndSend(pr, func(v any) any { return v.(*java.JavaTypePrimitive).Keyword }, nil)
 	return pr
 }
 
-// VisitMethod matches JavaTypeSender.visitMethod field order exactly:
 // declaringType, name, flagsBitMap, returnType, parameterNames, parameterTypes,
 // thrownExceptions, annotations, defaultValue, declaredFormalTypeNames
 func (s *JavaTypeSender) VisitMethod(m *java.JavaTypeMethod, p any) java.JavaType {
@@ -262,7 +251,6 @@ func (s *JavaTypeSender) VisitMethod(m *java.JavaTypeMethod, p any) java.JavaTyp
 	return m
 }
 
-// VisitVariable matches JavaTypeSender.visitVariable
 func (s *JavaTypeSender) VisitVariable(v *java.JavaTypeVariable, p any) java.JavaType {
 	q := p.(*SendQueue)
 	q.GetAndSend(v, func(x any) any { return x.(*java.JavaTypeVariable).Name }, nil)
@@ -276,8 +264,6 @@ func (s *JavaTypeSender) VisitVariable(v *java.JavaTypeVariable, p any) java.Jav
 		func(x any) { s.Visit(x.(java.JavaType), q) })
 	return v
 }
-
-// Helper functions to convert typed slices to []any
 
 func javaTypeSlice(types []java.JavaType) []any {
 	if types == nil {

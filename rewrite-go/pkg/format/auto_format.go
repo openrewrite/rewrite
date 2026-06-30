@@ -47,10 +47,6 @@ type AutoFormatVisitor struct {
 	stopAfter java.Tree
 }
 
-// NewAutoFormatVisitor returns a composer visitor that, on its first
-// Visit, queues the four per-responsibility passes via DoAfterVisit.
-// The recipe runner's after-visit drain runs them in order. Each pass
-// sees the partially-normalized tree from its predecessors.
 func NewAutoFormatVisitor(stopAfter java.Tree) *AutoFormatVisitor {
 	return visitor.Init(&AutoFormatVisitor{stopAfter: stopAfter})
 }

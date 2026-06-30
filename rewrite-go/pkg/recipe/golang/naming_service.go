@@ -109,21 +109,16 @@ func (s *NamingService) IsPredeclared(name string) bool {
 // spec. Update when the language adds new builtins (e.g. `min` /
 // `max` / `clear` were added in 1.21).
 var predeclaredIdentifiers = map[string]struct{}{
-	// Types.
 	"any": {}, "bool": {}, "byte": {}, "comparable": {},
 	"complex64": {}, "complex128": {}, "error": {},
 	"float32": {}, "float64": {},
 	"int": {}, "int8": {}, "int16": {}, "int32": {}, "int64": {},
 	"rune": {}, "string": {},
 	"uint": {}, "uint8": {}, "uint16": {}, "uint32": {}, "uint64": {}, "uintptr": {},
-
-	// Constants.
 	"true": {}, "false": {}, "iota": {},
 
 	// Zero value.
-	"nil": {},
-
-	// Functions.
+	"nil":    {},
 	"append": {}, "cap": {}, "clear": {}, "close": {}, "complex": {},
 	"copy": {}, "delete": {}, "imag": {}, "len": {}, "make": {},
 	"max": {}, "min": {}, "new": {}, "panic": {}, "print": {},

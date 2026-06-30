@@ -23,7 +23,6 @@ type Marker interface {
 	ID() uuid.UUID
 }
 
-// Markers holds a collection of Marker instances attached to a tree node.
 type Markers struct {
 	ID      uuid.UUID
 	Entries []Marker
@@ -40,8 +39,6 @@ type GenericMarker struct {
 
 func (m GenericMarker) ID() uuid.UUID { return m.Ident }
 
-// SearchResultMarker represents a SearchResult marker from Java.
-// It implements RpcCodec on the Java side, sending 2 sub-fields (id, description).
 type SearchResultMarker struct {
 	Ident       uuid.UUID
 	Description string
@@ -49,7 +46,6 @@ type SearchResultMarker struct {
 
 func (m SearchResultMarker) ID() uuid.UUID { return m.Ident }
 
-// FindMarker returns a pointer to the first marker of type T, or nil if not found.
 func FindMarker[T any](markers Markers) *T {
 	for _, m := range markers.Entries {
 		if t, ok := m.(T); ok {
@@ -59,7 +55,6 @@ func FindMarker[T any](markers Markers) *T {
 	return nil
 }
 
-// HasMarker reports whether a marker of type T exists in the markers collection.
 func HasMarker[T any](markers Markers) bool {
 	for _, m := range markers.Entries {
 		if _, ok := m.(T); ok {
@@ -69,15 +64,12 @@ func HasMarker[T any](markers Markers) bool {
 	return false
 }
 
-// AddMarker returns a new Markers with the given marker appended.
 func AddMarker(markers Markers, marker Marker) Markers {
 	entries := make([]Marker, len(markers.Entries)+1)
 	copy(entries, markers.Entries)
 	entries[len(markers.Entries)] = marker
 	return Markers{ID: markers.ID, Entries: entries}
 }
-
-// --- Cross-cutting markers used by the recipe framework ---
 
 // SearchResult is a marker indicating that a search recipe found a match.
 // It is rendered as a comment in printed output (e.g., /*~~(description)~~>*/).
@@ -133,22 +125,18 @@ type Semicolon struct {
 
 func (m Semicolon) ID() uuid.UUID { return m.Ident }
 
-// NewSemicolon creates a Semicolon marker with a fresh UUID.
 func NewSemicolon() Semicolon {
 	return Semicolon{Ident: uuid.New()}
 }
 
-// NewGoProject creates a GoProject marker with a new UUID.
 func NewGoProject(projectName string) GoProject {
 	return GoProject{Ident: uuid.New(), ProjectName: projectName}
 }
 
-// NewSearchResult creates a SearchResult marker with a new UUID.
 func NewSearchResult(description string) SearchResult {
 	return SearchResult{Ident: uuid.New(), Description: description}
 }
 
-// NewMarkup creates a Markup marker with the given level and message.
 func NewMarkup(level MarkupLevel, message, detail string) Markup {
 	return Markup{Ident: uuid.New(), Level: level, Message: message, Detail: detail}
 }

@@ -85,7 +85,6 @@ type projectFile struct {
 	content string
 }
 
-// NewProjectImporter creates an importer rooted at the given module path.
 // Pass importer.Default() (or nil for the same default) as the stdlib
 // fallback. Project root is unset and must be configured via
 // SetProjectRoot for vendor walking to find anything.
@@ -123,7 +122,6 @@ func (p *ProjectImporter) AddReplace(oldPath, newPath, newVersion string) {
 	p.replaces[oldPath] = replaceTarget{NewPath: newPath, NewVersion: newVersion}
 }
 
-// AddRequire registers a module path declared in go.mod's `require` list.
 // Imports of this path (or any sub-path under it) that aren't already
 // satisfied by AddSource'd sibling sources resolve to a stub
 // *types.Package — non-nil, with the right path and name, but with an
@@ -150,7 +148,6 @@ func (p *ProjectImporter) AddSource(relPath, content string) {
 	p.sources[importPath] = append(p.sources[importPath], projectFile{path: relPath, content: content})
 }
 
-// Import implements types.Importer.
 func (p *ProjectImporter) Import(importPath string) (*types.Package, error) {
 	if cached, ok := p.cache[importPath]; ok {
 		return cached, nil
@@ -274,7 +271,6 @@ func readGoFilesIn(dir string) ([]projectFile, error) {
 	return out, nil
 }
 
-// parsePackage parses + type-checks a sibling package's files.
 func (p *ProjectImporter) parsePackage(importPath string, files []projectFile) (*types.Package, error) {
 	asts := make([]*ast.File, 0, len(files))
 	for _, f := range files {

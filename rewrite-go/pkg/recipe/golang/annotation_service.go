@@ -80,7 +80,6 @@ type AnnotationMatcher struct {
 	pattern string
 }
 
-// NewAnnotationMatcher constructs a matcher for the given pattern.
 // See AnnotationMatcher for pattern semantics.
 func NewAnnotationMatcher(pattern string) AnnotationMatcher {
 	return AnnotationMatcher{pattern: pattern}

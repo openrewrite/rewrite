@@ -24,7 +24,6 @@ import (
 
 var defaultSender = NewGoSender()
 
-// SendQueue serializes objects into RpcObjectData messages for RPC transmission.
 // It tracks refs for deduplication and maintains a "before" state for delta encoding.
 type SendQueue struct {
 	batchSize int
@@ -34,7 +33,6 @@ type SendQueue struct {
 	before    any
 }
 
-// NewSendQueue creates a new SendQueue.
 func NewSendQueue(batchSize int, drain func([]RpcObjectData), refs map[uintptr]int) *SendQueue {
 	return &SendQueue{
 		batchSize: batchSize,
@@ -44,7 +42,6 @@ func NewSendQueue(batchSize int, drain func([]RpcObjectData), refs map[uintptr]i
 	}
 }
 
-// Put adds a message to the batch, flushing if the batch is full.
 func (q *SendQueue) Put(data RpcObjectData) {
 	q.batch = append(q.batch, data)
 	if len(q.batch) == q.batchSize {
@@ -52,7 +49,6 @@ func (q *SendQueue) Put(data RpcObjectData) {
 	}
 }
 
-// Flush sends the accumulated batch and clears it.
 func (q *SendQueue) Flush() {
 	if len(q.batch) == 0 {
 		return
@@ -63,7 +59,6 @@ func (q *SendQueue) Flush() {
 	q.batch = q.batch[:0]
 }
 
-// GetAndSend extracts a value from parent (and before), compares them, and sends the delta.
 func (q *SendQueue) GetAndSend(parent any, getter func(any) any, onChange func(any)) {
 	after := getter(parent)
 	var before any
@@ -73,12 +68,10 @@ func (q *SendQueue) GetAndSend(parent any, getter func(any) any, onChange func(a
 	q.Send(after, before, onChange)
 }
 
-// GetAndSendList extracts a list from parent and sends it with position tracking.
 func (q *SendQueue) GetAndSendList(parent any, getter func(any) []any, id func(any) any, onChange func(any)) {
 	q.getAndSendList(parent, getter, id, onChange, false)
 }
 
-// GetAndSendListAsRef is like GetAndSendList but wraps items in ref tracking.
 func (q *SendQueue) GetAndSendListAsRef(parent any, getter func(any) []any, id func(any) any, onChange func(any)) {
 	q.getAndSendList(parent, getter, id, onChange, true)
 }
@@ -95,7 +88,6 @@ func (q *SendQueue) getAndSendList(parent any, getter func(any) []any, id func(a
 	q.sendList(after, before, id, onChange, asRef)
 }
 
-// Send compares after and before values and emits the appropriate state message.
 func (q *SendQueue) Send(after, before any, onChange func(any)) {
 	afterVal := GetValue(after)
 	beforeVal := GetValue(before)
@@ -240,7 +232,6 @@ func (q *SendQueue) doChange(after, before any, onChange func(any)) {
 	}
 }
 
-// ptrKey returns a uintptr for use as a map key, based on pointer identity.
 func ptrKey(v any) uintptr {
 	if v == nil {
 		return 0
@@ -253,7 +244,6 @@ func ptrKey(v any) uintptr {
 	return 0
 }
 
-// sameIdentity checks if two values are the same object (pointer identity).
 func sameIdentity(a, b any) bool {
 	aNil := isNilValue(a)
 	bNil := isNilValue(b)
@@ -281,7 +271,6 @@ func sameIdentity(a, b any) bool {
 	return reflect.DeepEqual(a, b)
 }
 
-// sameType checks if two values have the same concrete type.
 func sameType(a, b any) bool {
 	if isNilValue(a) || isNilValue(b) {
 		return false
@@ -289,7 +278,6 @@ func sameType(a, b any) bool {
 	return reflect.TypeOf(a) == reflect.TypeOf(b)
 }
 
-// anySlice converts a []any to an any (to distinguish nil slice from empty slice).
 func anySlice(s []any) any {
 	if s == nil {
 		return nil
@@ -297,7 +285,6 @@ func anySlice(s []any) any {
 	return s
 }
 
-// getValueType returns the Java class name for a value, or nil if it's a primitive.
 func getValueType(v any) *string {
 	if v == nil {
 		return nil
@@ -326,7 +313,6 @@ func getValueType(v any) *string {
 // valueTypeMap maps Go types to their Java class names for RPC wire format.
 var valueTypeMap = map[reflect.Type]string{}
 
-// RegisterValueType registers a Go type -> Java class name mapping for RPC serialization.
 func RegisterValueType(goType reflect.Type, javaClassName string) {
 	valueTypeMap[goType] = javaClassName
 }

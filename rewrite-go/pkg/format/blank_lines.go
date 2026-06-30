@@ -39,8 +39,6 @@ type BlankLinesVisitor struct {
 	stopAfterTracker
 }
 
-// NewBlankLinesVisitor returns a visitor configured with the given
-// stopAfter bound. Pass nil to format the entire visited tree.
 func NewBlankLinesVisitor(stopAfter java.Tree) *BlankLinesVisitor {
 	return visitor.Init(&BlankLinesVisitor{
 		stopAfterTracker: stopAfterTracker{stopAfter: stopAfter},

@@ -42,12 +42,10 @@ type Semicolon struct {
 
 func (m Semicolon) ID() uuid.UUID { return m.Ident }
 
-// NewSemicolon creates a Semicolon marker with a fresh UUID.
 func NewSemicolon() Semicolon {
 	return Semicolon{Ident: uuid.New()}
 }
 
-// NewGoProject creates a GoProject marker with a new UUID.
 func NewGoProject(projectName string) GoProject {
 	return GoProject{Ident: uuid.New(), ProjectName: projectName}
 }

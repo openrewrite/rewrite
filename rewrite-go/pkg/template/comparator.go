@@ -49,7 +49,6 @@ func (c *patternComparator) match(pattern, candidate java.J) *MatchResult {
 	return nil
 }
 
-// matchNode compares two nodes structurally, handling placeholder binding.
 func (c *patternComparator) matchNode(pattern, candidate java.J) bool {
 	if pattern == nil && candidate == nil {
 		return true
@@ -379,8 +378,6 @@ func (c *patternComparator) matchProperties(pattern, candidate java.J) bool {
 		return false
 	}
 }
-
-// --- Helper methods for optional and list comparisons ---
 
 func (c *patternComparator) matchOptionalNode(pattern, candidate java.J) bool {
 	if pattern == nil && candidate == nil {

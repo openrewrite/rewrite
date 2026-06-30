@@ -44,8 +44,6 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.tree.GoMod$Value", func() any { return &golang.GoModValue{} })
 }
 
-// --- send ---
-
 func sendGoMod(gm *golang.GoMod, q *SendQueue) {
 	q.GetAndSend(gm, func(v any) any { return v.(*golang.GoMod).Ident.String() }, nil)
 	q.GetAndSend(gm, func(v any) any { return v.(*golang.GoMod).Prefix },
@@ -121,8 +119,6 @@ func sendGoModValue(val *golang.GoModValue, q *SendQueue) {
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 	q.GetAndSend(val, func(v any) any { return v.(*golang.GoModValue).Text }, nil)
 }
-
-// --- receive ---
 
 func receiveGoMod(gm *golang.GoMod, q *ReceiveQueue) *golang.GoMod {
 	gm.Ident = recvGoModID(q, gm.Ident)
@@ -221,8 +217,6 @@ func recvGoModValue(baseline any, q *ReceiveQueue) any {
 	v.Text = receiveScalar[string](q, v.Text)
 	return v
 }
-
-// --- shared helpers ---
 
 func recvGoModID(q *ReceiveQueue, before uuid.UUID) uuid.UUID {
 	idStr := receiveScalar[string](q, before.String())
