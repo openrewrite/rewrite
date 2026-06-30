@@ -2029,7 +2029,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		switch {
 		case filepath.Base(path) == "go.mod":
 			disc.goMods = append(disc.goMods, path)
-		case strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go"):
+		case strings.HasSuffix(path, ".go"):
 			disc.goFiles = append(disc.goFiles, path)
 		}
 		return nil
@@ -2115,6 +2115,13 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if !ok {
 			continue
 		}
+		// Test files are parseable project sources, but they must not feed
+		// sibling-package symbol resolution: Go's importer never exposes a
+		// package's `_test.go` files, and a black-box `package foo_test`
+		// file would corrupt the imported package's type-check.
+		if strings.HasSuffix(goFile, "_test.go") {
+			continue
+		}
 		m := closestModule(filepath.Dir(goFile))
 		if m == nil {
 			continue
@@ -2125,7 +2132,13 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 	// Group files by (owning module, package directory). Each group
 	// parses together via ParsePackage so file-A-references-file-B
 	// resolves within a package.
-	type groupKey struct{ moduleDir, pkgDir string }
+	// pkgName is the literal `package` clause, so it splits a directory by
+	// the package each file actually declares. Production code and white-box
+	// `_test.go` files share `package foo` (pkgName "foo"); black-box tests
+	// declare `package foo_test` (pkgName "foo_test") and thus form a second
+	// group. Without this split they'd share a key and go/types would
+	// silently drop every file whose clause disagrees with the group's first.
+	type groupKey struct{ moduleDir, pkgDir, pkgName string }
 	type fileEntry struct {
 		idx        int
 		path       string
@@ -2155,7 +2168,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if m != nil {
 			moduleDir = m.dir
 		}
-		key := groupKey{moduleDir: moduleDir, pkgDir: filepath.Dir(goFile)}
+		key := groupKey{moduleDir: moduleDir, pkgDir: filepath.Dir(goFile), pkgName: goparser.PackageNameOf(goFile, src)}
 		groups[key] = append(groups[key], fileEntry{
 			idx:        i,
 			path:       goFile,
