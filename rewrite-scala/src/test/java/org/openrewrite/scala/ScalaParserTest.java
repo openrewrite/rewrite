@@ -227,4 +227,34 @@ class ScalaParserTest {
         J.Block block = (J.Block) forLoop.getBody();
         assertThat(block.getStatements()).hasSize(2);
     }
+
+    @Test
+    void doesNotLeakTempDirectories() throws java.io.IOException {
+        // given
+        java.nio.file.Path tmpRoot = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"));
+        java.util.Set<java.nio.file.Path> before = listRewriteScalaTempDirs(tmpRoot);
+
+        // when
+        ScalaParser parser = ScalaParser.builder().build();
+        List<SourceFile> parsed = parser.parse("val x = 42\n").collect(Collectors.toList());
+
+        // then
+        assertThat(parsed).hasSize(1);
+        assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
+
+        java.util.Set<java.nio.file.Path> after = listRewriteScalaTempDirs(tmpRoot);
+        after.removeAll(before);
+        assertThat(after)
+            .as("Parsing should not leak any rewrite-scala temp directories")
+            .isEmpty();
+    }
+
+    private static java.util.Set<java.nio.file.Path> listRewriteScalaTempDirs(java.nio.file.Path tmpRoot) throws java.io.IOException {
+        try (java.util.stream.Stream<java.nio.file.Path> entries = java.nio.file.Files.list(tmpRoot)) {
+            return entries
+                .filter(java.nio.file.Files::isDirectory)
+                .filter(p -> p.getFileName().toString().startsWith("rewrite-scala"))
+                .collect(Collectors.toCollection(java.util.HashSet::new));
+        }
+    }
 }

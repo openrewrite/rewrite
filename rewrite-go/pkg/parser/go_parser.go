@@ -166,6 +166,19 @@ func (gp *GoParser) ParsePackage(files []FileInput) ([]*golang.CompilationUnit, 
 	return cus, nil
 }
 
+// PackageNameOf returns the package clause name of a Go source file, or ""
+// if it can't be parsed. A single directory can hold two packages — `foo`
+// (production code plus in-package `_test.go` files) and `foo_test` (the
+// black-box external test package) — which must be type-checked separately.
+// Callers use this to group files by their actual package, not just by dir.
+func PackageNameOf(path, content string) string {
+	f, err := parser.ParseFile(token.NewFileSet(), path, content, parser.PackageClauseOnly)
+	if err != nil || f.Name == nil {
+		return ""
+	}
+	return f.Name.Name
+}
+
 // parseContext holds the state needed during AST-to-LST mapping.
 type parseContext struct {
 	src      []byte

@@ -135,6 +135,11 @@ type server struct {
 	registry  *recipe.Registry
 	installer *installer.Installer
 
+	// recipeOrigin maps a recipe name to the package that contributed it,
+	// recorded at install time and read by GetMarketplace so each row is
+	// attributed to its own bundle on the host.
+	recipeOrigin map[string]string
+
 	// recipeWorkspaceCleanup removes the temp recipe install dir created
 	// when --recipe-install-dir was not supplied. Nil when the caller
 	// provided the path (in which case lifetime is the caller's concern).
@@ -223,6 +228,7 @@ func newServer(cfg serverConfig) *server {
 		logger:                  logger,
 		registry:                reg,
 		installer:               inst,
+		recipeOrigin:            make(map[string]string),
 		recipeWorkspaceCleanup:  recipeWorkspaceCleanup,
 	}
 
@@ -998,6 +1004,13 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 		return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Install package failed: %v", err)}
 	}
 
+	// Attribute the recipes this package contributed to it, so GetMarketplace can tag each row
+	// with its origin and the host can bind it to the right bundle. A local-path install has no
+	// package identity, so its recipes stay unattributed and fall back to the requested bundle.
+	for _, r := range info.Recipes {
+		s.recipeOrigin[r.Name] = pkg.PackageName
+	}
+
 	afterCount := len(s.registry.AllRecipes())
 	var version *string
 	if info.Version != "" {
@@ -1201,6 +1214,9 @@ func parseOrderedColumns(raw json.RawMessage) ([]recipe.ColumnValue, error) {
 type marketplaceRow struct {
 	Descriptor    marketplaceDescriptor   `json:"descriptor"`
 	CategoryPaths [][]marketplaceCategory `json:"categoryPaths"`
+	// PackageName is the package that contributed this recipe (nil when unattributed, e.g. a
+	// local-path install), so the host attributes each row to its own bundle.
+	PackageName *string `json:"packageName"`
 }
 
 // marketplaceDescriptor matches Java's RecipeDescriptor (minimal fields).
@@ -1261,9 +1277,14 @@ func (s *server) handleGetMarketplace(params json.RawMessage) (any, *rpcError) {
 			})
 		}
 
+		var packageName *string
+		if origin, ok := s.recipeOrigin[desc.Name]; ok {
+			packageName = &origin
+		}
 		rows = append(rows, marketplaceRow{
 			Descriptor:    marketplaceDescriptorFromRecipe(desc),
 			CategoryPaths: [][]marketplaceCategory{categoryPath},
+			PackageName:   packageName,
 		})
 	}
 	if rows == nil {
@@ -1457,6 +1478,10 @@ type prepareRecipeResponse struct {
 	ScanVisitor       *string               `json:"scanVisitor,omitempty"`
 	ScanPreconditions []any                 `json:"scanPreconditions"`
 	DelegatesTo       *delegatesToResponse  `json:"delegatesTo,omitempty"`
+	// RecipeList carries the prepared child recipes of a composite so the host builds the tree
+	// locally instead of re-preparing each child by name. Always emitted (an empty list for a
+	// leaf; null only for a delegating recipe, whose children the host resolves itself).
+	RecipeList []prepareRecipeResponse `json:"recipeList"`
 }
 
 type delegatesToResponse struct {
@@ -1496,22 +1521,62 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 		}, nil
 	}
 
-	// Create recipe instance with options
+	// Create recipe instance with options. A nil instance means an installer-loaded recipe with no
+	// constructor (the bootstrap binary's descriptor-only registration) — it can't run here, only
+	// be described, so return the stored descriptor with no prepared child tree. Execution happens
+	// in the CLI-built binary, where the recipe module is linked and its constructor exists, so
+	// prepareInstance below runs and returns the whole tree.
 	instance := reg.Constructor(req.Options)
-
-	var desc recipe.RecipeDescriptor
-	if instance != nil {
-		desc = recipe.Describe(instance)
-	} else {
-		// Installer-loaded recipes have no constructor; use stored descriptor
-		desc = reg.Descriptor
+	if instance == nil {
+		recipeID := uuid.New().String()
+		// Store the nil instance keyed by id so a later Visit can fail loudly by recipe name
+		// (stale/missing CLI-built binary) instead of "Unknown recipe: <uuid>".
+		s.preparedRecipes[recipeID] = instance
+		s.preparedRecipeNames[recipeID] = req.ID
+		return prepareRecipeResponse{
+			ID:                recipeID,
+			Descriptor:        marketplaceDescriptorFromRecipe(reg.Descriptor),
+			EditVisitor:       "edit:" + recipeID,
+			EditPreconditions: []any{},
+			ScanPreconditions: []any{},
+			RecipeList:        []prepareRecipeResponse{},
+		}, nil
 	}
 
-	// response.ID must be the per-instance UUID, not the recipe name —
-	// callers echo it back to identify the prepared instance.
+	resp, rerr := s.prepareInstance(instance, req.ID)
+	if rerr != nil {
+		return nil, rerr
+	}
+	return resp, nil
+}
+
+// prepareInstance prepares a recipe instance and, recursively, its whole child tree — storing every
+// node in preparedRecipes and returning the response with recipeList populated, so the host builds
+// the tree locally instead of a PrepareRecipe round trip per child.
+//
+// Mirrors the C#, JS, and Python servers. Required options are validated as each node is prepared,
+// which covers the whole tree (the root against the caller's options and each child against the
+// values its parent set). A child that delegates to a Java recipe is emitted as delegatesTo for the
+// host to resolve; the rest are prepared and validated recursively. Delegating recipes forward
+// validation to the recipe they delegate to, so they are not validated here.
+func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRecipeResponse, *rpcError) {
+	desc := recipe.Describe(instance)
+
+	_, isDelegating := instance.(recipe.DelegatesTo)
+	if !isDelegating {
+		for _, opt := range instance.Options() {
+			if opt.Required && opt.Value == nil {
+				return prepareRecipeResponse{}, &rpcError{
+					Code:    -32602,
+					Message: fmt.Sprintf("Missing required option `%s` for recipe `%s`.", opt.Name, desc.Name),
+				}
+			}
+		}
+	}
+
 	recipeID := uuid.New().String()
 	s.preparedRecipes[recipeID] = instance
-	s.preparedRecipeNames[recipeID] = req.ID
+	s.preparedRecipeNames[recipeID] = name
 
 	resp := prepareRecipeResponse{
 		ID:                recipeID,
@@ -1521,43 +1586,61 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 		ScanPreconditions: []any{},
 	}
 
-	// Introspect Editor() once at prepare time. If the recipe wrapped its
-	// editor in preconditions.Check(...), extract the precondition's wire
-	// identity (so the Java host can evaluate it locally and skip the
-	// visit RPC for non-matching files) and cache the bare editor (so a
-	// subsequent dispatch via instantiateVisitor returns the unwrapped
-	// editor — otherwise the precondition would also run Go-side and
-	// double the cost).
-	if instance != nil {
-		if _, isScan := instance.(recipe.ScanningRecipe); !isScan {
-			if editor := instance.Editor(); editor != nil {
-				if checkV, ok := editor.(*preconditions.CheckVisitor); ok {
-					if entry, ok := preconditionWireEntry(checkV.Check); ok {
-						resp.EditPreconditions = append(resp.EditPreconditions, entry)
-						s.preparedEditorOverrides[recipeID] = checkV.V
-					}
+	// Introspect Editor() once: if it's wrapped in preconditions.Check(...), extract the
+	// precondition's wire identity (so the Java host can evaluate it locally and skip the visit
+	// RPC for non-matching files) and cache the bare editor (so a subsequent dispatch via
+	// instantiateVisitor returns the unwrapped editor — otherwise the precondition runs Go-side
+	// too and doubles the cost).
+	_, isScan := instance.(recipe.ScanningRecipe)
+	if !isScan {
+		if editor := instance.Editor(); editor != nil {
+			if checkV, ok := editor.(*preconditions.CheckVisitor); ok {
+				if entry, ok := preconditionWireEntry(checkV.Check); ok {
+					resp.EditPreconditions = append(resp.EditPreconditions, entry)
+					s.preparedEditorOverrides[recipeID] = checkV.V
 				}
 			}
 		}
 	}
-
-	// Check if this is a scanning recipe
-	if instance != nil {
-		if _, isScan := instance.(recipe.ScanningRecipe); isScan {
-			scanVis := "scan:" + recipeID
-			resp.ScanVisitor = &scanVis
-		}
+	if isScan {
+		scanVis := "scan:" + recipeID
+		resp.ScanVisitor = &scanVis
 	}
 
-	// Check for delegation
-	if instance != nil {
-		if del, ok := instance.(recipe.DelegatesTo); ok {
-			resp.DelegatesTo = &delegatesToResponse{
-				RecipeName: del.JavaRecipeName(),
-				Options:    del.JavaOptions(),
+	if del, ok := instance.(recipe.DelegatesTo); ok {
+		resp.DelegatesTo = &delegatesToResponse{
+			RecipeName: del.JavaRecipeName(),
+			Options:    del.JavaOptions(),
+		}
+		return resp, nil
+	}
+
+	// Whole-tree: prepare each child. A child that delegates to a Java recipe is emitted as
+	// delegatesTo for the host to resolve; the rest are prepared and validated recursively.
+	childResponses := []prepareRecipeResponse{}
+	for _, child := range instance.RecipeList() {
+		if del, ok := child.(recipe.DelegatesTo); ok {
+			childID := uuid.New().String()
+			childResponses = append(childResponses, prepareRecipeResponse{
+				ID:                childID,
+				Descriptor:        delegateDescriptor(del.JavaRecipeName()),
+				EditVisitor:       "edit:" + childID,
+				EditPreconditions: []any{},
+				ScanPreconditions: []any{},
+				DelegatesTo: &delegatesToResponse{
+					RecipeName: del.JavaRecipeName(),
+					Options:    del.JavaOptions(),
+				},
+			})
+		} else {
+			childResp, rerr := s.prepareInstance(child, recipe.Describe(child).Name)
+			if rerr != nil {
+				return prepareRecipeResponse{}, rerr
 			}
+			childResponses = append(childResponses, childResp)
 		}
 	}
+	resp.RecipeList = childResponses
 
 	return resp, nil
 }
@@ -2029,7 +2112,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		switch {
 		case filepath.Base(path) == "go.mod":
 			disc.goMods = append(disc.goMods, path)
-		case strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go"):
+		case strings.HasSuffix(path, ".go"):
 			disc.goFiles = append(disc.goFiles, path)
 		}
 		return nil
@@ -2115,17 +2198,35 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if !ok {
 			continue
 		}
+		// Test files are parseable project sources, but they must not feed
+		// sibling-package symbol resolution: Go's importer never exposes a
+		// package's `_test.go` files, and a black-box `package foo_test`
+		// file would corrupt the imported package's type-check.
+		if strings.HasSuffix(goFile, "_test.go") {
+			continue
+		}
 		m := closestModule(filepath.Dir(goFile))
 		if m == nil {
 			continue
 		}
-		piByModule[m.dir].AddSource(goFile, src)
+		rel, err := filepath.Rel(m.dir, goFile)
+		if err != nil {
+			s.logger.Printf("ParseProject: cannot relativize %s to module %s: %v", goFile, m.dir, err)
+			continue
+		}
+		piByModule[m.dir].AddSource(filepath.ToSlash(rel), src)
 	}
 
 	// Group files by (owning module, package directory). Each group
 	// parses together via ParsePackage so file-A-references-file-B
 	// resolves within a package.
-	type groupKey struct{ moduleDir, pkgDir string }
+	// pkgName is the literal `package` clause, so it splits a directory by
+	// the package each file actually declares. Production code and white-box
+	// `_test.go` files share `package foo` (pkgName "foo"); black-box tests
+	// declare `package foo_test` (pkgName "foo_test") and thus form a second
+	// group. Without this split they'd share a key and go/types would
+	// silently drop every file whose clause disagrees with the group's first.
+	type groupKey struct{ moduleDir, pkgDir, pkgName string }
 	type fileEntry struct {
 		idx        int
 		path       string
@@ -2155,7 +2256,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if m != nil {
 			moduleDir = m.dir
 		}
-		key := groupKey{moduleDir: moduleDir, pkgDir: filepath.Dir(goFile)}
+		key := groupKey{moduleDir: moduleDir, pkgDir: filepath.Dir(goFile), pkgName: goparser.PackageNameOf(goFile, src)}
 		groups[key] = append(groups[key], fileEntry{
 			idx:        i,
 			path:       goFile,

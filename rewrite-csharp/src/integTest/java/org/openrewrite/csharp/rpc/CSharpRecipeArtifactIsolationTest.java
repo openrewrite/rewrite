@@ -93,9 +93,8 @@ class CSharpRecipeArtifactIsolationTest {
         NuGetRecipeBundleResolver resolver = new NuGetRecipeBundleResolver(rpc);
         RecipeMarketplace marketplace = new RecipeMarketplace();
 
-        // Install all three bundles in dependency order.
-        // Migration.Dotnet depends on Core, so installing Migration would previously
-        // pull Core's assemblies into Migration's scan dir and steal its recipes.
+        // Install all three bundles in dependency order. Migration.Dotnet depends on Core, so its
+        // install must not pull Core's assemblies into Migration's scan dir and steal Core's recipes.
         install(marketplace, resolver, "OpenRewrite.Recipes.CSharp.Core", PACKAGE_VERSION);
         install(marketplace, resolver, "OpenRewrite.Recipes.CSharp.CodeQuality", PACKAGE_VERSION);
         install(marketplace, resolver, "OpenRewrite.Recipes.CSharp.Migration.Dotnet", PACKAGE_VERSION);

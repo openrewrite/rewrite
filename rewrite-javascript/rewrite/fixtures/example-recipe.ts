@@ -30,6 +30,7 @@ import {ScanningEditor} from "./scanning-editor";
 import {ReplaceAssignment} from "./replace-assignment";
 import {JavaChangeMethodName} from "./java-change-method-name";
 import {CrossModuleRecipeList} from "./cross-module-recipe-list";
+import {CompositeWithInvalidChild} from "./composite-with-invalid-child";
 
 export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ChangeText, JavaScript);
@@ -48,4 +49,5 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ReplaceAssignment, JavaScript);
     await marketplace.install(JavaChangeMethodName, JavaScript);
     await marketplace.install(CrossModuleRecipeList, JavaScript);
+    await marketplace.install(CompositeWithInvalidChild, JavaScript);
 }

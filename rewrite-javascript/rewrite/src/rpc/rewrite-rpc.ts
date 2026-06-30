@@ -105,6 +105,9 @@ export class RewriteRpc {
         const dataTableStore = () => this.configuredDataTableStore;
 
         const marketplace = options.marketplace || new RecipeMarketplace();
+        // Recipe name -> the package that contributed it, recorded during InstallRecipes and read when
+        // GetMarketplace builds rows so the host can attribute each recipe to its own bundle.
+        const recipeOrigin: Map<string, string> = new Map();
 
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, dataTableStore, options.metricsCsv);
         BatchVisit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, dataTableStore, options.metricsCsv);
@@ -112,13 +115,13 @@ export class RewriteRpc {
         SetDataTableStore.handle(this.connection, store => this.configuredDataTableStore = store, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
             this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
-        GetMarketplace.handle(this.connection, marketplace, options.metricsCsv);
+        GetMarketplace.handle(this.connection, marketplace, recipeOrigin, options.metricsCsv);
         GetLanguages.handle(this.connection, options.metricsCsv);
         PrepareRecipe.handle(this.connection, marketplace, preparedRecipes, options.metricsCsv);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
         ParseProject.handle(this.connection, this.localObjects, options.metricsCsv);
         Print.handle(this.connection, getObject, options.logger, options.metricsCsv);
-        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", marketplace, options.logger, options.metricsCsv);
+        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", marketplace, recipeOrigin, options.logger, options.metricsCsv);
 
         this.connection.onRequest(
             new rpc.RequestType<TraceGetObject, boolean, Error>("TraceGetObject"),

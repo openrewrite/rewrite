@@ -241,3 +241,167 @@ def test_recipe_descriptor_to_dict_emits_all_collection_keys():
                 "dataTables", "maintainers", "contributors", "examples"):
         assert key in result, f"missing key: {key}"
         assert result[key] == [], f"{key} should be empty list, got {result[key]!r}"
+
+
+def test_get_marketplace_row_carries_package_name(monkeypatch):
+    """A GetMarketplace row is tagged with the package that contributed the recipe,
+    so the host attributes it to its own bundle instead of the requested one."""
+    import rewrite.rpc.server as server
+    from rewrite.discovery import RecipeAttribution
+    from rewrite import CategoryDescriptor, RecipeMarketplace, Recipe
+
+    class _MyRecipe(Recipe):
+        @property
+        def name(self): return "org.example.MyRecipe"
+        @property
+        def display_name(self): return "My Recipe"
+        @property
+        def description(self): return "A recipe."
+
+    marketplace = RecipeMarketplace()
+    marketplace.install(_MyRecipe, [CategoryDescriptor(display_name="Test")])
+
+    attribution = RecipeAttribution()
+    attribution.record("my-recipes-package", {"org.example.MyRecipe"})
+    monkeypatch.setattr(server, "_attribution", attribution)
+
+    rows = server._collect_marketplace_rows(marketplace)
+
+    row = next(r for r in rows if r["descriptor"]["name"] == "org.example.MyRecipe")
+    assert row["packageName"] == "my-recipes-package"
+
+
+def test_get_marketplace_row_unattributed_has_none_package_name(monkeypatch):
+    """An unattributed recipe (e.g. a local-path install with no package identity)
+    leaves packageName None so the host falls back to the requested bundle."""
+    import rewrite.rpc.server as server
+    from rewrite.discovery import RecipeAttribution
+    from rewrite import CategoryDescriptor, RecipeMarketplace, Recipe
+
+    class _Unattributed(Recipe):
+        @property
+        def name(self): return "org.example.Unattributed"
+        @property
+        def display_name(self): return "Unattributed"
+        @property
+        def description(self): return "A recipe."
+
+    marketplace = RecipeMarketplace()
+    marketplace.install(_Unattributed, [CategoryDescriptor(display_name="Test")])
+    monkeypatch.setattr(server, "_attribution", RecipeAttribution())
+
+    rows = server._collect_marketplace_rows(marketplace)
+
+    row = next(r for r in rows if r["descriptor"]["name"] == "org.example.Unattributed")
+    assert row["packageName"] is None
+
+
+def test_prepare_recipe_rejects_missing_required_option(monkeypatch):
+    """The server validates required options when preparing a recipe, rather than silently
+    preparing a broken recipe."""
+    import rewrite.rpc.server as server
+    from rewrite.marketplace import RecipeMarketplace
+    from rewrite import Recipe, CategoryDescriptor
+    from rewrite.recipe import option
+    from dataclasses import dataclass, field
+
+    @dataclass
+    class _RequiresText(Recipe):
+        text: str = field(default=None, metadata=option(
+            display_name="Text", description="Required text."))
+
+        @property
+        def name(self): return "org.example.RequiresText"
+        @property
+        def display_name(self): return "Requires text"
+        @property
+        def description(self): return "A recipe with a required option."
+
+    marketplace = RecipeMarketplace()
+    marketplace.install(_RequiresText, [CategoryDescriptor(display_name="Test")])
+    monkeypatch.setattr(server, "_marketplace", marketplace)
+
+    try:
+        server.handle_prepare_recipe({"id": "org.example.RequiresText"})
+        assert False, "expected a missing-required-option error"
+    except ValueError as e:
+        assert "Missing required option `text`" in str(e)
+
+
+def test_prepare_recipe_validates_required_options_of_children(monkeypatch):
+    """Validation recurses through the whole prepared tree (like the C# and JS servers), so a
+    composite whose child is missing a required option is rejected."""
+    import rewrite.rpc.server as server
+    from rewrite.marketplace import RecipeMarketplace
+    from rewrite import Recipe, CategoryDescriptor
+    from rewrite.recipe import option
+    from dataclasses import dataclass, field
+
+    @dataclass
+    class _RequiresText(Recipe):
+        text: str = field(default=None, metadata=option(
+            display_name="Text", description="Required text."))
+
+        @property
+        def name(self): return "org.example.ChildRequiresText"
+        @property
+        def display_name(self): return "Child requires text"
+        @property
+        def description(self): return "A child recipe with a required option."
+
+    class _CompositeWithInvalidChild(Recipe):
+        @property
+        def name(self): return "org.example.CompositeWithInvalidChild"
+        @property
+        def display_name(self): return "Composite with an invalid child"
+        @property
+        def description(self): return "A composite whose child lacks a required option."
+
+        def recipe_list(self):
+            return [_RequiresText()]
+
+    marketplace = RecipeMarketplace()
+    marketplace.install(_CompositeWithInvalidChild, [CategoryDescriptor(display_name="Test")])
+    monkeypatch.setattr(server, "_marketplace", marketplace)
+
+    try:
+        server.handle_prepare_recipe({"id": "org.example.CompositeWithInvalidChild"})
+        assert False, "expected a missing-required-option error for the child"
+    except ValueError as e:
+        assert "Missing required option `text`" in str(e)
+
+
+def test_prepare_recipe_returns_whole_child_tree(monkeypatch):
+    """PrepareRecipe prepares and returns the whole tree (recipeList), so the host builds it
+    locally instead of a round trip per child."""
+    import rewrite.rpc.server as server
+    from rewrite.marketplace import RecipeMarketplace
+    from rewrite import Recipe, CategoryDescriptor
+
+    class _Leaf(Recipe):
+        @property
+        def name(self): return "org.example.Leaf"
+        @property
+        def display_name(self): return "Leaf"
+        @property
+        def description(self): return "A leaf recipe."
+
+    class _Composite(Recipe):
+        @property
+        def name(self): return "org.example.Composite"
+        @property
+        def display_name(self): return "Composite"
+        @property
+        def description(self): return "A composite recipe."
+
+        def recipe_list(self):
+            return [_Leaf()]
+
+    marketplace = RecipeMarketplace()
+    marketplace.install(_Composite, [CategoryDescriptor(display_name="Test")])
+    monkeypatch.setattr(server, "_marketplace", marketplace)
+
+    response = server.handle_prepare_recipe({"id": "org.example.Composite"})
+
+    assert "recipeList" in response
+    assert [c["descriptor"]["name"] for c in response["recipeList"]] == ["org.example.Leaf"]
