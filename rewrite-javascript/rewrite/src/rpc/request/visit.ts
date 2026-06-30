@@ -20,6 +20,7 @@ import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {DATA_TABLE_STORE, DataTableStore} from "../../data-table";
 import {withMetrics, extractSourcePath} from "./metrics";
+import {lookupVisitor} from "./visitor-registry";
 
 export interface VisitResponse {
     modified: boolean
@@ -135,9 +136,12 @@ export class Visit {
             }
             return await recipe.editor();
         } else {
+            const ctor = lookupVisitor(visitorName) ?? (globalThis as any)[visitorName];
+            if (!ctor) {
+                throw new Error(`Unknown visitor: ${visitorName}`);
+            }
             return Reflect.construct(
-                // "as any" bypasses strict type checking
-                (globalThis as any)[visitorName],
+                ctor,
                 request.visitorOptions ? Array.from(request.visitorOptions.values()) : [])
         }
     }

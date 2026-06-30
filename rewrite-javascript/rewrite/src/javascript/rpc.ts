@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 import {JavaScriptVisitor} from "./visitor";
-import {asRef, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {asRef, registerVisitor, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {AutoformatVisitor} from "./format";
 import {isJavaScript, JS, JSX} from "./tree";
 import {Expression, J, Statement, Type, TypedTree, TypeTree} from "../java";
 import {JavaReceiver, JavaSender, registerJLanguageCodecs} from "../java/rpc";
@@ -1226,3 +1227,5 @@ class JavaScriptDelegateReceiver extends JavaReceiver {
 }
 
 registerJLanguageCodecs(JS.Kind.CompilationUnit, new JavaScriptReceiver(), new JavaScriptSender(), JS.Kind);
+
+registerVisitor("org.openrewrite.javascript.format.AutoformatVisitor", AutoformatVisitor);
