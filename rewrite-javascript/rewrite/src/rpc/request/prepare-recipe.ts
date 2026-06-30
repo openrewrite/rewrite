@@ -40,18 +40,13 @@ export class PrepareRecipe {
                 metricsCsv,
                 (context) => async (request) => {
                     context.target = request.id;
-                    const id = snowflake.generate();
                     const recipeCtor = marketplace.findRecipe(request.id);
                     if (!recipeCtor) {
-                        // The host re-prepares every sub-recipe of a composite by id while
-                        // building RpcRecipe.getRecipeList(). A sub-recipe that delegates to a
-                        // Java recipe (e.g. org.openrewrite.javascript.UpgradeDependencyVersion,
-                        // produced by upgradeDependencyVersion() -> prepareJavaRecipe) is an
-                        // RpcRecipe that installSubRecipes deliberately did not register here: it
-                        // has no no-arg constructor and is hosted on the peer. A miss therefore
-                        // means the host owns this recipe, so tell it to resolve the id locally
-                        // (the Java recipe is on the host's classpath) via delegatesTo, rather
-                        // than failing with "Could not find recipe with id ...".
+                        // A miss means the host owns this recipe (e.g. a sub-recipe that delegates to
+                        // a Java recipe, produced by prepareJavaRecipe — an RpcRecipe hosted on the peer
+                        // with no no-arg constructor to register here). Tell the host to resolve the id
+                        // locally via delegatesTo rather than failing with "Could not find recipe ...".
+                        const id = snowflake.generate();
                         return {
                             id: id,
                             descriptor: PrepareRecipe.delegateDescriptor(request.id),
@@ -67,35 +62,8 @@ export class PrepareRecipe {
                     if (!recipeCtor[1]) {
                         throw new Error(`Recipe ${request.id} was installed without a constructor`);
                     }
-                    let recipe = new recipeCtor[1](request.options);
-
-                    const editPreconditions: Precondition[] = [];
-                    recipe = await this.optimizePreconditions(recipe, "edit", editPreconditions);
-
-                    const scanPreconditions: Precondition[] = [];
-                    recipe = await this.optimizePreconditions(recipe, "scan", scanPreconditions);
-
-                    preparedRecipes.set(id, recipe);
-
-                    await this.installSubRecipes(recipe, marketplace);
-
-                    const result: PrepareRecipeResponse = {
-                        id: id,
-                        descriptor: await recipe.descriptor(),
-                        editVisitor: `edit:${id}`,
-                        editPreconditions: editPreconditions,
-                        scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
-                        scanPreconditions: scanPreconditions
-                    };
-
-                    if ('javaRecipeName' in recipe) {
-                        result.delegatesTo = {
-                            recipeName: (recipe as any).javaRecipeName,
-                            options: (recipe as any).delegatesToOptions ?? {}
-                        };
-                    }
-
-                    return result;
+                    return await PrepareRecipe.prepareInstance(new recipeCtor[1](request.options),
+                        snowflake, preparedRecipes, marketplace);
                 }
             )
         );
@@ -124,19 +92,91 @@ export class PrepareRecipe {
         };
     }
 
-    private static async installSubRecipes(recipe: Recipe, marketplace: RecipeMarketplace) {
-        for (const subRecipe of await recipe.recipeList()) {
-            // An RpcRecipe is a proxy for a recipe already prepared on a remote
-            // peer; it has no no-arg constructor to install and its sub-recipes
-            // live remotely, so there is nothing to register locally.
-            if (subRecipe instanceof RpcRecipe) {
-                continue;
-            }
-            if (!marketplace.findRecipe(subRecipe.name)) {
-                await marketplace.install(subRecipe.constructor as any, []);
-                await this.installSubRecipes(subRecipe, marketplace);
+    /**
+     * Prepares a recipe instance and recursively its whole child tree, registering every node in
+     * {@code preparedRecipes} and returning the prepared response with {@code recipeList} populated,
+     * so the host builds the tree locally instead of a PrepareRecipe round-trip per child.
+     *
+     * Mirrors the C# server's PrepareInstance. Required options are validated as each node is
+     * prepared (covering the whole tree). A child hosted on the peer (an {@link RpcRecipe}, e.g. from
+     * prepareJavaRecipe) carries only {@code delegatesTo} for the host to resolve locally; every other
+     * child carries its own {@code recipeList}. Delegating recipes forward validation to the recipe
+     * they delegate to, so they are not validated here.
+     */
+    private static async prepareInstance(recipe: Recipe,
+                                         snowflake: ReturnType<typeof SnowflakeId>,
+                                         preparedRecipes: Map<String, Recipe>,
+                                         marketplace: RecipeMarketplace): Promise<PrepareRecipeResponse> {
+        const id = snowflake.generate();
+
+        const editPreconditions: Precondition[] = [];
+        recipe = await PrepareRecipe.optimizePreconditions(recipe, "edit", editPreconditions);
+        const scanPreconditions: Precondition[] = [];
+        recipe = await PrepareRecipe.optimizePreconditions(recipe, "scan", scanPreconditions);
+
+        preparedRecipes.set(id, recipe);
+
+        const descriptor = await recipe.descriptor();
+        const isDelegating = 'javaRecipeName' in recipe;
+
+        if (!isDelegating) {
+            for (const option of descriptor.options) {
+                if ((option.required ?? true) && option.value == null) {
+                    throw new Error(`Missing required option \`${option.name}\` for recipe \`${descriptor.name}\`.`);
+                }
             }
         }
+
+        const response: PrepareRecipeResponse = {
+            id: id,
+            descriptor: descriptor,
+            editVisitor: `edit:${id}`,
+            editPreconditions: editPreconditions,
+            scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
+            scanPreconditions: scanPreconditions
+        };
+
+        if (isDelegating) {
+            response.delegatesTo = {
+                recipeName: (recipe as any).javaRecipeName,
+                options: (recipe as any).delegatesToOptions ?? {}
+            };
+            return response;
+        }
+
+        const childResponses: PrepareRecipeResponse[] = [];
+        for (const child of await recipe.recipeList()) {
+            if (child instanceof RpcRecipe) {
+                // Hosted on the peer: emit delegatesTo (its name + the options its parent set) so the
+                // host resolves it locally, matching how the by-name fallback used to resolve it.
+                const childId = snowflake.generate();
+                const childDescriptor = await child.descriptor();
+                const options: Record<string, any> = {};
+                for (const option of childDescriptor.options) {
+                    if (option.value != null) {
+                        options[option.name] = option.value;
+                    }
+                }
+                childResponses.push({
+                    id: childId,
+                    descriptor: PrepareRecipe.delegateDescriptor(child.name),
+                    editVisitor: `edit:${childId}`,
+                    editPreconditions: [],
+                    scanPreconditions: [],
+                    delegatesTo: {recipeName: child.name, options}
+                });
+            } else {
+                // Register a child that was instantiated in recipeList() but never installed, so a peer
+                // that re-prepares children by name (rather than consuming recipeList) can still find it.
+                if (!marketplace.findRecipe(child.name)) {
+                    await marketplace.install(child.constructor as any, []);
+                }
+                childResponses.push(await PrepareRecipe.prepareInstance(child, snowflake, preparedRecipes, marketplace));
+            }
+        }
+        response.recipeList = childResponses;
+
+        return response;
     }
 
     /**
@@ -266,6 +306,11 @@ export interface PrepareRecipeResponse {
     scanVisitor?: string
     scanPreconditions: Precondition[]
     delegatesTo?: DelegatesTo
+    /**
+     * The prepared child recipes of a composite. When present, the host builds the recipe tree
+     * locally from these instead of re-preparing each child by name (the whole-tree optimization).
+     */
+    recipeList?: PrepareRecipeResponse[]
 }
 
 /**
