@@ -17,31 +17,15 @@ package org.openrewrite.python.rpc;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.rpc.request.GetMarketplaceResponse;
-
-import java.util.Collections;
-import java.util.List;
 
 /**
- * Response to an {@code InstallRecipes} RPC request.
- * <p>
- * {@code recipes} carries the descriptor rows for recipes attributed to the
- * just-installed distribution, so the caller can construct a
- * {@link org.openrewrite.marketplace.RecipeMarketplace} bound to the bundle
- * without a follow-up {@code GetMarketplace} round trip. The follow-up call
- * was the source of the prior over-attribution bug — it returned the entire
- * singleton marketplace, which on a Python RPC server includes built-in
- * {@code openrewrite} recipes plus any recipes from previously-installed
- * sibling packages, all of which were then incorrectly tagged with the
- * just-requested bundle.
+ * Response to an {@code InstallRecipes} RPC request. The reader gets the bundle's recipes from a
+ * follow-up {@code GetMarketplace} call, whose rows now carry each recipe's origin
+ * {@code packageName} so the host attributes each to its own bundle — so this response only needs
+ * to report how many recipes were installed and the resolved version.
  */
 @Value
 public class InstallRecipesResponse {
     int recipesInstalled;
     @Nullable String version;
-    @Nullable List<GetMarketplaceResponse.Row> recipes;
-
-    public List<GetMarketplaceResponse.Row> recipesOrEmpty() {
-        return recipes == null ? Collections.emptyList() : recipes;
-    }
 }
