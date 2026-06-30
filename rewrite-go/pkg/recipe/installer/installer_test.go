@@ -91,7 +91,7 @@ go 1.25
 require (
 	github.com/foo/bar v1.2.3
 )
-`
+	`
 	inst := &Installer{WorkspaceDir: writeGoMod(t, goMod)}
 
 	// when
@@ -112,7 +112,7 @@ go 1.25
 require (
 	github.com/foo/bar v1.2.3 // indirect
 )
-`
+	`
 	inst := &Installer{WorkspaceDir: writeGoMod(t, goMod)}
 
 	// when
@@ -131,7 +131,7 @@ func TestReadResolvedVersion_SingleLineRequire(t *testing.T) {
 go 1.25
 
 require github.com/foo/bar v1.2.3
-`
+	`
 	inst := &Installer{WorkspaceDir: writeGoMod(t, goMod)}
 
 	// when
@@ -153,7 +153,7 @@ require (
 	github.com/foo/barbaz v0.9.9
 	github.com/foo/bar v1.2.3
 )
-`
+	`
 	inst := &Installer{WorkspaceDir: writeGoMod(t, goMod)}
 
 	// when

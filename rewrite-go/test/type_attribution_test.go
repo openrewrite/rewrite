@@ -258,7 +258,6 @@ func main() {
 }
 
 func TestTypeAttributionGracefulDegradation(t *testing.T) {
-	// Parse with unresolvable import — should not error, just have nil types
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", `package main
 

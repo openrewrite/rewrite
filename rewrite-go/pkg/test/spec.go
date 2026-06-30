@@ -31,7 +31,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// SourceSpec describes a Go source file for testing.
 type SourceSpec struct {
 	Before      string
 	After       *string // nil means no change expected (parse-print idempotence only)
@@ -335,7 +334,6 @@ func Golang(before string, after ...string) SourceSpec {
 	return spec
 }
 
-// GolangRaw creates a SourceSpec from raw Go source (no indent trimming).
 func GolangRaw(before string, after ...string) SourceSpec {
 	spec := SourceSpec{
 		Before: before,
@@ -362,7 +360,6 @@ func TrimIndent(s string) string {
 		lines = lines[:len(lines)-1]
 	}
 
-	// Find minimum indentation across non-empty lines
 	minIndent := math.MaxInt
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
@@ -395,13 +392,11 @@ func ValidateSpaces(root java.Tree) []string {
 	return (&recipes.WhitespaceValidationService{}).Validate(root)
 }
 
-// JavaRecipeConfig holds config for a Java-delegated recipe test.
 type JavaRecipeConfig struct {
 	RecipeName string
 	Options    map[string]any
 }
 
-// RecipeSpec configures a test run.
 type RecipeSpec struct {
 	CheckParsePrintIdempotence bool
 	Recipe                     recipe.Recipe
@@ -410,14 +405,12 @@ type RecipeSpec struct {
 	MarkerPrinter              printer.MarkerPrinter // printer for cross-cutting markers in recipe output; defaults to printer.DefaultMarkerPrinter
 }
 
-// NewRecipeSpec creates a new RecipeSpec with default settings.
 func NewRecipeSpec() *RecipeSpec {
 	return &RecipeSpec{
 		CheckParsePrintIdempotence: true,
 	}
 }
 
-// WithRecipe sets the recipe to apply during the test run.
 func (spec *RecipeSpec) WithRecipe(r recipe.Recipe) *RecipeSpec {
 	spec.Recipe = r
 	return spec
@@ -433,7 +426,6 @@ func (spec *RecipeSpec) WithJavaRecipe(recipeName string, options map[string]any
 	return spec
 }
 
-// WithJavaRpcClient sets the Java RPC client for recipe delegation.
 func (spec *RecipeSpec) WithJavaRpcClient(client *JavaRpcClient) *RecipeSpec {
 	spec.JavaRpcClient = client
 	return spec
@@ -627,7 +619,6 @@ func (spec *RecipeSpec) rewriteGoMod(t *testing.T, src SourceSpec) {
 	}
 }
 
-// runRecipe applies a recipe (including composite recipes with sub-recipes) to a tree.
 func runRecipe(r recipe.Recipe, t java.Tree) java.Tree {
 	ctx := recipe.NewExecutionContext()
 

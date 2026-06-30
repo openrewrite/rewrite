@@ -23,10 +23,7 @@ import (
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 )
 
-// strPtr returns a pointer to s for use as an Alias option.
 func strPtr(s string) *string { return &s }
-
-// ---- AddImport ----
 
 func TestAddImport_NoOpWhenAlreadyImported(t *testing.T) {
 	spec := NewRecipeSpec().WithRecipe(&recipes.AddImport{PackagePath: "fmt"})
@@ -154,8 +151,6 @@ func TestAddImport_AliasedFormDoesNotMatchRegular(t *testing.T) {
 	)
 }
 
-// ---- RemoveImport ----
-
 func TestRemoveImport_DeletesMatching(t *testing.T) {
 	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveImport{PackagePath: "strings"})
 	before := `
@@ -192,8 +187,6 @@ func TestRemoveImport_NoOpWhenAbsent(t *testing.T) {
 		`),
 	)
 }
-
-// ---- RemoveUnusedImports ----
 
 func TestRemoveUnusedImports_DropsUnreferenced(t *testing.T) {
 	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
@@ -251,8 +244,6 @@ func TestRemoveUnusedImports_NoOpWhenAllUsed(t *testing.T) {
 		`),
 	)
 }
-
-// ---- OrderImports ----
 
 func TestOrderImports_IdempotentOnAlreadyOrdered(t *testing.T) {
 	spec := NewRecipeSpec().WithRecipe(&recipes.OrderImports{})

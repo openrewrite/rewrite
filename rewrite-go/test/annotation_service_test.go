@@ -96,7 +96,6 @@ func TestAnnotationService_AllAnnotations_ViaCursor(t *testing.T) {
 	md := parseAndFindMethod(t, src, "slow")
 	svc := &recipes.AnnotationService{}
 
-	// Build a cursor positioned AT the MethodDeclaration.
 	c := buildCursor(md)
 	anns := svc.AllAnnotations(c)
 	if len(anns) != 1 {
