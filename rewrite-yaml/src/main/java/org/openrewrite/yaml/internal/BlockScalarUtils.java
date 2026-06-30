@@ -119,9 +119,6 @@ public final class BlockScalarUtils {
             indent = StringUtils.repeat(" ", defaultIndentSpaces);
         }
         String trailing = value.substring(bodyEnd);
-        if (trailing.isEmpty()) {
-            trailing = newLine;
-        }
         String[] lines = newBody.split("\r\n|\r|\n", -1);
         StringBuilder body = new StringBuilder();
         for (int i = 0; i < lines.length; i++) {
