@@ -284,7 +284,7 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
 
               class Foo {
                   void foo() {
-                      Set<String> one = Bar.bar();
+                      Set<java.lang.String> one = Bar.bar();
                   }
               }
               """
@@ -328,7 +328,7 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
 
               class Foo {
                   void foo() {
-                      Map<String, List<Integer>> one = Bar.bar();
+                      Map<java.lang.String, List<java.lang.Integer>> one = Bar.bar();
                   }
               }
               """
@@ -370,7 +370,7 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
               import java.util.Map;
               class Foo {
                   void foo() {
-                      Map<String, Map<Integer, Long>> one = Bar.bar();
+                      Map<java.lang.String, Map<java.lang.Integer, java.lang.Long>> one = Bar.bar();
                   }
               }
               """
@@ -411,7 +411,7 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
               import bar.Bar;
               class Foo {
                   void foo() {
-                      Object one = Bar.bar();
+                      java.lang.Object one = Bar.bar();
                   }
               }
               """
@@ -455,7 +455,7 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
 
               class Foo {
                   void foo() {
-                      ArrayList<String> one = Bar.bar();
+                      ArrayList<java.lang.String> one = Bar.bar();
                   }
               }
               """,
@@ -522,6 +522,48 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
                     return super.visitVariable(variable, p);
                 }
             }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void newReturnTypeMayUseSimpleNamesForJavaLangTypeArguments() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "java.util.List<String>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  public class Bar {
+                      public static Object bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              class Foo {
+                  void foo() {
+                      Object one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+
+              import java.util.List;
+
+              class Foo {
+                  void foo() {
+                      List<String> one = Bar.bar();
+                  }
+              }
+              """
           )
         );
     }

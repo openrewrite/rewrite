@@ -46,7 +46,8 @@ public class ChangeMethodInvocationReturnType extends Recipe {
 
     @Option(displayName = "New method invocation return type",
             description = "The fully qualified new return type of method invocation. " +
-                    "Parameterized types like `java.util.Set<java.lang.String>` are supported.",
+                    "Parameterized types like `java.util.Set<java.lang.String>` are supported; " +
+                    "`java.lang` type arguments may use their simple name, e.g. `java.util.List<String>`.",
             example = "long")
     String newReturnType;
 
@@ -93,10 +94,7 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                     return mv;
                 }
 
-                // Temporary workaround: `ShortenFullyQualifiedTypeReferences` deliberately leaves `java.lang.*` fully
-                // qualified, so strip it here. Remove once that recipe shortens `java.lang` too (separate PR).
-                String templateType = newReturnType.replaceAll("\\bjava\\.lang\\.([A-Z][A-Za-z0-9_]*)(?![.A-Za-z0-9_])", "$1");
-                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(templateType + " __typePlaceholder__").contextSensitive();
+                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(newReturnType + " __typePlaceholder__").contextSensitive();
                 List<String> stubs = synthesizeStubsForTypeAttribution(newReturnType);
                 if (!stubs.isEmpty()) {
                     templateBuilder.javaParser(JavaParser.fromJavaVersion().dependsOn(stubs.toArray(new String[0])));
