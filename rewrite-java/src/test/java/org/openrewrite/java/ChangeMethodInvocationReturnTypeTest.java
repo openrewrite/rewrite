@@ -472,4 +472,57 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void resolvesExternalRawTypeWithExternalTypeArgument() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodInvocationReturnType("bar.Bar bar()", "jakarta.validation.ConstraintViolation<org.springframework.http.ResponseEntity>"))
+            .parser(JavaParser.fromJavaVersion()
+              //language=java
+              .dependsOn(
+                """
+                  package bar;
+                  public class Bar {
+                      public static Object bar() {
+                          return null;
+                      }
+                  }
+                  """
+              )
+            ),
+          //language=java
+          java(
+            """
+              import bar.Bar;
+              class Foo {
+                  void foo() {
+                      Object one = Bar.bar();
+                  }
+              }
+              """,
+            """
+              import bar.Bar;
+              import jakarta.validation.ConstraintViolation;
+              import org.springframework.http.ResponseEntity;
+
+              class Foo {
+                  void foo() {
+                      ConstraintViolation<ResponseEntity> one = Bar.bar();
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer p) {
+                    if ("one".equals(variable.getSimpleName())) {
+                        JavaType.Parameterized type = (JavaType.Parameterized) variable.getType();
+                        assertThat(type.getType()).isNotInstanceOf(JavaType.ShallowClass.class);
+                        assertThat(type.getTypeParameters().get(0)).isNotInstanceOf(JavaType.ShallowClass.class);
+                    }
+                    return super.visitVariable(variable, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
 }
