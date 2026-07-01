@@ -93,12 +93,11 @@ public class ChangeMethodInvocationReturnType extends Recipe {
                     return mv;
                 }
 
-                // `ShortenFullyQualifiedTypeReferences` deliberately leaves `java.lang.*` fully qualified, so strip it here.
+                // Temporary workaround: `ShortenFullyQualifiedTypeReferences` deliberately leaves `java.lang.*` fully
+                // qualified, so strip it here. Remove once that recipe shortens `java.lang` too (separate PR).
                 String templateType = newReturnType.replaceAll("\\bjava\\.lang\\.([A-Z][A-Za-z0-9_]*)(?![.A-Za-z0-9_])", "$1");
-                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(templateType + " __cmirt__").contextSensitive();
-                // The default template parser only resolves JDK types. Synthesize stubs for any other referenced type
-                // so the template can attribute it to a real class without the declaring artifact on the classpath.
-                List<String> stubs = typeStubs(newReturnType);
+                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(templateType + " __typePlaceholder__").contextSensitive();
+                List<String> stubs = synthesizeStubsForTypeAttribution(newReturnType);
                 if (!stubs.isEmpty()) {
                     templateBuilder.javaParser(JavaParser.fromJavaVersion().dependsOn(stubs.toArray(new String[0])));
                 }
@@ -142,12 +141,7 @@ public class ChangeMethodInvocationReturnType extends Recipe {
         });
     }
 
-    /**
-     * Synthesize a minimal source stub (with the correct type-parameter arity) for every non-JDK type
-     * referenced in {@code type}, so a {@link JavaTemplate} parser can attribute it to a real class without
-     * the declaring artifact on the classpath. JDK types (prefixed {@code java.}) are left to the default parser.
-     */
-    private static List<String> typeStubs(String type) {
+    private static List<String> synthesizeStubsForTypeAttribution(String type) {
         Map<String, Integer> fqnToArity = new LinkedHashMap<>();
         collectStubTypes(type, fqnToArity);
         List<String> stubs = new ArrayList<>();
