@@ -147,7 +147,7 @@ class AttributeValueTest implements RewriteTest {
               }
               """,
             """
-              /*~~(EXPRESSION:null)~~>*/@Example(name = "a" + "b")
+              /*~~(EXPRESSION:ab)~~>*/@Example(name = "a" + "b")
               class Test {
               }
               """
@@ -402,15 +402,15 @@ class AttributeValueTest implements RewriteTest {
 
               import static com.x.Constants.NAME;
 
-              /*~~(CONSTANT_REFERENCE:com.x.Constants.NAME:null)~~>*/@Example(name = Constants.NAME)
+              /*~~(CONSTANT_REFERENCE:com.x.Constants.NAME:n)~~>*/@Example(name = Constants.NAME)
               class Test1 {
               }
 
-              /*~~(CONSTANT_REFERENCE:com.x.Constants.NAME:null)~~>*/@Example(name = NAME)
+              /*~~(CONSTANT_REFERENCE:com.x.Constants.NAME:n)~~>*/@Example(name = NAME)
               class Test2 {
               }
 
-              /*~~(CONSTANT_REFERENCE:Test3.LOCAL:null)~~>*/@Example(name = Test3.LOCAL)
+              /*~~(CONSTANT_REFERENCE:Test3.LOCAL:l)~~>*/@Example(name = Test3.LOCAL)
               class Test3 {
                   static final String LOCAL = "l";
               }
@@ -461,7 +461,7 @@ class AttributeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(describeAttribute("@Example", "tags",
             v -> v.getKind() + ":" + v.getElements().stream()
-              .map(e -> e.getKind().toString())
+              .map(e -> e.getKind() + "/" + e.getConstantValue())
               .collect(Collectors.joining(",")) +
               ":asLiteral=" + v.asLiteral().isPresent())),
           java(
@@ -485,7 +485,7 @@ class AttributeValueTest implements RewriteTest {
               }
               """,
             """
-              /*~~(ARRAY:LITERAL,CONSTANT_REFERENCE:asLiteral=false)~~>*/@Example(tags = {"a", Constants.NAME})
+              /*~~(ARRAY:LITERAL/a,CONSTANT_REFERENCE/n:asLiteral=false)~~>*/@Example(tags = {"a", Constants.NAME})
               class Test {
               }
               """
@@ -621,6 +621,100 @@ class AttributeValueTest implements RewriteTest {
           java(
             """
               @Example(exclude = {String.class, Integer.class})
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void foldsConstantsOnFieldMethodAndParameterDeclarations() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
+            .asVisitor(a -> SearchResult.found(a.getTree(),
+              a.getAttributeValue("name").map(v -> "name=" + v.getConstantValue())
+                .orElseGet(() -> a.getAttributeValue("count").map(v -> "count=" + v.getConstantValue())
+                  .orElse("missing")))))),
+          java(
+            """
+              @interface Example {
+                  String name() default "";
+                  int count() default 0;
+              }
+              """
+          ),
+          java(
+            """
+              class Constants {
+                  static final String NAME = "n";
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  @Example(name = Constants.NAME)
+                  String field;
+
+                  @Example(name = Constants.NAME)
+                  void method(@Example(count = Integer.MAX_VALUE) int param) {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  /*~~(name=n)~~>*/@Example(name = Constants.NAME)
+                  String field;
+
+                  /*~~(name=n)~~>*/@Example(name = Constants.NAME)
+                  void method(/*~~(count=2147483647)~~>*/@Example(count = Integer.MAX_VALUE) int param) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void repeatedAnnotationsDoNotFold() {
+        rewriteRun(
+          spec -> spec.recipe(describeAttribute("@Example", "name",
+            v -> v.getKind() + ":" + v.getConstantValue())),
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+
+              @Repeatable(Examples.class)
+              @interface Example {
+                  String name() default "";
+              }
+              """
+          ),
+          java(
+            """
+              @interface Examples {
+                  Example[] value();
+              }
+              """
+          ),
+          java(
+            """
+              class Constants {
+                  static final String NAME = "n";
+              }
+              """
+          ),
+          java(
+            """
+              @Example(name = Constants.NAME)
+              @Example(name = "b")
+              class Test {
+              }
+              """,
+            """
+              /*~~(CONSTANT_REFERENCE:null)~~>*/@Example(name = Constants.NAME)
+              /*~~(LITERAL:b)~~>*/@Example(name = "b")
               class Test {
               }
               """

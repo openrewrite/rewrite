@@ -335,17 +335,162 @@ public class AttributeValue implements Trait<Expression> {
 
     /**
      * The compile-time constant represented by this value, if one can be determined:
-     * a {@link J.Literal}'s value directly. Enum constants, class literals, nested
-     * annotations, and arrays are references or containers, not constants — use
-     * {@link #getReferencedField()}, {@link #getClassValue()}, {@link #asAnnotated()},
-     * or {@link #getElements()} for those.
+     * <ul>
+     *   <li>a {@link J.Literal}'s value directly;</li>
+     *   <li>for constant references and constant expressions ({@code Constants.NAME},
+     *       a statically imported {@code NAME}, {@code "a" + "b"}), the constant the
+     *       compiler folded into the {@link JavaType.Annotation.ElementValue}s on the
+     *       annotated declaration's type attribution — best-effort, see below.</li>
+     * </ul>
+     * Enum constants, class literals, nested annotations, and arrays are references or
+     * containers, not constants — use {@link #getReferencedField()},
+     * {@link #getClassValue()}, {@link #asAnnotated()}, or {@link #getElements()} for those.
+     * <p>
+     * The constant fold is only available where the parser records
+     * {@link JavaType.Annotation} element values on the annotated declaration: sources
+     * attributed by javac (including constants from binary dependencies). It is
+     * unavailable — and this method returns {@code null} — for Groovy sources and
+     * reflection-mapped types, for annotations in positions other than variable, method,
+     * and class declarations, and for annotations whose values cannot be unambiguously
+     * located on the declaration (e.g. repeated annotations, which javac stores under
+     * their container type).
      *
      * @return the constant value, or {@code null} when this value does not represent a
      * determinable constant.
      */
     public @Nullable Object getConstantValue() {
-        if (getKind() == Kind.LITERAL) {
-            return ((J.Literal) unwrapped()).getValue();
+        switch (getKind()) {
+            case LITERAL:
+                return ((J.Literal) unwrapped()).getValue();
+            case CONSTANT_REFERENCE:
+            case EXPRESSION:
+                return foldedConstantValue();
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Resolves the compiler's constant fold for this value from the annotated
+     * declaration's type attribution. Element values are not carried by
+     * {@code J.Annotation#getType()} at the use site; they live on the annotated
+     * element's {@link JavaType.Variable}/{@link JavaType.Method}/{@link JavaType.FullyQualified}.
+     */
+    private @Nullable Object foldedConstantValue() {
+        // walk up to the enclosing annotation, recording the attribute name and the
+        // position of this value inside an array initializer
+        String attributeName = null;
+        int index = -1;
+        Cursor annotationCursor = null;
+        Tree child = cursor.getValue();
+        for (Cursor c = cursor.getParentTreeCursor(); !c.isRoot(); c = c.getParentTreeCursor()) {
+            Object value = c.getValue();
+            if (value instanceof J.Annotation) {
+                annotationCursor = c;
+                break;
+            }
+            if (value instanceof J.Assignment) {
+                Expression variable = ((J.Assignment) value).getVariable();
+                if (!(variable instanceof J.Identifier)) {
+                    return null;
+                }
+                attributeName = ((J.Identifier) variable).getSimpleName();
+            } else if (value instanceof J.NewArray) {
+                if (index != -1) {
+                    // annotation values cannot contain nested array initializers
+                    return null;
+                }
+                List<Expression> initializer = ((J.NewArray) value).getInitializer();
+                if (initializer == null) {
+                    return null;
+                }
+                int i = 0;
+                int found = -1;
+                for (Expression element : initializer) {
+                    if (element == child) {
+                        found = i;
+                        break;
+                    }
+                    if (!(element instanceof J.Empty)) {
+                        i++;
+                    }
+                }
+                if (found == -1) {
+                    return null;
+                }
+                index = found;
+            } else if (!(value instanceof J.Parentheses)) {
+                return null;
+            }
+            child = (Tree) value;
+        }
+        if (annotationCursor == null) {
+            return null;
+        }
+        J.Annotation annotation = annotationCursor.getValue();
+        JavaType.FullyQualified annotationType = TypeUtils.asFullyQualified(annotation.getType());
+        if (annotationType == null) {
+            return null;
+        }
+
+        List<JavaType.FullyQualified> declaredAnnotations = declaredAnnotations(annotationCursor.getParentTreeCursor().getValue());
+        if (declaredAnnotations == null) {
+            return null;
+        }
+        JavaType.Annotation match = null;
+        for (JavaType.FullyQualified declared : declaredAnnotations) {
+            if (declared instanceof JavaType.Annotation &&
+                TypeUtils.fullyQualifiedNamesAreEqual(declared.getFullyQualifiedName(), annotationType.getFullyQualifiedName())) {
+                if (match != null) {
+                    // ambiguous; never risk returning another occurrence's value
+                    return null;
+                }
+                match = (JavaType.Annotation) declared;
+            }
+        }
+        if (match == null) {
+            return null;
+        }
+
+        String attribute = attributeName == null ? "value" : attributeName;
+        for (JavaType.Annotation.ElementValue elementValue : match.getValues()) {
+            JavaType element = elementValue.getElement();
+            if (element instanceof JavaType.Method && attribute.equals(((JavaType.Method) element).getName())) {
+                if (elementValue instanceof JavaType.Annotation.SingleElementValue) {
+                    return index < 0 ?
+                            ((JavaType.Annotation.SingleElementValue) elementValue).getConstantValue() :
+                            null;
+                }
+                if (elementValue instanceof JavaType.Annotation.ArrayElementValue) {
+                    Object[] constantValues = ((JavaType.Annotation.ArrayElementValue) elementValue).getConstantValues();
+                    if (constantValues == null) {
+                        return null;
+                    }
+                    if (index < 0) {
+                        // attribution normalizes the brace-less single-element form to an array
+                        return constantValues.length == 1 ? constantValues[0] : null;
+                    }
+                    return index < constantValues.length ? constantValues[index] : null;
+                }
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static @Nullable List<JavaType.FullyQualified> declaredAnnotations(Object declaration) {
+        if (declaration instanceof J.VariableDeclarations) {
+            for (J.VariableDeclarations.NamedVariable variable : ((J.VariableDeclarations) declaration).getVariables()) {
+                if (variable.getVariableType() != null) {
+                    return variable.getVariableType().getAnnotations();
+                }
+            }
+        } else if (declaration instanceof J.MethodDeclaration) {
+            JavaType.Method methodType = ((J.MethodDeclaration) declaration).getMethodType();
+            return methodType != null ? methodType.getAnnotations() : null;
+        } else if (declaration instanceof J.ClassDeclaration) {
+            JavaType.FullyQualified type = TypeUtils.asFullyQualified(((J.ClassDeclaration) declaration).getType());
+            return type != null ? type.getAnnotations() : null;
         }
         return null;
     }
