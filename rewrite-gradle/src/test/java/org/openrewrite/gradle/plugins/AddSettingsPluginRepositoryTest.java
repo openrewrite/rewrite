@@ -18,10 +18,19 @@ package org.openrewrite.gradle.plugins;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.SourceFile;
+import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.test.TypeValidation;
+
+import java.nio.file.Paths;
+import java.util.Collections;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradleKts;
@@ -709,6 +718,37 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
               }
 
               rootProject.name = "demo"
+              """
+          )
+        );
+    }
+
+    /**
+     * Helper to create settingsGradleKts specs using a GradleParser with empty settingsClasspath.
+     * When settingsClasspath is explicitly set to empty (e.g. no custom plugins in the settings
+     * buildscript), the Gradle API stubs must still be included for correct type attribution.
+     */
+    private static SourceSpecs settingsGradleKtsWithEmptyClasspath(String before) {
+        GradleParser.Builder parser = GradleParser.builder()
+                .kotlinParser(KotlinParser.builder().logCompilationWarningsAndErrors(true))
+                .settingsClasspath(Collections.emptyList());
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", parser, before, null);
+        gradle.path(Paths.get("settings.gradle.kts"));
+        return gradle;
+    }
+
+    @Test
+    void skipWhenExistsGradlePluginPortalKtsWithEmptyClasspath() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
+            .typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()),
+          settingsGradleKtsWithEmptyClasspath(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
               """
           )
         );
