@@ -376,4 +376,52 @@ class CoalescePropertiesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void skipsCoalesceWhenInnerMappingContainsBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new CoalesceProperties(null, null)),
+          yaml(
+            """
+              outer:
+                inner:
+                  java_opts: >-
+                    -Da=1
+                    -Db=2
+                  after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipsCoalesceWhenInnerValueIsBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new CoalesceProperties(null, null)),
+          yaml(
+            """
+              outer:
+                inner: |
+                  line one
+                  line two
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipsCoalesceWhenBlockScalarNestedDeeperInSubEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new CoalesceProperties(null, null)),
+          yaml(
+            """
+              outer:
+                inner:
+                  details:
+                    script: |
+                      echo hello
+              """
+          )
+        );
+    }
 }

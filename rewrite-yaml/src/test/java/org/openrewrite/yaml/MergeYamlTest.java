@@ -3752,4 +3752,45 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Test
+    void overwriteFoldedStripBlockScalarPreservesEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: replaced\n", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: >-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: >-
+                replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void overwriteLiteralKeepBlockScalarPreservesEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml("$", "key: replaced\n", false, null, null, null, null, null)),
+          yaml(
+            """
+              key: |+
+                line one
+                line two
+
+              after: tail
+              """,
+            """
+              key: |+
+                replaced
+
+              after: tail
+              """
+          )
+        );
+    }
 }

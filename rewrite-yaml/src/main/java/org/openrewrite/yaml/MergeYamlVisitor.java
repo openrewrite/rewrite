@@ -380,9 +380,9 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     private Yaml.Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {
-        String s1 = y1.getValue();
-        String s2 = y2.getValue();
-        return !s1.equals(s2) && !acceptTheirs ? y1.withValue(s2) : y1;
+        String s1 = y1.getBody();
+        String s2 = y2.getBody();
+        return !s1.equals(s2) && !acceptTheirs ? y1.withBody(s2) : y1;
     }
 
     /**
