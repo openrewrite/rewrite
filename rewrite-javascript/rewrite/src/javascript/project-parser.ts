@@ -195,6 +195,10 @@ export class ProjectParser {
      * Builds an Autodetect marker from the given source files.
      * Samples all files to detect common formatting styles.
      * Uses dynamic import to avoid circular dependencies.
+     *
+     * When {@code sourceFiles} is empty (e.g. a subset parse that doesn't include any
+     * JS/TS files to sample) the detector yields its built-in defaults rather than
+     * throwing — a less-rich marker, but a safe one.
      */
     async buildAutodetectMarker(sourceFiles: SourceFile[]): Promise<Marker> {
         // Dynamic import to break circular dependency at module load time:
