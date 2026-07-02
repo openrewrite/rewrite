@@ -365,7 +365,6 @@ public interface Yaml extends Tree {
             return out.toString();
         }
 
-        /** {@link #withBody(String, int)} with a 2-space empty-body indent fallback. */
         public Scalar withBody(String newBody) {
             return withBody(newBody, 2);
         }
@@ -373,9 +372,7 @@ public interface Yaml extends Tree {
         /**
          * Returns a copy with the body replaced. For PLAIN and quoted styles, equivalent to
          * {@code withValue(newBody)}. For FOLDED / LITERAL, the block envelope and existing
-         * line-ending convention are preserved; {@code defaultIndentSpaces} is the body indent
-         * width when the source block scalar had an empty body (pass
-         * {@code IndentsStyle.getIndentSize()} to honor the document's configured indent).
+         * line-ending convention are preserved.
          */
         public Scalar withBody(String newBody, int defaultIndentSpaces) {
             if (!isBlockStyle()) {
