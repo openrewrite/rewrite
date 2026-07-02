@@ -27,10 +27,8 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 /**
  * Pins the {@link org.openrewrite.java.trait.AttributeValue} behavior on Kotlin sources:
  * {@code A::class} / {@code A::class.java} class references, and the documented
- * degradations — Kotlin collection literals ({@code K.ListLiteral} is not a
- * {@code J.NewArray}), enum constants (no {@code Flag.Enum} from the Kotlin type
- * mapping), and constant references (no {@code JavaType.Annotation} element values,
- * so no fold).
+ * degradations — no constant folding, no enum discrimination, collection literals as
+ * opaque expressions.
  */
 class AttributeValueTraitTest implements RewriteTest {
 
@@ -93,7 +91,6 @@ class AttributeValueTraitTest implements RewriteTest {
 
     @Test
     void enumConstantDegradesToConstantReference() {
-        // the Kotlin type mapping does not set Flag.Enum on the referenced variable
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
             .asVisitor(a -> SearchResult.found(a.getTree(),

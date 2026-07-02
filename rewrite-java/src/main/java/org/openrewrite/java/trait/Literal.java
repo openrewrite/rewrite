@@ -126,7 +126,6 @@ public class Literal implements Trait<Expression> {
         List<Object> acc = new ArrayList<>();
         for (Expression init : requireNonNull(newArray.getInitializer())) {
             if (init instanceof J.Empty) {
-                // an empty initializer `{}` is represented as a single J.Empty element
                 continue;
             }
             if (init instanceof J.Literal) {
@@ -172,7 +171,6 @@ public class Literal implements Trait<Expression> {
                 }
                 for (Expression expr : init) {
                     if (expr instanceof J.Empty) {
-                        // an empty initializer `{}` is represented as a single J.Empty element
                         continue;
                     }
                     if (!(expr instanceof J.Literal) &&

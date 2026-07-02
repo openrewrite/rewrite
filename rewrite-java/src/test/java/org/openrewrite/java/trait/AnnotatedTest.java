@@ -64,7 +64,6 @@ class AnnotatedTest implements RewriteTest {
 
     @Test
     void attributesViaAttributeValue() {
-        // the mechanical migration of attributes(): getDefaultAttribute -> getDefaultAttributeValue
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new Annotated.Matcher("@Example").asVisitor(a -> SearchResult.found(a.getTree(),
@@ -104,9 +103,6 @@ class AnnotatedTest implements RewriteTest {
 
     @Test
     void oldAccessorFallsThroughToAliasWhenValueIsNotLiteral() {
-        // Documents a deliberate divergence: the Optional<Literal> accessor cannot see a
-        // non-literal `value` attribute and falls through to the alias, while
-        // getDefaultAttributeValue surfaces the `value` attribute in any shape.
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
             new Annotated.Matcher("@Example").asVisitor(a -> SearchResult.found(a.getTree(),

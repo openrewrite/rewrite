@@ -23,11 +23,9 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 /**
- * Pins the {@link org.openrewrite.java.trait.AttributeValue} behavior on Groovy sources.
- * Groovy never populates {@link org.openrewrite.java.tree.JavaType.Annotation} element
- * values, so constant folding degrades to {@code null}; Groovy list literals are
- * {@code G.ListLiteral}, not {@code J.NewArray}, so they classify as
- * {@code Kind.EXPRESSION} without element normalization.
+ * Pins the {@link org.openrewrite.java.trait.AttributeValue} degradations documented
+ * for Groovy sources: no constant folding, no enum discrimination, list literals as
+ * opaque expressions.
  */
 class AttributeValueTraitTest implements RewriteTest {
 
@@ -126,8 +124,6 @@ class AttributeValueTraitTest implements RewriteTest {
 
     @Test
     void bareClassReferenceDegradesToConstantReference() {
-        // idiomatic Groovy `type = String` (no `.class`) parses as a plain type tree,
-        // invisible to the class-literal channel
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
             .asVisitor(a -> SearchResult.found(a.getTree(),
@@ -159,7 +155,6 @@ class AttributeValueTraitTest implements RewriteTest {
 
     @Test
     void enumConstantDegradesToConstantReference() {
-        // the Groovy type mapping does not set Flag.Enum on the referenced variable
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
             .asVisitor(a -> SearchResult.found(a.getTree(),

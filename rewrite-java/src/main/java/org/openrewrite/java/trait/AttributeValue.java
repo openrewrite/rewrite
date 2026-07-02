@@ -102,7 +102,7 @@ public class AttributeValue implements Trait<Expression> {
     public Kind getKind() {
         Expression e = unwrapped();
         if (e instanceof J.Literal) {
-            // note: `-1` parses as a single J.Literal, not a J.Unary
+            // `-1` parses as a single J.Literal, not a J.Unary
             return Kind.LITERAL;
         }
         if (e instanceof J.NewArray) {
@@ -158,17 +158,6 @@ public class AttributeValue implements Trait<Expression> {
     public boolean isClassLiteral(String fullyQualifiedName) {
         JavaType.FullyQualified fq = TypeUtils.asFullyQualified(getClassValue());
         return fq != null && TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fullyQualifiedName);
-    }
-
-    /**
-     * @return {@code true} if this value references an enum constant, in any spelling.
-     * Requires type attribution that sets {@link Flag#Enum} on the referenced field —
-     * without it (unattributed sources, but also Groovy and Kotlin sources, whose type
-     * mappings do not set the flag) enum constants are indistinguishable from other
-     * constant references and classify as {@link Kind#CONSTANT_REFERENCE}.
-     */
-    public boolean isEnumConstant() {
-        return getKind() == Kind.ENUM_CONSTANT;
     }
 
     /**
@@ -319,7 +308,7 @@ public class AttributeValue implements Trait<Expression> {
      * @return the static field referenced by this value when it is an enum constant or a
      * constant reference: the variable's {@code owner} is the declaring type and its
      * {@code name} the constant's name — identical across the qualified, fully qualified,
-     * and statically imported spellings. Distinguish enums via {@link #isEnumConstant()}.
+     * and statically imported spellings. Distinguish enums via {@link #isEnumConstant(String, String)}.
      * {@code null} when this value is not a reference or attribution is missing; class
      * literals return {@code null} here (their synthetic {@code Variable{name="class"}}
      * is deliberately hidden — use {@link #getClassValue()}).
@@ -340,27 +329,7 @@ public class AttributeValue implements Trait<Expression> {
     }
 
     /**
-     * The compile-time constant represented by this value, if one can be determined:
-     * <ul>
-     *   <li>a {@link J.Literal}'s value directly;</li>
-     *   <li>for constant references and constant expressions ({@code Constants.NAME},
-     *       a statically imported {@code NAME}, {@code "a" + "b"}), the constant the
-     *       compiler folded into the {@link JavaType.Annotation.ElementValue}s on the
-     *       annotated declaration's type attribution — best-effort, see below.</li>
-     * </ul>
-     * Enum constants, class literals, nested annotations, and arrays are references or
-     * containers, not constants — use {@link #getReferencedField()},
-     * {@link #getClassValue()}, {@link #asAnnotated()}, or {@link #getElements()} for those.
-     * <p>
-     * The constant fold is only available where the parser records
-     * {@link JavaType.Annotation} element values on the annotated declaration: sources
-     * attributed by javac (including constants from binary dependencies). It is
-     * unavailable — and this method returns {@code null} — for Groovy and Kotlin sources
-     * and reflection-mapped types (none of which build element values), for annotations
-     * in positions other than variable, method, and class declarations, and for
-     * annotations whose values cannot be unambiguously located on the declaration
-     * (e.g. repeated annotations, which javac stores under their container type).
-     *
+     * The compile-time constant represented by this value, if one can be determined.
      * @return the constant value, or {@code null} when this value does not represent a
      * determinable constant.
      */
@@ -377,14 +346,9 @@ public class AttributeValue implements Trait<Expression> {
     }
 
     /**
-     * Resolves the compiler's constant fold for this value from the annotated
-     * declaration's type attribution. Element values are not carried by
-     * {@code J.Annotation#getType()} at the use site; they live on the annotated
-     * element's {@link JavaType.Variable}/{@link JavaType.Method}/{@link JavaType.FullyQualified}.
+     * Resolves the compiler's constant fold for this value from the annotated declaration's type attribution.
      */
     private @Nullable Object foldedConstantValue() {
-        // walk up to the enclosing annotation, recording the attribute name and the
-        // position of this value inside an array initializer
         String attributeName = null;
         int index = -1;
         Cursor annotationCursor = null;
@@ -439,9 +403,6 @@ public class AttributeValue implements Trait<Expression> {
             return null;
         }
 
-        // an annotation written after a modifier parents under J.Modifier or J.AnnotatedType
-        // rather than directly under the declaration (`private @Foo String f;`); skip only
-        // these wrappers so deeper nestings (type arguments etc.) still bail to null
         Cursor declarationCursor = annotationCursor.getParentTreeCursor();
         while (declarationCursor.getValue() instanceof J.Modifier ||
                declarationCursor.getValue() instanceof J.AnnotatedType) {
@@ -456,7 +417,7 @@ public class AttributeValue implements Trait<Expression> {
             if (declared instanceof JavaType.Annotation &&
                 TypeUtils.fullyQualifiedNamesAreEqual(declared.getFullyQualifiedName(), annotationType.getFullyQualifiedName())) {
                 if (match != null) {
-                    // ambiguous; never risk returning another occurrence's value
+                    // ambiguous
                     return null;
                 }
                 match = (JavaType.Annotation) declared;
