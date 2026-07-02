@@ -33,10 +33,13 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -48,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Spliterator;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -427,6 +431,7 @@ public class GoRewriteRpc extends RewriteRpc {
             }
             process.setStderrRedirect(log);
             process.environment().putAll(environment);
+            ensureGoRoot(process.environment());
             process.start();
 
             try {
@@ -440,5 +445,58 @@ public class GoRewriteRpc extends RewriteRpc {
                 throw new UncheckedIOException(e);
             }
         }
+    }
+
+    private static volatile boolean goRootResolved;
+    private static volatile @Nullable String resolvedGoRoot;
+
+    // The RPC binary is built with `-trimpath`, which strips its baked-in
+    // GOROOT. Without GOROOT the parser's go/types importer can't resolve the
+    // stdlib, so every J.MethodInvocation loses its JavaType.Method. If nothing
+    // else supplies GOROOT, discover it from the host toolchain and pass it in.
+    private static void ensureGoRoot(Map<String, String> env) {
+        String parent = System.getenv("GOROOT");
+        if (env.containsKey("GOROOT") || (parent != null && !parent.trim().isEmpty())) {
+            return;
+        }
+        String goRoot = discoverGoRoot();
+        if (goRoot != null) {
+            env.put("GOROOT", goRoot);
+        }
+    }
+
+    private static @Nullable String discoverGoRoot() {
+        if (!goRootResolved) {
+            synchronized (GoRewriteRpc.class) {
+                if (!goRootResolved) {
+                    resolvedGoRoot = queryGoEnvGoRoot();
+                    goRootResolved = true;
+                }
+            }
+        }
+        return resolvedGoRoot;
+    }
+
+    private static @Nullable String queryGoEnvGoRoot() {
+        try {
+            Process p = new ProcessBuilder("go", "env", "GOROOT").start();
+            String line;
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+                line = reader.readLine();
+            }
+            if (!p.waitFor(10, TimeUnit.SECONDS)) {
+                p.destroyForcibly();
+                return null;
+            }
+            if (p.exitValue() == 0 && line != null && !line.trim().isEmpty()) {
+                return line.trim();
+            }
+        } catch (IOException ignored) {
+            // `go` not on PATH — nothing to inject; behavior is unchanged.
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return null;
     }
 }
