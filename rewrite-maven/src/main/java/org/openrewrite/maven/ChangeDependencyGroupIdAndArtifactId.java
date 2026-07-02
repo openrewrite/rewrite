@@ -440,7 +440,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             }
 
             private boolean canAffectManagedDependency(MavenResolutionResult result, Scope scope, String groupId, String artifactId) {
-                // We're only going to be able to effect managed dependencies that are either direct or are brought in as direct via a local parent
+                // We're only going to be able to affect managed dependencies that are either direct or are brought in as direct via a local parent
                 // `ChangeManagedDependencyGroupIdAndArtifactId` cannot manipulate BOM imported managed dependencies nor direct dependencies from remote parents
                 Pom requestedPom = result.getPom().getRequested();
                 for (ManagedDependency requestedManagedDependency : requestedPom.getDependencyManagement()) {
