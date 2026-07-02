@@ -23,7 +23,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.yaml.MergeYaml.InsertMode;
-import org.openrewrite.yaml.internal.BlockScalarUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
@@ -381,9 +380,9 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     private Yaml.Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {
-        String s1 = BlockScalarUtils.getBody(y1);
-        String s2 = BlockScalarUtils.getBody(y2);
-        return !s1.equals(s2) && !acceptTheirs ? BlockScalarUtils.withBody(y1, s2) : y1;
+        String s1 = y1.getBody();
+        String s2 = y2.getBody();
+        return !s1.equals(s2) && !acceptTheirs ? y1.withBody(s2) : y1;
     }
 
     /**
