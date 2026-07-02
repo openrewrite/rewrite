@@ -310,10 +310,9 @@ public interface Yaml extends Tree {
 
         /**
          * For FOLDED/LITERAL scalars this includes the chomp indicator, header newline,
-         * indented body, and trailing whitespace bounding the next sibling — so the
-         * Lombok-generated {@code withValue} cannot safely rewrite a block scalar's body.
-         * Use {@link #getBody()} / {@link #withBody(String)} to mutate the body without
-         * clobbering the block envelope.
+         * indented body, and trailing whitespace bounding the next sibling; use
+         * {@link #getBody()} / {@link #withBody(String)} to mutate without clobbering the
+         * block envelope.
          */
         String value;
 
@@ -326,11 +325,9 @@ public interface Yaml extends Tree {
         }
 
         /**
-         * Returns the body content of this scalar, stripped of any style-specific envelope.
-         * For PLAIN and quoted styles this returns {@link #value} verbatim. For FOLDED and
-         * LITERAL styles the body is dedented to column zero with interior line breaks
-         * normalized to {@code \n} (so callers can compare or regex against it irrespective
-         * of the file's CRLF/LF convention).
+         * Returns {@link #value} for PLAIN and quoted styles. For FOLDED / LITERAL, returns
+         * the body dedented to column zero with interior line breaks normalized to {@code \n}
+         * regardless of the source file's line-ending convention.
          */
         public String getBody() {
             if (!isBlockStyle()) {
@@ -374,13 +371,11 @@ public interface Yaml extends Tree {
         }
 
         /**
-         * Returns a copy of this scalar with its body replaced by {@code newBody}. For PLAIN
-         * and quoted styles this just sets {@link #value} (via the Lombok-generated
-         * {@code withValue}); for block styles the chomp indicator, header newline, body
-         * indent, and trailing whitespace are preserved, and each line of {@code newBody} is
-         * emitted in the existing value's line-ending convention. {@code defaultIndentSpaces}
-         * is used as the body indent width when the existing block scalar has an empty body —
-         * pass an {@code IndentsStyle#getIndentSize()} to honor the document's configured indent.
+         * Returns a copy with the body replaced. For PLAIN and quoted styles, equivalent to
+         * {@code withValue(newBody)}. For FOLDED / LITERAL, the block envelope and existing
+         * line-ending convention are preserved; {@code defaultIndentSpaces} is the body indent
+         * width when the source block scalar had an empty body (pass
+         * {@code IndentsStyle.getIndentSize()} to honor the document's configured indent).
          */
         public Scalar withBody(String newBody, int defaultIndentSpaces) {
             if (!isBlockStyle()) {
