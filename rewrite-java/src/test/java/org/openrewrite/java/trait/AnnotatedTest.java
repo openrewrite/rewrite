@@ -63,6 +63,88 @@ class AnnotatedTest implements RewriteTest {
     }
 
     @Test
+    void attributesViaAttributeValue() {
+        // the mechanical migration of attributes(): getDefaultAttribute -> getDefaultAttributeValue
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new Annotated.Matcher("@Example").asVisitor(a -> SearchResult.found(a.getTree(),
+              a.getDefaultAttributeValue("name")
+                .map(v -> v.getValue(String.class))
+                .orElse("unknown"))
+            )
+          )),
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              @Repeatable
+              @interface Example {
+                  String value() default "";
+                  String name() default "";
+              }
+              """
+          ),
+          java(
+            """
+              @Example("test")
+              @Example(value = "test")
+              @Example(name = "test")
+              class Test {
+              }
+              """,
+            """
+              /*~~(test)~~>*/@Example("test")
+              /*~~(test)~~>*/@Example(value = "test")
+              /*~~(test)~~>*/@Example(name = "test")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void oldAccessorFallsThroughToAliasWhenValueIsNotLiteral() {
+        // Documents a deliberate divergence: the Optional<Literal> accessor cannot see a
+        // non-literal `value` attribute and falls through to the alias, while
+        // getDefaultAttributeValue surfaces the `value` attribute in any shape.
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new Annotated.Matcher("@Example").asVisitor(a -> SearchResult.found(a.getTree(),
+              "old=" + a.getDefaultAttribute("alias").map(lit -> lit.getValue(String.class)).orElse("empty") +
+              ":new=" + a.getDefaultAttributeValue("alias").map(v -> v.getKind().toString()).orElse("empty"))
+            )
+          )),
+          java(
+            """
+              class Constants {
+                  static final String NAME = "n";
+              }
+              """
+          ),
+          java(
+            """
+              @interface Example {
+                  String value() default "";
+                  String alias() default "";
+              }
+              """
+          ),
+          java(
+            """
+              @Example(value = Constants.NAME, alias = "x")
+              class Test {
+              }
+              """,
+            """
+              /*~~(old=x:new=CONSTANT_REFERENCE)~~>*/@Example(value = Constants.NAME, alias = "x")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void emptyArrayAttribute() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->

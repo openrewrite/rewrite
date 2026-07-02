@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.AnnotationMatcher;
@@ -34,6 +35,61 @@ import java.util.Optional;
 @Value
 public class Annotated implements Trait<J.Annotation> {
     Cursor cursor;
+
+    /**
+     * The value of the given attribute in any syntactic shape — literal, class literal,
+     * enum constant, constant reference, nested annotation, or array of these.
+     * <p>
+     * {@code getAttributeValue("value")} also matches a positional argument, since
+     * {@code @Foo("x")} is shorthand for {@code @Foo(value = "x")}.
+     *
+     * @param attribute The name of the annotation attribute.
+     * @return The attribute's value, or empty when the attribute is not explicitly
+     * present in the source. Defaults declared on the annotation type are not resolved.
+     */
+    @Incubating(since = "8.87.0")
+    public Optional<AttributeValue> getAttributeValue(String attribute) {
+        if (getTree().getArguments() == null) {
+            return Optional.empty();
+        }
+        for (Expression argument : getTree().getArguments()) {
+            if (argument instanceof J.Assignment) {
+                J.Assignment assignment = (J.Assignment) argument;
+                if (assignment.getVariable() instanceof J.Identifier &&
+                    ((J.Identifier) assignment.getVariable()).getSimpleName().equals(attribute)) {
+                    return new AttributeValue.Matcher().get(
+                            assignment.getAssignment(),
+                            new Cursor(cursor, argument)
+                    );
+                }
+            } else if ("value".equals(attribute)) {
+                return new AttributeValue.Matcher().get(argument, cursor);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Like {@link #getAttributeValue(String)}, but for the implicit {@code value}
+     * attribute: returns the positional argument if present, then the explicit
+     * {@code value} attribute, then the given alias. "Default" refers to the implicit
+     * value element (JLS §9.7.3), not to defaults declared on the annotation type —
+     * those are never resolved.
+     *
+     * @param defaultAlias The name of the annotation attribute that is aliased to
+     *                     "value", if any.
+     * @return The attribute value in any syntactic shape.
+     */
+    @Incubating(since = "8.87.0")
+    public Optional<AttributeValue> getDefaultAttributeValue(@Nullable String defaultAlias) {
+        Optional<AttributeValue> valueAttr = getAttributeValue("value");
+        if (valueAttr.isPresent()) {
+            return valueAttr;
+        }
+        return defaultAlias != null ?
+                getAttributeValue(defaultAlias) :
+                Optional.empty();
+    }
 
     /**
      * @param defaultAlias The name of the annotation attribute that is aliased to
