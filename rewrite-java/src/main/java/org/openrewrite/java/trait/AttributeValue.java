@@ -57,7 +57,11 @@ import static java.util.Collections.singletonList;
  * distinction between enum constants and other constant references requires attribution
  * ({@link Flag#Enum} on the referenced {@link JavaType.Variable}). Unattributed references
  * degrade to {@link Kind#CONSTANT_REFERENCE} with a {@code null}
- * {@link #getReferencedField()}.
+ * {@link #getReferencedField()}. The same degradation applies on Groovy and Kotlin
+ * sources, whose type mappings do not set {@link Flag#Enum}: there enum constants always
+ * classify as {@link Kind#CONSTANT_REFERENCE}. Groovy and Kotlin list literals are not
+ * {@link J.NewArray} and classify as {@link Kind#EXPRESSION} without element
+ * normalization.
  * <p>
  * The trait is cursor-bearing: {@link #getTree()} / {@link #getCursor()} give recipes the
  * exact expression to edit, and for arrays {@link #getElements()} yields one cursor-bearing
@@ -158,8 +162,10 @@ public class AttributeValue implements Trait<Expression> {
 
     /**
      * @return {@code true} if this value references an enum constant, in any spelling.
-     * Requires type attribution; without it enum constants are indistinguishable from
-     * other constant references and classify as {@link Kind#CONSTANT_REFERENCE}.
+     * Requires type attribution that sets {@link Flag#Enum} on the referenced field —
+     * without it (unattributed sources, but also Groovy and Kotlin sources, whose type
+     * mappings do not set the flag) enum constants are indistinguishable from other
+     * constant references and classify as {@link Kind#CONSTANT_REFERENCE}.
      */
     public boolean isEnumConstant() {
         return getKind() == Kind.ENUM_CONSTANT;
@@ -349,11 +355,11 @@ public class AttributeValue implements Trait<Expression> {
      * The constant fold is only available where the parser records
      * {@link JavaType.Annotation} element values on the annotated declaration: sources
      * attributed by javac (including constants from binary dependencies). It is
-     * unavailable — and this method returns {@code null} — for Groovy sources and
-     * reflection-mapped types, for annotations in positions other than variable, method,
-     * and class declarations, and for annotations whose values cannot be unambiguously
-     * located on the declaration (e.g. repeated annotations, which javac stores under
-     * their container type).
+     * unavailable — and this method returns {@code null} — for Groovy and Kotlin sources
+     * and reflection-mapped types (none of which build element values), for annotations
+     * in positions other than variable, method, and class declarations, and for
+     * annotations whose values cannot be unambiguously located on the declaration
+     * (e.g. repeated annotations, which javac stores under their container type).
      *
      * @return the constant value, or {@code null} when this value does not represent a
      * determinable constant.
@@ -433,7 +439,15 @@ public class AttributeValue implements Trait<Expression> {
             return null;
         }
 
-        List<JavaType.FullyQualified> declaredAnnotations = declaredAnnotations(annotationCursor.getParentTreeCursor().getValue());
+        // an annotation written after a modifier parents under J.Modifier or J.AnnotatedType
+        // rather than directly under the declaration (`private @Foo String f;`); skip only
+        // these wrappers so deeper nestings (type arguments etc.) still bail to null
+        Cursor declarationCursor = annotationCursor.getParentTreeCursor();
+        while (declarationCursor.getValue() instanceof J.Modifier ||
+               declarationCursor.getValue() instanceof J.AnnotatedType) {
+            declarationCursor = declarationCursor.getParentTreeCursor();
+        }
+        List<JavaType.FullyQualified> declaredAnnotations = declaredAnnotations(declarationCursor.getValue());
         if (declaredAnnotations == null) {
             return null;
         }

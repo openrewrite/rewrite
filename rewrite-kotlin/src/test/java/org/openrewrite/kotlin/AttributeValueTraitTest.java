@@ -26,8 +26,11 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 /**
  * Pins the {@link org.openrewrite.java.trait.AttributeValue} behavior on Kotlin sources:
- * {@code A::class} class references, and the degradation of Kotlin collection literals
- * ({@code K.ListLiteral} is not a {@code J.NewArray}).
+ * {@code A::class} / {@code A::class.java} class references, and the documented
+ * degradations — Kotlin collection literals ({@code K.ListLiteral} is not a
+ * {@code J.NewArray}), enum constants (no {@code Flag.Enum} from the Kotlin type
+ * mapping), and constant references (no {@code JavaType.Annotation} element values,
+ * so no fold).
  */
 class AttributeValueTraitTest implements RewriteTest {
 
@@ -57,6 +60,130 @@ class AttributeValueTraitTest implements RewriteTest {
               annotation class Example(val clazz: KClass<*>)
 
               /*~~(CLASS_LITERAL:kotlin.String)~~>*/@Example(clazz = String::class)
+              class Test
+              """
+          )
+        );
+    }
+
+    @Test
+    void implicitValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
+            .asVisitor(a -> SearchResult.found(a.getTree(),
+              a.getDefaultAttributeValue(null)
+                .map(v -> v.getKind() + ":" + v.getConstantValue())
+                .orElse("missing"))))),
+          kotlin(
+            """
+              annotation class Example(val name: String)
+
+              @Example("x")
+              class Test
+              """,
+            """
+              annotation class Example(val name: String)
+
+              /*~~(LITERAL:x)~~>*/@Example("x")
+              class Test
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantDegradesToConstantReference() {
+        // the Kotlin type mapping does not set Flag.Enum on the referenced variable
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
+            .asVisitor(a -> SearchResult.found(a.getTree(),
+              a.getAttributeValue("e")
+                .map(v -> v.getKind() + ":isEnum=" + v.isEnumConstant("E", "ONE"))
+                .orElse("missing"))))),
+          kotlin(
+            """
+              enum class E {
+                  ONE, TWO
+              }
+
+              annotation class Example(val e: E)
+
+              @Example(e = E.ONE)
+              class Test
+              """,
+            """
+              enum class E {
+                  ONE, TWO
+              }
+
+              annotation class Example(val e: E)
+
+              /*~~(CONSTANT_REFERENCE:isEnum=false)~~>*/@Example(e = E.ONE)
+              class Test
+              """
+          )
+        );
+    }
+
+    @Test
+    void classReferenceViaClassJava() {
+        rewriteRun(
+          spec -> spec
+            .recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@org.junit.jupiter.api.extension.ExtendWith")
+              .asVisitor(a -> SearchResult.found(a.getTree(),
+                a.getDefaultAttributeValue(null)
+                  .map(v -> {
+                      JavaType.FullyQualified fq = TypeUtils.asFullyQualified(v.getClassValue());
+                      return v.getKind() + ":" + (fq != null ? fq.getFullyQualifiedName() : "null");
+                  })
+                  .orElse("missing")))))
+            .parser(KotlinParser.builder().classpath("junit-jupiter-api")),
+          kotlin(
+            """
+              import org.junit.jupiter.api.extension.ExtendWith
+              import org.junit.jupiter.api.extension.Extension
+
+              @ExtendWith(Extension::class.java)
+              class Test
+              """,
+            """
+              import org.junit.jupiter.api.extension.ExtendWith
+              import org.junit.jupiter.api.extension.Extension
+
+              /*~~(CLASS_LITERAL:org.junit.jupiter.api.extension.Extension)~~>*/@ExtendWith(Extension::class.java)
+              class Test
+              """
+          )
+        );
+    }
+
+    @Test
+    void constantReferenceDoesNotFold() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
+            .asVisitor(a -> SearchResult.found(a.getTree(),
+              a.getAttributeValue("name")
+                .map(v -> v.getKind() + ":" + v.getConstantValue())
+                .orElse("missing"))))),
+          kotlin(
+            """
+              object Constants {
+                  const val NAME = "n"
+              }
+
+              annotation class Example(val name: String)
+
+              @Example(name = Constants.NAME)
+              class Test
+              """,
+            """
+              object Constants {
+                  const val NAME = "n"
+              }
+
+              annotation class Example(val name: String)
+
+              /*~~(CONSTANT_REFERENCE:null)~~>*/@Example(name = Constants.NAME)
               class Test
               """
           )

@@ -125,6 +125,79 @@ class AttributeValueTraitTest implements RewriteTest {
     }
 
     @Test
+    void bareClassReferenceDegradesToConstantReference() {
+        // idiomatic Groovy `type = String` (no `.class`) parses as a plain type tree,
+        // invisible to the class-literal channel
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
+            .asVisitor(a -> SearchResult.found(a.getTree(),
+              a.getAttributeValue("type")
+                .map(v -> v.getKind() + ":field=" + (v.getReferencedField() != null) + ":class=" + (v.getClassValue() != null))
+                .orElse("missing"))))),
+          groovy(
+            """
+              @interface Example {
+                  Class type()
+              }
+
+              @Example(type = String)
+              class Test {
+              }
+              """,
+            """
+              @interface Example {
+                  Class type()
+              }
+
+              /*~~(CONSTANT_REFERENCE:field=false:class=false)~~>*/@Example(type = String)
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstantDegradesToConstantReference() {
+        // the Groovy type mapping does not set Flag.Enum on the referenced variable
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
+            .asVisitor(a -> SearchResult.found(a.getTree(),
+              a.getAttributeValue("e")
+                .map(v -> v.getKind() + ":isEnum=" + v.isEnumConstant("E", "ONE"))
+                .orElse("missing"))))),
+          groovy(
+            """
+              enum E {
+                  ONE, TWO
+              }
+
+              @interface Example {
+                  E e()
+              }
+
+              @Example(e = E.ONE)
+              class Test {
+              }
+              """,
+            """
+              enum E {
+                  ONE, TWO
+              }
+
+              @interface Example {
+                  E e()
+              }
+
+              /*~~(CONSTANT_REFERENCE:isEnum=false)~~>*/@Example(e = E.ONE)
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void constantReferenceDoesNotFold() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")

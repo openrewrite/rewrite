@@ -221,7 +221,7 @@ class AttributeValueTest implements RewriteTest {
     void classLiteralArrayAndBracelessForm() {
         rewriteRun(
           spec -> spec.recipe(describeAttribute("@com.x.Example", "exclude",
-            v -> v.getKind() + ":array=" + v.isArray() + ":" + v.getElements().stream()
+            v -> v.getKind() + ":array=" + v.isArray() + ":asLiteral=" + v.asLiteral().isPresent() + ":" + v.getElements().stream()
               .map(e -> e.getKind() + "/" + e.isClassLiteral("com.x.A") + "/" + e.getName())
               .collect(Collectors.joining(",")))),
           java(
@@ -269,15 +269,15 @@ class AttributeValueTest implements RewriteTest {
               import com.x.B;
               import com.x.Example;
 
-              /*~~(ARRAY:array=true:CLASS_LITERAL/true/exclude,CLASS_LITERAL/false/exclude)~~>*/@Example(exclude = {A.class, B.class})
+              /*~~(ARRAY:array=true:asLiteral=false:CLASS_LITERAL/true/exclude,CLASS_LITERAL/false/exclude)~~>*/@Example(exclude = {A.class, B.class})
               class Test1 {
               }
 
-              /*~~(CLASS_LITERAL:array=false:CLASS_LITERAL/true/exclude)~~>*/@Example(exclude = A.class)
+              /*~~(CLASS_LITERAL:array=false:asLiteral=false:CLASS_LITERAL/true/exclude)~~>*/@Example(exclude = A.class)
               class Test2 {
               }
 
-              /*~~(ARRAY:array=true:)~~>*/@Example(exclude = {})
+              /*~~(ARRAY:array=true:asLiteral=true:)~~>*/@Example(exclude = {})
               class Test3 {
               }
               """
@@ -657,6 +657,10 @@ class AttributeValueTest implements RewriteTest {
                   @Example(name = Constants.NAME)
                   String field;
 
+                  private @Example(name = Constants.NAME) String afterModifier;
+
+                  static @Example(name = Constants.NAME) final String betweenModifiers = "x";
+
                   @Example(name = Constants.NAME)
                   void method(@Example(count = Integer.MAX_VALUE) int param) {
                   }
@@ -667,9 +671,61 @@ class AttributeValueTest implements RewriteTest {
                   /*~~(name=n)~~>*/@Example(name = Constants.NAME)
                   String field;
 
+                  private /*~~(name=n)~~>*/@Example(name = Constants.NAME) String afterModifier;
+
+                  static /*~~(name=n)~~>*/@Example(name = Constants.NAME) final String betweenModifiers = "x";
+
                   /*~~(name=n)~~>*/@Example(name = Constants.NAME)
                   void method(/*~~(count=2147483647)~~>*/@Example(count = Integer.MAX_VALUE) int param) {
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void foldsPositionalAndBracelessArrayValues() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
+            .asVisitor(a -> SearchResult.found(a.getTree(),
+              a.getDefaultAttributeValue(null)
+                .map(v -> String.valueOf(v.getConstantValue()))
+                .orElseGet(() -> a.getAttributeValue("tags")
+                  .map(v -> "tags=" + v.getConstantValue())
+                  .orElse("missing")))))),
+          java(
+            """
+              @interface Example {
+                  String value() default "";
+                  String[] tags() default {};
+              }
+              """
+          ),
+          java(
+            """
+              class Constants {
+                  static final String NAME = "n";
+              }
+              """
+          ),
+          java(
+            """
+              @Example(Constants.NAME)
+              class Test1 {
+              }
+
+              @Example(tags = Constants.NAME)
+              class Test2 {
+              }
+              """,
+            """
+              /*~~(n)~~>*/@Example(Constants.NAME)
+              class Test1 {
+              }
+
+              /*~~(tags=n)~~>*/@Example(tags = Constants.NAME)
+              class Test2 {
               }
               """
           )
