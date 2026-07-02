@@ -39,6 +39,7 @@ export {
     or,
     not,
     capture,
+    DerivedCapture,
     any,
     param,
     raw,

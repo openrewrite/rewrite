@@ -19,7 +19,7 @@ import {JS} from '..';
 import {JavaScriptVisitor} from '../visitor';
 import {create as produce} from 'mutative';
 import {PlaceholderUtils} from './utils';
-import {CaptureImpl, TemplateParamImpl, CaptureValue, CAPTURE_NAME_SYMBOL} from './capture';
+import {CaptureImpl, TemplateParamImpl, CaptureValue, DerivedCapture, CAPTURE_NAME_SYMBOL, DERIVED_CAPTURE_SYMBOL, RawCode, RAW_CODE_SYMBOL} from './capture';
 import {Parameter} from './types';
 
 /**
@@ -393,6 +393,35 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             }
 
             // If no match found or unhandled type, return placeholder unchanged
+            return placeholder;
+        }
+
+        // Check if the parameter value is a DerivedCapture
+        const isDerivedCapture = param.value instanceof DerivedCapture ||
+            (param.value && typeof param.value === 'object' && param.value[DERIVED_CAPTURE_SYMBOL]);
+
+        if (isDerivedCapture) {
+            const derived = param.value as DerivedCapture;
+            const sourceName = derived.source.getName();
+            const sourceNode = this.values.get(sourceName);
+            if (sourceNode !== undefined) {
+                const transformed = derived.transform(sourceNode as J | J[]);
+                // If transform returns RawCode, create an Identifier from the code string
+                if (transformed instanceof RawCode || (transformed && typeof transformed === 'object' && (transformed as any)[RAW_CODE_SYMBOL])) {
+                    const rawCode = transformed as RawCode;
+                    return produce(placeholder as J.Identifier, draft => {
+                        draft.simpleName = rawCode.code;
+                        draft.prefix = placeholder.prefix;
+                    });
+                }
+                // Otherwise it's a J node — use it directly
+                if (isTree(transformed)) {
+                    return produce(transformed as J, draft => {
+                        draft.markers = placeholder.markers;
+                        draft.prefix = this.mergePrefix((transformed as J).prefix, placeholder.prefix);
+                    });
+                }
+            }
             return placeholder;
         }
 
