@@ -33,8 +33,7 @@ public sealed class SearchResult(Guid id, string? description) : Marker, IRpcCod
     public static T Found<T>(T tree, string? description = null) where T : Tree
     {
         var newMarkers = tree.Markers.Add(new SearchResult(Guid.NewGuid(), description));
-        var withMarkers = tree.GetType().GetMethod("WithMarkers", [typeof(Markers)]);
-        return withMarkers != null ? (T)withMarkers.Invoke(tree, [newMarkers])! : tree;
+        return (T)(object)((dynamic)tree).WithMarkers(newMarkers);
     }
 
     public void RpcSend(SearchResult after, RpcSendQueue q)

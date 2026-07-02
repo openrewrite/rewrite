@@ -51,6 +51,8 @@ public sealed class ExpressionStatement(
     // ExpressionStatement delegates prefix/markers to its expression
     public Space Prefix => Expression.Prefix;
     public Markers Markers => Expression.Markers;
+    public ExpressionStatement WithMarkers(Markers markers) =>
+        new(Id, (Expression)((dynamic)Expression).WithMarkers(markers));
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
