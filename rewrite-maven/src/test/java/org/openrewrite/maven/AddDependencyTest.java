@@ -2264,6 +2264,57 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void doesNotDuplicateWhenManagedVersionExceedsSemverSelector() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:28.X", "com.google.common.math.IntMath")),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>33.5.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject(
+            "server",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void doesNotDuplicateWhenManagedVersionSatisfiesSemverSelector() {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:28.X", "com.google.common.math.IntMath")),
