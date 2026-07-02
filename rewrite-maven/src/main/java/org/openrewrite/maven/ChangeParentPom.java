@@ -173,7 +173,6 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
 
     public static class Accumulator {
         @Nullable MavenResolutionResult updatedRootMarker;
-        @Nullable MavenDownloadingException scannerException;
         final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> gavToOriginalMarker = new HashMap<>();
         final Map<ResolvedGroupArtifactVersion, MavenResolutionResult> gavToNewMarker = new HashMap<>();
 
@@ -296,20 +295,33 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                                 return document;
                             }
 
-                            // Pre-compute the updated MavenResolutionResult with the new parent info
+                            // Pre-compute the updated MavenResolutionResult with the new parent info.
+                            // Attempt a deep resolve so that descendant pom markers can reflect the new
+                            // parent's dependencyManagement. If the deep resolve fails (for instance,
+                            // the new parent's dependencyManagement references properties whose names or
+                            // values only become valid after the visitor — or a prior recipe such as
+                            // RenamePropertyKey — edits the XML), fall back to a shallow marker that
+                            // just swaps in the new parent reference. Each pom's marker is re-resolved
+                            // later by `maybeUpdateModel` once the XML edits land.
                             Parent updatedParentRef = new Parent(
                                     new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()),
                                     targetRelativePath
                             );
                             Pom updatedPom = mrr.getPom().getRequested().withParent(updatedParentRef);
-                            ResolvedPom updatedResolvedPom = mrr.getPom()
-                                    .withRequested(updatedPom)
-                                    .resolve(ctx, new MavenPomDownloader(
-                                            mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles()));
+                            ResolvedPom updatedResolvedPom;
+                            try {
+                                updatedResolvedPom = mrr.getPom()
+                                        .withRequested(updatedPom)
+                                        .resolve(ctx, new MavenPomDownloader(
+                                                mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles()));
+                            } catch (MavenDownloadingException deepResolveFailure) {
+                                updatedResolvedPom = mrr.getPom().withRequested(updatedPom);
+                            }
                             acc.updatedRootMarker = mrr.withPom(updatedResolvedPom);
                         }
-                    } catch (MavenDownloadingException e) {
-                        acc.scannerException = e;
+                    } catch (MavenDownloadingException ignored) {
+                        // Metadata download failure for the new parent's version metadata — the
+                        // visitor's own resolve will surface this as a warning on the parent tag.
                     }
                 }
                 return document;
@@ -465,9 +477,6 @@ public class ChangeParentPom extends ScanningRecipe<ChangeParentPom.Accumulator>
                                         repository.getUri(), repository.getSnapshots(), repository.getReleases(), repositoryResponse.getValue()));
                             }
                             return e.warn(tag);
-                        }
-                        if (acc.scannerException != null) {
-                            t = acc.scannerException.warn(t);
                         }
                     }
                 }
