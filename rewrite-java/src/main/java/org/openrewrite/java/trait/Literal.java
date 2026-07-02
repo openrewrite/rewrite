@@ -121,6 +121,10 @@ public class Literal implements Trait<Expression> {
     private List<Object> untypedInitializerLiterals(J.NewArray newArray) {
         List<Object> acc = new ArrayList<>();
         for (Expression init : requireNonNull(newArray.getInitializer())) {
+            if (init instanceof J.Empty) {
+                // an empty initializer `{}` is represented as a single J.Empty element
+                continue;
+            }
             if (init instanceof J.Literal) {
                 //noinspection DataFlowIssue
                 acc.add(((J.Literal) init).getValue());
@@ -163,6 +167,10 @@ public class Literal implements Trait<Expression> {
                     return false;
                 }
                 for (Expression expr : init) {
+                    if (expr instanceof J.Empty) {
+                        // an empty initializer `{}` is represented as a single J.Empty element
+                        continue;
+                    }
                     if (!(expr instanceof J.Literal) &&
                         !isNewArrayWithLiteralInitializer(expr)) {
                         return false;

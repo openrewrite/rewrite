@@ -59,6 +59,35 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void emptyArrayLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+              new Literal.Matcher().asVisitor(lit -> {
+                  assertThat(lit.isArray()).isTrue();
+                  assertThat(lit.isNotNull()).isTrue();
+                  assertThat(lit.getStrings()).isEmpty();
+                  return SearchResult.found(lit.getTree());
+              })
+            )
+          ),
+          java(
+            """
+              class Test {
+                String[] s = {};
+                int[] n = new int[] {};
+              }
+              """,
+            """
+              class Test {
+                String[] s = /*~~>*/{};
+                int[] n = /*~~>*/new int[] {};
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void arrayLiteral() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->

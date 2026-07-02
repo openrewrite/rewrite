@@ -63,6 +63,38 @@ class AnnotatedTest implements RewriteTest {
     }
 
     @Test
+    void emptyArrayAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new Annotated.Matcher("@Example").asVisitor(a -> SearchResult.found(a.getTree(),
+              a.getAttribute("other")
+                .map(lit -> "size:" + lit.getStrings().size())
+                .orElse("missing"))
+            )
+          )),
+          java(
+            """
+              @interface Example {
+                  String[] other() default {};
+              }
+              """
+          ),
+          java(
+            """
+              @Example(other = {})
+              class Test {
+              }
+              """,
+            """
+              /*~~(size:0)~~>*/@Example(other = {})
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void checkOnArray() {
         rewriteRun(
           spec ->
