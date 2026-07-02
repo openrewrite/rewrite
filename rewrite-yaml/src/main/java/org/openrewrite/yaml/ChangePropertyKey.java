@@ -283,14 +283,87 @@ public class ChangePropertyKey extends Recipe {
                         }));
                     } else {
                         m = (Yaml.Mapping) new DeletePropertyVisitor<>(entryToReplace).visitNonNull(m, p);
-                        Yaml.Mapping newMapping = m.withEntries(singletonList(newEntry));
-                        Yaml.Mapping mergedMapping = (Yaml.Mapping) new MergeYamlVisitor<>(m, newMapping, true, null, false, null, null).visitMapping(m, p);
+                        // If a prefix of the relocated key already exists as a mapping in this scope,
+                        // nest the remainder under it rather than inserting a dotted key at this level.
+                        Yaml.Mapping incoming = nestUnderExistingPrefix(m, newEntry);
+                        if (incoming == null) {
+                            incoming = m.withEntries(singletonList(newEntry));
+                        }
+                        Yaml.Mapping mergedMapping = (Yaml.Mapping) new MergeYamlVisitor<>(m, incoming, true, null, false, null, null).visitMapping(m, p);
+                        // Preserve the leading prefix of the first entry at the document root: when the relocated
+                        // property's original tree was the first top-level entry and is fully removed, auto-format
+                        // would otherwise introduce a blank line before the new first entry.
+                        boolean atDocumentRoot = getCursor().getParentOrThrow().getValue() instanceof Yaml.Document;
+                        String firstEntryPrefix = atDocumentRoot ? mergedMapping.getEntries().get(0).getPrefix() : null;
                         m = maybeAutoFormat(m, mergedMapping, p, getCursor().getParentOrThrow());
+                        if (atDocumentRoot && !m.getEntries().isEmpty()) {
+                            m = m.withEntries(ListUtils.mapFirst(m.getEntries(), e -> e.withPrefix(firstEntryPrefix)));
+                        }
                     }
                 }
             }
 
             return m;
+        }
+
+        /**
+         * When relocating {@code newEntry} (a dot-separated key) into {@code mapping}, descend through any
+         * mapping entries whose keys already form a prefix of the relocated key and nest the remaining
+         * portion of the key under the deepest such mapping. Returns {@code null} when no prefix exists,
+         * in which case the caller inserts the dotted key at the current level as before.
+         */
+        private Yaml.@Nullable Mapping nestUnderExistingPrefix(Yaml.Mapping mapping, Yaml.Mapping.Entry newEntry) {
+            String[] segments = ((Yaml.Scalar) newEntry.getKey()).getValue().split("\\.");
+            if (segments.length < 2) {
+                return null;
+            }
+
+            List<String> nestKeys = new ArrayList<>();
+            Yaml.Mapping current = mapping;
+            int consumed = 0;
+            while (consumed < segments.length - 1) {
+                Yaml.Mapping.Entry match = null;
+                int matchLength = 0;
+                for (Yaml.Mapping.Entry e : current.getEntries()) {
+                    if (e.getValue() instanceof Yaml.Mapping) {
+                        String[] keyParts = e.getKey().getValue().split("\\.");
+                        if (consumed + keyParts.length < segments.length && matchesPrefix(segments, consumed, keyParts)) {
+                            match = e;
+                            matchLength = keyParts.length;
+                            break;
+                        }
+                    }
+                }
+                if (match == null) {
+                    break;
+                }
+                nestKeys.add(match.getKey().getValue());
+                current = (Yaml.Mapping) match.getValue();
+                consumed += matchLength;
+            }
+            if (nestKeys.isEmpty()) {
+                return null;
+            }
+
+            String remainder = String.join(".", Arrays.copyOfRange(segments, consumed, segments.length));
+            Yaml.Mapping.Entry leaf = newEntry.withKey(((Yaml.Scalar) newEntry.getKey()).withValue(remainder));
+            Yaml.Mapping nested = new Yaml.Mapping(randomId(), Markers.EMPTY, null, singletonList(leaf), null, null, null);
+            for (int i = nestKeys.size() - 1; i >= 0; i--) {
+                Yaml.Mapping.Entry wrapper = new Yaml.Mapping.Entry(randomId(), "", Markers.EMPTY,
+                        new Yaml.Scalar(randomId(), "", Markers.EMPTY, Yaml.Scalar.Style.PLAIN, null, null, nestKeys.get(i)),
+                        "", nested);
+                nested = new Yaml.Mapping(randomId(), Markers.EMPTY, null, singletonList(wrapper), null, null, null);
+            }
+            return nested;
+        }
+
+        private boolean matchesPrefix(String[] segments, int start, String[] keyParts) {
+            for (int i = 0; i < keyParts.length; i++) {
+                if (!segments[start + i].equals(keyParts[i])) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         @Override
