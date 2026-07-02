@@ -133,14 +133,14 @@ class MavenArtifactDownloaderTest {
     }
 
     @Test
-    void fallsBackToAnonymousWhenServerReturns401(@TempDir Path tempDir) throws Exception {
+    void retriesWithCredentialsWhenAnonymousReturns401(@TempDir Path tempDir) throws Exception {
         byte[] jarBytes = {0x50, 0x4B, 0x03, 0x04};
 
         try (MockWebServer mockRepo = new MockWebServer()) {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
-                    if (request.getHeader("Authorization") != null) {
+                    if (request.getHeader("Authorization") == null) {
                         return new MockResponse().setResponseCode(401);
                     }
                     return new MockResponse().setResponseCode(200)
@@ -184,20 +184,20 @@ class MavenArtifactDownloaderTest {
             assertThat(artifact).isNotNull();
             assertThat(error.get()).isNull();
             assertThat(mockRepo.getRequestCount()).isEqualTo(2);
-            assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNotNull();
             assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNull();
+            assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNotNull();
         }
     }
 
     @Test
-    void fallsBackToAnonymousWhenHttpHeaderAuthRejected(@TempDir Path tempDir) throws Exception {
+    void retriesWithHttpHeaderAuthWhenAnonymousReturns401(@TempDir Path tempDir) throws Exception {
         byte[] jarBytes = {0x50, 0x4B, 0x03, 0x04};
 
         try (MockWebServer mockRepo = new MockWebServer()) {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
-                    if (request.getHeader("X-Auth-Token") != null) {
+                    if (request.getHeader("X-Auth-Token") == null) {
                         return new MockResponse().setResponseCode(401);
                     }
                     return new MockResponse().setResponseCode(200)
@@ -247,8 +247,8 @@ class MavenArtifactDownloaderTest {
             assertThat(artifact).isNotNull();
             assertThat(error.get()).isNull();
             assertThat(mockRepo.getRequestCount()).isEqualTo(2);
-            assertThat(mockRepo.takeRequest().getHeader("X-Auth-Token")).isNotNull();
             assertThat(mockRepo.takeRequest().getHeader("X-Auth-Token")).isNull();
+            assertThat(mockRepo.takeRequest().getHeader("X-Auth-Token")).isNotNull();
         }
     }
 
@@ -258,7 +258,7 @@ class MavenArtifactDownloaderTest {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
-                    // 429 is a transient rate-limit, not a credential rejection, so no anonymous retry should follow
+                    // 429 is a transient rate-limit, not a credential rejection, so no authenticated retry should follow
                     return new MockResponse().setResponseCode(429);
                 }
             });
@@ -299,7 +299,7 @@ class MavenArtifactDownloaderTest {
             assertThat(artifact).isNull();
             assertThat(error.get()).isNotNull();
             assertThat(mockRepo.getRequestCount()).isEqualTo(1);
-            assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNotNull();
+            assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNull();
         }
     }
 

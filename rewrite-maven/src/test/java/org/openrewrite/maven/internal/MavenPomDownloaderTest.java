@@ -1433,6 +1433,44 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
+        void doesNotSendCredentialsWhenRepositoryServesAnonymously() {
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<@Nullable String> authorizationHeaders = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        authorizationHeaders.add(recordedRequest.getHeaders().get("Authorization"));
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <project>
+                                <groupId>fred</groupId>
+                                <artifactId>fred</artifactId>
+                                <version>1.0.0</version>
+                            </project>
+                            """);
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+
+                // Mirror Apache Maven: a repository that serves anonymously must never be sent credentials
+                assertThat(authorizationHeaders).containsOnlyNulls();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
         void usesAuthenticationIfRepositoryHasCredentials() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
