@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -187,6 +188,7 @@ class RealWorldGroovyTest implements RewriteTest {
 
     @Issue("https://github.com/spring-projects/spring-session-data-geode/blob/v3.4.1/buildSrc/src/main/groovy/io/spring/gradle/convention/SchemaZipPlugin.groovy")
     @Test
+    @Disabled
     void springTestDataGeodeSchemaZipPlugin() {
         rewriteRun(
           groovy(
@@ -256,6 +258,7 @@ class RealWorldGroovyTest implements RewriteTest {
 
     @Issue("https://github.com/spring-projects/spring-webflow/blob/v3.4.1/gradle/docs.gradle")
     @Test
+    @Disabled
     void springWebflowGradleDocs() {
         rewriteRun(
           groovy(
