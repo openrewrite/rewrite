@@ -175,6 +175,40 @@ class YamlResourceLoaderTest implements RewriteTest {
     }
 
     @Test
+    void nonStringTagsAreReportedAsValidationErrorsInsteadOfThrowing() {
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.ChangeTextToHello
+              displayName: Change text to hello
+              tags:
+                - fine
+                - not_string_tag: boom
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello!
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .build();
+
+        Recipe recipe = env.listRecipes().iterator().next();
+
+        // Only valid String tags are retained, so iterating getTags() does not throw a ClassCastException
+        assertThat(recipe.getTags()).containsExactly("fine");
+        recipe.getTags().forEach(tag -> assertThat(tag).isInstanceOf(String.class));
+
+        // The non-string tag surfaces as a validation error rather than crashing at runtime
+        assertThat(recipe.validate().isValid()).isFalse();
+        assertThat(recipe.validate().failures())
+          .anySatisfy(failure -> {
+              assertThat(failure.getProperty()).isEqualTo("test.ChangeTextToHello.tags");
+              assertThat(failure.getMessage()).contains("tags must be a list of strings");
+          });
+    }
+
+    @Test
     void maintainers() {
         Environment env = Environment.builder()
           .load(new YamlResourceLoader(new ByteArrayInputStream(
