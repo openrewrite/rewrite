@@ -357,4 +357,70 @@ class MavenArtifactDownloaderTest {
             assertThat(mockRepo.getRequestCount()).isEqualTo(1);
         }
     }
+
+    @Test
+    void authenticatesPreemptivelyAfterFirstChallengeForSameHost(@TempDir Path tempDir) throws Exception {
+        byte[] jarBytes = {0x50, 0x4B, 0x03, 0x04};
+
+        try (MockWebServer mockRepo = new MockWebServer()) {
+            // Private repository: anonymous requests are rejected, authenticated requests succeed
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    if (request.getHeader("Authorization") == null) {
+                        return new MockResponse().setResponseCode(401);
+                    }
+                    return new MockResponse().setResponseCode(200)
+                      .setBody(new okio.Buffer().write(jarBytes));
+                }
+            });
+            mockRepo.start();
+
+            String repoUrl = "http://" + mockRepo.getHostName() + ":" + mockRepo.getPort();
+            MavenSettings settings = MavenSettings.parse(new Parser.Input(
+              Path.of("settings.xml"), () -> new ByteArrayInputStream(
+              //language=xml
+              """
+                <settings>
+                    <servers>
+                        <server>
+                            <id>mock-repo</id>
+                            <username>good-user</username>
+                            <password>good-password</password>
+                        </server>
+                    </servers>
+                </settings>
+                """.getBytes())), new InMemoryExecutionContext());
+
+            MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
+            AtomicReference<Throwable> error = new AtomicReference<>();
+            MavenArtifactDownloader downloader = new MavenArtifactDownloader(
+              artifactCache, settings, error::set, new InMemoryExecutionContext());
+
+            MavenRepository repo = new MavenRepository(
+              "mock-repo", repoUrl, "true", "false", true, null, null, null, false);
+
+            Path first = downloader.downloadArtifact(resolvedDependency(repo, repoUrl, "lib-a"));
+            Path second = downloader.downloadArtifact(resolvedDependency(repo, repoUrl, "lib-b"));
+
+            assertThat(first).isNotNull();
+            assertThat(second).isNotNull();
+            assertThat(error.get()).isNull();
+            // First artifact probes anonymously (401) then authenticates (200). Once the host is known to
+            // require credentials, the second artifact authenticates preemptively: three requests, not four.
+            assertThat(mockRepo.getRequestCount()).isEqualTo(3);
+            assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNull();
+            assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNotNull();
+            assertThat(mockRepo.takeRequest().getHeader("Authorization")).isNotNull();
+        }
+    }
+
+    private static ResolvedDependency resolvedDependency(MavenRepository repo, String repoUrl, String artifactId) {
+        GroupArtifactVersion gav = new GroupArtifactVersion("com.example", artifactId, "1.0.0");
+        return ResolvedDependency.builder()
+          .repository(repo)
+          .gav(new ResolvedGroupArtifactVersion(repoUrl, gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null))
+          .requested(Dependency.builder().gav(gav).build())
+          .build();
+    }
 }

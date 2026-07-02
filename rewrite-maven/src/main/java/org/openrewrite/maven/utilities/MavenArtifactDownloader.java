@@ -19,11 +19,14 @@ import dev.failsafe.Failsafe;
 import dev.failsafe.FailsafeException;
 import dev.failsafe.RetryPolicy;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenArtifactCache;
+import org.openrewrite.maven.internal.MavenAuthenticationCache;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
@@ -61,21 +64,38 @@ public class MavenArtifactDownloader {
     private final Map<String, MavenSettings.Server> serverIdToServer;
     private final Consumer<Throwable> onError;
     private final HttpSender httpSender;
+    private final ExecutionContext ctx;
 
 
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
                                    @Nullable MavenSettings settings,
                                    Consumer<Throwable> onError) {
-        this(mavenArtifactCache, settings, new HttpUrlConnectionSender(), onError);
+        this(mavenArtifactCache, settings, new HttpUrlConnectionSender(), onError, new InMemoryExecutionContext());
+    }
+
+    public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
+                                   @Nullable MavenSettings settings,
+                                   Consumer<Throwable> onError,
+                                   ExecutionContext ctx) {
+        this(mavenArtifactCache, settings, new HttpUrlConnectionSender(), onError, ctx);
     }
 
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
                                    @Nullable MavenSettings settings,
                                    HttpSender httpSender,
                                    Consumer<Throwable> onError) {
+        this(mavenArtifactCache, settings, httpSender, onError, new InMemoryExecutionContext());
+    }
+
+    public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
+                                   @Nullable MavenSettings settings,
+                                   HttpSender httpSender,
+                                   Consumer<Throwable> onError,
+                                   ExecutionContext ctx) {
         this.httpSender = httpSender;
         this.mavenArtifactCache = mavenArtifactCache;
         this.onError = onError;
+        this.ctx = ctx;
         this.serverIdToServer = settings == null || settings.getServers() == null ?
                 new HashMap<>() :
                 settings.getServers().getServers().stream()
@@ -112,10 +132,17 @@ public class MavenArtifactDownloader {
                 bodyStream = Files.newInputStream(Paths.get(URI.create(uri)));
             } else {
                 try {
-                    // Try anonymously first, mirroring Apache Maven's DeferredCredentialsProvider behavior
+                    MavenRepository repository = dependency.getRepository();
+                    // Mirror Apache Maven's DeferredCredentialsProvider: anonymous first, unless this host has
+                    // already required credentials in this session, in which case authenticate preemptively.
+                    boolean preemptive = hasAuthentication(repository) &&
+                                         MavenAuthenticationCache.requiresAuthentication(ctx, uri);
                     byte[] responseBytes = null;
                     int responseCode;
-                    try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(httpSender.get(uri).build()));
+                    HttpSender.Request firstRequest = preemptive ?
+                            applyAuthentication(repository, httpSender.get(uri)).build() :
+                            httpSender.get(uri).build();
+                    try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(firstRequest));
                          InputStream body = response.getBody()) {
                         responseCode = response.getCode();
                         if (response.isSuccessful() && body != null) {
@@ -123,14 +150,18 @@ public class MavenArtifactDownloader {
                         }
                     }
                     // Retry with credentials if the anonymous request failed with a client error
-                    if (responseBytes == null && isClientSideError(responseCode) && hasAuthentication(dependency.getRepository())) {
-                        HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
+                    if (responseBytes == null && !preemptive && isClientSideError(responseCode) && hasAuthentication(repository)) {
+                        HttpSender.Request.Builder request = applyAuthentication(repository, httpSender.get(uri));
                         try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
                              InputStream body = response.getBody()) {
                             responseCode = response.getCode();
                             if (response.isSuccessful() && body != null) {
                                 responseBytes = readAllBytes(body);
                             }
+                        }
+                        if (responseBytes != null) {
+                            // Remember so later artifacts from this host authenticate preemptively
+                            MavenAuthenticationCache.rememberRequiresAuthentication(ctx, uri);
                         }
                     }
                     if (responseBytes == null) {

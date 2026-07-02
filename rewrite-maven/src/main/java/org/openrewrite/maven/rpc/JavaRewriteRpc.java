@@ -172,7 +172,8 @@ public class JavaRewriteRpc {
                 artifactCache,
                 null, // No custom Maven settings
                 new HttpUrlConnectionSender(),
-                t -> errorHandler.println("Download error: " + t.getMessage())
+                t -> errorHandler.println("Download error: " + t.getMessage()),
+                ctx // Share the session auth cache with POM resolution
         );
 
         // Set up resolvers
