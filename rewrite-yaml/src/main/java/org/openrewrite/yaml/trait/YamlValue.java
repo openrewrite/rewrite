@@ -22,7 +22,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.yaml.JsonPathMatcher;
-import org.openrewrite.yaml.internal.BlockScalarUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
 @AllArgsConstructor
@@ -53,7 +52,7 @@ public class YamlValue implements Trait<Yaml.Mapping.Entry> {
     }
 
     public YamlValue withValue(String newValue) {
-        Yaml.Scalar value = BlockScalarUtils.withBody(getValueAsScalar(), newValue);
+        Yaml.Scalar value = getValueAsScalar().withBody(newValue);
         cursor = new Cursor(cursor.getParent(), getTree().withValue(value));
         return this;
     }

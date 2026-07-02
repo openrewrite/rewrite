@@ -20,7 +20,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.yaml.internal.BlockScalarUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
 import static org.openrewrite.Tree.randomId;
@@ -67,9 +66,9 @@ public class ChangeValue extends Recipe {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
-                if (matcher.matches(getCursor()) && (!(e.getValue() instanceof Yaml.Scalar) || !BlockScalarUtils.getBody((Yaml.Scalar) e.getValue()).equals(value))) {
+                if (matcher.matches(getCursor()) && (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getBody().equals(value))) {
                     if (e.getValue() instanceof Yaml.Scalar && isBlockStyle((Yaml.Scalar) e.getValue())) {
-                        e = e.withValue(BlockScalarUtils.withBody((Yaml.Scalar) e.getValue(), value));
+                        e = e.withValue(((Yaml.Scalar) e.getValue()).withBody(value));
                     } else {
                         Yaml.Anchor anchor = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getAnchor() : null;
                         Yaml.Tag tag = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getTag() : null;
@@ -86,8 +85,8 @@ public class ChangeValue extends Recipe {
             @Override
             public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext ctx) {
                 Yaml.Scalar s = super.visitScalar(scalar, ctx);
-                if (matcher.matches(getCursor()) && !BlockScalarUtils.getBody(s).equals(value)) {
-                    s = BlockScalarUtils.withBody(s, value);
+                if (matcher.matches(getCursor()) && !s.getBody().equals(value)) {
+                    s = s.withBody(value);
                 }
                 return s;
             }

@@ -22,6 +22,7 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.CommentService;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
@@ -311,6 +312,8 @@ public interface Yaml extends Tree {
          * For FOLDED/LITERAL scalars this includes the chomp indicator, header newline,
          * indented body, and trailing whitespace bounding the next sibling — so the
          * Lombok-generated {@code withValue} cannot safely rewrite a block scalar's body.
+         * Use {@link #getBody()} / {@link #withBody(String)} to mutate the body without
+         * clobbering the block envelope.
          */
         String value;
 
@@ -320,6 +323,105 @@ public interface Yaml extends Tree {
             LITERAL,
             FOLDED,
             PLAIN
+        }
+
+        /**
+         * Returns the body content of this scalar, stripped of any style-specific envelope.
+         * For PLAIN and quoted styles this returns {@link #value} verbatim. For FOLDED and
+         * LITERAL styles the body is dedented to column zero with interior line breaks
+         * normalized to {@code \n} (so callers can compare or regex against it irrespective
+         * of the file's CRLF/LF convention).
+         */
+        public String getBody() {
+            if (!isBlockStyle()) {
+                return value;
+            }
+            int headerEnd = value.indexOf('\n');
+            if (headerEnd < 0) {
+                return "";
+            }
+            int bodyEnd = value.length();
+            while (bodyEnd > headerEnd + 1 && Character.isWhitespace(value.charAt(bodyEnd - 1))) {
+                bodyEnd--;
+            }
+            if (bodyEnd <= headerEnd + 1) {
+                return "";
+            }
+            String bodyRegion = value.substring(headerEnd + 1, bodyEnd);
+            int indent = 0;
+            while (indent < bodyRegion.length() && bodyRegion.charAt(indent) == ' ') {
+                indent++;
+            }
+            String indentStr = bodyRegion.substring(0, indent);
+            String[] lines = bodyRegion.split("\r\n|\r|\n", -1);
+            StringBuilder out = new StringBuilder(bodyRegion.length());
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i];
+                if (indent > 0 && line.startsWith(indentStr)) {
+                    line = line.substring(indent);
+                }
+                if (i > 0) {
+                    out.append('\n');
+                }
+                out.append(line);
+            }
+            return out.toString();
+        }
+
+        /** {@link #withBody(String, int)} with a 2-space empty-body indent fallback. */
+        public Scalar withBody(String newBody) {
+            return withBody(newBody, 2);
+        }
+
+        /**
+         * Returns a copy of this scalar with its body replaced by {@code newBody}. For PLAIN
+         * and quoted styles this just sets {@link #value} (via the Lombok-generated
+         * {@code withValue}); for block styles the chomp indicator, header newline, body
+         * indent, and trailing whitespace are preserved, and each line of {@code newBody} is
+         * emitted in the existing value's line-ending convention. {@code defaultIndentSpaces}
+         * is used as the body indent width when the existing block scalar has an empty body —
+         * pass an {@code IndentsStyle#getIndentSize()} to honor the document's configured indent.
+         */
+        public Scalar withBody(String newBody, int defaultIndentSpaces) {
+            if (!isBlockStyle()) {
+                return withValue(newBody);
+            }
+            int headerEnd = value.indexOf('\n');
+            String header = headerEnd < 0 ? value : value.substring(0, headerEnd + 1);
+            String newLine = (headerEnd > 0 && value.charAt(headerEnd - 1) == '\r') ? "\r\n" : "\n";
+            int bodyEnd = value.length();
+            while (bodyEnd > 0 && Character.isWhitespace(value.charAt(bodyEnd - 1))) {
+                bodyEnd--;
+            }
+            String indent;
+            if (headerEnd >= 0 && headerEnd + 1 < bodyEnd) {
+                int indentEnd = headerEnd + 1;
+                while (indentEnd < bodyEnd && value.charAt(indentEnd) == ' ') {
+                    indentEnd++;
+                }
+                indent = value.substring(headerEnd + 1, indentEnd);
+                if (indent.isEmpty()) {
+                    indent = StringUtils.repeat(" ", defaultIndentSpaces);
+                }
+            } else {
+                indent = StringUtils.repeat(" ", defaultIndentSpaces);
+            }
+            String trailing = value.substring(bodyEnd);
+            String[] lines = newBody.split("\r\n|\r|\n", -1);
+            StringBuilder body = new StringBuilder();
+            for (int i = 0; i < lines.length; i++) {
+                if (i > 0) {
+                    body.append(newLine);
+                }
+                if (!lines[i].isEmpty()) {
+                    body.append(indent).append(lines[i]);
+                }
+            }
+            return withValue(header + body + trailing);
+        }
+
+        private boolean isBlockStyle() {
+            return style == Style.FOLDED || style == Style.LITERAL;
         }
 
         @Override

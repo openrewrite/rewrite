@@ -22,7 +22,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.yaml.internal.BlockScalarUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.Iterator;
@@ -111,14 +110,14 @@ public class ChangePropertyValue extends Recipe {
     private Yaml.@Nullable Block updateValue(Yaml.Block value) {
         if (value instanceof Yaml.Scalar) {
             Yaml.Scalar scalar = (Yaml.Scalar) value;
-            String body = BlockScalarUtils.getBody(scalar);
+            String body = scalar.getBody();
             String updatedBody = Boolean.TRUE.equals(regex) ?
                     body.replaceAll(Objects.requireNonNull(oldValue), newValue) :
                     newValue;
             if (body.equals(updatedBody)) {
                 return null;
             }
-            return BlockScalarUtils.withBody(scalar, updatedBody);
+            return scalar.withBody(updatedBody);
         }
         if (value instanceof Yaml.Sequence) {
             Yaml.Sequence sequence = (Yaml.Sequence) value;

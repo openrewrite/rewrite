@@ -20,7 +20,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.trait.Reference;
-import org.openrewrite.yaml.internal.BlockScalarUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
 public abstract class YamlReference implements Reference {
@@ -41,7 +40,7 @@ public abstract class YamlReference implements Reference {
     public Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
         Tree tree = cursor.getValue();
         if (tree instanceof Yaml.Scalar) {
-            return BlockScalarUtils.withBody((Yaml.Scalar) tree, renamer.rename(this));
+            return ((Yaml.Scalar) tree).withBody(renamer.rename(this));
         }
         throw new IllegalArgumentException("cursor.getValue() must be an Yaml.Scalar but is: " + tree.getClass());
     }
