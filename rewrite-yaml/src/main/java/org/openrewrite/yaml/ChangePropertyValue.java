@@ -110,10 +110,14 @@ public class ChangePropertyValue extends Recipe {
     private Yaml.@Nullable Block updateValue(Yaml.Block value) {
         if (value instanceof Yaml.Scalar) {
             Yaml.Scalar scalar = (Yaml.Scalar) value;
-            Yaml.Scalar newScalar = scalar.withValue(Boolean.TRUE.equals(regex) ?
-                    scalar.getValue().replaceAll(Objects.requireNonNull(oldValue), newValue) :
-                    newValue);
-            return scalar.getValue().equals(newScalar.getValue()) ? null : newScalar;
+            String body = scalar.getBody();
+            String updatedBody = Boolean.TRUE.equals(regex) ?
+                    body.replaceAll(Objects.requireNonNull(oldValue), newValue) :
+                    newValue;
+            if (body.equals(updatedBody)) {
+                return null;
+            }
+            return scalar.withBody(updatedBody);
         }
         if (value instanceof Yaml.Sequence) {
             Yaml.Sequence sequence = (Yaml.Sequence) value;

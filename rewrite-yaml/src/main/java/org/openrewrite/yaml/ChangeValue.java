@@ -66,14 +66,18 @@ public class ChangeValue extends Recipe {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
-                if (matcher.matches(getCursor()) && (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getValue().equals(value))) {
-                    Yaml.Anchor anchor = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getAnchor() : null;
-                    Yaml.Tag tag = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getTag() : null;
-                    String prefix = e.getValue() instanceof Yaml.Sequence ? ((Yaml.Sequence) e.getValue()).getOpeningBracketPrefix() : e.getValue().getPrefix();
-                    e = e.withValue(
-                            new Yaml.Scalar(randomId(), prefix, Markers.EMPTY,
-                                    Yaml.Scalar.Style.PLAIN, anchor, tag, value)
-                    );
+                if (matcher.matches(getCursor()) && (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getBody().equals(value))) {
+                    if (e.getValue() instanceof Yaml.Scalar && isBlockStyle((Yaml.Scalar) e.getValue())) {
+                        e = e.withValue(((Yaml.Scalar) e.getValue()).withBody(value));
+                    } else {
+                        Yaml.Anchor anchor = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getAnchor() : null;
+                        Yaml.Tag tag = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getTag() : null;
+                        String prefix = e.getValue() instanceof Yaml.Sequence ? ((Yaml.Sequence) e.getValue()).getOpeningBracketPrefix() : e.getValue().getPrefix();
+                        e = e.withValue(
+                                new Yaml.Scalar(randomId(), prefix, Markers.EMPTY,
+                                        Yaml.Scalar.Style.PLAIN, anchor, tag, value)
+                        );
+                    }
                 }
                 return e;
             }
@@ -81,10 +85,15 @@ public class ChangeValue extends Recipe {
             @Override
             public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext ctx) {
                 Yaml.Scalar s = super.visitScalar(scalar, ctx);
-                if (matcher.matches(getCursor())) {
-                    s = s.withValue(value);
+                if (matcher.matches(getCursor()) && !s.getBody().equals(value)) {
+                    s = s.withBody(value);
                 }
                 return s;
+            }
+
+            private boolean isBlockStyle(Yaml.Scalar s) {
+                return s.getStyle() == Yaml.Scalar.Style.FOLDED ||
+                        s.getStyle() == Yaml.Scalar.Style.LITERAL;
             }
         });
     }
