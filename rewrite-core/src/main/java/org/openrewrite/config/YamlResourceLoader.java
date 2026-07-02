@@ -265,9 +265,20 @@ public class YamlResourceLoader implements ResourceLoader {
         String description = (String) yaml.get("description");
 
         Set<String> tags = emptySet();
-        List<String> rawTags = (List<String>) yaml.get("tags");
+        List<Object> invalidTags = emptyList();
+        List<Object> rawTags = (List<Object>) yaml.get("tags");
         if (rawTags != null) {
-            tags = new HashSet<>(rawTags);
+            tags = new HashSet<>(rawTags.size());
+            for (Object rawTag : rawTags) {
+                if (rawTag instanceof String) {
+                    tags.add((String) rawTag);
+                } else {
+                    if (invalidTags.isEmpty()) {
+                        invalidTags = new ArrayList<>();
+                    }
+                    invalidTags.add(rawTag);
+                }
+            }
         }
 
         String estimatedEffortPerOccurrenceStr = (String) yaml.get("estimatedEffortPerOccurrence");
@@ -306,6 +317,14 @@ public class YamlResourceLoader implements ResourceLoader {
                 source,
                 (boolean) yaml.getOrDefault("causesAnotherCycle", false),
                 maintainers);
+
+        for (Object invalidTag : invalidTags) {
+            recipe.addValidation(invalid(
+                    name + ".tags",
+                    invalidTag,
+                    "tags must be a list of strings, but found a " +
+                            (invalidTag == null ? "null value" : invalidTag.getClass().getSimpleName())));
+        }
 
         List<Object> recipeList = (List<Object>) yaml.get("recipeList");
         if (recipeList == null) {
