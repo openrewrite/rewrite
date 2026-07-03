@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.yaml.trait.BlockScalar;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.Iterator;
@@ -96,7 +97,7 @@ public class ChangePropertyValue extends Recipe {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 String prop = getProperty(getCursor());
                 if (keyMatcher.matchesGlob(prop) && matchesOldValue(e.getValue())) {
-                    Yaml.Block updatedValue = updateValue(e.getValue());
+                    Yaml.Block updatedValue = updateValue(e.getValue(), getCursor());
                     if (updatedValue != null) {
                         e = e.withValue(updatedValue);
                     }
@@ -107,19 +108,24 @@ public class ChangePropertyValue extends Recipe {
     }
 
     // returns null if value should not change
-    private Yaml.@Nullable Block updateValue(Yaml.Block value) {
+    private Yaml.@Nullable Block updateValue(Yaml.Block value, Cursor parent) {
         if (value instanceof Yaml.Scalar) {
             Yaml.Scalar scalar = (Yaml.Scalar) value;
-            Yaml.Scalar newScalar = scalar.withValue(Boolean.TRUE.equals(regex) ?
-                    scalar.getValue().replaceAll(Objects.requireNonNull(oldValue), newValue) :
-                    newValue);
-            return scalar.getValue().equals(newScalar.getValue()) ? null : newScalar;
+            BlockScalar block = new BlockScalar.Matcher().get(scalar, parent).orElse(null);
+            String body = block != null ? block.getBody() : scalar.getValue();
+            String updatedBody = Boolean.TRUE.equals(regex) ?
+                    body.replaceAll(Objects.requireNonNull(oldValue), newValue) :
+                    newValue;
+            if (body.equals(updatedBody)) {
+                return null;
+            }
+            return block != null ? block.withBody(updatedBody) : scalar.withValue(updatedBody);
         }
         if (value instanceof Yaml.Sequence) {
             Yaml.Sequence sequence = (Yaml.Sequence) value;
             return sequence.withEntries(ListUtils.map(sequence.getEntries(), entry -> {
                 if (matchesOldValue(entry.getBlock())) {
-                    Yaml.Block updatedValue = updateValue(entry.getBlock());
+                    Yaml.Block updatedValue = updateValue(entry.getBlock(), parent);
                     if (updatedValue != null) {
                         return entry.withBlock(updatedValue);
                     }

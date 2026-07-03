@@ -307,6 +307,13 @@ public interface Yaml extends Tree {
         @Nullable
         Tag tag;
 
+        /**
+         * For FOLDED/LITERAL scalars this includes the chomp indicator, header newline,
+         * indented body, and trailing whitespace bounding the next sibling; the Lombok-generated
+         * {@code withValue} cannot safely rewrite a block scalar's body. Use the
+         * {@code org.openrewrite.yaml.trait.BlockScalar} trait to mutate the body without
+         * clobbering the block envelope.
+         */
         String value;
 
         public enum Style {
