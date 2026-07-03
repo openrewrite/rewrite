@@ -141,6 +141,65 @@ class AnnotatedTest implements RewriteTest {
     }
 
     @Test
+    void oldDefaultAccessorStopsAtPositionalNonLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new Annotated.Matcher("@Example").asVisitor(a -> SearchResult.found(a.getTree(),
+              "old=" + a.getDefaultAttribute("alias").isPresent() +
+              ":new=" + a.getDefaultAttributeValue("alias").map(v -> v.getKind().toString()).orElse("empty")))
+          )),
+          java(
+            """
+              class Constants {
+                  static final String NAME = "n";
+              }
+              """
+          ),
+          java(
+            """
+              @interface Example {
+                  String value() default "";
+                  String alias() default "";
+              }
+              """
+          ),
+          java(
+            """
+              @Example(Constants.NAME)
+              class Test {
+              }
+              """,
+            """
+              /*~~(old=false:new=CONSTANT_REFERENCE)~~>*/@Example(Constants.NAME)
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void matcherFromAnnotationClass() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new Annotated.Matcher(Deprecated.class).asVisitor(a -> SearchResult.found(a.getTree()))
+          )),
+          java(
+            """
+              @Deprecated
+              class Test {
+              }
+              """,
+            """
+              /*~~>*/@Deprecated
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void emptyArrayAttribute() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
@@ -191,7 +250,7 @@ class AnnotatedTest implements RewriteTest {
               @Target(ElementType.TYPE)
               @Retention(RetentionPolicy.RUNTIME)
               @interface Example {
-                  String[] other;
+                  String[] other();
               }
               """
           ),

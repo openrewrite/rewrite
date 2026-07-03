@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.trait;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -609,7 +611,7 @@ class AttributeValueTest implements RewriteTest {
                     assertThat(elements.get(i).getTree()).isSameAs(array.getInitializer().get(i));
                     assertThat((Object) elements.get(i).getCursor().getParentTreeCursor().getValue()).isSameAs(array);
                 }
-                return a.getTree();
+                return SearchResult.found(a.getTree());
             }))),
           java(
             """
@@ -621,6 +623,11 @@ class AttributeValueTest implements RewriteTest {
           java(
             """
               @Example(exclude = {String.class, Integer.class})
+              class Test {
+              }
+              """,
+            """
+              /*~~>*/@Example(exclude = {String.class, Integer.class})
               class Test {
               }
               """
@@ -788,7 +795,8 @@ class AttributeValueTest implements RewriteTest {
                 "/" + v.isEnumConstant("com.x.E", "ONE") +
                 "/" + v.isClassLiteral("com.x.A") +
                 "/" + (v.getReferencedField() != null) +
-                "/" + (v.getClassValue() != null)))))
+                "/" + (v.getClassValue() != null) +
+                "/" + v.getConstantValue()))))
             .typeValidationOptions(TypeValidation.none()),
           java(
             """
@@ -801,12 +809,195 @@ class AttributeValueTest implements RewriteTest {
               }
               """,
             """
-              @Example(e = /*~~(CONSTANT_REFERENCE/false/false/false/false)~~>*/E.ONE)
+              @Example(e = /*~~(CONSTANT_REFERENCE/false/false/false/false/null)~~>*/E.ONE)
               class Test1 {
               }
 
-              @Example(clazz = /*~~(CLASS_LITERAL/false/false/false/false)~~>*/A.class)
+              @Example(clazz = /*~~(CLASS_LITERAL/false/false/false/false/null)~~>*/A.class)
               class Test2 {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void constantValueIsNullForNonConstantKinds() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new AttributeValue.Matcher().mapper(new ObjectMapper())
+            .asVisitor((v, ctx) -> SearchResult.found(v.getTree(), v.getKind() + "=" + v.getConstantValue())))),
+          java(
+            """
+              @interface Bar {
+                  String value() default "";
+              }
+
+              enum E {
+                  ONE
+              }
+
+              @interface Example {
+                  Class<?> clazz() default Object.class;
+                  Bar bar() default @Bar;
+                  E e() default E.ONE;
+                  String[] tags() default {};
+              }
+              """
+          ),
+          java(
+            """
+              @Example(clazz = String.class, bar = @Bar("x"), e = E.ONE, tags = {"a"})
+              class Test {
+              }
+              """,
+            """
+              @Example(clazz = /*~~(CLASS_LITERAL=null)~~>*/String.class, bar = /*~~(NESTED_ANNOTATION=null)~~>*/@Bar(/*~~(LITERAL=x)~~>*/"x"), e = /*~~(ENUM_CONSTANT=null)~~>*/E.ONE, tags = /*~~(ARRAY=null)~~>*/{"a"})
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typedValueCoercion() {
+        rewriteRun(
+          spec -> spec.recipe(describeAttribute("@Example", "tags",
+            v -> "list=" + v.getValue(new TypeReference<List<String>>() {}) + ":int=" + v.getValue(Integer.class))),
+          java(
+            """
+              @interface Example {
+                  String[] tags() default {};
+              }
+              """
+          ),
+          java(
+            """
+              @Example(tags = "a")
+              class Test {
+              }
+              """,
+            """
+              /*~~(list=[a]:int=null)~~>*/@Example(tags = "a")
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedArrayElements() {
+        rewriteRun(
+          spec -> spec.recipe(describeAttribute("@Example", "tags",
+            v -> v.getElements().stream()
+              .map(e -> e.getKind() + "/" + e.getConstantValue() + "/" + e.getName())
+              .collect(Collectors.joining(",")))),
+          java(
+            """
+              class Constants {
+                  static final String NAME = "n";
+              }
+              """
+          ),
+          java(
+            """
+              @interface Example {
+                  String[] tags() default {};
+              }
+              """
+          ),
+          java(
+            """
+              @Example(tags = {("a"), (Constants.NAME)})
+              class Test {
+              }
+              """,
+            """
+              /*~~(LITERAL/a/tags,CONSTANT_REFERENCE/n/tags)~~>*/@Example(tags = {("a"), (Constants.NAME)})
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void positionalArrayElements() {
+        rewriteRun(
+          spec -> spec.recipe(describeAttribute("@Example", "value",
+            v -> v.getElements().stream()
+              .map(e -> e.getKind() + "/" + e.getConstantValue() + "/" + e.getName())
+              .collect(Collectors.joining(",")))),
+          java(
+            """
+              class Constants {
+                  static final String NAME = "n";
+              }
+              """
+          ),
+          java(
+            """
+              @interface Example {
+                  String[] value();
+              }
+              """
+          ),
+          java(
+            """
+              @Example({Constants.NAME, "b"})
+              class Test {
+              }
+              """,
+            """
+              /*~~(CONSTANT_REFERENCE/n/value,LITERAL/b/value)~~>*/@Example({Constants.NAME, "b"})
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void constantReferencesDoNotFoldOnUnsupportedDeclarations() {
+        rewriteRun(
+          spec -> spec.recipe(describeAttribute("@Example", "name",
+            v -> v.getKind() + ":" + v.getConstantValue())),
+          java(
+            """
+              class Constants {
+                  static final String NAME = "n";
+              }
+              """
+          ),
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+
+              @Target({ElementType.FIELD, ElementType.TYPE_PARAMETER})
+              @interface Example {
+                  String name() default "";
+              }
+              """
+          ),
+          java(
+            """
+              enum Status {
+                  @Example(name = Constants.NAME)
+                  ACTIVE
+              }
+
+              class Poly<@Example(name = Constants.NAME) T> {
+              }
+              """,
+            """
+              enum Status {
+                  /*~~(CONSTANT_REFERENCE:null)~~>*/@Example(name = Constants.NAME)
+                  ACTIVE
+              }
+
+              class Poly</*~~(CONSTANT_REFERENCE:null)~~>*/@Example(name = Constants.NAME) T> {
               }
               """
           )
