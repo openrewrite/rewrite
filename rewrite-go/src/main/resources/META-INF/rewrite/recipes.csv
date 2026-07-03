@@ -1,1 +1,2 @@
-ecosystem,packageName,name,displayName,description,recipeCount,category1,options
+ecosystem,packageName,name,displayName,description,recipeCount,category1
+maven,org.openrewrite:rewrite-go,org.openrewrite.golang.RegenerateGoSum,Regenerate `go.sum`,"Regenerate a Go module's `go.sum` from its `go.mod` by running `go mod download`, recomputing checksums for the whole module graph. Useful after a dependency version change to bring `go.sum` back in sync. Requires the `go` toolchain to be installed; otherwise `go.sum` is left unchanged.",1,Golang
