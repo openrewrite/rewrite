@@ -18,7 +18,6 @@ package org.openrewrite.java.trait;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -38,7 +37,6 @@ import org.openrewrite.trait.VisitFunction2;
  * in an enclosing block, or a {@link J.FieldAccess} on a non-final field whose
  * target is a bare {@link J.Identifier}.
  */
-@Incubating(since = "8.68.0")
 @Value
 public class Reassignable implements Trait<Expression> {
     Cursor cursor;
