@@ -112,6 +112,76 @@ class TreeVisitorAdapterTest {
 
         jv.visitNonNull(cu, 0);
     }
+
+    @Test
+    void preVisitDeclaredOnSuperclassIsForwarded() {
+        AtomicInteger n = new AtomicInteger();
+        // preVisit is declared on the SUPERCLASS, not the leaf delegate class.
+        //noinspection unchecked
+        JavaVisitor<Integer> jv = TreeVisitorAdapter.adapt(new PreVisitSubclass(n), JavaVisitor.class);
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}")
+          .findFirst()
+          .map(J.CompilationUnit.class::cast)
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+        jv.visit(cu, 0);
+        // Must fire per node exactly as if preVisit were declared on the leaf (see adapter()).
+        assertThat(n.get()).isEqualTo(4);
+    }
+
+    @Test
+    void visitMethodDeclaredOnIsoVisitorSuperclassIsForwarded() {
+        AtomicInteger n = new AtomicInteger();
+        // visitIdentifier is declared on a user superclass that extends JavaIsoVisitor; the adapter
+        // must collect it (walking up to, but not into, JavaIsoVisitor).
+        //noinspection unchecked
+        JavaVisitor<Integer> jv = TreeVisitorAdapter.adapt(new IdentifierCountingSubclass(n), JavaVisitor.class);
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}")
+          .findFirst()
+          .map(J.CompilationUnit.class::cast)
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+        jv.visit(cu, 0);
+        assertThat(n.get()).isEqualTo(1);
+    }
+
+    static class IdentifierCountingBase extends JavaIsoVisitor<Integer> {
+        final AtomicInteger n;
+
+        IdentifierCountingBase(AtomicInteger n) {
+            this.n = n;
+        }
+
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+            n.incrementAndGet();
+            return identifier;
+        }
+    }
+
+    static class IdentifierCountingSubclass extends IdentifierCountingBase {
+        IdentifierCountingSubclass(AtomicInteger n) {
+            super(n);
+        }
+    }
+}
+
+class PreVisitBase extends TreeVisitor<Tree, Integer> {
+    final AtomicInteger visitCount;
+
+    PreVisitBase(AtomicInteger visitCount) {
+        this.visitCount = visitCount;
+    }
+
+    @Override
+    public Tree preVisit(Tree tree, Integer p) {
+        visitCount.incrementAndGet();
+        return super.preVisit(tree, p);
+    }
+}
+
+class PreVisitSubclass extends PreVisitBase {
+    PreVisitSubclass(AtomicInteger visitCount) {
+        super(visitCount);
+    }
 }
 
 @Value
