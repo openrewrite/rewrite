@@ -34,17 +34,9 @@ import org.openrewrite.trait.VisitFunction2;
 
 /**
  * A syntactic check that an expression could be the target of a plain assignment
- * {@code target = ...} without introducing a compile error. Handles two shapes:
- * <ul>
- *     <li>a {@link J.Identifier} referring to a non-final local declared in an
- *         enclosing block (method parameters are excluded because reassigning a
- *         parameter silently drops the caller's expected mutation), and</li>
- *     <li>a {@link J.FieldAccess} whose target is a bare {@link J.Identifier}
- *         (e.g. {@code this.f} or {@code holder.f}) and whose field is non-final.</li>
- * </ul>
- * Array-element writes, parenthesized targets, method-chain receivers, and
- * multi-hop qualified field access (e.g. {@code a.b.c}) are intentionally not
- * matched. Effectively-final semantics are not modelled.
+ * {@code target = ...}. Matches a non-final local {@link J.Identifier} declared
+ * in an enclosing block, or a {@link J.FieldAccess} on a non-final field whose
+ * target is a bare {@link J.Identifier}.
  */
 @Incubating(since = "8.68.0")
 @Value
