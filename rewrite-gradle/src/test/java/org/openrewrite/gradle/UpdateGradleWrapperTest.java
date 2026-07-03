@@ -1162,6 +1162,86 @@ class UpdateGradleWrapperTest implements RewriteTest {
         );
     }
 
+    /**
+     * Verifies version detection works when the repository is served at the host root without an "/artifactory" context path.
+     */
+    @Test
+    void updatesCustomDistributionUrlHostedUnderNonArtifactoryPath() {
+        upgradeCustomDistributionUrl(
+          "https\\://artifactory.aexp.com/gradle-distributions/gradle-6.9.1-bin.zip",
+          "https\\://artifactory.aexp.com/gradle-distributions/gradle-7.6.6-bin.zip"
+        );
+    }
+
+    /**
+     * Verifies version detection works for a non-Artifactory repository (e.g. Nexus) that never matched the old "/artifactory" heuristic.
+     */
+    @Test
+    void updatesCustomDistributionUrlOnArbitraryRepository() {
+        upgradeCustomDistributionUrl(
+          "https\\://nexus.company.com/repository/gradle-distributions/gradle-6.9.1-bin.zip",
+          "https\\://nexus.company.com/repository/gradle-distributions/gradle-7.6.6-bin.zip"
+        );
+    }
+
+    private void upgradeCustomDistributionUrl(String beforeUrl, String afterUrl) {
+        HttpSender versionsList = request -> {
+            if ("https://services.gradle.org/versions/all".equals(request.getUrl().toString())) {
+                return new HttpSender.Response(200, new ByteArrayInputStream("""
+                  [ {
+                    "version" : "8.5",
+                    "downloadUrl" : "https://services.gradle.org/distributions/gradle-8.5-bin.zip",
+                    "checksumUrl" : "https://services.gradle.org/distributions/gradle-8.5-bin.zip.sha256",
+                    "wrapperChecksumUrl" : "https://services.gradle.org/distributions/gradle-8.5-wrapper.jar.sha256"
+                  }, {
+                    "version" : "7.6.6",
+                    "downloadUrl" : "https://services.gradle.org/distributions/gradle-7.6.6-bin.zip",
+                    "checksumUrl" : "https://services.gradle.org/distributions/gradle-7.6.6-bin.zip.sha256",
+                    "wrapperChecksumUrl" : "https://services.gradle.org/distributions/gradle-7.6.6-wrapper.jar.sha256"
+                  }, {
+                    "version" : "7.4",
+                    "downloadUrl" : "https://services.gradle.org/distributions/gradle-7.4-bin.zip",
+                    "checksumUrl" : "https://services.gradle.org/distributions/gradle-7.4-bin.zip.sha256",
+                    "wrapperChecksumUrl" : "https://services.gradle.org/distributions/gradle-7.4-wrapper.jar.sha256"
+                  } ]
+                  """.getBytes(StandardCharsets.UTF_8)), () -> {
+                });
+            }
+            return new HttpUrlConnectionSender().send(request);
+        };
+        HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(versionsList)
+          .setLargeFileHttpSender(versionsList);
+        rewriteRun(
+          // addIfMissing=false so the recipe only rewrites the existing properties file and never downloads a distribution
+          spec -> spec.recipe(new UpdateGradleWrapper("7.x", null, false, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "6.9.1")))
+            .executionContext(ctx),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=%s
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """.formatted(beforeUrl),
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=%s
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """.formatted(afterUrl),
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+              .afterRecipe(gradleWrapperProperties ->
+                assertThat(gradleWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
+                    assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Gradle);
+                    assertThat(buildTool.getVersion()).isEqualTo("7.6.6");
+                }))
+          )
+        );
+    }
+
     @Test
     void usesExecutableJarFrom8_14() {
         rewriteRun(
