@@ -96,7 +96,7 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Groovy list literals are G.ListLiteral, not J.NewArray; getElements() cannot normalize them from rewrite-java")
+    @ExpectedToFail("Groovy list literals are G.ListLiteral, not J.NewArray; getElements() cannot normalize them from rewrite-java — https://github.com/openrewrite/rewrite/issues/8170")
     @Test
     void listLiteralArray() {
         rewriteRun(
@@ -128,7 +128,7 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("GroovyParserVisitor#visitPropertyExpression attaches no type to the idiomatic bare class reference")
+    @ExpectedToFail("GroovyParserVisitor#visitPropertyExpression attaches no type to the idiomatic bare class reference — https://github.com/openrewrite/rewrite/issues/8170")
     @Test
     void bareClassReference() {
         rewriteRun(
@@ -160,7 +160,7 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("GroovyParserVisitor#visitPropertyExpression hard-codes fieldType=null on property-access references, so Flag.Enum is unavailable")
+    @ExpectedToFail("GroovyParserVisitor#visitPropertyExpression hard-codes fieldType=null on property-access references, so Flag.Enum is unavailable — https://github.com/openrewrite/rewrite/issues/8170")
     @Test
     void enumConstant() {
         rewriteRun(
@@ -200,7 +200,7 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("GroovyTypeMapping builds no JavaType.Annotation element values, so the compiler's constant fold is unavailable")
+    @ExpectedToFail("GroovyTypeMapping builds no JavaType.Annotation element values, so the compiler's constant fold is unavailable — https://github.com/openrewrite/rewrite/issues/8170")
     @Test
     void constantReferenceFolds() {
         rewriteRun(

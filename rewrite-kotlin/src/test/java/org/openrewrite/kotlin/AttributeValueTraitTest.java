@@ -124,7 +124,7 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("KotlinTypeMapping#variableType does not set Flag.Enum on enum entries (mapToFlagsBitmap uses only visibility/modality/static)")
+    @ExpectedToFail("KotlinTypeMapping#variableType does not set Flag.Enum on enum entries (mapToFlagsBitmap uses only visibility/modality/static) — https://github.com/openrewrite/rewrite/issues/8170")
     @Test
     void enumConstant() {
         rewriteRun(
@@ -158,7 +158,7 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("KotlinTypeMapping builds no JavaType.Annotation element values, so the compiler's constant fold is unavailable")
+    @ExpectedToFail("KotlinTypeMapping builds no JavaType.Annotation element values, so the compiler's constant fold is unavailable — https://github.com/openrewrite/rewrite/issues/8170")
     @Test
     void constantReferenceFolds() {
         rewriteRun(
@@ -192,7 +192,7 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Kotlin collection literals are K.ListLiteral, not J.NewArray; getElements() cannot normalize them from rewrite-java")
+    @ExpectedToFail("Kotlin collection literals are K.ListLiteral, not J.NewArray; getElements() cannot normalize them from rewrite-java — https://github.com/openrewrite/rewrite/issues/8170")
     @Test
     void collectionLiteralArray() {
         rewriteRun(
