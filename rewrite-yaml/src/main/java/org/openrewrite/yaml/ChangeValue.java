@@ -70,9 +70,7 @@ public class ChangeValue extends Recipe {
                 if (!matcher.matches(getCursor())) {
                     return e;
                 }
-                BlockScalar block = e.getValue() instanceof Yaml.Scalar ?
-                        new BlockScalar.Matcher().get(e.getValue(), getCursor()).orElse(null) :
-                        null;
+                BlockScalar block = new BlockScalar.Matcher().get(new Cursor(getCursor(), e.getValue())).orElse(null);
                 if (block != null) {
                     if (!block.getBody().equals(value)) {
                         e = e.withValue(block.withBody(value));
