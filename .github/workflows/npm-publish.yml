@@ -73,7 +73,7 @@ jobs:
       # falls back to Gradle's own snapshot-version derivation.
       - if: github.event.workflow_run.name == 'ci'
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: published-snapshot-version
           path: .published-version
