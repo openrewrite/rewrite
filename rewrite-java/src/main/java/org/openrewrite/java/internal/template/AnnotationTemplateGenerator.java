@@ -45,9 +45,9 @@ public class AnnotationTemplateGenerator {
 
         J j = cursor.getValue();
         if (j instanceof J.MethodDeclaration) {
-            after.insert(0, " void $method() {}");
+            addDummyMethod(after);
         } else if (j instanceof J.VariableDeclarations) {
-            after.insert(0, " int $variable;");
+            addDummyVariable(after);
         } else if (j instanceof J.ClassDeclaration) {
             addDummyClass(cursor, after);
         }
@@ -83,9 +83,9 @@ public class AnnotationTemplateGenerator {
                     }
 
                     if (j instanceof J.MethodDeclaration || annotationParent instanceof J.MethodDeclaration) {
-                        after.insert(0, " void $method() {}");
+                        addDummyMethod(after);
                     } else if (j instanceof J.VariableDeclarations || annotationParent instanceof J.VariableDeclarations) {
-                        after.insert(0, " int $variable;");
+                        addDummyVariable(after);
                     } else if (j instanceof J.ClassDeclaration || annotationParent instanceof J.ClassDeclaration) {
                         // Check if this is a top-level class or nested class
                         Cursor classCursor = j instanceof J.ClassDeclaration ? cursor : cursor.getParent(level);
@@ -103,6 +103,14 @@ public class AnnotationTemplateGenerator {
         } else {
             after.insert(0, "static class $Clazz {}");
         }
+    }
+
+    protected void addDummyMethod(StringBuilder after) {
+        after.insert(0, " void $method() {}");
+    }
+
+    protected void addDummyVariable(StringBuilder after) {
+        after.insert(0, " int $variable;");
     }
 
     protected void addDummyAnnotationType(StringBuilder after) {
@@ -375,7 +383,7 @@ public class AnnotationTemplateGenerator {
         return annotationService.getAllAnnotations(cursor).contains(maybeAnnotation);
     }
 
-    private String variable(J.VariableDeclarations variable, Cursor cursor) {
+    protected String variable(J.VariableDeclarations variable, Cursor cursor) {
         StringBuilder varBuilder = new StringBuilder();
         if (variable.getTypeExpression() != null) {
             for (J.Modifier modifier : variable.getModifiers()) {
