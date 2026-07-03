@@ -28,23 +28,11 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 /**
- * Regenerates a Go module's {@code go.sum} by running the real {@code go}
- * toolchain in a temporary directory seeded with {@code go.mod}. Mirrors the
- * Python/JavaScript {@code LockFileRegeneration}, adapted to Go's split between
- * {@code go.mod} (the dependency manifest) and {@code go.sum} (the checksum lock).
- * <p>
- * The command is {@code go mod download all}: it recomputes the checksums for the
- * whole module graph and writes them to {@code go.sum} without restructuring
- * {@code go.mod}, so the transformation stays scoped to the lock. Delegating to
- * {@code go} means checksums are byte-identical to what the toolchain produces,
- * with module cache, proxy, {@code GONOSUMDB}/{@code GOPRIVATE}, and credentials
- * all honored from the inherited environment — no local hashing or checksum-db
- * parsing in Java.
- * <p>
- * By default the existing {@code go.sum} is not seeded, so stale entries are
- * dropped from the regenerated file rather than lingering ({@code go mod download}
- * only appends). A depless module legitimately produces no {@code go.sum}; that
- * is reported as success with empty content.
+ * Regenerates a Go module's {@code go.sum} by running {@code go mod download all}
+ * in a temporary directory seeded with {@code go.mod}. The existing {@code go.sum}
+ * is not seeded by default, so stale entries are dropped rather than left behind
+ * ({@code go mod download} only appends). A module with no dependencies produces
+ * no {@code go.sum}, reported as success with empty content.
  */
 public final class LockFileRegeneration {
 

@@ -36,9 +36,6 @@ import java.util.Map;
  * real {@code go} toolchain, e.g. after a dependency upgrade edited {@code go.mod}.
  * The checksums are produced by {@code go mod download}, so they are byte-identical
  * to what the toolchain writes; {@code go.mod} itself is left untouched.
- * <p>
- * No-op when {@code go} is not installed: the recipe warns via the regeneration
- * result and leaves {@code go.sum} unchanged rather than failing the run.
  */
 @Value
 @EqualsAndHashCode(callSuper = false)
