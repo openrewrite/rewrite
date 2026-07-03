@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.java.trait.Annotated;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -25,10 +26,12 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 /**
- * Pins the {@link org.openrewrite.java.trait.AttributeValue} behavior on Kotlin sources:
- * {@code A::class} / {@code A::class.java} class references, and the documented
- * degradations — no constant folding, no enum discrimination, collection literals as
- * opaque expressions.
+ * The {@link org.openrewrite.java.trait.AttributeValue} behavior on Kotlin sources,
+ * asserting the same semantics the trait has on javac-attributed Java sources.
+ * Tests annotated {@link ExpectedToFail} document known Kotlin type-mapping gaps:
+ * {@code KotlinTypeMapping#variableType} does not set {@code Flag.Enum} on enum
+ * entries, no {@code JavaType.Annotation} element values are built (no constant
+ * folding), and collection literals are {@code K.ListLiteral}, not {@code J.NewArray}.
  */
 class AttributeValueTraitTest implements RewriteTest {
 
@@ -90,39 +93,6 @@ class AttributeValueTraitTest implements RewriteTest {
     }
 
     @Test
-    void enumConstantDegradesToConstantReference() {
-        rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
-            .asVisitor(a -> SearchResult.found(a.getTree(),
-              a.getAttributeValue("e")
-                .map(v -> v.getKind() + ":isEnum=" + v.isEnumConstant("E", "ONE"))
-                .orElse("missing"))))),
-          kotlin(
-            """
-              enum class E {
-                  ONE, TWO
-              }
-
-              annotation class Example(val e: E)
-
-              @Example(e = E.ONE)
-              class Test
-              """,
-            """
-              enum class E {
-                  ONE, TWO
-              }
-
-              annotation class Example(val e: E)
-
-              /*~~(CONSTANT_REFERENCE:isEnum=false)~~>*/@Example(e = E.ONE)
-              class Test
-              """
-          )
-        );
-    }
-
-    @Test
     void classReferenceViaClassJava() {
         rewriteRun(
           spec -> spec
@@ -154,8 +124,43 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("KotlinTypeMapping#variableType does not set Flag.Enum on enum entries (mapToFlagsBitmap uses only visibility/modality/static)")
     @Test
-    void constantReferenceDoesNotFold() {
+    void enumConstant() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
+            .asVisitor(a -> SearchResult.found(a.getTree(),
+              a.getAttributeValue("e")
+                .map(v -> v.getKind() + ":isEnum=" + v.isEnumConstant("E", "ONE"))
+                .orElse("missing"))))),
+          kotlin(
+            """
+              enum class E {
+                  ONE, TWO
+              }
+
+              annotation class Example(val e: E)
+
+              @Example(e = E.ONE)
+              class Test
+              """,
+            """
+              enum class E {
+                  ONE, TWO
+              }
+
+              annotation class Example(val e: E)
+
+              /*~~(ENUM_CONSTANT:isEnum=true)~~>*/@Example(e = E.ONE)
+              class Test
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("KotlinTypeMapping builds no JavaType.Annotation element values, so the compiler's constant fold is unavailable")
+    @Test
+    void constantReferenceFolds() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
             .asVisitor(a -> SearchResult.found(a.getTree(),
@@ -180,15 +185,16 @@ class AttributeValueTraitTest implements RewriteTest {
 
               annotation class Example(val name: String)
 
-              /*~~(CONSTANT_REFERENCE:null)~~>*/@Example(name = Constants.NAME)
+              /*~~(CONSTANT_REFERENCE:n)~~>*/@Example(name = Constants.NAME)
               class Test
               """
           )
         );
     }
 
+    @ExpectedToFail("Kotlin collection literals are K.ListLiteral, not J.NewArray; getElements() cannot normalize them from rewrite-java")
     @Test
-    void collectionLiteralIsAnOpaqueExpression() {
+    void collectionLiteralArray() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
             .asVisitor(a -> SearchResult.found(a.getTree(),
@@ -205,7 +211,7 @@ class AttributeValueTraitTest implements RewriteTest {
             """
               annotation class Example(val tags: Array<String>)
 
-              /*~~(EXPRESSION:elements=1)~~>*/@Example(tags = ["a", "b"])
+              /*~~(ARRAY:elements=2)~~>*/@Example(tags = ["a", "b"])
               class Test
               """
           )

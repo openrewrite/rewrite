@@ -16,6 +16,7 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.java.trait.Annotated;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
@@ -23,9 +24,13 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 /**
- * Pins the {@link org.openrewrite.java.trait.AttributeValue} degradations documented
- * for Groovy sources: no constant folding, no enum discrimination, list literals as
- * opaque expressions.
+ * The {@link org.openrewrite.java.trait.AttributeValue} behavior on Groovy sources,
+ * asserting the same semantics the trait has on javac-attributed Java sources.
+ * Tests annotated {@link ExpectedToFail} document known Groovy parser/type-mapping
+ * gaps: property-access references carry no {@code fieldType}
+ * ({@code GroovyParserVisitor#visitPropertyExpression}), no
+ * {@code JavaType.Annotation} element values are built (no constant folding), and
+ * list literals are {@code G.ListLiteral}, not {@code J.NewArray}.
  */
 class AttributeValueTraitTest implements RewriteTest {
 
@@ -91,8 +96,9 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("Groovy list literals are G.ListLiteral, not J.NewArray; getElements() cannot normalize them from rewrite-java")
     @Test
-    void listLiteralIsAnOpaqueExpression() {
+    void listLiteralArray() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
             .asVisitor(a -> SearchResult.found(a.getTree(),
@@ -114,7 +120,7 @@ class AttributeValueTraitTest implements RewriteTest {
                   String[] tags()
               }
 
-              /*~~(EXPRESSION:elements=1)~~>*/@Example(tags = ["a", "b"])
+              /*~~(ARRAY:elements=2)~~>*/@Example(tags = ["a", "b"])
               class Test {
               }
               """
@@ -122,8 +128,9 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("GroovyParserVisitor#visitPropertyExpression attaches no type to the idiomatic bare class reference")
     @Test
-    void bareClassReferenceDegradesToConstantReference() {
+    void bareClassReference() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
             .asVisitor(a -> SearchResult.found(a.getTree(),
@@ -145,7 +152,7 @@ class AttributeValueTraitTest implements RewriteTest {
                   Class type()
               }
 
-              /*~~(CONSTANT_REFERENCE:field=false:class=false)~~>*/@Example(type = String)
+              /*~~(CLASS_LITERAL:field=false:class=true)~~>*/@Example(type = String)
               class Test {
               }
               """
@@ -153,8 +160,9 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("GroovyParserVisitor#visitPropertyExpression hard-codes fieldType=null on property-access references, so Flag.Enum is unavailable")
     @Test
-    void enumConstantDegradesToConstantReference() {
+    void enumConstant() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
             .asVisitor(a -> SearchResult.found(a.getTree(),
@@ -184,7 +192,7 @@ class AttributeValueTraitTest implements RewriteTest {
                   E e()
               }
 
-              /*~~(CONSTANT_REFERENCE:isEnum=false)~~>*/@Example(e = E.ONE)
+              /*~~(ENUM_CONSTANT:isEnum=true)~~>*/@Example(e = E.ONE)
               class Test {
               }
               """
@@ -192,8 +200,9 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("GroovyTypeMapping builds no JavaType.Annotation element values, so the compiler's constant fold is unavailable")
     @Test
-    void constantReferenceDoesNotFold() {
+    void constantReferenceFolds() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new Annotated.Matcher("@Example")
             .asVisitor(a -> SearchResult.found(a.getTree(),
@@ -223,7 +232,7 @@ class AttributeValueTraitTest implements RewriteTest {
                   static final String NAME = "n"
               }
 
-              /*~~(CONSTANT_REFERENCE:null)~~>*/@Example(name = Constants.NAME)
+              /*~~(CONSTANT_REFERENCE:n)~~>*/@Example(name = Constants.NAME)
               class Test {
               }
               """
