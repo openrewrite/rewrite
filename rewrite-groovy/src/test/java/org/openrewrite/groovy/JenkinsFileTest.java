@@ -17,6 +17,8 @@ package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
@@ -158,6 +160,63 @@ class JenkinsFileTest implements RewriteTest {
               foo()
               """,
             spec -> spec.path("Jenkinsfile")
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7229")
+    @Test
+    void jenkinsSharedLibraryMethodResolutionFromScope() {
+        rewriteRun(
+          groovy(
+            "sbPipeline()",
+            spec -> spec.path("Jenkinsfile")
+              .afterRecipe(sourceFile -> {
+                  if (sourceFile.getSourcePath().toString().contains("Jenkinsfile")) {
+                      G.CompilationUnit cu = (G.CompilationUnit) sourceFile;
+                      J.MethodInvocation m = cu.getStatements().stream()
+                              .filter(J.MethodInvocation.class::isInstance)
+                              .map(J.MethodInvocation.class::cast)
+                              .filter(it -> "sbPipeline".equals(it.getSimpleName()))
+                              .findFirst()
+                              .orElseThrow();
+                      org.assertj.core.api.Assertions.assertThat(m.getMethodType()).isNotNull();
+                      org.assertj.core.api.Assertions.assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName())
+                              .isEqualTo("jenkins.sharedlibrary.my_library.Vars");
+                  }
+              })
+          ),
+          groovy(
+            "def call() { }",
+            spec -> spec.path("my-library/vars/sbPipeline.groovy")
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7229")
+    @Test
+    void jenkinsSharedLibraryMethodResolutionFromLibraryAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+            @Library('my-pipeline-library') _
+            sbPipeline()
+            """,
+            spec -> spec.path("Jenkinsfile")
+              .afterRecipe(sourceFile -> {
+                  if (sourceFile.getSourcePath().toString().contains("Jenkinsfile")) {
+                      G.CompilationUnit cu = (G.CompilationUnit) sourceFile;
+                      J.MethodInvocation m = cu.getStatements().stream()
+                              .filter(J.MethodInvocation.class::isInstance)
+                              .map(J.MethodInvocation.class::cast)
+                              .filter(it -> "sbPipeline".equals(it.getSimpleName()))
+                              .findFirst()
+                              .orElseThrow();
+                      org.assertj.core.api.Assertions.assertThat(m.getMethodType()).isNotNull();
+                      org.assertj.core.api.Assertions.assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName())
+                              .isEqualTo("jenkins.sharedlibrary.my_pipeline_library.Vars");
+                  }
+              })
           )
         );
     }
