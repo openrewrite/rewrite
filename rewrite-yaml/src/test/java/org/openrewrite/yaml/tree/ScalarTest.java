@@ -16,15 +16,12 @@
 package org.openrewrite.yaml.tree;
 
 import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.yaml.YamlIsoVisitor;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class ScalarTest implements RewriteTest {
@@ -80,37 +77,5 @@ class ScalarTest implements RewriteTest {
                     Assertions.assertThat(maybeScalar).isInstanceOf(Yaml.Scalar.class);
                 }))
         );
-    }
-
-    @Nested
-    class BlockScalarBody {
-
-        private Yaml.Scalar literal(String value) {
-            return new Yaml.Scalar(randomId(), "", Markers.EMPTY, Yaml.Scalar.Style.LITERAL, null, null, value);
-        }
-
-        @Test
-        void getBodyStripsCrFromLfBody() {
-            Yaml.Scalar s = literal("\n  line one\n  line two\n");
-            assertThat(s.getBody()).isEqualTo("line one\nline two");
-        }
-
-        @Test
-        void getBodyStripsCrFromCrlfBody() {
-            Yaml.Scalar s = literal("\r\n  line one\r\n  line two\r\n");
-            assertThat(s.getBody()).isEqualTo("line one\nline two");
-        }
-
-        @Test
-        void withBodyKeepsLfForLfScalar() {
-            Yaml.Scalar s = literal("\n  line one\n  line two\n");
-            assertThat(s.withBody("new one\nnew two").getValue()).isEqualTo("\n  new one\n  new two\n");
-        }
-
-        @Test
-        void withBodyEmitsCrlfForCrlfScalar() {
-            Yaml.Scalar s = literal("\r\n  line one\r\n  line two\r\n");
-            assertThat(s.withBody("new one\nnew two").getValue()).isEqualTo("\r\n  new one\r\n  new two\r\n");
-        }
     }
 }

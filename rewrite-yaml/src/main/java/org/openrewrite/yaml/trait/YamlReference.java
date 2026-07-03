@@ -40,7 +40,7 @@ public abstract class YamlReference implements Reference {
     public Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
         Tree tree = cursor.getValue();
         if (tree instanceof Yaml.Scalar) {
-            return ((Yaml.Scalar) tree).withBody(renamer.rename(this));
+            return BlockScalar.of(cursor).withBody(renamer.rename(this));
         }
         throw new IllegalArgumentException("cursor.getValue() must be an Yaml.Scalar but is: " + tree.getClass());
     }

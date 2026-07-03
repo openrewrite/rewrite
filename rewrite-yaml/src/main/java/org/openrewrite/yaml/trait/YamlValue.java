@@ -52,7 +52,7 @@ public class YamlValue implements Trait<Yaml.Mapping.Entry> {
     }
 
     public YamlValue withValue(String newValue) {
-        Yaml.Scalar value = getValueAsScalar().withBody(newValue);
+        Yaml.Scalar value = BlockScalar.of(new Cursor(cursor, getValueAsScalar())).withBody(newValue);
         cursor = new Cursor(cursor.getParent(), getTree().withValue(value));
         return this;
     }
