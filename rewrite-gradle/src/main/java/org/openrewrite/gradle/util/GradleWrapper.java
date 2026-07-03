@@ -129,7 +129,7 @@ public class GradleWrapper {
             return privateArtifactoryVersion.get();
         }
 
-        return substituteCustomDistributionVersion(currentDistributionUrl, version, versionComparator, distributionType, ctx);
+        return resolveCustomDistributionVersion(currentDistributionUrl, version, versionComparator, distributionType);
     }
 
     /**
@@ -137,7 +137,7 @@ public class GradleWrapper {
      * version it doesn't contain. This is best-effort: it only works when Artifactory is served under the conventional
      * "/artifactory" context path and exposes the storage API. Returns empty when the URL isn't a recognizable
      * Artifactory storage layout, the listing fails, or no hosted version satisfies the requested selector, in which
-     * case the caller falls back to resolving against the public Gradle version list.
+     * case the caller falls back to {@link #resolveCustomDistributionVersion}.
      */
     private static Optional<GradleVersion> selectPrivateArtifactoryVersion(String currentDistributionUrl, VersionComparator versionComparator,
                                                                            DistributionType distributionType, ExecutionContext ctx) {
@@ -157,27 +157,26 @@ public class GradleWrapper {
     }
 
     /**
-     * Resolve the target version for a Gradle distribution hosted in an arbitrary repository (an arbitrary Maven
-     * repository in Artifactory or Nexus, an S3 bucket, a CDN, etc.) that can't be queried for its available versions.
-     * For a wildcard selector the concrete version is resolved from the public Gradle version list; the resolved
-     * version is then substituted into the existing URL, preserving the custom host and path layout already present
-     * in the wrapper properties.
+     * Resolve the target version for a Gradle distribution hosted at a non-standard URL (an arbitrary Maven repository
+     * in Artifactory or Nexus, an S3 bucket, a CDN, etc.) that can't be queried for its available versions.
+     * <p>
+     * An exact version is substituted into the existing URL, preserving the custom host and path layout already present
+     * in the wrapper properties. A dynamic selector (e.g. {@code 7.x}) can't be resolved without querying an external
+     * service such as {@code services.gradle.org}, which is frequently unavailable in the enterprise environments that
+     * host distributions at non-standard URLs. Rather than failing the (often deeply chained) recipe run, the version
+     * already present in the URL is returned so the caller leaves the wrapper unchanged.
      */
-    private static GradleVersion substituteCustomDistributionVersion(String currentDistributionUrl, @Nullable String version, VersionComparator versionComparator,
-                                                                     DistributionType distributionType, ExecutionContext ctx) {
-        String resolvedVersion = version;
+    private static GradleVersion resolveCustomDistributionVersion(String currentDistributionUrl, @Nullable String version, VersionComparator versionComparator,
+                                                                  DistributionType distributionType) {
         if (!(versionComparator instanceof ExactVersion)) {
-            resolvedVersion = listAllPublicVersions(ctx).stream()
-                    .filter(v -> versionComparator.isValid(null, v.version))
-                    .filter(v -> v.distributionType == distributionType)
-                    .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
-                    .map(GradleVersion::getVersion)
-                    .orElseThrow(() -> new IllegalStateException(String.format("Expected to find at least one Gradle wrapper version to select from %s.", GRADLE_DOWNLOADS_URL)));
+            Matcher matcher = GRADLE_VERSION_PATTERN.matcher(currentDistributionUrl);
+            String existingVersion = matcher.find() ? matcher.group(1) : version;
+            return new GradleVersion(existingVersion, currentDistributionUrl, distributionType, null, null);
         }
 
         return new GradleVersion(
-                resolvedVersion,
-                currentDistributionUrl.replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-)(?:bin|all).zip", "$1" + resolvedVersion + "$3" + distributionType.getFileSuffix() + ".zip"),
+                version,
+                currentDistributionUrl.replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-)(?:bin|all).zip", "$1" + version + "$3" + distributionType.getFileSuffix() + ".zip"),
                 distributionType,
                 null,
                 null
