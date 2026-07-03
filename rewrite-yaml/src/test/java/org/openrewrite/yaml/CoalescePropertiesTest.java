@@ -376,4 +376,79 @@ class CoalescePropertiesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void coalescesMappingSiblingOfBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new CoalesceProperties(null, null)),
+          yaml(
+            """
+              outer:
+                inner:
+                  java_opts: >-
+                    -Da=1
+                    -Db=2
+                  after: tail
+              """,
+            """
+              outer.inner:
+                java_opts: >-
+                  -Da=1
+                  -Db=2
+                after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void coalescesLoneBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new CoalesceProperties(null, null)),
+          yaml(
+            """
+              outer:
+                inner: |
+                  line one
+                  line two
+              """,
+            """
+              outer.inner: |
+                line one
+                line two
+              """
+          )
+        );
+    }
+
+    @Test
+    void coalescesDeeplyNestedBlockScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new CoalesceProperties(null, null)),
+          yaml(
+            """
+              outer:
+                inner:
+                  details:
+                    script: |
+                      echo hello
+              """,
+            """
+              outer.inner.details.script: |
+                echo hello
+              """
+          )
+        );
+    }
+
+    @Test
+    void coalescesBlockScalarPreservingCrlfBodyLineEndings() {
+        rewriteRun(
+          spec -> spec.recipe(new CoalesceProperties(null, null)),
+          yaml(
+            "outer:\r\n  inner: |\r\n    line one\r\n    line two\r\n",
+            "outer.inner: |\r\n  line one\r\n  line two\r\n"
+          )
+        );
+    }
 }
