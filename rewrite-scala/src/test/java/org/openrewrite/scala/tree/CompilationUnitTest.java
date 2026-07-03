@@ -101,6 +101,19 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Test
+    void packageWithBacktickedSegment() {
+        rewriteRun(
+          scala(
+            """
+            package com.example.`trait`
+
+            val x = 42
+            """
+          )
+        );
+    }
+
+    @Test
     void withImports() {
         rewriteRun(
           scala(
