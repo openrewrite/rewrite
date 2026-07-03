@@ -67,19 +67,24 @@ public class ChangeValue extends Recipe {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
-                if (matcher.matches(getCursor()) && (!(e.getValue() instanceof Yaml.Scalar)
-                        || !BlockScalar.of(new Cursor(getCursor(), e.getValue())).getBody().equals(value))) {
-                    if (e.getValue() instanceof Yaml.Scalar && isBlockStyle((Yaml.Scalar) e.getValue())) {
-                        e = e.withValue(BlockScalar.of(new Cursor(getCursor(), e.getValue())).withBody(value));
-                    } else {
-                        Yaml.Anchor anchor = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getAnchor() : null;
-                        Yaml.Tag tag = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getTag() : null;
-                        String prefix = e.getValue() instanceof Yaml.Sequence ? ((Yaml.Sequence) e.getValue()).getOpeningBracketPrefix() : e.getValue().getPrefix();
-                        e = e.withValue(
-                                new Yaml.Scalar(randomId(), prefix, Markers.EMPTY,
-                                        Yaml.Scalar.Style.PLAIN, anchor, tag, value)
-                        );
+                if (!matcher.matches(getCursor())) {
+                    return e;
+                }
+                BlockScalar block = e.getValue() instanceof Yaml.Scalar ?
+                        new BlockScalar.Matcher().get(e.getValue(), getCursor()).orElse(null) :
+                        null;
+                if (block != null) {
+                    if (!block.getBody().equals(value)) {
+                        e = e.withValue(block.withBody(value));
                     }
+                } else if (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getValue().equals(value)) {
+                    Yaml.Anchor anchor = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getAnchor() : null;
+                    Yaml.Tag tag = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getTag() : null;
+                    String prefix = e.getValue() instanceof Yaml.Sequence ? ((Yaml.Sequence) e.getValue()).getOpeningBracketPrefix() : e.getValue().getPrefix();
+                    e = e.withValue(
+                            new Yaml.Scalar(randomId(), prefix, Markers.EMPTY,
+                                    Yaml.Scalar.Style.PLAIN, anchor, tag, value)
+                    );
                 }
                 return e;
             }
@@ -88,17 +93,16 @@ public class ChangeValue extends Recipe {
             public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext ctx) {
                 Yaml.Scalar s = super.visitScalar(scalar, ctx);
                 if (matcher.matches(getCursor())) {
-                    BlockScalar block = BlockScalar.of(getCursor());
-                    if (!block.getBody().equals(value)) {
-                        s = block.withBody(value);
+                    BlockScalar block = new BlockScalar.Matcher().get(getCursor()).orElse(null);
+                    if (block != null) {
+                        if (!block.getBody().equals(value)) {
+                            s = block.withBody(value);
+                        }
+                    } else if (!s.getValue().equals(value)) {
+                        s = s.withValue(value);
                     }
                 }
                 return s;
-            }
-
-            private boolean isBlockStyle(Yaml.Scalar s) {
-                return s.getStyle() == Yaml.Scalar.Style.FOLDED ||
-                        s.getStyle() == Yaml.Scalar.Style.LITERAL;
             }
         });
     }

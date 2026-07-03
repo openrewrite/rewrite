@@ -15,40 +15,26 @@
  */
 package org.openrewrite.yaml.trait;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.yaml.tree.Yaml;
 
 /**
- * Body-aware access to a {@link Yaml.Scalar}. For FOLDED / LITERAL scalars, the raw
- * {@link Yaml.Scalar#value} field carries the block envelope (chomp indicator, header
- * newline, indented body, trailing whitespace bounding the next sibling); rewriting it
- * directly via the Lombok-generated {@code withValue} clobbers the envelope. This trait
- * exposes {@link #getBody()} / {@link #withBody(String)} that operate on just the body.
+ * Body-aware access to a FOLDED / LITERAL {@link Yaml.Scalar}: the raw {@link Yaml.Scalar#value}
+ * carries the block envelope (chomp indicator, header newline, indented body, trailing whitespace
+ * bounding the next sibling), so rewriting it directly via the Lombok-generated {@code withValue}
+ * clobbers the envelope.
  */
-@AllArgsConstructor
+@Value
 public class BlockScalar implements Trait<Yaml.Scalar> {
-    @Getter
     Cursor cursor;
 
-    public static BlockScalar of(Cursor cursor) {
-        return new BlockScalar(cursor);
-    }
-
-    /**
-     * Returns {@link Yaml.Scalar#value} for PLAIN and quoted styles. For FOLDED / LITERAL,
-     * returns the body dedented to column zero with interior line breaks normalized to
-     * {@code \n} regardless of the source file's line-ending convention.
-     */
     public String getBody() {
-        Yaml.Scalar scalar = getTree();
-        if (!isBlockStyle(scalar)) {
-            return scalar.getValue();
-        }
-        String value = scalar.getValue();
+        String value = getTree().getValue();
         int headerEnd = value.indexOf('\n');
         if (headerEnd < 0) {
             return "";
@@ -85,16 +71,8 @@ public class BlockScalar implements Trait<Yaml.Scalar> {
         return withBody(newBody, 2);
     }
 
-    /**
-     * Returns a copy of the underlying scalar with the body replaced. For PLAIN and quoted
-     * styles, equivalent to {@code withValue(newBody)}. For FOLDED / LITERAL, the block
-     * envelope and existing line-ending convention are preserved.
-     */
     public Yaml.Scalar withBody(String newBody, int defaultIndentSpaces) {
         Yaml.Scalar scalar = getTree();
-        if (!isBlockStyle(scalar)) {
-            return scalar.withValue(newBody);
-        }
         String value = scalar.getValue();
         int headerEnd = value.indexOf('\n');
         String header = headerEnd < 0 ? value : value.substring(0, headerEnd + 1);
@@ -130,8 +108,16 @@ public class BlockScalar implements Trait<Yaml.Scalar> {
         return scalar.withValue(header + body + trailing);
     }
 
-    private static boolean isBlockStyle(Yaml.Scalar scalar) {
-        return scalar.getStyle() == Yaml.Scalar.Style.FOLDED ||
-                scalar.getStyle() == Yaml.Scalar.Style.LITERAL;
+    public static class Matcher extends SimpleTraitMatcher<BlockScalar> {
+        @Override
+        protected @Nullable BlockScalar test(Cursor cursor) {
+            if (cursor.getValue() instanceof Yaml.Scalar) {
+                Yaml.Scalar.Style style = ((Yaml.Scalar) cursor.getValue()).getStyle();
+                if (style == Yaml.Scalar.Style.FOLDED || style == Yaml.Scalar.Style.LITERAL) {
+                    return new BlockScalar(cursor);
+                }
+            }
+            return null;
+        }
     }
 }

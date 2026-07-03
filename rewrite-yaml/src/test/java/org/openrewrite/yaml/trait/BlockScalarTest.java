@@ -23,16 +23,17 @@ import org.openrewrite.yaml.tree.Yaml;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 
-/**
- * Tests {@link BlockScalar#getBody()} / {@link BlockScalar#withBody(String)} in isolation:
- * a stray {@code \r} leaked by {@code getBody} can be re-absorbed by a subsequent
- * {@code withBody} call and mask a line-ending bug in end-to-end recipe tests.
- */
 class BlockScalarTest {
 
     private static BlockScalar of(String value) {
         Yaml.Scalar scalar = new Yaml.Scalar(randomId(), "", Markers.EMPTY, Yaml.Scalar.Style.LITERAL, null, null, value);
-        return BlockScalar.of(new Cursor(null, scalar));
+        return new BlockScalar.Matcher().get(new Cursor(null, scalar)).orElseThrow();
+    }
+
+    @Test
+    void matcherRejectsPlainScalar() {
+        Yaml.Scalar plain = new Yaml.Scalar(randomId(), "", Markers.EMPTY, Yaml.Scalar.Style.PLAIN, null, null, "hello");
+        assertThat(new BlockScalar.Matcher().get(new Cursor(null, plain))).isEmpty();
     }
 
     @Test
