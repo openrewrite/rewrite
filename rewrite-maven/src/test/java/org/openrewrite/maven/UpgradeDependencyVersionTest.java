@@ -3169,4 +3169,56 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void upgradesDependencyWhenResolvedRepositoryIsNull() {
+        // Some LSTs are built without recording the origin repository on resolved dependencies (the
+        // repository ends up null even for genuine external dependencies). Historically the recipe used a
+        // null repository as the signal for "parsed from source" and silently skipped every such dependency.
+        // The dependency is now recognized as external via the project artifacts collected during scanning,
+        // so it is upgraded regardless of a missing origin repository. Here the version is defined by a
+        // property in the same POM, mirroring the reported reproduction.
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit.jupiter", "junit-jupiter-api", "5.7.2", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <junit.version>5.6.2</junit.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <version>${junit.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <junit.version>5.7.2</junit.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <version>${junit.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            spec -> spec.beforeRecipe(doc -> doc.getMarkers().findFirst(MavenResolutionResult.class)
+              .ifPresent(mrr -> mrr.getDependencies().values()
+                .forEach(deps -> deps.replaceAll(d -> d.withRepository(null)))))
+          )
+        );
+    }
+
 }
