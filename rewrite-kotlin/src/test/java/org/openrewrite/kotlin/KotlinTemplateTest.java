@@ -691,6 +691,44 @@ class KotlinTemplateTest implements RewriteTest {
     }
 
     @Test
+    void replaceAnnotationArgumentsOnLocalVariablePrecededByUntypedLocal() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("Suppress".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("RedundantSuppression"))) {
+                      return KotlinTemplate.builder("\"RedundantSuppression\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  fun foo() {
+                      val y = 1
+                      @Suppress("UNCHECKED_CAST")
+                      val x = y
+                  }
+              }
+              """,
+            """
+              class Test {
+                  fun foo() {
+                      val y = 1
+                      @Suppress("RedundantSuppression")
+                      val x = y
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
     void addAnnotationToMethod() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
