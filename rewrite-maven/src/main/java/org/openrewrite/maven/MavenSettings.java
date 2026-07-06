@@ -47,26 +47,30 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @ToString(onlyExplicitlyIncluded = true)
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
 @AllArgsConstructor
 @JacksonXmlRootElement(localName = "settings")
 public class MavenSettings {
     @Nullable
+    @ToString.Include
     String localRepository;
 
     @Nullable
     @NonFinal
     @JsonIgnore
+    @EqualsAndHashCode.Exclude
     MavenRepository mavenLocal;
 
     @Nullable
+    @ToString.Include
     Profiles profiles;
 
     @Nullable
+    @ToString.Include
     ActiveProfiles activeProfiles;
 
     @Nullable
+    @ToString.Include
     Mirrors mirrors;
 
     @Nullable
@@ -203,7 +207,7 @@ public class MavenSettings {
     }
 
     public MavenSettings merge(@Nullable MavenSettings installSettings) {
-        return installSettings == null ? this : new MavenSettings(
+        return installSettings == null || equals(installSettings) ? this : new MavenSettings(
                 localRepository == null ? installSettings.localRepository : localRepository,
                 profiles == null ? installSettings.profiles : profiles.merge(installSettings.profiles),
                 activeProfiles == null ? installSettings.activeProfiles : activeProfiles.merge(installSettings.activeProfiles),
@@ -332,6 +336,8 @@ public class MavenSettings {
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Getter
     @Setter
+    @EqualsAndHashCode
+    @ToString
     @AllArgsConstructor
     @NoArgsConstructor
     public static class Profiles {
@@ -354,6 +360,8 @@ public class MavenSettings {
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Getter
     @Setter
+    @EqualsAndHashCode
+    @ToString
     @AllArgsConstructor
     @NoArgsConstructor
     public static class ActiveProfiles {
@@ -401,6 +409,8 @@ public class MavenSettings {
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Getter
     @Setter
+    @EqualsAndHashCode
+    @ToString
     @AllArgsConstructor
     @NoArgsConstructor
     public static class Mirrors {
@@ -442,6 +452,7 @@ public class MavenSettings {
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Getter
     @Setter
+    @EqualsAndHashCode
     @AllArgsConstructor
     @NoArgsConstructor
     public static class Servers {
@@ -478,6 +489,7 @@ public class MavenSettings {
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Getter
     @Setter
+    @EqualsAndHashCode
     @AllArgsConstructor
     @NoArgsConstructor
     public static class Proxies {

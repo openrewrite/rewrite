@@ -1048,4 +1048,103 @@ class MavenSettingsTest {
         assertThat(proxy.getPassword()).isEqualTo("proxypass");
         assertThat(proxy.getNonProxyHosts()).isEqualTo("localhost|*.example.com");
     }
+
+    /**
+     * {@link MavenExecutionContextView#getMirrors(MavenSettings)} decides whether supplied settings
+     * override those on the execution context by comparing them for equality, so {@link MavenSettings}
+     * must compare by value across all of its nested types.
+     */
+    @Nested
+    class Equality {
+        //language=xml
+        private final String settingsXml = """
+          <settings>
+              <localRepository>~/.m2/repository</localRepository>
+              <activeProfiles>
+                  <activeProfile>repo</activeProfile>
+              </activeProfiles>
+              <profiles>
+                  <profile>
+                      <id>repo</id>
+                      <activation>
+                          <activeByDefault>false</activeByDefault>
+                          <jdk>11</jdk>
+                          <property>
+                              <name>env</name>
+                              <value>ci</value>
+                          </property>
+                      </activation>
+                      <repositories>
+                          <repository>
+                              <id>internal</id>
+                              <url>https://artifacts.example.com/maven2</url>
+                              <snapshots>
+                                  <enabled>false</enabled>
+                              </snapshots>
+                          </repository>
+                      </repositories>
+                  </profile>
+              </profiles>
+              <mirrors>
+                  <mirror>
+                      <id>internal-mirror</id>
+                      <url>https://artifacts.example.com/maven2</url>
+                      <mirrorOf>central</mirrorOf>
+                  </mirror>
+              </mirrors>
+              <servers>
+                  <server>
+                      <id>internal-mirror</id>
+                      <username>ci</username>
+                      <password>secret</password>
+                      <configuration>
+                          <timeout>30000</timeout>
+                          <httpHeaders>
+                              <property>
+                                  <name>X-Custom</name>
+                                  <value>value</value>
+                              </property>
+                          </httpHeaders>
+                      </configuration>
+                  </server>
+              </servers>
+              <proxies>
+                  <proxy>
+                      <id>my-proxy</id>
+                      <host>proxy.example.com</host>
+                  </proxy>
+                  <proxy>
+                      <host>anonymous-proxy.example.com</host>
+                  </proxy>
+              </proxies>
+          </settings>
+          """;
+
+        private MavenSettings parse(String xml) {
+            MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"), xml), ctx);
+            assertThat(settings).isNotNull();
+            return settings;
+        }
+
+        @Test
+        void equalWhenParsedFromSameDocument() {
+            assertThat(parse(settingsXml))
+              .isEqualTo(parse(settingsXml))
+              .hasSameHashCodeAs(parse(settingsXml));
+        }
+
+        @Test
+        void notEqualWhenMirrorsDiffer() {
+            MavenSettings withMirror = parse(settingsXml);
+            MavenSettings withoutMirror = parse(settingsXml.replaceAll("(?s)<mirrors>.*</mirrors>", ""));
+            assertThat(withMirror).isNotEqualTo(withoutMirror);
+        }
+
+        @Test
+        void lazyMavenLocalCacheDoesNotAffectEquality() {
+            MavenSettings primed = parse(settingsXml);
+            primed.getMavenLocal();
+            assertThat(primed).isEqualTo(parse(settingsXml));
+        }
+    }
 }
