@@ -15,20 +15,25 @@
  */
 package org.openrewrite.csharp;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
 import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.csharp.tree.CsDocCommentRawComment;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.*;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
@@ -41,10 +46,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.csharp.Assertions.csharp;
 import static org.openrewrite.csharp.Assertions.csproj;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 class CSharpRecipeTest implements RewriteTest {
@@ -134,6 +141,21 @@ class CSharpRecipeTest implements RewriteTest {
         return rpc.parseSolution(csproj, tempDir, new InMemoryExecutionContext()).toList();
     }
 
+    private static Cs.CompilationUnit parseSingleCs(CSharpRewriteRpc rpc, String source) throws IOException {
+        Path tempDir = Files.createTempDirectory("csharp-recipe-test-");
+        try (OutputStream os = Files.newOutputStream(tempDir.resolve("Test.cs"))) {
+            os.write(source.getBytes(StandardCharsets.UTF_8));
+        }
+        Path csproj = tempDir.resolve("Test.csproj");
+        try (OutputStream os = Files.newOutputStream(csproj)) {
+            os.write(("<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n" +
+              "    <TargetFramework>net10.0</TargetFramework>\n  </PropertyGroup>\n</Project>\n")
+              .getBytes(StandardCharsets.UTF_8));
+        }
+        return (Cs.CompilationUnit) rpc.parseSolution(csproj, tempDir, new InMemoryExecutionContext())
+          .filter(f -> f instanceof Cs.CompilationUnit).toList().getFirst();
+    }
+
     private static J.MethodInvocation findFirstMethodInvocation(Object tree) {
         if (tree instanceof J.MethodInvocation mi) {
             return mi;
@@ -185,30 +207,88 @@ class CSharpRecipeTest implements RewriteTest {
 
     @Test
     void structuredDocCommentSurvivesPrintRoundTrip() throws Exception {
-        // A CSharpVisitor pass converts the raw doc comment into a structured CsDocComment tree.
-        // When the modified tree is printed (serialized back to the C# side), the structured
-        // comment is decomposed over RPC and the C# side must re-flatten it to text without
-        // failing to map the type (e.g. "Unexpected comment type ...$DocComment").
         String source = "class Foo {\n    /// <summary>Does <c>x</c>.</summary>\n    void Test() {\n    }\n}\n";
         CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
-        Path tempDir = Files.createTempDirectory("csharp-doc-test-");
-        try (OutputStream os = Files.newOutputStream(tempDir.resolve("Test.cs"))) {
-            os.write(source.getBytes(StandardCharsets.UTF_8));
-        }
-        Path csproj = tempDir.resolve("Test.csproj");
-        try (OutputStream os = Files.newOutputStream(csproj)) {
-            os.write(("<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n" +
-              "    <TargetFramework>net10.0</TargetFramework>\n  </PropertyGroup>\n</Project>\n")
-              .getBytes(StandardCharsets.UTF_8));
-        }
-        SourceFile sf = rpc.parseSolution(csproj, tempDir, new InMemoryExecutionContext())
-          .filter(f -> f instanceof Cs.CompilationUnit).toList().getFirst();
+        Cs.CompilationUnit sf = parseSingleCs(rpc, source);
 
-        SourceFile modified = (SourceFile) new CSharpIsoVisitor<InMemoryExecutionContext>()
-          .visit(sf, new InMemoryExecutionContext());
+        SourceFile modified = (SourceFile) new CSharpIsoVisitor<InMemoryExecutionContext>() {
+            @Override
+            public Space visitSpace(@Nullable Space space, Space.Location loc, InMemoryExecutionContext ctx) {
+                if (space == null || space.getComments().isEmpty()) {
+                    return space;
+                }
+                return space.withComments(ListUtils.map(space.getComments(), c ->
+                  c instanceof CsDocCommentRawComment ? CsDocCommentParser.parse((CsDocCommentRawComment) c) : c));
+            }
+        }.visit(sf, new InMemoryExecutionContext());
 
+        assertThat(modified).as("Forced doc comment conversion should modify the tree").isNotSameAs(sf);
         String printed = rpc.print(modified);
         assertThat(printed).contains("<summary>Does <c>x</c>.</summary>");
+    }
+
+    @Test
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2696")
+    void noOpVisitorReturnsIdenticalTreeWhenDocCommentsPresent() throws Exception {
+        String source = "class Foo {\n    /// <summary>Does <c>x</c>. See <see cref=\"System.Math\"/>.</summary>\n    void Test() {\n    }\n}\n";
+        CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
+        Cs.CompilationUnit sf = parseSingleCs(rpc, source);
+
+        SourceFile visited = (SourceFile) new CSharpIsoVisitor<InMemoryExecutionContext>()
+          .visit(sf, new InMemoryExecutionContext());
+
+        assertThat(visited).isSameAs(sf);
+    }
+
+    @Test
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2696")
+    void readOnlyRecipeLeavesXmlDocCommentsUnchanged() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>()))
+            .typeValidationOptions(TypeValidation.builder()
+              .allowNonWhitespaceInWhitespace(true)
+              .build()),
+          csharp(
+            """
+              /// <summary>
+              /// A simple calculator. See <see cref="System.Math"/>.
+              /// </summary>
+              public class Calculator
+              {
+                  /// <summary>
+                  /// Adds two numbers together.
+                  /// </summary>
+                  /// <param name="left">The left operand.</param>
+                  /// <param name="right">The right operand.</param>
+                  /// <returns>The sum of the two operands.</returns>
+                  public int Add(int left, int right) => left + right;
+
+                  /// <summary>
+                  /// Returns the first item.
+                  /// </summary>
+                  /// <typeparam name="T">The element type.</typeparam>
+                  /// <param name="items">The source list.</param>
+                  public T First<T>(System.Collections.Generic.IList<T> items) => items[0];
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                AtomicBoolean foundRawDocComment = new AtomicBoolean();
+                new CSharpIsoVisitor<AtomicBoolean>() {
+                    @Override
+                    public Space visitSpace(@Nullable Space space, Space.Location loc, AtomicBoolean found) {
+                        if (space != null && space.getComments().stream().anyMatch(CsDocCommentRawComment.class::isInstance)) {
+                            found.set(true);
+                        }
+                        return space;
+                    }
+                }.visit(cu, foundRawDocComment);
+                assertThat(foundRawDocComment)
+                  .as("XML doc comments should be parsed as CsDocCommentRawComment and survive a read-only recipe run")
+                  .isTrue();
+            })
+          )
+        );
     }
 
     @Test

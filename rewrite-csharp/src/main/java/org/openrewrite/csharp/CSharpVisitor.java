@@ -57,7 +57,8 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
             if (comment instanceof CsDocCommentRawComment) {
                 // Convert raw doc comment from RPC into structured tree, then visit
                 CsDocComment.DocComment parsed = CsDocCommentParser.parse((CsDocCommentRawComment) comment);
-                return visitCsDocCommentComment(parsed, p);
+                Comment visited = visitCsDocCommentComment(parsed, p);
+                return visited == parsed ? comment : visited;
             } else if (comment instanceof CsDocComment.DocComment) {
                 return visitCsDocCommentComment((CsDocComment.DocComment) comment, p);
             }
