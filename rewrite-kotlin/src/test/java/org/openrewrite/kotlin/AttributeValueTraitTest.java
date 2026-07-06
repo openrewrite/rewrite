@@ -29,9 +29,9 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
  * The {@link org.openrewrite.java.trait.AttributeValue} behavior on Kotlin sources,
  * asserting the same semantics the trait has on javac-attributed Java sources.
  * Tests annotated {@link ExpectedToFail} document known Kotlin type-mapping gaps:
- * {@code KotlinTypeMapping#variableType} does not set {@code Flag.Enum} on enum
- * entries, no {@code JavaType.Annotation} element values are built (no constant
- * folding), and collection literals are {@code K.ListLiteral}, not {@code J.NewArray}.
+ * {@code KotlinTypeMapping} builds no {@code JavaType.Annotation} element values (no
+ * constant folding), and collection literals are {@code K.ListLiteral}, not
+ * {@code J.NewArray}.
  */
 class AttributeValueTraitTest implements RewriteTest {
 
@@ -124,7 +124,6 @@ class AttributeValueTraitTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("KotlinTypeMapping#variableType does not set Flag.Enum on enum entries (mapToFlagsBitmap uses only visibility/modality/static) — https://github.com/openrewrite/rewrite/issues/8170")
     @Test
     void enumConstant() {
         rewriteRun(
