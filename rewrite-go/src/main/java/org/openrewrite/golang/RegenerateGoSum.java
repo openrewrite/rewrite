@@ -24,6 +24,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.golang.internal.LockFileRegeneration;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
 
@@ -139,7 +140,7 @@ public class RegenerateGoSum extends ScanningRecipe<RegenerateGoSum.Accumulator>
                     return tree;
                 }
                 if (!result.isSuccess()) {
-                    return tree;
+                    return Markup.warn(goSum, new IllegalStateException(result.getErrorMessage()));
                 }
 
                 String regenerated = result.getLockFileContent();
