@@ -25,11 +25,16 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.golang.internal.LockFileRegeneration;
 import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Regenerates {@code go.sum} to match the sibling {@code go.mod} by running the
@@ -49,14 +54,23 @@ public class RegenerateGoSum extends ScanningRecipe<RegenerateGoSum.Accumulator>
     @Override
     public String getDescription() {
         return "Regenerate a Go module's `go.sum` from its `go.mod` by running `go mod download`, " +
-               "recomputing checksums for the whole module graph. Useful after a dependency version " +
-               "change to bring `go.sum` back in sync. Requires the `go` toolchain to be installed; " +
-               "otherwise `go.sum` is left unchanged.";
+               "recomputing checksums for the whole module graph, including creating it when absent. " +
+               "Useful after a dependency version change to bring `go.sum` back in sync. Requires the " +
+               "`go` toolchain to be installed; otherwise `go.sum` is left unchanged.";
     }
 
     public static class Accumulator {
-        final Map<Path, String> goModByDir = new HashMap<>();
-        final Map<Path, LockFileRegeneration.Result> regenByDir = new HashMap<>();
+        final Map<Path, String> goModByDir = new ConcurrentHashMap<>();
+        final Set<Path> goSumDirs = ConcurrentHashMap.newKeySet();
+        final Map<Path, LockFileRegeneration.Result> regenByDir = new ConcurrentHashMap<>();
+
+        LockFileRegeneration.@Nullable Result regenerate(Path dir) {
+            String goMod = goModByDir.get(dir);
+            if (goMod == null) {
+                return null;
+            }
+            return regenByDir.computeIfAbsent(dir, k -> LockFileRegeneration.GO_SUM.regenerate(goMod));
+        }
     }
 
     @Override
@@ -72,13 +86,39 @@ public class RegenerateGoSum extends ScanningRecipe<RegenerateGoSum.Accumulator>
                 stopAfterPreVisit();
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
-                    if ("go.mod".equals(fileName(sourceFile.getSourcePath()))) {
+                    String fileName = fileName(sourceFile.getSourcePath());
+                    if ("go.mod".equals(fileName)) {
                         acc.goModByDir.put(dirOf(sourceFile.getSourcePath()), sourceFile.printAll());
+                    } else if ("go.sum".equals(fileName)) {
+                        acc.goSumDirs.add(dirOf(sourceFile.getSourcePath()));
                     }
                 }
                 return tree;
             }
         };
+    }
+
+    @Override
+    public Collection<SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
+        List<SourceFile> created = new ArrayList<>();
+        for (Path dir : acc.goModByDir.keySet()) {
+            if (acc.goSumDirs.contains(dir)) {
+                continue;
+            }
+            LockFileRegeneration.Result result = acc.regenerate(dir);
+            if (result == null || !result.isSuccess()) {
+                continue;
+            }
+            String content = result.getLockFileContent();
+            if (content == null || content.isEmpty()) {
+                continue;
+            }
+            Path goSumPath = dir.resolve("go.sum");
+            PlainTextParser.builder().build().parse(content)
+                    .map(pt -> (SourceFile) pt.withSourcePath(goSumPath))
+                    .forEach(created::add);
+        }
+        return created;
     }
 
     @Override
@@ -94,13 +134,10 @@ public class RegenerateGoSum extends ScanningRecipe<RegenerateGoSum.Accumulator>
                 if (!"go.sum".equals(fileName(goSum.getSourcePath()))) {
                     return tree;
                 }
-                String goMod = acc.goModByDir.get(dirOf(goSum.getSourcePath()));
-                if (goMod == null) {
+                LockFileRegeneration.Result result = acc.regenerate(dirOf(goSum.getSourcePath()));
+                if (result == null) {
                     return tree;
                 }
-
-                LockFileRegeneration.Result result = acc.regenByDir.computeIfAbsent(
-                        dirOf(goSum.getSourcePath()), k -> LockFileRegeneration.GO_SUM.regenerate(goMod));
                 if (!result.isSuccess()) {
                     return tree;
                 }
