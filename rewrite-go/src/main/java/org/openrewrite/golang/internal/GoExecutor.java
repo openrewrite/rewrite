@@ -42,6 +42,9 @@ public final class GoExecutor {
 
     public static final GoExecutor GO = new GoExecutor("go", 300);
 
+    private static final boolean IS_WINDOWS =
+            System.getProperty("os.name", "").toLowerCase().contains("windows");
+
     @Value
     public static class RunResult {
         boolean success;
@@ -104,15 +107,21 @@ public final class GoExecutor {
             return cachedPath;
         }
 
+        String exe = IS_WINDOWS ? name + ".exe" : name;
         List<String> locations = new ArrayList<>();
         String goRoot = System.getenv("GOROOT");
         if (goRoot != null && !goRoot.trim().isEmpty()) {
-            locations.add(goRoot + "/bin/" + name);
+            locations.add(goRoot + (IS_WINDOWS ? "\\bin\\" : "/bin/") + exe);
         }
-        locations.add("/usr/local/go/bin/" + name);
-        locations.add("/opt/homebrew/bin/" + name);
-        locations.add("/usr/local/bin/" + name);
-        locations.add("/usr/bin/" + name);
+        if (IS_WINDOWS) {
+            locations.add("C:\\Program Files\\Go\\bin\\" + exe);
+            locations.add("C:\\Go\\bin\\" + exe);
+        } else {
+            locations.add("/usr/local/go/bin/" + exe);
+            locations.add("/opt/homebrew/bin/" + exe);
+            locations.add("/usr/local/bin/" + exe);
+            locations.add("/usr/bin/" + exe);
+        }
 
         for (String location : locations) {
             Path path = Paths.get(location);
@@ -123,20 +132,21 @@ public final class GoExecutor {
         }
 
         try {
-            ProcessBuilder pb = new ProcessBuilder("which", name);
+            ProcessBuilder pb = new ProcessBuilder(IS_WINDOWS ? "where" : "which", exe);
             pb.redirectErrorStream(true);
             Process process = pb.start();
+            String first = null;
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                StringBuilder sb = new StringBuilder();
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    sb.append(line);
+                    if (first == null && !line.trim().isEmpty()) {
+                        first = line.trim();
+                    }
                 }
-                String output = sb.toString().trim();
-                if (process.waitFor() == 0 && !output.isEmpty()) {
-                    cachedPath = output;
-                    return cachedPath;
-                }
+            }
+            if (process.waitFor() == 0 && first != null) {
+                cachedPath = first;
+                return cachedPath;
             }
         } catch (IOException | InterruptedException e) {
             // Ignore
