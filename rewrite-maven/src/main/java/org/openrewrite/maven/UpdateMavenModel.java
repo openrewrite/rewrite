@@ -195,7 +195,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
     }
 
     private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) throws MavenDownloadingExceptions {
-        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx, getResolutionResult().getMavenSettings(),
+        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx,
+                MavenExecutionContextView.view(ctx).effectiveSettings(getResolutionResult()),
                 getResolutionResult().getActiveProfiles());
 
         try {

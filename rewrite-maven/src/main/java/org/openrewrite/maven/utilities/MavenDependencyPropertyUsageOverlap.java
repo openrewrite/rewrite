@@ -112,7 +112,7 @@ public class MavenDependencyPropertyUsageOverlap {
             ResolvedPom currentResolved = current.getPom();
             remainingProperties = filterPropertiesWithOverlapInDependencies(remainingProperties, groupId, artifactId, currentResolved.getRequested(), currentResolved, configuredToChangeManagedDependency);
         }
-        MavenPomDownloader downloader = new MavenPomDownloader(current.getProjectPoms(), ctx);
+        MavenPomDownloader downloader = MavenPomDownloader.forResolutionResult(current, ctx);
         ResolvedPom currentResolved = current.getPom();
         while (currentResolved.getRequested().getParent() != null) {
             if (remainingProperties.isEmpty()) {

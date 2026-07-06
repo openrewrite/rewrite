@@ -90,6 +90,11 @@ public class MavenPomDownloader {
     private boolean addLocalRepository;
 
     /**
+     * Prefer {@link #forResolutionResult(MavenResolutionResult, ExecutionContext)} when resolving on
+     * behalf of an already-parsed source: settings passed here replace, rather than combine with, the
+     * settings on the execution context, so passing a resolution result's settings directly discards
+     * run-time configuration such as mirrors.
+     *
      * @param projectPoms    Other POMs in this project.
      * @param ctx            The execution context, which potentially contain Maven settings customization
      *                       and {@link HttpSender} customization.
@@ -106,6 +111,17 @@ public class MavenPomDownloader {
         this.mavenSettings = mavenSettings != null ? mavenSettings : MavenExecutionContextView.view(ctx).getSettings();
         this.mirrors = this.ctx.getMirrors(mavenSettings);
         this.activeProfiles = activeProfiles;
+    }
+
+    /**
+     * A downloader resolving further poms and metadata on behalf of a source that was already parsed,
+     * combining the Maven settings carried by its {@link MavenResolutionResult} with those on the execution
+     * context, so that both parse-time configuration (e.g. mirrors captured in the LST) and run-time
+     * configuration are honored.
+     */
+    public static MavenPomDownloader forResolutionResult(MavenResolutionResult mrr, ExecutionContext ctx) {
+        return new MavenPomDownloader(mrr.getProjectPoms(), ctx,
+                MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles());
     }
 
     /**

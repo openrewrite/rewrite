@@ -25,8 +25,10 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.search.ParentPomInsight;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.GroupArtifact;
@@ -72,6 +74,30 @@ class MavenCentralMirrorTest {
       """;
 
     @Language("xml")
+    private static final String POM_WITH_PARENT = """
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <parent>
+              <groupId>org.example.hermetic</groupId>
+              <artifactId>hermetic-parent</artifactId>
+              <version>1</version>
+          </parent>
+          <artifactId>my-app</artifactId>
+      </project>
+      """;
+
+    @Language("xml")
+    private static final String PARENT_POM = """
+      <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>org.example.hermetic</groupId>
+          <artifactId>hermetic-parent</artifactId>
+          <version>1</version>
+          <packaging>pom</packaging>
+      </project>
+      """;
+
+    @Language("xml")
     private static final String METADATA = """
       <metadata>
           <groupId>org.example.hermetic</groupId>
@@ -98,7 +124,14 @@ class MavenCentralMirrorTest {
         public Response send(Request request) {
             String url = request.getUrl().toString();
             requestedUrls.add(url);
-            byte[] body = url.endsWith("maven-metadata.xml") ? METADATA.getBytes(StandardCharsets.UTF_8) : new byte[0];
+            byte[] body;
+            if (url.endsWith("maven-metadata.xml")) {
+                body = METADATA.getBytes(StandardCharsets.UTF_8);
+            } else if (url.endsWith("hermetic-parent-1.pom")) {
+                body = PARENT_POM.getBytes(StandardCharsets.UTF_8);
+            } else {
+                body = new byte[0];
+            }
             return new Response(200, new ByteArrayInputStream(body), () -> {
             });
         }
@@ -128,6 +161,23 @@ class MavenCentralMirrorTest {
 
         assertThat(newerVersion).isEqualTo("1.1");
         assertOnlyMirrorContacted(ctx);
+    }
+
+    @Test
+    void recipeParentResolutionHonorsContextMirror() {
+        // The inverse direction: the LST was produced without any mirror, and the mirror is supplied
+        // on the execution context at recipe run time. A recipe resolving parent poms must route that
+        // traffic through the context's mirror rather than the settings captured in the LST.
+        Xml.Document pom = parsePomWithParent(settingsWithServerCredentialsOnly());
+        ExecutionContext ctx = runContext();
+        MavenExecutionContextView.view(ctx).setMavenSettings(settingsWithMirror("central"));
+
+        Tree after = new ParentPomInsight("com.example.nonexistent", "*", null, null).getVisitor().visit(pom, ctx);
+
+        assertThat(after)
+          .as("parent resolution must succeed (a download failure would attach a warning markup)")
+          .isSameAs(pom);
+        assertOnlyMirrorContacted(ctx, "hermetic-parent-1.pom");
     }
 
     @Test
@@ -199,6 +249,13 @@ class MavenCentralMirrorTest {
         return mrr;
     }
 
+    private static Xml.Document parsePomWithParent(MavenSettings settings) {
+        return (Xml.Document) MavenParser.builder().build()
+          .parse(parseContext(settings), POM_WITH_PARENT)
+          .findFirst()
+          .orElseThrow();
+    }
+
     private static ExecutionContext parseContext(MavenSettings settings) {
         ExecutionContext parseCtx = runContext();
         MavenExecutionContextView.view(parseCtx).setMavenSettings(settings);
@@ -229,12 +286,16 @@ class MavenCentralMirrorTest {
     }
 
     private static void assertOnlyMirrorContacted(ExecutionContext ctx) {
+        assertOnlyMirrorContacted(ctx, "maven-metadata.xml");
+    }
+
+    private static void assertOnlyMirrorContacted(ExecutionContext ctx, String expectedSuffix) {
         RecordingHttpSender sender = (RecordingHttpSender)
           HttpSenderExecutionContextView.view(ctx).getHttpSender();
         assertThat(sender.requestedUrls)
           .as("all resolution traffic must be redirected to the mirror")
           .allSatisfy(url -> assertThat(url).startsWith(MIRROR_URL))
-          .as("at least one metadata request must have reached the mirror")
-          .anySatisfy(url -> assertThat(url).endsWith("maven-metadata.xml"));
+          .as("the request for %s must have reached the mirror", expectedSuffix)
+          .anySatisfy(url -> assertThat(url).endsWith(expectedSuffix));
     }
 }
