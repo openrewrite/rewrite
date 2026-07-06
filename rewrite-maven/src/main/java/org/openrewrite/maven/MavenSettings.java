@@ -40,6 +40,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
@@ -217,6 +218,41 @@ public class MavenSettings {
         );
     }
 
+    /**
+     * Entries from {@code preferred} win over same-id entries from {@code other}, and duplicate ids
+     * within one side collapse to the last value at the first position, as Maven does. Entries without
+     * an id cannot be correlated, so both sides' are kept; merging two equal settings stays idempotent
+     * only through the equality short-circuit in {@link #merge(MavenSettings)}.
+     */
+    private static <T> List<T> mergeById(List<T> preferred, @Nullable List<T> other, Function<T, @Nullable String> id) {
+        List<T> merged = new ArrayList<>(preferred.size());
+        Map<String, Integer> indexOfId = new HashMap<>();
+        for (T t : preferred) {
+            String tId = id.apply(t);
+            Integer existing = tId == null ? null : indexOfId.get(tId);
+            if (existing != null) {
+                merged.set(existing, t);
+            } else {
+                if (tId != null) {
+                    indexOfId.put(tId, merged.size());
+                }
+                merged.add(t);
+            }
+        }
+        if (other != null) {
+            for (T t : other) {
+                String tId = id.apply(t);
+                if (tId == null || !indexOfId.containsKey(tId)) {
+                    if (tId != null) {
+                        indexOfId.put(tId, merged.size());
+                    }
+                    merged.add(t);
+                }
+            }
+        }
+        return merged;
+    }
+
     public List<RawRepositories.Repository> getActiveRepositories(Iterable<String> activeProfiles) {
         LinkedHashMap<String, RawRepositories.Repository> activeRepositories = new LinkedHashMap<>();
 
@@ -346,14 +382,8 @@ public class MavenSettings {
         List<Profile> profiles = emptyList();
 
         public Profiles merge(@Nullable Profiles profiles) {
-            final Map<String, Profile> merged = new LinkedHashMap<>();
-            for (Profile profile : this.profiles) {
-                merged.put(profile.id, profile);
-            }
-            if (profiles != null) {
-                profiles.getProfiles().forEach(profile -> merged.putIfAbsent(profile.getId(), profile));
-            }
-            return new Profiles(new ArrayList<>(merged.values()));
+            return new Profiles(
+                    mergeById(this.profiles, profiles == null ? null : profiles.getProfiles(), Profile::getId));
         }
     }
 
@@ -419,14 +449,7 @@ public class MavenSettings {
         List<Mirror> mirrors = emptyList();
 
         public Mirrors merge(@Nullable Mirrors mirrors) {
-            final Map<String, Mirror> merged = new LinkedHashMap<>();
-            for (Mirror mirror : this.mirrors) {
-                merged.put(mirror.id, mirror);
-            }
-            if (mirrors != null) {
-                mirrors.getMirrors().forEach(mirror -> merged.putIfAbsent(mirror.getId(), mirror));
-            }
-            return new Mirrors(new ArrayList<>(merged.values()));
+            return new Mirrors(mergeById(this.mirrors, mirrors == null ? null : mirrors.getMirrors(), Mirror::getId));
         }
     }
 
@@ -462,14 +485,7 @@ public class MavenSettings {
         List<Server> servers = emptyList();
 
         public Servers merge(@Nullable Servers servers) {
-            final Map<String, Server> merged = new LinkedHashMap<>();
-            for (Server server : this.servers) {
-                merged.put(server.id, server);
-            }
-            if (servers != null) {
-                servers.getServers().forEach(server -> merged.putIfAbsent(server.getId(), server));
-            }
-            return new Servers(new ArrayList<>(merged.values()));
+            return new Servers(mergeById(this.servers, servers == null ? null : servers.getServers(), Server::getId));
         }
     }
 
@@ -498,22 +514,7 @@ public class MavenSettings {
         List<Proxy> proxies = emptyList();
 
         public Proxies merge(@Nullable Proxies proxies) {
-            final Map<String, Proxy> merged = new LinkedHashMap<>();
-            int nullIndex = 0;
-            for (Proxy proxy : this.proxies) {
-                String key = proxy.id != null ? proxy.id : "__null_" + nullIndex++;
-                merged.put(key, proxy);
-            }
-            if (proxies != null) {
-                for (Proxy proxy : proxies.getProxies()) {
-                    if (proxy.getId() != null) {
-                        merged.putIfAbsent(proxy.getId(), proxy);
-                    } else {
-                        merged.put("__null_" + nullIndex++, proxy);
-                    }
-                }
-            }
-            return new Proxies(new ArrayList<>(merged.values()));
+            return new Proxies(mergeById(this.proxies, proxies == null ? null : proxies.getProxies(), Proxy::getId));
         }
     }
 

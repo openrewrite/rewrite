@@ -911,6 +911,190 @@ class MavenSettingsTest {
               .hasFieldOrPropertyWithValue("username", "foo")
               .hasFieldOrPropertyWithValue("password", null);
         }
+
+        @Test
+        void keepsIdLessEntriesFromBothSides() {
+            var first = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <profiles>
+                        <profile>
+                            <repositories>
+                                <repository>
+                                    <id>first-repo</id>
+                                    <url>https://first.example.com/maven2</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                    <mirrors>
+                        <mirror>
+                            <url>https://first.example.com/maven2</url>
+                            <mirrorOf>central</mirrorOf>
+                        </mirror>
+                    </mirrors>
+                    <servers>
+                        <server>
+                            <username>first</username>
+                            <password>secret</password>
+                        </server>
+                    </servers>
+                    <proxies>
+                        <proxy>
+                            <host>first-proxy.example.com</host>
+                        </proxy>
+                    </proxies>
+                </settings>
+                """
+            ), ctx);
+            var second = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <profiles>
+                        <profile>
+                            <repositories>
+                                <repository>
+                                    <id>second-repo</id>
+                                    <url>https://second.example.com/maven2</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                    <mirrors>
+                        <mirror>
+                            <url>https://second.example.com/maven2</url>
+                            <mirrorOf>*</mirrorOf>
+                        </mirror>
+                    </mirrors>
+                    <servers>
+                        <server>
+                            <username>second</username>
+                            <password>secret</password>
+                        </server>
+                    </servers>
+                    <proxies>
+                        <proxy>
+                            <host>second-proxy.example.com</host>
+                        </proxy>
+                    </proxies>
+                </settings>
+                """
+            ), ctx);
+
+            var mergedSettings = first.merge(second);
+
+            assertThat(mergedSettings.getProfiles().getProfiles())
+              .extracting(p -> p.getRepositories().getRepositories().getFirst().getId())
+              .containsExactly("first-repo", "second-repo");
+            assertThat(mergedSettings.getMirrors().getMirrors())
+              .extracting(MavenSettings.Mirror::getUrl)
+              .containsExactly("https://first.example.com/maven2", "https://second.example.com/maven2");
+            assertThat(mergedSettings.getServers().getServers())
+              .extracting(MavenSettings.Server::getUsername)
+              .containsExactly("first", "second");
+            assertThat(mergedSettings.getProxies().getProxies())
+              .extracting(MavenSettings.Proxy::getHost)
+              .containsExactly("first-proxy.example.com", "second-proxy.example.com");
+        }
+
+        @Test
+        void collapsesDuplicateIdsWithinOneSideToTheLastValue() {
+            var first = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <mirrors>
+                        <mirror>
+                            <id>duplicate</id>
+                            <url>https://stale.example.com/maven2</url>
+                            <mirrorOf>central</mirrorOf>
+                        </mirror>
+                        <mirror>
+                            <id>tail</id>
+                            <url>https://tail.example.com/maven2</url>
+                            <mirrorOf>*</mirrorOf>
+                        </mirror>
+                        <mirror>
+                            <id>duplicate</id>
+                            <url>https://effective.example.com/maven2</url>
+                            <mirrorOf>central</mirrorOf>
+                        </mirror>
+                    </mirrors>
+                    <servers>
+                        <server>
+                            <id>duplicate</id>
+                            <username>stale</username>
+                            <password>secret</password>
+                        </server>
+                        <server>
+                            <id>duplicate</id>
+                            <username>effective</username>
+                            <password>secret</password>
+                        </server>
+                    </servers>
+                </settings>
+                """
+            ), ctx);
+            var second = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <localRepository>/tmp/other-repo</localRepository>
+                </settings>
+                """
+            ), ctx);
+
+            var mergedSettings = first.merge(second);
+
+            assertThat(mergedSettings.getMirrors().getMirrors())
+              .extracting(MavenSettings.Mirror::getUrl)
+              .containsExactly("https://effective.example.com/maven2", "https://tail.example.com/maven2");
+            assertThat(mergedSettings.getServers().getServers())
+              .extracting(MavenSettings.Server::getUsername)
+              .containsExactly("effective");
+        }
+
+        @Test
+        void replacesProxiesWithMatchingIds() {
+            var first = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <proxies>
+                        <proxy>
+                            <id>corp</id>
+                            <host>preferred.example.com</host>
+                        </proxy>
+                    </proxies>
+                </settings>
+                """
+            ), ctx);
+            var second = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <proxies>
+                        <proxy>
+                            <id>corp</id>
+                            <host>other.example.com</host>
+                        </proxy>
+                        <proxy>
+                            <id>backup</id>
+                            <host>backup.example.com</host>
+                        </proxy>
+                    </proxies>
+                </settings>
+                """
+            ), ctx);
+
+            var mergedSettings = first.merge(second);
+
+            assertThat(mergedSettings.getProxies().getProxies())
+              .extracting(MavenSettings.Proxy::getHost)
+              .containsExactly("preferred.example.com", "backup.example.com");
+        }
     }
 
     /**
