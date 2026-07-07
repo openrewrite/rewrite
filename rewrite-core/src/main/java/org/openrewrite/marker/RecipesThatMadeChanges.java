@@ -55,7 +55,7 @@ public class RecipesThatMadeChanges implements Marker, RpcCodec<RecipesThatMadeC
 
     @Override
     public void rpcSend(RecipesThatMadeChanges after, RpcSendQueue q) {
-        q.getAndSend(after, RecipesThatMadeChanges::getId);
+        q.getAndSend(after, r -> r.getId().toString());
         q.getAndSendList(after, r -> WireForm.from(r).recipeTable, System::identityHashCode, null);
         q.getAndSend(after, r -> WireForm.from(r).stacks);
     }
