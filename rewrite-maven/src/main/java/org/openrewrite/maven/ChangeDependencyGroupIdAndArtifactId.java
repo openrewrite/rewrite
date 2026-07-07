@@ -427,20 +427,26 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 MavenResolutionResult result = getResolutionResult();
                 for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
                     if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
-                        return scope.isInClasspathOf(managedDependency.getScope());
+                        return scopeIsManagedBy(scope, managedDependency.getScope());
                     }
                 }
                 return false;
             }
 
+            // A managed version applies whenever coordinates match regardless of scope, so an identical scope
+            // qualifies; isInClasspathOf alone wrongly returns false for provided/provided and test/test.
+            private boolean scopeIsManagedBy(Scope dependencyScope, @Nullable Scope managedScope) {
+                return managedScope == null || dependencyScope == managedScope || dependencyScope.isInClasspathOf(managedScope);
+            }
+
             private boolean canAffectManagedDependency(MavenResolutionResult result, Scope scope, String groupId, String artifactId) {
-                // We're only going to be able to effect managed dependencies that are either direct or are brought in as direct via a local parent
+                // We're only going to be able to affect managed dependencies that are either direct or are brought in as direct via a local parent
                 // `ChangeManagedDependencyGroupIdAndArtifactId` cannot manipulate BOM imported managed dependencies nor direct dependencies from remote parents
                 Pom requestedPom = result.getPom().getRequested();
                 for (ManagedDependency requestedManagedDependency : requestedPom.getDependencyManagement()) {
                     if (matchesGlob(requestedManagedDependency.getGroupId(), groupId) && matchesGlob(requestedManagedDependency.getArtifactId(), artifactId)) {
                         if (requestedManagedDependency instanceof ManagedDependency.Defined) {
-                            return scope.isInClasspathOf(Scope.fromName(((ManagedDependency.Defined) requestedManagedDependency).getScope()));
+                            return scopeIsManagedBy(scope, Scope.fromName(((ManagedDependency.Defined) requestedManagedDependency).getScope()));
                         }
                     }
                 }

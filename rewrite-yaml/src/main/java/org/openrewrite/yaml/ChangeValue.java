@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.yaml.trait.BlockScalar;
 import org.openrewrite.yaml.tree.Yaml;
 
 import static org.openrewrite.Tree.randomId;
@@ -66,7 +67,15 @@ public class ChangeValue extends Recipe {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
-                if (matcher.matches(getCursor()) && (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getValue().equals(value))) {
+                if (!matcher.matches(getCursor())) {
+                    return e;
+                }
+                BlockScalar block = new BlockScalar.Matcher().get(new Cursor(getCursor(), e.getValue())).orElse(null);
+                if (block != null) {
+                    if (!block.getBody().equals(value)) {
+                        e = e.withValue(block.withBody(value));
+                    }
+                } else if (!(e.getValue() instanceof Yaml.Scalar) || !((Yaml.Scalar) e.getValue()).getValue().equals(value)) {
                     Yaml.Anchor anchor = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getAnchor() : null;
                     Yaml.Tag tag = (e.getValue() instanceof Yaml.Scalar) ? ((Yaml.Scalar) e.getValue()).getTag() : null;
                     String prefix = e.getValue() instanceof Yaml.Sequence ? ((Yaml.Sequence) e.getValue()).getOpeningBracketPrefix() : e.getValue().getPrefix();
@@ -82,7 +91,14 @@ public class ChangeValue extends Recipe {
             public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext ctx) {
                 Yaml.Scalar s = super.visitScalar(scalar, ctx);
                 if (matcher.matches(getCursor())) {
-                    s = s.withValue(value);
+                    BlockScalar block = new BlockScalar.Matcher().get(getCursor()).orElse(null);
+                    if (block != null) {
+                        if (!block.getBody().equals(value)) {
+                            s = block.withBody(value);
+                        }
+                    } else if (!s.getValue().equals(value)) {
+                        s = s.withValue(value);
+                    }
                 }
                 return s;
             }

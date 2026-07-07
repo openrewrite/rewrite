@@ -138,4 +138,36 @@ class GradleBestPracticesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void usePropertyAssignmentSyntaxForDistributionUrl() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+
+              wrapper {
+                  distributionUrl("https://example.com/files/example.zip")
+              }
+              """,
+            """
+              plugins { id 'java' }
+
+              wrapper {
+                  distributionUrl = "https://example.com/files/example.zip"
+              }
+              """),
+          properties(
+            //language=properties
+            """
+              """,
+            //language=properties
+            """
+              org.gradle.caching=true
+              org.gradle.parallel=true
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
 }

@@ -37,8 +37,12 @@ import static java.util.Objects.requireNonNull;
 /**
  * A literal in Java is either a {@link J.Literal} or a {@link J.NewArray}
  * that has a non-null initializer that, itself, contains literals or new
- * arrays that recursively contain these constraints. In other languages
+ * arrays that recursively contain these constraints. An empty array
+ * initializer {@code {}} is an (empty) array literal. In other languages
  * this trait is inclusive of constructs like list or map literals.
+ * <p>
+ * For annotation attribute values that are not literals (class literals,
+ * enum constants, constant references), see {@link AttributeValue}.
  */
 @RequiredArgsConstructor
 public class Literal implements Trait<Expression> {
@@ -121,6 +125,9 @@ public class Literal implements Trait<Expression> {
     private List<Object> untypedInitializerLiterals(J.NewArray newArray) {
         List<Object> acc = new ArrayList<>();
         for (Expression init : requireNonNull(newArray.getInitializer())) {
+            if (init instanceof J.Empty) {
+                continue;
+            }
             if (init instanceof J.Literal) {
                 //noinspection DataFlowIssue
                 acc.add(((J.Literal) init).getValue());
@@ -163,6 +170,9 @@ public class Literal implements Trait<Expression> {
                     return false;
                 }
                 for (Expression expr : init) {
+                    if (expr instanceof J.Empty) {
+                        continue;
+                    }
                     if (!(expr instanceof J.Literal) &&
                         !isNewArrayWithLiteralInitializer(expr)) {
                         return false;
