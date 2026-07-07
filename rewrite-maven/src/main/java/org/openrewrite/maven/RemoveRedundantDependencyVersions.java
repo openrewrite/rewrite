@@ -270,7 +270,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 }
                 try {
                     GroupArtifactVersion parentGav = mrr.getPom().getRequested().getParent().getGav();
-                    MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+                    MavenPomDownloader mpd = MavenPomDownloader.forResolutionResult(mrr, ctx);
                     ResolvedPom parentPom = mpd.download(parentGav, null, mrr.getPom(), mrr.getPom().getRepositories())
                             .resolve(emptyList(), mpd, ctx);
                     ResolvedManagedDependency parentManagedVersion = parentPom.getDependencyManagement().stream()
@@ -320,7 +320,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 }
                 try {
                     GroupArtifactVersion parentGav = mrr.getPom().getRequested().getParent().getGav();
-                    MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+                    MavenPomDownloader mpd = MavenPomDownloader.forResolutionResult(mrr, ctx);
                     ResolvedPom parentPom = mpd.download(parentGav, null, mrr.getPom(), mrr.getPom().getRepositories())
                             .resolve(emptyList(), mpd, ctx);
                     return parentPom.getPluginManagement().stream()

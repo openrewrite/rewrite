@@ -37,7 +37,6 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static java.util.Collections.emptyMap;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
@@ -87,12 +86,7 @@ public class MavenDependency implements Trait<Xml.Tag> {
             MavenMetadata mavenMetadata;
             try {
                 mavenMetadata = metadataFailures.insertRows(ctx, () -> new MavenPomDownloader(
-                        emptyMap(), ctx,
-                        settings,
-                        Optional.ofNullable(settings)
-                                .map(MavenSettings::getActiveProfiles)
-                                .map(MavenSettings.ActiveProfiles::getActiveProfiles)
-                                .orElse(null)
+                        emptyMap(), ctx, settings, mrr.getActiveProfiles()
                 ).downloadMetadata(new GroupArtifact(groupId, artifactId), null, mrr.getPom().getRepositories()));
             } catch (NumberFormatException e) {
                 // this can happen when we encounter exotic, non-semver version numbers
@@ -115,9 +109,9 @@ public class MavenDependency implements Trait<Xml.Tag> {
                         // This is a best effort attempt to see if the pom is there anyway, in spite of the
                         // fact that it's not in the metadata. Usually it won't be, only in situations like the
                         // MapR repository mentioned in the comment above will it be.
-                        Pom pom = new MavenPomDownloader(emptyMap(), ctx,
-                                mrr.getMavenSettings(), mrr.getActiveProfiles()).download(new GroupArtifactVersion(groupId, artifactId, ((ExactVersion) versionComparator).getVersion()),
-                                null, null, mrr.getPom().getRepositories());
+                        Pom pom = new MavenPomDownloader(emptyMap(), ctx, settings, mrr.getActiveProfiles())
+                                .download(new GroupArtifactVersion(groupId, artifactId, exactVersion),
+                                        null, null, mrr.getPom().getRepositories());
                         if (pom.getGav().getVersion().equals(exactVersion) &&
                             !exactVersion.equals(finalVersion) &&
                             versionComparator.compare(finalVersion, finalVersion, exactVersion) <= 0) {
