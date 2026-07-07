@@ -22,6 +22,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.marker.Quoted;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
@@ -765,6 +766,21 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         return pkg;
     }
     
+    @Override
+    public J visitIdentifier(J.Identifier ident, PrintOutputCapture<P> p) {
+        // A Quoted marker means the simple name is the bare identifier and the
+        // source form is backtick-quoted (e.g. a `trait` package segment).
+        if (ident.getMarkers().findFirst(Quoted.class).isPresent()) {
+            visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
+            visit(ident.getAnnotations(), p);
+            beforeSyntax(ident, Space.Location.IDENTIFIER_PREFIX, p);
+            p.append('`').append(ident.getSimpleName()).append('`');
+            afterSyntax(ident, p);
+            return ident;
+        }
+        return super.visitIdentifier(ident, p);
+    }
+
     @Override
     public J visitImport(J.Import import_, PrintOutputCapture<P> p) {
         beforeSyntax(import_, Space.Location.IMPORT_PREFIX, p);
