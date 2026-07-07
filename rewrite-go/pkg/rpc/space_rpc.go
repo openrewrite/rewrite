@@ -17,6 +17,8 @@
 package rpc
 
 import (
+	"reflect"
+
 	"github.com/google/uuid"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
@@ -38,6 +40,75 @@ func emptyAsNil(s string) any {
 		return nil
 	}
 	return s
+}
+
+// Each recipe is an opaque descriptor map that Java sends without a value type; Go keeps it
+// as raw data and re-sends it verbatim. Repeated recipes within a marker collapse into a
+// single wire-table entry referenced by the stacks, mirroring the Java codec.
+func recipesThatMadeChangesWire(m java.RecipesThatMadeChanges) ([]any, []any) {
+	recipeTable := make([]any, 0)
+	stacks := make([]any, 0, len(m.Recipes))
+	recipeIds := make(map[uintptr]int)
+
+	for _, stack := range m.Recipes {
+		stackIds := make([]any, 0, len(stack))
+		for _, recipe := range stack {
+			idx := -1
+			if key := recipeIdentity(recipe); key != 0 {
+				if existing, ok := recipeIds[key]; ok {
+					idx = existing
+				} else {
+					recipeIds[key] = len(recipeTable)
+				}
+			}
+			if idx < 0 {
+				idx = len(recipeTable)
+				recipeTable = append(recipeTable, recipe)
+			}
+			stackIds = append(stackIds, idx)
+		}
+		stacks = append(stacks, stackIds)
+	}
+
+	return recipeTable, stacks
+}
+
+func recipeIdentity(recipe any) uintptr {
+	if recipe == nil {
+		return 0
+	}
+	switch rv := reflect.ValueOf(recipe); rv.Kind() {
+	case reflect.Ptr, reflect.Interface, reflect.Map, reflect.Slice:
+		return rv.Pointer()
+	default:
+		return 0
+	}
+}
+
+func toIntStacks(v any) [][]int {
+	if v == nil {
+		return nil
+	}
+	rawStacks, ok := v.([]any)
+	if !ok {
+		if typed, ok := v.([][]int); ok {
+			return typed
+		}
+		return nil
+	}
+	stacks := make([][]int, len(rawStacks))
+	for i, rawStack := range rawStacks {
+		switch stack := rawStack.(type) {
+		case []any:
+			stacks[i] = make([]int, len(stack))
+			for j, rawIdx := range stack {
+				stacks[i][j] = toInt(rawIdx)
+			}
+		case []int:
+			stacks[i] = stack
+		}
+	}
+	return stacks
 }
 
 // Matches JavaSender.visitSpace field order: comments (list), whitespace.
@@ -136,6 +207,7 @@ func hasGenericMarkerCodec(javaType string) bool {
 	switch javaType {
 	case "org.openrewrite.Checksum",
 		"org.openrewrite.FileAttributes",
+		"org.openrewrite.marker.RecipesThatMadeChanges",
 		"org.openrewrite.marker.Markup$Error",
 		"org.openrewrite.marker.Markup$Warn",
 		"org.openrewrite.marker.Markup$Info",
@@ -165,6 +237,19 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		// SearchResult.rpcSend sends: id (UUID string), description (nullable string)
 		q.GetAndSend(m, func(x any) any { return x.(java.SearchResult).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(java.SearchResult).Description }, nil)
+	case java.RecipesThatMadeChanges:
+		q.GetAndSend(m, func(x any) any { return x.(java.RecipesThatMadeChanges).Ident.String() }, nil)
+		q.GetAndSendList(m,
+			func(x any) []any {
+				table, _ := recipesThatMadeChangesWire(x.(java.RecipesThatMadeChanges))
+				return table
+			},
+			func(x any) any { return recipeIdentity(x) },
+			nil)
+		q.GetAndSend(m, func(x any) any {
+			_, stacks := recipesThatMadeChangesWire(x.(java.RecipesThatMadeChanges))
+			return stacks
+		}, nil)
 	case golang.GroupedImport:
 		// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Ident.String() }, nil)
@@ -336,6 +421,25 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 			desc := q.Receive(m.Description, nil)
 			if desc != nil {
 				m.Description = desc.(string)
+			}
+			return m
+		case java.RecipesThatMadeChanges:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			beforeTable, beforeStacks := recipesThatMadeChangesWire(m)
+			table := q.ReceiveList(beforeTable, nil)
+			stacksAny := q.Receive(beforeStacks, nil)
+			stacks := toIntStacks(stacksAny)
+			m.Recipes = make([][]any, len(stacks))
+			for i, stack := range stacks {
+				m.Recipes[i] = make([]any, len(stack))
+				for j, recipeIdx := range stack {
+					m.Recipes[i][j] = table[recipeIdx]
+				}
 			}
 			return m
 		case golang.GroupedImport:

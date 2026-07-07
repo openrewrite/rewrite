@@ -15,7 +15,16 @@
  */
 import {Checksum, FileAttributes, TreeKind} from "../tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./queue";
-import {Markers, MarkersKind, MarkupDebug, MarkupError, MarkupInfo, MarkupWarn, SearchResult} from "../markers";
+import {
+    Markers,
+    MarkersKind,
+    MarkupDebug,
+    MarkupError,
+    MarkupInfo,
+    MarkupWarn,
+    RecipesThatMadeChanges,
+    SearchResult
+} from "../markers";
 import {asRef} from "../reference";
 import {updateIfChanged} from "../util";
 
@@ -78,6 +87,29 @@ RpcCodecs.registerCodec(MarkersKind.Markers, {
     }
 });
 
+function recipesThatMadeChangesWire(marker: Partial<RecipesThatMadeChanges> | undefined): {
+    recipeTable: any[],
+    stacks: number[][]
+} {
+    const recipeTable: any[] = [];
+    const stacks: number[][] = [];
+    const recipeIds = new Map<any, number>();
+    for (const stack of marker?.recipes ?? []) {
+        const stackIds: number[] = [];
+        for (const recipe of stack) {
+            let recipeId = recipeIds.get(recipe);
+            if (recipeId === undefined) {
+                recipeId = recipeTable.length;
+                recipeIds.set(recipe, recipeId);
+                recipeTable.push(recipe);
+            }
+            stackIds.push(recipeId);
+        }
+        stacks.push(stackIds);
+    }
+    return {recipeTable, stacks};
+}
+
 // Register codecs for all Java markers with additional properties
 RpcCodecs.registerCodec(MarkersKind.SearchResult, {
     async rpcReceive(before: SearchResult, q: RpcReceiveQueue): Promise<SearchResult> {
@@ -90,6 +122,25 @@ RpcCodecs.registerCodec(MarkersKind.SearchResult, {
     async rpcSend(after: SearchResult, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.id);
         await q.getAndSend(after, a => a.description);
+    }
+});
+
+RpcCodecs.registerCodec(MarkersKind.RecipesThatMadeChanges, {
+    async rpcReceive(before: RecipesThatMadeChanges, q: RpcReceiveQueue): Promise<RecipesThatMadeChanges> {
+        const beforeWire = recipesThatMadeChangesWire(before);
+        const id = await q.receive(before.id);
+        const recipeTable = (await q.receiveList(beforeWire.recipeTable)) ?? [];
+        const stacks = (await q.receive(beforeWire.stacks)) ?? [];
+        return updateIfChanged(before, {
+            id,
+            recipes: stacks.map(stack => stack.map(recipeIndex => recipeTable[recipeIndex])),
+        });
+    },
+
+    async rpcSend(after: RecipesThatMadeChanges, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.id);
+        await q.getAndSendList(after, a => recipesThatMadeChangesWire(a).recipeTable, recipe => recipe);
+        await q.getAndSend(after, a => recipesThatMadeChangesWire(a).stacks);
     }
 });
 

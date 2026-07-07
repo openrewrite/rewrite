@@ -129,3 +129,25 @@ def test_parse_exception_result_marker_round_trip_preserves_content():
     rebuilt_marker = _find_first(rebuilt, MethodInvocation).markers.find_first(ParseExceptionResult)
     assert rebuilt_marker is not None
     assert rebuilt_marker.message == "boom"
+
+
+def test_recipes_that_made_changes_marker_round_trip_shares_recipe_within_marker():
+    # given a marker whose stacks repeat the same opaque recipe descriptor
+    from rewrite.markers import RecipesThatMadeChanges
+
+    cu = _parse('x = obj.foo()\n')
+    recipe = {"name": "example.Recipe", "displayName": "Example recipe"}
+    marker = RecipesThatMadeChanges(_id=random_id(), _recipes=[[recipe, recipe], [recipe]])
+    edited = _add_marker_to_first_call(cu, marker)
+
+    # when it is round-tripped through the RPC codec
+    rebuilt = _rpc_round_trip(cu, edited)
+
+    # then the descriptor content survives and the repeated recipe is a single shared instance
+    rebuilt_marker = _find_first(rebuilt, MethodInvocation).markers.find_first(RecipesThatMadeChanges)
+    assert rebuilt_marker is not None
+    assert len(rebuilt_marker.recipes) == 2
+    assert len(rebuilt_marker.recipes[0]) == 2
+    assert rebuilt_marker.recipes[0][0]["name"] == "example.Recipe"
+    assert rebuilt_marker.recipes[0][0] is rebuilt_marker.recipes[0][1]
+    assert rebuilt_marker.recipes[0][0] is rebuilt_marker.recipes[1][0]

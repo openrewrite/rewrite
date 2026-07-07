@@ -341,5 +341,9 @@ class RpcSendQueue:
             return str(obj)
         if isinstance(obj, Enum):
             return obj.name
+        if isinstance(obj, (dict, list)):
+            # Opaque JSON payloads (e.g. RecipesThatMadeChanges descriptor maps and their
+            # index stacks) are inlined verbatim; the receiver keeps them as raw data.
+            return obj
         # Complex objects are serialized via visitor, not as values
         return None

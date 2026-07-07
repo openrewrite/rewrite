@@ -35,6 +35,7 @@ import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.UpgradeDependencyVersion;
 import org.openrewrite.javascript.style.Autodetect;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleReader;
 import org.openrewrite.marketplace.RecipeBundleResolver;
@@ -174,6 +175,29 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           javascript(
             "const hello = 'world'",
             "const /*~~>*/hello = 'world'"
+          )
+        );
+    }
+
+    @Test
+    void printsChangedJavaScriptSourceWithRecipesThatMadeChangesMarker() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.javascript.find-identifier",
+              Map.of("identifier", "hello"))),
+          javascript(
+            "const hello = 'world'",
+            "const /*~~>*/hello = 'world'",
+            spec -> spec.afterRecipe(cu -> {
+                RecipesThatMadeChanges marker = cu.getMarkers()
+                  .findFirst(RecipesThatMadeChanges.class)
+                  .orElseThrow(() -> new AssertionError("Expected RecipesThatMadeChanges marker"));
+                assertThat(marker.getRecipes().stream().flatMap(List::stream))
+                  .anyMatch(RpcRecipe.class::isInstance);
+
+                assertThat(client().print(cu)).isEqualTo("const /*~~>*/hello = 'world'");
+            })
           )
         );
     }

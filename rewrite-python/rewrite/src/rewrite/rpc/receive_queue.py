@@ -535,4 +535,3 @@ def make_dataclass_factory(cls):
     else:
         return lambda: object.__new__(cls)
 
-

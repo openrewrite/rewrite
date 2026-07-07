@@ -347,6 +347,7 @@ public class RpcSendQueue
             {
                 "Markers" => "org.openrewrite.marker.Markers",
                 "SearchResult" => "org.openrewrite.marker.SearchResult",
+                "RecipesThatMadeChanges" => "org.openrewrite.marker.RecipesThatMadeChanges",
                 "Markup" => "org.openrewrite.marker.Markup",
                 "Space" => "org.openrewrite.java.tree.Space",
                 "TextComment" => "org.openrewrite.java.tree.TextComment",

@@ -137,3 +137,48 @@ func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
 		t.Errorf("ModulePath: want %q, got %q", "example.com/empty", got.ModulePath)
 	}
 }
+
+func TestRecipesThatMadeChangesMarkerRoundTripSharesRecipeWithinMarker(t *testing.T) {
+	recipe := map[string]any{
+		"name":        "example.Recipe",
+		"displayName": "Example recipe",
+	}
+	id := uuid.MustParse("aaaaaaaa-1111-2222-3333-444444444444")
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{
+		java.RecipesThatMadeChanges{Ident: id, Recipes: [][]any{{recipe, recipe}, {recipe}}},
+	}}
+
+	after := roundTripMarkers(t, before)
+	if len(after.Entries) != 1 {
+		t.Fatalf("entries: want 1, got %d", len(after.Entries))
+	}
+	got, ok := after.Entries[0].(java.RecipesThatMadeChanges)
+	if !ok {
+		t.Fatalf("entry is %T, want java.RecipesThatMadeChanges", after.Entries[0])
+	}
+	if got.Ident != id {
+		t.Errorf("Ident: want %s, got %s", id, got.Ident)
+	}
+	if len(got.Recipes) != 2 || len(got.Recipes[0]) != 2 || len(got.Recipes[1]) != 1 {
+		t.Fatalf("unexpected recipe stack shape: %#v", got.Recipes)
+	}
+
+	// the repeated recipe collapses to a single shared instance across the marker's stacks
+	if !sameRecipeInstance(got.Recipes[0][0], got.Recipes[0][1]) ||
+		!sameRecipeInstance(got.Recipes[0][0], got.Recipes[1][0]) {
+		t.Fatalf("repeated recipe was not shared within the marker")
+	}
+
+	// the descriptor content survives the round trip as raw data
+	desc, ok := got.Recipes[0][0].(map[string]any)
+	if !ok {
+		t.Fatalf("recipe is %T, want map[string]any", got.Recipes[0][0])
+	}
+	if desc["name"] != "example.Recipe" || desc["displayName"] != "Example recipe" {
+		t.Fatalf("descriptor content not preserved: %#v", desc)
+	}
+}
+
+func sameRecipeInstance(a, b any) bool {
+	return recipeIdentity(a) != 0 && recipeIdentity(a) == recipeIdentity(b)
+}
