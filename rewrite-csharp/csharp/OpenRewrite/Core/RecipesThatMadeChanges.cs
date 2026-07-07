@@ -32,7 +32,7 @@ public sealed class RecipesThatMadeChanges(Guid id, IList<IList<object?>> recipe
     {
         q.GetAndSend(after, m => m.Id);
         q.GetAndSendListAsRef(after, m => WireForm.From(m).RecipeTable,
-            RuntimeHelpers.GetHashCode, null);
+            recipe => RuntimeHelpers.GetHashCode(recipe), null);
         q.GetAndSend(after, m => WireForm.From(m).Stacks);
     }
 
@@ -41,7 +41,8 @@ public sealed class RecipesThatMadeChanges(Guid id, IList<IList<object?>> recipe
         var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
         var beforeWire = WireForm.From(before);
         var recipeTable = q.ReceiveList(beforeWire.RecipeTable, null) ?? [];
-        var stacks = ToStacks(q.Receive<object>(beforeWire.Stacks) ?? []);
+        var stacksValue = q.Receive<object>(beforeWire.Stacks);
+        var stacks = ToStacks(stacksValue ?? new List<List<int>>());
 
         var recipes = new List<IList<object?>>(stacks.Count);
         foreach (var stack in stacks)
