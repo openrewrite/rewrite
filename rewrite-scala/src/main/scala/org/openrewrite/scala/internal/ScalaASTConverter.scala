@@ -198,7 +198,7 @@ class ScalaASTConverter {
   private def buildBracedPackage(pkgDef: Trees.PackageDef[?], visitor: ScalaTreeVisitor): S.PackageDeclaration = {
     val prefix = visitor.extractPrefix(pkgDef.span)
 
-    val packageExpr: Expression = TypeTree.build(packageNameFromSource(pkgDef, visitor))
+    val packageExpr: Expression = TypeTree.build(packageNameFromSource(pkgDef, visitor), '`')
     val namePkg = new J.Package(
       Tree.randomId(),
       Space.EMPTY,
@@ -278,7 +278,7 @@ class ScalaASTConverter {
     visitor.updateCursor(cursorAfter)
 
     // Create package expression
-    val packageExpr: Expression = TypeTree.build(packageNameFromSource(pkgDef, visitor))
+    val packageExpr: Expression = TypeTree.build(packageNameFromSource(pkgDef, visitor), '`')
 
     val markerList = new util.ArrayList[org.openrewrite.marker.Marker]()
     if (hasIndentedColon) {
@@ -311,8 +311,11 @@ class ScalaASTConverter {
 
   /**
    * The package name as written in source (the `pid` span), so backtick-quoted
-   * segments like `` `trait` `` keep their backticks — the compiler's name strings
-   * strip them. Falls back to [[extractPackageName]] when the span is unusable.
+   * segments like `` `trait` `` retain their quoting — the compiler's name strings
+   * strip it. `TypeTree.build` with the backtick escape turns each quoted segment
+   * into an identifier with a bare simple name and a [[org.openrewrite.java.marker.Quoted]]
+   * marker, which the printer renders back with backticks. Falls back to
+   * [[extractPackageName]] when the span is unusable.
    */
   private def packageNameFromSource(pkgDef: Trees.PackageDef[?], visitor: ScalaTreeVisitor): String = {
     if (pkgDef.pid.span.exists) {
