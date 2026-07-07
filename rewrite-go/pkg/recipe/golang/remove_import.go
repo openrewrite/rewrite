@@ -24,8 +24,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// RemoveImport deletes a single import from a Go compilation unit.
-//
 // Matches by import path: any form (regular, aliased, dot, or blank)
 // that imports PackagePath is removed. If the imports container becomes
 // empty as a result, it is nil-ed out so the printer doesn't emit an

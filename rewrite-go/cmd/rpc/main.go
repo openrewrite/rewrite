@@ -20,6 +20,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"flag"
@@ -50,7 +51,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// jsonRPCRequest represents an incoming JSON-RPC 2.0 message (request or response).
 type jsonRPCRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id"`
@@ -59,7 +59,6 @@ type jsonRPCRequest struct {
 	Result  json.RawMessage `json:"result"` // present in responses
 }
 
-// jsonRPCResponse represents an outgoing JSON-RPC 2.0 response.
 type jsonRPCResponse struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id"`
@@ -67,14 +66,12 @@ type jsonRPCResponse struct {
 	Error   *rpcError       `json:"error,omitempty"`
 }
 
-// rpcError is the error object in a JSON-RPC response.
 type rpcError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Data    string `json:"data,omitempty"`
 }
 
-// server holds the RPC state.
 type server struct {
 	localObjects  map[string]any
 	remoteObjects map[string]any // forward direction: tracks what Java has from Go
@@ -89,6 +86,12 @@ type server struct {
 
 	// Prepared recipe instances keyed by unique ID
 	preparedRecipes map[string]recipe.Recipe
+
+	// Recipe name (fully qualified id) keyed by the same prepared recipe ID.
+	// Used to produce a meaningful error when an edit/scan run is attempted
+	// on a recipe that was registered descriptor-only (nil instance) — i.e.
+	// the workspace binary is stale or missing its implementation.
+	preparedRecipeNames map[string]string
 
 	// Bare editor cached at PrepareRecipe time when an editor was wrapped in
 	// preconditions.Check(...). Subsequent dispatch via instantiateVisitor
@@ -106,13 +109,12 @@ type server struct {
 	// remote object id (the `p` value in Visit/Generate/BatchVisit).
 	preparedContexts map[string]*recipe.ExecutionContext
 
-	// Tracing toggles for GetObject
 	traceReceive bool
 	traceSend    bool
 
-	// Server configuration from CLI flags (see serverConfig)
-	metricsCsv       string
-	dataTablesCsvDir string
+	metricsCsv string
+
+	configuredDataTableStore recipe.DataTableStore
 
 	// Per-RPC metrics writer. Lazily opened in newServer when metricsCsv
 	// is set. Writes are guarded by metricsMu so concurrent dispatch
@@ -127,19 +129,22 @@ type server struct {
 	registry  *recipe.Registry
 	installer *installer.Installer
 
+	// recipeOrigin maps a recipe name to the package that contributed it,
+	// recorded at install time and read by GetMarketplace so each row is
+	// attributed to its own bundle on the host.
+	recipeOrigin map[string]string
+
 	// recipeWorkspaceCleanup removes the temp recipe install dir created
 	// when --recipe-install-dir was not supplied. Nil when the caller
 	// provided the path (in which case lifetime is the caller's concern).
 	recipeWorkspaceCleanup func()
 }
 
-// serverConfig holds CLI-driven configuration applied to the server at startup.
 type serverConfig struct {
 	logFile          string
 	traceRpcMessages bool
 	metricsCsv       string
 	recipeInstallDir string
-	dataTablesCsvDir string
 }
 
 func newServer(cfg serverConfig) *server {
@@ -203,6 +208,7 @@ func newServer(cfg serverConfig) *server {
 		reverseRemoteObjects:    make(map[string]any),
 		reverseRemoteRefs:       make(map[int]any),
 		preparedRecipes:         make(map[string]recipe.Recipe),
+		preparedRecipeNames:     make(map[string]string),
 		preparedEditorOverrides: make(map[string]recipe.TreeVisitor),
 		preparedAccumulators:    make(map[string]any),
 		preparedContexts:        make(map[string]*recipe.ExecutionContext),
@@ -210,12 +216,12 @@ func newServer(cfg serverConfig) *server {
 		traceReceive:            cfg.traceRpcMessages,
 		traceSend:               cfg.traceRpcMessages,
 		metricsCsv:              cfg.metricsCsv,
-		dataTablesCsvDir:        cfg.dataTablesCsvDir,
 		reader:                  bufio.NewReader(os.Stdin),
 		writer:                  os.Stdout,
 		logger:                  logger,
 		registry:                reg,
 		installer:               inst,
+		recipeOrigin:            make(map[string]string),
 		recipeWorkspaceCleanup:  recipeWorkspaceCleanup,
 	}
 
@@ -236,7 +242,6 @@ func newServer(cfg serverConfig) *server {
 	return s
 }
 
-// closeMetrics flushes and closes the metrics CSV writer if open. Idempotent.
 func (s *server) closeMetrics() {
 	s.metricsMu.Lock()
 	defer s.metricsMu.Unlock()
@@ -285,7 +290,6 @@ func parseFlags() serverConfig {
 	flag.BoolVar(&cfg.traceRpcMessages, "trace-rpc-messages", false, "log every GetObject batch send/receive")
 	flag.StringVar(&cfg.metricsCsv, "metrics-csv", "", "path to write per-RPC metrics as CSV")
 	flag.StringVar(&cfg.recipeInstallDir, "recipe-install-dir", "", "directory used as the recipe installer workspace; if empty, a temporary directory is created and cleaned up on shutdown")
-	flag.StringVar(&cfg.dataTablesCsvDir, "data-tables-csv-dir", "", "directory where DataTable rows are written as CSV; empty = in-memory only")
 	flag.Parse()
 	return cfg
 }
@@ -346,9 +350,7 @@ func main() {
 	}
 }
 
-// readMessage reads a Content-Length framed JSON-RPC message from stdin.
 func (s *server) readMessage() (*jsonRPCRequest, error) {
-	// Read Content-Length header
 	headerLine, err := s.reader.ReadString('\n')
 	if err != nil {
 		return nil, err
@@ -363,12 +365,10 @@ func (s *server) readMessage() (*jsonRPCRequest, error) {
 		return nil, fmt.Errorf("invalid content length: %s", lengthStr)
 	}
 
-	// Read empty separator line
 	if _, err := s.reader.ReadString('\n'); err != nil {
 		return nil, err
 	}
 
-	// Read content body
 	body := make([]byte, contentLength)
 	if _, err := io.ReadFull(s.reader, body); err != nil {
 		return nil, err
@@ -381,7 +381,6 @@ func (s *server) readMessage() (*jsonRPCRequest, error) {
 	return &req, nil
 }
 
-// writeMessage writes a Content-Length framed JSON-RPC message to stdout.
 func (s *server) writeMessage(resp *jsonRPCResponse) error {
 	body, err := json.Marshal(resp)
 	if err != nil {
@@ -443,6 +442,8 @@ func (s *server) handleRequest(req *jsonRPCRequest) *jsonRPCResponse {
 		result, rpcErr = s.handleBatchVisit(req.Params)
 	case "Generate":
 		result, rpcErr = s.handleGenerate(req.Params)
+	case "SetDataTableStore":
+		result, rpcErr = s.handleSetDataTableStore(req.Params)
 	case "TraceGetObject":
 		result, rpcErr = s.handleTraceGetObject(req.Params)
 	case "ParseProject":
@@ -462,7 +463,6 @@ func (s *server) handleRequest(req *jsonRPCRequest) *jsonRPCResponse {
 	}
 }
 
-// handleGetLanguages returns the supported language types.
 func (s *server) handleGetLanguages() []string {
 	return []string{
 		"org.openrewrite.golang.tree.Go$CompilationUnit",
@@ -497,13 +497,11 @@ type parseInput struct {
 }
 
 func (p *parseInput) UnmarshalJSON(data []byte) error {
-	// Try bare string first (Java PathInput serializes as @JsonValue string)
 	var s string
 	if err := json.Unmarshal(data, &s); err == nil {
 		p.Path = s
 		return nil
 	}
-	// Otherwise unmarshal as a structured object
 	type alias parseInput
 	var a alias
 	if err := json.Unmarshal(data, &a); err != nil {
@@ -513,8 +511,6 @@ func (p *parseInput) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// handleParse parses Go source files and returns their IDs.
-//
 // When req.Module + req.GoModContent are set, the handler builds a
 // ProjectImporter from the parsed go.mod (requires) plus every .go input
 // in the batch (siblings) and uses it for type attribution. Inputs in the
@@ -678,7 +674,6 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		goModByIdx[r.idx] = gm
 	}
 
-	// Emit results in input order.
 	ids := make([]string, 0, len(req.Inputs))
 	for _, r := range resolvedInputs {
 		if cu, ok := cuByIdx[r.idx]; ok && cu != nil {
@@ -707,13 +702,11 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 	return ids, nil
 }
 
-// getObjectRequest is the parameter type for GetObject.
 type getObjectRequest struct {
 	ID             string `json:"id"`
 	SourceFileType string `json:"sourceFileType"`
 }
 
-// handleGetObject serializes a local object for transfer to Java.
 func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	var req getObjectRequest
 	if err := json.Unmarshal(params, &req); err != nil {
@@ -733,7 +726,6 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	// between the reverse direction (Java→Go) and forward direction (Go→Java).
 	localRefs := make(map[uintptr]int)
 
-	// Collect all batches into a single result
 	var result []rpc.RpcObjectData
 	q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
 		result = append(result, batch...)
@@ -748,13 +740,11 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	q.Put(rpc.RpcObjectData{State: rpc.EndOfObject})
 	q.Flush()
 
-	// Update remote tracking
 	s.remoteObjects[req.ID] = obj
 
 	return result, nil
 }
 
-// printRequest is the parameter type for Print.
 type printRequest struct {
 	TreeID         string  `json:"treeId"`
 	SourcePath     string  `json:"sourcePath"`
@@ -762,20 +752,17 @@ type printRequest struct {
 	MarkerPrinter  *string `json:"markerPrinter"`
 }
 
-// handlePrint retrieves a tree from Java and prints it to source.
 func (s *server) handlePrint(params json.RawMessage) (any, *rpcError) {
 	var req printRequest
 	if err := json.Unmarshal(params, &req); err != nil {
 		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("Invalid params: %v", err)}
 	}
 
-	// Get the object from Java via bidirectional RPC
 	obj := s.getObjectFromJava(req.TreeID, req.SourceFileType)
 	if obj == nil {
 		return "", nil
 	}
 
-	// Map markerPrinter from the request to the Go MarkerPrinter
 	mp := mapMarkerPrinter(req.MarkerPrinter)
 
 	if cu, ok := obj.(*golang.CompilationUnit); ok {
@@ -797,7 +784,6 @@ func (s *server) handlePrint(params json.RawMessage) (any, *rpcError) {
 	return "", &rpcError{Code: -32603, Message: "Object is not a Tree"}
 }
 
-// mapMarkerPrinter maps the RPC marker printer string to the Go MarkerPrinter.
 func mapMarkerPrinter(mp *string) printer.MarkerPrinter {
 	if mp == nil {
 		return nil
@@ -829,7 +815,6 @@ func (s *server) getObjectFromJava(id string, sourceFileType string) any {
 		before = s.localObjects[id]
 	}
 
-	// fetchBatch sends a GetObject request to Java and reads one batch of RpcObjectData.
 	fetchBatch := func() []rpc.RpcObjectData {
 		reqParams := getObjectRequest{ID: id, SourceFileType: sourceFileType}
 		paramsJSON, _ := json.Marshal(reqParams)
@@ -990,6 +975,13 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 		return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Install package failed: %v", err)}
 	}
 
+	// Attribute the recipes this package contributed to it, so GetMarketplace can tag each row
+	// with its origin and the host can bind it to the right bundle. A local-path install has no
+	// package identity, so its recipes stay unattributed and fall back to the requested bundle.
+	for _, r := range info.Recipes {
+		s.recipeOrigin[r.Name] = pkg.PackageName
+	}
+
 	afterCount := len(s.registry.AllRecipes())
 	var version *string
 	if info.Version != "" {
@@ -1002,7 +994,6 @@ func (s *server) handleInstallRecipes(params json.RawMessage) (any, *rpcError) {
 	}, nil
 }
 
-// handleReset clears all cached state.
 func (s *server) handleReset() bool {
 	s.localObjects = make(map[string]any)
 	s.remoteObjects = make(map[string]any)
@@ -1011,6 +1002,7 @@ func (s *server) handleReset() bool {
 	s.reverseRemoteObjects = make(map[string]any)
 	s.reverseRemoteRefs = make(map[int]any)
 	s.preparedRecipes = make(map[string]recipe.Recipe)
+	s.preparedRecipeNames = make(map[string]string)
 	s.preparedEditorOverrides = make(map[string]recipe.TreeVisitor)
 	s.preparedAccumulators = make(map[string]any)
 	s.preparedContexts = make(map[string]*recipe.ExecutionContext)
@@ -1022,10 +1014,7 @@ func (s *server) handleReset() bool {
 // returned. Otherwise the ctx is fetched from Java once (via the empty-body
 // codec) and cached under the pid for subsequent calls in the same recipe run.
 //
-// When --data-tables-csv-dir is set, a CsvDataTableStore is installed into
-// the ctx so any recipe that emits data-table rows writes them to that
-// directory. Otherwise an InMemoryDataTableStore is created lazily on first
-// InsertRow.
+// It then installs the host-configured DataTableStore (see installDataTableStore).
 func (s *server) resolveExecutionContext(pid *string) *recipe.ExecutionContext {
 	var ctx *recipe.ExecutionContext
 	if pid == nil || *pid == "" {
@@ -1083,31 +1072,122 @@ func (s *server) seedCursor(v recipe.TreeVisitor, ids []string) {
 	}
 }
 
-// installDataTableStore puts a DataTableStore into the ctx if one isn't
-// already present. Choice driven by --data-tables-csv-dir.
+// installDataTableStore installs the host-configured store onto the ctx. When
+// none was configured, the ctx is left untouched so an InMemoryDataTableStore
+// is created lazily on the first InsertRow.
 func (s *server) installDataTableStore(ctx *recipe.ExecutionContext) {
-	if _, ok := ctx.GetMessage(recipe.DataTableStoreKey); ok {
-		return
+	if s.configuredDataTableStore != nil {
+		ctx.PutMessage(recipe.DataTableStoreKey, s.configuredDataTableStore)
 	}
-	if s.dataTablesCsvDir != "" {
-		store, err := recipe.NewCsvDataTableStore(s.dataTablesCsvDir)
-		if err != nil {
-			s.logger.Printf("CsvDataTableStore unavailable, falling back to in-memory: %v", err)
-		} else {
-			ctx.PutMessage(recipe.DataTableStoreKey, store)
-			return
-		}
-	}
-	ctx.PutMessage(recipe.DataTableStoreKey, recipe.NewInMemoryDataTableStore())
 }
 
-// marketplaceRow matches Java's GetMarketplaceResponse.Row.
+// setDataTableStore is the wire form of the data table store configuration,
+// mirroring org.openrewrite.rpc.request.SetDataTableStore.
+type setDataTableStore interface {
+	toDataTableStore() (recipe.DataTableStore, error)
+}
+
+type csvDataTableStore struct {
+	OutputDir string `json:"outputDir"`
+	// Raw JSON to preserve the host's key order; Go maps are unordered.
+	PrefixColumns json.RawMessage `json:"prefixColumns"`
+	SuffixColumns json.RawMessage `json:"suffixColumns"`
+}
+
+func (c *csvDataTableStore) toDataTableStore() (recipe.DataTableStore, error) {
+	if c.OutputDir == "" {
+		return recipe.NewInMemoryDataTableStore(), nil
+	}
+	prefix, err := parseOrderedColumns(c.PrefixColumns)
+	if err != nil {
+		return nil, fmt.Errorf("prefixColumns: %w", err)
+	}
+	suffix, err := parseOrderedColumns(c.SuffixColumns)
+	if err != nil {
+		return nil, fmt.Errorf("suffixColumns: %w", err)
+	}
+	return recipe.NewCsvDataTableStoreWithColumns(c.OutputDir, prefix, suffix)
+}
+
+type noOpDataTableStore struct{}
+
+func (noOpDataTableStore) toDataTableStore() (recipe.DataTableStore, error) {
+	return recipe.NewInMemoryDataTableStore(), nil
+}
+
+func parseSetDataTableStore(params json.RawMessage) (setDataTableStore, error) {
+	var tag struct {
+		Kind string `json:"kind"`
+	}
+	if err := json.Unmarshal(params, &tag); err != nil {
+		return nil, err
+	}
+	if tag.Kind == "CSV" {
+		var c csvDataTableStore
+		if err := json.Unmarshal(params, &c); err != nil {
+			return nil, err
+		}
+		return &c, nil
+	}
+	return noOpDataTableStore{}, nil
+}
+
+// handleSetDataTableStore remembers the reconstructed store as the configured
+// store. Mirrors the JS SetDataTableStore.handle.
+func (s *server) handleSetDataTableStore(params json.RawMessage) (any, *rpcError) {
+	cfg, err := parseSetDataTableStore(params)
+	if err != nil {
+		return nil, &rpcError{Code: -32602, Message: fmt.Sprintf("Invalid params: %v", err)}
+	}
+	store, err := cfg.toDataTableStore()
+	if err != nil {
+		return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Cannot reconstruct data table store: %v", err)}
+	}
+	s.configuredDataTableStore = store
+	return true, nil
+}
+
+// parseOrderedColumns decodes a JSON object into ordered (name, value) pairs;
+// key order must be preserved, so a plain (unordered) map won't do.
+func parseOrderedColumns(raw json.RawMessage) ([]recipe.ColumnValue, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	tok, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	if d, ok := tok.(json.Delim); !ok || d != '{' {
+		return nil, fmt.Errorf("expected JSON object, got %v", tok)
+	}
+	var cols []recipe.ColumnValue
+	for dec.More() {
+		keyTok, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		key, ok := keyTok.(string)
+		if !ok {
+			return nil, fmt.Errorf("expected string key, got %v", keyTok)
+		}
+		var val string
+		if err := dec.Decode(&val); err != nil {
+			return nil, err
+		}
+		cols = append(cols, recipe.ColumnValue{Name: key, Value: val})
+	}
+	return cols, nil
+}
+
 type marketplaceRow struct {
 	Descriptor    marketplaceDescriptor   `json:"descriptor"`
 	CategoryPaths [][]marketplaceCategory `json:"categoryPaths"`
+	// PackageName is the package that contributed this recipe (nil when unattributed, e.g. a
+	// local-path install), so the host attributes each row to its own bundle.
+	PackageName *string `json:"packageName"`
 }
 
-// marketplaceDescriptor matches Java's RecipeDescriptor (minimal fields).
 type marketplaceDescriptor struct {
 	Name                         string                  `json:"name"`
 	DisplayName                  string                  `json:"displayName"`
@@ -1136,7 +1216,6 @@ type marketplaceOption struct {
 	Valid       []any   `json:"valid"`
 }
 
-// marketplaceCategory matches Java's CategoryDescriptor.
 type marketplaceCategory struct {
 	DisplayName string   `json:"displayName"`
 	PackageName string   `json:"packageName"`
@@ -1165,9 +1244,14 @@ func (s *server) handleGetMarketplace(params json.RawMessage) (any, *rpcError) {
 			})
 		}
 
+		var packageName *string
+		if origin, ok := s.recipeOrigin[desc.Name]; ok {
+			packageName = &origin
+		}
 		rows = append(rows, marketplaceRow{
 			Descriptor:    marketplaceDescriptorFromRecipe(desc),
 			CategoryPaths: [][]marketplaceCategory{categoryPath},
+			PackageName:   packageName,
 		})
 	}
 	if rows == nil {
@@ -1346,7 +1430,6 @@ func nonNil(s []string) []string {
 	return s
 }
 
-// prepareRecipeRequest is the parameter type for PrepareRecipe.
 type prepareRecipeRequest struct {
 	ID      string         `json:"id"`
 	Options map[string]any `json:"options"`
@@ -1361,6 +1444,10 @@ type prepareRecipeResponse struct {
 	ScanVisitor       *string               `json:"scanVisitor,omitempty"`
 	ScanPreconditions []any                 `json:"scanPreconditions"`
 	DelegatesTo       *delegatesToResponse  `json:"delegatesTo,omitempty"`
+	// RecipeList carries the prepared child recipes of a composite so the host builds the tree
+	// locally instead of re-preparing each child by name. Always emitted (an empty list for a
+	// leaf; null only for a delegating recipe, whose children the host resolves itself).
+	RecipeList []prepareRecipeResponse `json:"recipeList"`
 }
 
 type delegatesToResponse struct {
@@ -1400,21 +1487,62 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 		}, nil
 	}
 
-	// Create recipe instance with options
+	// Create recipe instance with options. A nil instance means an installer-loaded recipe with no
+	// constructor (the bootstrap binary's descriptor-only registration) — it can't run here, only
+	// be described, so return the stored descriptor with no prepared child tree. Execution happens
+	// in the CLI-built binary, where the recipe module is linked and its constructor exists, so
+	// prepareInstance below runs and returns the whole tree.
 	instance := reg.Constructor(req.Options)
-
-	var desc recipe.RecipeDescriptor
-	if instance != nil {
-		desc = recipe.Describe(instance)
-	} else {
-		// Installer-loaded recipes have no constructor; use stored descriptor
-		desc = reg.Descriptor
+	if instance == nil {
+		recipeID := uuid.New().String()
+		// Store the nil instance keyed by id so a later Visit can fail loudly by recipe name
+		// (stale/missing CLI-built binary) instead of "Unknown recipe: <uuid>".
+		s.preparedRecipes[recipeID] = instance
+		s.preparedRecipeNames[recipeID] = req.ID
+		return prepareRecipeResponse{
+			ID:                recipeID,
+			Descriptor:        marketplaceDescriptorFromRecipe(reg.Descriptor),
+			EditVisitor:       "edit:" + recipeID,
+			EditPreconditions: []any{},
+			ScanPreconditions: []any{},
+			RecipeList:        []prepareRecipeResponse{},
+		}, nil
 	}
 
-	// response.ID must be the per-instance UUID, not the recipe name —
-	// callers echo it back to identify the prepared instance.
+	resp, rerr := s.prepareInstance(instance, req.ID)
+	if rerr != nil {
+		return nil, rerr
+	}
+	return resp, nil
+}
+
+// prepareInstance prepares a recipe instance and, recursively, its whole child tree — storing every
+// node in preparedRecipes and returning the response with recipeList populated, so the host builds
+// the tree locally instead of a PrepareRecipe round trip per child.
+//
+// Mirrors the C#, JS, and Python servers. Required options are validated as each node is prepared,
+// which covers the whole tree (the root against the caller's options and each child against the
+// values its parent set). A child that delegates to a Java recipe is emitted as delegatesTo for the
+// host to resolve; the rest are prepared and validated recursively. Delegating recipes forward
+// validation to the recipe they delegate to, so they are not validated here.
+func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRecipeResponse, *rpcError) {
+	desc := recipe.Describe(instance)
+
+	_, isDelegating := instance.(recipe.DelegatesTo)
+	if !isDelegating {
+		for _, opt := range instance.Options() {
+			if opt.Required && opt.Value == nil {
+				return prepareRecipeResponse{}, &rpcError{
+					Code:    -32602,
+					Message: fmt.Sprintf("Missing required option `%s` for recipe `%s`.", opt.Name, desc.Name),
+				}
+			}
+		}
+	}
+
 	recipeID := uuid.New().String()
 	s.preparedRecipes[recipeID] = instance
+	s.preparedRecipeNames[recipeID] = name
 
 	resp := prepareRecipeResponse{
 		ID:                recipeID,
@@ -1424,43 +1552,61 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 		ScanPreconditions: []any{},
 	}
 
-	// Introspect Editor() once at prepare time. If the recipe wrapped its
-	// editor in preconditions.Check(...), extract the precondition's wire
-	// identity (so the Java host can evaluate it locally and skip the
-	// visit RPC for non-matching files) and cache the bare editor (so a
-	// subsequent dispatch via instantiateVisitor returns the unwrapped
-	// editor — otherwise the precondition would also run Go-side and
-	// double the cost).
-	if instance != nil {
-		if _, isScan := instance.(recipe.ScanningRecipe); !isScan {
-			if editor := instance.Editor(); editor != nil {
-				if checkV, ok := editor.(*preconditions.CheckVisitor); ok {
-					if entry, ok := preconditionWireEntry(checkV.Check); ok {
-						resp.EditPreconditions = append(resp.EditPreconditions, entry)
-						s.preparedEditorOverrides[recipeID] = checkV.V
-					}
+	// Introspect Editor() once: if it's wrapped in preconditions.Check(...), extract the
+	// precondition's wire identity (so the Java host can evaluate it locally and skip the visit
+	// RPC for non-matching files) and cache the bare editor (so a subsequent dispatch via
+	// instantiateVisitor returns the unwrapped editor — otherwise the precondition runs Go-side
+	// too and doubles the cost).
+	_, isScan := instance.(recipe.ScanningRecipe)
+	if !isScan {
+		if editor := instance.Editor(); editor != nil {
+			if checkV, ok := editor.(*preconditions.CheckVisitor); ok {
+				if entry, ok := preconditionWireEntry(checkV.Check); ok {
+					resp.EditPreconditions = append(resp.EditPreconditions, entry)
+					s.preparedEditorOverrides[recipeID] = checkV.V
 				}
 			}
 		}
 	}
-
-	// Check if this is a scanning recipe
-	if instance != nil {
-		if _, isScan := instance.(recipe.ScanningRecipe); isScan {
-			scanVis := "scan:" + recipeID
-			resp.ScanVisitor = &scanVis
-		}
+	if isScan {
+		scanVis := "scan:" + recipeID
+		resp.ScanVisitor = &scanVis
 	}
 
-	// Check for delegation
-	if instance != nil {
-		if del, ok := instance.(recipe.DelegatesTo); ok {
-			resp.DelegatesTo = &delegatesToResponse{
-				RecipeName: del.JavaRecipeName(),
-				Options:    del.JavaOptions(),
+	if del, ok := instance.(recipe.DelegatesTo); ok {
+		resp.DelegatesTo = &delegatesToResponse{
+			RecipeName: del.JavaRecipeName(),
+			Options:    del.JavaOptions(),
+		}
+		return resp, nil
+	}
+
+	// Whole-tree: prepare each child. A child that delegates to a Java recipe is emitted as
+	// delegatesTo for the host to resolve; the rest are prepared and validated recursively.
+	childResponses := []prepareRecipeResponse{}
+	for _, child := range instance.RecipeList() {
+		if del, ok := child.(recipe.DelegatesTo); ok {
+			childID := uuid.New().String()
+			childResponses = append(childResponses, prepareRecipeResponse{
+				ID:                childID,
+				Descriptor:        delegateDescriptor(del.JavaRecipeName()),
+				EditVisitor:       "edit:" + childID,
+				EditPreconditions: []any{},
+				ScanPreconditions: []any{},
+				DelegatesTo: &delegatesToResponse{
+					RecipeName: del.JavaRecipeName(),
+					Options:    del.JavaOptions(),
+				},
+			})
+		} else {
+			childResp, rerr := s.prepareInstance(child, recipe.Describe(child).Name)
+			if rerr != nil {
+				return prepareRecipeResponse{}, rerr
 			}
+			childResponses = append(childResponses, childResp)
 		}
 	}
+	resp.RecipeList = childResponses
 
 	return resp, nil
 }
@@ -1472,7 +1618,6 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 // operands (a list of nested wire entries). Returns ok=false when the
 // condition can't be serialized (e.g. an opaque local TreeVisitor with
 // no recipe identity) — the caller leaves the wrapper intact so the
-// gate runs Go-side as a fallback.
 func preconditionWireEntry(condition preconditions.CheckArg) (map[string]any, bool) {
 	switch c := condition.(type) {
 	case *preconditions.RecipeRef:
@@ -1496,7 +1641,6 @@ func preconditionWireEntry(condition preconditions.CheckArg) (map[string]any, bo
 	}
 }
 
-// visitRequest is the parameter type for Visit.
 type visitRequest struct {
 	Visitor        string   `json:"visitor"`
 	TreeID         string   `json:"treeId"`
@@ -1505,12 +1649,10 @@ type visitRequest struct {
 	Cursor         []string `json:"cursor"`
 }
 
-// visitResponse is the response type for Visit.
 type visitResponse struct {
 	Modified bool `json:"modified"`
 }
 
-// handleVisit applies a prepared recipe's visitor to a tree.
 func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	var req visitRequest
 	if err := json.Unmarshal(params, &req); err != nil {
@@ -1531,8 +1673,21 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 		return nil, &rpcError{Code: -32602, Message: "Unknown recipe: " + recipeID}
 	}
 	if r == nil {
-		// Installer-loaded recipes have no implementation in Go
-		return &visitResponse{Modified: false}, nil
+		// The recipe was registered descriptor-only (nil instance) yet an
+		// edit/scan run is being dispatched against it. A descriptor-only
+		// registration exists purely so the recipe can be listed in the
+		// marketplace; the real implementation is supposed to overwrite it
+		// when the recipe binary is activated (see Registry.RegisterWithCategories).
+		// Reaching here means it never was — fail loudly rather than silently
+		// reporting "no changes", which masks a stale or missing workspace binary.
+		name := s.preparedRecipeNames[recipeID]
+		if name == "" {
+			name = recipeID
+		}
+		return nil, &rpcError{
+			Code:    -32603,
+			Message: fmt.Sprintf("recipe %q is registered as metadata only and has no executable implementation in this server build; the workspace binary is stale or missing", name),
+		}
 	}
 
 	// Get the tree from Java via bidirectional RPC
@@ -1604,13 +1759,11 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	return &visitResponse{Modified: modified}, nil
 }
 
-// generateRequest is the parameter type for Generate.
 type generateRequest struct {
 	ID  string  `json:"id"`
 	PID *string `json:"p"`
 }
 
-// generateResponse is the response type for Generate.
 type generateResponse struct {
 	IDs             []string `json:"ids"`
 	SourceFileTypes []string `json:"sourceFileTypes"`
@@ -1839,13 +1992,11 @@ func sourceFileTypeFor(t java.Tree) string {
 	return ""
 }
 
-// traceGetObjectRequest is the parameter type for TraceGetObject.
 type traceGetObjectRequest struct {
 	Receive bool `json:"receive"`
 	Send    bool `json:"send"`
 }
 
-// handleTraceGetObject toggles tracing for GetObject calls.
 func (s *server) handleTraceGetObject(params json.RawMessage) (any, *rpcError) {
 	var req traceGetObjectRequest
 	if err := json.Unmarshal(params, &req); err != nil {
@@ -1859,14 +2010,12 @@ func (s *server) handleTraceGetObject(params json.RawMessage) (any, *rpcError) {
 	return true, nil
 }
 
-// parseProjectRequest is the parameter type for ParseProject.
 type parseProjectRequest struct {
 	ProjectPath string   `json:"projectPath"`
 	Exclusions  []string `json:"exclusions"`
 	RelativeTo  *string  `json:"relativeTo"`
 }
 
-// parseProjectResponseItem describes a parsed source file.
 type parseProjectResponseItem struct {
 	ID             string `json:"id"`
 	SourceFileType string `json:"sourceFileType"`
@@ -1919,7 +2068,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		switch {
 		case filepath.Base(path) == "go.mod":
 			disc.goMods = append(disc.goMods, path)
-		case strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go"):
+		case strings.HasSuffix(path, ".go"):
 			disc.goFiles = append(disc.goFiles, path)
 		}
 		return nil
@@ -2005,17 +2154,35 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if !ok {
 			continue
 		}
+		// Test files are parseable project sources, but they must not feed
+		// sibling-package symbol resolution: Go's importer never exposes a
+		// package's `_test.go` files, and a black-box `package foo_test`
+		// file would corrupt the imported package's type-check.
+		if strings.HasSuffix(goFile, "_test.go") {
+			continue
+		}
 		m := closestModule(filepath.Dir(goFile))
 		if m == nil {
 			continue
 		}
-		piByModule[m.dir].AddSource(goFile, src)
+		rel, err := filepath.Rel(m.dir, goFile)
+		if err != nil {
+			s.logger.Printf("ParseProject: cannot relativize %s to module %s: %v", goFile, m.dir, err)
+			continue
+		}
+		piByModule[m.dir].AddSource(filepath.ToSlash(rel), src)
 	}
 
 	// Group files by (owning module, package directory). Each group
 	// parses together via ParsePackage so file-A-references-file-B
 	// resolves within a package.
-	type groupKey struct{ moduleDir, pkgDir string }
+	// pkgName is the literal `package` clause, so it splits a directory by
+	// the package each file actually declares. Production code and white-box
+	// `_test.go` files share `package foo` (pkgName "foo"); black-box tests
+	// declare `package foo_test` (pkgName "foo_test") and thus form a second
+	// group. Without this split they'd share a key and go/types would
+	// silently drop every file whose clause disagrees with the group's first.
+	type groupKey struct{ moduleDir, pkgDir, pkgName string }
 	type fileEntry struct {
 		idx        int
 		path       string
@@ -2045,7 +2212,7 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 		if m != nil {
 			moduleDir = m.dir
 		}
-		key := groupKey{moduleDir: moduleDir, pkgDir: filepath.Dir(goFile)}
+		key := groupKey{moduleDir: moduleDir, pkgDir: filepath.Dir(goFile), pkgName: goparser.PackageNameOf(goFile, src)}
 		groups[key] = append(groups[key], fileEntry{
 			idx:        i,
 			path:       goFile,

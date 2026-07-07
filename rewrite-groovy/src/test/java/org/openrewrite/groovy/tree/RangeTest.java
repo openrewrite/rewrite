@@ -101,4 +101,17 @@ class RangeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void rangeWithComplexBoundExpression() {
+        rewriteRun(
+          groovy(
+            """
+              def slice(String s, int n) {
+                  s[0..(n - 1)]
+              }
+              """
+          )
+        );
+    }
 }

@@ -187,8 +187,8 @@ class CSharpRecipeTest implements RewriteTest {
     void structuredDocCommentSurvivesPrintRoundTrip() throws Exception {
         // A CSharpVisitor pass converts the raw doc comment into a structured CsDocComment tree.
         // When the modified tree is printed (serialized back to the C# side), the structured
-        // comment is decomposed over RPC and the C# side re-flattens it to text. This used to
-        // throw "Unexpected comment type ...$DocComment" / fail to map the type on the C# side.
+        // comment is decomposed over RPC and the C# side must re-flatten it to text without
+        // failing to map the type (e.g. "Unexpected comment type ...$DocComment").
         String source = "class Foo {\n    /// <summary>Does <c>x</c>.</summary>\n    void Test() {\n    }\n}\n";
         CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
         Path tempDir = Files.createTempDirectory("csharp-doc-test-");

@@ -62,8 +62,6 @@ func (s *GoSender) Visit(t java.Tree, p any) java.Tree {
 	return s.GoVisitor.Visit(t, p)
 }
 
-// --- G nodes ---
-
 func (s *GoSender) VisitCompilationUnit(cu *golang.CompilationUnit, p any) java.J {
 	q := p.(*SendQueue)
 	q.GetAndSend(cu, func(v any) any { return v.(*golang.CompilationUnit).SourcePath }, nil)

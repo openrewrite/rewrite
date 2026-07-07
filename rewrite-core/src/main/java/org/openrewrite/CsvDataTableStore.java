@@ -18,6 +18,7 @@ package org.openrewrite;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import com.google.errorprone.annotations.MustBeClosed;
 import com.univocity.parsers.csv.CsvParser;
 import com.univocity.parsers.csv.CsvParserSettings;
 import com.univocity.parsers.csv.CsvWriter;
@@ -37,8 +38,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
@@ -108,6 +111,16 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
     }
 
     /**
+     * Raw CSV has no cross-record state, so several writers can safely append to one shared file.
+     */
+    public CsvDataTableStore(Path outputDir,
+                             Map<String, String> prefixColumns,
+                             Map<String, String> suffixColumns) {
+        this(outputDir, CsvDataTableStore::defaultOutputStream, CsvDataTableStore::defaultInputStream,
+                ".csv", prefixColumns, suffixColumns);
+    }
+
+    /**
      * Create a store with control over output stream creation, file extension,
      * and additional static columns prepended/appended to each row.
      * <p>
@@ -166,6 +179,22 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
         }
     }
 
+    public Path getOutputDir() {
+        return outputDir;
+    }
+
+    public String getFileExtension() {
+        return fileExtension;
+    }
+
+    public Map<String, String> getPrefixColumns() {
+        return prefixColumns;
+    }
+
+    public Map<String, String> getSuffixColumns() {
+        return suffixColumns;
+    }
+
     private static OutputStream defaultOutputStream(Path path) {
         try {
             return Files.newOutputStream(path, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
@@ -193,12 +222,14 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
     }
 
     @Deprecated
+    @MustBeClosed
     @Override
     public Stream<?> getRows(String dataTableName, @Nullable String group) {
         RowMetadata meta = rowMetadata.get(metaKey(dataTableName, group));
         return readRows(dataTableName, group, meta);
     }
 
+    @MustBeClosed
     @SuppressWarnings("unchecked")
     @Override
     public <Row> Stream<Row> getRows(Class<? extends DataTable<Row>> dataTableClass, @Nullable String group) {
@@ -223,7 +254,6 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
             }
         }
 
-        List<Object> allRows = new ArrayList<>();
         //noinspection DataFlowIssue
         File[] files = outputDir.toFile().listFiles((dir, name) -> name.endsWith(fileExtension));
         if (files == null) {
@@ -237,54 +267,104 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
             activeWriterPaths.add(outputDir.resolve(entry.getKey() + fileExtension));
         }
 
-        int prefixCount = prefixColumns.size();
-        int suffixCount = suffixColumns.size();
-
+        // Select the files belonging to this table by reading only their small comment
+        // header, then parse their rows lazily so a whole table is never held in memory.
+        List<Path> matchingFiles = new ArrayList<>();
         for (File file : files) {
             if (activeWriterPaths.contains(file.toPath())) {
                 continue;
             }
             try (InputStream is = inputStreamFactory.apply(file.toPath())) {
                 DataTableDescriptor descriptor = readDescriptor(is);
-                if (descriptor == null ||
-                    !descriptor.getName().equals(dataTableName) ||
-                    !Objects.equals(descriptor.getGroup(), group)) {
-                    continue;
+                if (descriptor != null &&
+                    descriptor.getName().equals(dataTableName) &&
+                    Objects.equals(descriptor.getGroup(), group)) {
+                    matchingFiles.add(file.toPath());
                 }
-                // readDescriptor consumed comment lines; now parse the remaining CSV
-                // (header + data rows). Re-read the full file with CsvParser.
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+        }
 
-            try (InputStream is = inputStreamFactory.apply(file.toPath())) {
-                CsvParserSettings settings = new CsvParserSettings();
-                settings.setMaxCharsPerColumn(-1);
-                settings.setHeaderExtractionEnabled(true);
-                settings.getFormat().setComment('#');
-                CsvParser parser = new CsvParser(settings);
-                parser.beginParsing(new InputStreamReader(is, StandardCharsets.UTF_8));
+        RowSpliterator rows = new RowSpliterator(matchingFiles, meta);
+        return (Stream<T>) StreamSupport.stream(rows, false).onClose(rows::close);
+    }
 
-                String[] row;
-                while ((row = parser.parseNext()) != null) {
-                    // Strip prefix and suffix columns, returning only data table columns
-                    int dataCount = row.length - prefixCount - suffixCount;
-                    String[] dataRow;
-                    if (dataCount <= 0) {
-                        dataRow = row;
-                    } else {
-                        dataRow = new String[dataCount];
-                        System.arraycopy(row, prefixCount, dataRow, 0, dataCount);
+    /**
+     * Streams rows from the matching files one at a time, keeping a single file open as it
+     * goes. The file is closed as soon as its last row is read, so a fully drained stream
+     * (the way every caller consumes one) releases its handle without any explicit close.
+     * Closing the stream early (try-with-resources) also releases the open file.
+     */
+    private final class RowSpliterator extends Spliterators.AbstractSpliterator<Object> {
+        private final Iterator<Path> paths;
+        private final @Nullable RowMetadata meta;
+        private final int prefixCount = prefixColumns.size();
+        private final int suffixCount = suffixColumns.size();
+
+        private @Nullable InputStream is;
+        private @Nullable CsvParser parser;
+
+        RowSpliterator(List<Path> matchingFiles, @Nullable RowMetadata meta) {
+            super(Long.MAX_VALUE, Spliterator.ORDERED | Spliterator.NONNULL);
+            this.paths = matchingFiles.iterator();
+            this.meta = meta;
+        }
+
+        @Override
+        public boolean tryAdvance(Consumer<? super Object> action) {
+            while (true) {
+                if (parser == null) {
+                    if (!paths.hasNext()) {
+                        return false;
                     }
-                    allRows.add(meta != null ? meta.toRow(dataRow) : dataRow);
+                    open(paths.next());
                 }
-                parser.stopParsing();
-            } catch (IOException e) {
-                // Skip unreadable files
+                String[] row = parser.parseNext();
+                if (row == null) {
+                    close();
+                    continue;
+                }
+                // Strip prefix and suffix columns, returning only data table columns
+                int dataCount = row.length - prefixCount - suffixCount;
+                String[] dataRow;
+                if (dataCount <= 0) {
+                    dataRow = row;
+                } else {
+                    dataRow = new String[dataCount];
+                    System.arraycopy(row, prefixCount, dataRow, 0, dataCount);
+                }
+                action.accept(meta != null ? meta.toRow(dataRow) : dataRow);
+                return true;
             }
         }
 
-        return (Stream<T>) allRows.stream();
+        // Assign the stream before creating the parser so a setup failure still leaves
+        // the open stream visible to close().
+        private void open(Path path) {
+            is = inputStreamFactory.apply(path);
+            CsvParserSettings settings = new CsvParserSettings();
+            settings.setMaxCharsPerColumn(-1);
+            settings.setHeaderExtractionEnabled(true);
+            settings.getFormat().setComment('#');
+            parser = new CsvParser(settings);
+            parser.beginParsing(new InputStreamReader(is, StandardCharsets.UTF_8));
+        }
+
+        void close() {
+            if (parser != null) {
+                parser.stopParsing();
+                parser = null;
+            }
+            if (is != null) {
+                try {
+                    is.close();
+                } catch (IOException ignored) {
+                    // best effort; the parser may have already closed it at end-of-input
+                }
+                is = null;
+            }
+        }
     }
 
     @Override
@@ -318,6 +398,11 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
         }
         headers.addAll(suffixColumns.keySet());
 
+        // Writers sharing one file must agree on column order; fail loud rather than misalign rows.
+        if (append) {
+            validateExistingHeader(path, headers);
+        }
+
         OutputStream os = outputStreamFactory.apply(path);
         try {
             CsvWriterSettings settings = new CsvWriterSettings();
@@ -340,6 +425,26 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
             } catch (IOException ignored) {
             }
             throw e;
+        }
+    }
+
+    private void validateExistingHeader(Path path, List<String> expectedHeaders) {
+        try (InputStream is = inputStreamFactory.apply(path)) {
+            CsvParserSettings settings = new CsvParserSettings();
+            settings.setMaxCharsPerColumn(-1);
+            settings.getFormat().setComment('#');
+            CsvParser parser = new CsvParser(settings);
+            parser.beginParsing(new InputStreamReader(is, StandardCharsets.UTF_8));
+            String[] existing = parser.parseNext();
+            parser.stopParsing();
+            if (existing != null && !Arrays.asList(existing).equals(expectedHeaders)) {
+                throw new IllegalStateException(
+                        "Data table file " + path.getFileName() + " has header " + Arrays.toString(existing) +
+                        " but a writer expected " + expectedHeaders + ". Writers sharing a data table file " +
+                        "must agree on column order.");
+            }
+        } catch (IOException e) {
+            // Existing file is unreadable here (e.g. not yet flushed); skip the guard and proceed.
         }
     }
 
@@ -388,6 +493,8 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
             }
 
             csvWriter.writeRow((Object[]) values);
+            // Flush per row so a shared file always ends at a complete line.
+            csvWriter.flush();
         }
 
         void close() {

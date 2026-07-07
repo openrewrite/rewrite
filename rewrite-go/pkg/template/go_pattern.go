@@ -64,7 +64,6 @@ func (p *GoPattern) Match(candidate java.J, cursor *visitor.Cursor) *MatchResult
 	return cmp.match(patternTree, candidate)
 }
 
-// Matches returns true if this pattern matches the candidate.
 func (p *GoPattern) Matches(candidate java.J, cursor *visitor.Cursor) bool {
 	return p.Match(candidate, cursor) != nil
 }
@@ -77,9 +76,6 @@ func (p *GoPattern) getTree() (java.J, error) {
 	return p.cached, p.parseErr
 }
 
-// --- Pattern builder ---
-
-// PatternBuilder constructs a GoPattern with fluent configuration.
 type PatternBuilder struct {
 	code     string
 	captures []*Capture
@@ -87,34 +83,28 @@ type PatternBuilder struct {
 	kind     ScaffoldKind
 }
 
-// Expression creates a PatternBuilder for matching an expression.
 func Expression(code string) *PatternBuilder {
 	return &PatternBuilder{code: code, kind: ScaffoldExpression}
 }
 
-// Statement creates a PatternBuilder for matching a statement.
 func StatementPattern(code string) *PatternBuilder {
 	return &PatternBuilder{code: code, kind: ScaffoldStatement}
 }
 
-// TopLevel creates a PatternBuilder for matching a top-level declaration.
 func TopLevel(code string) *PatternBuilder {
 	return &PatternBuilder{code: code, kind: ScaffoldTopLevel}
 }
 
-// Captures adds captures to the builder.
 func (b *PatternBuilder) Captures(caps ...*Capture) *PatternBuilder {
 	b.captures = append(b.captures, caps...)
 	return b
 }
 
-// Imports adds required imports for the pattern code.
 func (b *PatternBuilder) Imports(pkgs ...string) *PatternBuilder {
 	b.imports = append(b.imports, pkgs...)
 	return b
 }
 
-// Build creates the GoPattern.
 func (b *PatternBuilder) Build() *GoPattern {
 	return &GoPattern{
 		code:     b.code,

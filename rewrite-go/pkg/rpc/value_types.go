@@ -97,8 +97,6 @@ func init() {
 	RegisterValueType(reflect.TypeOf((*java.TypeCast)(nil)), "org.openrewrite.java.tree.J$TypeCast")
 	RegisterValueType(reflect.TypeOf((*java.ControlParentheses)(nil)), "org.openrewrite.java.tree.J$ControlParentheses")
 	RegisterValueType(reflect.TypeOf((*java.Import)(nil)), "org.openrewrite.java.tree.J$Import")
-
-	// ParseError
 	RegisterValueType(reflect.TypeOf((*java.ParseError)(nil)), "org.openrewrite.tree.ParseError")
 
 	// Non-tree types that Java needs valueType for
@@ -220,8 +218,6 @@ func init() {
 	RegisterFactory("org.openrewrite.java.tree.J$TypeCast", func() any { return &java.TypeCast{ID: uuid.New()} })
 	RegisterFactory("org.openrewrite.java.tree.J$ControlParentheses", func() any { return &java.ControlParentheses{ID: uuid.New()} })
 	RegisterFactory("org.openrewrite.java.tree.J$Import", func() any { return &java.Import{ID: uuid.New()} })
-
-	// ParseError
 	RegisterFactory("org.openrewrite.tree.ParseError", func() any { return &java.ParseError{Ident: uuid.New()} })
 	RegisterFactory("org.openrewrite.ParseExceptionResult", func() any { return java.ParseExceptionResult{} })
 

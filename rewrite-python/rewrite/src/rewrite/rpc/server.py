@@ -874,23 +874,10 @@ def handle_install_recipes(params: dict) -> dict:
     else:
         raise ValueError(f"Invalid recipes parameter: {recipes}")
 
-    package_rows: List[dict] = []
-    if package_name:
-        # recipes_for returns an empty set (not None) when the package activated
-        # nothing, so the filter scopes the result to "this package's recipes"
-        # (zero of them) instead of falling back to "no filter" and returning
-        # everything.
-        package_rows = _collect_marketplace_rows(
-            marketplace, recipe_filter=_attribution.recipes_for(package_name)
-        )
-
-    logger.info(
-        f"InstallRecipes: {recipes_added} new, {len(package_rows)} cumulative for {package_name}"
-    )
+    logger.info(f"InstallRecipes: {recipes_added} new for {package_name}")
     return {
         'recipesInstalled': recipes_added,
         'version': installed_version,
-        'recipes': package_rows,
     }
 
 
@@ -1101,7 +1088,8 @@ def _collect_marketplace_rows(
             else:
                 rows.append({
                     'descriptor': _recipe_descriptor_to_dict(recipe_desc),
-                    'categoryPaths': [current_path]
+                    'categoryPaths': [current_path],
+                    'packageName': _attribution.package_for(recipe_desc.name),
                 })
 
         for subcategory in category.categories:
@@ -1212,8 +1200,8 @@ _execution_contexts: Dict[str, Any] = {}
 _recipe_accumulators: Dict[str, Any] = {}
 # Phase tracking for recipes - maps recipe IDs to 'scan' or 'edit'
 _recipe_phases: Dict[str, str] = {}
-# Data table output directory - if set, data tables will be written to CSV files
-_data_table_output_dir: Optional[str] = None
+# Host-configured store (via SetDataTableStore); None means per-context in-memory default.
+_configured_data_table_store: Optional[Any] = None
 
 # Registry mapping fully-qualified visitor names to visitor classes.
 # Used to instantiate visitors by name when dispatched via RPC (e.g., auto-format).
@@ -1231,23 +1219,99 @@ def _get_visitor_registry() -> Dict[str, type]:
     return _VISITOR_REGISTRY
 
 
-def _install_sub_recipes(recipe, marketplace) -> None:
-    """Ensure sub-recipes from recipe_list() are registered in the marketplace."""
+def _prepare_instance(recipe, marketplace) -> dict:
+    """Prepare a recipe instance and, recursively, its whole child tree — storing every node in
+    _prepared_recipes and returning the response with ``recipeList`` populated, so the host builds
+    the tree locally instead of a PrepareRecipe round trip per child.
+
+    Mirrors the C# and JS servers. Required options are validated as each node is prepared, which
+    covers the whole tree (the root against the caller's options and each child against the values
+    its parent set). A child hosted on the peer (an RpcRecipe) carries only ``delegatesTo`` for the
+    host to resolve; every other child carries its own ``recipeList``. Delegating recipes forward
+    validation to the recipe they delegate to, so they are not validated here.
+    """
+    from rewrite.recipe import ScanningRecipe
     from rewrite.rpc.rpc_recipe import RpcRecipe
 
-    for sub_recipe in recipe.recipe_list():
-        if isinstance(sub_recipe, RpcRecipe):
-            # An RpcRecipe is a reference to a recipe on another peer, with no
-            # Python implementation and no no-arg constructor, so it can't be
-            # installed in the marketplace. Register it so a later PrepareRecipe
-            # round-trip for its id resolves to it (and answers with
-            # delegatesTo). It has no sub-recipes of its own, so there is nothing
-            # to recurse into.
-            _delegating_recipes[sub_recipe.java_recipe_name] = sub_recipe
-            continue
-        if not marketplace.find_recipe(sub_recipe.name):
-            marketplace.install(type(sub_recipe), [])
-            _install_sub_recipes(sub_recipe, marketplace)
+    prepared_id = generate_id()
+    _prepared_recipes[prepared_id] = recipe
+
+    descriptor = recipe.descriptor()
+    is_delegating = hasattr(recipe, 'java_recipe_name')
+
+    if not is_delegating:
+        for name, value, opt in descriptor.options:
+            if opt.required and value is None:
+                raise ValueError(
+                    f"Missing required option `{name}` for recipe `{descriptor.name}`."
+                )
+
+    is_scanning = isinstance(recipe, ScanningRecipe)
+
+    # Introspect recipe.editor() once at prepare time. If the recipe wrapped its editor in
+    # Preconditions.check(...), we extract the precondition's wire identity (so the Java host can
+    # evaluate it locally and skip the visit RPC for non-matching files) and cache the bare editor
+    # (so a subsequent dispatch via _instantiate_visitor returns the unwrapped editor — otherwise
+    # the precondition would also run Python-side and double the cost).
+    edit_preconditions: List[Dict[str, Any]] = list(_get_preconditions(recipe, 'edit'))
+    if not is_scanning:
+        try:
+            editor_visitor = recipe.editor()
+        except Exception:
+            editor_visitor = None
+        if editor_visitor is not None:
+            extracted = _extract_preconditions_from_editor(editor_visitor)
+            if extracted is not None:
+                bare_editor, wire_entries = extracted
+                _prepared_editor_overrides[prepared_id] = bare_editor
+                edit_preconditions.extend(wire_entries)
+    _prepared_edit_preconditions[prepared_id] = edit_preconditions
+
+    response = {
+        'id': prepared_id,
+        'descriptor': _recipe_descriptor_to_dict(descriptor),
+        'editVisitor': f'edit:{prepared_id}',
+        'editPreconditions': edit_preconditions,
+        'scanVisitor': f'scan:{prepared_id}' if is_scanning else None,
+        'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
+    }
+
+    if is_delegating:
+        response['delegatesTo'] = {
+            'recipeName': recipe.java_recipe_name,
+            'options': getattr(recipe, 'delegates_to_options', {}),
+        }
+        return response
+
+    # Whole-tree: prepare each child here so the host builds the tree locally. A child hosted on
+    # the peer (an RpcRecipe) is emitted as delegatesTo for the host to resolve; the rest are
+    # prepared recursively. Children are also registered (in the marketplace, or _delegating_recipes
+    # for an RpcRecipe) so a peer that re-prepares children by name — rather than consuming
+    # recipeList — can still resolve them.
+    child_responses: List[dict] = []
+    for child in recipe.recipe_list():
+        if isinstance(child, RpcRecipe):
+            _delegating_recipes[child.java_recipe_name] = child
+            child_id = generate_id()
+            child_responses.append({
+                'id': child_id,
+                'descriptor': _delegate_descriptor(child.java_recipe_name),
+                'editVisitor': f'edit:{child_id}',
+                'editPreconditions': [],
+                'scanVisitor': None,
+                'scanPreconditions': [],
+                'delegatesTo': {
+                    'recipeName': child.java_recipe_name,
+                    'options': getattr(child, 'delegates_to_options', {}),
+                },
+            })
+        else:
+            if not marketplace.find_recipe(child.name):
+                marketplace.install(type(child), [])
+            child_responses.append(_prepare_instance(child, marketplace))
+    response['recipeList'] = child_responses
+
+    return response
 
 
 def handle_prepare_recipe(params: dict) -> dict:
@@ -1260,22 +1324,15 @@ def handle_prepare_recipe(params: dict) -> dict:
     4. Returning the descriptor and visitor info
 
     Args:
-        params: dict with 'id' (recipe name), optional 'options', and optional 'dataTableOutputDir'
+        params: dict with 'id' (recipe name) and optional 'options'
 
     Returns:
         dict with 'id', 'descriptor', 'editVisitor', and precondition info
     """
-    global _data_table_output_dir
-
     recipe_name = params.get('id')
     if recipe_name is None:
         raise ValueError("Recipe 'id' is required")
     options = params.get('options', {})
-
-    # Set up data table output directory if specified
-    if 'dataTableOutputDir' in params:
-        _data_table_output_dir = params['dataTableOutputDir']
-        logger.info(f"Data table output directory set to: {_data_table_output_dir}")
 
     logger.debug(f"PrepareRecipe: id={recipe_name}, options={options}")
 
@@ -1328,62 +1385,10 @@ def handle_prepare_recipe(params: dict) -> dict:
     if recipe_class is None:
         raise ValueError(f"Recipe class not found for: {recipe_name}")
 
-    # Instantiate the recipe with options
-    if options:
-        recipe = recipe_class(**options)
-    else:
-        recipe = recipe_class()
+    # Instantiate the recipe with options, then prepare it and its whole child tree.
+    recipe = recipe_class(**options) if options else recipe_class()
 
-    # Generate a unique ID for this prepared recipe
-    prepared_id = generate_id()
-    _prepared_recipes[prepared_id] = recipe
-
-    _install_sub_recipes(recipe, marketplace)
-
-    # Build the response
-    descriptor = recipe.descriptor()
-
-    # Determine if this is a scanning recipe
-    from rewrite.recipe import ScanningRecipe
-    is_scanning = isinstance(recipe, ScanningRecipe)
-
-    # Introspect recipe.editor() once at prepare time. If the recipe wrapped
-    # its editor in Preconditions.check(...), we extract the precondition's
-    # wire identity (so the Java host can evaluate it locally and skip the
-    # visit RPC for non-matching files) and cache the bare editor (so a
-    # subsequent dispatch via _instantiate_visitor returns the unwrapped
-    # editor — otherwise the precondition would also run Python-side and
-    # double the cost).
-    edit_preconditions: List[Dict[str, Any]] = list(_get_preconditions(recipe, 'edit'))
-    if not is_scanning:
-        try:
-            editor_visitor = recipe.editor()
-        except Exception:
-            editor_visitor = None
-        if editor_visitor is not None:
-            extracted = _extract_preconditions_from_editor(editor_visitor)
-            if extracted is not None:
-                bare_editor, wire_entries = extracted
-                _prepared_editor_overrides[prepared_id] = bare_editor
-                edit_preconditions.extend(wire_entries)
-    _prepared_edit_preconditions[prepared_id] = edit_preconditions
-
-    response = {
-        'id': prepared_id,
-        'descriptor': _recipe_descriptor_to_dict(descriptor),
-        'editVisitor': f'edit:{prepared_id}',
-        'editPreconditions': edit_preconditions,
-        'scanVisitor': f'scan:{prepared_id}' if is_scanning else None,
-        'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
-    }
-
-    # If the recipe declares delegation to a Java recipe, include it in the response
-    if hasattr(recipe, 'java_recipe_name'):
-        response['delegatesTo'] = {
-            'recipeName': recipe.java_recipe_name,
-            'options': getattr(recipe, 'delegates_to_options', {}),
-        }
-
+    response = _prepare_instance(recipe, marketplace)
     logger.debug(f"PrepareRecipe response: {response}")
     return response
 
@@ -1511,6 +1516,34 @@ def _find_prepared_id(recipe) -> Optional[str]:
     return None
 
 
+def handle_set_data_table_store(params: dict) -> bool:
+    """Install the host-configured store: ``CSV`` writes raw CSV at ``outputDir``, else in-memory."""
+    global _configured_data_table_store
+
+    from rewrite.data_table import CsvDataTableStore, InMemoryDataTableStore
+
+    kind = params.get('kind')
+    output_dir = params.get('outputDir')
+    if kind == 'CSV' and output_dir:
+        prefix_columns = params.get('prefixColumns') or {}
+        suffix_columns = params.get('suffixColumns') or {}
+        _configured_data_table_store = CsvDataTableStore(
+            output_dir, prefix_columns, suffix_columns)
+        logger.info(f"SetDataTableStore: CSV store at {output_dir}")
+    else:
+        _configured_data_table_store = InMemoryDataTableStore()
+        logger.info("SetDataTableStore: in-memory (NOOP) store")
+
+    return True
+
+
+def _install_data_table_store(ctx) -> None:
+    """Install the host-configured store on a recipe-run context (no-op when unconfigured)."""
+    if _configured_data_table_store is not None:
+        from rewrite.data_table import DATA_TABLE_STORE
+        ctx.put_message(DATA_TABLE_STORE, _configured_data_table_store)
+
+
 def handle_visit(params: dict) -> dict:
     """Handle a Visit RPC request.
 
@@ -1541,15 +1574,11 @@ def handle_visit(params: dict) -> dict:
     else:
         from rewrite import InMemoryExecutionContext
         ctx = InMemoryExecutionContext()
-        # Set up data table store if output directory is configured
-        if _data_table_output_dir:
-            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
-            store = CsvDataTableStore(_data_table_output_dir)
-            store.accept_rows(True)
-            ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
             local_objects[p_id] = ctx
+
+    _install_data_table_store(ctx)
 
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
@@ -1619,14 +1648,11 @@ def handle_batch_visit(params: dict) -> dict:
     else:
         from rewrite import InMemoryExecutionContext
         ctx = InMemoryExecutionContext()
-        if _data_table_output_dir:
-            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
-            store = CsvDataTableStore(_data_table_output_dir)
-            store.accept_rows(True)
-            ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
             local_objects[p_id] = ctx
+
+    _install_data_table_store(ctx)
 
     # Fetch tree once from Java
     tree = get_object_from_java(tree_id, source_file_type)
@@ -1811,15 +1837,11 @@ def handle_generate(params: dict) -> dict:
     else:
         from rewrite import InMemoryExecutionContext
         ctx = InMemoryExecutionContext()
-        # Set up data table store if output directory is configured
-        if _data_table_output_dir:
-            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
-            store = CsvDataTableStore(_data_table_output_dir)
-            store.accept_rows(True)
-            ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
             local_objects[p_id] = ctx
+
+    _install_data_table_store(ctx)
 
     # Only scanning recipes can generate files
     from rewrite.recipe import ScanningRecipe
@@ -1859,6 +1881,7 @@ def handle_request(method: str, params: dict) -> Any:
         'InstallRecipes': handle_install_recipes,
         'GetMarketplace': handle_get_marketplace,
         'PrepareRecipe': handle_prepare_recipe,
+        'SetDataTableStore': handle_set_data_table_store,
         'Visit': handle_visit,
         'BatchVisit': handle_batch_visit,
         'Generate': handle_generate,

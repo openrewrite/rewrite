@@ -246,6 +246,46 @@ testing {
 // `next`), and the duplicate-publish guard. The dedicated workflow filename is also what the
 // package's npm Trusted Publisher (OIDC) record matches against. CI/release workflows still
 // publish to Sonatype, PyPI, NuGet as before.
+//
+// npm publishing is decoupled from the Maven snapshot publish (it runs in a separate
+// `workflow_run` triggered by `ci`, because npm Trusted Publisher binds to a single workflow
+// filename), so the `ci` run must hand off the exact version string to publish. That string is NOT
+// the Maven snapshot coordinate (`8.86.0-<yyyyMMdd>.<HHmmss>-<buildNumber>`, a deploy-time
+// timestamp): it MUST be the value baked into the jar's
+// `META-INF/rewrite-javascript-version.txt` (= `datedSnapshotVersion`, a git-commit-time
+// timestamp). A downstream consumer reads that embedded value and feeds it verbatim to
+// `npx --package=@openrewrite/rewrite@<version>` when spawning the JS RPC server (see
+// JavaScriptRewriteRpc). If npm carries the deploy timestamp instead, it diverges from the
+// embedded value by however long elapses between commit and deploy, so the consumer asks npm for a
+// version that was never published and the RPC process dies on startup.
+//
+// So we record `datedSnapshotVersion` itself, and assert it matches the jar that was just built.
+// The `ci` run uploads the recorded version as an artifact and `npm-publish.yml` pins npm to it.
+val recordPublishedSnapshotVersion = tasks.register("recordPublishedSnapshotVersion") {
+    description = "Records the npm snapshot version (identical to the jar's embedded version.txt) for npm-publish to mirror."
+    val baseVersion = project.version.toString()
+    val recordedVersion = datedSnapshotVersion
+    val versionFile = layout.buildDirectory.file("npm/publishedVersion.txt")
+    onlyIf { baseVersion.endsWith("-SNAPSHOT") }
+    doLast {
+        // `extractVersionFromJar()` returns null only if the jar is absent; this task is
+        // `finalizedBy` the `publish` that builds it, so in practice it is always present here.
+        val embedded = extractVersionFromJar()
+        check(embedded == null || embedded == recordedVersion) {
+            "npm publish version ($recordedVersion) must equal the jar's embedded " +
+                    "META-INF/rewrite-javascript-version.txt ($embedded); a downstream consumer derives the " +
+                    "`npx --package=@openrewrite/rewrite@<version>` coordinate from the embedded value."
+        }
+        val out = versionFile.get().asFile
+        out.parentFile.mkdirs()
+        out.writeText(recordedVersion)
+        logger.lifecycle("Recorded published snapshot version for npm: $recordedVersion")
+    }
+}
+
+tasks.named("publish") {
+    finalizedBy(recordPublishedSnapshotVersion)
+}
 
 // ============================================
 // JavaScript Test Support Tasks

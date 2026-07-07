@@ -1,11 +1,11 @@
 /*
  * Copyright 2026 the original author or authors.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,8 +35,6 @@ func isSourceFile(t java.Tree) bool {
 	return ok
 }
 
-// IsSourceFileVisitor matches SourceFile trees by path glob.
-//
 // Mirrors org.openrewrite.FindSourceFiles. Used as the LocalVisitor
 // bundled with the *RecipeRef returned by HasSourcePath so unit tests
 // without an active RPC connection still see real filtering.

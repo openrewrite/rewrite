@@ -33,8 +33,10 @@ import {
     TraceGetObject,
     Visit,
     VisitResponse,
-    BatchVisit
+    BatchVisit,
+    SetDataTableStore
 } from "./request";
+import {DataTableStore} from "../data-table";
 import {RecipeMarketplace} from "../marketplace";
 import {initializeMetricsCsv} from "./request/metrics";
 import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
@@ -76,6 +78,8 @@ export class RewriteRpc {
     private readonly logger?: rpc.Logger;
     private traceGetObject: TraceGetObject = {receive: false, send: false};
 
+    private configuredDataTableStore?: DataTableStore;
+
     constructor(readonly connection: MessageConnection = rpc.createMessageConnection(
                     new rpc.StreamMessageReader(process.stdin),
                     new rpc.StreamMessageWriter(process.stdout),
@@ -98,21 +102,26 @@ export class RewriteRpc {
         const getObject = (id: string, sourceFileType?: string) => this.getObject(id, sourceFileType);
         const getCursor = (cursorIds: string[] | undefined, sourceFileType?: string) => this.getCursor(cursorIds, sourceFileType);
         const traceGetObject = () => this.traceGetObject.send;
+        const dataTableStore = () => this.configuredDataTableStore;
 
         const marketplace = options.marketplace || new RecipeMarketplace();
+        // Recipe name -> the package that contributed it, recorded during InstallRecipes and read when
+        // GetMarketplace builds rows so the host can attribute each recipe to its own bundle.
+        const recipeOrigin: Map<string, string> = new Map();
 
-        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
-        BatchVisit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
-        Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, options.metricsCsv);
+        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, dataTableStore, options.metricsCsv);
+        BatchVisit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, dataTableStore, options.metricsCsv);
+        Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, dataTableStore, options.metricsCsv);
+        SetDataTableStore.handle(this.connection, store => this.configuredDataTableStore = store, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
             this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
-        GetMarketplace.handle(this.connection, marketplace, options.metricsCsv);
+        GetMarketplace.handle(this.connection, marketplace, recipeOrigin, options.metricsCsv);
         GetLanguages.handle(this.connection, options.metricsCsv);
         PrepareRecipe.handle(this.connection, marketplace, preparedRecipes, options.metricsCsv);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
         ParseProject.handle(this.connection, this.localObjects, options.metricsCsv);
         Print.handle(this.connection, getObject, options.logger, options.metricsCsv);
-        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", marketplace, options.logger, options.metricsCsv);
+        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", marketplace, recipeOrigin, options.logger, options.metricsCsv);
 
         this.connection.onRequest(
             new rpc.RequestType<TraceGetObject, boolean, Error>("TraceGetObject"),

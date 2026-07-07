@@ -31,7 +31,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// SourceSpec describes a Go source file for testing.
 type SourceSpec struct {
 	Before      string
 	After       *string // nil means no change expected (parse-print idempotence only)
@@ -284,18 +283,29 @@ func parsePackageGroups(t *testing.T, p *parser.GoParser, flat []SourceSpec) map
 //   - intra-project imports type-check against real sources;
 //   - imports of declared third-party modules resolve to stub packages.
 //
+// SourceSpec paths may be absolute when tests model ParseProject's
+// filesystem-discovery shape; ProjectImporter still needs module-relative
+// paths so its import-path index matches the module path.
+//
 // Returns nil when there's no module context — the caller should fall
 // back to importer.Default().
 func buildProjectImporter(flat []SourceSpec) *parser.ProjectImporter {
 	var mrr *golang.GoResolutionResult
+	moduleRoot := ""
 	for _, s := range flat {
 		if found := FindGoResolutionResult(s); found != nil && found.ModulePath != "" {
 			mrr = found
+			if path.IsAbs(s.Path) {
+				moduleRoot = path.Dir(path.Clean(s.Path))
+			}
 			break
 		}
 	}
 	if mrr == nil {
 		return nil
+	}
+	if moduleRoot == "" {
+		moduleRoot = commonAbsoluteSourceRoot(flat)
 	}
 	pi := parser.NewProjectImporter(mrr.ModulePath, nil)
 	for _, req := range mrr.Requires {
@@ -305,9 +315,56 @@ func buildProjectImporter(flat []SourceSpec) *parser.ProjectImporter {
 		if !strings.HasSuffix(s.Path, ".go") {
 			continue
 		}
-		pi.AddSource(s.Path, s.Before)
+		pi.AddSource(moduleRelativeSourcePath(s.Path, moduleRoot), s.Before)
 	}
 	return pi
+}
+
+func commonAbsoluteSourceRoot(flat []SourceSpec) string {
+	root := ""
+	for _, s := range flat {
+		if !strings.HasSuffix(s.Path, ".go") || !path.IsAbs(s.Path) {
+			continue
+		}
+		dir := path.Dir(path.Clean(s.Path))
+		if root == "" {
+			root = dir
+		} else {
+			root = commonPathPrefix(root, dir)
+		}
+	}
+	return root
+}
+
+func commonPathPrefix(a, b string) string {
+	if a == b {
+		return a
+	}
+	aParts := strings.Split(strings.Trim(a, "/"), "/")
+	bParts := strings.Split(strings.Trim(b, "/"), "/")
+	n := 0
+	for n < len(aParts) && n < len(bParts) && aParts[n] == bParts[n] {
+		n++
+	}
+	if n == 0 {
+		return "/"
+	}
+	return "/" + strings.Join(aParts[:n], "/")
+}
+
+func moduleRelativeSourcePath(sourcePath, moduleRoot string) string {
+	if moduleRoot == "" {
+		return sourcePath
+	}
+	cleaned := path.Clean(sourcePath)
+	if !path.IsAbs(cleaned) {
+		return sourcePath
+	}
+	root := path.Clean(moduleRoot)
+	if strings.HasPrefix(cleaned, root+"/") {
+		return strings.TrimPrefix(cleaned, root+"/")
+	}
+	return sourcePath
 }
 
 // Golang creates a SourceSpec for Go source code.
@@ -335,7 +392,6 @@ func Golang(before string, after ...string) SourceSpec {
 	return spec
 }
 
-// GolangRaw creates a SourceSpec from raw Go source (no indent trimming).
 func GolangRaw(before string, after ...string) SourceSpec {
 	spec := SourceSpec{
 		Before: before,
@@ -362,7 +418,6 @@ func TrimIndent(s string) string {
 		lines = lines[:len(lines)-1]
 	}
 
-	// Find minimum indentation across non-empty lines
 	minIndent := math.MaxInt
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
@@ -395,13 +450,11 @@ func ValidateSpaces(root java.Tree) []string {
 	return (&recipes.WhitespaceValidationService{}).Validate(root)
 }
 
-// JavaRecipeConfig holds config for a Java-delegated recipe test.
 type JavaRecipeConfig struct {
 	RecipeName string
 	Options    map[string]any
 }
 
-// RecipeSpec configures a test run.
 type RecipeSpec struct {
 	CheckParsePrintIdempotence bool
 	Recipe                     recipe.Recipe
@@ -410,14 +463,12 @@ type RecipeSpec struct {
 	MarkerPrinter              printer.MarkerPrinter // printer for cross-cutting markers in recipe output; defaults to printer.DefaultMarkerPrinter
 }
 
-// NewRecipeSpec creates a new RecipeSpec with default settings.
 func NewRecipeSpec() *RecipeSpec {
 	return &RecipeSpec{
 		CheckParsePrintIdempotence: true,
 	}
 }
 
-// WithRecipe sets the recipe to apply during the test run.
 func (spec *RecipeSpec) WithRecipe(r recipe.Recipe) *RecipeSpec {
 	spec.Recipe = r
 	return spec
@@ -433,7 +484,6 @@ func (spec *RecipeSpec) WithJavaRecipe(recipeName string, options map[string]any
 	return spec
 }
 
-// WithJavaRpcClient sets the Java RPC client for recipe delegation.
 func (spec *RecipeSpec) WithJavaRpcClient(client *JavaRpcClient) *RecipeSpec {
 	spec.JavaRpcClient = client
 	return spec
@@ -627,7 +677,6 @@ func (spec *RecipeSpec) rewriteGoMod(t *testing.T, src SourceSpec) {
 	}
 }
 
-// runRecipe applies a recipe (including composite recipes with sub-recipes) to a tree.
 func runRecipe(r recipe.Recipe, t java.Tree) java.Tree {
 	ctx := recipe.NewExecutionContext()
 

@@ -298,7 +298,7 @@ describe('method mapping', () => {
 
     test('tolerates a MethodDeclaration with undefined dimensionsAfterName (pre-#6992 LST)', () => {
         // given a visitor that strips dimensionsAfterName, simulating a legacy LST deserialized
-        // without the field (Java backfills it via @JsonCreator, the JS side previously did not)
+        // without the field (Java backfills it via @JsonCreator; the JS side must tolerate it too)
         const legacyVisitor = class extends JavaScriptVisitor<ExecutionContext> {
             protected async visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): Promise<J | undefined> {
                 const legacy = {...method, dimensionsAfterName: undefined as unknown as J.MethodDeclaration["dimensionsAfterName"]};

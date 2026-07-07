@@ -299,7 +299,9 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         if (!elem.getPrefix().getLastWhitespace().contains("\n")) {
                             if (elem instanceof J.Lambda) {
                                 J body = ((J.Lambda) elem).getBody();
-                                if (!(body instanceof J.Binary)) {
+                                // Binary and ternary bodies introduce their own continuation indent
+                                // for their operands, so avoid double-indenting them here.
+                                if (!(body instanceof J.Binary) && !(body instanceof J.Ternary)) {
                                     if (!body.getPrefix().getLastWhitespace().contains("\n")) {
                                         getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
                                     }

@@ -47,6 +47,15 @@ public class PrepareRecipeResponse {
     @Nullable
     DelegatesTo delegatesTo;
 
+    /**
+     * The fully-prepared child recipe responses returned by the server as part of the
+     * whole-tree prepare response. When non-null and non-empty, the host builds
+     * {@link org.openrewrite.rpc.RpcRecipe} children locally from these nodes instead
+     * of making individual PrepareRecipe RPC calls.
+     */
+    @Nullable
+    List<PrepareRecipeResponse> recipeList;
+
     @Value
     public static class DelegatesTo {
         String recipeName;

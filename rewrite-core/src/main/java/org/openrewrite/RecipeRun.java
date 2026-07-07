@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Value
 public class RecipeRun {
@@ -58,8 +59,9 @@ public class RecipeRun {
     @SuppressWarnings("unchecked")
     @Deprecated
     public <E> List<E> getDataTableRows(String name, @Nullable String group) {
-        return (List<E>) dataTableStore.getRows(name, group)
-                .collect(Collectors.toList());
+        try (Stream<?> rows = dataTableStore.getRows(name, group)) {
+            return (List<E>) rows.collect(Collectors.toList());
+        }
     }
 
     public <E> List<E> getDataTableRows(Class<? extends DataTable<E>> dataTableClass) {
@@ -67,7 +69,8 @@ public class RecipeRun {
     }
 
     public <E> List<E> getDataTableRows(Class<? extends DataTable<E>> dataTableClass, @Nullable String group) {
-        return dataTableStore.getRows(dataTableClass, group)
-                .collect(Collectors.toList());
+        try (Stream<E> rows = dataTableStore.getRows(dataTableClass, group)) {
+            return rows.collect(Collectors.toList());
+        }
     }
 }

@@ -22,7 +22,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// GoPrinter prints an OpenRewrite LST back to Go source code.
 type GoPrinter struct {
 	visitor.GoVisitor
 }
@@ -282,7 +281,6 @@ func (p *GoPrinter) VisitMethodDeclaration(md *java.MethodDeclaration, param any
 	return md
 }
 
-// VisitGoMethodDeclaration prints a method declaration with a receiver. The
 // wrapper owns the prefix and the receiver, but both are emitted by the inner
 // declaration's VisitMethodDeclaration (which sources them via the cursor),
 // keeping the receiver correctly positioned between `func` and the name and the
@@ -304,7 +302,6 @@ func (p *GoPrinter) methodDeclarationWrapper() (*golang.MethodDeclaration, bool)
 	return wrapper, ok
 }
 
-// VisitStatementWithInit prints an if/switch carrying an init clause. The
 // wrapper owns the prefix and the init statement, but both are emitted by the
 // inner statement's VisitIf/VisitSwitch (which source them via the cursor),
 // keeping `<init>;` correctly positioned between the keyword and the condition.
@@ -691,7 +688,6 @@ func (p *GoPrinter) VisitForEachControl(control *java.ForEachControl, param any)
 	return control
 }
 
-// VisitAnnotation prints an Annotation in struct-tag form
 // (`key:"value"`) — including its leading whitespace via Prefix.
 // Backtick wrapping is the VariableDeclarations printer's job for
 // struct-field context; this method only emits the annotation's own

@@ -44,11 +44,6 @@
   eolDate: "2024-08-14"
   suggestedReplacement: trixie (13)
 
-- imageName: debian
-  tagPatterns: [bookworm, "bookworm-*", "12", "12.*"]
-  eolDate: "2026-06-10"
-  suggestedReplacement: trixie (13)
-
 - imageName: ubuntu
   tagPatterns: ["12.04", "12.04.*"]
   eolDate: "2017-04-28"
@@ -157,6 +152,11 @@
 - imageName: ubuntu
   tagPatterns: [plucky, "plucky-*", "25.04", "25.04.*"]
   eolDate: "2026-01-17"
+  suggestedReplacement: plucky (26.04)
+
+- imageName: ubuntu
+  tagPatterns: [questing, "questing-*", "25.10", "25.10.*"]
+  eolDate: "2026-07-01"
   suggestedReplacement: plucky (26.04)
 
 - imageName: alpine

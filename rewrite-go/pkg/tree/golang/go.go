@@ -22,7 +22,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// CompilationUnit represents a Go source file.
 type CompilationUnit struct {
 	ID          uuid.UUID
 	Prefix      java.Space
@@ -76,7 +75,6 @@ func (n *CompilationUnit) WithEOF(eof java.Space) *CompilationUnit {
 	return &c
 }
 
-// Go represents a `go expr` statement (goroutine launch).
 type GoStmt struct {
 	ID      uuid.UUID
 	Prefix  java.Space
@@ -100,7 +98,6 @@ func (n *GoStmt) WithMarkers(markers java.Markers) *GoStmt {
 	return &c
 }
 
-// Defer represents a `defer expr` statement.
 type Defer struct {
 	ID      uuid.UUID
 	Prefix  java.Space
@@ -124,7 +121,6 @@ func (n *Defer) WithMarkers(markers java.Markers) *Defer {
 	return &c
 }
 
-// Send represents a channel send statement: `ch <- value`.
 type Send struct {
 	ID      uuid.UUID
 	Prefix  java.Space
@@ -149,7 +145,6 @@ func (n *Send) WithMarkers(markers java.Markers) *Send {
 	return &c
 }
 
-// Goto represents a `goto label` statement.
 type Goto struct {
 	ID      uuid.UUID
 	Prefix  java.Space
@@ -173,7 +168,6 @@ func (n *Goto) WithMarkers(markers java.Markers) *Goto {
 	return &c
 }
 
-// Fallthrough represents a `fallthrough` statement in a switch case.
 type Fallthrough struct {
 	ID      uuid.UUID
 	Prefix  java.Space
@@ -196,7 +190,6 @@ func (n *Fallthrough) WithMarkers(markers java.Markers) *Fallthrough {
 	return &c
 }
 
-// Composite represents a composite literal: `Type{elem1, elem2}`.
 type Composite struct {
 	ID       uuid.UUID
 	Prefix   java.Space
@@ -221,7 +214,6 @@ func (n *Composite) WithMarkers(markers java.Markers) *Composite {
 	return &c
 }
 
-// KeyValue represents a `key: value` pair in composite literals.
 type KeyValue struct {
 	ID      uuid.UUID
 	Prefix  java.Space
@@ -246,7 +238,6 @@ func (n *KeyValue) WithMarkers(markers java.Markers) *KeyValue {
 	return &c
 }
 
-// Slice represents a slice expression: `a[low:high]` or `a[low:high:max]`.
 type Slice struct {
 	ID           uuid.UUID
 	Prefix       java.Space
@@ -303,7 +294,6 @@ func (n *ArrayType) WithMarkers(markers java.Markers) *ArrayType {
 	return &c
 }
 
-// MapType represents a map type expression: `map[K]V`.
 type MapType struct {
 	ID          uuid.UUID
 	Prefix      java.Space
@@ -329,7 +319,6 @@ func (n *MapType) WithMarkers(markers java.Markers) *MapType {
 	return &c
 }
 
-// ChanDir represents the direction of a channel type.
 type ChanDir int
 
 const (
@@ -338,7 +327,6 @@ const (
 	ChanRecvOnly                // <-chan T
 )
 
-// PointerType represents a pointer type expression: `*T`.
 type PointerType struct {
 	ID      uuid.UUID
 	Prefix  java.Space
@@ -362,7 +350,6 @@ func (n *PointerType) WithMarkers(markers java.Markers) *PointerType {
 	return &c
 }
 
-// Channel represents a channel type expression: `chan T`, `chan<- T`, `<-chan T`.
 type Channel struct {
 	ID      uuid.UUID
 	Prefix  java.Space
@@ -387,7 +374,6 @@ func (n *Channel) WithMarkers(markers java.Markers) *Channel {
 	return &c
 }
 
-// FuncType represents a function type expression: `func(int) string`.
 type FuncType struct {
 	ID         uuid.UUID
 	Prefix     java.Space
@@ -412,7 +398,6 @@ func (n *FuncType) WithMarkers(markers java.Markers) *FuncType {
 	return &c
 }
 
-// StructType represents a struct type expression: `struct { fields }`.
 type StructType struct {
 	ID      uuid.UUID
 	Prefix  java.Space
@@ -436,7 +421,6 @@ func (n *StructType) WithMarkers(markers java.Markers) *StructType {
 	return &c
 }
 
-// InterfaceType represents an interface type expression: `interface { methods }`.
 type InterfaceType struct {
 	ID      uuid.UUID
 	Prefix  java.Space
@@ -460,7 +444,6 @@ func (n *InterfaceType) WithMarkers(markers java.Markers) *InterfaceType {
 	return &c
 }
 
-// TypeList represents a parenthesized list of return types: `(int, error)` or `(n int, err error)`.
 // Used for multiple (or single parenthesized) return values in function signatures.
 // Elements are VariableDeclarations, each with optional name and type.
 type TypeList struct {
@@ -545,7 +528,6 @@ func (n *UnderlyingType) WithMarkers(markers java.Markers) *UnderlyingType {
 	return &c
 }
 
-// TypeDecl represents a `type Name Type` declaration.
 // Covers: `type Foo struct{...}`, `type Foo interface{...}`, `type Foo int`, `type Foo = Bar`.
 // For grouped declarations `type ( ... )`, Specs is non-nil and Name/Definition are unused.
 type TypeDecl struct {
@@ -588,7 +570,6 @@ func (n *TypeDecl) WithTypeParameters(tps *java.TypeParameters) *TypeDecl {
 	return &c
 }
 
-// DeclKind is the keyword introducing a grouped declaration block.
 type DeclKind int
 
 const (
@@ -665,7 +646,6 @@ type ImportBlock struct {
 
 func (b ImportBlock) ID() uuid.UUID { return b.Ident }
 
-// ChanDirMarker stores whitespace around the direction operator in a channel type.
 // For send channels (`chan <- T`), Before holds the space before `<-`.
 // For recv channels (`<- chan T`), Before holds the space before `chan`.
 type ChanDirMarker struct {
@@ -675,7 +655,6 @@ type ChanDirMarker struct {
 
 func (c ChanDirMarker) ID() uuid.UUID { return c.Ident }
 
-// MultiAssignment represents a multi-value assignment: `x, y = 1, 2` or `x, y := f()`.
 type MultiAssignment struct {
 	ID        uuid.UUID
 	Prefix    java.Space
@@ -791,7 +770,6 @@ func (n *StatementWithInit) WithMarkers(markers java.Markers) *StatementWithInit
 	return &c
 }
 
-// CommClause represents a communication clause in a select statement.
 // `case <-ch:` or `case ch <- val:` or `case v := <-ch:` or `default:`.
 type CommClause struct {
 	ID      uuid.UUID
@@ -818,7 +796,6 @@ func (n *CommClause) WithMarkers(markers java.Markers) *CommClause {
 	return &c
 }
 
-// StatementExpression wraps a Statement so it can appear in expression contexts.
 // Used for Go function literals which are parsed as MethodDeclaration (a Statement)
 // but can appear in return statements, assignments, and call arguments.
 type StatementExpression struct {
@@ -881,7 +858,6 @@ const (
 	Receive                              // <-
 )
 
-// String returns the Java enum-constant name (Go.Unary.Type) for the wire.
 // Unlike java.UnaryOperator.String() these are faithful 1:1 mappings, so the
 // operator survives a Java round-trip without collapsing to "Not".
 func (op UnaryOperator) String() string {
@@ -897,7 +873,6 @@ func (op UnaryOperator) String() string {
 	}
 }
 
-// ParseUnaryOperator converts a Go.Unary.Type enum name back to the operator.
 func ParseUnaryOperator(s string) UnaryOperator {
 	switch s {
 	case "AddressOf":
@@ -911,7 +886,6 @@ func ParseUnaryOperator(s string) UnaryOperator {
 	}
 }
 
-// Unary represents a Go-specific prefix unary expression: `&x`, `*p`, `<-ch`.
 type Unary struct {
 	ID         uuid.UUID
 	Prefix     java.Space
@@ -945,7 +919,6 @@ const (
 	BinAndNot BinaryOperator = iota + 1 // &^
 )
 
-// String returns the Java enum-constant name (Go.Binary.Type) for the wire.
 func (op BinaryOperator) String() string {
 	switch op {
 	case BinAndNot:
@@ -955,7 +928,6 @@ func (op BinaryOperator) String() string {
 	}
 }
 
-// ParseBinaryOperator converts a Go.Binary.Type enum name back to the operator.
 func ParseBinaryOperator(s string) BinaryOperator {
 	switch s {
 	case "AndNot":
@@ -965,7 +937,6 @@ func ParseBinaryOperator(s string) BinaryOperator {
 	}
 }
 
-// Binary represents a Go-specific binary expression: `a &^ b`.
 type Binary struct {
 	ID       uuid.UUID
 	Prefix   java.Space
@@ -999,7 +970,6 @@ const (
 	AssignAndNot AssignmentOperator = iota + 1 // &^=
 )
 
-// String returns the Java enum-constant name (Go.AssignmentOperation.Type).
 func (op AssignmentOperator) String() string {
 	switch op {
 	case AssignAndNot:
@@ -1009,7 +979,6 @@ func (op AssignmentOperator) String() string {
 	}
 }
 
-// ParseAssignmentOperator converts a Go.AssignmentOperation.Type enum name back.
 func ParseAssignmentOperator(s string) AssignmentOperator {
 	switch s {
 	case "AndNot":
@@ -1019,7 +988,6 @@ func ParseAssignmentOperator(s string) AssignmentOperator {
 	}
 }
 
-// AssignmentOperation represents a Go-specific compound assignment: `a &^= b`.
 type AssignmentOperation struct {
 	ID         uuid.UUID
 	Prefix     java.Space

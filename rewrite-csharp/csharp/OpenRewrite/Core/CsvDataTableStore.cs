@@ -26,37 +26,66 @@ namespace OpenRewrite.Core;
 public class CsvDataTableStore : IDataTableStore
 {
     private readonly string _outputDir;
-    private readonly HashSet<string> _initializedTables = [];
+    private readonly IReadOnlyDictionary<string, string> _prefixColumns;
+    private readonly IReadOnlyDictionary<string, string> _suffixColumns;
     private readonly Dictionary<string, int> _rowCounts = new();
     private readonly Dictionary<string, object> _dataTables = new();
     private readonly Dictionary<Type, PropertyInfo[]> _propertyCache = new();
+    private readonly object _lock = new();
 
     public CsvDataTableStore(string outputDir)
+        : this(outputDir, new Dictionary<string, string>(), new Dictionary<string, string>())
+    {
+    }
+
+    /// <summary>
+    /// Raw (uncompressed) CSV so complete-line appends from multiple writers sharing one
+    /// file per table interleave into one valid file.
+    /// </summary>
+    public CsvDataTableStore(string outputDir,
+        IReadOnlyDictionary<string, string> prefixColumns,
+        IReadOnlyDictionary<string, string> suffixColumns)
     {
         _outputDir = outputDir;
+        _prefixColumns = prefixColumns;
+        _suffixColumns = suffixColumns;
         Directory.CreateDirectory(outputDir);
     }
+
+    public IReadOnlyDictionary<string, string> PrefixColumns => _prefixColumns;
+
+    public IReadOnlyDictionary<string, string> SuffixColumns => _suffixColumns;
 
     public void InsertRow<TRow>(DataTable<TRow> dataTable, ExecutionContext ctx, TRow row) where TRow : notnull
     {
         var fileKey = FileKey(dataTable);
         var csvPath = Path.Combine(_outputDir, fileKey + ".csv");
 
-        if (!_initializedTables.Contains(fileKey))
+        lock (_lock)
         {
-            _initializedTables.Add(fileKey);
-            _rowCounts[fileKey] = 0;
             _dataTables[fileKey] = dataTable;
+            var properties = GetCachedProperties(typeof(TRow), dataTable.Descriptor);
 
-            var headers = dataTable.Descriptor.Columns.Select(c => EscapeCsv(c.DisplayName));
-            var comments = $"# @name {dataTable.Name}\n# @instanceName {dataTable.InstanceName}\n# @group {dataTable.Group ?? ""}\n";
-            File.WriteAllText(csvPath, comments + string.Join(",", headers) + "\n");
+            // Header decided by file existence (not in-memory state) and keyed on field NAMES,
+            // so writers sharing one file with the Java host write it once and stay aligned.
+            if (!File.Exists(csvPath))
+            {
+                var headers = _prefixColumns.Keys
+                    .Concat(dataTable.Descriptor.Columns.Select(c => c.Name))
+                    .Concat(_suffixColumns.Keys)
+                    .Select(EscapeCsv);
+                var comments = $"# @name {dataTable.Name}\n# @instanceName {dataTable.InstanceName}\n# @group {dataTable.Group ?? ""}\n";
+                File.WriteAllText(csvPath, comments + string.Join(",", headers) + "\n");
+            }
+
+            var values = _prefixColumns.Values
+                .Select(v => (object?)v)
+                .Concat(properties.Select(p => p.GetValue(row)))
+                .Concat(_suffixColumns.Values.Select(v => (object?)v))
+                .Select(EscapeCsv);
+            File.AppendAllText(csvPath, string.Join(",", values) + "\n");
+            _rowCounts[fileKey] = _rowCounts.GetValueOrDefault(fileKey) + 1;
         }
-
-        var properties = GetCachedProperties(typeof(TRow), dataTable.Descriptor);
-        var values = properties.Select(p => EscapeCsv(p.GetValue(row)));
-        File.AppendAllText(csvPath, string.Join(",", values) + "\n");
-        _rowCounts[fileKey]++;
     }
 
     public IEnumerable<object> GetRows(string dataTableName, string? group)
@@ -67,18 +96,39 @@ public class CsvDataTableStore : IDataTableStore
 
     public IReadOnlyList<object> GetDataTables()
     {
-        return _dataTables.Values.ToList();
+        lock (_lock)
+        {
+            return _dataTables.Values.ToList();
+        }
     }
 
     /// <summary>
     /// Number of rows written for each data table.
     /// </summary>
-    public IReadOnlyDictionary<string, int> RowCounts => _rowCounts;
+    public IReadOnlyDictionary<string, int> RowCounts
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return new Dictionary<string, int>(_rowCounts);
+            }
+        }
+    }
 
     /// <summary>
     /// File-safe keys of all data tables that have been written to.
     /// </summary>
-    public IReadOnlyList<string> TableKeys => _initializedTables.ToList();
+    public IReadOnlyList<string> TableKeys
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _dataTables.Keys.ToList();
+            }
+        }
+    }
 
     private PropertyInfo[] GetCachedProperties(Type rowType, DataTableDescriptor descriptor)
     {
@@ -104,8 +154,15 @@ public class CsvDataTableStore : IDataTableStore
 
     public static string FileKey<TRow>(DataTable<TRow> dataTable) where TRow : notnull
     {
-        var suffix = dataTable.Group ?? dataTable.InstanceName;
-        return suffix == dataTable.Name ? dataTable.Name : $"{dataTable.Name}--{Sanitize(suffix)}";
+        // Must mirror the Java host's fileKey exactly, or a table shared by a Java and a C# recipe resolves to two files.
+        var group = dataTable.Group;
+        if (group != null)
+        {
+            return group == dataTable.Name ? dataTable.Name : $"{dataTable.Name}--{Sanitize(group)}";
+        }
+        return dataTable.InstanceName == dataTable.Descriptor.DisplayName
+            ? dataTable.Name
+            : $"{dataTable.Name}--{Sanitize(dataTable.InstanceName)}";
     }
 
     public static string Sanitize(string value)

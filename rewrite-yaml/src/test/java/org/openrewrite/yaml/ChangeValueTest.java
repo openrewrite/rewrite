@@ -180,6 +180,84 @@ class ChangeValueTest implements RewriteTest {
     }
 
     @Test
+    void preservesFoldedStripBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.key", "replaced", null)),
+          yaml(
+            """
+              key: >-
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: >-
+                replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesLiteralKeepBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.key", "replaced", null)),
+          yaml(
+            """
+              key: |+
+                line one
+                line two
+
+              after: tail
+              """,
+            """
+              key: |+
+                replaced
+
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesFoldedClipBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.key", "replaced", null)),
+          yaml(
+            """
+              key: >
+                line one
+                line two
+              after: tail
+              """,
+            """
+              key: >
+                replaced
+              after: tail
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesCrlfLiteralBlockEnvelope() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.key", "replaced", null)),
+          yaml(
+            "key: |\r\n" +
+            "  line one\r\n" +
+            "  line two\r\n" +
+            "after: tail\r\n",
+            "key: |\r\n" +
+            "  replaced\r\n" +
+            "after: tail\r\n"
+          )
+        );
+    }
+
+    @Test
     void changeSequenceKeyByExactMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(

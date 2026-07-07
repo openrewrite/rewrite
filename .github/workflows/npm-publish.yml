@@ -39,6 +39,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      actions: read  # download the published-snapshot-version artifact from the triggering `ci` run
     steps:
       - uses: actions/checkout@v7
         with:
@@ -63,22 +64,47 @@ jobs:
       - shell: bash
         run: sudo npm install -g npm@latest
 
+      # The `ci` run records the exact version string baked into its rewrite-javascript jar
+      # (META-INF/rewrite-javascript-version.txt) and uploads it as the
+      # `published-snapshot-version` artifact. Download it so the npm package publishes that
+      # identical string — a downstream consumer feeds the jar's embedded value to
+      # `npx --package=@openrewrite/rewrite@<version>`, so npm must match it exactly. Best-effort:
+      # absent on the `publish` tag path (and on older `ci` runs), in which case the step below
+      # falls back to Gradle's own snapshot-version derivation.
+      - if: github.event.workflow_run.name == 'ci'
+        continue-on-error: true
+        uses: actions/download-artifact@v8
+        with:
+          name: published-snapshot-version
+          path: .published-version
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
       # For a tag-triggered upstream `publish` run, `head_branch` is the tag name
       # (e.g. `v8.83.0`). Strip the leading `v` and publish to dist-tag `latest`.
-      # Otherwise this is the `ci`-triggered snapshot path: let Gradle derive the
-      # dated snapshot version and publish to dist-tag `next`.
+      # Otherwise this is the `ci`-triggered snapshot path: publish the exact version string
+      # handed off above (= the version embedded in the ci run's jar), and publish to
+      # dist-tag `next`.
       - id: ver
         shell: bash
         env:
           TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
           if [[ '${{ github.event.workflow_run.name }}' == 'publish' ]]; then
-            echo "version=${TAG#v}"   >> "$GITHUB_OUTPUT"
-            echo "dist_tag=latest"    >> "$GITHUB_OUTPUT"
-          else
-            echo "version="           >> "$GITHUB_OUTPUT"
-            echo "dist_tag=next"      >> "$GITHUB_OUTPUT"
+            echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+            echo "dist_tag=latest"  >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          V=''
+          F=$(find .published-version -name publishedVersion.txt 2>/dev/null | head -1)
+          if [[ -n "$F" ]]; then
+            V=$(tr -d '[:space:]' < "$F")
+            echo "Publishing the version handed off from the ci run (== jar's embedded version): $V"
+          else
+            echo "No handed-off version found; falling back to Gradle-derived snapshot version"
+          fi
+          echo "version=$V"     >> "$GITHUB_OUTPUT"
+          echo "dist_tag=next"  >> "$GITHUB_OUTPUT"
 
       - shell: bash
         run: |
@@ -89,9 +115,10 @@ jobs:
           ./gradlew --no-daemon --console=plain --info --stacktrace \
             :rewrite-javascript:npmPack "${ARGS[@]}"
 
-      # npm has no `--skip-duplicate`. The daily scheduled snapshot publish would
-      # otherwise 403 whenever no new commit had landed since the previous run
-      # (the snapshot version is derived from the latest commit timestamp).
+      # npm has no `--skip-duplicate`. Guards against a re-run of the same upstream
+      # event (which resolves to the identical version) 403-ing. A genuine new Maven
+      # snapshot always carries a fresh build number, so this never suppresses a
+      # legitimate publish — including the daily schedule, even with no new commit.
       - shell: bash
         env:
           CI: 'true'

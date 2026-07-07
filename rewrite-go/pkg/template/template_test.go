@@ -87,17 +87,14 @@ func TestParseScaffoldExpression(t *testing.T) {
 }
 
 func TestPatternMatchIdentifier(t *testing.T) {
-	// Parse source containing identifier "x"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", "package main\n\nvar y = x\n")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Build a pattern that matches identifier "x"
 	pat := Expression("x").Build()
 
-	// Find the identifier "x" in the parsed tree
 	var found java.J
 	v := visitor.Init(&identFinder{target: "x", found: &found})
 	v.Visit(cu, nil)
@@ -113,17 +110,14 @@ func TestPatternMatchIdentifier(t *testing.T) {
 }
 
 func TestPatternNoMatch(t *testing.T) {
-	// Parse source containing identifier "y"
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", "package main\n\nvar z = y\n")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Build a pattern that matches identifier "x"
 	pat := Expression("x").Build()
 
-	// Find identifier "y" in the tree
 	var found java.J
 	v := visitor.Init(&identFinder{target: "y", found: &found})
 	v.Visit(cu, nil)
@@ -139,20 +133,17 @@ func TestPatternNoMatch(t *testing.T) {
 }
 
 func TestPatternMatchWithCapture(t *testing.T) {
-	// Parse: 1 + 2
 	p := parser.NewGoParser()
 	cu, err := p.Parse("test.go", "package main\n\nvar x = 1 + 2\n")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Pattern: <expr> + 2
 	expr := Expr("expr")
 	pat := Expression(fmt.Sprintf("%s + 2", expr)).
 		Captures(expr).
 		Build()
 
-	// Find the binary expression
 	var found java.J
 	v := visitor.Init(&binaryFinder{found: &found})
 	v.Visit(cu, nil)
@@ -180,7 +171,6 @@ func TestPatternMatchWithCapture(t *testing.T) {
 }
 
 func TestRewriteVisitor(t *testing.T) {
-	// Recipe that rewrites `x` identifiers to `y`
 	pat := Expression("x").Build()
 	tmpl := ExpressionTemplate("y").Build()
 	rewriter := Rewrite(pat, tmpl)
@@ -201,7 +191,6 @@ func TestRewriteVisitor(t *testing.T) {
 }
 
 func TestRewriteBinaryExpression(t *testing.T) {
-	// Recipe that rewrites `1 + 2` to `3`
 	pat := Expression("1 + 2").Build()
 	tmpl := ExpressionTemplate("3").Build()
 	rewriter := Rewrite(pat, tmpl)
@@ -222,7 +211,6 @@ func TestRewriteBinaryExpression(t *testing.T) {
 }
 
 func TestRewriteWithCapture(t *testing.T) {
-	// Recipe that rewrites `<expr> + 0` to `<expr>`
 	expr := Expr("expr")
 	pat := Expression(fmt.Sprintf("%s + 0", expr)).
 		Captures(expr).
@@ -248,7 +236,6 @@ func TestRewriteWithCapture(t *testing.T) {
 }
 
 func TestPatternNoChangeWhenNoMatch(t *testing.T) {
-	// Pattern that matches `1 + 2` should not change `3 + 4`
 	pat := Expression("1 + 2").Build()
 	tmpl := ExpressionTemplate("99").Build()
 	rewriter := Rewrite(pat, tmpl)
@@ -265,7 +252,6 @@ func TestPatternNoChangeWhenNoMatch(t *testing.T) {
 }
 
 func TestRewritePreservesFormatting(t *testing.T) {
-	// Rewriting should preserve the original node's prefix (whitespace).
 	pat := Expression("x").Build()
 	tmpl := ExpressionTemplate("y").Build()
 	rewriter := Rewrite(pat, tmpl)
@@ -326,8 +312,6 @@ func TestPatternMatchGoUnary(t *testing.T) {
 	}
 }
 
-// --- Test helpers ---
-
 type rewriteRecipeWithVisitor struct {
 	recipe.Base
 	visitor recipe.TreeVisitor
@@ -338,7 +322,6 @@ func (r *rewriteRecipeWithVisitor) DisplayName() string        { return "Test Re
 func (r *rewriteRecipeWithVisitor) Description() string        { return "Test rewrite recipe" }
 func (r *rewriteRecipeWithVisitor) Editor() recipe.TreeVisitor { return r.visitor }
 
-// identFinder walks the tree to find the first Identifier with the given name.
 type identFinder struct {
 	visitor.GoVisitor
 	target string
@@ -352,7 +335,6 @@ func (v *identFinder) VisitIdentifier(ident *java.Identifier, p any) java.J {
 	return v.GoVisitor.VisitIdentifier(ident, p)
 }
 
-// goUnaryFinder walks the tree to find the first Go-specific Unary expression.
 type goUnaryFinder struct {
 	visitor.GoVisitor
 	found *java.J
@@ -365,7 +347,6 @@ func (v *goUnaryFinder) VisitGoUnary(u *golang.Unary, p any) java.J {
 	return v.GoVisitor.VisitGoUnary(u, p)
 }
 
-// binaryFinder walks the tree to find the first Binary expression.
 type binaryFinder struct {
 	visitor.GoVisitor
 	found *java.J

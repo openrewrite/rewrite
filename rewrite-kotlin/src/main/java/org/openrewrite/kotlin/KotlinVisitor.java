@@ -231,7 +231,14 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         } else {
             r = (K.Return) temp2;
         }
-        r = r.withExpression(visitAndCast(r.getExpression(), p));
+        // A K.Return wraps a J.Return. A recipe may rewrite that inner J.Return into a
+        // different statement (e.g. unwrapping `return foo()` to `foo()`), so guard the
+        // cast rather than assuming the visited expression is still a J.Return.
+        J expression = visitAndCast(r.getExpression(), p);
+        if (!(expression instanceof J.Return)) {
+            return expression;
+        }
+        r = r.withExpression((J.Return) expression);
         return r.withLabel(visitAndCast(r.getLabel(), p));
     }
 

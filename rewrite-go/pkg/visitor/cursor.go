@@ -34,7 +34,6 @@ func NewCursor(parent *Cursor, value java.Tree) *Cursor {
 func (c *Cursor) Parent() *Cursor  { return c.parent }
 func (c *Cursor) Value() java.Tree { return c.value }
 
-// PutMessage stores a value on this cursor's frame, keyed by name.
 // Mirrors Java Cursor.putMessage(String, Object).
 func (c *Cursor) PutMessage(key string, value any) {
 	if c.messages == nil {
@@ -120,7 +119,6 @@ func (c *Cursor) PutMessageOnFirstEnclosing(match func(t java.Tree) bool, key st
 	}
 }
 
-// BuildChain constructs a cursor chain from a list of tree values, root first.
 // Returns nil for an empty input. Used by the RPC layer to reconstruct the
 // cursor from a Visit request's `cursor` field (a list of tree IDs whose
 // values have already been fetched in order).

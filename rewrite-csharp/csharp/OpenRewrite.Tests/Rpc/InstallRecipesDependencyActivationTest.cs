@@ -20,17 +20,10 @@ using OpenRewrite.CSharp.Rpc;
 namespace OpenRewrite.Tests.Rpc;
 
 /// <summary>
-/// Regression test for cross-package composite recipe resolution when a recipe package is
-/// registered as a loose DLL (file path) rather than a NuGet package.
-///
-/// A composite recipe in one package (here: PrimaryPlugin) commonly lists a recipe defined in a
-/// *referenced* package (here: DepPlugin) inside its <c>GetRecipeList()</c>. When installed via
-/// <c>InstallRecipes</c> from a loose DLL, only the primary assembly used to be activated; the
-/// dependency assembly's types loaded on demand but its <see cref="IRecipeActivator"/> never ran,
-/// so its recipes were missing from the marketplace and <c>PrepareRecipe</c> failed with
-/// "Recipe not found" (e.g. Migration.Dotnet's UpgradeToDotNet10 -> Core's
-/// ChangeDotNetTargetFramework). <c>InstallRecipes</c> now walks the primary's reference graph and
-/// activates plugin-private recipe assemblies too.
+/// Verifies strict isolation when a recipe package is installed as a loose DLL: only the
+/// primary assembly's own recipes are registered into the marketplace. Referenced dependency
+/// assemblies are NOT activated at install time; cross-package composition is resolved by binary
+/// integration at recipe-tree preparation time instead.
 /// </summary>
 public class InstallRecipesDependencyActivationTest : IDisposable
 {
@@ -138,7 +131,7 @@ public class InstallRecipesDependencyActivationTest : IDisposable
     }
 
     [Fact]
-    public void InstallRecipes_FromLooseDll_ActivatesReferencedRecipePackages()
+    public void InstallRecipes_FromLooseDll_RegistersOnlyPrimaryAssemblyRecipes()
     {
         var primaryDll = Path.Combine(_publishDir, "PrimaryPlugin.dll");
         Assert.True(File.Exists(primaryDll), $"Primary plugin DLL not found at {primaryDll}");
@@ -153,11 +146,12 @@ public class InstallRecipesDependencyActivationTest : IDisposable
 
         var names = marketplace.AllRecipes().Select(r => r.Name).ToHashSet();
 
+        // The installed artifact contributes only its own recipe.
         Assert.Contains("PrimaryPlugin.PrimaryRecipe", names);
-        // The fix: the referenced package's recipe is registered even though only the primary
-        // DLL was installed by path. Without dependency activation this is absent and a
-        // composite run fails with "Recipe not found: DepPlugin.DepRecipe".
-        Assert.Contains("DepPlugin.DepRecipe", names);
+        // Strict isolation: the referenced package's recipe is NOT registered into the
+        // marketplace by installing the dependent. It is resolved by binary integration
+        // at composition time instead (see PrepareRecipeTreeTest).
+        Assert.DoesNotContain("DepPlugin.DepRecipe", names);
     }
 
     private static void RunDotnet(string arguments)

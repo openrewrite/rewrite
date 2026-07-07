@@ -22,7 +22,6 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
-// nilableString converts a *string to an any, returning nil if the pointer is nil.
 func nilableString(s *string) any {
 	if s == nil {
 		return nil
@@ -41,10 +40,8 @@ func emptyAsNil(s string) any {
 	return s
 }
 
-// sendSpace serializes a Space to the send queue.
 // Matches JavaSender.visitSpace field order: comments (list), whitespace.
 func sendSpace(s java.Space, q *SendQueue) {
-	// Comments list: id = text + suffix
 	q.GetAndSendList(s,
 		func(v any) []any {
 			sp := v.(java.Space)
@@ -67,17 +64,13 @@ func sendSpace(s java.Space, q *SendQueue) {
 			q.GetAndSend(c, func(x any) any { return x.(java.Comment).Multiline }, nil)
 			q.GetAndSend(c, func(x any) any { return x.(java.Comment).Text }, nil)
 			q.GetAndSend(c, func(x any) any { return x.(java.Comment).Suffix }, nil)
-			// Markers - use codec callback to match Java's Markers codec behavior
 			q.GetAndSend(c, func(x any) any { return x.(java.Comment).Markers },
 				func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 		})
-	// Whitespace
 	q.GetAndSend(s, func(v any) any { return v.(java.Space).Whitespace }, nil)
 }
 
-// receiveSpace deserializes a Space from the receive queue.
 func receiveSpace(before java.Space, q *ReceiveQueue) java.Space {
-	// Comments list
 	commentsAny := make([]any, len(before.Comments))
 	for i, c := range before.Comments {
 		commentsAny[i] = c
@@ -112,10 +105,8 @@ func receiveSpace(before java.Space, q *ReceiveQueue) java.Space {
 	return java.Space{Comments: comments, Whitespace: whitespace}
 }
 
-// SendMarkersCodec serializes Markers fields like Java's Markers.rpcSend codec.
 // Sends: ID (uuid string), then marker entries list as ref.
 func SendMarkersCodec(m java.Markers, q *SendQueue) {
-	// ID
 	q.GetAndSend(m, func(v any) any { return v.(java.Markers).ID.String() }, nil)
 	// Entries list (as ref) — matches Java's Markers.rpcSend protocol.
 	q.GetAndSendListAsRef(m,
@@ -295,9 +286,7 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 	}
 }
 
-// receiveMarkersCodec deserializes Markers fields like Java's Markers.rpcReceive codec.
 func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
-	// ID
 	idStr := receiveScalar[string](q, before.ID.String())
 	id := before.ID
 	if idStr != "" && idStr != before.ID.String() {

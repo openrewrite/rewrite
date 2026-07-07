@@ -18,7 +18,6 @@ package golang
 
 import "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 
-// ChangeType changes a Go type reference from one fully qualified name to another.
 // Delegates to the Java ChangeType recipe via RPC.
 type ChangeType struct {
 	recipe.Base

@@ -2168,6 +2168,7 @@ export class JavaScriptParserVisitor {
         }
 
         if (name && name.simpleName.length > 0) {
+            const methodType = this.mapMethodType(node);
             return {
                 kind: J.Kind.MethodInvocation,
                 id: randomId(),
@@ -2177,10 +2178,10 @@ export class JavaScriptParserVisitor {
                 typeParameters: typeArguments,
                 name: {
                     ...name,
-                    type: undefined
+                    type: methodType && methodType.name.startsWith('<') ? {...methodType} : undefined
                 },
                 arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
-                methodType: this.mapMethodType(node)
+                methodType: methodType
             }
         } else {
             return {
