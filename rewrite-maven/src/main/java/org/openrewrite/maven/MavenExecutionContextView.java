@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
@@ -52,6 +54,8 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_REPOSITORIES = "org.openrewrite.maven.repos";
     private static final String MAVEN_PINNED_SNAPSHOT_VERSIONS = "org.openrewrite.maven.pinnedSnapshotVersions";
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
+    private static final String MAVEN_EFFECTIVE_SETTINGS_CACHE = "org.openrewrite.maven.effectiveSettingsCache";
+    private static final String MAVEN_MIRRORS_CACHE = "org.openrewrite.maven.mirrorsCache";
     private static final String MAVEN_ARTIFACT_CACHE = "org.openrewrite.maven.artifactCache";
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
     private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
@@ -103,6 +107,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     public MavenExecutionContextView setMirrors(@Nullable Collection<MavenRepositoryMirror> mirrors) {
         putMessage(MAVEN_MIRRORS, mirrors);
+        putMessage(MAVEN_MIRRORS_CACHE, null);
         return this;
     }
 
@@ -112,15 +117,20 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     /**
      * Get mirrors set on this execution context, unless overridden by a supplied maven settings file.
+     * Supplied settings take precedence: when they differ in value from the settings on this context,
+     * their mirrors replace (not merge with) the context's mirror list, including a list installed
+     * explicitly via {@link #setMirrors(Collection)}.
      *
      * @param mavenSettings The maven settings defining mirrors to use, if any.
      * @return The mirrors to use for dependency resolution.
      */
     public Collection<MavenRepositoryMirror> getMirrors(@Nullable MavenSettings mavenSettings) {
-        if (mavenSettings != null && !Objects.equals(mavenSettings, getSettings())) {
-            return mapMirrors(mavenSettings);
+        if (mavenSettings == null) {
+            return getMirrors();
         }
-        return getMirrors();
+        return this.<Collection<MavenRepositoryMirror>>getIdentityCache(MAVEN_MIRRORS_CACHE)
+                .get(mavenSettings, settings ->
+                        !Objects.equals(settings, getSettings()) ? mapMirrors(settings) : getMirrors());
     }
 
     public MavenExecutionContextView setCredentials(Collection<MavenRepositoryCredentials> credentials) {
@@ -312,6 +322,8 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         }
 
         putMessage(MAVEN_SETTINGS, settings);
+        putMessage(MAVEN_EFFECTIVE_SETTINGS_CACHE, null);
+        putMessage(MAVEN_MIRRORS_CACHE, null);
         List<String> effectiveActiveProfiles = mapActiveProfiles(settings, activeProfiles);
         setActiveProfiles(effectiveActiveProfiles);
         setCredentials(mapCredentials(settings));
@@ -332,13 +344,26 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      *
      */
     public @Nullable MavenSettings effectiveSettings(MavenResolutionResult mrr) {
-        MavenSettings effectiveSettings = getMessage(MAVEN_SETTINGS);
-        if (effectiveSettings == null) {
-            effectiveSettings = mrr.getMavenSettings();
-        } else {
-            effectiveSettings = effectiveSettings.merge(mrr.getMavenSettings());
+        MavenSettings contextSettings = getMessage(MAVEN_SETTINGS);
+        MavenSettings parsedSettings = mrr.getMavenSettings();
+        if (contextSettings == null) {
+            return parsedSettings;
         }
-        return effectiveSettings;
+        if (parsedSettings == null) {
+            return contextSettings;
+        }
+        // Recipes construct a downloader per visited tag, so memoize the merge per parsed-settings
+        // instance; returning a stable instance also lets getMirrors(MavenSettings) memoize.
+        return this.<MavenSettings>getIdentityCache(MAVEN_EFFECTIVE_SETTINGS_CACHE)
+                .get(parsedSettings, contextSettings::merge);
+    }
+
+    private <T> Cache<MavenSettings, T> getIdentityCache(String key) {
+        // Weak keys give identity comparison and let entries die with the settings instances they
+        // memoize for, so a long run over many repositories does not pin every parsed settings graph.
+        //noinspection unchecked
+        return (Cache<MavenSettings, T>) getMessages().computeIfAbsent(key,
+                k -> Caffeine.newBuilder().weakKeys().build());
     }
 
     private static List<String> mapActiveProfiles(MavenSettings settings, String... activeProfiles) {
