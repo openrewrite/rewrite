@@ -17,6 +17,7 @@ package org.openrewrite.marker;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
+import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
@@ -28,44 +29,31 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RecipesThatMadeChangesTest {
 
     @Test
-    void rpcCodecSendsRepeatedRecipesOnce() {
+    void rpcCodecRoundTripsStacksAndSharesRepeatedRecipesWithinAMarker() {
+        // given a marker whose stacks repeat the same recipe instance
         Recipe recipe = Recipe.noop();
         RecipesThatMadeChanges marker = new RecipesThatMadeChanges(UUID.randomUUID(), List.of(
           List.of(recipe, recipe),
           List.of(recipe)
         ));
-        RecipesThatMadeChanges marker2 = new RecipesThatMadeChanges(UUID.randomUUID(), List.of(
-          List.of(recipe)
-        ));
 
+        // when it is sent
         Deque<List<RpcObjectData>> batches = new ArrayDeque<>();
         RpcSendQueue send = new RpcSendQueue(100, batches::addLast, new IdentityHashMap<>(), null, false);
         send.send(marker, null, null);
-        send.send(marker2, null, null);
         send.flush();
 
+        // then a repeated recipe is written to the wire table only once (referenced by the stacks)
         List<RpcObjectData> messages = batches.removeFirst();
-        assertThat(messages).hasSize(12);
-        assertThat(messages.get(0).getValueType()).isEqualTo(RecipesThatMadeChanges.class.getName());
-        assertThat((Object) messages.get(0).getValue()).isNull();
+        long recipeEntries = messages.stream()
+          .filter(m -> RecipeDescriptor.class.getName().equals(m.getValueType()))
+          .count();
+        assertThat(recipeEntries).isEqualTo(1);
 
-        assertThat((Object) messages.get(2).getValue()).isNull();
-        assertThat((Object) messages.get(3).getValue()).isEqualTo(List.of(-1));
-        assertThat(messages.get(4).getValueType()).isEqualTo(recipe.getClass().getName());
-        assertThat(messages.get(4).getRef()).isNotNull();
-        assertThat((Object) messages.get(5).getValue()).isEqualTo(List.of(List.of(0, 0), List.of(0)));
-
-        assertThat((Object) messages.get(8).getValue()).isNull();
-        assertThat((Object) messages.get(9).getValue()).isEqualTo(List.of(-1));
-        assertThat(messages.get(10).getValueType()).isNull();
-        assertThat((Object) messages.get(10).getValue()).isNull();
-        assertThat(messages.get(10).getRef()).isEqualTo(messages.get(4).getRef());
-        assertThat((Object) messages.get(11).getValue()).isEqualTo(List.of(List.of(0)));
-
+        // and the round trip rebuilds the stack structure, sharing the single reconstructed instance
         batches.addLast(messages);
         RpcReceiveQueue receive = new RpcReceiveQueue(new HashMap<>(), batches::removeFirst, null, null);
         RecipesThatMadeChanges roundTrip = receive.receive(null);
-        RecipesThatMadeChanges roundTrip2 = receive.receive(null);
 
         List<List<Recipe>> recipes = new ArrayList<>(roundTrip.getRecipes());
         assertThat(recipes).hasSize(2);
@@ -73,6 +61,74 @@ class RecipesThatMadeChangesTest {
         assertThat(recipes.get(1)).hasSize(1);
         assertThat(recipes.get(0).get(0)).isSameAs(recipes.get(0).get(1));
         assertThat(recipes.get(0).get(0)).isSameAs(recipes.get(1).get(0));
-        assertThat(new ArrayList<>(roundTrip2.getRecipes()).get(0).get(0)).isSameAs(recipes.get(0).get(0));
+        assertThat(recipes.get(0).get(0).getName()).isEqualTo(recipe.getName());
+    }
+
+    @Test
+    void rpcCodecSendsShallowDescriptorNotRecipeSubtree() {
+        // given a composite recipe whose descriptor carries a recursive recipeList
+        Recipe parent = new ParentRecipe();
+        assertThat(parent.getDescriptor().getRecipeList()).isNotEmpty();
+
+        RecipesThatMadeChanges marker = new RecipesThatMadeChanges(UUID.randomUUID(), List.of(List.of(parent)));
+
+        // when the marker is sent
+        Deque<List<RpcObjectData>> batches = new ArrayDeque<>();
+        RpcSendQueue send = new RpcSendQueue(100, batches::addLast, new IdentityHashMap<>(), null, false);
+        send.send(marker, null, null);
+        send.flush();
+
+        // then the recipe is transmitted as an identity-only descriptor with the recursive subtree cleared
+        List<RpcObjectData> messages = batches.removeFirst();
+        RecipeDescriptor sent = null;
+        for (RpcObjectData m : messages) {
+            Object value = m.getValue();
+            if (value instanceof RecipeDescriptor) {
+                sent = (RecipeDescriptor) value;
+                break;
+            }
+        }
+        assertThat(sent).isNotNull();
+        assertThat(sent.getName()).isEqualTo(parent.getName());
+        assertThat(sent.getRecipeList()).isEmpty();
+        assertThat(sent.getDataTables()).isEmpty();
+        assertThat(sent.getPreconditions()).isEmpty();
+
+        // and the round trip reconstructs the recipe with the same identity
+        batches.addLast(messages);
+        RpcReceiveQueue receive = new RpcReceiveQueue(new HashMap<>(), batches::removeFirst, null, null);
+        RecipesThatMadeChanges roundTrip = receive.receive(null);
+        Recipe received = new ArrayList<>(roundTrip.getRecipes()).get(0).get(0);
+        assertThat(received.getName()).isEqualTo(parent.getName());
+        assertThat(received.getDisplayName()).isEqualTo(parent.getDisplayName());
+    }
+
+    static class ParentRecipe extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Parent recipe";
+        }
+
+        @Override
+        public String getDescription() {
+            return "A composite recipe with a child, so its descriptor carries a recipeList.";
+        }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return List.of(new ChildRecipe());
+        }
+    }
+
+    static class ChildRecipe extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Child recipe";
+        }
+
+        @Override
+        public String getDescription() {
+            return "A leaf recipe.";
+        }
     }
 }

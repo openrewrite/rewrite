@@ -15,6 +15,8 @@
  */
 package org.openrewrite.marker;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
@@ -96,13 +98,29 @@ public class RecipesThatMadeChanges implements Marker, RpcCodec<RecipesThatMadeC
                         id = wire.recipeTable.size();
                         wire.recipeIds.put(recipe, id);
                         wire.recipeTable.add(recipe instanceof SnapshotRecipe ?
-                                ((SnapshotRecipe) recipe).getWireValue() : recipe);
+                                ((SnapshotRecipe) recipe).getWireValue() : shallowDescriptor(recipe));
                     }
                     stackIds.add(id);
                 }
                 wire.stacks.add(stackIds);
             }
             return wire;
+        }
+
+        /**
+         * The marker only conveys which recipes made a change; the receiver reconstructs each as a
+         * {@link SnapshotRecipe} from its descriptor and never reads the recipe's sub-tree or
+         * visitors. Sending the full recipe drags along the recursive {@code recipeList}/{@code
+         * childResponses} and precondition-visitor state, which for a large composite recipe
+         * expands into hundreds of MB over RPC. Emitting an identity-only descriptor (the recursive
+         * and data-table fields cleared) is exactly what the receiver rebuilds, and the stack
+         * structure already encodes the recipe hierarchy.
+         */
+        private static RecipeDescriptor shallowDescriptor(Recipe recipe) {
+            return recipe.getDescriptor()
+                    .withRecipeList(emptyList())
+                    .withPreconditions(emptyList())
+                    .withDataTables(emptyList());
         }
     }
 
@@ -161,6 +179,9 @@ public class RecipesThatMadeChanges implements Marker, RpcCodec<RecipesThatMadeC
             return descriptor;
         }
 
+        private static final ObjectMapper DESCRIPTOR_MAPPER =
+                ObjectMappers.propertyBasedMapper(null).copy().registerModule(new JavaTimeModule());
+
         private static RecipeDescriptor descriptorFrom(Object wireValue) {
             Object descriptorValue = wireValue;
             if (wireValue instanceof Map) {
@@ -169,7 +190,10 @@ public class RecipesThatMadeChanges implements Marker, RpcCodec<RecipesThatMadeC
                     descriptorValue = nestedDescriptor;
                 }
             }
-            return ObjectMappers.propertyBasedMapper(null).convertValue(descriptorValue, RecipeDescriptor.class);
+            if (descriptorValue instanceof RecipeDescriptor) {
+                return (RecipeDescriptor) descriptorValue;
+            }
+            return DESCRIPTOR_MAPPER.convertValue(descriptorValue, RecipeDescriptor.class);
         }
     }
 }
