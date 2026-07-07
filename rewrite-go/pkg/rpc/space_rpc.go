@@ -40,6 +40,74 @@ func emptyAsNil(s string) any {
 	return s
 }
 
+func recipesThatMadeChangesWire(m java.RecipesThatMadeChanges) ([]any, []any) {
+	recipeTable := make([]any, 0)
+	stacks := make([]any, 0, len(m.Recipes))
+	recipeIds := make(map[uintptr]int)
+	wrapped := make(map[uintptr]*opaqueRpcPayload)
+
+	for _, stack := range m.Recipes {
+		stackIds := make([]any, 0, len(stack))
+		for _, recipe := range stack {
+			payload := recipeWirePayload(recipe, wrapped)
+			key := ptrKey(payload)
+			idx, ok := recipeIds[key]
+			if !ok {
+				idx = len(recipeTable)
+				recipeIds[key] = idx
+				recipeTable = append(recipeTable, payload)
+			}
+			stackIds = append(stackIds, idx)
+		}
+		stacks = append(stacks, stackIds)
+	}
+
+	return recipeTable, stacks
+}
+
+func recipeWirePayload(recipe any, wrapped map[uintptr]*opaqueRpcPayload) *opaqueRpcPayload {
+	if payload, ok := recipe.(*opaqueRpcPayload); ok {
+		return payload
+	}
+
+	if key := ptrKey(recipe); key != 0 {
+		if payload, ok := wrapped[key]; ok {
+			return payload
+		}
+		payload := &opaqueRpcPayload{Value: recipe}
+		wrapped[key] = payload
+		return payload
+	}
+
+	return &opaqueRpcPayload{Value: recipe}
+}
+
+func toIntStacks(v any) [][]int {
+	if v == nil {
+		return nil
+	}
+	rawStacks, ok := v.([]any)
+	if !ok {
+		if typed, ok := v.([][]int); ok {
+			return typed
+		}
+		return nil
+	}
+	stacks := make([][]int, len(rawStacks))
+	for i, rawStack := range rawStacks {
+		switch stack := rawStack.(type) {
+		case []any:
+			stacks[i] = make([]int, len(stack))
+			for j, rawIdx := range stack {
+				stacks[i][j] = toInt(rawIdx)
+			}
+		case []int:
+			stacks[i] = stack
+		}
+	}
+	return stacks
+}
+
 // Matches JavaSender.visitSpace field order: comments (list), whitespace.
 func sendSpace(s java.Space, q *SendQueue) {
 	q.GetAndSendList(s,
@@ -136,6 +204,7 @@ func hasGenericMarkerCodec(javaType string) bool {
 	switch javaType {
 	case "org.openrewrite.Checksum",
 		"org.openrewrite.FileAttributes",
+		"org.openrewrite.marker.RecipesThatMadeChanges",
 		"org.openrewrite.marker.Markup$Error",
 		"org.openrewrite.marker.Markup$Warn",
 		"org.openrewrite.marker.Markup$Info",
@@ -165,6 +234,19 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		// SearchResult.rpcSend sends: id (UUID string), description (nullable string)
 		q.GetAndSend(m, func(x any) any { return x.(java.SearchResult).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(java.SearchResult).Description }, nil)
+	case java.RecipesThatMadeChanges:
+		q.GetAndSend(m, func(x any) any { return x.(java.RecipesThatMadeChanges).Ident.String() }, nil)
+		q.GetAndSendListAsRef(m,
+			func(x any) []any {
+				table, _ := recipesThatMadeChangesWire(x.(java.RecipesThatMadeChanges))
+				return table
+			},
+			func(x any) any { return x },
+			nil)
+		q.GetAndSend(m, func(x any) any {
+			_, stacks := recipesThatMadeChangesWire(x.(java.RecipesThatMadeChanges))
+			return stacks
+		}, nil)
 	case golang.GroupedImport:
 		// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
 		q.GetAndSend(m, func(x any) any { return x.(golang.GroupedImport).Ident.String() }, nil)
@@ -336,6 +418,25 @@ func receiveMarkersCodec(q *ReceiveQueue, before java.Markers) java.Markers {
 			desc := q.Receive(m.Description, nil)
 			if desc != nil {
 				m.Description = desc.(string)
+			}
+			return m
+		case java.RecipesThatMadeChanges:
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			beforeTable, beforeStacks := recipesThatMadeChangesWire(m)
+			table := q.ReceiveList(beforeTable, nil)
+			stacksAny := q.Receive(beforeStacks, nil)
+			stacks := toIntStacks(stacksAny)
+			m.Recipes = make([][]any, len(stacks))
+			for i, stack := range stacks {
+				m.Recipes[i] = make([]any, len(stack))
+				for j, recipeIdx := range stack {
+					m.Recipes[i][j] = table[recipeIdx]
+				}
 			}
 			return m
 		case golang.GroupedImport:

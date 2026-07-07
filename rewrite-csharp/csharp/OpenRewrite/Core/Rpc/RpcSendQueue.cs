@@ -61,6 +61,7 @@ public class RpcSendQueue
     /// </summary>
     private IRpcCodec? GetCodecFor(object val)
     {
+        if (val is OpaqueRpcPayload) return null;
         if (val is IRpcCodec selfCodec) return selfCodec;
         if (val is Marker) return null; // Markers without IRpcCodec are serialized as plain values
         if (_treeCodec != null && GetValueType(val) != null) return _treeCodec;
@@ -158,7 +159,7 @@ public class RpcSendQueue
             {
                 State = CHANGE,
                 ValueType = GetValueType(afterVal),
-                Value = onChange == null && afterCodec == null ? afterVal : null
+                Value = onChange == null && afterCodec == null ? InlineValue(afterVal) : null
             });
             DoChange(afterVal, beforeVal, onChange, afterCodec);
         }
@@ -259,7 +260,7 @@ public class RpcSendQueue
         {
             State = ADD,
             ValueType = GetValueType(afterVal),
-            Value = onChange == null && afterCodec == null ? afterVal : null,
+            Value = onChange == null && afterCodec == null ? InlineValue(afterVal) : null,
             Ref = refValue
         });
         DoChange(afterVal, null, onChange, afterCodec);
@@ -292,6 +293,7 @@ public class RpcSendQueue
     private static string? GetValueType(object? after)
     {
         if (after == null) return null;
+        if (after is OpaqueRpcPayload opaque) return opaque.JavaType;
 
         var type = after.GetType();
         if (type.IsPrimitive || type.IsArray ||
@@ -309,6 +311,9 @@ public class RpcSendQueue
 
         return ToJavaTypeName(type);
     }
+
+    private static object? InlineValue(object after) =>
+        after is OpaqueRpcPayload opaque ? opaque.Value : after;
 
     /// <summary>
     /// Maps a C# type to its equivalent Java type name for RPC protocol compatibility.
@@ -347,6 +352,7 @@ public class RpcSendQueue
             {
                 "Markers" => "org.openrewrite.marker.Markers",
                 "SearchResult" => "org.openrewrite.marker.SearchResult",
+                "RecipesThatMadeChanges" => "org.openrewrite.marker.RecipesThatMadeChanges",
                 "Markup" => "org.openrewrite.marker.Markup",
                 "Space" => "org.openrewrite.java.tree.Space",
                 "TextComment" => "org.openrewrite.java.tree.TextComment",

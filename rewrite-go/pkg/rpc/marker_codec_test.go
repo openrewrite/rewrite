@@ -137,3 +137,55 @@ func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
 		t.Errorf("ModulePath: want %q, got %q", "example.com/empty", got.ModulePath)
 	}
 }
+
+func TestRecipesThatMadeChangesMarkerRoundTripSharesRecipePayloads(t *testing.T) {
+	recipe := &opaqueRpcPayload{
+		JavaType: "org.openrewrite.rpc.RpcRecipe",
+		Value: map[string]any{
+			"descriptor": map[string]any{
+				"name":        "example.Recipe",
+				"displayName": "Example recipe",
+			},
+		},
+	}
+	firstID := uuid.MustParse("aaaaaaaa-1111-2222-3333-444444444444")
+	secondID := uuid.MustParse("bbbbbbbb-1111-2222-3333-444444444444")
+	first := java.RecipesThatMadeChanges{
+		Ident:   firstID,
+		Recipes: [][]any{{recipe, recipe}},
+	}
+	second := java.RecipesThatMadeChanges{
+		Ident:   secondID,
+		Recipes: [][]any{{recipe}},
+	}
+	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{first, second}}
+
+	after := roundTripMarkers(t, before)
+	if len(after.Entries) != 2 {
+		t.Fatalf("entries: want 2, got %d", len(after.Entries))
+	}
+
+	gotFirst, ok := after.Entries[0].(java.RecipesThatMadeChanges)
+	if !ok {
+		t.Fatalf("first entry is %T, want java.RecipesThatMadeChanges", after.Entries[0])
+	}
+	gotSecond, ok := after.Entries[1].(java.RecipesThatMadeChanges)
+	if !ok {
+		t.Fatalf("second entry is %T, want java.RecipesThatMadeChanges", after.Entries[1])
+	}
+	if gotFirst.Ident != firstID {
+		t.Errorf("first Ident: want %s, got %s", firstID, gotFirst.Ident)
+	}
+	if gotSecond.Ident != secondID {
+		t.Errorf("second Ident: want %s, got %s", secondID, gotSecond.Ident)
+	}
+	if len(gotFirst.Recipes) != 1 || len(gotFirst.Recipes[0]) != 2 || len(gotSecond.Recipes) != 1 || len(gotSecond.Recipes[0]) != 1 {
+		t.Fatalf("unexpected recipe stack shape: first=%#v second=%#v", gotFirst.Recipes, gotSecond.Recipes)
+	}
+	if gotFirst.Recipes[0][0] != gotFirst.Recipes[0][1] {
+		t.Fatalf("first marker did not preserve shared recipe payload identity")
+	}
+	if gotFirst.Recipes[0][0] != gotSecond.Recipes[0][0] {
+		t.Fatalf("recipe payload identity was not shared across markers")
+	}
+}

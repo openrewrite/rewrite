@@ -20,6 +20,7 @@ export const MarkersKind = {
     Markers: "org.openrewrite.marker.Markers",
     NamedStyles: "org.openrewrite.style.NamedStyles",
     SearchResult: "org.openrewrite.marker.SearchResult",
+    RecipesThatMadeChanges: "org.openrewrite.marker.RecipesThatMadeChanges",
     ParseExceptionResult: "org.openrewrite.ParseExceptionResult",
 
     // Markup markers for errors, warnings, info, and debug messages
@@ -134,6 +135,11 @@ export const emptyMarkers: Markers = asRef({
 export interface SearchResult extends Marker {
     readonly kind: typeof MarkersKind.SearchResult,
     readonly description?: string
+}
+
+export interface RecipesThatMadeChanges extends Marker {
+    readonly kind: typeof MarkersKind.RecipesThatMadeChanges,
+    readonly recipes: any[][]
 }
 
 export function foundSearchResult<T extends { markers: Markers }>(t: T, description?: string): T {

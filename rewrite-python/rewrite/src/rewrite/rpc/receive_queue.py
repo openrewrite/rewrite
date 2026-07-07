@@ -49,6 +49,14 @@ class RpcObjectData(NamedTuple):
     trace: Optional[str] = None
 
 
+class OpaqueRpcPayload:
+    __slots__ = ('value_type', 'value')
+
+    def __init__(self, value_type: str, value: Any):
+        self.value_type = value_type
+        self.value = value
+
+
 class RpcReceiveQueue:
     """Queue for receiving and deserializing RpcObjectData from Java.
 
@@ -196,6 +204,8 @@ class RpcReceiveQueue:
             codec = self._get_codec(before)
             if codec is not None:
                 after = codec(before, self)
+            elif isinstance(before, OpaqueRpcPayload) and message.value is not None:
+                after = OpaqueRpcPayload(before.value_type, message.value)
             elif message.value is not None:
                 if message.value_type:
                     after = {'kind': message.value_type, **message.value} if isinstance(message.value, dict) else message.value
@@ -320,8 +330,7 @@ class RpcReceiveQueue:
         if factory is not None:
             return factory()
 
-        # Fallback: return a dict with kind field
-        return {'kind': value_type}
+        return OpaqueRpcPayload(value_type, None)
 
     def _get_codec(self, obj: Any) -> Optional[Callable[[Any, 'RpcReceiveQueue'], Any]]:
         """Get the deserializer codec for an object.
@@ -534,5 +543,4 @@ def make_dataclass_factory(cls):
         return factory
     else:
         return lambda: object.__new__(cls)
-
 

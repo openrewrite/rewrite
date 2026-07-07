@@ -91,6 +91,7 @@ __all__ = [
     'Marker',
     'Markers',
     'SearchResult',
+    'RecipesThatMadeChanges',
     'Markup',
     'MarkupWarn',
     'MarkupError',

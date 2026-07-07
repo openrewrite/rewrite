@@ -94,6 +94,10 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 					before = gm
 				}
 			}
+			if op, ok := before.(*opaqueRpcPayload); ok {
+				op.Value = msg.Value
+				before = op
+			}
 		}
 		if ref != nil {
 			// Store before deserialization to handle cycles
@@ -278,5 +282,5 @@ func newObj(javaClassName string) any {
 	if strings.Contains(javaClassName, "marker") || strings.Contains(javaClassName, "Marker") {
 		return java.GenericMarker{JavaType: javaClassName}
 	}
-	panic(fmt.Sprintf("no factory registered for type: %s", javaClassName))
+	return &opaqueRpcPayload{JavaType: javaClassName}
 }
