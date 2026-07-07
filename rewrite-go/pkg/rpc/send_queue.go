@@ -197,7 +197,13 @@ func (q *SendQueue) add(after any, onChange func(any)) {
 	vt := getValueType(afterVal)
 	var val any
 	skipDoChange := false
-	if gm, ok := afterVal.(java.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
+	if op, ok := afterVal.(*opaqueRpcPayload); ok {
+		if op.JavaType != "" {
+			vt = &op.JavaType
+		}
+		val = op.Value
+		skipDoChange = true
+	} else if gm, ok := afterVal.(java.GenericMarker); ok && !hasGenericMarkerCodec(gm.JavaType) {
 		// No RpcCodec on either side for this marker — inline the marker's
 		// data as the ADD message's Value so the receiver can reconstruct
 		// the typed instance. Skip sub-field dispatch, which would otherwise
@@ -305,6 +311,9 @@ func getValueType(v any) *string {
 	// GenericMarker carries the original Java class name
 	if gm, ok := v.(java.GenericMarker); ok && gm.JavaType != "" {
 		return &gm.JavaType
+	}
+	if op, ok := v.(*opaqueRpcPayload); ok && op.JavaType != "" {
+		return &op.JavaType
 	}
 	// Check padding types (Go generics have no reflect.Name())
 	return getValueTypeForPadding(v)

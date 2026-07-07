@@ -147,6 +147,16 @@ class SearchResult(Marker):
         return tree.replace(_markers=new_markers)
 
 
+@dataclass(frozen=True, eq=False, slots=True)
+class RecipesThatMadeChanges(Marker):
+    _id: UUID
+    _recipes: List[List[Any]]
+
+    @property
+    def recipes(self) -> List[List[Any]]:
+        return self._recipes
+
+
 class Markup(Marker, ABC):
     """
     Base class for markup markers that provide visual indicators (warnings, errors, info, debug).

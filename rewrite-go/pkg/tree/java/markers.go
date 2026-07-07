@@ -46,6 +46,15 @@ type SearchResultMarker struct {
 
 func (m SearchResultMarker) ID() uuid.UUID { return m.Ident }
 
+// RecipesThatMadeChanges records recipe stacks that changed a source file.
+// Recipe payloads are intentionally opaque to Go and preserved for RPC round-trips.
+type RecipesThatMadeChanges struct {
+	Ident   uuid.UUID
+	Recipes [][]any
+}
+
+func (m RecipesThatMadeChanges) ID() uuid.UUID { return m.Ident }
+
 func FindMarker[T any](markers Markers) *T {
 	for _, m := range markers.Entries {
 		if t, ok := m.(T); ok {

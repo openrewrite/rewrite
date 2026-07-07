@@ -268,9 +268,12 @@ class RpcSendQueue:
         # Import python_receiver to ensure codecs are registered before get_java_type_name
         from rewrite.rpc import python_receiver  # noqa: F401 - triggers codec registration
         from rewrite.rpc.receive_queue import get_java_type_name
+        from rewrite.rpc.receive_queue import OpaqueRpcPayload
 
         if obj is None:
             return None
+        if isinstance(obj, OpaqueRpcPayload):
+            return obj.value_type
 
         obj_type = type(obj)
 
@@ -316,8 +319,11 @@ class RpcSendQueue:
     def _get_primitive_value(self, obj: Any) -> Any:
         """Get the primitive value representation for serialization."""
         import math
+        from rewrite.rpc.receive_queue import OpaqueRpcPayload
         if obj is None:
             return None
+        if isinstance(obj, OpaqueRpcPayload):
+            return obj.value
         if isinstance(obj, bool):
             return obj
         if isinstance(obj, int):

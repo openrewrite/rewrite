@@ -118,6 +118,7 @@ func init() {
 	RegisterValueType(reflect.TypeOf(golang.TrailingComma{}), "org.openrewrite.golang.marker.TrailingComma")
 	RegisterValueType(reflect.TypeOf(java.SearchResult{}), "org.openrewrite.marker.SearchResult")
 	RegisterValueType(reflect.TypeOf(java.ParseExceptionResult{}), "org.openrewrite.ParseExceptionResult")
+	RegisterValueType(reflect.TypeOf(java.RecipesThatMadeChanges{}), "org.openrewrite.marker.RecipesThatMadeChanges")
 	RegisterValueType(reflect.TypeOf(golang.Semicolon{}), "org.openrewrite.java.marker.Semicolon")
 	RegisterValueType(reflect.TypeOf(golang.GoProject{}), "org.openrewrite.golang.marker.GoProject")
 	RegisterValueType(reflect.TypeOf(golang.GoResolutionResult{}), "org.openrewrite.golang.marker.GoResolutionResult")
@@ -226,8 +227,9 @@ func init() {
 	RegisterFactory("org.openrewrite.FileAttributes", func() any { return java.GenericMarker{JavaType: "org.openrewrite.FileAttributes"} })
 
 	// Java-side markers that may appear when recipes modify trees or during LST writing.
+	// RecipesThatMadeChanges implements RpcCodec and interns repeated recipe payloads.
+	RegisterFactory("org.openrewrite.marker.RecipesThatMadeChanges", func() any { return java.RecipesThatMadeChanges{} })
 	// These markers do NOT implement RpcCodec and are serialized as raw values.
-	RegisterFactory("org.openrewrite.marker.RecipesThatMadeChanges", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.RecipesThatMadeChanges"} })
 	RegisterFactory("org.openrewrite.marker.LstProvenance", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.LstProvenance"} })
 	RegisterFactory("org.openrewrite.marker.BuildMetadata", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.BuildMetadata"} })
 	RegisterFactory("org.openrewrite.marker.GitTreeEntry", func() any { return java.GenericMarker{JavaType: "org.openrewrite.marker.GitTreeEntry"} })

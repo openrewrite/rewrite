@@ -395,7 +395,12 @@ public class RpcReceiveQueue
     /// </summary>
     internal static T DeserializeInline<T>(string javaTypeName, object value)
     {
-        var type = FromJavaTypeName(javaTypeName) ?? typeof(T);
+        var type = FromJavaTypeName(javaTypeName);
+        if (type == null && typeof(T) == typeof(object))
+        {
+            return (T)(object)new OpaqueRpcPayload(javaTypeName, value);
+        }
+        type ??= typeof(T);
 
         // Enum types: parse the string value directly
         if (type.IsEnum)
