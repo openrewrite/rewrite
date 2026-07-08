@@ -18,6 +18,7 @@ package org.openrewrite.maven.internal.engine;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.Model;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.io.DefaultModelReader;
+import org.openrewrite.maven.engine.shaded.org.apache.maven.model.io.DefaultModelWriter;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.io.ModelReader;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.model.resolution.WorkspaceModelResolver;
 import org.openrewrite.maven.engine.shaded.org.apache.maven.repository.internal.MavenWorkspaceReader;
@@ -29,6 +30,7 @@ import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedPom;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -197,15 +199,22 @@ public class ReactorWorkspace implements MavenWorkspaceReader, WorkspaceModelRes
         }
         byte[] bytes = pomXmlSource.apply(path);
         Model model = null;
-        if (bytes != null) {
-            try (InputStream in = new ByteArrayInputStream(bytes)) {
-                model = modelReader.read(in, Collections.emptyMap());
+        try {
+            if (bytes != null) {
+                try (InputStream in = new ByteArrayInputStream(bytes)) {
+                    model = modelReader.read(in, Collections.emptyMap());
+                }
                 // The model builder resolves a workspace parent as a FileModelSource(model.getPomFile()), so the
                 // printed bytes need a real file behind them; the model cache makes this once per epoch.
                 model.setPomFile(materialize(bytes));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
+            } else {
+                // Synthetic Pom.builder() graph (rewrite-gradle) with no backing XML: convert to a raw Model and back
+                // its pomFile with printed bytes so a workspace-parent read still gets a real FileModelSource.
+                model = new PomToModelConverter().convert(pom);
+                model.setPomFile(materialize(printModel(model)));
             }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
         // Cache the pristine model but hand out a clone: the model builder mutates the raw model it receives, which
         // would otherwise corrupt the cached copy and make a re-resolution fall through to the repository.
@@ -218,6 +227,12 @@ public class ReactorWorkspace implements MavenWorkspaceReader, WorkspaceModelRes
         file.deleteOnExit();
         Files.write(file.toPath(), bytes);
         return file;
+    }
+
+    private static byte[] printModel(Model model) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        new DefaultModelWriter().write(out, Collections.emptyMap(), model);
+        return out.toByteArray();
     }
 
     private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {

@@ -128,13 +128,17 @@ class ReactorWorkspaceTest {
     }
 
     @Test
-    void syntheticPomWithoutXmlBytesReturnsNullModel() {
-        // The seam slice B's PomToModelConverter fills: a project pom with no printed XML yields no model.
+    void syntheticPomWithoutXmlBytesResolvesThroughConverter() {
+        // The seam slice B's PomToModelConverter fills: a project pom with no printed XML is converted from the Pom.
         Path path = Paths.get("pom.xml");
         Pom app = pom("pom.xml", "com.example", "app", "1.0", emptyMap(), null);
         ReactorWorkspace workspace = new ReactorWorkspace(singletonMap(path, app), p -> null);
 
-        assertNull(workspace.resolveRawModel("com.example", "app", "1.0"));
+        Model model = workspace.resolveRawModel("com.example", "app", "1.0");
+        assertNotNull(model);
+        assertEquals("com.example", model.getGroupId());
+        assertEquals("app", model.getArtifactId());
+        assertEquals("1.0", model.getVersion());
     }
 
     @Test
