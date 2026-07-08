@@ -432,21 +432,6 @@ func GolangRaw(before string, after ...string) SourceSpec {
 	return spec
 }
 
-// Generated declares a source file the recipe under test is expected to
-// create in its ScanningRecipe.Generate phase. It carries no "before"
-// content — only the expected output keyed by its source path. RewriteRun
-// matches each generated tree to a Generated spec by source path, so a
-// scanning recipe that emits new files can be asserted alongside the files
-// it edits. Fails the test if the recipe generates a file with no matching
-// Generated spec, or a Generated spec matches nothing.
-//
-//	spec.RewriteRun(t,
-//	    test.GoProject("foo",
-//	        test.GoMod("module example.com/foo\ngo 1.22\n"),
-//	        test.Golang("package main\nfunc main(){}\n"),
-//	    ),
-//	    test.Generated("tools.go", "package main\n"),
-//	)
 func Generated(sourcePath, after string) SourceSpec {
 	a := TrimIndent(after)
 	return SourceSpec{
@@ -552,9 +537,6 @@ func (spec *RecipeSpec) WithMarkerPrinter(mp printer.MarkerPrinter) *RecipeSpec 
 	return spec
 }
 
-// parsedSource pairs a SourceSpec with the tree the harness parsed for it.
-// tree is nil for sources that have no LST yet (e.g. go.sum). result holds
-// the tree after recipe application; it defaults to tree.
 type parsedSource struct {
 	spec   SourceSpec
 	tree   java.Tree
@@ -566,19 +548,11 @@ type parsedSource struct {
 // configured) applies a recipe and checks the result. Accepts both bare
 // SourceSpec values and project wrappers like GoProject — they both
 // implement Sources.
-//
-// Recipe application runs in two passes so cross-file ScanningRecipes work:
-// every source is parsed first, then the recipe is applied over the whole
-// set. A ScanningRecipe is driven through its real
-// InitialValue -> Scanner -> Generate -> EditorWithData lifecycle (mirroring
-// cmd/rpc/main.go and the JavaScript run scheduler); a plain recipe keeps the
-// historical per-source Editor() application.
 func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 	t.Helper()
 
 	// Flatten any project wrappers into a flat list of SourceSpecs, with
-	// project markers already attached. Generated(...) specs describe files
-	// the recipe is expected to emit, not inputs — hold them aside.
+	// project markers already attached.
 	var flat []SourceSpec
 	var genSpecs []SourceSpec
 	for _, s := range sources {
@@ -603,10 +577,7 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 		parsedByIdx = parsePackageGroups(t, p, flat)
 	}
 
-	// Pass 1: parse every source and run its per-source validations and
-	// parse-print idempotence check. Recipe application is deferred to
-	// pass 2 so a ScanningRecipe can observe every source before editing
-	// any single file.
+	// Pass 1: parse every source.
 	parsed := make([]parsedSource, len(flat))
 	for i, src := range flat {
 		parsed[i].spec = src
@@ -614,12 +585,7 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 		case strings.HasSuffix(src.Path, ".go"):
 			parsed[i].tree = spec.parseGoSource(t, p, parsedByIdx, i, src)
 		case path.Base(src.Path) == "go.mod":
-			// go.mod parses into a lossless LST, so recipes can run
-			// against it.
 			parsed[i].tree = spec.parseGoMod(t, src)
-		default:
-			// Other non-Go sources (e.g. go.sum) have no LST yet and
-			// round-trip verbatim; tree stays nil.
 		}
 	}
 
@@ -647,9 +613,6 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...Sources) {
 	spec.compareGenerated(t, genSpecs, generated)
 }
 
-// parseGoSource parses one .go SourceSpec (reusing the shared package parse
-// when a project context supplied one), attaches project markers, runs the
-// whitespace/idempotence validations, and fires the AfterRecipe callback.
 func (spec *RecipeSpec) parseGoSource(t *testing.T, p *parser.GoParser, parsedByIdx map[int]*golang.CompilationUnit, i int, src SourceSpec) *golang.CompilationUnit {
 	t.Helper()
 
@@ -703,9 +666,6 @@ func (spec *RecipeSpec) parseGoSource(t *testing.T, p *parser.GoParser, parsedBy
 	return cu
 }
 
-// parseGoMod parses a go.mod source into its lossless LST, attaches project
-// markers, and checks parse-print idempotence. GoMod is a SourceFile that is
-// not a *golang.CompilationUnit, so it uses the go.mod-specific parser.
 func (spec *RecipeSpec) parseGoMod(t *testing.T, src SourceSpec) *golang.GoMod {
 	t.Helper()
 
@@ -730,15 +690,11 @@ func (spec *RecipeSpec) parseGoMod(t *testing.T, src SourceSpec) *golang.GoMod {
 	return gm
 }
 
-// compareSource prints a source's recipe result and asserts it against the
-// spec's expected after-state (or, when none is given, that nothing changed).
 func (spec *RecipeSpec) compareSource(t *testing.T, ps parsedSource) {
 	t.Helper()
 	src := ps.spec
 
 	if ps.tree == nil {
-		// Non-LST source (e.g. go.sum): round-trips verbatim; the harness
-		// can't apply recipes to it yet.
 		if src.After != nil && *src.After != src.Before {
 			t.Errorf("non-Go source %q: harness cannot apply recipes to it yet", src.Path)
 		}
@@ -773,10 +729,6 @@ func (spec *RecipeSpec) compareSource(t *testing.T, ps parsedSource) {
 	}
 }
 
-// compareGenerated matches each Generated(...) spec to a tree the recipe
-// emitted (by source path) and asserts its printed form. It flags both a
-// Generated spec that matched nothing and a generated tree with no spec, so
-// generation stays fully covered rather than silently ignored.
 func (spec *RecipeSpec) compareGenerated(t *testing.T, specs []SourceSpec, generated []java.Tree) {
 	t.Helper()
 	if len(specs) == 0 && len(generated) == 0 {
@@ -810,8 +762,6 @@ func (spec *RecipeSpec) compareGenerated(t *testing.T, specs []SourceSpec, gener
 	}
 }
 
-// markerPrinter returns the configured MarkerPrinter, defaulting to
-// DefaultMarkerPrinter so SearchResult/Markup markers render as /*~~>*/.
 func (spec *RecipeSpec) markerPrinter() printer.MarkerPrinter {
 	if spec.MarkerPrinter != nil {
 		return spec.MarkerPrinter
@@ -819,8 +769,6 @@ func (spec *RecipeSpec) markerPrinter() printer.MarkerPrinter {
 	return printer.DefaultMarkerPrinter
 }
 
-// printTree renders a recipe result, picking the go.mod printer for a GoMod
-// and the Go source printer for everything else.
 func printTree(t java.Tree, mp printer.MarkerPrinter) string {
 	if gm, ok := t.(*golang.GoMod); ok {
 		return printer.PrintGoModWithMarkers(gm, mp)
@@ -835,8 +783,6 @@ func generatedSourcePath(t java.Tree) string {
 	return ""
 }
 
-// recipeIsScanning reports whether r, or any recipe in its RecipeList,
-// implements ScanningRecipe.
 func recipeIsScanning(r recipe.Recipe) bool {
 	if _, ok := r.(recipe.ScanningRecipe); ok {
 		return true
@@ -849,12 +795,6 @@ func recipeIsScanning(r recipe.Recipe) bool {
 	return false
 }
 
-// runScanningLifecycle drives spec.Recipe (and any nested recipes) through
-// the real scan-then-edit lifecycle over the whole parsed source set,
-// sharing one ExecutionContext so accumulators live across phases — exactly
-// as the RPC server does. Existing sources are edited in place (results
-// written back onto parsed[i].result); Generate outputs are returned so the
-// caller can assert them against Generated(...) specs.
 func (spec *RecipeSpec) runScanningLifecycle(parsed []parsedSource) []java.Tree {
 	ctx := recipe.NewExecutionContext()
 
@@ -902,9 +842,6 @@ func (spec *RecipeSpec) runScanningLifecycle(parsed []parsedSource) []java.Tree 
 	return working[nExisting:]
 }
 
-// applyEditorAcross visits every tree with editor, draining after-visits per
-// tree, and writes results back in place. Mirrors runRecipe's single-file
-// editor handling: a nil visit result keeps the original tree.
 func applyEditorAcross(editor recipe.TreeVisitor, trees []java.Tree, ctx *recipe.ExecutionContext) {
 	for i, tr := range trees {
 		if tr == nil {

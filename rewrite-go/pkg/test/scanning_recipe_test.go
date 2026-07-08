@@ -31,17 +31,10 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
-// importAccumulator collects the distinct external (non-standard-library)
-// import paths seen across every .go file in the scan phase.
 type importAccumulator struct {
 	paths map[string]bool
 }
 
-// collectExternalImports is a cross-file ScanningRecipe: it scans every .go
-// source for external imports, then annotates the sibling go.mod with a
-// SearchResult naming them. It reads state from one set of files and writes
-// to another, so it only makes sense end-to-end — the exact shape the unit
-// harness previously could not drive.
 type collectExternalImports struct {
 	recipe.ScanningBase
 }
@@ -83,8 +76,6 @@ func (v *externalImportScanner) VisitCompilationUnit(cu *golang.CompilationUnit,
 	return cu
 }
 
-// importPath returns an Import's unquoted path (the parser stores the raw
-// quoted source, e.g. `"example.com/a"`, on the Qualid Literal).
 func importPath(imp *java.Import) string {
 	if imp == nil {
 		return ""
@@ -114,9 +105,6 @@ func (v *goModAnnotator) VisitGoMod(gm *golang.GoMod, p any) java.Tree {
 	return gm.WithMarkers(java.AddMarker(gm.Markers, java.SearchResult{Ident: uuid.New(), Description: desc}))
 }
 
-// isExternalImport reports whether path looks like a third-party module
-// import (first segment contains a dot, e.g. "example.com/x") rather than a
-// standard-library package (e.g. "fmt", "net/http").
 func isExternalImport(path string) bool {
 	if path == "" {
 		return false
@@ -128,10 +116,6 @@ func isExternalImport(path string) bool {
 	return strings.Contains(first, ".")
 }
 
-// TestScanningRecipeAnnotatesGoModFromSources is the harness's first
-// ScanningRecipe coverage. It fails as a no-op (go.mod unchanged) unless
-// RewriteRun drives InitialValue -> Scanner over every .go file ->
-// EditorWithData over go.mod.
 func TestScanningRecipeAnnotatesGoModFromSources(t *testing.T) {
 	// given a project whose .go files import two external modules
 	spec := NewRecipeSpec().WithRecipe(&collectExternalImports{})
@@ -184,9 +168,6 @@ func TestScanningRecipeAnnotatesGoModFromSources(t *testing.T) {
 	)
 }
 
-// generateBuildTag is a ScanningRecipe that only generates a new file
-// (its Editor/EditorWithData are no-ops) — exercising the Generate phase and
-// the Generated(...) assertion.
 type generateBuildTag struct {
 	recipe.ScanningBase
 }
@@ -216,8 +197,6 @@ func (r *generateBuildTag) Generate(acc any, _ *recipe.ExecutionContext) []java.
 	return []java.Tree{cu}
 }
 
-// TestScanningRecipeGeneratesFile confirms Generate outputs are driven by the
-// harness and matched against Generated(...) specs by source path.
 func TestScanningRecipeGeneratesFile(t *testing.T) {
 	// given a project that imports an external module
 	spec := NewRecipeSpec().WithRecipe(&generateBuildTag{})
@@ -245,8 +224,6 @@ func TestScanningRecipeGeneratesFile(t *testing.T) {
 	)
 }
 
-// TestScanningRecipeNoMatchesLeavesGoModUnchanged confirms the lifecycle is
-// a faithful no-op when the scan finds nothing to act on.
 func TestScanningRecipeNoMatchesLeavesGoModUnchanged(t *testing.T) {
 	// given .go files that import only the standard library
 	spec := NewRecipeSpec().WithRecipe(&collectExternalImports{})
