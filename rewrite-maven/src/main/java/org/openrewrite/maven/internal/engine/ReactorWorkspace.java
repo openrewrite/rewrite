@@ -33,6 +33,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -89,6 +90,11 @@ public class ReactorWorkspace implements MavenWorkspaceReader, WorkspaceModelRes
     /** The current reactor epoch; incorporated into the workspace identity so GAV-keyed caches can key on it. */
     public int epoch() {
         return epoch;
+    }
+
+    /** Whether this GAV resolves to a reactor pom (three-tier match); the model cache keys such GAVs on {@link #epoch()}. */
+    public boolean isReactorMember(@Nullable String groupId, @Nullable String artifactId, @Nullable String version) {
+        return match(groupId, artifactId, version) != null;
     }
 
     /** Increment the epoch (on marker replacement) and drop cached models so re-resolution re-reads printed bytes. */
@@ -186,19 +192,32 @@ public class ReactorWorkspace implements MavenWorkspaceReader, WorkspaceModelRes
             return null;
         }
         if (modelCache.containsKey(path)) {
-            return modelCache.get(path);
+            Model cached = modelCache.get(path);
+            return cached == null ? null : cached.clone();
         }
         byte[] bytes = pomXmlSource.apply(path);
         Model model = null;
         if (bytes != null) {
             try (InputStream in = new ByteArrayInputStream(bytes)) {
                 model = modelReader.read(in, Collections.emptyMap());
+                // The model builder resolves a workspace parent as a FileModelSource(model.getPomFile()), so the
+                // printed bytes need a real file behind them; the model cache makes this once per epoch.
+                model.setPomFile(materialize(bytes));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
         }
+        // Cache the pristine model but hand out a clone: the model builder mutates the raw model it receives, which
+        // would otherwise corrupt the cached copy and make a re-resolution fall through to the repository.
         modelCache.put(path, model);
-        return model;
+        return model == null ? null : model.clone();
+    }
+
+    private static File materialize(byte[] bytes) throws IOException {
+        File file = Files.createTempFile("rewrite-reactor-", ".pom.xml").toFile();
+        file.deleteOnExit();
+        Files.write(file.toPath(), bytes);
+        return file;
     }
 
     private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {
