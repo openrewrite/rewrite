@@ -204,7 +204,7 @@ public class MavenResolutionResult implements Marker {
             }
         }
         if (exceptions != null) {
-            throw exceptions;
+            throw exceptions.setPartialResult(withDependencies(dependencies));
         }
         return withDependencies(dependencies);
     }

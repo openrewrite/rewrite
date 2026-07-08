@@ -122,15 +122,20 @@ public class MavenParser implements Parser {
                 }
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
             } catch (MavenDownloadingExceptions e) {
+                Xml.Document doc = docToPom.getKey();
+                if (e.getPartialResult() != null) {
+                    // Keep the complete model with every resolvable scope populated; the failure is surfaced below
+                    doc = doc.withMarkers(doc.getMarkers().compute(e.getPartialResult(), (old, n) -> n));
+                }
                 if (e.getExceptions().size() == 1) {
                     // If there is only a single MavenDownloadingException, report just that as no additional debugging value is gleaned from its wrapper
                     MavenDownloadingException e2 = e.getExceptions().get(0);
-                    String message = e2.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
-                    parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e2, message))));
+                    String message = e2.warn(doc).printAll(); // Shows any underlying MavenDownloadingException
+                    parsed.add(doc.withMarkers(doc.getMarkers().add(ParseExceptionResult.build(this, e2, message))));
                     ctx.getOnError().accept(e2);
                 } else {
-                    String message = e.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
-                    parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e, message))));
+                    String message = e.warn(doc).printAll(); // Shows any underlying MavenDownloadingException
+                    parsed.add(doc.withMarkers(doc.getMarkers().add(ParseExceptionResult.build(this, e, message))));
                     ctx.getOnError().accept(e);
                 }
             } catch (MavenDownloadingException e) {
